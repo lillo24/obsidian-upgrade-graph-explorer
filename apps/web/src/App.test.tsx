@@ -8,7 +8,7 @@ describe('foundation status page', () => {
     const markup = renderToStaticMarkup(<App />);
 
     expect(markup).toContain('Icarus Graph Explorer');
-    expect(markup).toContain('Foundation ready');
+    expect(markup).toContain('Canonical model v1 ready');
     expect(markup).toContain('graph rendering are deliberately deferred');
   });
 });

@@ -1,4 +1,4 @@
-import { foundationIdentity } from '@icarus-graph-explorer/core';
+import { KNOWLEDGE_SNAPSHOT_SCHEMA_VERSION } from '@icarus-graph-explorer/core';
 
 import './App.css';
 
@@ -12,12 +12,12 @@ export function App() {
         <section className="foundation-card" aria-labelledby="product-title">
           <p className="eyebrow">Repository foundation</p>
           <h1 id="product-title" translate="no">
-            {foundationIdentity.productName}
+            Icarus Graph Explorer
           </h1>
-          <p className="description">{foundationIdentity.description}</p>
+          <p className="description">Hierarchical Markdown graph explorer</p>
           <p className="status" role="status">
             <span className="status-dot" aria-hidden="true" />
-            {foundationIdentity.status}
+            Canonical model v{KNOWLEDGE_SNAPSHOT_SCHEMA_VERSION} ready
           </p>
           <p className="scope-note">
             Parser, vault access, and graph rendering are deliberately deferred.

@@ -1,17 +1,17 @@
-# Core Foundation
+# Core Domain
 
-Status: **DRAFT — package boundary only; KG1 domain contracts are undefined.**
+Status: **STABLE — canonical snapshot schema version 1 is fixture-backed.**
 
-This package is the innermost, framework-independent workspace boundary. KG0
-uses it only to prove package direction and consumption from the web app. KG1
-will design the serializable hierarchical-document domain and its fixture
-contracts.
+This package is the innermost, framework-independent workspace boundary. It
+owns the ordinary-data contracts for source-backed document structure and
+references, plus runtime validation for data crossing a JSON or worker
+boundary.
 
 ## Current boundary
 
-Core may own generic, serializable knowledge contracts. It must not know about
-React, React Flow, Sigma, Graphology runtime objects, Tauri, Obsidian application
-APIs, or the web package.
+Core owns generic, serializable knowledge contracts. It must not know about
+React, React Flow, Sigma, Graphology runtime objects, Tauri, Obsidian
+application APIs, parser libraries, or the web package.
 
 ESLint's `no-restricted-imports` configuration mechanically rejects those
 obvious dependency violations. Architectural rationale and the full dependency
@@ -21,17 +21,39 @@ direction live in `../../docs/ARCHITECTURE.md`.
 
 ```text
 packages/core/
-  package.json       Source export, package identity, and typecheck command.
-  tsconfig.json      Strict framework-independent TypeScript configuration.
+  package.json          Source export, package identity, and typecheck command.
+  tsconfig.json         Strict framework-independent TypeScript configuration.
   src/
-    index.ts         Temporary immutable KG0 product metadata export.
-    index.test.ts    Contract proving the export is stable and immutable.
+    index.ts            Intentional public model and validation exports.
+    index.test.ts       Public API and JSON round-trip contract.
+    model/
+      README.md         Detailed file map and canonical conventions.
+      ids.ts            Opaque serializable identity aliases.
+      source.ts         Workspace path, point, and span contracts.
+      entities.ts       Document/section/block hierarchy union.
+      references.ts     Provenance and resolution-state union.
+      snapshot.ts       Versioned canonical snapshot envelope.
+      validation.ts     Exact-shape and cross-record validation.
+      validation.test.ts Focused valid and invalid snapshot cases.
 ```
 
 The source export is intentional for this private workspace package: Vite
 consumes it through `@icarus-graph-explorer/core`, while both packages remain
-independently typechecked. `foundationIdentity` is scaffolding, not the
-canonical knowledge model.
+independently typechecked. Test-only builders stay private; consumers receive
+only canonical types, the schema version, structured validation results, and
+`validateKnowledgeSnapshot`.
+
+## Runtime boundary
+
+The validator accepts `unknown`, rejects unexpected or contradictory fields,
+and returns a typed snapshot only after structural and relational checks pass.
+It checks normalized source paths, point/span bounds, identity uniqueness,
+parent kinds and cycles, heading levels, source-path coherence, reference
+endpoints, and ambiguous candidate sets.
+
+Canonical snapshots remain arrays and plain objects. Runtime indexes, parser
+ASTs, source-provider handles, view state, and graph-library objects are not
+part of schema version 1.
 
 ## Local validation
 
@@ -39,14 +61,13 @@ Run focused or repository-wide checks from the repository root:
 
 ```bash
 pnpm --filter @icarus-graph-explorer/core typecheck
-pnpm exec vitest run packages/core/src/index.test.ts
+pnpm exec vitest run packages/core/src
 pnpm check
 ```
 
-## KG1 boundary
+## Deferred
 
-KG1 should introduce explicit, serializable contracts for documents, nested
-sections, optional addressable blocks, references, source spans, identities,
-and resolution outcomes. It must use synthetic fixtures and must not pull
-Markdown parsing, Obsidian syntax, renderer ownership, or platform APIs into
-core prematurely.
+KG2 may target these contracts with a generic Markdown structural parser.
+Obsidian syntax, target-resolution policy, stable identity generation,
+incremental deltas, projections, persistence, and platform access remain later
+milestones.
