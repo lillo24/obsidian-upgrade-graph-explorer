@@ -1,0 +1,12 @@
+* text=auto eol=lf
+
+# Preserve intentional Markdown hard breaks in copied third-party skills.
+.agents/skills/** whitespace=-trailing-space
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.woff binary
+*.woff2 binary

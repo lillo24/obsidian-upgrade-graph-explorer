@@ -1,0 +1,8 @@
+node_modules/
+dist/
+coverage/
+history-implementations/
+.agents/skills/
+.codex/skills/
+skills-lock.json
+pnpm-lock.yaml
