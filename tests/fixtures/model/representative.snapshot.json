@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "workspace": {
+    "id": "fixture-workspace"
+  },
+  "entities": [
+    {
+      "id": "document-a",
+      "kind": "document",
+      "source": {
+        "path": "notes/A.md",
+        "span": {
+          "start": { "line": 1, "column": 1, "offset": 0 },
+          "end": { "line": 12, "column": 1, "offset": 180 }
+        }
+      }
+    },
+    {
+      "id": "section-a-top",
+      "kind": "section",
+      "parentId": "document-a",
+      "title": "Top",
+      "level": 1,
+      "source": {
+        "path": "notes/A.md",
+        "span": {
+          "start": { "line": 3, "column": 1, "offset": 30 },
+          "end": { "line": 12, "column": 1, "offset": 180 }
+        }
+      }
+    },
+    {
+      "id": "section-a-details",
+      "kind": "section",
+      "parentId": "section-a-top",
+      "title": "Details",
+      "level": 2,
+      "source": {
+        "path": "notes/A.md",
+        "span": {
+          "start": { "line": 5, "column": 1, "offset": 60 },
+          "end": { "line": 10, "column": 1, "offset": 150 }
+        }
+      }
+    },
+    {
+      "id": "block-a-detail",
+      "kind": "block",
+      "parentId": "section-a-details",
+      "source": {
+        "path": "notes/A.md",
+        "span": {
+          "start": { "line": 7, "column": 1, "offset": 90 },
+          "end": { "line": 8, "column": 1, "offset": 110 }
+        }
+      }
+    },
+    {
+      "id": "document-b",
+      "kind": "document",
+      "source": {
+        "path": "notes/B.md",
+        "span": {
+          "start": { "line": 1, "column": 1, "offset": 0 },
+          "end": { "line": 8, "column": 1, "offset": 120 }
+        }
+      }
+    },
+    {
+      "id": "section-b-notes",
+      "kind": "section",
+      "parentId": "document-b",
+      "title": "Notes",
+      "level": 1,
+      "source": {
+        "path": "notes/B.md",
+        "span": {
+          "start": { "line": 2, "column": 1, "offset": 20 },
+          "end": { "line": 8, "column": 1, "offset": 120 }
+        }
+      }
+    },
+    {
+      "id": "section-b-details",
+      "kind": "section",
+      "parentId": "section-b-notes",
+      "title": "Details",
+      "level": 2,
+      "source": {
+        "path": "notes/B.md",
+        "span": {
+          "start": { "line": 4, "column": 1, "offset": 55 },
+          "end": { "line": 8, "column": 1, "offset": 120 }
+        }
+      }
+    }
+  ],
+  "references": [
+    {
+      "id": "reference-preamble",
+      "kind": "link",
+      "sourceEntityId": "document-a",
+      "rawTarget": "B",
+      "sourceSpan": {
+        "start": { "line": 1, "column": 1, "offset": 0 },
+        "end": { "line": 1, "column": 6, "offset": 5 }
+      },
+      "resolution": {
+        "status": "resolved",
+        "targetEntityId": "document-b"
+      }
+    },
+    {
+      "id": "reference-section",
+      "kind": "link",
+      "sourceEntityId": "section-a-details",
+      "rawTarget": "B#Details",
+      "sourceSpan": {
+        "start": { "line": 6, "column": 1, "offset": 70 },
+        "end": { "line": 6, "column": 14, "offset": 83 }
+      },
+      "resolution": {
+        "status": "resolved",
+        "targetEntityId": "section-b-details"
+      }
+    },
+    {
+      "id": "reference-unresolved",
+      "kind": "link",
+      "sourceEntityId": "section-a-top",
+      "rawTarget": "Missing",
+      "sourceSpan": {
+        "start": { "line": 4, "column": 1, "offset": 40 },
+        "end": { "line": 4, "column": 12, "offset": 51 }
+      },
+      "resolution": {
+        "status": "unresolved",
+        "reason": "No matching document"
+      }
+    },
+    {
+      "id": "reference-ambiguous",
+      "kind": "link",
+      "sourceEntityId": "section-b-notes",
+      "rawTarget": "Details",
+      "sourceSpan": {
+        "start": { "line": 3, "column": 1, "offset": 35 },
+        "end": { "line": 3, "column": 12, "offset": 46 }
+      },
+      "resolution": {
+        "status": "ambiguous",
+        "candidateEntityIds": ["section-a-details", "section-b-details"],
+        "reason": "Two sections share the requested title"
+      }
+    },
+    {
+      "id": "reference-invalid",
+      "kind": "link",
+      "sourceEntityId": "section-b-details",
+      "rawTarget": "[",
+      "sourceSpan": {
+        "start": { "line": 5, "column": 1, "offset": 70 },
+        "end": { "line": 5, "column": 2, "offset": 71 }
+      },
+      "resolution": {
+        "status": "invalid",
+        "reason": "Malformed reference syntax"
+      }
+    },
+    {
+      "id": "reference-block-embed",
+      "kind": "embed",
+      "sourceEntityId": "block-a-detail",
+      "rawTarget": "B",
+      "sourceSpan": {
+        "start": { "line": 7, "column": 1, "offset": 90 },
+        "end": { "line": 7, "column": 7, "offset": 96 }
+      },
+      "resolution": {
+        "status": "resolved",
+        "targetEntityId": "document-b"
+      }
+    }
+  ]
+}

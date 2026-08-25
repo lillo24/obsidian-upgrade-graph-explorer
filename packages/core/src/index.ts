@@ -1,9 +1,30 @@
-/**
- * Temporary product metadata used to prove the workspace boundary is wired.
- * Canonical knowledge-domain types are intentionally reserved for KG1.
- */
-export const foundationIdentity = Object.freeze({
-  productName: 'Icarus Graph Explorer',
-  description: 'Hierarchical Markdown graph explorer',
-  status: 'Foundation ready',
-} as const);
+export type {
+  AddressableEntity,
+  BlockEntity,
+  DocumentEntity,
+  EntityKind,
+  SectionEntity,
+} from './model/entities';
+export type { EntityId, ReferenceId, WorkspaceId } from './model/ids';
+export type {
+  Reference,
+  ReferenceKind,
+  ReferenceResolution,
+} from './model/references';
+export {
+  KNOWLEDGE_SNAPSHOT_SCHEMA_VERSION,
+  type KnowledgeSnapshot,
+  type WorkspaceDescriptor,
+} from './model/snapshot';
+export type {
+  SourceLocation,
+  SourcePoint,
+  SourceSpan,
+  WorkspacePath,
+} from './model/source';
+export {
+  validateKnowledgeSnapshot,
+  type SnapshotValidationIssue,
+  type SnapshotValidationIssueCode,
+  type SnapshotValidationResult,
+} from './model/validation';

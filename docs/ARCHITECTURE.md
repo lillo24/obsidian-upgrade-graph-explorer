@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 implements only a React/Vite shell and a framework-independent workspace package; parsing, source adapters, resolution, graph projections, renderers, persistence, and local filesystem access remain planned work.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and framework-independent workspace package. KG1 implements canonical snapshot schema version 1 and fixture conventions; parsing, source adapters, workspace resolution, graph projections, renderers, persistence, and local filesystem access remain planned work.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -17,7 +17,11 @@ Document
           └─ optional addressable Block
 ```
 
-References connect addressable entities and retain source locations. This project is not a universal arbitrary-data graph platform. KG1 will define the exact serializable contracts for documents, sections, optional blocks, references, spans, identities, and diagnostics.
+Schema version 1 stores addressable `Document`, `Section`, and `Block` entities in one array. Documents are roots; sections and blocks have one document/section parent. Section titles are content rather than identity, heading levels are 1–6, and skipped nested levels are valid. Opaque non-empty string IDs allow later identity infrastructure without making paths or titles permanent identity.
+
+Every entity retains a normalized workspace-relative source path and a half-open source span. Paths use forward slashes with no leading slash, drive prefix, empty component, `.` component, or `..` traversal. Lines and columns are 1-based. Optional offsets are 0-based JavaScript UTF-16 code-unit indexes and appear on both span endpoints or neither.
+
+References retain their source entity, exact syntax span, raw target, and `link`/`embed` kind separately from a discriminated `resolved`, `unresolved`, `ambiguous`, or `invalid` result. A document may own a preamble reference; sections and blocks may provide more precise ownership. This project is not a universal arbitrary-data graph platform.
 
 Core terminology must remain source-neutral. `Document`, `Section`, `Reference`, `SourceSpan`, and `SourceProvider` are appropriate concepts; types such as `ObsidianFileNode` or `ObsidianWikilinkEdge` are not. Obsidian is an adapter for wikilinks, aliases, embeds, block references, frontmatter conventions, and Obsidian-specific target resolution. Plain Markdown and future adapters must be able to feed the same canonical boundary.
 
@@ -38,7 +42,7 @@ ViewStateStore
   → view projection / UI
 ```
 
-The canonical snapshot and delta formats must be plain, serializable data. They must not contain React elements, renderer objects, Graphology graphs, Tauri handles, or source-provider objects. This keeps worker transfer, deterministic tests, caching, and renderer replacement possible.
+The canonical snapshot is a versioned plain-data envelope containing workspace identity, entity arrays, and reference arrays. Future delta formats must follow the same serializable boundary. Neither may contain React elements, renderer objects, Graphology graphs, Tauri handles, parser ASTs, or source-provider objects. This keeps worker transfer, deterministic tests, caching, and renderer replacement possible.
 
 `packages/core` is currently the innermost workspace boundary. It must not import React, React DOM, React Flow, Sigma, Graphology, Tauri, Obsidian application APIs, or code from `apps/web`. ESLint mechanically rejects those obvious imports. Later packages should be created only when they contain real implementation, with dependency direction enforced at their narrowest stable boundary.
 
@@ -46,13 +50,13 @@ The canonical snapshot and delta formats must be plain, serializable data. They 
 
 Source-derived knowledge and application-owned visualization state are separate domains.
 
-Source truth will include document structure, source-backed metadata, references, source spans, and resolution results. View state will include hidden/collapsed state, selection, pins, manual positions, filters, viewport, saved views, and renderer preferences. A UI action such as hiding, moving, or pinning an entity must never mutate source truth. Early releases are read-only with respect to Markdown.
+Canonical source truth now includes document structure, references, source spans, and explicit resolution results. Later source-backed fields may be added only for concrete requirements. View state will include hidden/collapsed state, selection, pins, manual positions, filters, viewport, saved views, and renderer preferences. A UI action such as hiding, moving, or pinning an entity must never mutate source truth. Early releases are read-only with respect to Markdown.
 
 Renderers receive projections formed from canonical source truth plus view state. A file-level projection may aggregate several section-level references; it must not replace or degrade the canonical relationships. React Flow, Sigma, and Graphology must never own persisted or canonical truth.
 
 ## Resolution and diagnostics
 
-Accuracy is more important than plausible guesses. Resolver contracts must explicitly represent at least `resolved`, `unresolved`, `ambiguous`, and `invalid` outcomes and retain useful diagnostics/source spans. An adapter or resolver must not silently choose an arbitrary candidate. Synthetic tests should make uncertain behavior visible and reproducible.
+Accuracy is more important than plausible guesses. The reference contract explicitly represents `resolved`, `unresolved`, `ambiguous`, and `invalid` outcomes. Ambiguous results retain at least two distinct candidates and never select one silently; optional or required reason strings explain non-resolved states. Runtime validation rejects contradictory fields and missing endpoints. Future adapters and resolvers must preserve these semantics.
 
 ## Trust and privacy boundary
 
@@ -72,7 +76,7 @@ React and Vite implement the SPA shell; they are outer-layer delivery choices, n
 
 Tauri is deferred until the local-vault workflow milestone. It may provide desktop filesystem capabilities through a narrow source-provider boundary. Tauri commands, paths, events, and handles must not leak into generic core packages. Browser and future platform providers should remain viable.
 
-None of React Flow, Sigma, Graphology, or Tauri is installed in KG0.
+None of React Flow, Sigma, Graphology, or Tauri is installed through KG1.
 
 ## Performance principles
 
@@ -90,9 +94,9 @@ Rust, WASM, universal graph abstractions, and million-node optimization are not 
 
 ## Testing philosophy
 
-Vitest is the unit and contract test foundation. Domain work should favor deterministic, table-driven tests against small synthetic Markdown fixtures. Adapter tests must separate generic Markdown behavior from Obsidian-specific behavior. Snapshot/delta and projection tests should assert serializability and preservation of section-level precision.
+Vitest is the unit and contract test foundation. KG1 validates one representative synthetic JSON snapshot and uses focused test builders for malformed variants, including a stringify/parse/validate round trip. Future domain work should favor deterministic, table-driven tests against small synthetic Markdown fixtures. Adapter tests must separate generic Markdown behavior from Obsidian-specific behavior. Snapshot/delta and projection tests should assert serializability and preservation of section-level precision.
 
-Playwright may be introduced when end-to-end UI flows exist; it is intentionally absent in KG0. Real-vault validation remains local and diagnostic. Any regression committed to the repository must be synthetic and free of private theory content.
+Playwright may be introduced when end-to-end UI flows exist; it remains intentionally absent through KG1. Real-vault validation remains local and diagnostic. Any regression committed to the repository must be synthetic and free of private theory content.
 
 ## Changing these decisions
 

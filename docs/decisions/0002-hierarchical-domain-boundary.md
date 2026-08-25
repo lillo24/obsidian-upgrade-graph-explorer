@@ -12,4 +12,4 @@ Center the canonical domain on `Document → Section → nested Section → opti
 
 ## Consequences
 
-Collapsed projections may aggregate relationships, but canonical data must retain section-level precision. Plain Markdown and future source adapters can share contracts. KG1 must explicitly represent resolved, unresolved, ambiguous, and invalid outcomes rather than choosing arbitrary targets.
+Collapsed projections may aggregate relationships, but canonical data must retain section-level precision. Plain Markdown and future source adapters can share contracts. KG1 implements this decision in snapshot schema version 1 with opaque IDs, workspace-relative provenance, a single parent relation, and explicit resolved, unresolved, ambiguous, and invalid outcomes.
