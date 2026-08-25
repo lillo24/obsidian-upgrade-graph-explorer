@@ -22,7 +22,9 @@ jobs:
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 24
-          cache: pnpm
+
+      # Corepack exposes the packageManager-pinned pnpm only after Node setup.
+      # setup-node caching cannot resolve pnpm before this step has run.
 
       - name: Enable pinned pnpm
         run: corepack enable
