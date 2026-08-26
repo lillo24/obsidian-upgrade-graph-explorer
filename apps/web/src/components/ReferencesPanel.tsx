@@ -95,6 +95,7 @@ export const ReferencesPanel = memo(function ReferencesPanel({
   return (
     <section
       className="panel references-panel"
+      aria-busy={searchIsPending}
       aria-labelledby="references-title"
     >
       <div className="panel-heading">
