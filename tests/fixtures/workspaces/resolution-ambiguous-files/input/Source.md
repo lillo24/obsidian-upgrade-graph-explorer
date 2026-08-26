@@ -1,0 +1,7 @@
+[[Note]]
+[[folder-a/Note]]
+[[folder-a/Note.md]]
+[[Note#Alpha]]
+[[Alternate]]
+[[Target|Alternate]]
+[[Missing]]

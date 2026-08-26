@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, and KG3 implements the tested Obsidian frontmatter/link/block syntax adapter. Workspace resolution, canonical assembly, graph projections, renderers, persistence, and local filesystem access remain planned work.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, and KG4 resolves complete parsed workspaces into validated canonical snapshots. Diagnostic exploration, graph projections, renderers, persistence, and local filesystem access remain planned work.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -57,6 +57,12 @@ filesystem access, workspace matching, or canonical assembly. ESLint rejects
 UI, renderer, platform, runtime, application, and filesystem imports in its
 production source.
 
+`packages/resolver-obsidian` depends inward on adapter-obsidian and core. It
+owns Obsidian-specific whole-workspace matching and source-neutral canonical
+assembly. It accepts parsed values only; filesystem, Obsidian runtime, UI,
+renderer, platform, and graph-index imports are mechanically excluded from its
+production source.
+
 ## Markdown structural parsing
 
 KG2 returns a serializable parser intermediate representation without canonical
@@ -99,7 +105,50 @@ Explicit Obsidian block IDs retain exact marker spans. KG3 does not guess full
 block-content ownership. Duplicate or invalid markers and malformed or
 unsupported syntax remain visible through adapter diagnostics. Target matching,
 reference source ownership, canonical IDs, resolution states, and snapshot
-assembly belong to KG4.
+assembly are deliberately owned by the KG4 workspace resolver rather than the
+syntax adapter.
+
+## Workspace resolution and canonical assembly
+
+KG4 sorts parsed documents by normalized path, preserves KG2 section hierarchy,
+creates one marker-backed canonical block per valid explicit KG3 anchor, and
+creates one canonical reference per parsed source occurrence. Block source
+spans represent the exact explicit marker only, not a guessed Markdown block
+extent.
+
+Reference source ownership is geometric: the deepest section whose half-open
+full span contains the complete reference wins; otherwise the document owns the
+reference. Blocks do not own references until a future parser can establish
+reliable block content extents.
+
+Default canonical IDs are deterministic transient tuples of workspace, path,
+kind, and source offset. They stabilize one snapshot and repeated assembly but
+are not durable across source edits or renames. A small provider seam preserves
+KG9's ability to add durable identity later.
+
+Wikilinks match exact Markdown basenames and qualified paths, with `.md`
+equivalence. Explicit relative paths use the source folder. Folder-qualified
+targets prefer exact vault-relative, exact source-relative, then path-suffix
+evidence. Markdown links use source-relative path semantics and deliberate
+percent decoding. Workspace escape or malformed percent encoding is invalid;
+non-Markdown targets are unsupported by the Markdown-only inventory rather than
+reported as missing notes.
+
+Heading titles match exactly. Multiple heading components must match a
+contiguous structural chain. Heading or block evidence may narrow ambiguous
+file candidates only when one complete target remains; otherwise ambiguity is
+retained. Undocumented filename tie-breakers, fuzzy matching, case folding, and
+array-order selection are forbidden.
+
+YAML aliases are metadata for suggestions, display, search, and unlinked
+mentions—not persisted link-destination keys. Obsidian's alias authoring flow
+creates a real target plus display text such as `[[Target|Alias]]`; KG4 does not
+resolve `[[Alias]]` merely from frontmatter.
+
+Resolver and forwarded adapter diagnostics remain outside schema v1. A valid
+snapshot may contain unresolved, ambiguous, and invalid references. Duplicate
+document paths, incompatible source geometry, generated ID collisions, or
+runtime snapshot-validation failures are fatal and return no partial snapshot.
 
 ## Source truth and view state
 
@@ -131,7 +180,7 @@ React and Vite implement the SPA shell; they are outer-layer delivery choices, n
 
 Tauri is deferred until the local-vault workflow milestone. It may provide desktop filesystem capabilities through a narrow source-provider boundary. Tauri commands, paths, events, and handles must not leak into generic core packages. Browser and future platform providers should remain viable.
 
-None of React Flow, Sigma, Graphology, or Tauri is installed through KG2.
+None of React Flow, Sigma, Graphology, or Tauri is installed through KG4.
 
 ## Performance principles
 
@@ -149,9 +198,9 @@ Rust, WASM, universal graph abstractions, and million-node optimization are not 
 
 ## Testing philosophy
 
-Vitest is the unit and contract test foundation. KG1 validates canonical snapshots; KG2 combines focused parser cases with a synthetic workspace fixture and JSON round-trip coverage; KG3 adds separate Obsidian frontmatter, link, and block fixtures plus source-span and diagnostic coverage. Future domain work should favor deterministic, table-driven tests against small synthetic Markdown fixtures. Adapter tests keep generic Markdown behavior separate from Obsidian-specific behavior. Snapshot/delta and projection tests should assert serializability and preservation of section-level precision.
+Vitest is the unit and contract test foundation. KG1 validates canonical snapshots; KG2 combines focused parser cases with a synthetic workspace fixture and JSON round-trip coverage; KG3 adds separate Obsidian frontmatter, link, and block fixtures; KG4 adds independent multi-file resolution fixtures for ownership, ambiguity, hierarchy, blocks, paths, and unsupported attachments. Future domain work should favor deterministic, table-driven tests against small synthetic Markdown fixtures. Adapter tests keep generic Markdown behavior separate from Obsidian-specific behavior. Snapshot/delta and projection tests should assert serializability and preservation of section-level precision.
 
-Playwright may be introduced when end-to-end UI flows exist; it remains intentionally absent through KG3. Real-vault validation remains local and diagnostic. Any regression committed to the repository must be synthetic and free of private theory content.
+Playwright may be introduced when end-to-end UI flows exist; it remains intentionally absent through KG4. Real-vault validation remains local and diagnostic. Any regression committed to the repository must be synthetic and free of private theory content.
 
 ## Changing these decisions
 

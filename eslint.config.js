@@ -207,4 +207,74 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ['packages/resolver-obsidian/**/*.{ts,tsx}'],
+    ignores: ['packages/resolver-obsidian/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react',
+              message:
+                'Workspace resolvers must remain independent from React.',
+            },
+            {
+              name: 'react-dom',
+              message:
+                'Workspace resolvers must remain independent from React.',
+            },
+            {
+              name: 'reactflow',
+              message: 'Renderers cannot be resolver dependencies.',
+            },
+            {
+              name: 'sigma',
+              message: 'Renderers cannot be resolver dependencies.',
+            },
+            {
+              name: 'graphology',
+              message: 'Graph indexes cannot be resolver dependencies.',
+            },
+            {
+              name: 'obsidian',
+              message:
+                'The resolver consumes adapter IR, not the Obsidian application runtime.',
+            },
+            {
+              name: '@icarus-graph-explorer/web',
+              message: 'Resolvers cannot depend on the web application.',
+            },
+            {
+              name: 'node:fs',
+              message: 'The in-memory workspace resolver cannot read files.',
+            },
+            {
+              name: 'node:fs/promises',
+              message: 'The in-memory workspace resolver cannot read files.',
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                'react/*',
+                'react-dom/*',
+                '@xyflow/*',
+                '@tauri-apps/*',
+                '@react-sigma/*',
+                'sigma/*',
+                'graphology-*',
+                '@obsidian/*',
+                '@icarus-graph-explorer/web/*',
+                'node:fs/*',
+              ],
+              message:
+                'UI, renderer, platform, runtime, and filesystem imports are forbidden in the Obsidian resolver.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );
