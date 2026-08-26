@@ -277,4 +277,78 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ['packages/diagnostics-obsidian/**/*.{ts,tsx}'],
+    ignores: ['packages/diagnostics-obsidian/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react',
+              message:
+                'Diagnostic report logic must remain independent from React.',
+            },
+            {
+              name: 'react-dom',
+              message:
+                'Diagnostic report logic must remain independent from React.',
+            },
+            {
+              name: 'reactflow',
+              message: 'Renderers cannot be diagnostic-report dependencies.',
+            },
+            {
+              name: 'sigma',
+              message: 'Renderers cannot be diagnostic-report dependencies.',
+            },
+            {
+              name: 'graphology',
+              message:
+                'Graph indexes cannot be diagnostic-report dependencies.',
+            },
+            {
+              name: 'obsidian',
+              message:
+                'Diagnostics consume parsed data, not the Obsidian application runtime.',
+            },
+            {
+              name: '@icarus-graph-explorer/web',
+              message:
+                'Diagnostic report logic cannot depend on the web application.',
+            },
+            {
+              name: 'node:fs',
+              message:
+                'Filesystem acquisition belongs in the development runner.',
+            },
+            {
+              name: 'node:fs/promises',
+              message:
+                'Filesystem acquisition belongs in the development runner.',
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                'react/*',
+                'react-dom/*',
+                '@xyflow/*',
+                '@tauri-apps/*',
+                '@react-sigma/*',
+                'sigma/*',
+                'graphology-*',
+                '@obsidian/*',
+                '@icarus-graph-explorer/web/*',
+                'node:fs/*',
+              ],
+              message:
+                'UI, renderer, platform, runtime, application, and filesystem imports are forbidden in diagnostic report logic.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );

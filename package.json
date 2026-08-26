@@ -10,6 +10,8 @@
   "scripts": {
     "dev": "pnpm --filter @icarus-graph-explorer/web dev",
     "build": "pnpm --filter @icarus-graph-explorer/web build",
+    "diagnose:vault": "pnpm --filter @icarus-graph-explorer/vault-diagnostics diagnose",
+    "benchmark:pipeline": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark",
     "test": "vitest run",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "pnpm --recursive typecheck",
