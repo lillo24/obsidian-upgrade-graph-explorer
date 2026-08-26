@@ -1,6 +1,6 @@
-# Future workspace fixtures
+# Workspace fixtures
 
-KG2 and later parser/adapter work may add small cases using this convention:
+Parser and adapter work uses this convention:
 
 ```text
 workspaces/<case>/
@@ -8,13 +8,19 @@ workspaces/<case>/
   input/
     A.md             Synthetic workspace-relative source files.
     B.md
-  expected/          Optional, once a parser output contract actually exists.
+  expected/          Optional parser IR or later-stage contract output.
 ```
 
 Keep each case deterministic, platform-independent, and understandable by
 inspection. Preserve the input tree and use forward-slash relative paths in
-expected canonical data. Do not commit absolute machine paths, real vault
-content, fake parser output, or empty case directories.
+expected data. An expected file must name and conform to the stage-specific
+contract it represents; parser structure must not masquerade as a canonical
+snapshot. Do not commit absolute machine paths, real vault content, fake output,
+or empty case directories.
+
+`section-extents/` is the first KG2 CommonMark case. Its package test asserts
+parser intermediate structure directly because a separate golden JSON file
+would duplicate short, behavior-focused assertions.
 
 When a private workspace reveals a defect, reduce it to the smallest synthetic
 case and explain the generic behavior in that case's README.

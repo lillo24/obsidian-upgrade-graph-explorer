@@ -12,4 +12,4 @@ Keep canonical snapshots library-independent and serializable. Renderers consume
 
 ## Consequences
 
-KG0 and KG1 install none of these libraries. Projection code must preserve canonical precision even when aggregating nodes or edges. Renderer selection remains replaceable and measurable rather than becoming a domain constraint.
+KG0 through KG2 install none of these libraries. Projection code must preserve canonical precision even when aggregating nodes or edges. Renderer selection remains replaceable and measurable rather than becoming a domain constraint.

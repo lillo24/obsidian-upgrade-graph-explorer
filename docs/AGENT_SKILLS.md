@@ -7,4 +7,4 @@ The repository approves two third-party skills from [`vercel-labs/agent-skills`]
 
 They are installed at project scope by the Agent Skills CLI. The committed copies live under `.agents/skills/vercel-react-best-practices/` and `.agents/skills/web-design-guidelines/`; source hashes are recorded in `skills-lock.json`. `npx skills list` reports both as project-scoped and discoverable by Codex. Do not edit third-party skill content locally. Review upstream changes before running `npx skills update --project`.
 
-Deployment, Tauri, React Flow, Sigma/Graphology, Playwright/browser automation, backend, database, and cloud skills remain deliberately uninstalled through KG1.
+Deployment, Tauri, React Flow, Sigma/Graphology, Playwright/browser automation, backend, database, and cloud skills remain deliberately uninstalled through KG2.
