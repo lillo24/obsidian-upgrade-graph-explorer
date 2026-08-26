@@ -4,7 +4,7 @@ import { fromMarkdown } from 'mdast-util-from-markdown';
 import { describe, expect, it } from 'vitest';
 
 import { parseMarkdownDocument } from './index';
-import { deriveMarkdownStructure } from './structure';
+import { deriveMarkdownStructureFromMdast } from './structure';
 import type { ParsedMarkdownSection } from './types';
 
 const fixtureSource = readFileSync(
@@ -256,7 +256,7 @@ describe('deriveMarkdownStructure', () => {
     delete heading.position;
 
     expect(() =>
-      deriveMarkdownStructure(root, {
+      deriveMarkdownStructureFromMdast(root, {
         path: 'notes/Missing-position.md',
         sourceLength: 3,
       }),

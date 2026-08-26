@@ -15,15 +15,16 @@ packages/parser-markdown/
   tsconfig.json      Strict framework-independent TypeScript settings.
   src/
     index.ts         Intentional public exports.
+    mdast.ts         Narrow source-adapter integration subpath.
     types.ts         Serializable parser intermediate representation.
     parse.ts         CommonMark source-to-mdast entry point.
-    structure.ts     Internal mdast-to-heading-tree derivation.
+    structure.ts     Shared mdast-to-heading-tree derivation.
     index.test.ts    Parser semantics, positions, failures, and fixture tests.
 ```
 
-`parse.ts` and `structure.ts` are separate so a later package-owned syntax entry
-can feed an extended mdast tree through the same hierarchy algorithm. The mdast
-tree is not returned or exposed as a stable public contract.
+`parse.ts` and `structure.ts` are separate so a package-owned syntax entry can
+feed an extended mdast tree through the same hierarchy algorithm. The ordinary
+package entry point does not return or expose mdast.
 
 ## Public contract
 
@@ -58,10 +59,23 @@ children of the mdast root define sections, so fences and block quotes do not
 create false sections.
 
 Frontmatter, wikilinks, embeds, aliases, block IDs, references, identity
-assignment, and resolution remain KG3+. In particular, frontmatter-looking text
-is interpreted as ordinary CommonMark in this entry point and can form a Setext
-heading. An Obsidian-aware entry must supply syntax extensions before reusing
-the structure derivation.
+assignment, and resolution are not part of this entry point. In particular,
+frontmatter-looking text is interpreted as ordinary CommonMark here and can
+form a Setext heading. `@icarus-graph-explorer/adapter-obsidian` supplies
+frontmatter handling before reusing structure derivation.
+
+## Adapter integration subpath
+
+Source-adapter packages that already own an mdast root may import:
+
+```ts
+import { deriveMarkdownStructureFromMdast } from '@icarus-graph-explorer/parser-markdown/mdast';
+```
+
+This dedicated subpath is parser-integration infrastructure. It exists so
+extended syntax can share the exact KG2 hierarchy and span algorithm without
+duplicating it or changing CommonMark behavior. It is not canonical domain API,
+and the mdast tree never appears in `ParsedMarkdownDocument`.
 
 ## Local validation
 

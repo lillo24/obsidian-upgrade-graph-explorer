@@ -139,4 +139,72 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ['packages/adapter-obsidian/**/*.{ts,tsx}'],
+    ignores: ['packages/adapter-obsidian/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react',
+              message: 'Source adapters must remain independent from React.',
+            },
+            {
+              name: 'react-dom',
+              message: 'Source adapters must remain independent from React.',
+            },
+            {
+              name: 'reactflow',
+              message: 'Renderers cannot be source-adapter dependencies.',
+            },
+            {
+              name: 'sigma',
+              message: 'Renderers cannot be source-adapter dependencies.',
+            },
+            {
+              name: 'graphology',
+              message: 'Graph indexes cannot be source-adapter dependencies.',
+            },
+            {
+              name: 'obsidian',
+              message:
+                'This syntax adapter must not depend on the Obsidian application runtime.',
+            },
+            {
+              name: '@icarus-graph-explorer/web',
+              message: 'Source adapters cannot depend on the web application.',
+            },
+            {
+              name: 'node:fs',
+              message: 'The single-document adapter cannot read files.',
+            },
+            {
+              name: 'node:fs/promises',
+              message: 'The single-document adapter cannot read files.',
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                'react/*',
+                'react-dom/*',
+                '@xyflow/*',
+                '@tauri-apps/*',
+                '@react-sigma/*',
+                'sigma/*',
+                'graphology-*',
+                '@obsidian/*',
+                '@icarus-graph-explorer/web/*',
+                'node:fs/*',
+              ],
+              message:
+                'UI, renderer, platform, runtime, and filesystem imports are forbidden in the Obsidian source adapter.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );
