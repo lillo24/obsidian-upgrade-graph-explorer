@@ -3,12 +3,16 @@ import { describe, expect, it } from 'vitest';
 
 import { App } from './App';
 
-describe('foundation status page', () => {
-  it('states the implemented scope without promising graph features', () => {
+describe('diagnostic explorer shell', () => {
+  it('renders the validated synthetic report and local-only workflow', () => {
     const markup = renderToStaticMarkup(<App />);
 
-    expect(markup).toContain('Icarus Graph Explorer');
-    expect(markup).toContain('Canonical model v1 ready');
-    expect(markup).toContain('graph rendering are deliberately deferred');
+    expect(markup).toContain('Icarus Diagnostic Explorer');
+    expect(markup).toContain('Load Diagnostic Report');
+    expect(markup).toContain('Load Synthetic Sample');
+    expect(markup).toContain('Canonical Hierarchy');
+    expect(markup).toContain('Compatibility Probes');
+    expect(markup).toContain('Nothing is uploaded');
+    expect(markup).not.toContain('React Flow');
   });
 });

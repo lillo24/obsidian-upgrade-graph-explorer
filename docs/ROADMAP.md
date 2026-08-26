@@ -2,22 +2,54 @@
 
 The roadmap is a sequencing map, not a claim that future features exist. Each milestone begins only after its dependency/gate is satisfied.
 
-| Milestone                                                    | Outcome                                                                                                                                                                                    | Dependency or gate                                                                                 |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| **KG0 — Repository + architecture foundation**               | Reproducible pnpm workspace, minimal React/Vite shell, generic core boundary, checks, CI, and repository-owned guidance.                                                                   | **Complete** — KG0 validation gate passed.                                                         |
-| **KG1 — Canonical domain model + fixture infrastructure**    | Serializable domain contracts and synthetic fixture conventions for hierarchical documents, references, spans, and explicit resolution states.                                             | **Complete** — schema version 1 and its runtime validation gate passed.                            |
-| **KG2 — Base Markdown structural parser**                    | Parse files and heading hierarchies with source locations using generic Markdown behavior.                                                                                                 | **Complete** — CommonMark parser IR and structural validation gate passed.                         |
-| **KG3 — Obsidian syntax adapter**                            | Interpret wikilinks, embeds, aliases, heading targets, block references, and relevant frontmatter outside generic core.                                                                    | **Complete** — tested source-adapter IR and diagnostic gate passed.                                |
-| **KG4 — Workspace resolver + canonical snapshot**            | Resolve workspace references into explicit states and produce serializable snapshots.                                                                                                      | **Complete** — conservative resolution and canonical-validation gate passed.                       |
-| **KG5 — Diagnostic explorer + real-vault validation**        | Inspect canonical output and validate locally against a real vault without committing private content.                                                                                     | **Next** — KG4 produces trustworthy diagnostics; private regressions can be reduced synthetically. |
-| **KG6 — View-projection architecture**                       | Combine canonical truth and separate view state into renderer-independent projections.                                                                                                     | KG5 validates the source model before UI projections harden assumptions.                           |
-| **KG7 — Structural graph MVP**                               | First interactive hierarchical graph, likely with React Flow, driven only by projections.                                                                                                  | KG6 projection contracts and renderer boundary are tested.                                         |
-| **KG8 — Inspector, backlinks, search + navigation**          | Product navigation and inspection workflows over canonical and projected data.                                                                                                             | KG7 supports stable selection and navigation semantics.                                            |
-| **KG9 — Persistence + stable identity**                      | Local persistence for application view state and identities robust across normal edits.                                                                                                    | Real interaction patterns reveal what must survive sessions.                                       |
-| **KG10 — Incremental workspace engine**                      | File-granular reparsing and snapshot deltas.                                                                                                                                               | Correct full-snapshot behavior and identity rules are established.                                 |
-| **KG11 — Tauri local-vault workflow**                        | Desktop folder access and watching through a narrow source-provider adapter.                                                                                                               | Web/core boundaries are stable; platform APIs remain outside generic packages.                     |
-| **KG12 — Performance + worker hardening**                    | Measurement-led worker split, projection optimization, and realistic performance budgets.                                                                                                  | Incremental engine and real workload profiles exist.                                               |
-| **KG13 — Global graph decision / renderer, benchmark-gated** | Decide whether a separate high-density global renderer is justified. Sigma is introduced only if benchmarks show React Flow/projection strategies cannot meet an explicit workload target. | KG12 benchmarks and product need provide evidence; otherwise no Sigma dependency is added.         |
-| **KG14 — Product-quality exploration**                       | Accessibility, resilience, onboarding, polished exploration workflows, and release-quality hardening.                                                                                      | Core workflows and renderer choices are evidence-backed and stable.                                |
+| Milestone                                                    | Outcome                                                                                                                                            | Dependency or gate                                                                                  |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| **KG0 — Repository + architecture foundation**               | Reproducible pnpm workspace, minimal React/Vite shell, generic core boundary, checks, CI, and repository-owned guidance.                           | **Complete** — KG0 validation gate passed.                                                          |
+| **KG1 — Canonical domain model + fixture infrastructure**    | Serializable domain contracts and synthetic fixture conventions for hierarchical documents, references, spans, and explicit resolution states.     | **Complete** — schema version 1 and its runtime validation gate passed.                             |
+| **KG2 — Base Markdown structural parser**                    | Parse files and heading hierarchies with source locations using generic Markdown behavior.                                                         | **Complete** — CommonMark parser IR and structural validation gate passed.                          |
+| **KG3 — Obsidian syntax adapter**                            | Interpret wikilinks, embeds, aliases, heading targets, block references, and relevant frontmatter outside generic core.                            | **Complete** — tested source-adapter IR and diagnostic gate passed.                                 |
+| **KG4 — Workspace resolver + canonical snapshot**            | Resolve workspace references into explicit states and produce serializable snapshots.                                                              | **Complete** — conservative resolution and canonical-validation gate passed.                        |
+| **KG5 — Diagnostic explorer + real-vault validation**        | Validated private-report workflow, canonical hierarchy/reference inspection, compatibility probes, and non-gating pipeline evidence.               | **Complete** — synthetic and real-vault validation gates passed without committing private content. |
+| **KG6 — View-projection architecture**                       | Renderer-independent granularity, collapse/endpoint roll-up, aggregated provenance, focus-neighborhood, and supported filter contracts.            | **Next** — KG5 confirms hierarchy and reference endpoints are sufficient for roll-up.               |
+| **KG7 — Structural graph MVP**                               | Projection-driven hierarchical graph with focused scalability interactions and distinct non-resolved states.                                       | KG6 projection contracts and renderer boundary are tested.                                          |
+| **KG8 — Inspector, backlinks, search + navigation**          | Provenance-first inspection, incoming/outgoing references, ambiguity candidates, and search/navigation over projected data.                        | KG7 supports stable selection and navigation semantics.                                             |
+| **KG9 — Persistence + stable identity**                      | Local persistence for renderer-independent application view state and identities robust across normal edits.                                       | Real interaction patterns reveal what must survive sessions.                                        |
+| **KG10 — Incremental workspace engine**                      | File-granular reparsing and snapshot deltas.                                                                                                       | Correct full-snapshot behavior and identity rules are established.                                  |
+| **KG11 — Tauri local-vault workflow**                        | Desktop folder access and watching through a narrow source-provider adapter.                                                                       | Web/core boundaries are stable; platform APIs remain outside generic packages.                      |
+| **KG12 — Performance + worker hardening**                    | Explicit workload budgets, measurement-led worker split, and projection/focus/collapse optimization.                                               | KG5 harness, incremental engine, and renderer measurements provide real workload evidence.          |
+| **KG13 — Global graph decision / renderer, benchmark-gated** | Decide whether a separate high-density renderer is justified; WebGL/Pixi/Sigma viability is not evidence to replace the structural renderer early. | KG12 benchmarks and product need provide evidence; otherwise no Sigma dependency is added.          |
+| **KG14 — Product-quality exploration**                       | Accessibility, resilience, onboarding, polished exploration workflows, and release-quality hardening.                                              | Core workflows and renderer choices are evidence-backed and stable.                                 |
 
 Future package names, state libraries, and implementation details are intentionally unspecified until their milestone supplies concrete requirements.
+
+## Accepted future interaction guidance
+
+KG6 must define projection granularity for documents-only, selected/top-level
+sections, and expanded selected hierarchies. It must distinguish visible from
+collapsed structural entities; roll hidden reference sources and targets to
+their nearest visible ancestors; let one projected edge retain multiple
+underlying reference IDs; define a selected-root, small N-hop focus projection
+with a hierarchy inclusion policy; and support path, title/search, entity-kind,
+and resolution-state filters. General tag/property filtering is deferred until
+the canonical/adapter model supports it.
+
+KG7 should keep primary controls small and emphasize expand/collapse, projected
+link roll-up, select, focus mode, hover-neighborhood emphasis, structural and
+local/focus layout, and distinct unresolved/ambiguous/invalid treatment. Any
+ghost representation is a projection/UI marker, never canonical source truth.
+
+KG8 should expose exact path and span provenance, section breadcrumbs,
+incoming/outgoing references, the reason each edge exists, ambiguity candidates,
+and search/filter navigation. Rich live snippets or open-in-source behavior
+depends on KG11 source access; pathfinding is not a gate for the core inspector.
+
+KG9 may persist fold state, pins/manual positions, selected view mode, filters,
+saved views, and viewport, but never renderer objects as canonical truth. KG12
+will use the KG5 harness plus later renderer evidence to set workload profiles,
+budgets, worker splits, and projection/focus/collapse benchmarks.
+
+Post-MVP analytics—typed conceptual relations, pathfinding variants,
+centrality, betweenness, communities, connected components, co-citation,
+semantic similarity, and timeline overlays—remain derived data. Future semantic
+relations should use a provenance-bearing derived or author-annotation layer
+instead of overloading canonical syntactic references.

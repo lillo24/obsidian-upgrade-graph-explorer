@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, and KG4 resolves complete parsed workspaces into validated canonical snapshots. Diagnostic exploration, graph projections, renderers, persistence, and local filesystem access remain planned work.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, and KG5 implements a development-only scanner, validated diagnostic report, and browser explorer. Graph projections, renderers, persistence, and product filesystem access remain planned work.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -62,6 +62,19 @@ owns Obsidian-specific whole-workspace matching and source-neutral canonical
 assembly. It accepts parsed values only; filesystem, Obsidian runtime, UI,
 renderer, platform, and graph-index imports are mechanically excluded from its
 production source.
+
+`packages/diagnostics-obsidian` depends on the parsed/resolved contracts and
+turns successful KG4 output into a deterministic, validated read model. It owns
+compatibility probes and readable lookup helpers, not canonical resolution,
+filesystem acquisition, UI, graph projection, or rendering. Those exclusions
+are mechanically enforced for production source.
+
+`tools/vault-diagnostics` is the sole KG5 filesystem boundary. It recursively
+discovers one explicitly selected vault, reads strict UTF-8 Markdown, inventories
+non-Markdown paths without reading their contents, and invokes KG3 → KG4 → the
+diagnostics package. The browser receives only a generated report; it never
+receives a folder handle. This tool is development infrastructure, not the KG11
+product source-provider design.
 
 ## Markdown structural parsing
 
@@ -150,11 +163,45 @@ snapshot may contain unresolved, ambiguous, and invalid references. Duplicate
 document paths, incompatible source geometry, generated ID collisions, or
 runtime snapshot-validation failures are fatal and return no partial snapshot.
 
+## Diagnostic report workflow
+
+KG5 adds a versioned plain-data envelope around a validated canonical snapshot:
+
+```text
+development filesystem scanner
+  → KG3 parsed documents
+  → KG4 canonical snapshot + diagnostics
+  → compatibility probes + aggregate inventory + optional timings
+  → runtime-validated JSON report
+  → local browser explorer
+```
+
+The report deliberately excludes source text and snippets, but it contains
+paths, headings, raw targets, spans, and relationships and must therefore be
+treated as private. Real reports are written only to an explicitly requested,
+gitignored destination. The committed browser sample is generated from neutral
+synthetic fixtures.
+
+Compatibility probes are inspection evidence outside canonical truth. They may
+surface a unique case-only file or heading match, or classify unsupported
+attachment inventory as present, missing, or ambiguous. They never rewrite a
+KG4 resolution, create attachment entities, select fuzzy matches, or create
+graph nodes.
+
+Real-vault validation confirmed that the canonical model retains document and
+section ancestry plus precise reference endpoints needed for future endpoint
+roll-up. Any private regression must be reduced to a neutral synthetic fixture
+before entering the repository.
+
 ## Source truth and view state
 
 Source-derived knowledge and application-owned visualization state are separate domains.
 
 Canonical source truth now includes document structure, references, source spans, and explicit resolution results. Later source-backed fields may be added only for concrete requirements. View state will include hidden/collapsed state, selection, pins, manual positions, filters, viewport, saved views, and renderer preferences. A UI action such as hiding, moving, or pinning an entity must never mutate source truth. Early releases are read-only with respect to Markdown.
+
+KG5 search, resolution filters, disclosure state, and pagination are transient
+diagnostic UI state. They are not KG6 projection contracts or KG9 persisted view
+state.
 
 Renderers receive projections formed from canonical source truth plus view state. A file-level projection may aggregate several section-level references; it must not replace or degrade the canonical relationships. React Flow, Sigma, and Graphology must never own persisted or canonical truth.
 
@@ -174,13 +221,17 @@ The initial product is local-first:
 
 Remote capabilities, collaboration, or source editing would require an explicit later trust decision. Private workspace material must not enter repository fixtures or logs. Bugs discovered in the Icarus vault must be reduced to small synthetic examples before they are committed.
 
+The KG5 browser File API reads one user-selected report in memory and performs
+no upload. Product-grade folder selection, file watching, and live source access
+remain KG11 responsibilities behind a narrow provider boundary.
+
 ## UI, renderer, and platform roles
 
 React and Vite implement the SPA shell; they are outer-layer delivery choices, not domain dependencies. React Flow is the planned first structural renderer because the early product emphasizes interactive, hierarchical views. Sigma is conditional and may be added only when benchmark evidence demonstrates a need for a separate high-density global renderer. Graphology may later provide derived runtime indexes and algorithms, but its data structure is not canonical or persisted.
 
 Tauri is deferred until the local-vault workflow milestone. It may provide desktop filesystem capabilities through a narrow source-provider boundary. Tauri commands, paths, events, and handles must not leak into generic core packages. Browser and future platform providers should remain viable.
 
-None of React Flow, Sigma, Graphology, or Tauri is installed through KG4.
+None of React Flow, Sigma, Graphology, or Tauri is installed through KG5.
 
 ## Performance principles
 
@@ -194,13 +245,17 @@ Performance work begins with boundaries and measurement:
 - benchmark realistic synthetic and private-local workspaces before selecting a high-density renderer;
 - prefer explicit diagnostics over fast but uncertain resolution.
 
+KG5 provides deterministic smoke/small/medium/large pipeline workloads and
+coarse real-vault phase timings. They are investigative evidence only: no CI
+timing threshold or renderer conclusion is established before KG12.
+
 Rust, WASM, universal graph abstractions, and million-node optimization are not foundation requirements.
 
 ## Testing philosophy
 
-Vitest is the unit and contract test foundation. KG1 validates canonical snapshots; KG2 combines focused parser cases with a synthetic workspace fixture and JSON round-trip coverage; KG3 adds separate Obsidian frontmatter, link, and block fixtures; KG4 adds independent multi-file resolution fixtures for ownership, ambiguity, hierarchy, blocks, paths, and unsupported attachments. Future domain work should favor deterministic, table-driven tests against small synthetic Markdown fixtures. Adapter tests keep generic Markdown behavior separate from Obsidian-specific behavior. Snapshot/delta and projection tests should assert serializability and preservation of section-level precision.
+Vitest is the unit and contract test foundation. KG1 validates canonical snapshots; KG2 combines focused parser cases with a synthetic workspace fixture and JSON round-trip coverage; KG3 adds separate Obsidian frontmatter, link, and block fixtures; KG4 adds independent multi-file resolution fixtures for ownership, ambiguity, hierarchy, blocks, paths, and unsupported attachments; KG5 adds report/probe validation, temporary-directory scanner tests, synthetic workload generation, pure UI transformations, and shell rendering tests. Future domain work should favor deterministic, table-driven tests against small synthetic Markdown fixtures. Adapter tests keep generic Markdown behavior separate from Obsidian-specific behavior. Snapshot/delta and projection tests should assert serializability and preservation of section-level precision.
 
-Playwright may be introduced when end-to-end UI flows exist; it remains intentionally absent through KG4. Real-vault validation remains local and diagnostic. Any regression committed to the repository must be synthetic and free of private theory content.
+The KG5 browser workflow is automation-tested locally without adding a browser-test dependency. A product end-to-end suite remains a future choice. Real-vault validation stays local and diagnostic; any committed regression must be synthetic and free of private theory content.
 
 ## Changing these decisions
 

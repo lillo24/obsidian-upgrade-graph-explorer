@@ -1,0 +1,23 @@
+{
+  "name": "@icarus-graph-explorer/vault-diagnostics",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "benchmark": "tsx src/benchmark.ts",
+    "diagnose": "tsx src/cli.ts",
+    "generate:sample": "tsx src/generate-sample.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@icarus-graph-explorer/adapter-obsidian": "workspace:*",
+    "@icarus-graph-explorer/core": "workspace:*",
+    "@icarus-graph-explorer/diagnostics-obsidian": "workspace:*",
+    "@icarus-graph-explorer/resolver-obsidian": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "prettier": "3.9.6",
+    "tsx": "4.23.12"
+  }
+}

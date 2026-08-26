@@ -44,5 +44,10 @@ KG4 adds six independent multi-file resolver cases:
 The resolver package parses these sources only as test setup. Its production
 entry accepts KG3 values and never reads files.
 
+KG5 adds `diagnostic-sample/`, a neutral end-to-end report fixture with nested
+structure, every non-resolved state needed by the explorer, marker-backed
+blocks, forwarded diagnostics, case-only clues, and attachment inventory
+evidence. The committed browser sample is generated from this fixture.
+
 When a private workspace reveals a defect, reduce it to the smallest synthetic
 case and explain the generic behavior in that case's README.
