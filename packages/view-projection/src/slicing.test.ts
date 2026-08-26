@@ -1,0 +1,260 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  documentOnlyProjectionState,
+  topLevelSectionProjectionState,
+} from './presets';
+import { projectSnapshot } from './project';
+import { projectionFixture } from './test-fixture';
+import type {
+  ProjectedEntityNode,
+  ProjectedReferenceTargetNode,
+  ViewProjection,
+  ViewProjectionState,
+} from './types';
+
+function entityNodes(
+  projection: ViewProjection,
+): readonly ProjectedEntityNode[] {
+  return projection.nodes.filter(
+    (node): node is ProjectedEntityNode => node.kind === 'entity',
+  );
+}
+
+function entityIds(projection: ViewProjection): readonly string[] {
+  return entityNodes(projection)
+    .map(({ entityId }) => entityId)
+    .sort();
+}
+
+function focusState(
+  rootEntityId: string,
+  hops: 1 | 2 | 3,
+  direction: 'incoming' | 'outgoing' | 'both' = 'outgoing',
+): ViewProjectionState {
+  return {
+    ...documentOnlyProjectionState(),
+    focus: {
+      rootEntityId,
+      hops,
+      direction,
+      hierarchyContext: 'ancestors',
+    },
+  };
+}
+
+describe('focus projection', () => {
+  it('extracts one-hop outgoing reference neighbors and diagnostic targets', () => {
+    const projection = projectSnapshot(
+      projectionFixture(),
+      focusState('doc-a', 1),
+    );
+
+    expect(entityIds(projection)).toEqual(['doc-a', 'doc-b']);
+    expect(
+      projection.nodes.filter((node) => node.kind === 'reference-target'),
+    ).not.toHaveLength(0);
+    expect(
+      entityNodes(projection).find(({ entityId }) => entityId === 'doc-b'),
+    ).toMatchObject({ focusDistance: 1, role: 'content' });
+  });
+
+  it('supports bounded two/three-hop traversal and direction', () => {
+    expect(
+      entityIds(projectSnapshot(projectionFixture(), focusState('doc-a', 2))),
+    ).toEqual(['doc-a', 'doc-b', 'doc-c']);
+    expect(
+      entityIds(
+        projectSnapshot(
+          projectionFixture(),
+          focusState('doc-a', 1, 'incoming'),
+        ),
+      ),
+    ).toEqual(['doc-a', 'doc-b', 'doc-c']);
+    expect(
+      entityIds(
+        projectSnapshot(projectionFixture(), focusState('doc-b', 1, 'both')),
+      ),
+    ).toEqual(['doc-a', 'doc-b', 'doc-c']);
+    expect(
+      entityNodes(
+        projectSnapshot(projectionFixture(), focusState('doc-a', 3)),
+      ).every((node) => (node.focusDistance ?? 0) <= 3),
+    ).toBe(true);
+  });
+
+  it('does not traverse beyond a diagnostic target', () => {
+    const projection = projectSnapshot(
+      projectionFixture(),
+      focusState('doc-a', 3),
+    );
+    const targets = projection.nodes.filter(
+      (node): node is ProjectedReferenceTargetNode =>
+        node.kind === 'reference-target',
+    );
+
+    expect(targets.every((target) => target.rawTarget !== '')).toBe(true);
+    expect(targets.every((target) => !('focusDistance' in target))).toBe(true);
+  });
+
+  it('adds ancestors and optional direct children as context without hop distances', () => {
+    const state: ViewProjectionState = {
+      ...topLevelSectionProjectionState(),
+      disclosure: {
+        ...topLevelSectionProjectionState().disclosure,
+        expandedEntityIds: ['a-overview'],
+      },
+      focus: {
+        rootEntityId: 'a-overview',
+        hops: 1,
+        direction: 'outgoing',
+        hierarchyContext: 'ancestors-and-children',
+      },
+    };
+    const projection = projectSnapshot(projectionFixture(), state);
+    const document = entityNodes(projection).find(
+      ({ entityId }) => entityId === 'doc-a',
+    );
+    const directChild = entityNodes(projection).find(
+      ({ entityId }) => entityId === 'a-detail',
+    );
+
+    expect(document).toMatchObject({ role: 'context', focusDistance: null });
+    expect(directChild).toMatchObject({ role: 'context', focusDistance: null });
+  });
+
+  it('reports unknown and structurally hidden focus roots without crashing', () => {
+    const unknown = projectSnapshot(
+      projectionFixture(),
+      focusState('absent', 1),
+    );
+    const hidden = projectSnapshot(
+      projectionFixture(),
+      focusState('a-detail', 1),
+    );
+
+    expect(unknown.nodes).toEqual([]);
+    expect(unknown.issues[0]?.code).toBe('unknown-focus-root');
+    expect(hidden.nodes).toEqual([]);
+    expect(hidden.issues[0]?.code).toBe('hidden-focus-root');
+  });
+});
+
+describe('projected filters', () => {
+  it('filters normalized paths and keeps only necessary structural context', () => {
+    const state: ViewProjectionState = {
+      ...topLevelSectionProjectionState(),
+      filters: { pathPrefixes: ['folder'] },
+    };
+    const projection = projectSnapshot(projectionFixture(), state);
+
+    expect(entityIds(projection)).toEqual(['b-target', 'doc-b']);
+    expect(
+      entityNodes(projection).every(({ role }) => role === 'content'),
+    ).toBe(true);
+    expect(
+      projection.edges.filter((edge) => edge.kind === 'reference'),
+    ).toHaveLength(1);
+  });
+
+  it('matches projected titles and marks required ancestors as context', () => {
+    const projection = projectSnapshot(projectionFixture(), {
+      ...topLevelSectionProjectionState(),
+      filters: { text: 'target' },
+    });
+
+    expect(entityIds(projection)).toEqual(['b-target', 'doc-b']);
+    expect(
+      entityNodes(projection).find(({ entityId }) => entityId === 'b-target'),
+    ).toMatchObject({ role: 'content' });
+    expect(
+      entityNodes(projection).find(({ entityId }) => entityId === 'doc-b'),
+    ).toMatchObject({ role: 'context' });
+  });
+
+  it('allows raw diagnostic targets to match without crossing path/kind exclusions', () => {
+    const projection = projectSnapshot(projectionFixture(), {
+      ...topLevelSectionProjectionState(),
+      filters: { pathPrefixes: ['folder'], text: 'missing' },
+    });
+
+    expect(entityIds(projection)).toEqual(['b-target', 'doc-b']);
+    expect(
+      entityNodes(projection).find(({ entityId }) => entityId === 'b-target'),
+    ).toMatchObject({ role: 'context' });
+    expect(
+      projection.nodes.filter((node) => node.kind === 'reference-target'),
+    ).toHaveLength(1);
+  });
+
+  it('filters entity kinds while retaining ancestors as context', () => {
+    const projection = projectSnapshot(projectionFixture(), {
+      ...topLevelSectionProjectionState(),
+      filters: { entityKinds: ['section'] },
+    });
+    const documents = entityNodes(projection).filter(
+      ({ entityKind }) => entityKind === 'document',
+    );
+
+    expect(documents).toHaveLength(3);
+    expect(documents.every(({ role }) => role === 'context')).toBe(true);
+    expect(
+      projection.edges
+        .filter((edge) => edge.kind === 'reference')
+        .some((edge) => edge.referenceIds.includes('r-b-back')),
+    ).toBe(false);
+  });
+
+  it('filters resolution states, clears excluded internal provenance, and removes orphan targets', () => {
+    const projection = projectSnapshot(projectionFixture(), {
+      ...documentOnlyProjectionState(),
+      filters: { referenceStatuses: ['unresolved', 'ambiguous'] },
+    });
+
+    expect(
+      projection.edges
+        .filter((edge) => edge.kind === 'reference')
+        .every(
+          (edge) => edge.status === 'unresolved' || edge.status === 'ambiguous',
+        ),
+    ).toBe(true);
+    expect(
+      entityNodes(projection).every(
+        ({ internalReferenceIds }) => internalReferenceIds.length === 0,
+      ),
+    ).toBe(true);
+    expect(
+      projection.nodes.some(
+        (node) => node.kind === 'reference-target' && node.status === 'invalid',
+      ),
+    ).toBe(false);
+  });
+
+  it('does not reroute a relationship when filtering removes its endpoint', () => {
+    const projection = projectSnapshot(projectionFixture(), {
+      ...topLevelSectionProjectionState(),
+      filters: { pathPrefixes: ['A.md'] },
+    });
+
+    expect(
+      projection.edges
+        .filter((edge) => edge.kind === 'reference')
+        .some((edge) => edge.referenceIds.includes('r-a-detail-to-b-leaf')),
+    ).toBe(false);
+    expect(
+      entityNodes(projection).flatMap(
+        ({ internalReferenceIds }) => internalReferenceIds,
+      ),
+    ).toEqual(['r-a-internal']);
+  });
+
+  it('reports invalid path prefixes and returns no accidental broad match', () => {
+    const projection = projectSnapshot(projectionFixture(), {
+      ...documentOnlyProjectionState(),
+      filters: { pathPrefixes: ['../outside'] },
+    });
+
+    expect(projection.nodes).toEqual([]);
+    expect(projection.issues[0]?.code).toBe('invalid-path-prefix');
+  });
+});

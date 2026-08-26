@@ -351,4 +351,86 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ['packages/view-projection/**/*.{ts,tsx}'],
+    ignores: ['packages/view-projection/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react',
+              message: 'View projection must remain renderer-independent.',
+            },
+            {
+              name: 'react-dom',
+              message: 'View projection must remain renderer-independent.',
+            },
+            {
+              name: 'reactflow',
+              message: 'Renderer types cannot define projection truth.',
+            },
+            {
+              name: 'sigma',
+              message: 'Renderer types cannot define projection truth.',
+            },
+            {
+              name: 'graphology',
+              message: 'KG6 uses its own small derived runtime indexes.',
+            },
+            {
+              name: 'obsidian',
+              message: 'Projection consumes source-neutral canonical data.',
+            },
+            {
+              name: '@icarus-graph-explorer/adapter-obsidian',
+              message: 'View projection may depend inward on core only.',
+            },
+            {
+              name: '@icarus-graph-explorer/resolver-obsidian',
+              message: 'View projection may depend inward on core only.',
+            },
+            {
+              name: '@icarus-graph-explorer/diagnostics-obsidian',
+              message: 'View projection may depend inward on core only.',
+            },
+            {
+              name: '@icarus-graph-explorer/web',
+              message: 'View projection cannot depend on the web application.',
+            },
+            {
+              name: 'node:fs',
+              message: 'Projection is an in-memory pure transformation.',
+            },
+            {
+              name: 'node:fs/promises',
+              message: 'Projection is an in-memory pure transformation.',
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                'react/*',
+                'react-dom/*',
+                '@xyflow/*',
+                '@tauri-apps/*',
+                '@react-sigma/*',
+                'sigma/*',
+                'graphology-*',
+                '@obsidian/*',
+                '@icarus-graph-explorer/adapter-obsidian/*',
+                '@icarus-graph-explorer/resolver-obsidian/*',
+                '@icarus-graph-explorer/diagnostics-obsidian/*',
+                '@icarus-graph-explorer/web/*',
+                'node:fs/*',
+              ],
+              message:
+                'Renderer, platform, source-specific, application, and filesystem imports are forbidden in view projection.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );
