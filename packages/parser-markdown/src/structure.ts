@@ -28,7 +28,7 @@ interface SectionDraft {
   end?: OffsetSourcePoint;
 }
 
-interface StructureInput {
+export interface MarkdownStructureInput {
   readonly path: WorkspacePath;
   readonly sourceLength: number;
 }
@@ -188,12 +188,12 @@ function headingDraft(
 /**
  * Derive parser IR from an mdast root.
  *
- * This stays internal so mdast is not a stable public contract, while keeping
- * CommonMark parsing separate from the reusable heading-structure algorithm.
+ * This is exposed only through the dedicated `parser-markdown/mdast`
+ * integration subpath. The ordinary package entry point remains mdast-free.
  */
-export function deriveMarkdownStructure(
+export function deriveMarkdownStructureFromMdast(
   root: Root,
-  input: StructureInput,
+  input: MarkdownStructureInput,
 ): ParsedMarkdownDocument {
   const documentSpan = sourceSpan(root.position, input.path, 'document');
   assertDocumentExtent(documentSpan, input.sourceLength, input.path);

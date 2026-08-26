@@ -22,5 +22,14 @@ or empty case directories.
 parser intermediate structure directly because a separate golden JSON file
 would duplicate short, behavior-focused assertions.
 
+KG3 adds three focused Obsidian cases:
+
+- `obsidian-frontmatter/` separates leading YAML aliases from structure;
+- `obsidian-links/` preserves unresolved wikilink, embed, and Markdown targets;
+- `obsidian-blocks/` covers exact, invalid, duplicate, and shielded markers.
+
+Their adapter test asserts stage-specific IR directly. No fixture claims that a
+syntactic target resolves to another file or canonical entity.
+
 When a private workspace reveals a defect, reduce it to the smallest synthetic
 case and explain the generic behavior in that case's README.

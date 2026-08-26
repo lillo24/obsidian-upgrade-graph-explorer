@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, and KG2 implements generic CommonMark document/section structure parsing. Source adapters, reference extraction, workspace resolution, graph projections, renderers, persistence, and local filesystem access remain planned work.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, and KG3 implements the tested Obsidian frontmatter/link/block syntax adapter. Workspace resolution, canonical assembly, graph projections, renderers, persistence, and local filesystem access remain planned work.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -51,6 +51,12 @@ already-normalized workspace path and source string; it does not read files or
 assemble canonical entities. ESLint rejects UI, renderer, platform, and
 Obsidian imports in this package.
 
+`packages/adapter-obsidian` depends inward on parser-markdown and core. It owns
+Obsidian source interpretation but not the Obsidian application runtime,
+filesystem access, workspace matching, or canonical assembly. ESLint rejects
+UI, renderer, platform, runtime, application, and filesystem imports in its
+production source.
+
 ## Markdown structural parsing
 
 KG2 returns a serializable parser intermediate representation without canonical
@@ -69,9 +75,31 @@ include and overlap descendant spans. Line endings are not normalized: offsets
 index the original JavaScript string in UTF-16 code units, while lines and
 columns retain KG1's 1-based semantics.
 
-CommonMark parsing and mdast-to-structure derivation are separate internal
-steps. KG3 may add extension-aware parsing and reuse the structure algorithm
-without making mdast part of the long-term public parser contract.
+CommonMark parsing and mdast-to-structure derivation are separate steps. A
+dedicated `parser-markdown/mdast` integration subpath lets source adapters reuse
+the structure algorithm. The ordinary parser contract and canonical model stay
+mdast-free.
+
+## Obsidian syntax adaptation
+
+KG3 parses a supported Obsidian subset into plain, canonical-ID-free adapter
+IR. Frontmatter-aware mdast parsing prevents leading YAML from becoming a false
+CommonMark Setext section. Valid string-list aliases are retained as document
+metadata. Malformed YAML produces a diagnostic while trustworthy structure and
+body references remain available.
+
+Wikilinks and embeds preserve their raw target, optional display text, exact
+syntax span, and unresolved file/heading/block components. Standard local
+Markdown links and images use the same occurrence contract; obvious external
+schemes are omitted. The adapter scans only mdast-approved text ranges, so code,
+HTML, frontmatter, and Obsidian comments shield false link syntax while nested
+Markdown containers remain discoverable.
+
+Explicit Obsidian block IDs retain exact marker spans. KG3 does not guess full
+block-content ownership. Duplicate or invalid markers and malformed or
+unsupported syntax remain visible through adapter diagnostics. Target matching,
+reference source ownership, canonical IDs, resolution states, and snapshot
+assembly belong to KG4.
 
 ## Source truth and view state
 
@@ -121,9 +149,9 @@ Rust, WASM, universal graph abstractions, and million-node optimization are not 
 
 ## Testing philosophy
 
-Vitest is the unit and contract test foundation. KG1 validates canonical snapshots; KG2 combines focused parser cases with a synthetic workspace fixture and JSON round-trip coverage. Future domain work should favor deterministic, table-driven tests against small synthetic Markdown fixtures. Adapter tests must separate generic Markdown behavior from Obsidian-specific behavior. Snapshot/delta and projection tests should assert serializability and preservation of section-level precision.
+Vitest is the unit and contract test foundation. KG1 validates canonical snapshots; KG2 combines focused parser cases with a synthetic workspace fixture and JSON round-trip coverage; KG3 adds separate Obsidian frontmatter, link, and block fixtures plus source-span and diagnostic coverage. Future domain work should favor deterministic, table-driven tests against small synthetic Markdown fixtures. Adapter tests keep generic Markdown behavior separate from Obsidian-specific behavior. Snapshot/delta and projection tests should assert serializability and preservation of section-level precision.
 
-Playwright may be introduced when end-to-end UI flows exist; it remains intentionally absent through KG2. Real-vault validation remains local and diagnostic. Any regression committed to the repository must be synthetic and free of private theory content.
+Playwright may be introduced when end-to-end UI flows exist; it remains intentionally absent through KG3. Real-vault validation remains local and diagnostic. Any regression committed to the repository must be synthetic and free of private theory content.
 
 ## Changing these decisions
 

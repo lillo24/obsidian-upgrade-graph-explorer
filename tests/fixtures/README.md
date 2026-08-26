@@ -7,7 +7,7 @@ Fixtures are repository-owned, synthetic examples shared across package tests.
 ```text
 tests/fixtures/
   model/        Valid JSON examples of the canonical snapshot contract.
-  workspaces/   Convention for future parser and resolver input cases.
+  workspaces/   CommonMark and Obsidian parser inputs; later resolver cases.
 ```
 
 Fixtures must be small, deterministic, platform-independent, understandable by
