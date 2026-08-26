@@ -31,5 +31,18 @@ KG3 adds three focused Obsidian cases:
 Their adapter test asserts stage-specific IR directly. No fixture claims that a
 syntactic target resolves to another file or canonical entity.
 
+KG4 adds six independent multi-file resolver cases:
+
+- `resolution-basic/` covers file links, occurrences, and source ownership;
+- `resolution-ambiguous-files/` covers duplicate basenames, qualified paths,
+  complete-target narrowing, and alias non-resolution;
+- `resolution-headings/` covers exact same/cross-file and hierarchical targets;
+- `resolution-blocks/` covers marker-backed entities and block ambiguity;
+- `resolution-paths/` covers relative paths, traversal, and percent decoding;
+- `resolution-attachments/` records the Markdown-only inventory boundary.
+
+The resolver package parses these sources only as test setup. Its production
+entry accepts KG3 values and never reads files.
+
 When a private workspace reveals a defect, reduce it to the smallest synthetic
 case and explain the generic behavior in that case's README.

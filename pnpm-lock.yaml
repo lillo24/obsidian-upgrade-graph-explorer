@@ -113,6 +113,19 @@ importers:
         specifier: 24.13.3
         version: 24.13.3
 
+  packages/resolver-obsidian:
+    dependencies:
+      '@icarus-graph-explorer/adapter-obsidian':
+        specifier: workspace:*
+        version: link:../adapter-obsidian
+      '@icarus-graph-explorer/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.3
+        version: 24.13.3
+
 packages:
 
   '@babel/code-frame@7.29.7':

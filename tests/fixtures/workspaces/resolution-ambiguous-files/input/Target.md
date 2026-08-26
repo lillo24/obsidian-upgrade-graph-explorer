@@ -1,0 +1,6 @@
+---
+aliases:
+  - Alternate
+---
+
+# Actual target
