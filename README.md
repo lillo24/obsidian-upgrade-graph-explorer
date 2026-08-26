@@ -2,7 +2,7 @@
 
 Icarus Graph Explorer is an early-stage, hierarchical knowledge-graph explorer for Markdown workspaces. Its intended model treats documents, their nested sections, and optional addressable blocks as distinct entities so references can retain their precise source and target locations.
 
-KG0 established the repository foundation. KG1 adds a versioned, runtime-validated canonical model and synthetic fixture conventions. Markdown parsing, Obsidian syntax interpretation, workspace resolution, vault access, and graph rendering are not implemented yet.
+KG0 established the repository foundation, KG1 added the versioned canonical model, and KG2 adds deterministic CommonMark document/section structure parsing. Obsidian syntax interpretation, reference extraction, workspace resolution, vault access, and graph rendering are not implemented yet.
 
 The application is local-first and read-only with respect to Markdown. The initial architecture has no backend, account, cloud upload, telemetry, or source-file write path.
 

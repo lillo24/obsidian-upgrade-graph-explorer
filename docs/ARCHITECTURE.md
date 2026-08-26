@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and framework-independent workspace package. KG1 implements canonical snapshot schema version 1 and fixture conventions; parsing, source adapters, workspace resolution, graph projections, renderers, persistence, and local filesystem access remain planned work.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, and KG2 implements generic CommonMark document/section structure parsing. Source adapters, reference extraction, workspace resolution, graph projections, renderers, persistence, and local filesystem access remain planned work.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -46,6 +46,33 @@ The canonical snapshot is a versioned plain-data envelope containing workspace i
 
 `packages/core` is currently the innermost workspace boundary. It must not import React, React DOM, React Flow, Sigma, Graphology, Tauri, Obsidian application APIs, or code from `apps/web`. ESLint mechanically rejects those obvious imports. Later packages should be created only when they contain real implementation, with dependency direction enforced at their narrowest stable boundary.
 
+`packages/parser-markdown` depends inward on core's source types. It accepts one
+already-normalized workspace path and source string; it does not read files or
+assemble canonical entities. ESLint rejects UI, renderer, platform, and
+Obsidian imports in this package.
+
+## Markdown structural parsing
+
+KG2 returns a serializable parser intermediate representation without canonical
+IDs. A parsed document contains its full source extent and nested sections. Each
+section retains human-readable heading text, Markdown level, the exact heading
+syntax span, the full logical section span, and child sections.
+
+Base syntax follows CommonMark through mdast. Only heading nodes directly under
+the mdast document root define sections; heading-looking content in fences,
+block quotes, HTML, or escaped text does not. ATX and Setext headings share the
+same structure rules. Preamble content stays at document level.
+
+The full section starts at its heading and ends before the next root heading
+whose level is less than or equal to its own, or at EOF. Parent spans therefore
+include and overlap descendant spans. Line endings are not normalized: offsets
+index the original JavaScript string in UTF-16 code units, while lines and
+columns retain KG1's 1-based semantics.
+
+CommonMark parsing and mdast-to-structure derivation are separate internal
+steps. KG3 may add extension-aware parsing and reuse the structure algorithm
+without making mdast part of the long-term public parser contract.
+
 ## Source truth and view state
 
 Source-derived knowledge and application-owned visualization state are separate domains.
@@ -76,13 +103,13 @@ React and Vite implement the SPA shell; they are outer-layer delivery choices, n
 
 Tauri is deferred until the local-vault workflow milestone. It may provide desktop filesystem capabilities through a narrow source-provider boundary. Tauri commands, paths, events, and handles must not leak into generic core packages. Browser and future platform providers should remain viable.
 
-None of React Flow, Sigma, Graphology, or Tauri is installed through KG1.
+None of React Flow, Sigma, Graphology, or Tauri is installed through KG2.
 
 ## Performance principles
 
 Performance work begins with boundaries and measurement:
 
-- parse incrementally at file granularity when parsing exists;
+- parse one supplied file deterministically now; add file-granular incremental orchestration in KG10;
 - communicate through serializable snapshots and deltas;
 - introduce workers only after measured UI-thread cost justifies them;
 - project only the graph needed for the active view;
@@ -94,9 +121,9 @@ Rust, WASM, universal graph abstractions, and million-node optimization are not 
 
 ## Testing philosophy
 
-Vitest is the unit and contract test foundation. KG1 validates one representative synthetic JSON snapshot and uses focused test builders for malformed variants, including a stringify/parse/validate round trip. Future domain work should favor deterministic, table-driven tests against small synthetic Markdown fixtures. Adapter tests must separate generic Markdown behavior from Obsidian-specific behavior. Snapshot/delta and projection tests should assert serializability and preservation of section-level precision.
+Vitest is the unit and contract test foundation. KG1 validates canonical snapshots; KG2 combines focused parser cases with a synthetic workspace fixture and JSON round-trip coverage. Future domain work should favor deterministic, table-driven tests against small synthetic Markdown fixtures. Adapter tests must separate generic Markdown behavior from Obsidian-specific behavior. Snapshot/delta and projection tests should assert serializability and preservation of section-level precision.
 
-Playwright may be introduced when end-to-end UI flows exist; it remains intentionally absent through KG1. Real-vault validation remains local and diagnostic. Any regression committed to the repository must be synthetic and free of private theory content.
+Playwright may be introduced when end-to-end UI flows exist; it remains intentionally absent through KG2. Real-vault validation remains local and diagnostic. Any regression committed to the repository must be synthetic and free of private theory content.
 
 ## Changing these decisions
 
