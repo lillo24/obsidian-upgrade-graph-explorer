@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, and KG5 implements a development-only scanner, validated diagnostic report, and browser explorer. Graph projections, renderers, persistence, and product filesystem access remain planned work.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner, validated diagnostic report, and browser explorer, and KG6 implements renderer-independent view projection. Renderers, persistence, and product filesystem access remain planned work.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -68,6 +68,14 @@ turns successful KG4 output into a deterministic, validated read model. It owns
 compatibility probes and readable lookup helpers, not canonical resolution,
 filesystem acquisition, UI, graph projection, or rendering. Those exclusions
 are mechanically enforced for production source.
+
+`packages/view-projection` depends inward on core only. It validates and indexes
+one canonical snapshot, then derives plain visible nodes/edges from structural
+disclosure, focus, and filter state. It owns nearest-visible-ancestor endpoint
+roll-up, aggregated reference provenance, internal collapsed relationships, and
+projection-only diagnostic targets. Source adapters, filesystem/platform APIs,
+renderers, layout engines, application code, and graph libraries are
+mechanically excluded from its production source.
 
 `tools/vault-diagnostics` is the sole KG5 filesystem boundary. It recursively
 discovers one explicitly selected vault, reads strict UTF-8 Markdown, inventories
@@ -197,13 +205,30 @@ before entering the repository.
 
 Source-derived knowledge and application-owned visualization state are separate domains.
 
-Canonical source truth now includes document structure, references, source spans, and explicit resolution results. Later source-backed fields may be added only for concrete requirements. View state will include hidden/collapsed state, selection, pins, manual positions, filters, viewport, saved views, and renderer preferences. A UI action such as hiding, moving, or pinning an entity must never mutate source truth. Early releases are read-only with respect to Markdown.
+Canonical source truth includes document structure, references, source spans,
+and explicit resolution results. Later source-backed fields may be added only
+for concrete requirements. KG6 renderer-independent projection state now covers
+structural disclosure, block inclusion, focus root/hops/direction/context, and
+path/projected-text/entity-kind/resolution filters. Future application view
+state may additionally include selection, pins, manual positions, viewport,
+saved views, and renderer preferences. A UI action such as hiding, moving, or
+pinning an entity must never mutate source truth. Early releases are read-only
+with respect to Markdown.
 
 KG5 search, resolution filters, disclosure state, and pagination are transient
 diagnostic UI state. They are not KG6 projection contracts or KG9 persisted view
 state.
 
-Renderers receive projections formed from canonical source truth plus view state. A file-level projection may aggregate several section-level references; it must not replace or degrade the canonical relationships. React Flow, Sigma, and Graphology must never own persisted or canonical truth.
+Renderers receive `ViewProjection` plain data formed from canonical source truth
+plus renderer-independent state. Structural disclosure happens before each
+hidden reference endpoint independently rolls to its nearest visible ancestor.
+Equal visible source/target/status relationships aggregate while retaining exact
+reference IDs; same-node relationships remain internal node provenance instead
+of self-loop edges. Unresolved, ambiguous, and invalid targets are typed
+projection-only nodes, never canonical entities. Focus runs over projected
+reference edges before filters, and filter removal never causes endpoint
+rerouting. React Flow, Sigma, and Graphology must never own persisted or
+canonical truth.
 
 ## Resolution and diagnostics
 
@@ -246,8 +271,11 @@ Performance work begins with boundaries and measurement:
 - prefer explicit diagnostics over fast but uncertain resolution.
 
 KG5 provides deterministic smoke/small/medium/large pipeline workloads and
-coarse real-vault phase timings. They are investigative evidence only: no CI
-timing threshold or renderer conclusion is established before KG12.
+coarse real-vault phase timings. KG6 extends the same harness with projection
+index construction plus documents-only, top-level, expanded, one-hop focus, and
+resolution-filter scenarios and projected counts. They are investigative
+evidence only: no CI timing threshold or renderer conclusion is established
+before KG12.
 
 Rust, WASM, universal graph abstractions, and million-node optimization are not foundation requirements.
 
@@ -255,7 +283,13 @@ Rust, WASM, universal graph abstractions, and million-node optimization are not 
 
 Vitest is the unit and contract test foundation. KG1 validates canonical snapshots; KG2 combines focused parser cases with a synthetic workspace fixture and JSON round-trip coverage; KG3 adds separate Obsidian frontmatter, link, and block fixtures; KG4 adds independent multi-file resolution fixtures for ownership, ambiguity, hierarchy, blocks, paths, and unsupported attachments; KG5 adds report/probe validation, temporary-directory scanner tests, synthetic workload generation, pure UI transformations, and shell rendering tests. Future domain work should favor deterministic, table-driven tests against small synthetic Markdown fixtures. Adapter tests keep generic Markdown behavior separate from Obsidian-specific behavior. Snapshot/delta and projection tests should assert serializability and preservation of section-level precision.
 
-The KG5 browser workflow is automation-tested locally without adding a browser-test dependency. A product end-to-end suite remains a future choice. Real-vault validation stays local and diagnostic; any committed regression must be synthetic and free of private theory content.
+KG6 adds pure disclosure, endpoint-routing, aggregation, synthetic-target,
+focus, filter, determinism, JSON round-trip, immutability, validation, and exact
+provenance-coverage tests over neutral canonical data. The KG5 browser workflow
+is automation-tested locally without adding a browser-test dependency. A
+product end-to-end suite remains a future choice. Real-vault validation stays
+local and diagnostic; any committed regression must be synthetic and free of
+private theory content.
 
 ## Changing these decisions
 

@@ -1,7 +1,17 @@
+import { performance } from 'node:perf_hooks';
+
 import {
   generateSyntheticWorkspace,
   type SyntheticWorkspaceConfig,
 } from '@icarus-graph-explorer/diagnostics-obsidian';
+import {
+  createProjectionWorkspace,
+  documentOnlyProjectionState,
+  projectView,
+  topLevelSectionProjectionState,
+  type ViewProjection,
+  type ViewProjectionState,
+} from '@icarus-graph-explorer/view-projection';
 
 import {
   BENCHMARK_PROFILES,
@@ -42,6 +52,32 @@ function expectedCounts(config: SyntheticWorkspaceConfig) {
   };
 }
 
+function elapsed(start: number): number {
+  return Number((performance.now() - start).toFixed(3));
+}
+
+function projectionCounts(projection: ViewProjection) {
+  return {
+    nodes: projection.nodes.length,
+    edges: projection.edges.length,
+    referenceGroups: projection.edges.filter(
+      (edge) => edge.kind === 'reference',
+    ).length,
+    syntheticTargets: projection.nodes.filter(
+      (node) => node.kind === 'reference-target',
+    ).length,
+  };
+}
+
+function measureProjection(
+  workspace: ReturnType<typeof createProjectionWorkspace>,
+  state: ViewProjectionState,
+) {
+  const start = performance.now();
+  const projection = projectView(workspace, state);
+  return { timingMs: elapsed(start), ...projectionCounts(projection) };
+}
+
 function main(): void {
   const profile = selectedProfile(process.argv.slice(2));
   const config = BENCHMARK_PROFILES[profile];
@@ -51,6 +87,48 @@ function main(): void {
     nonMarkdownPaths: [],
     discoveryReadMs: 0,
   });
+  const indexStart = performance.now();
+  const projectionWorkspace = createProjectionWorkspace(run.report.snapshot);
+  const indexConstructionMs = elapsed(indexStart);
+  const expandableEntityIds = projectionWorkspace
+    .entities()
+    .filter((entity) => entity.kind !== 'block')
+    .map((entity) => entity.id);
+  const focusRoot = projectionWorkspace
+    .entities()
+    .find((entity) => entity.kind === 'document');
+  if (focusRoot === undefined) {
+    throw new Error('Synthetic benchmark produced no focus-root document.');
+  }
+  const documentsOnly = documentOnlyProjectionState();
+  const topLevelSections = topLevelSectionProjectionState();
+  const projectionScenarios = {
+    documentsOnly: measureProjection(projectionWorkspace, documentsOnly),
+    topLevelSections: measureProjection(projectionWorkspace, topLevelSections),
+    expandedHierarchy: measureProjection(projectionWorkspace, {
+      disclosure: {
+        defaultDepth: 1,
+        expandedEntityIds: expandableEntityIds,
+        collapsedEntityIds: [],
+        includeBlocks: true,
+      },
+    }),
+    oneHopFocus: measureProjection(projectionWorkspace, {
+      ...documentsOnly,
+      focus: {
+        rootEntityId: focusRoot.id,
+        hops: 1,
+        direction: 'both',
+        hierarchyContext: 'ancestors',
+      },
+    }),
+    resolutionFilter: measureProjection(projectionWorkspace, {
+      ...topLevelSections,
+      filters: {
+        referenceStatuses: ['unresolved', 'ambiguous', 'invalid'],
+      },
+    }),
+  };
   console.log(
     JSON.stringify(
       {
@@ -67,6 +145,12 @@ function main(): void {
           parseAdapt: run.timings.parseAdaptMs,
           resolution: run.timings.resolutionMs,
           reportConstruction: run.timings.reportConstructionMs,
+        },
+        projection: {
+          canonicalEntities: run.report.snapshot.entities.length,
+          canonicalReferences: run.report.snapshot.references.length,
+          indexConstructionMs,
+          scenarios: projectionScenarios,
         },
         note: 'Diagnostic evidence only; no performance budget is enforced.',
       },

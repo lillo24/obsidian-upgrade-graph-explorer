@@ -145,6 +145,12 @@ importers:
         specifier: 24.13.3
         version: 24.13.3
 
+  packages/view-projection:
+    dependencies:
+      '@icarus-graph-explorer/core':
+        specifier: workspace:*
+        version: link:../core
+
   tools/vault-diagnostics:
     dependencies:
       '@icarus-graph-explorer/adapter-obsidian':
@@ -159,6 +165,9 @@ importers:
       '@icarus-graph-explorer/resolver-obsidian':
         specifier: workspace:*
         version: link:../../packages/resolver-obsidian
+      '@icarus-graph-explorer/view-projection':
+        specifier: workspace:*
+        version: link:../../packages/view-projection
     devDependencies:
       '@types/node':
         specifier: 24.13.3

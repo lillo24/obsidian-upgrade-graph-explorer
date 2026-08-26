@@ -24,7 +24,7 @@ src/
   output.ts           Explicit JSON report writing.
   cli.ts              Aggregate-only command output and exit behavior.
   benchmark-config.ts Deterministic smoke/small/medium/large workload profiles.
-  benchmark.ts        Opt-in pure-pipeline timing command without budgets.
+  benchmark.ts        Opt-in pipeline/projection timing command without budgets.
   generate-sample.ts  Regenerates the committed neutral browser sample.
   index.test.ts       Temporary-directory scanner and failure contracts.
 ```
@@ -77,6 +77,9 @@ pnpm benchmark:pipeline -- --profile medium
 pnpm benchmark:pipeline -- --profile large
 ```
 
-Profiles are deterministic and measure parse/adapt, resolution, and report
-construction. Timings are local evidence, never CI budgets. Normal tests execute
-only a tiny correctness workload.
+Profiles are deterministic and measure parse/adapt, resolution, report
+construction, projection-index construction, documents-only/top-level/expanded
+projection, one-hop focus, and resolution filtering. Projection scenarios also
+report canonical and projected counts, aggregated reference groups, and
+synthetic target counts. Timings are local evidence, never CI budgets. Normal
+tests execute only a tiny correctness workload.
