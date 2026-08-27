@@ -16,9 +16,11 @@ canonical truth, or own a platform storage implementation.
   controls directly to KG6 filter state.
 - `maximized-graph-mode.ts` owns the reversible body scroll lock and Escape-key
   exit listener for the transient application maximize mode.
-- `ProvenanceInspector.tsx` presents canonical identity, breadcrumbs, exact
-  occurrences, subtree relationships, roll-up explanations, diagnostics, and
-  bounded relationship groups.
+- `ProvenanceInspector.tsx` presents user-facing identity, breadcrumbs,
+  outgoing links, backlinks, connection occurrences, structural containment,
+  and plain-language link problems in bounded groups. Canonical IDs, exact
+  ranges, resolution metadata, ambiguous candidate mentions, and collapsed
+  internal occurrences stay in a closed-by-default technical disclosure.
 - `SummaryPanel.tsx` renders derived canonical/evidence counts.
 - `HierarchyPanel.tsx` lazily expands document, section, and block ownership.
 - `ReferencesPanel.tsx` pages filtered references and exposes provenance details.

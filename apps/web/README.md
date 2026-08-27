@@ -1,6 +1,6 @@
 # Web Structural Graph Explorer
 
-Status: **STABLE — UX1 graph workspace shell and KG9B persistence gates pass.**
+Status: **STABLE — UX2 inspector, UX1 shell, and KG9B persistence gates pass.**
 
 This package owns the browser SPA, validated KG5 report selection, KG6 graph
 interaction state, guarded browser persistence, graph selection, canonical
@@ -76,6 +76,15 @@ column and does not clear or change graph selection. Selecting another graph ite
 while it is closed does not reopen it, and reopening resolves the current selection.
 Neither shell preference is part of the persisted-view schema.
 
+The normal Inspector view is deliberately user-facing: entities show their name,
+kind, location, outgoing links, and backlinks; reference edges show the actual
+source-to-destination link occurrences; hierarchy edges use containment language;
+and unresolved, ambiguous, or invalid links use plain-language problem states.
+Canonical/projection IDs, source ranges, resolution metadata, ambiguous candidate
+mentions, and links internal to collapsed sections are available only inside the
+closed-by-default **Technical details** disclosure. Relationship lists render at
+most 20 entries initially and reveal further entries in bounded increments.
+
 Successful persistence and navigation messages remain in visually hidden
 `aria-live` regions. Projection, storage, report-loading, and navigation failures
 use explicit visible alerts; failure visibility is not inferred from message text.
@@ -111,9 +120,10 @@ The default view is documents-only; top-level sections and explicit per-entity
 disclosure remain KG6 state. Selecting an entity enables one-to-three-hop focus
 with incoming/outgoing/both direction. Selection and hover affect presentation
 only. Diagnostic targets can be selected but never focused or expanded. The
-primary inspector resolves projected selection to canonical descriptors, exact
-occurrences, subtree outgoing references/backlinks, ambiguous candidate
-mentions, and internal collapsed relationships.
+primary inspector resolves projected selection to canonical descriptors and
+exact occurrences, then keeps that internal model behind a user-facing boundary:
+normal relationship summaries count only outgoing links and backlinks, while
+candidate mentions and internal collapsed relationships remain technical context.
 
 Blocks remain opt-in through the labelled **Blocks** checkbox and still require
 explicit expansion of their visible parent, preserving KG6's conservative block
