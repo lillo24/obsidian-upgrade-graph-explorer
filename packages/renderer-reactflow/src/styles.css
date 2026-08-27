@@ -1,0 +1,363 @@
+@import '@xyflow/react/dist/style.css';
+
+.graph-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 34rem;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at 50% 0%,
+      rgb(255 255 255 / 90%),
+      transparent 38rem
+    ),
+    #edf2f3;
+}
+
+.graph-canvas .react-flow__renderer {
+  cursor: grab;
+}
+
+.graph-canvas .react-flow__renderer:active {
+  cursor: grabbing;
+}
+
+.graph-canvas .react-flow__node {
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition:
+    opacity 120ms ease,
+    filter 120ms ease;
+}
+
+.graph-canvas .react-flow__node:focus-visible {
+  outline: 3px solid #c78310;
+  outline-offset: 4px;
+}
+
+.graph-canvas .react-flow__node.selected .entity-card,
+.graph-canvas .react-flow__node.selected .diagnostic-card {
+  border-color: #101723;
+  box-shadow:
+    0 0 0 3px rgb(247 211 106 / 90%),
+    0 1rem 2rem rgb(16 23 35 / 18%);
+}
+
+.graph-canvas .react-flow__node.is-deemphasized,
+.graph-canvas .react-flow__edge.is-deemphasized {
+  opacity: 0.24;
+}
+
+.graph-canvas .react-flow__node.is-highlighted {
+  filter: saturate(1.15);
+}
+
+.entity-card,
+.diagnostic-card {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  padding: 0.78rem 0.85rem;
+  overflow: hidden;
+  border: 1px solid #95aab5;
+  border-radius: 0.75rem;
+  color: #142631;
+  background: #ffffff;
+  box-shadow: 0 0.55rem 1.4rem rgb(31 58 72 / 12%);
+}
+
+.entity-card--document {
+  border-top: 4px solid #245e74;
+  background: linear-gradient(145deg, #ffffff, #edf7f8);
+}
+
+.entity-card--section {
+  border-top: 4px solid #665d8c;
+  background: linear-gradient(145deg, #ffffff, #f4f2fa);
+}
+
+.entity-card--block {
+  border-style: dashed;
+  border-top: 4px solid #89713f;
+  background: #fffcf2;
+}
+
+.entity-card--context {
+  color: #536873;
+  background: #f0f3f4;
+  box-shadow: none;
+}
+
+.entity-card__topline,
+.diagnostic-card__topline,
+.entity-card__footer {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.entity-kind,
+.focus-distance {
+  color: #59717d;
+  font-size: 0.61rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.focus-distance {
+  color: #385e9b;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.entity-title,
+.diagnostic-target {
+  display: block;
+  margin-top: 0.35rem;
+  overflow: hidden;
+  font-size: 0.95rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entity-detail,
+.diagnostic-meta {
+  display: block;
+  margin-top: 0.2rem;
+  overflow: hidden;
+  color: #607682;
+  font-size: 0.66rem;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entity-card__footer {
+  min-height: 1.55rem;
+  margin-top: auto;
+}
+
+.internal-reference-badge {
+  color: #21604b;
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.entity-disclosure {
+  display: inline-flex;
+  min-width: 2.4rem;
+  min-height: 1.75rem;
+  gap: 0.25rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid #8ca1ac;
+  border-radius: 999px;
+  color: #183b4b;
+  background: #ffffff;
+  font-size: 0.69rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.entity-disclosure:hover {
+  border-color: #183b4b;
+  background: #e7f2f4;
+}
+
+.entity-disclosure:focus-visible {
+  outline: 3px solid #c78310;
+  outline-offset: 2px;
+}
+
+.diagnostic-card {
+  border-width: 2px;
+  box-shadow: 0 0.5rem 1.3rem rgb(74 51 22 / 13%);
+}
+
+.diagnostic-card--unresolved {
+  border-color: #a97a19;
+  border-style: dashed;
+  background: #fff8df;
+}
+
+.diagnostic-card--ambiguous {
+  border-color: #b35d25;
+  border-style: double;
+  border-width: 4px;
+  background: #fff0e2;
+}
+
+.diagnostic-card--invalid {
+  border-color: #a63845;
+  background: repeating-linear-gradient(
+    135deg,
+    #fff0f1,
+    #fff0f1 8px,
+    #fbe4e6 8px,
+    #fbe4e6 16px
+  );
+}
+
+.diagnostic-card__topline {
+  justify-content: flex-start;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.diagnostic-symbol {
+  display: inline-grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.graph-canvas .react-flow__handle {
+  width: 2px;
+  height: 2px;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.graph-edge-path {
+  fill: none;
+  stroke: #63808e;
+  stroke-width: 1.8;
+}
+
+.graph-edge-path--hierarchy {
+  stroke: #a7b4ba;
+  stroke-width: 1.2;
+}
+
+.graph-edge-path--resolved {
+  stroke: #2b765f;
+  stroke-width: 2.3;
+}
+
+.graph-edge-path--unresolved {
+  stroke: #a97a19;
+  stroke-dasharray: 8 5;
+}
+
+.graph-edge-path--ambiguous {
+  stroke: #b35d25;
+  stroke-dasharray: 2 4;
+  stroke-width: 3;
+}
+
+.graph-edge-path--invalid {
+  stroke: #a63845;
+  stroke-dasharray: 10 3 2 3;
+  stroke-width: 3;
+}
+
+.react-flow__edge.selected .graph-edge-path,
+.react-flow__edge.is-highlighted .graph-edge-path {
+  stroke-width: 4;
+}
+
+.graph-edge-label {
+  position: absolute;
+  z-index: 2;
+  display: inline-flex;
+  min-width: 1.55rem;
+  min-height: 1.55rem;
+  gap: 0.12rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.38rem;
+  border: 1px solid #718792;
+  border-radius: 999px;
+  color: #18303d;
+  background: #ffffff;
+  box-shadow: 0 0.2rem 0.5rem rgb(16 23 35 / 12%);
+  font-size: 0.66rem;
+  font-weight: 900;
+  pointer-events: none;
+}
+
+.graph-edge-label--unresolved {
+  border-style: dashed;
+  color: #765310;
+  background: #fff8df;
+}
+
+.graph-edge-label--ambiguous {
+  border-style: double;
+  color: #8b451d;
+  background: #fff0e2;
+}
+
+.graph-edge-label--invalid {
+  color: #8a2f38;
+  background: #fff0f1;
+}
+
+.graph-canvas .react-flow__controls {
+  overflow: hidden;
+  border: 1px solid #a8b8c0;
+  border-radius: 0.6rem;
+  box-shadow: 0 0.55rem 1.2rem rgb(16 23 35 / 14%);
+}
+
+.graph-canvas .react-flow__controls-button {
+  width: 2.3rem;
+  height: 2.3rem;
+  border-bottom-color: #d4dde1;
+  color: #183b4b;
+  background: #ffffff;
+}
+
+.graph-canvas .react-flow__controls-button:hover {
+  background: #e8f1f3;
+}
+
+.graph-layout-warning {
+  position: absolute;
+  z-index: 5;
+  top: 0.75rem;
+  left: 50%;
+  width: min(90%, 44rem);
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #b4781b;
+  border-radius: 0.55rem;
+  color: #553a0d;
+  background: #fff4d2;
+  font-size: 0.76rem;
+  transform: translateX(-50%);
+}
+
+.graph-empty {
+  display: grid;
+  min-height: 34rem;
+  place-content: center;
+  gap: 0.35rem;
+  padding: 2rem;
+  color: #536873;
+  text-align: center;
+}
+
+.graph-empty strong {
+  color: #18303d;
+  font-size: 1.1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graph-canvas .react-flow__node,
+  .graph-canvas .react-flow__edge {
+    transition: none;
+  }
+}

@@ -12,6 +12,7 @@ import {
   type ViewProjection,
   type ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
+import { prepareRendererGraph } from '@icarus-graph-explorer/renderer-reactflow/prepare';
 
 import {
   BENCHMARK_PROFILES,
@@ -78,6 +79,20 @@ function measureProjection(
   return { timingMs: elapsed(start), ...projectionCounts(projection) };
 }
 
+function measureRenderer(
+  projection: ViewProjection,
+  layoutMode: 'structure' | 'focus',
+) {
+  const start = performance.now();
+  const graph = prepareRendererGraph(projection, { layoutMode });
+  return {
+    timingMs: elapsed(start),
+    nodes: graph.nodes.length,
+    edges: graph.edges.length,
+    layoutWarning: graph.layoutWarning,
+  };
+}
+
 function main(): void {
   const profile = selectedProfile(process.argv.slice(2));
   const config = BENCHMARK_PROFILES[profile];
@@ -102,18 +117,18 @@ function main(): void {
   }
   const documentsOnly = documentOnlyProjectionState();
   const topLevelSections = topLevelSectionProjectionState();
-  const projectionScenarios = {
-    documentsOnly: measureProjection(projectionWorkspace, documentsOnly),
-    topLevelSections: measureProjection(projectionWorkspace, topLevelSections),
-    expandedHierarchy: measureProjection(projectionWorkspace, {
+  const scenarioStates = {
+    documentsOnly,
+    topLevelSections,
+    expandedHierarchy: {
       disclosure: {
         defaultDepth: 1,
         expandedEntityIds: expandableEntityIds,
         collapsedEntityIds: [],
         includeBlocks: true,
       },
-    }),
-    oneHopFocus: measureProjection(projectionWorkspace, {
+    } satisfies ViewProjectionState,
+    oneHopFocus: {
       ...documentsOnly,
       focus: {
         rootEntityId: focusRoot.id,
@@ -121,14 +136,36 @@ function main(): void {
         direction: 'both',
         hierarchyContext: 'ancestors',
       },
-    }),
-    resolutionFilter: measureProjection(projectionWorkspace, {
+    } satisfies ViewProjectionState,
+    resolutionFilter: {
       ...topLevelSections,
       filters: {
         referenceStatuses: ['unresolved', 'ambiguous', 'invalid'],
       },
-    }),
+    } satisfies ViewProjectionState,
   };
+  const measuredProjections = Object.fromEntries(
+    Object.entries(scenarioStates).map(([name, state]) => [
+      name,
+      measureProjection(projectionWorkspace, state),
+    ]),
+  );
+  const rendererScenarios = Object.fromEntries(
+    Object.entries(scenarioStates)
+      .filter(([name]) =>
+        ['documentsOnly', 'expandedHierarchy', 'oneHopFocus'].includes(name),
+      )
+      .map(([name, state]) => {
+        const projection = projectView(projectionWorkspace, state);
+        return [
+          name,
+          measureRenderer(
+            projection,
+            name === 'oneHopFocus' ? 'focus' : 'structure',
+          ),
+        ];
+      }),
+  );
   console.log(
     JSON.stringify(
       {
@@ -150,7 +187,12 @@ function main(): void {
           canonicalEntities: run.report.snapshot.entities.length,
           canonicalReferences: run.report.snapshot.references.length,
           indexConstructionMs,
-          scenarios: projectionScenarios,
+          scenarios: measuredProjections,
+        },
+        renderer: {
+          library: '@xyflow/react',
+          layout: '@dagrejs/dagre',
+          scenarios: rendererScenarios,
         },
         note: 'Diagnostic evidence only; no performance budget is enforced.',
       },

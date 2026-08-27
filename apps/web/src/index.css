@@ -1,3 +1,5 @@
+@import '@icarus-graph-explorer/renderer-reactflow/styles.css';
+
 :root {
   color: #172631;
   background: #eef2f4;

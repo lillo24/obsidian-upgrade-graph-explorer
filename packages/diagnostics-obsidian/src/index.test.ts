@@ -109,10 +109,11 @@ describe('Obsidian diagnostic reports', () => {
     expect(summary).toMatchObject({
       documents: 5,
       blocks: 3,
-      references: 8,
-      resolved: 1,
+      references: 11,
+      resolved: 3,
       unresolved: 6,
       ambiguous: 1,
+      invalid: 1,
     });
     expect(
       nested === undefined ? undefined : lookups.labelByEntityId.get(nested.id),

@@ -24,7 +24,7 @@ src/
   output.ts           Explicit JSON report writing.
   cli.ts              Aggregate-only command output and exit behavior.
   benchmark-config.ts Deterministic smoke/small/medium/large workload profiles.
-  benchmark.ts        Opt-in pipeline/projection timing command without budgets.
+  benchmark.ts        Opt-in pipeline/projection/renderer timing without budgets.
   generate-sample.ts  Regenerates the committed neutral browser sample.
   index.test.ts       Temporary-directory scanner and failure contracts.
 ```
@@ -79,7 +79,8 @@ pnpm benchmark:pipeline -- --profile large
 
 Profiles are deterministic and measure parse/adapt, resolution, report
 construction, projection-index construction, documents-only/top-level/expanded
-projection, one-hop focus, and resolution filtering. Projection scenarios also
-report canonical and projected counts, aggregated reference groups, and
-synthetic target counts. Timings are local evidence, never CI budgets. Normal
+projection, one-hop focus, and resolution filtering. For structural, expanded,
+and focus scenarios it also measures pure React Flow mapping plus Dagre layout
+and reports node/edge counts or an explicit layout warning. Run small and medium
+for the KG7 evidence set. Timings are local evidence, never CI budgets. Normal
 tests execute only a tiny correctness workload.
