@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, and KG8 implements source-neutral inspection/search plus provenance-first navigation. Persistence and product filesystem access remain planned work.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, and KG9A implements app-owned stable canonical identity through private source-neutral reconciliation. KG9 view-state persistence and product filesystem access remain planned work.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -32,7 +32,9 @@ Dependencies point from source/platform details and UI toward stable domain cont
 ```text
 SourceProvider
   → workspace / parser / source adapter / resolver
-  → canonical snapshot and deltas
+  → transient canonical snapshot
+  → stable-identity reconciliation
+  → stable canonical snapshot and future deltas
   → derived indexes
   ├─→ explorer inspection/search → UI inspector
   └─→ view projection → renderer → UI graph
@@ -68,6 +70,15 @@ compatibility probes and readable lookup helpers, not canonical resolution,
 filesystem acquisition, UI, graph projection, or rendering. Those exclusions
 are mechanically enforced for production source.
 
+`packages/stable-identity` depends inward on core only. It validates one
+versioned private observation catalog, matches one complete canonical snapshot
+conservatively against it, allocates opaque IDs, remaps all entity/reference
+relationships, proves non-identity semantics are unchanged, and validates the
+result as schema version 1. It has no Markdown/Obsidian, diagnostics,
+projection, renderer, application, filesystem, platform, or UUID-generation
+dependency. Catalog persistence and workspace-UUID creation belong to the
+outer application boundary.
+
 `packages/view-projection` depends inward on core only. It validates and indexes
 one canonical snapshot, then derives plain visible nodes/edges from structural
 disclosure, focus, and filter state. It owns nearest-visible-ancestor endpoint
@@ -100,12 +111,14 @@ Centering uses prepared renderer coordinates only after the new projection and
 layout exist. It remains separate from selection and full-graph fit; no
 canonical or inspection truth enters the renderer.
 
-`tools/vault-diagnostics` is the sole KG5 filesystem boundary. It recursively
+`tools/vault-diagnostics` is the current development filesystem boundary. It recursively
 discovers one explicitly selected vault, reads strict UTF-8 Markdown, inventories
-non-Markdown paths without reading their contents, and invokes KG3 → KG4 → the
-diagnostics package. The browser receives only a generated report; it never
-receives a folder handle. This tool is development infrastructure, not the KG11
-product source-provider design.
+non-Markdown paths without reading their contents, and invokes KG3 → KG4 →
+KG9A stable identity → diagnostics. It also owns the private catalog file
+adapter: strict load, explicit reset, vault-local-path rejection, and validated
+temporary-sibling replacement after report success. The browser receives only
+a generated report; it never receives a catalog or folder handle. This tool is
+development infrastructure, not the KG11 product source-provider design.
 
 ## Markdown structural parsing
 
@@ -165,10 +178,13 @@ full span contains the complete reference wins; otherwise the document owns the
 reference. Blocks do not own references until a future parser can establish
 reliable block content extents.
 
-Default canonical IDs are deterministic transient tuples of workspace, path,
-kind, and source offset. They stabilize one snapshot and repeated assembly but
-are not durable across source edits or renames. A small provider seam preserves
-KG9's ability to add durable identity later.
+Default KG4 IDs are deterministic transient tuples of workspace, path, kind,
+and source offset. They stabilize one assembly but are intentionally not
+durable across source edits or renames. The small provider seam remains useful
+for deterministic assembly/tests; KG9A does not overload it with application
+identity. Persistent flows reconcile the complete resolved canonical hierarchy
+after KG4 instead, where source-neutral parent, target, candidate, and reference
+evidence is available.
 
 Wikilinks match exact Markdown basenames and qualified paths, with `.md`
 equivalence. Explicit relative paths use the source folder. Folder-qualified
@@ -194,6 +210,36 @@ snapshot may contain unresolved, ambiguous, and invalid references. Duplicate
 document paths, incompatible source geometry, generated ID collisions, or
 runtime snapshot-validation failures are fatal and return no partial snapshot.
 
+## Stable identity reconciliation
+
+KG9A keeps durable identity outside Markdown and outside Obsidian resolution:
+
+```text
+KG4 transient correct KnowledgeSnapshot
+  → source-neutral conservative reconciliation
+  → stable-ID schema-v1 KnowledgeSnapshot
+```
+
+Documents reuse one exact normalized path or, after a rename/move, one unique
+non-empty graph-structural fingerprint. Sections reuse exact structure beneath
+a matched stable parent; one unique non-empty subtree/reference fingerprint may
+also preserve a heading rename or cross-parent move. Blocks use matched-parent
+locators or unchanged sibling cardinality/ordinal only. References reconcile
+after entities through stable source and resolution signatures. Duplicate
+identical references require unchanged unique offsets. Matching is staged and
+one-to-one. Weak or duplicate evidence receives a new ID; there is no fuzzy,
+nearest-candidate, semantic/AI, or array-order tie-breaker.
+
+The catalog is schema-versioned private local plain data. It retains allocation
+counters and only the paths, hierarchy, offsets, headings, fingerprints, raw
+targets, and stable resolution observations needed for the next complete run.
+It contains no source body, absolute filesystem path, report, renderer state,
+or view state. Deleted observations are omitted while counters continue; no
+historical identity resurrection is attempted. New IDs are opaque sequence
+values and never derive from path/title/offset. Persistent workspace identity
+comes from an explicit ID or an outer-layer UUID generated once and then reused
+from the catalog.
+
 ## Diagnostic report workflow
 
 KG5 adds a versioned plain-data envelope around a validated canonical snapshot:
@@ -201,11 +247,16 @@ KG5 adds a versioned plain-data envelope around a validated canonical snapshot:
 ```text
 development filesystem scanner
   → KG3 parsed documents
-  → KG4 canonical snapshot + diagnostics
+  → KG4 transient canonical snapshot + diagnostics
+  → optional KG9A stable identity reconciliation
   → compatibility probes + aggregate inventory + optional timings
   → runtime-validated JSON report
   → local browser explorer
 ```
+
+Compatibility probes and the report are constructed after optional identity
+stabilization, so every exposed entity/reference/target/candidate ID is stable
+in persistent runs. The catalog stays separate and never enters the report.
 
 The report deliberately excludes source text and snippets, but it contains
 paths, headings, raw targets, spans, and relationships and must therefore be
@@ -246,6 +297,11 @@ KG8 graph filters remain KG6 state. Explicit navigation exits focus, reveals
 the canonical ancestor chain through KG6, widens only filters that exclude the
 target, then selects and centers the resulting projected node.
 
+KG9A makes canonical IDs durable across the tested conservative edit classes
+but does not persist any `ViewProjectionState`, disclosure, filters, focus,
+selection, search, inspector state, viewport, saved view, or renderer position.
+KG9B remains the owner of renderer-independent application view persistence.
+
 Renderers receive `ViewProjection` plain data formed from canonical source truth
 plus renderer-independent state. Structural disclosure happens before each
 hidden reference endpoint independently rolls to its nearest visible ancestor.
@@ -270,6 +326,11 @@ The initial product is local-first:
 - no telemetry or analytics;
 - no source-file write-back;
 - application-owned caches and view state may be stored locally.
+
+KG9A identity catalogs are application-owned private local state. Even without
+Markdown body text they may contain paths, headings, fingerprints, and raw
+targets, so they must stay in ignored/app-local storage outside the selected
+vault and must not be logged or included in browser reports.
 
 Remote capabilities, collaboration, or source editing would require an explicit later trust decision. Private workspace material must not enter repository fixtures or logs. Bugs discovered in the Icarus vault must be reduced to small synthetic examples before they are committed.
 
@@ -305,7 +366,9 @@ resolution-filter scenarios and projected counts. KG7 additionally measures
 one-to-one React Flow mapping and Dagre structure/focus layout for representative
 small and medium projections. KG8 adds inspection-index construction, canonical
 search, entity-subtree inspection, and aggregated-edge provenance timings with
-result counts. They are investigative evidence only: no CI
+result counts. KG9A adds cold assignment and warm deterministic normal-edit
+reconciliation counts/timings for small and medium profiles. They are
+investigative evidence only: no CI
 timing threshold or high-density renderer conclusion is established before
 KG12.
 
@@ -337,6 +400,14 @@ filter-conflict navigation, and center-request tests. Synthetic and gitignored
 real-report browser checks cover hidden-entity search/reveal, inspector
 navigation, graph filters, focus exit, bounded lists, accessibility, and narrow
 layout without adding a browser-test dependency or private artifacts.
+
+KG9A adds source-neutral synthetic revisions for unchanged snapshots, offset
+shifts, inserted headings, body-stable edits, unique and ambiguous document
+renames, strong and weak heading renames/moves, duplicates, deletion, blocks,
+unique and duplicate references, resolution remapping, JSON round trips,
+semantic invariance, determinism, corruption, workspace mismatch, and private
+catalog lifecycle behavior. Real-vault continuity remains an ignored local
+aggregate check; no catalog or private observation enters the repository.
 
 ## Changing these decisions
 

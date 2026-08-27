@@ -2,7 +2,7 @@
 
 Icarus Graph Explorer is an early-stage, hierarchical knowledge-graph explorer for Markdown workspaces. Its intended model treats documents, their nested sections, and optional addressable blocks as distinct entities so references can retain their precise source and target locations.
 
-KG0 established the repository foundation, KG1 added the versioned canonical model, KG2 added deterministic CommonMark document/section structure parsing, KG3 added tested Obsidian syntax interpretation, KG4 added conservative workspace resolution plus validated canonical snapshot assembly, KG5 added a local diagnostic-report workflow, KG6 added renderer-independent disclosure and focus, KG7 added the projection-driven React Flow structural graph, and KG8 adds source-neutral provenance inspection, backlinks, canonical search, and targeted graph navigation. Product vault access remains deferred.
+KG0 established the repository foundation, KG1 added the versioned canonical model, KG2 added deterministic CommonMark document/section structure parsing, KG3 added tested Obsidian syntax interpretation, KG4 added conservative workspace resolution plus validated canonical snapshot assembly, KG5 added a local diagnostic-report workflow, KG6 added renderer-independent disclosure and focus, KG7 added the projection-driven React Flow structural graph, KG8 added source-neutral provenance inspection, backlinks, canonical search, and targeted graph navigation, and KG9A adds private app-owned stable identity across supported normal edits. KG9B view persistence and product vault access remain deferred.
 
 The application is local-first and read-only with respect to Markdown. The initial architecture has no backend, account, cloud upload, telemetry, or source-file write path.
 
@@ -37,13 +37,16 @@ Generate a private local report with the development-only scanner:
 
 ```bash
 pnpm diagnose:vault -- --vault "C:/path/to/vault" \
-  --out output/diagnostics/local-report.json \
-  --workspace-id local-validation
+  --out output/diagnostics/local-report.json
 ```
 
-The recommended output directory is gitignored. A report contains paths,
+With `--out`, the runner creates/reuses an adjacent private identity catalog and
+embeds stable canonical IDs in the report. Supply `--workspace-id` only when an
+explicit persistent workspace ID is required; use `--reset-identity` to discard
+continuity explicitly. The recommended output directory is gitignored. A report contains paths,
 headings, targets, spans, and relationships even though it excludes full source
-text, so do not commit or share a real-vault report.
+text, and the separate catalog contains sensitive matching observations, so do
+not commit or share either real-vault artifact.
 
 Run the opt-in deterministic pipeline harness with:
 
@@ -51,7 +54,8 @@ Run the opt-in deterministic pipeline harness with:
 pnpm benchmark:pipeline -- --profile medium
 ```
 
-Its timings cover the source pipeline, representative view projections, React
+Its timings cover the source pipeline, cold/warm stable identity,
+representative view projections, React
 Flow mapping/Dagre layout, canonical inspection indexes, search, subtree
 inspection, and edge provenance as local evidence, not CI budgets.
 

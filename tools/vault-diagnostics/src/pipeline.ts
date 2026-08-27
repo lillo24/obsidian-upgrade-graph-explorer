@@ -6,6 +6,7 @@ import {
   summarizeDiagnosticReport,
 } from '@icarus-graph-explorer/diagnostics-obsidian';
 import { resolveObsidianWorkspace } from '@icarus-graph-explorer/resolver-obsidian';
+import { reconcileStableIdentity } from '@icarus-graph-explorer/stable-identity';
 
 import { discoverVault } from './discovery';
 import type {
@@ -38,9 +39,22 @@ export function buildReportFromSources(
     );
   }
 
+  const identityStart = performance.now();
+  const identity =
+    input.identityCatalog === undefined
+      ? undefined
+      : {
+          ...reconcileStableIdentity({
+            snapshot: resolution.snapshot,
+            previousCatalog: input.identityCatalog,
+          }),
+          reconciliationMs: elapsed(identityStart),
+        };
+  const snapshot = identity?.snapshot ?? resolution.snapshot;
+
   const reportStart = performance.now();
   const evidenceReport = buildObsidianDiagnosticReport({
-    snapshot: resolution.snapshot,
+    snapshot,
     diagnostics: resolution.diagnostics,
     documents,
     nonMarkdownPaths: input.nonMarkdownPaths,
@@ -58,7 +72,7 @@ export function buildReportFromSources(
     reportSerializationMs,
   };
   const report = buildObsidianDiagnosticReport({
-    snapshot: resolution.snapshot,
+    snapshot,
     diagnostics: resolution.diagnostics,
     documents,
     nonMarkdownPaths: input.nonMarkdownPaths,
@@ -69,6 +83,7 @@ export function buildReportFromSources(
     serializedReport: `${JSON.stringify(report, null, 2)}\n`,
     summary: summarizeDiagnosticReport(report),
     timings,
+    ...(identity === undefined ? {} : { identity }),
   };
 }
 
@@ -83,5 +98,8 @@ export async function runVaultDiagnostics(
     markdownDocuments: discovery.markdownDocuments,
     nonMarkdownPaths: discovery.nonMarkdownPaths,
     discoveryReadMs,
+    ...(options.identityCatalog === undefined
+      ? {}
+      : { identityCatalog: options.identityCatalog }),
   });
 }

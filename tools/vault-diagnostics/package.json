@@ -16,6 +16,7 @@
     "@icarus-graph-explorer/explorer-inspection": "workspace:*",
     "@icarus-graph-explorer/renderer-reactflow": "workspace:*",
     "@icarus-graph-explorer/resolver-obsidian": "workspace:*",
+    "@icarus-graph-explorer/stable-identity": "workspace:*",
     "@icarus-graph-explorer/view-projection": "workspace:*"
   },
   "devDependencies": {

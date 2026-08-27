@@ -1,5 +1,10 @@
 import { performance } from 'node:perf_hooks';
 
+import type {
+  AddressableEntity,
+  KnowledgeSnapshot,
+  SourceSpan,
+} from '@icarus-graph-explorer/core';
 import {
   generateSyntheticWorkspace,
   type SyntheticWorkspaceConfig,
@@ -22,6 +27,11 @@ import {
   layoutRendererGraph,
   mapProjectionToReactFlow,
 } from '@icarus-graph-explorer/renderer-reactflow/prepare';
+import {
+  createStableIdentityCatalog,
+  reconcileStableIdentity,
+  type StableIdentityReconciliationSummary,
+} from '@icarus-graph-explorer/stable-identity';
 
 import {
   BENCHMARK_PROFILES,
@@ -64,6 +74,102 @@ function expectedCounts(config: SyntheticWorkspaceConfig) {
 
 function elapsed(start: number): number {
   return Number((performance.now() - start).toFixed(3));
+}
+
+function shiftedSpan(span: SourceSpan): SourceSpan {
+  const shiftPoint = (point: SourceSpan['start']) => ({
+    line: point.line + 1,
+    column: point.column,
+    ...(point.offset === undefined ? {} : { offset: point.offset + 17 }),
+  });
+  return { start: shiftPoint(span.start), end: shiftPoint(span.end) };
+}
+
+function normalIdentityEdit(snapshot: KnowledgeSnapshot): KnowledgeSnapshot {
+  const documents = snapshot.entities.filter(
+    (entity) => entity.kind === 'document',
+  );
+  const sections = snapshot.entities.filter(
+    (entity) => entity.kind === 'section',
+  );
+  const blocks = snapshot.entities.filter((entity) => entity.kind === 'block');
+  const firstDocument = documents[0];
+  if (firstDocument === undefined) {
+    throw new Error('Synthetic identity benchmark produced no document.');
+  }
+  const shiftEntity = (entity: AddressableEntity): AddressableEntity =>
+    entity.kind === 'document'
+      ? {
+          ...entity,
+          source: {
+            ...entity.source,
+            span: {
+              start: entity.source.span.start,
+              end: shiftedSpan(entity.source.span).end,
+            },
+          },
+        }
+      : {
+          ...entity,
+          source: { ...entity.source, span: shiftedSpan(entity.source.span) },
+        };
+  const insertedOffset = Math.max(
+    1,
+    (firstDocument.source.span.end.offset ?? 10_000) + 16,
+  );
+  const insertedSection: AddressableEntity = {
+    id: 'benchmark-transient-inserted-section',
+    kind: 'section',
+    parentId: firstDocument.id,
+    title: 'Inserted Identity Benchmark Section',
+    level: 1,
+    source: {
+      path: firstDocument.source.path,
+      span: {
+        start: {
+          line: firstDocument.source.span.end.line + 1,
+          column: 1,
+          offset: insertedOffset,
+        },
+        end: {
+          line: firstDocument.source.span.end.line + 1,
+          column: 2,
+          offset: insertedOffset + 1,
+        },
+      },
+    },
+  };
+  return {
+    schemaVersion: snapshot.schemaVersion,
+    workspace: snapshot.workspace,
+    entities: [
+      ...documents.map(shiftEntity),
+      ...sections.map(shiftEntity),
+      insertedSection,
+      ...blocks.map(shiftEntity),
+    ],
+    references: snapshot.references.map((reference) => ({
+      ...reference,
+      sourceSpan: shiftedSpan(reference.sourceSpan),
+    })),
+  };
+}
+
+function identityCounts(summary: StableIdentityReconciliationSummary) {
+  const kinds = [summary.documents, summary.sections, summary.blocks] as const;
+  return {
+    entitiesReused: kinds.reduce(
+      (total, kind) => total + kind.reusedExact + kind.reusedStrong,
+      0,
+    ),
+    entitiesNew: kinds.reduce((total, kind) => total + kind.allocatedNew, 0),
+    referencesReused:
+      summary.references.reusedExact + summary.references.reusedStrong,
+    referencesNew: summary.references.allocatedNew,
+    ambiguousNotReused:
+      kinds.reduce((total, kind) => total + kind.ambiguousNotReused, 0) +
+      summary.references.ambiguousNotReused,
+  };
 }
 
 function projectionCounts(projection: ViewProjection) {
@@ -110,12 +216,26 @@ function measureRenderer(
 function main(): void {
   const profile = selectedProfile(process.argv.slice(2));
   const config = BENCHMARK_PROFILES[profile];
+  const workspaceId = `synthetic-${profile}`;
   const run = buildReportFromSources({
-    workspaceId: `synthetic-${profile}`,
+    workspaceId,
     markdownDocuments: generateSyntheticWorkspace(config),
     nonMarkdownPaths: [],
     discoveryReadMs: 0,
+    identityCatalog: createStableIdentityCatalog(workspaceId),
   });
+  if (run.identity === undefined) {
+    throw new Error(
+      'Synthetic benchmark did not perform cold identity assignment.',
+    );
+  }
+  const warmSnapshot = normalIdentityEdit(run.report.snapshot);
+  const warmStart = performance.now();
+  const warmIdentity = reconcileStableIdentity({
+    snapshot: warmSnapshot,
+    previousCatalog: run.identity.catalog,
+  });
+  const warmIdentityMs = elapsed(warmStart);
   const indexStart = performance.now();
   const projectionWorkspace = createProjectionWorkspace(run.report.snapshot);
   const indexConstructionMs = elapsed(indexStart);
@@ -223,6 +343,18 @@ function main(): void {
           parseAdapt: run.timings.parseAdaptMs,
           resolution: run.timings.resolutionMs,
           reportConstruction: run.timings.reportConstructionMs,
+        },
+        identity: {
+          entities: run.report.snapshot.entities.length,
+          references: run.report.snapshot.references.length,
+          cold: {
+            timingMs: run.identity.reconciliationMs,
+            ...identityCounts(run.identity.summary),
+          },
+          warmNormalEdit: {
+            timingMs: warmIdentityMs,
+            ...identityCounts(warmIdentity.summary),
+          },
         },
         projection: {
           canonicalEntities: run.report.snapshot.entities.length,
