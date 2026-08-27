@@ -14,6 +14,7 @@ import {
 } from '@xyflow/react';
 
 import { GRAPH_EDGE_TYPES, GRAPH_NODE_TYPES } from './component-maps';
+import { resolveGraphCenterRequest } from './center-request';
 import { EntityDisclosureProvider } from './disclosure-context';
 import { applyRendererHighlight } from './highlight';
 import { prepareRendererGraph } from './prepare';
@@ -25,6 +26,7 @@ import type {
 } from './types';
 
 function GraphCanvasInner({
+  centerRequest,
   expandedEntityIds,
   fitRequestKey,
   layoutMode,
@@ -34,8 +36,9 @@ function GraphCanvasInner({
   selection,
 }: GraphCanvasProps) {
   const [hovered, setHovered] = useState<GraphSelection | null>(null);
-  const { fitView } = useReactFlow<GraphFlowNode, GraphFlowEdge>();
+  const { fitView, setCenter } = useReactFlow<GraphFlowNode, GraphFlowEdge>();
   const previousFitRequest = useRef(fitRequestKey);
+  const previousCenterRequest = useRef<number | null>(null);
   const prepared = useMemo(
     () =>
       prepareRendererGraph(projection, {
@@ -74,6 +77,22 @@ function GraphCanvasInner({
     previousFitRequest.current = fitRequestKey;
     void fitView({ duration: 0, padding: 0.14, maxZoom: 1.35 });
   }, [fitRequestKey, fitView]);
+
+  useEffect(() => {
+    const resolved = resolveGraphCenterRequest(
+      prepared,
+      centerRequest,
+      previousCenterRequest.current,
+    );
+    if (resolved === null) return;
+    previousCenterRequest.current = resolved.handledKey;
+    if (resolved.instruction === null) return;
+    const { x, y, zoom } = resolved.instruction;
+    void setCenter(x, y, {
+      duration: 0,
+      ...(zoom === undefined ? {} : { zoom }),
+    });
+  }, [centerRequest, prepared, setCenter]);
 
   const selectNode = useCallback<NodeMouseHandler<GraphFlowNode>>(
     (_event, node) =>

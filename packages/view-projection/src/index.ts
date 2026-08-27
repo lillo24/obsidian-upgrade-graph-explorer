@@ -3,6 +3,7 @@ export {
   topLevelSectionProjectionState,
 } from './presets';
 export { projectSnapshot, projectView } from './project';
+export { revealEntityInViewState } from './reveal';
 export type {
   DiagnosticReferenceStatus,
   FocusProjectionState,

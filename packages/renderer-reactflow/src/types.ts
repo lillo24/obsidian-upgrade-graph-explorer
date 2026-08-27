@@ -13,6 +13,12 @@ export type GraphSelection =
   | { readonly kind: 'node'; readonly id: ProjectionNodeId }
   | { readonly kind: 'edge'; readonly id: ProjectionEdgeId };
 
+export interface GraphCenterRequest {
+  readonly key: number;
+  readonly nodeId: ProjectionNodeId;
+  readonly zoom?: number;
+}
+
 export interface EntityNodeData extends Record<string, unknown> {
   readonly projectionNodeId: ProjectionNodeId;
   readonly entityId: string;
@@ -95,6 +101,7 @@ export interface GraphCanvasProps {
   readonly expandedEntityIds: readonly string[];
   readonly selection: GraphSelection | null;
   readonly fitRequestKey: number;
+  readonly centerRequest?: GraphCenterRequest;
   readonly onSelectionChange: (selection: GraphSelection | null) => void;
   readonly onToggleEntity: (entityId: string, currentlyOpen: boolean) => void;
 }

@@ -1,19 +1,29 @@
 import { useCallback, useMemo, useReducer, useState } from 'react';
 
+import type { EntityId, KnowledgeSnapshot } from '@icarus-graph-explorer/core';
+import { createInspectionWorkspace } from '@icarus-graph-explorer/explorer-inspection';
 import {
   GraphCanvas,
+  type GraphCenterRequest,
   type GraphSelection,
 } from '@icarus-graph-explorer/renderer-reactflow';
 import {
   createProjectionWorkspace,
   projectView,
-  type ProjectedEdge,
+  type ProjectedEntityNode,
   type ProjectedNode,
   type ViewProjection,
 } from '@icarus-graph-explorer/view-projection';
-import type { ObsidianDiagnosticReport } from '@icarus-graph-explorer/diagnostics-obsidian';
 
-import { graphStateReducer, initialGraphState } from '../graph-state';
+import {
+  graphStateReducer,
+  initialGraphState,
+  type GraphStateAction,
+} from '../graph-state';
+import { planEntityNavigation, topLevelPathScopes } from '../navigation';
+import { EntitySearch } from './EntitySearch';
+import { GraphFilters } from './GraphFilters';
+import { ProvenanceInspector } from './ProvenanceInspector';
 
 interface ProjectionSuccess {
   readonly ok: true;
@@ -36,107 +46,20 @@ function selectedNode(
     : undefined;
 }
 
-function selectedEdge(
+function selectionExists(
   projection: ViewProjection,
   selection: GraphSelection | null,
-): ProjectedEdge | undefined {
-  return selection?.kind === 'edge'
-    ? projection.edges.find((edge) => edge.id === selection.id)
-    : undefined;
-}
-
-function SelectionPanel({
-  edge,
-  node,
-}: {
-  readonly edge: ProjectedEdge | undefined;
-  readonly node: ProjectedNode | undefined;
-}) {
-  if (node === undefined && edge === undefined) {
-    return (
-      <div className="selection-empty">
-        <strong>Nothing selected</strong>
-        <span>Select a node or edge for a compact structural summary.</span>
-      </div>
-    );
-  }
-  if (node?.kind === 'entity') {
-    return (
-      <dl className="selection-facts">
-        <div>
-          <dt>Entity</dt>
-          <dd>{node.entityKind}</dd>
-        </div>
-        <div>
-          <dt>Path</dt>
-          <dd title={node.sourcePath} translate="no">
-            {node.sourcePath}
-          </dd>
-        </div>
-        <div>
-          <dt>Line</dt>
-          <dd>{node.sourceStartLine}</dd>
-        </div>
-        <div>
-          <dt>Hidden</dt>
-          <dd>{node.hiddenDescendantCount}</dd>
-        </div>
-        <div>
-          <dt>Internal links</dt>
-          <dd>{node.internalReferenceIds.length}</dd>
-        </div>
-      </dl>
-    );
-  }
-  if (node?.kind === 'reference-target') {
-    return (
-      <dl className="selection-facts">
-        <div>
-          <dt>Status</dt>
-          <dd>{node.status}</dd>
-        </div>
-        <div>
-          <dt>Raw target</dt>
-          <dd title={node.rawTarget} translate="no">
-            {node.rawTarget}
-          </dd>
-        </div>
-        <div>
-          <dt>References</dt>
-          <dd>{node.referenceIds.length}</dd>
-        </div>
-        <div>
-          <dt>Candidates</dt>
-          <dd>{node.candidateEntityIds.length}</dd>
-        </div>
-      </dl>
-    );
-  }
-  if (edge !== undefined) {
-    return (
-      <dl className="selection-facts">
-        <div>
-          <dt>Relationship</dt>
-          <dd>{edge.kind}</dd>
-        </div>
-        <div>
-          <dt>Status</dt>
-          <dd>{edge.kind === 'reference' ? edge.status : 'structural'}</dd>
-        </div>
-        <div>
-          <dt>Occurrences</dt>
-          <dd>{edge.kind === 'reference' ? edge.referenceIds.length : 1}</dd>
-        </div>
-      </dl>
-    );
-  }
-  return null;
+): boolean {
+  if (selection === null) return false;
+  return selection.kind === 'node'
+    ? projection.nodes.some((node) => node.id === selection.id)
+    : projection.edges.some((edge) => edge.id === selection.id);
 }
 
 export function GraphExplorer({
-  report,
+  snapshot,
 }: {
-  readonly report: ObsidianDiagnosticReport;
+  readonly snapshot: KnowledgeSnapshot;
 }) {
   const [viewState, dispatch] = useReducer(
     graphStateReducer,
@@ -145,25 +68,45 @@ export function GraphExplorer({
   );
   const [selection, setSelection] = useState<GraphSelection | null>(null);
   const [fitRequestKey, setFitRequestKey] = useState(0);
-  const workspace = useMemo(
-    () => createProjectionWorkspace(report.snapshot),
-    [report.snapshot],
+  const [centerRequest, setCenterRequest] = useState<GraphCenterRequest>();
+  const [navigationStatus, setNavigationStatus] = useState(
+    'Select a graph element to inspect it, or use Find to reveal a hidden entity.',
+  );
+  const projectionWorkspace = useMemo(
+    () => createProjectionWorkspace(snapshot),
+    [snapshot],
+  );
+  const inspectionWorkspace = useMemo(
+    () => createInspectionWorkspace(snapshot),
+    [snapshot],
+  );
+  const pathScopes = useMemo(
+    () => topLevelPathScopes(projectionWorkspace),
+    [projectionWorkspace],
   );
   const result = useMemo<ProjectionResult>(() => {
     try {
-      return { ok: true, projection: projectView(workspace, viewState) };
+      return {
+        ok: true,
+        projection: projectView(projectionWorkspace, viewState),
+      };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       return { ok: false, message: `Graph projection failed: ${message}` };
     }
-  }, [viewState, workspace]);
+  }, [projectionWorkspace, viewState]);
 
   const projection = result.ok ? result.projection : undefined;
+  const activeSelection =
+    projection !== undefined && selectionExists(projection, selection)
+      ? selection
+      : null;
   const node =
-    projection === undefined ? undefined : selectedNode(projection, selection);
-  const edge =
-    projection === undefined ? undefined : selectedEdge(projection, selection);
-  const focusEntity = node?.kind === 'entity' ? node : undefined;
+    projection === undefined
+      ? undefined
+      : selectedNode(projection, activeSelection);
+  const focusEntity: ProjectedEntityNode | undefined =
+    node?.kind === 'entity' ? node : undefined;
 
   const toggleEntity = useCallback(
     (entityId: string, currentlyOpen: boolean) =>
@@ -174,17 +117,48 @@ export function GraphExplorer({
     (nextSelection: GraphSelection | null) => setSelection(nextSelection),
     [],
   );
+  const applyGraphAction = useCallback(
+    (action: GraphStateAction) => dispatch(action),
+    [],
+  );
+  const clearSelection = useCallback(() => setSelection(null), []);
+  const navigateToEntity = useCallback(
+    (entityId: EntityId, origin: string) => {
+      const plan = planEntityNavigation(
+        projectionWorkspace,
+        viewState,
+        entityId,
+      );
+      if (!plan.ok) {
+        setNavigationStatus(`${origin}: ${plan.message}`);
+        return;
+      }
+      dispatch({ type: 'apply-navigation', state: plan.state });
+      setSelection({ kind: 'node', id: plan.projectionNodeId });
+      setCenterRequest((current) => ({
+        key: (current?.key ?? 0) + 1,
+        nodeId: plan.projectionNodeId,
+        zoom: 1.1,
+      }));
+      setNavigationStatus(`${origin}: ${plan.announcement}`);
+    },
+    [projectionWorkspace, viewState],
+  );
 
   function enterFocus(): void {
     if (focusEntity === undefined) return;
     dispatch({ type: 'enter-focus', entityId: focusEntity.entityId });
     setFitRequestKey((current) => current + 1);
+    setNavigationStatus(
+      `Focused ${focusEntity.entityKind} in ${focusEntity.sourcePath}.`,
+    );
   }
 
   function exitFocus(): void {
     dispatch({ type: 'exit-focus' });
     setSelection(null);
     setFitRequestKey((current) => current + 1);
+    setNavigationStatus('Exited focus and restored structural disclosure.');
   }
 
   function changeHops(hops: 1 | 2 | 3): void {
@@ -201,8 +175,8 @@ export function GraphExplorer({
     <section className="graph-workspace" aria-labelledby="graph-title">
       <div className="graph-heading">
         <div>
-          <p className="eyebrow">KG7 · Projection-driven</p>
-          <h2 id="graph-title">Structural Graph</h2>
+          <p className="eyebrow">KG8 · Explainable Navigation</p>
+          <h2 id="graph-title">Knowledge Graph</h2>
         </div>
         {projection === undefined ? null : (
           <p className="graph-counts" aria-live="polite">
@@ -211,6 +185,11 @@ export function GraphExplorer({
           </p>
         )}
       </div>
+
+      <EntitySearch
+        onNavigate={navigateToEntity}
+        workspace={inspectionWorkspace}
+      />
 
       <div className="graph-toolbar" aria-label="Graph view controls">
         <div
@@ -305,31 +284,39 @@ export function GraphExplorer({
         </div>
       </div>
 
+      <GraphFilters
+        onAction={applyGraphAction}
+        pathScopes={pathScopes}
+        state={viewState}
+      />
+      <p className="navigation-status" aria-live="polite" aria-atomic="true">
+        {navigationStatus}
+      </p>
+
       {result.ok ? (
         <div className="graph-stage">
           <GraphCanvas
+            {...(centerRequest === undefined ? {} : { centerRequest })}
             expandedEntityIds={viewState.disclosure.expandedEntityIds}
             fitRequestKey={fitRequestKey}
             layoutMode={viewState.focus === undefined ? 'structure' : 'focus'}
             onSelectionChange={changeSelection}
             onToggleEntity={toggleEntity}
             projection={result.projection}
-            selection={selection}
+            selection={activeSelection}
           />
-          <aside
-            className="selection-panel"
-            aria-label="Graph selection summary"
-          >
-            <div className="selection-panel__heading">
-              <span>Selection</span>
-              {selection === null ? null : (
-                <button onClick={() => setSelection(null)} type="button">
-                  Clear
-                </button>
-              )}
-            </div>
-            <SelectionPanel edge={edge} node={node} />
-          </aside>
+          <ProvenanceInspector
+            key={
+              activeSelection === null
+                ? 'empty'
+                : `${activeSelection.kind}:${activeSelection.id}`
+            }
+            onClear={clearSelection}
+            onNavigate={navigateToEntity}
+            projection={result.projection}
+            selection={activeSelection}
+            workspace={inspectionWorkspace}
+          />
         </div>
       ) : (
         <p className="graph-failure" role="alert">
@@ -338,7 +325,7 @@ export function GraphExplorer({
       )}
       {projection === undefined || projection.issues.length === 0 ? null : (
         <details className="projection-issues">
-          <summary>{projection.issues.length} projection issues</summary>
+          <summary>{projection.issues.length} Projection Issues</summary>
           <ul>
             {projection.issues.map((issue) => (
               <li key={`${issue.code}:${issue.subject}`}>{issue.message}</li>

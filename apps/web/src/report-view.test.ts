@@ -19,11 +19,11 @@ const views = buildReferenceViews(report, lookups);
 
 describe('diagnostic report view transformations', () => {
   it('filters every explicit resolution state without changing report data', () => {
-    expect(filterReferenceViews(views, 'resolved', '')).toHaveLength(3);
+    expect(filterReferenceViews(views, 'resolved', '')).toHaveLength(23);
     expect(filterReferenceViews(views, 'ambiguous', '')).toHaveLength(1);
     expect(filterReferenceViews(views, 'unresolved', '')).toHaveLength(6);
     expect(filterReferenceViews(views, 'invalid', '')).toHaveLength(1);
-    expect(report.snapshot.references).toHaveLength(11);
+    expect(report.snapshot.references).toHaveLength(31);
   });
 
   it('searches source paths, owner labels, targets, and candidate labels', () => {

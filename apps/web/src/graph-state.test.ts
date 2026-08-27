@@ -61,4 +61,53 @@ describe('graph projection interaction state', () => {
     });
     expect(initial.disclosure.includeBlocks).toBe(false);
   });
+
+  it('maps practical path, entity-kind, and status controls to KG6 filters', () => {
+    const scoped = graphStateReducer(initialGraphState(), {
+      type: 'set-path-scope',
+      pathPrefix: 'folder',
+    });
+    const withoutSections = graphStateReducer(scoped, {
+      type: 'toggle-entity-kind',
+      entityKind: 'section',
+      enabled: false,
+    });
+    const withoutInvalid = graphStateReducer(withoutSections, {
+      type: 'toggle-reference-status',
+      status: 'invalid',
+      enabled: false,
+    });
+
+    expect(withoutInvalid.filters).toEqual({
+      pathPrefixes: ['folder'],
+      entityKinds: ['document', 'block'],
+      referenceStatuses: ['resolved', 'unresolved', 'ambiguous'],
+    });
+    expect(
+      graphStateReducer(withoutInvalid, {
+        type: 'set-path-scope',
+        pathPrefix: null,
+      }).filters,
+    ).toEqual({
+      entityKinds: ['document', 'block'],
+      referenceStatuses: ['resolved', 'unresolved', 'ambiguous'],
+    });
+  });
+
+  it('applies one verified navigation state atomically', () => {
+    const navigated = {
+      ...initialGraphState(),
+      disclosure: {
+        ...initialGraphState().disclosure,
+        expandedEntityIds: ['doc-a'],
+      },
+    };
+
+    expect(
+      graphStateReducer(initialGraphState(), {
+        type: 'apply-navigation',
+        state: navigated,
+      }),
+    ).toBe(navigated);
+  });
 });

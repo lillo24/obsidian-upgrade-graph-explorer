@@ -1,16 +1,19 @@
 # Web Structural Graph Explorer
 
-Status: **STABLE — KG7 graph workflow is synthetic- and real-report browser-tested.**
+Status: **STABLE — KG8 synthetic and ignored real-report navigation gates pass.**
 
 This package owns the browser SPA, validated KG5 report selection, transient KG6
-projection state, and lightweight graph selection summary. It accepts one
+projection/filter state, graph selection, canonical navigation orchestration,
+and provenance-first inspection UI. It accepts one
 runtime-validated report selected by the user or the committed neutral sample.
 It does not scan folders, upload reports, persist state, modify canonical truth,
 or derive renderer semantics.
 
 ```text
-selected report JSON → runtime validation → KG6 projection → KG7 renderer
-                                           ↘ secondary KG5 evidence UI
+selected report JSON → runtime validation → canonical inspection/search
+                                   └───────→ KG6 projection → KG7 renderer
+                                                     ↘ KG8 inspector/navigation
+                                   ↘ secondary KG5 evidence UI
 ```
 
 ## File map
@@ -24,7 +27,8 @@ apps/web/
   src/
     main.tsx          Root validation and React startup.
     App.tsx           Report selection, reset boundary, and secondary evidence UI.
-    graph-state.ts    Pure disclosure/focus interaction reducer.
+    graph-state.ts    Pure disclosure/focus/filter interaction reducer.
+    navigation.ts     Shared reveal/filter-widening/navigation planner.
     report-view.ts    Pure reference/hierarchy presentation transformations.
     sample-report.json Deterministic private-safe report generated from fixtures.
     components/       Primary graph workspace and secondary diagnostic panels.
@@ -33,9 +37,10 @@ apps/web/
 ```
 
 The `components/README.md` maps the presentation components. The graph workspace
-creates one reusable `ProjectionWorkspace` per loaded report and passes only a
-`ViewProjection` to `@icarus-graph-explorer/renderer-reactflow`. Loading or
-restoring a report keys a complete graph-state/selection/viewport reset.
+creates one reusable `ProjectionWorkspace` and `InspectionWorkspace` per loaded
+snapshot and passes only a `ViewProjection` plus viewport requests to
+`@icarus-graph-explorer/renderer-reactflow`. Loading or restoring a report keys
+a complete graph-state/selection/search/viewport reset.
 
 ## Report loading and privacy
 
@@ -57,24 +62,37 @@ The default view is documents-only; top-level sections and explicit per-entity
 disclosure remain KG6 state. Selecting an entity enables one-to-three-hop focus
 with incoming/outgoing/both direction. Selection and hover affect presentation
 only. Diagnostic targets can be selected but never focused or expanded. The
-selection summary intentionally stops short of KG8's provenance inspector.
+primary inspector resolves projected selection to canonical descriptors, exact
+occurrences, subtree outgoing references/backlinks, ambiguous candidate
+mentions, and internal collapsed relationships.
 
 Blocks remain opt-in through the labelled **Blocks** checkbox and still require
 explicit expansion of their visible parent, preserving KG6's conservative block
 disclosure rule. Open branches retain a collapse control even when all of their
 descendants are visible.
 
-Opaque entity IDs use prebuilt maps, expensive secondary-evidence search is
-deferred and memoized, hierarchy descendants mount only when expanded, and
-references are paged in groups of 100. No renderer virtualization switch or
-performance budget is introduced before KG12 evidence requires it.
+Global Find searches the full canonical snapshot, including entities hidden by
+disclosure or graph filters. Selecting any search, breadcrumb, source,
+backlink, resolved-target, or ambiguity-candidate action uses one navigation
+pipeline: exit focus, reveal ancestors through KG6, widen only conflicting
+path/entity/text filters with an announcement, reproject, select, and request a
+renderer-only center. Graph filters expose derived top-level path scopes,
+entity content kinds, and reference statuses. Search is exact/prefix/substring
+over names, headings, breadcrumbs, paths, and block line labels; it is not
+fuzzy, semantic, or Markdown body search.
+
+Opaque entity IDs use prebuilt maps. Canonical search is deferred and memoized;
+search results are capped at 30; provenance groups render 20 rows at a time;
+secondary references remain paged in groups of 100. No renderer virtualization
+switch or performance budget is introduced before KG12 evidence requires it.
 
 ## Scope boundary
 
 The hierarchy tree under “Inspect diagnostic evidence” remains KG5 diagnostic
-UI only. Its expanded state is separate from KG6 projection state. No source
-preview, live filesystem access, write-back, persistence, or KG8 inspector is
-implemented.
+UI only. Its expanded state is separate from KG6 projection state. Report mode
+provides paths, breadcrumbs, raw targets, and exact spans, but no source text,
+preview, live filesystem access, open-in-source action, write-back, or
+persistence.
 
 ## Local validation
 

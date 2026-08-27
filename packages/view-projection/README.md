@@ -31,6 +31,7 @@ src/
   slicing.ts           Reference-hop focus and post-focus projected filters.
   validation.ts        Deserialized-output and cross-record invariant checks.
   presets.ts           Documents-only and top-level-section state helpers.
+  reveal.ts            Canonical-target disclosure helper for navigation.
   project.ts           Public orchestration and one-call snapshot wrapper.
   index.ts             Intentional public surface.
   test-fixture.ts      Neutral canonical fixture shared only by package tests.
@@ -49,6 +50,9 @@ const projection = projectView(workspace, state);
 
 // Convenient when indexes will not be reused:
 const oneOff = projectSnapshot(snapshot, state);
+
+// Reveal one hidden canonical entity without renderer-specific logic:
+const revealedState = revealEntityInViewState(workspace, state, entityId);
 ```
 
 `ProjectionWorkspace` contains derived runtime maps and memoized descendant
@@ -78,6 +82,11 @@ visible parent must be explicitly expanded. Default depth alone never reveals
 blocks. Each visible entity reports how many canonical descendants remain
 structurally hidden. Filtering does not rewrite that structural disclosure
 metadata.
+
+`revealEntityInViewState` opens and uncollapses the target's ancestor chain. It
+also enables blocks when the target is a block. It deliberately leaves focus
+and filters unchanged: application navigation owns exiting focus and widening
+only filters that conflict with an explicit target.
 
 Unknown expanded/collapsed IDs and expand/collapse conflicts produce sorted,
 non-fatal projection issues. A missing or structurally hidden focus root returns

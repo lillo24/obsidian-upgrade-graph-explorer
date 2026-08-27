@@ -5,6 +5,12 @@ import {
   type SyntheticWorkspaceConfig,
 } from '@icarus-graph-explorer/diagnostics-obsidian';
 import {
+  createInspectionWorkspace,
+  inspectEntity,
+  inspectProjectedEdge,
+  searchEntities,
+} from '@icarus-graph-explorer/explorer-inspection';
+import {
   createProjectionWorkspace,
   documentOnlyProjectionState,
   projectView,
@@ -172,6 +178,35 @@ function main(): void {
         ];
       }),
   );
+  const inspectionIndexStart = performance.now();
+  const inspectionWorkspace = createInspectionWorkspace(run.report.snapshot);
+  const inspectionIndexConstructionMs = elapsed(inspectionIndexStart);
+  const searchStart = performance.now();
+  const searchResults = searchEntities(inspectionWorkspace, 'Section 2-0');
+  const searchMs = elapsed(searchStart);
+  const entityInspectionStart = performance.now();
+  const inspectedEntity = inspectEntity(inspectionWorkspace, focusRoot.id);
+  const entityInspectionMs = elapsed(entityInspectionStart);
+  const documentsProjection = projectView(projectionWorkspace, documentsOnly);
+  const aggregatedEdge = documentsProjection.edges
+    .filter((edge) => edge.kind === 'reference')
+    .sort(
+      (left, right) =>
+        right.referenceIds.length - left.referenceIds.length ||
+        left.id.localeCompare(right.id),
+    )[0];
+  if (aggregatedEdge === undefined) {
+    throw new Error(
+      'Synthetic benchmark produced no projected reference edge to inspect.',
+    );
+  }
+  const edgeInspectionStart = performance.now();
+  const inspectedEdge = inspectProjectedEdge(
+    inspectionWorkspace,
+    documentsProjection,
+    aggregatedEdge.id,
+  );
+  const edgeInspectionMs = elapsed(edgeInspectionStart);
   console.log(
     JSON.stringify(
       {
@@ -199,6 +234,33 @@ function main(): void {
           library: '@xyflow/react',
           layout: '@dagrejs/dagre',
           scenarios: rendererScenarios,
+        },
+        inspection: {
+          canonicalEntities: inspectionWorkspace.entities().length,
+          canonicalReferences: inspectionWorkspace.references().length,
+          indexConstructionMs: inspectionIndexConstructionMs,
+          search: {
+            query: 'Section 2-0',
+            timingMs: searchMs,
+            resultCount: searchResults.length,
+          },
+          entitySubtree: {
+            entityId: focusRoot.id,
+            timingMs: entityInspectionMs,
+            descendantCount: inspectedEntity.descendantCount,
+            outgoingCount: inspectedEntity.outgoingReferences.length,
+            backlinkCount: inspectedEntity.backlinks.length,
+            candidateMentionCount:
+              inspectedEntity.ambiguousCandidateMentions.length,
+          },
+          aggregatedEdge: {
+            projectionEdgeId: aggregatedEdge.id,
+            timingMs: edgeInspectionMs,
+            occurrenceCount:
+              inspectedEdge.kind === 'reference'
+                ? inspectedEdge.occurrences.length
+                : 0,
+          },
         },
         note: 'Diagnostic evidence only; no performance budget is enforced.',
       },

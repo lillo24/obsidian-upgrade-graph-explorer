@@ -44,6 +44,9 @@ importers:
       '@icarus-graph-explorer/diagnostics-obsidian':
         specifier: workspace:*
         version: link:../../packages/diagnostics-obsidian
+      '@icarus-graph-explorer/explorer-inspection':
+        specifier: workspace:*
+        version: link:../../packages/explorer-inspection
       '@icarus-graph-explorer/renderer-reactflow':
         specifier: workspace:*
         version: link:../../packages/renderer-reactflow
@@ -119,6 +122,15 @@ importers:
         specifier: 24.13.3
         version: 24.13.3
 
+  packages/explorer-inspection:
+    dependencies:
+      '@icarus-graph-explorer/core':
+        specifier: workspace:*
+        version: link:../core
+      '@icarus-graph-explorer/view-projection':
+        specifier: workspace:*
+        version: link:../view-projection
+
   packages/parser-markdown:
     dependencies:
       '@icarus-graph-explorer/core':
@@ -193,6 +205,9 @@ importers:
       '@icarus-graph-explorer/diagnostics-obsidian':
         specifier: workspace:*
         version: link:../../packages/diagnostics-obsidian
+      '@icarus-graph-explorer/explorer-inspection':
+        specifier: workspace:*
+        version: link:../../packages/explorer-inspection
       '@icarus-graph-explorer/renderer-reactflow':
         specifier: workspace:*
         version: link:../../packages/renderer-reactflow
