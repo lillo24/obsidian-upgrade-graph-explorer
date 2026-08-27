@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useMemo, useState, type ReactNode } from 'react';
 
 import type { EntityId } from '@icarus-graph-explorer/core';
 import {
@@ -22,39 +22,61 @@ interface ProvenanceInspectorProps {
   readonly onNavigate: (entityId: EntityId, origin: string) => void;
 }
 
-interface OccurrenceItem {
-  readonly occurrence: ReferenceOccurrenceDescriptor;
-  readonly note?: string;
-}
-
-interface OccurrenceSectionProps {
+interface BoundedSectionProps<Item> {
   readonly emptyMessage: string;
-  readonly items: readonly OccurrenceItem[];
+  readonly itemKey: (item: Item) => string;
+  readonly items: readonly Item[];
+  readonly renderItem: (item: Item) => ReactNode;
   readonly title: string;
-  readonly onNavigate: (entityId: EntityId, origin: string) => void;
 }
 
 const PAGE_SIZE = 20;
 
+function humanKind(kind: EntityDescriptor['kind']): string {
+  switch (kind) {
+    case 'document':
+      return 'File';
+    case 'section':
+      return 'Section';
+    case 'block':
+      return 'Block';
+  }
+}
+
+function breadcrumbText(entity: EntityDescriptor): string {
+  return entity.breadcrumb.map(({ label }) => label).join(' › ');
+}
+
+function issueTitle(
+  status: Exclude<ReferenceOccurrenceDescriptor['status'], 'resolved'>,
+): string {
+  switch (status) {
+    case 'unresolved':
+      return 'Broken link';
+    case 'ambiguous':
+      return 'Uncertain link';
+    case 'invalid':
+      return 'Invalid link';
+  }
+}
+
 const EntityAction = memo(function EntityAction({
   entity,
-  label,
   onNavigate,
   origin,
 }: {
   readonly entity: EntityDescriptor;
-  readonly label?: string;
   readonly onNavigate: (entityId: EntityId, origin: string) => void;
   readonly origin: string;
 }) {
   return (
     <button
+      aria-label={`Navigate to ${entity.displayName} at ${breadcrumbText(entity)}`}
       className="entity-navigation"
       onClick={() => onNavigate(entity.entityId, origin)}
-      title={entity.sourceProvenance}
       type="button"
     >
-      {label ?? entity.displayName}
+      {entity.displayName}
     </button>
   );
 });
@@ -67,13 +89,13 @@ const Breadcrumbs = memo(function Breadcrumbs({
   readonly onNavigate: (entityId: EntityId, origin: string) => void;
 }) {
   return (
-    <nav aria-label="Canonical breadcrumb">
+    <nav aria-label="Location">
       <ol className="inspector-breadcrumbs">
         {breadcrumb.map((part) => (
           <li key={part.entityId}>
             <button
+              aria-label={`Navigate to ${part.label}`}
               onClick={() => onNavigate(part.entityId, 'Breadcrumb')}
-              title={`Reveal ${part.kind}`}
               type="button"
             >
               {part.label}
@@ -85,94 +107,27 @@ const Breadcrumbs = memo(function Breadcrumbs({
   );
 });
 
-const OccurrenceCard = memo(function OccurrenceCard({
-  item,
+function EntityLocation({
+  entity,
   onNavigate,
 }: {
-  readonly item: OccurrenceItem;
+  readonly entity: EntityDescriptor;
   readonly onNavigate: (entityId: EntityId, origin: string) => void;
 }) {
-  const { occurrence } = item;
-  const { resolution } = occurrence;
-  return (
-    <article className="occurrence-card">
-      <div className="occurrence-card__heading">
-        <span className={`status-badge status-${occurrence.status}`}>
-          {occurrence.status}
-        </span>
-        <span className="reference-kind">{occurrence.kind}</span>
-      </div>
-      <p className="occurrence-target" translate="no">
-        {occurrence.rawTarget}
-      </p>
-      <dl>
-        <div>
-          <dt>Exact Source</dt>
-          <dd>
-            <EntityAction
-              entity={occurrence.source}
-              onNavigate={onNavigate}
-              origin="Reference Source"
-            />
-          </dd>
-        </div>
-        <div>
-          <dt>Source Location</dt>
-          <dd translate="no">{occurrence.sourceProvenance}</dd>
-        </div>
-        <div>
-          <dt>Reference ID</dt>
-          <dd translate="no">{occurrence.referenceId}</dd>
-        </div>
-      </dl>
-      {resolution.status === 'resolved' ? (
-        <p>
-          Resolved to{' '}
-          <EntityAction
-            entity={resolution.target}
-            onNavigate={onNavigate}
-            origin="Resolved Target"
-          />
-          .
-        </p>
-      ) : null}
-      {resolution.reason === null ? null : (
-        <p className="occurrence-reason">Reason: {resolution.reason}</p>
-      )}
-      {resolution.status !== 'ambiguous' ? null : (
-        <div className="occurrence-candidates">
-          <strong>Ambiguity Candidates</strong>
-          <ul>
-            {resolution.candidates.map((candidate) => (
-              <li key={candidate.entityId}>
-                <EntityAction
-                  entity={candidate}
-                  label={`${candidate.displayName} — ${candidate.sourceProvenance}`}
-                  onNavigate={onNavigate}
-                  origin="Ambiguity Candidate"
-                />
-              </li>
-            ))}
-          </ul>
-          <small>No candidate is treated as the chosen resolution.</small>
-        </div>
-      )}
-      {item.note === undefined ? null : (
-        <p className="occurrence-note">{item.note}</p>
-      )}
-    </article>
-  );
-});
+  return <Breadcrumbs breadcrumb={entity.breadcrumb} onNavigate={onNavigate} />;
+}
 
-const OccurrenceSection = memo(function OccurrenceSection({
+function BoundedSection<Item>({
   emptyMessage,
+  itemKey,
   items,
-  onNavigate,
+  renderItem,
   title,
-}: OccurrenceSectionProps) {
+}: BoundedSectionProps<Item>) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const visibleItems = items.slice(0, visibleCount);
   const remaining = items.length - visibleItems.length;
+
   return (
     <section className="inspector-section">
       <div className="inspector-section__heading">
@@ -182,13 +137,9 @@ const OccurrenceSection = memo(function OccurrenceSection({
       {items.length === 0 ? (
         <p className="inspector-empty">{emptyMessage}</p>
       ) : (
-        <div className="occurrence-list">
+        <div className="relationship-list">
           {visibleItems.map((item) => (
-            <OccurrenceCard
-              item={item}
-              key={item.occurrence.referenceId}
-              onNavigate={onNavigate}
-            />
+            <div key={itemKey(item)}>{renderItem(item)}</div>
           ))}
         </div>
       )}
@@ -202,15 +153,223 @@ const OccurrenceSection = memo(function OccurrenceSection({
           }
           type="button"
         >
-          Show {Math.min(PAGE_SIZE, remaining)} More
+          Show {Math.min(PAGE_SIZE, remaining)} more
         </button>
       )}
     </section>
   );
-});
+}
 
-function sourceLocation(entity: EntityDescriptor): React.ReactNode {
-  return <span translate="no">{entity.sourceProvenance}</span>;
+function ResolvedOutgoingCard({
+  occurrence,
+  showSource,
+  onNavigate,
+}: {
+  readonly occurrence: ReferenceOccurrenceDescriptor;
+  readonly showSource: boolean;
+  readonly onNavigate: (entityId: EntityId, origin: string) => void;
+}) {
+  if (occurrence.resolution.status !== 'resolved') return null;
+  return (
+    <article className="relationship-card">
+      <div className="relationship-card__main">
+        <span aria-hidden="true" className="relationship-arrow">
+          →
+        </span>
+        <div>
+          <div className="relationship-card__title">
+            <EntityAction
+              entity={occurrence.resolution.target}
+              onNavigate={onNavigate}
+              origin="Outgoing Link"
+            />
+            {occurrence.kind === 'embed' ? (
+              <span className="relationship-kind">Embed</span>
+            ) : null}
+          </div>
+          <EntityLocation
+            entity={occurrence.resolution.target}
+            onNavigate={onNavigate}
+          />
+        </div>
+      </div>
+      {showSource ? (
+        <div className="relationship-context">
+          <span>From</span>
+          <EntityLocation entity={occurrence.source} onNavigate={onNavigate} />
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function ProblemOutgoingCard({
+  occurrence,
+  showSource,
+  onNavigate,
+}: {
+  readonly occurrence: ReferenceOccurrenceDescriptor;
+  readonly showSource: boolean;
+  readonly onNavigate: (entityId: EntityId, origin: string) => void;
+}) {
+  if (occurrence.status === 'resolved') return null;
+  return (
+    <article
+      className={`relationship-card relationship-card--${occurrence.status}`}
+    >
+      <span className="relationship-problem-label">
+        {issueTitle(occurrence.status)}
+      </span>
+      <strong className="relationship-raw-target" translate="no">
+        {occurrence.rawTarget}
+      </strong>
+      {showSource ? (
+        <div className="relationship-context">
+          <span>From</span>
+          <EntityLocation entity={occurrence.source} onNavigate={onNavigate} />
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function BacklinkCard({
+  occurrence,
+  onNavigate,
+}: {
+  readonly occurrence: ReferenceOccurrenceDescriptor;
+  readonly onNavigate: (entityId: EntityId, origin: string) => void;
+}) {
+  return (
+    <article className="relationship-card">
+      <EntityAction
+        entity={occurrence.source}
+        onNavigate={onNavigate}
+        origin="Backlink"
+      />
+      <EntityLocation entity={occurrence.source} onNavigate={onNavigate} />
+    </article>
+  );
+}
+
+function TechnicalFacts({
+  rows,
+}: {
+  readonly rows: readonly {
+    readonly label: string;
+    readonly value: ReactNode;
+  }[];
+}) {
+  return (
+    <dl className="technical-facts">
+      {rows.map(({ label, value }) => (
+        <div key={label}>
+          <dt>{label}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function TechnicalOccurrenceCard({
+  occurrence,
+}: {
+  readonly occurrence: ReferenceOccurrenceDescriptor;
+}) {
+  const resolution = occurrence.resolution;
+  return (
+    <article className="technical-occurrence">
+      <TechnicalFacts
+        rows={[
+          {
+            label: 'Reference ID',
+            value: <span translate="no">{occurrence.referenceId}</span>,
+          },
+          { label: 'Resolution state', value: occurrence.status },
+          {
+            label: 'Raw target',
+            value: <span translate="no">{occurrence.rawTarget}</span>,
+          },
+          {
+            label: 'Exact source',
+            value: <span translate="no">{occurrence.sourceProvenance}</span>,
+          },
+          ...(resolution.reason === null
+            ? []
+            : [{ label: 'Resolution reason', value: resolution.reason }]),
+          ...(resolution.status === 'resolved'
+            ? [
+                {
+                  label: 'Destination entity ID',
+                  value: (
+                    <span translate="no">{resolution.target.entityId}</span>
+                  ),
+                },
+              ]
+            : []),
+          ...(resolution.status === 'ambiguous'
+            ? [
+                {
+                  label: 'Candidate entity IDs',
+                  value: (
+                    <span translate="no">
+                      {resolution.candidates
+                        .map(({ entityId }) => entityId)
+                        .join(', ')}
+                    </span>
+                  ),
+                },
+              ]
+            : []),
+        ]}
+      />
+    </article>
+  );
+}
+
+function TechnicalOccurrenceSection({
+  items,
+  title,
+}: {
+  readonly items: readonly ReferenceOccurrenceDescriptor[];
+  readonly title: string;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <BoundedSection
+      emptyMessage=""
+      itemKey={({ referenceId }) => referenceId}
+      items={items}
+      renderItem={(occurrence) => (
+        <TechnicalOccurrenceCard occurrence={occurrence} />
+      )}
+      title={title}
+    />
+  );
+}
+
+function TechnicalDetails({ children }: { readonly children: ReactNode }) {
+  return (
+    <details className="technical-details">
+      <summary>Technical details</summary>
+      <div className="technical-details__body">
+        {children}
+        <p className="technical-note">
+          Report mode provides paths and source ranges, but not Markdown source
+          text or an open-in-source action.
+        </p>
+      </div>
+    </details>
+  );
+}
+
+function uniqueOccurrences(
+  occurrences: readonly ReferenceOccurrenceDescriptor[],
+): readonly ReferenceOccurrenceDescriptor[] {
+  return [
+    ...new Map(occurrences.map((item) => [item.referenceId, item])).values(),
+  ];
 }
 
 function EntityInspector({
@@ -220,102 +379,150 @@ function EntityInspector({
   readonly inspection: Extract<ProjectedNodeInspection, { kind: 'entity' }>;
   readonly onNavigate: (entityId: EntityId, origin: string) => void;
 }) {
-  const { entity: scoped } = inspection;
-  const outgoing = scoped.outgoingReferences.map((relationship) => ({
-    occurrence: relationship.occurrence,
-    ...(relationship.sourceIsDescendant
-      ? { note: 'Authored by a descendant in the selected subtree.' }
-      : {}),
-  }));
-  const backlinks = scoped.backlinks.map((relationship) => ({
-    occurrence: relationship.occurrence,
-    ...(relationship.targetIsDescendant
-      ? {
-          note: `The exact target is descendant “${relationship.target.displayName}”.`,
-        }
-      : {}),
-  }));
-  const candidateMentions = scoped.ambiguousCandidateMentions.map(
-    (relationship) => ({
-      occurrence: relationship.occurrence,
-      note: `${relationship.relevantCandidates.length} candidate${relationship.relevantCandidates.length === 1 ? '' : 's'} fall within this subtree; none is resolved.`,
-    }),
-  );
-  const internal = inspection.internalRelationships.map((occurrence) => ({
-    occurrence,
-    note: 'Both exact endpoints currently roll into this visible node.',
-  }));
+  const scoped = inspection.entity;
+  const outgoing = scoped.outgoingReferences;
+  const backlinks = scoped.backlinks;
+  const candidateMentions = scoped.ambiguousCandidateMentions;
+  const internal = inspection.internalRelationships;
+  const relationshipMetadata = uniqueOccurrences([
+    ...outgoing.map(({ occurrence }) => occurrence),
+    ...backlinks.map(({ occurrence }) => occurrence),
+  ]);
 
   return (
     <>
       <div className="inspector-identity">
         <span className={`kind-tag kind-${scoped.entity.kind}`}>
-          {scoped.entity.kind}
+          {humanKind(scoped.entity.kind)}
         </span>
         <h4>{scoped.entity.displayName}</h4>
-        <Breadcrumbs
-          breadcrumb={scoped.entity.breadcrumb}
-          onNavigate={onNavigate}
-        />
-        <p>{sourceLocation(scoped.entity)}</p>
-        <dl className="inspector-facts">
-          <div>
-            <dt>Projection Role</dt>
-            <dd>{inspection.role}</dd>
-          </div>
-          <div>
-            <dt>Focus Distance</dt>
-            <dd>{inspection.focusDistance ?? 'Not in focus mode'}</dd>
-          </div>
-          <div>
-            <dt>Canonical Descendants</dt>
-            <dd>{scoped.descendantCount}</dd>
-          </div>
-          <div>
-            <dt>Structurally Hidden</dt>
-            <dd>{inspection.hiddenDescendantCount}</dd>
-          </div>
-        </dl>
+        <EntityLocation entity={scoped.entity} onNavigate={onNavigate} />
       </div>
-      <div className="relationship-summary" aria-label="Relationship summary">
-        <span>{outgoing.length} outgoing</span>
-        <span>{backlinks.length} backlinks</span>
-        <span>{candidateMentions.length} candidate mentions</span>
-        <span>{internal.length} internal</span>
-      </div>
-      <OccurrenceSection
-        emptyMessage="No references are authored by this entity or its descendants."
+      <p className="relationship-summary" aria-label="Relationship summary">
+        {outgoing.length} outgoing · {backlinks.length} backlinks
+      </p>
+      <BoundedSection
+        emptyMessage="No outgoing links."
+        itemKey={({ occurrence }) => occurrence.referenceId}
         items={outgoing}
-        onNavigate={onNavigate}
-        title="Outgoing References"
+        renderItem={({ occurrence, sourceIsDescendant }) =>
+          occurrence.status === 'resolved' ? (
+            <ResolvedOutgoingCard
+              occurrence={occurrence}
+              onNavigate={onNavigate}
+              showSource={sourceIsDescendant}
+            />
+          ) : (
+            <ProblemOutgoingCard
+              occurrence={occurrence}
+              onNavigate={onNavigate}
+              showSource={sourceIsDescendant}
+            />
+          )
+        }
+        title="Outgoing"
       />
-      <OccurrenceSection
-        emptyMessage="No resolved references target this entity or its descendants."
+      <BoundedSection
+        emptyMessage="No backlinks."
+        itemKey={({ occurrence }) => occurrence.referenceId}
         items={backlinks}
-        onNavigate={onNavigate}
+        renderItem={({ occurrence }) => (
+          <BacklinkCard occurrence={occurrence} onNavigate={onNavigate} />
+        )}
         title="Backlinks"
       />
-      <OccurrenceSection
-        emptyMessage="No ambiguous occurrence lists this entity subtree as a candidate."
-        items={candidateMentions}
-        onNavigate={onNavigate}
-        title="Ambiguous Candidate Mentions"
-      />
-      <section className="internal-explanation">
-        <h4>Internal Relationships Hidden by Current Collapse</h4>
-        <p>
-          {internal.length} reference{internal.length === 1 ? ' is' : 's are'}{' '}
-          currently internal to this collapsed node. Expand sections to expose
-          them as visible graph relationships.
+      {internal.length === 0 ? null : (
+        <p className="collapsed-links-hint">
+          {internal.length} additional link
+          {internal.length === 1 ? ' is' : 's are'} inside collapsed sections.
         </p>
-      </section>
-      <OccurrenceSection
-        emptyMessage="No exact reference occurrence is currently internal to this node."
-        items={internal}
-        onNavigate={onNavigate}
-        title="Internal Occurrences"
-      />
+      )}
+      <TechnicalDetails>
+        <TechnicalFacts
+          rows={[
+            {
+              label: 'Entity ID',
+              value: <span translate="no">{scoped.entity.entityId}</span>,
+            },
+            { label: 'Projection role', value: inspection.role },
+            {
+              label: 'Focus distance',
+              value: inspection.focusDistance ?? 'Not in focus mode',
+            },
+            {
+              label: 'Exact source',
+              value: (
+                <span translate="no">{scoped.entity.sourceProvenance}</span>
+              ),
+            },
+            { label: 'Descendants', value: scoped.descendantCount },
+            {
+              label: 'Structurally hidden descendants',
+              value: inspection.hiddenDescendantCount,
+            },
+            {
+              label: 'Possible matches from uncertain links',
+              value: candidateMentions.length,
+            },
+            {
+              label: 'Links inside collapsed sections',
+              value: internal.length,
+            },
+          ]}
+        />
+        {candidateMentions.length === 0 ? null : (
+          <section className="technical-section">
+            <h5>Possible matches from uncertain links</h5>
+            <ul className="technical-candidate-list">
+              {candidateMentions.map(({ occurrence, relevantCandidates }) => (
+                <li key={occurrence.referenceId}>
+                  <strong translate="no">{occurrence.rawTarget}</strong>
+                  <span> from {breadcrumbText(occurrence.source)}</span>
+                  <ul>
+                    {relevantCandidates.map((candidate) => (
+                      <li key={candidate.entityId}>
+                        <EntityAction
+                          entity={candidate}
+                          onNavigate={onNavigate}
+                          origin="Possible Match"
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        <TechnicalOccurrenceSection
+          items={relationshipMetadata}
+          title="Link metadata"
+        />
+        <TechnicalOccurrenceSection
+          items={internal}
+          title="Links inside collapsed sections"
+        />
+      </TechnicalDetails>
     </>
+  );
+}
+
+function DiagnosticSourceCard({
+  occurrence,
+  onNavigate,
+}: {
+  readonly occurrence: ReferenceOccurrenceDescriptor;
+  readonly onNavigate: (entityId: EntityId, origin: string) => void;
+}) {
+  return (
+    <article className="relationship-card">
+      <EntityAction
+        entity={occurrence.source}
+        onNavigate={onNavigate}
+        origin="Link Source"
+      />
+      <EntityLocation entity={occurrence.source} onNavigate={onNavigate} />
+    </article>
   );
 }
 
@@ -326,51 +533,138 @@ function DiagnosticInspector({
   readonly inspection: Extract<ProjectedNodeInspection, { kind: 'diagnostic' }>;
   readonly onNavigate: (entityId: EntityId, origin: string) => void;
 }) {
+  const title = issueTitle(inspection.status);
   return (
     <>
-      <div className="inspector-identity">
-        <span className={`status-badge status-${inspection.status}`}>
-          {inspection.status}
-        </span>
-        <h4 translate="no">{inspection.rawTarget}</h4>
+      <div className={`link-issue link-issue--${inspection.status}`}>
+        <span className="link-issue__title">{title}</span>
+        <h4>
+          Target: <span translate="no">{inspection.rawTarget}</span>
+        </h4>
         <p>
-          Projection-only diagnostic target · {inspection.occurrences.length}{' '}
-          exact occurrence
-          {inspection.occurrences.length === 1 ? '' : 's'}
+          {inspection.status === 'unresolved'
+            ? 'No matching destination was found.'
+            : inspection.status === 'ambiguous'
+              ? 'More than one possible destination exists.'
+              : 'This link could not be interpreted as a valid destination.'}
         </p>
-        {inspection.reasons.length === 0 ? null : (
-          <ul className="diagnostic-reasons">
-            {inspection.reasons.map((reason) => (
-              <li key={reason}>{reason}</li>
-            ))}
-          </ul>
-        )}
-        {inspection.candidates.length === 0 ? null : (
-          <div className="diagnostic-candidates">
-            <h4>Ambiguity Candidates</h4>
-            <ul>
-              {inspection.candidates.map((candidate) => (
-                <li key={candidate.entityId}>
-                  <EntityAction
-                    entity={candidate}
-                    label={`${candidate.displayName} — ${candidate.sourceProvenance}`}
-                    onNavigate={onNavigate}
-                    origin="Ambiguity Candidate"
-                  />
-                </li>
-              ))}
-            </ul>
-            <p>No candidate is treated as the chosen resolution.</p>
-          </div>
+        {inspection.status !== 'invalid' ||
+        inspection.reasons.length === 0 ? null : (
+          <p className="link-issue__reason">{inspection.reasons.join(' ')}</p>
         )}
       </div>
-      <OccurrenceSection
-        emptyMessage="This diagnostic target has no canonical occurrence."
-        items={inspection.occurrences.map((occurrence) => ({ occurrence }))}
-        onNavigate={onNavigate}
-        title="Source Occurrences"
+      {inspection.status !== 'ambiguous' ? null : (
+        <section className="candidate-destinations">
+          <h4>Possible destinations</h4>
+          <ul>
+            {inspection.candidates.map((candidate) => (
+              <li key={candidate.entityId}>
+                <EntityAction
+                  entity={candidate}
+                  onNavigate={onNavigate}
+                  origin="Possible Destination"
+                />
+                <EntityLocation entity={candidate} onNavigate={onNavigate} />
+              </li>
+            ))}
+          </ul>
+          <p>No destination has been selected.</p>
+        </section>
+      )}
+      <BoundedSection
+        emptyMessage="No source location is available."
+        itemKey={({ referenceId }) => referenceId}
+        items={inspection.occurrences}
+        renderItem={(occurrence) => (
+          <DiagnosticSourceCard
+            occurrence={occurrence}
+            onNavigate={onNavigate}
+          />
+        )}
+        title="From"
       />
+      <TechnicalDetails>
+        <TechnicalFacts
+          rows={[
+            {
+              label: 'Projection node ID',
+              value: <span translate="no">{inspection.projectionNodeId}</span>,
+            },
+            { label: 'Resolution state', value: inspection.status },
+            {
+              label: 'Raw target',
+              value: <span translate="no">{inspection.rawTarget}</span>,
+            },
+            {
+              label: 'Resolution reasons',
+              value:
+                inspection.reasons.length === 0
+                  ? 'None provided'
+                  : inspection.reasons.join(' '),
+            },
+            {
+              label: 'Candidate entity IDs',
+              value:
+                inspection.candidates.length === 0 ? (
+                  'None'
+                ) : (
+                  <span translate="no">
+                    {inspection.candidates
+                      .map(({ entityId }) => entityId)
+                      .join(', ')}
+                  </span>
+                ),
+            },
+          ]}
+        />
+        <TechnicalOccurrenceSection
+          items={inspection.occurrences}
+          title="Source occurrence metadata"
+        />
+      </TechnicalDetails>
     </>
+  );
+}
+
+function ConnectionOccurrenceCard({
+  occurrence,
+  onNavigate,
+}: {
+  readonly occurrence: ReferenceOccurrenceDescriptor;
+  readonly onNavigate: (entityId: EntityId, origin: string) => void;
+}) {
+  return (
+    <article className="connection-occurrence">
+      <div>
+        <EntityAction
+          entity={occurrence.source}
+          onNavigate={onNavigate}
+          origin="Connection Source"
+        />
+        <EntityLocation entity={occurrence.source} onNavigate={onNavigate} />
+      </div>
+      <span aria-hidden="true" className="connection-arrow">
+        →
+      </span>
+      {occurrence.resolution.status === 'resolved' ? (
+        <div>
+          <EntityAction
+            entity={occurrence.resolution.target}
+            onNavigate={onNavigate}
+            origin="Connection Destination"
+          />
+          <EntityLocation
+            entity={occurrence.resolution.target}
+            onNavigate={onNavigate}
+          />
+        </div>
+      ) : (
+        <div className="connection-problem">
+          <span>{issueTitle(occurrence.resolution.status)}</span>
+          <strong translate="no">{occurrence.rawTarget}</strong>
+        </div>
+      )}
+    </article>
   );
 }
 
@@ -385,43 +679,129 @@ function ReferenceEdgeInspector({
     inspection.projectedTarget.kind === 'diagnostic'
       ? inspection.projectedTarget.rawTarget
       : inspection.projectedTarget.displayName;
+  const isGrouped = inspection.occurrences.length > 1;
+  const groupedByCollapse =
+    isGrouped &&
+    inspection.occurrences.some(
+      ({ sourceRolledUp, targetRolledUp }) => sourceRolledUp || targetRolledUp,
+    );
   return (
     <>
       <div className="inspector-identity">
-        <span className={`status-badge status-${inspection.status}`}>
-          {inspection.status}
-        </span>
+        <span className="inspector-type">Connection</span>
         <h4>
           {inspection.projectedSource.displayName} → {targetLabel}
         </h4>
-        <p>
-          Visible projected relationship · {inspection.occurrences.length}{' '}
-          canonical occurrence
-          {inspection.occurrences.length === 1 ? '' : 's'}
+        <p className="connection-summary">
+          This visible connection represents {inspection.occurrences.length}{' '}
+          link{inspection.occurrences.length === 1 ? '' : 's'}.
         </p>
+        {isGrouped ? (
+          <p className="connection-grouping-hint">
+            {inspection.occurrences.length} links are grouped into this
+            connection
+            {groupedByCollapse
+              ? ' because some sections are currently collapsed.'
+              : '.'}
+          </p>
+        ) : null}
       </div>
-      <OccurrenceSection
-        emptyMessage="This projected edge has no canonical reference provenance."
-        items={inspection.occurrences.map(
-          ({ occurrence, sourceRolledUp, targetRolledUp }) => ({
-            occurrence,
-            ...(!sourceRolledUp && !targetRolledUp
-              ? {}
-              : {
-                  note: `Displayed through visible ${[
-                    sourceRolledUp ? 'source' : '',
-                    targetRolledUp ? 'target' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(
-                      ' and ',
-                    )} ancestor${sourceRolledUp && targetRolledUp ? 's' : ''}.`,
-                }),
-          }),
+      <BoundedSection
+        emptyMessage="No underlying links are available."
+        itemKey={({ occurrence }) => occurrence.referenceId}
+        items={inspection.occurrences}
+        renderItem={({ occurrence }) => (
+          <ConnectionOccurrenceCard
+            occurrence={occurrence}
+            onNavigate={onNavigate}
+          />
         )}
-        onNavigate={onNavigate}
-        title="Aggregated Provenance"
+        title="Links in this connection"
       />
+      <TechnicalDetails>
+        <TechnicalFacts
+          rows={[
+            {
+              label: 'Projection edge ID',
+              value: <span translate="no">{inspection.projectionEdgeId}</span>,
+            },
+            { label: 'Resolution state', value: inspection.status },
+            {
+              label: 'Projected source entity ID',
+              value: (
+                <span translate="no">
+                  {inspection.projectedSource.entityId}
+                </span>
+              ),
+            },
+            {
+              label: 'Rolled-up occurrences',
+              value: inspection.occurrences.filter(
+                ({ sourceRolledUp, targetRolledUp }) =>
+                  sourceRolledUp || targetRolledUp,
+              ).length,
+            },
+          ]}
+        />
+        <TechnicalOccurrenceSection
+          items={inspection.occurrences.map(({ occurrence }) => occurrence)}
+          title="Connection occurrence metadata"
+        />
+      </TechnicalDetails>
+    </>
+  );
+}
+
+function HierarchyEdgeInspector({
+  inspection,
+  onNavigate,
+}: {
+  readonly inspection: Extract<ProjectedEdgeInspection, { kind: 'hierarchy' }>;
+  readonly onNavigate: (entityId: EntityId, origin: string) => void;
+}) {
+  return (
+    <>
+      <div className="inspector-identity">
+        <span className="inspector-type">Structure</span>
+        <h4>{inspection.parent.displayName}</h4>
+      </div>
+      <div className="structure-relationship">
+        <div>
+          <EntityAction
+            entity={inspection.parent}
+            onNavigate={onNavigate}
+            origin="Containing Item"
+          />
+          <EntityLocation entity={inspection.parent} onNavigate={onNavigate} />
+        </div>
+        <span>contains</span>
+        <div>
+          <EntityAction
+            entity={inspection.child}
+            onNavigate={onNavigate}
+            origin="Contained Item"
+          />
+          <EntityLocation entity={inspection.child} onNavigate={onNavigate} />
+        </div>
+      </div>
+      <TechnicalDetails>
+        <TechnicalFacts
+          rows={[
+            {
+              label: 'Projection edge ID',
+              value: <span translate="no">{inspection.projectionEdgeId}</span>,
+            },
+            {
+              label: 'Parent entity ID',
+              value: <span translate="no">{inspection.parent.entityId}</span>,
+            },
+            {
+              label: 'Child entity ID',
+              value: <span translate="no">{inspection.child.entityId}</span>,
+            },
+          ]}
+        />
+      </TechnicalDetails>
     </>
   );
 }
@@ -433,45 +813,10 @@ function EdgeInspector({
   readonly inspection: ProjectedEdgeInspection;
   readonly onNavigate: (entityId: EntityId, origin: string) => void;
 }) {
-  if (inspection.kind === 'reference') {
-    return (
-      <ReferenceEdgeInspector inspection={inspection} onNavigate={onNavigate} />
-    );
-  }
-  return (
-    <div className="inspector-identity">
-      <span className="kind-tag kind-section">hierarchy</span>
-      <h4>
-        {inspection.parent.displayName} → {inspection.child.displayName}
-      </h4>
-      <p>Canonical structural containment. No Reference ID is fabricated.</p>
-      <dl className="inspector-facts inspector-facts--stacked">
-        <div>
-          <dt>Parent</dt>
-          <dd>
-            <EntityAction
-              entity={inspection.parent}
-              onNavigate={onNavigate}
-              origin="Hierarchy Parent"
-            />
-            <br />
-            {sourceLocation(inspection.parent)}
-          </dd>
-        </div>
-        <div>
-          <dt>Child</dt>
-          <dd>
-            <EntityAction
-              entity={inspection.child}
-              onNavigate={onNavigate}
-              origin="Hierarchy Child"
-            />
-            <br />
-            {sourceLocation(inspection.child)}
-          </dd>
-        </div>
-      </dl>
-    </div>
+  return inspection.kind === 'reference' ? (
+    <ReferenceEdgeInspector inspection={inspection} onNavigate={onNavigate} />
+  ) : (
+    <HierarchyEdgeInspector inspection={inspection} onNavigate={onNavigate} />
   );
 }
 
@@ -506,23 +851,19 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
   }, [projection, selection, workspace]);
 
   return (
-    <aside className="selection-panel" aria-label="Provenance inspector">
+    <aside className="selection-panel" aria-label="Inspector">
       <div className="selection-panel__heading">
-        <h3>Provenance Inspector</h3>
+        <h3>Inspector</h3>
         {selection === null ? null : (
           <button onClick={onClear} type="button">
-            Clear Selection
+            Clear selection
           </button>
         )}
       </div>
       {inspected === null ? (
-        <div className="selection-empty">
-          <strong>Nothing Selected</strong>
-          <span>Select a node or edge to inspect its exact provenance.</span>
-          <span>
-            Use Find to reveal entities that are not currently visible.
-          </span>
-        </div>
+        <p className="selection-empty">
+          Select a file, section, or connection.
+        </p>
       ) : !inspected.ok ? (
         <p className="inspector-error" role="alert">
           {inspected.message} Clear the selection and choose a visible graph
@@ -538,10 +879,6 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
       ) : (
         <EdgeInspector inspection={inspected.value} onNavigate={onNavigate} />
       )}
-      <p className="source-limitation">
-        Report mode includes paths and exact line/column spans, but no Markdown
-        source text, snippets, or open-in-source action.
-      </p>
     </aside>
   );
 });

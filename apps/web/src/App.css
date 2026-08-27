@@ -216,9 +216,7 @@ h2 {
 
 .entity-search h3,
 .inspector-identity h4,
-.inspector-section h4,
-.internal-explanation h4,
-.diagnostic-candidates h4 {
+.inspector-section h4 {
   margin: 0;
   color: #1d3541;
   text-wrap: balance;
@@ -574,7 +572,7 @@ h2 {
 
 .inspector-identity {
   display: grid;
-  gap: 0.65rem;
+  gap: 0.4rem;
   margin-top: 0.9rem;
 }
 
@@ -584,12 +582,10 @@ h2 {
   overflow-wrap: anywhere;
 }
 
-.inspector-identity > p,
-.source-limitation,
-.internal-explanation p,
 .inspector-empty,
 .inspector-error,
-.diagnostic-candidates p {
+.collapsed-links-hint,
+.technical-note {
   margin: 0;
   color: #5b717c;
   font-size: 0.75rem;
@@ -597,10 +593,18 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.inspector-type {
+  color: #5c7380;
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .inspector-breadcrumbs {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
+  gap: 0.15rem 0.25rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -620,6 +624,7 @@ h2 {
 
 .inspector-breadcrumbs button,
 .entity-navigation {
+  max-width: 100%;
   min-height: 1.8rem;
   padding: 0.2rem 0.35rem;
   border: 0;
@@ -643,63 +648,15 @@ h2 {
   background: #e2eff2;
 }
 
-.inspector-facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.45rem;
-  margin: 0;
-}
-
-.inspector-facts > div {
-  min-width: 0;
-  padding: 0.55rem;
-  border: 1px solid #dde5e8;
-  border-radius: 0.45rem;
-  background: #ffffff;
-}
-
-.inspector-facts dt,
-.occurrence-card dt {
-  color: #69808b;
-  font-size: 0.63rem;
-  font-weight: 850;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.inspector-facts dd,
-.occurrence-card dd {
-  margin: 0.2rem 0 0;
-  color: #1d3541;
-  font-size: 0.72rem;
-  font-weight: 700;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-}
-
-.inspector-facts--stacked {
-  grid-template-columns: 1fr;
-}
-
 .relationship-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin: 0.9rem 0;
-}
-
-.relationship-summary span {
-  padding: 0.25rem 0.45rem;
-  border-radius: 999px;
+  margin: 0.65rem 0 0;
   color: #36505e;
-  background: #e7eef1;
-  font-size: 0.66rem;
-  font-weight: 800;
+  font-size: 0.75rem;
+  font-weight: 750;
   font-variant-numeric: tabular-nums;
 }
 
-.inspector-section,
-.internal-explanation {
+.inspector-section {
   margin-top: 1rem;
   padding-top: 0.85rem;
   border-top: 1px solid #dbe3e7;
@@ -714,8 +671,9 @@ h2 {
 }
 
 .inspector-section h4,
-.internal-explanation h4,
-.diagnostic-candidates h4 {
+.candidate-destinations h4 {
+  margin: 0;
+  color: #1d3541;
   font-size: 0.82rem;
   line-height: 1.35;
 }
@@ -727,85 +685,93 @@ h2 {
   font-variant-numeric: tabular-nums;
 }
 
-.occurrence-list {
+.relationship-list {
   display: grid;
   min-width: 0;
   gap: 0.55rem;
 }
 
-.occurrence-card {
+.relationship-card {
+  display: grid;
+  gap: 0.35rem;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  padding: 0.65rem;
+  padding: 0.6rem;
   border: 1px solid #dce4e8;
   border-radius: 0.55rem;
   background: #ffffff;
   content-visibility: auto;
-  contain-intrinsic-size: 0 15rem;
+  contain-intrinsic-size: 0 6rem;
 }
 
-.occurrence-card__heading {
+.relationship-card__main,
+.relationship-card__title {
   display: flex;
-  gap: 0.4rem;
+  min-width: 0;
+  gap: 0.35rem;
   align-items: center;
 }
 
-.occurrence-card .reference-kind {
-  margin-left: auto;
-}
-
-.occurrence-target {
-  margin: 0.55rem 0;
-  color: #17323f;
-  font-size: 0.78rem;
-  font-weight: 850;
-  overflow-wrap: anywhere;
-}
-
-.occurrence-card dl {
-  display: grid;
-  gap: 0.4rem;
-  margin: 0;
-}
-
-.occurrence-card dl > div {
+.relationship-card__main > div,
+.relationship-card__title > .entity-navigation {
   min-width: 0;
 }
 
-.occurrence-card > p,
-.occurrence-candidates {
-  margin: 0.55rem 0 0;
-  color: #526a76;
-  font-size: 0.72rem;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
+.relationship-arrow,
+.connection-arrow {
+  flex: 0 0 auto;
+  color: #6c818c;
+  font-weight: 850;
 }
 
-.occurrence-reason {
-  padding: 0.45rem;
-  border-left: 3px solid #cf9e3d;
-  background: #fff8e8;
+.relationship-kind {
+  flex: 0 0 auto;
+  padding: 0.12rem 0.35rem;
+  border-radius: 999px;
+  color: #546b77;
+  background: #e9eff2;
+  font-size: 0.62rem;
+  font-weight: 800;
 }
 
-.occurrence-note {
+.relationship-context {
+  display: flex;
+  min-width: 0;
+  gap: 0.3rem;
+  align-items: baseline;
+  padding-top: 0.3rem;
+  border-top: 1px solid #edf1f3;
+}
+
+.relationship-context > span {
+  flex: 0 0 auto;
+  color: #70848e;
+  font-size: 0.66rem;
   font-weight: 750;
 }
 
-.occurrence-candidates ul,
-.diagnostic-candidates ul,
-.diagnostic-reasons {
-  display: grid;
-  gap: 0.25rem;
-  margin: 0.35rem 0 0;
-  padding: 0;
-  list-style: none;
+.relationship-card--unresolved,
+.relationship-card--invalid {
+  border-left: 3px solid #b34853;
+  background: #fff7f7;
 }
 
-.occurrence-candidates small {
-  display: block;
-  margin-top: 0.4rem;
-  color: #6b7e89;
+.relationship-card--ambiguous {
+  border-left: 3px solid #c18a22;
+  background: #fffbf1;
+}
+
+.relationship-problem-label {
+  color: #6a5255;
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+
+.relationship-raw-target {
+  color: #253f4b;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
 }
 
 .show-more {
@@ -829,17 +795,230 @@ h2 {
   background: #23495b;
 }
 
-.internal-explanation {
-  display: grid;
-  gap: 0.35rem;
+.collapsed-links-hint {
+  margin-top: 1rem;
+  padding-left: 0.65rem;
+  border-left: 2px solid #aebdc5;
 }
 
-.source-limitation {
+.link-issue {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+  padding: 0.8rem;
+  border-left: 4px solid #b34853;
+  border-radius: 0.45rem;
+  background: #fff4f5;
+}
+
+.link-issue--ambiguous {
+  border-left-color: #b27b17;
+  background: #fff9e9;
+}
+
+.link-issue h4,
+.link-issue p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.link-issue h4 {
+  color: #1d3541;
+  font-size: 0.9rem;
+}
+
+.link-issue p {
+  color: #526a76;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.link-issue__title {
+  color: #78343c;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.link-issue--ambiguous .link-issue__title {
+  color: #70500f;
+}
+
+.link-issue__reason {
+  font-weight: 700;
+}
+
+.candidate-destinations {
   margin-top: 1rem;
-  padding: 0.65rem;
-  border: 1px dashed #aebdc5;
-  border-radius: 0.5rem;
+}
+
+.candidate-destinations > ul,
+.technical-candidate-list,
+.technical-candidate-list ul {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.candidate-destinations > ul > li {
+  min-width: 0;
+  padding: 0.55rem;
+  border: 1px solid #e0d5b6;
+  border-radius: 0.45rem;
   background: #ffffff;
+}
+
+.candidate-destinations > p {
+  margin: 0.55rem 0 0;
+  color: #685625;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.connection-summary,
+.connection-grouping-hint {
+  margin: 0;
+  color: #4c6571;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.connection-grouping-hint {
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.4rem;
+  background: #eaf1f4;
+}
+
+.connection-occurrence {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: start;
+  min-width: 0;
+  padding: 0.65rem;
+  border: 1px solid #dce4e8;
+  border-radius: 0.55rem;
+  background: #ffffff;
+}
+
+.connection-occurrence > div,
+.connection-problem {
+  min-width: 0;
+}
+
+.connection-problem {
+  display: grid;
+  gap: 0.25rem;
+  color: #7b2731;
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
+.structure-relationship {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: start;
+  margin-top: 0.9rem;
+  padding: 0.7rem;
+  border: 1px solid #dce4e8;
+  border-radius: 0.55rem;
+  background: #ffffff;
+}
+
+.structure-relationship > div {
+  min-width: 0;
+}
+
+.structure-relationship > span {
+  padding-top: 0.4rem;
+  color: #647983;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.technical-details {
+  margin-top: 1rem;
+  border-top: 1px solid #cbd6db;
+}
+
+.technical-details > summary {
+  padding: 0.8rem 0;
+  color: #405965;
+  font-size: 0.75rem;
+  font-weight: 850;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.technical-details > summary:hover,
+.technical-details > summary:active {
+  color: #173c4e;
+}
+
+.technical-details__body {
+  display: grid;
+  gap: 0.85rem;
+  min-width: 0;
+  padding: 0.25rem 0.7rem 0.8rem;
+  border-left: 2px solid #cbd6db;
+}
+
+.technical-facts {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  margin: 0;
+}
+
+.technical-facts > div {
+  min-width: 0;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e3e9ec;
+}
+
+.technical-facts dt {
+  color: #69808b;
+  font-size: 0.63rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.technical-facts dd {
+  margin: 0.2rem 0 0;
+  color: #294450;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.technical-section h5 {
+  margin: 0;
+  color: #314c59;
+  font-size: 0.75rem;
+}
+
+.technical-candidate-list,
+.technical-candidate-list ul {
+  color: #526a76;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.technical-candidate-list ul {
+  margin-left: 0.7rem;
+}
+
+.technical-occurrence {
+  min-width: 0;
+  padding: 0 0.55rem;
+  border: 1px solid #dce4e8;
+  border-radius: 0.45rem;
+  background: #fdfefe;
 }
 
 .inspector-error {
@@ -851,46 +1030,10 @@ h2 {
 }
 
 .selection-empty {
-  display: grid;
-  gap: 0.35rem;
-  margin-top: 1rem;
+  margin: 0.9rem 0 0;
   color: #647983;
   font-size: 0.78rem;
   line-height: 1.5;
-}
-
-.selection-empty strong {
-  color: #263e4a;
-}
-
-.selection-facts {
-  display: grid;
-  gap: 0;
-  margin: 0.55rem 0 0;
-}
-
-.selection-facts > div {
-  min-width: 0;
-  padding: 0.6rem 0;
-  border-bottom: 1px solid #e1e7ea;
-}
-
-.selection-facts dt {
-  color: #69808b;
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.selection-facts dd {
-  margin: 0.2rem 0 0;
-  overflow: hidden;
-  color: #1d3541;
-  font-size: 0.78rem;
-  font-weight: 700;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
 }
 
 .projection-issues,
@@ -1502,7 +1645,18 @@ a:focus-visible {
     width: 100%;
   }
 
-  .inspector-facts {
-    grid-template-columns: 1fr;
+  .connection-occurrence,
+  .structure-relationship {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .connection-arrow,
+  .structure-relationship > span {
+    padding: 0 0 0 0.35rem;
+  }
+
+  .technical-details__body {
+    padding-right: 0.35rem;
+    padding-left: 0.55rem;
   }
 }
