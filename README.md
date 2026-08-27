@@ -2,7 +2,7 @@
 
 Icarus Graph Explorer is an early-stage, hierarchical knowledge-graph explorer for Markdown workspaces. Its intended model treats documents, their nested sections, and optional addressable blocks as distinct entities so references can retain their precise source and target locations.
 
-KG0 established the repository foundation, KG1 added the versioned canonical model, KG2 added deterministic CommonMark document/section structure parsing, KG3 added tested Obsidian syntax interpretation, KG4 added conservative workspace resolution plus validated canonical snapshot assembly, KG5 added a local diagnostic-report workflow, KG6 added renderer-independent disclosure and focus, KG7 added the projection-driven React Flow structural graph, KG8 added source-neutral provenance inspection, backlinks, canonical search, and targeted graph navigation, and KG9A adds private app-owned stable identity across supported normal edits. KG9B view persistence and product vault access remain deferred.
+KG0 established the repository foundation, KG1 added the versioned canonical model, KG2 added deterministic CommonMark document/section structure parsing, KG3 added tested Obsidian syntax interpretation, KG4 added conservative workspace resolution plus validated canonical snapshot assembly, KG5 added a local diagnostic-report workflow, KG6 added renderer-independent disclosure and focus, KG7 added the projection-driven React Flow structural graph, KG8 added source-neutral provenance inspection, backlinks, canonical search, and targeted graph navigation, and KG9 completed private app-owned stable identity plus local renderer-independent view restoration. KG10 incremental workspace processing is next; product vault access remains KG11.
 
 The application is local-first and read-only with respect to Markdown. The initial architecture has no backend, account, cloud upload, telemetry, or source-file write path.
 
@@ -32,6 +32,10 @@ through the browser File API. The graph defaults to documents, supports
 progressive structural disclosure and local focus, searches the complete
 canonical snapshot for hidden entities, explains exact relationship
 occurrences, and keeps KG5 evidence in a secondary expandable section.
+Reports that explicitly declare stable identity also restore disclosure, focus,
+visible graph filters, and a semantic entity-plus-zoom viewport bookmark from
+browser-local storage. Search and selection remain transient. Legacy or
+transient reports stay fully usable without cross-session persistence.
 
 Generate a private local report with the development-only scanner:
 

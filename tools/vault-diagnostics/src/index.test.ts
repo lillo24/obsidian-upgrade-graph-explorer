@@ -75,6 +75,7 @@ describe('vault diagnostic runner', () => {
       true,
     );
     expect(stored).not.toContain('PRIVATE BODY TOKEN');
+    expect(run.report.identity).toEqual({ stability: 'transient' });
     expect(run.summary).toMatchObject({
       documents: 2,
       references: 1,
@@ -156,6 +157,7 @@ describe('vault diagnostic runner', () => {
       identityCatalog: initialState.catalog,
     });
     expect(first.identity).toBeDefined();
+    expect(first.report.identity).toEqual({ stability: 'stable' });
     expect(
       first.report.snapshot.entities.every(({ id }) =>
         id.startsWith('stable:'),
@@ -185,6 +187,7 @@ describe('vault diagnostic runner', () => {
     expect(second.report.snapshot.entities.map(({ id }) => id)).toEqual(
       first.report.snapshot.entities.map(({ id }) => id),
     );
+    expect(second.report.identity).toEqual({ stability: 'stable' });
     expect(second.identity?.summary.documents.allocatedNew).toBe(0);
     expect(second.identity?.summary.sections.allocatedNew).toBe(0);
     expect(second.identity?.summary.references.allocatedNew).toBe(0);

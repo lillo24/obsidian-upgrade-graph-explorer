@@ -1,6 +1,6 @@
 # Obsidian Diagnostics
 
-Status: **STABLE — KG5 report schema and compatibility probes are synthetic-fixture-backed.**
+Status: **STABLE — KG9B report identity provenance and KG5 evidence are synthetic-fixture-backed.**
 
 This pure package converts successful KG4 output into a deterministic,
 runtime-validated diagnostic report for local inspection. It owns Obsidian
@@ -15,7 +15,7 @@ adapter/resolver values → diagnostics-obsidian → serialized report → UI
 
 ```text
 src/
-  types.ts        Versioned report, probe, inventory, timing, and generator contracts.
+  types.ts        Versioned report, identity, probe, inventory, timing, and generator contracts.
   validation.ts   Strict report-envelope and embedded-snapshot runtime validation.
   probes.ts       Case-only and non-Markdown inventory compatibility clues.
   report.ts       Deterministic report construction and diagnostic ordering.
@@ -30,6 +30,9 @@ src/
 Schema version 1 stores the validated `KnowledgeSnapshot`, resolver/forwarded
 adapter diagnostics, non-canonical compatibility probes, aggregate source
 inventory, and optional coarse timings. It never stores source text or snippets.
+An optional `identity.stability` field declares `stable` or `transient`
+provenance. New report builders must state it; legacy schema-v1 reports without
+the field still validate but are persistence-ineligible in the browser.
 
 `validateObsidianDiagnosticReport()` rejects unsupported versions, malformed
 records, invalid embedded snapshots, dangling probe references/candidates, and

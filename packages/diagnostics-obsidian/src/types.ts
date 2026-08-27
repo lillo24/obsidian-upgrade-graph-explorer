@@ -9,6 +9,13 @@ import type { WorkspaceResolutionDiagnostic } from '@icarus-graph-explorer/resol
 
 export const OBSIDIAN_DIAGNOSTIC_REPORT_SCHEMA_VERSION = 1 as const;
 
+export type DiagnosticIdentityStability = 'stable' | 'transient';
+
+/** Provenance for deciding whether canonical IDs are safe across report runs. */
+export interface DiagnosticIdentityMetadata {
+  readonly stability: DiagnosticIdentityStability;
+}
+
 export type CompatibilityProbeCode =
   | 'case-only-file-match'
   | 'case-only-heading-match'
@@ -45,6 +52,8 @@ export interface ObsidianDiagnosticReport {
   readonly diagnostics: readonly WorkspaceResolutionDiagnostic[];
   readonly probes: readonly CompatibilityProbe[];
   readonly sourceInventory: DiagnosticSourceInventory;
+  /** Missing on legacy schema-v1 reports, which are persistence-ineligible. */
+  readonly identity?: DiagnosticIdentityMetadata;
   readonly timings?: DiagnosticPipelineTimings;
 }
 
@@ -52,6 +61,7 @@ export interface BuildObsidianDiagnosticReportInput {
   readonly snapshot: KnowledgeSnapshot;
   readonly diagnostics: readonly WorkspaceResolutionDiagnostic[];
   readonly documents: readonly ParsedObsidianDocument[];
+  readonly identity: DiagnosticIdentityMetadata;
   readonly nonMarkdownPaths?: readonly WorkspacePath[];
   readonly timings?: DiagnosticPipelineTimings;
 }

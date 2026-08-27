@@ -1,6 +1,6 @@
 # Local Vault Diagnostics
 
-Status: **STABLE — KG5 acquisition and KG9A private identity lifecycle are temp-directory tested and real-vault validated.**
+Status: **STABLE — KG9B report provenance and KG9A private identity lifecycle are tested and real-vault validated.**
 
 This development-only workspace package is the sole KG5 filesystem boundary.
 It recursively acquires one explicitly selected local vault, then calls KG3,
@@ -78,9 +78,14 @@ pnpm --filter @icarus-graph-explorer/vault-diagnostics generate:sample
 ```
 
 This deterministically rebuilds the committed, formatted report from
-`tests/fixtures/workspaces/diagnostic-sample/`. It never uses a real vault.
-It intentionally retains deterministic transient fixture IDs and does not
-create or require a persistent catalog.
+`tests/fixtures/workspaces/diagnostic-sample/`. It never uses a real vault or
+writes a catalog. A deterministic in-memory stable catalog/reconciliation pass
+makes the bundled report explicitly persistence-eligible for reproducible
+browser reload QA.
+
+Persistent runner reports declare stable identity provenance; non-persistent
+runs declare transient provenance. This metadata does not enter the canonical
+snapshot and does not expose the private catalog.
 
 ## Browser boundary
 

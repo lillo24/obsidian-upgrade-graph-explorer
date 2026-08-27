@@ -365,6 +365,21 @@ function validateTimings(
   }
 }
 
+function validateIdentity(
+  value: unknown,
+  issues: DiagnosticReportValidationIssue[],
+): void {
+  const path = '$.identity';
+  if (!isRecord(value)) {
+    issue(issues, path, 'Expected an identity-provenance object.');
+    return;
+  }
+  fields(value, ['stability'], [], path, issues);
+  if (value.stability !== 'stable' && value.stability !== 'transient') {
+    issue(issues, `${path}.stability`, 'Expected "stable" or "transient".');
+  }
+}
+
 export function validateObsidianDiagnosticReport(
   value: unknown,
 ): DiagnosticReportValidationResult {
@@ -379,7 +394,7 @@ export function validateObsidianDiagnosticReport(
   fields(
     value,
     ['schemaVersion', 'snapshot', 'diagnostics', 'probes', 'sourceInventory'],
-    ['timings'],
+    ['identity', 'timings'],
     '$',
     issues,
   );
@@ -418,6 +433,9 @@ export function validateObsidianDiagnosticReport(
   );
   if (Object.hasOwn(value, 'timings')) {
     validateTimings(value.timings, issues);
+  }
+  if (Object.hasOwn(value, 'identity')) {
+    validateIdentity(value.identity, issues);
   }
 
   if (issues.length > 0) {

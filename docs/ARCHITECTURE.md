@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, and KG9A implements app-owned stable canonical identity through private source-neutral reconciliation. KG9 view-state persistence and product filesystem access remain planned work.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, and KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration. KG10 incremental workspace processing is next; product filesystem access remains KG11.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -39,8 +39,10 @@ SourceProvider
   ├─→ explorer inspection/search → UI inspector
   └─→ view projection → renderer → UI graph
 
-ViewStateStore
-  → view projection / UI
+stable report identity provenance
+  → source-neutral saved-view schema/reconciliation
+  → platform ViewStateStore (browser localStorage today)
+  → view projection / semantic renderer viewport request
 ```
 
 The canonical snapshot is a versioned plain-data envelope containing workspace identity, entity arrays, and reference arrays. Future delta formats must follow the same serializable boundary. Neither may contain React elements, renderer objects, Graphology graphs, Tauri handles, parser ASTs, or source-provider objects. This keeps worker transfer, deterministic tests, caching, and renderer replacement possible.
@@ -87,6 +89,15 @@ projection-only diagnostic targets. Source adapters, filesystem/platform APIs,
 renderers, layout engines, application code, and graph libraries are
 mechanically excluded from its production source.
 
+`packages/view-state` depends inward on core and view-projection only. It owns a
+versioned plain-data subset of KG6 disclosure, focus, user-facing filters, and a
+semantic canonical-entity viewport bookmark. It strictly validates saved data,
+reconciles it against the current `ProjectionWorkspace`, drops stale identities
+without fuzzy replacement, and emits non-fatal restore issues. React, renderers,
+diagnostics, stable-identity catalogs, filesystems, storage APIs, and platform
+code are mechanically excluded from production source. Browser localStorage is
+an outer adapter, not the durable domain contract.
+
 `packages/explorer-inspection` depends inward on core and view-projection. It
 builds canonical hierarchy/reference/search indexes once per snapshot and emits
 plain deterministic entity, occurrence, subtree-relationship, projected
@@ -110,6 +121,14 @@ KG8 adds a keyed projected-node center request to the renderer boundary.
 Centering uses prepared renderer coordinates only after the new projection and
 layout exist. It remains separate from selection and full-graph fit; no
 canonical or inspection truth enters the renderer.
+
+KG9B adds one interaction-end semantic viewport observation. The renderer uses
+the current React Flow transform and actual container dimensions to find the
+nearest visible entity node, then reports only its canonical entity ID plus
+zoom. Diagnostic nodes never become bookmarks. Raw x/y, renderer node IDs,
+Dagre coordinates, and per-frame movement never cross into saved view state.
+Restoration reuses the KG8 center request after layout; missing or filtered
+anchors use normal fit without widening the restored view.
 
 `tools/vault-diagnostics` is the current development filesystem boundary. It recursively
 discovers one explicitly selected vault, reads strict UTF-8 Markdown, inventories
@@ -257,6 +276,12 @@ development filesystem scanner
 Compatibility probes and the report are constructed after optional identity
 stabilization, so every exposed entity/reference/target/candidate ID is stable
 in persistent runs. The catalog stays separate and never enters the report.
+The schema-v1 report envelope may declare `identity.stability` as `stable` or
+`transient`; the field is provenance for outer persistence eligibility, not
+canonical truth. Legacy schema-v1 reports without it remain readable and are
+treated as persistence-ineligible. Newly built reports state the provenance
+explicitly. The committed sample uses deterministic in-memory stable
+reconciliation without writing a catalog.
 
 The report deliberately excludes source text and snippets, but it contains
 paths, headings, raw targets, spans, and relationships and must therefore be
@@ -283,11 +308,15 @@ Canonical source truth includes document structure, references, source spans,
 and explicit resolution results. Later source-backed fields may be added only
 for concrete requirements. KG6 renderer-independent projection state now covers
 structural disclosure, block inclusion, focus root/hops/direction/context, and
-path/projected-text/entity-kind/resolution filters. Future application view
-state may additionally include selection, pins, manual positions, viewport,
-saved views, and renderer preferences. A UI action such as hiding, moving, or
-pinning an entity must never mutate source truth. Early releases are read-only
-with respect to Markdown.
+path/projected-text/entity-kind/resolution filters. KG9 persists the user-facing
+subset: disclosure, block inclusion, focus, path/entity/status filters, and a
+semantic canonical-entity-plus-zoom viewport bookmark. The internal projected
+text filter is deliberately excluded because the current UI does not expose it.
+Selection, hover, search, inspector pagination, renderer graph data, raw
+viewport transforms, manual positions/pins, named saved views, timestamps, and
+renderer preferences are not persisted. A UI action such as hiding or focusing
+an entity never mutates source truth. Early releases remain read-only with
+respect to Markdown.
 
 KG5 search, resolution filters, disclosure state, and pagination are transient
 diagnostic UI state. They are not KG6 projection contracts or KG9 persisted view
@@ -297,10 +326,15 @@ KG8 graph filters remain KG6 state. Explicit navigation exits focus, reveals
 the canonical ancestor chain through KG6, widens only filters that exclude the
 target, then selects and centers the resulting projected node.
 
-KG9A makes canonical IDs durable across the tested conservative edit classes
-but does not persist any `ViewProjectionState`, disclosure, filters, focus,
-selection, search, inspector state, viewport, saved view, or renderer position.
-KG9B remains the owner of renderer-independent application view persistence.
+KG9B persistence activates only for reports with explicit stable-identity
+provenance. The browser synchronously loads, validates, and reconciles the
+workspace-keyed record before autosave is enabled. Stale disclosure IDs, focus
+roots, path scopes, and viewport anchors are removed with visible non-fatal
+status; collapsed disclosure wins conflicts. Corrupt or unsupported records are
+not overwritten or deleted. Reset removes only that workspace view, restores
+documents-only defaults, clears transient selection/search, and fits the graph;
+it never resets the KG9A identity catalog. A selected report file itself must
+still be re-selected after browser reload because file handles are out of scope.
 
 Renderers receive `ViewProjection` plain data formed from canonical source truth
 plus renderer-independent state. Structural disclosure happens before each
@@ -331,6 +365,14 @@ KG9A identity catalogs are application-owned private local state. Even without
 Markdown body text they may contain paths, headings, fingerprints, and raw
 targets, so they must stay in ignored/app-local storage outside the selected
 vault and must not be logged or included in browser reports.
+
+KG9B browser saved views are also private local application data, but their
+scope is intentionally small: stable workspace/entity IDs, disclosure/focus,
+workspace-relative path filters, enum filters, and zoom. They contain no report,
+catalog, source body, absolute path, renderer layout, raw transform, search, or
+selection. Keys use encoded stable workspace IDs rather than filenames, vault
+basenames, or paths. Storage denial/corruption is non-fatal and never becomes a
+success-shaped empty value.
 
 Remote capabilities, collaboration, or source editing would require an explicit later trust decision. Private workspace material must not enter repository fixtures or logs. Bugs discovered in the Icarus vault must be reduced to small synthetic examples before they are committed.
 
@@ -408,6 +450,16 @@ unique and duplicate references, resolution remapping, JSON round trips,
 semantic invariance, determinism, corruption, workspace mismatch, and private
 catalog lifecycle behavior. Real-vault continuity remains an ignored local
 aggregate check; no catalog or private observation enters the repository.
+
+KG9B adds strict saved-view round trips, exact restore, workspace mismatch,
+stale disclosure/focus/path/viewport reconciliation, collapsed-wins conflicts,
+enum/zoom validation, deterministic serialization, canonical immutability,
+supported-edit/identity-loss evolution, injected storage failures/isolation,
+report provenance compatibility, and semantic viewport geometry tests.
+Synthetic reload, transient/report-switch, and gitignored real stable-report
+browser checks cover hydration, transient state reset, disclosure/focus,
+semantic zoom restoration, and console cleanliness without adding a browser
+test dependency or committing private artifacts.
 
 ## Changing these decisions
 

@@ -5,7 +5,7 @@
     "workspace": { "id": "diagnostic-sample" },
     "entities": [
       {
-        "id": "transient:[\"document\",\"diagnostic-sample\",\"Case Target.md\"]",
+        "id": "stable:[\"diagnostic-sample\",\"entity\",1]",
         "kind": "document",
         "source": {
           "path": "Case Target.md",
@@ -16,7 +16,7 @@
         }
       },
       {
-        "id": "transient:[\"document\",\"diagnostic-sample\",\"Source.md\"]",
+        "id": "stable:[\"diagnostic-sample\",\"entity\",2]",
         "kind": "document",
         "source": {
           "path": "Source.md",
@@ -27,7 +27,7 @@
         }
       },
       {
-        "id": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]",
+        "id": "stable:[\"diagnostic-sample\",\"entity\",3]",
         "kind": "document",
         "source": {
           "path": "Target.md",
@@ -38,7 +38,7 @@
         }
       },
       {
-        "id": "transient:[\"document\",\"diagnostic-sample\",\"folder-a/Note.md\"]",
+        "id": "stable:[\"diagnostic-sample\",\"entity\",4]",
         "kind": "document",
         "source": {
           "path": "folder-a/Note.md",
@@ -49,7 +49,7 @@
         }
       },
       {
-        "id": "transient:[\"document\",\"diagnostic-sample\",\"folder-b/Note.md\"]",
+        "id": "stable:[\"diagnostic-sample\",\"entity\",5]",
         "kind": "document",
         "source": {
           "path": "folder-b/Note.md",
@@ -60,9 +60,9 @@
         }
       },
       {
-        "id": "transient:[\"section\",\"diagnostic-sample\",\"Case Target.md\",0]",
+        "id": "stable:[\"diagnostic-sample\",\"entity\",6]",
         "kind": "section",
-        "parentId": "transient:[\"document\",\"diagnostic-sample\",\"Case Target.md\"]",
+        "parentId": "stable:[\"diagnostic-sample\",\"entity\",1]",
         "title": "Case target",
         "level": 1,
         "source": {
@@ -74,9 +74,9 @@
         }
       },
       {
-        "id": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "id": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "kind": "section",
-        "parentId": "transient:[\"document\",\"diagnostic-sample\",\"Source.md\"]",
+        "parentId": "stable:[\"diagnostic-sample\",\"entity\",2]",
         "title": "Overview",
         "level": 1,
         "source": {
@@ -88,9 +88,9 @@
         }
       },
       {
-        "id": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",392]",
+        "id": "stable:[\"diagnostic-sample\",\"entity\",11]",
         "kind": "section",
-        "parentId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "parentId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "title": "Nested",
         "level": 2,
         "source": {
@@ -102,9 +102,9 @@
         }
       },
       {
-        "id": "transient:[\"section\",\"diagnostic-sample\",\"Target.md\",0]",
+        "id": "stable:[\"diagnostic-sample\",\"entity\",8]",
         "kind": "section",
-        "parentId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]",
+        "parentId": "stable:[\"diagnostic-sample\",\"entity\",3]",
         "title": "Overview",
         "level": 1,
         "source": {
@@ -116,9 +116,9 @@
         }
       },
       {
-        "id": "transient:[\"section\",\"diagnostic-sample\",\"folder-a/Note.md\",0]",
+        "id": "stable:[\"diagnostic-sample\",\"entity\",9]",
         "kind": "section",
-        "parentId": "transient:[\"document\",\"diagnostic-sample\",\"folder-a/Note.md\"]",
+        "parentId": "stable:[\"diagnostic-sample\",\"entity\",4]",
         "title": "First note",
         "level": 1,
         "source": {
@@ -130,9 +130,9 @@
         }
       },
       {
-        "id": "transient:[\"section\",\"diagnostic-sample\",\"folder-b/Note.md\",0]",
+        "id": "stable:[\"diagnostic-sample\",\"entity\",10]",
         "kind": "section",
-        "parentId": "transient:[\"document\",\"diagnostic-sample\",\"folder-b/Note.md\"]",
+        "parentId": "stable:[\"diagnostic-sample\",\"entity\",5]",
         "title": "Second note",
         "level": 1,
         "source": {
@@ -144,9 +144,9 @@
         }
       },
       {
-        "id": "transient:[\"block\",\"diagnostic-sample\",\"Source.md\",410,\"block-one\"]",
+        "id": "stable:[\"diagnostic-sample\",\"entity\",12]",
         "kind": "block",
-        "parentId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",392]",
+        "parentId": "stable:[\"diagnostic-sample\",\"entity\",11]",
         "source": {
           "path": "Source.md",
           "span": {
@@ -156,9 +156,9 @@
         }
       },
       {
-        "id": "transient:[\"block\",\"diagnostic-sample\",\"Source.md\",431,\"repeat\"]",
+        "id": "stable:[\"diagnostic-sample\",\"entity\",13]",
         "kind": "block",
-        "parentId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",392]",
+        "parentId": "stable:[\"diagnostic-sample\",\"entity\",11]",
         "source": {
           "path": "Source.md",
           "span": {
@@ -168,9 +168,9 @@
         }
       },
       {
-        "id": "transient:[\"block\",\"diagnostic-sample\",\"Source.md\",445,\"repeat\"]",
+        "id": "stable:[\"diagnostic-sample\",\"entity\",14]",
         "kind": "block",
-        "parentId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",392]",
+        "parentId": "stable:[\"diagnostic-sample\",\"entity\",11]",
         "source": {
           "path": "Source.md",
           "span": {
@@ -182,9 +182,9 @@
     ],
     "references": [
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",12]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",1]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 3, "column": 1, "offset": 12 },
@@ -192,13 +192,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",23]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",2]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 4, "column": 1, "offset": 23 },
@@ -206,13 +206,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",34]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",3]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 5, "column": 1, "offset": 34 },
@@ -220,13 +220,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",45]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",4]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 6, "column": 1, "offset": 45 },
@@ -234,13 +234,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",56]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",5]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 7, "column": 1, "offset": 56 },
@@ -248,13 +248,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",67]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",6]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 8, "column": 1, "offset": 67 },
@@ -262,13 +262,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",78]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",7]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 9, "column": 1, "offset": 78 },
@@ -276,13 +276,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",89]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",8]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 10, "column": 1, "offset": 89 },
@@ -290,13 +290,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",100]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",9]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 11, "column": 1, "offset": 100 },
@@ -304,13 +304,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",111]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",10]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 12, "column": 1, "offset": 111 },
@@ -318,13 +318,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",122]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",11]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 13, "column": 1, "offset": 122 },
@@ -332,13 +332,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",133]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",12]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 14, "column": 1, "offset": 133 },
@@ -346,13 +346,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",144]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",13]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 15, "column": 1, "offset": 144 },
@@ -360,13 +360,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",155]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",14]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 16, "column": 1, "offset": 155 },
@@ -374,13 +374,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",166]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",15]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 17, "column": 1, "offset": 166 },
@@ -388,13 +388,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",177]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",16]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 18, "column": 1, "offset": 177 },
@@ -402,13 +402,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",188]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",17]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 19, "column": 1, "offset": 188 },
@@ -416,13 +416,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",199]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",18]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 20, "column": 1, "offset": 199 },
@@ -430,13 +430,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",210]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",19]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 21, "column": 1, "offset": 210 },
@@ -444,13 +444,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",221]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",20]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 22, "column": 1, "offset": 221 },
@@ -458,13 +458,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",232]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",21]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 23, "column": 1, "offset": 232 },
@@ -472,13 +472,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",243]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",22]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target",
         "sourceSpan": {
           "start": { "line": 24, "column": 1, "offset": 243 },
@@ -486,13 +486,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"document\",\"diagnostic-sample\",\"Target.md\"]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",3]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",254]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",23]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Missing",
         "sourceSpan": {
           "start": { "line": 25, "column": 1, "offset": 254 },
@@ -504,9 +504,9 @@
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",266]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",24]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Note",
         "sourceSpan": {
           "start": { "line": 26, "column": 1, "offset": 266 },
@@ -515,16 +515,16 @@
         "resolution": {
           "status": "ambiguous",
           "candidateEntityIds": [
-            "transient:[\"document\",\"diagnostic-sample\",\"folder-a/Note.md\"]",
-            "transient:[\"document\",\"diagnostic-sample\",\"folder-b/Note.md\"]"
+            "stable:[\"diagnostic-sample\",\"entity\",4]",
+            "stable:[\"diagnostic-sample\",\"entity\",5]"
           ],
           "reason": "Multiple Markdown documents match this target."
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",275]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",25]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "case target",
         "sourceSpan": {
           "start": { "line": 27, "column": 1, "offset": 275 },
@@ -536,9 +536,9 @@
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",291]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",26]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "Target#overview",
         "sourceSpan": {
           "start": { "line": 28, "column": 1, "offset": 291 },
@@ -550,9 +550,9 @@
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",311]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",27]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "#Nested",
         "sourceSpan": {
           "start": { "line": 29, "column": 1, "offset": 311 },
@@ -560,13 +560,13 @@
         },
         "resolution": {
           "status": "resolved",
-          "targetEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",392]"
+          "targetEntityId": "stable:[\"diagnostic-sample\",\"entity\",11]"
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",323]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",28]",
         "kind": "link",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "../Outside",
         "sourceSpan": {
           "start": { "line": 30, "column": 1, "offset": 323 },
@@ -578,9 +578,9 @@
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",338]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",29]",
         "kind": "embed",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "assets/image.png",
         "sourceSpan": {
           "start": { "line": 31, "column": 1, "offset": 338 },
@@ -592,9 +592,9 @@
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",360]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",30]",
         "kind": "embed",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "missing.pdf",
         "sourceSpan": {
           "start": { "line": 32, "column": 1, "offset": 360 },
@@ -606,9 +606,9 @@
         }
       },
       {
-        "id": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",377]",
+        "id": "stable:[\"diagnostic-sample\",\"reference\",31]",
         "kind": "embed",
-        "sourceEntityId": "transient:[\"section\",\"diagnostic-sample\",\"Source.md\",0]",
+        "sourceEntityId": "stable:[\"diagnostic-sample\",\"entity\",7]",
         "rawTarget": "logo.png",
         "sourceSpan": {
           "start": { "line": 33, "column": 1, "offset": 377 },
@@ -726,37 +726,34 @@
   "probes": [
     {
       "code": "case-only-file-match",
-      "referenceId": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",275]",
+      "referenceId": "stable:[\"diagnostic-sample\",\"reference\",25]",
       "message": "Exactly one Markdown document matches when letter case is ignored.",
-      "candidateEntityIds": [
-        "transient:[\"document\",\"diagnostic-sample\",\"Case Target.md\"]"
-      ]
+      "candidateEntityIds": ["stable:[\"diagnostic-sample\",\"entity\",1]"]
     },
     {
       "code": "case-only-heading-match",
-      "referenceId": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",291]",
+      "referenceId": "stable:[\"diagnostic-sample\",\"reference\",26]",
       "message": "Exactly one heading matches when letter case is ignored.",
-      "candidateEntityIds": [
-        "transient:[\"section\",\"diagnostic-sample\",\"Target.md\",0]"
-      ]
+      "candidateEntityIds": ["stable:[\"diagnostic-sample\",\"entity\",8]"]
     },
     {
       "code": "attachment-present-unmodeled",
-      "referenceId": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",338]",
+      "referenceId": "stable:[\"diagnostic-sample\",\"reference\",29]",
       "message": "A matching non-Markdown resource exists but is not canonical schema-v1 truth.",
       "candidatePaths": ["assets/image.png"]
     },
     {
       "code": "attachment-not-found",
-      "referenceId": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",360]",
+      "referenceId": "stable:[\"diagnostic-sample\",\"reference\",30]",
       "message": "No matching non-Markdown resource was found in the diagnostic inventory."
     },
     {
       "code": "attachment-match-ambiguous",
-      "referenceId": "transient:[\"reference\",\"diagnostic-sample\",\"Source.md\",377]",
+      "referenceId": "stable:[\"diagnostic-sample\",\"reference\",31]",
       "message": "Multiple non-Markdown resources match this unsupported target.",
       "candidatePaths": ["one/logo.png", "two/logo.png"]
     }
   ],
-  "sourceInventory": { "markdownFileCount": 5, "nonMarkdownFileCount": 3 }
+  "sourceInventory": { "markdownFileCount": 5, "nonMarkdownFileCount": 3 },
+  "identity": { "stability": "stable" }
 }

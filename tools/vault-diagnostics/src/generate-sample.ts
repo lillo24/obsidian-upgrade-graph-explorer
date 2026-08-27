@@ -3,6 +3,10 @@ import { fileURLToPath } from 'node:url';
 import { parseObsidianDocument } from '@icarus-graph-explorer/adapter-obsidian';
 import { buildObsidianDiagnosticReport } from '@icarus-graph-explorer/diagnostics-obsidian';
 import { resolveObsidianWorkspace } from '@icarus-graph-explorer/resolver-obsidian';
+import {
+  createStableIdentityCatalog,
+  reconcileStableIdentity,
+} from '@icarus-graph-explorer/stable-identity';
 import { format } from 'prettier';
 
 import { discoverVault } from './discovery';
@@ -29,10 +33,15 @@ async function main(): Promise<void> {
       `Synthetic workspace resolution failed: ${resolution.diagnostics[0]?.message ?? 'unknown failure'}`,
     );
   }
-  const report = buildObsidianDiagnosticReport({
+  const stable = reconcileStableIdentity({
     snapshot: resolution.snapshot,
+    previousCatalog: createStableIdentityCatalog('diagnostic-sample'),
+  });
+  const report = buildObsidianDiagnosticReport({
+    snapshot: stable.snapshot,
     diagnostics: resolution.diagnostics,
     documents,
+    identity: { stability: 'stable' },
     nonMarkdownPaths: discovery.nonMarkdownPaths,
   });
   const serializedReport = await format(JSON.stringify(report), {

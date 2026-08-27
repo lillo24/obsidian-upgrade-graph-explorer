@@ -53,6 +53,9 @@ importers:
       '@icarus-graph-explorer/view-projection':
         specifier: workspace:*
         version: link:../../packages/view-projection
+      '@icarus-graph-explorer/view-state':
+        specifier: workspace:*
+        version: link:../../packages/view-state
       react:
         specifier: 19.2.8
         version: 19.2.8
@@ -199,6 +202,19 @@ importers:
       '@icarus-graph-explorer/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/view-state:
+    dependencies:
+      '@icarus-graph-explorer/core':
+        specifier: workspace:*
+        version: link:../core
+      '@icarus-graph-explorer/view-projection':
+        specifier: workspace:*
+        version: link:../view-projection
+    devDependencies:
+      '@icarus-graph-explorer/stable-identity':
+        specifier: workspace:*
+        version: link:../stable-identity
 
   tools/vault-diagnostics:
     dependencies:

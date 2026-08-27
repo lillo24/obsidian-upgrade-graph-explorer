@@ -15,6 +15,11 @@ export {
   mapProjectionToReactFlow,
 } from './mapping';
 export { prepareRendererGraph } from './prepare';
+export { observeSemanticViewport } from './semantic-viewport';
+export type {
+  RendererViewport,
+  ViewportContainerSize,
+} from './semantic-viewport';
 export type {
   DiagnosticFlowNode,
   DiagnosticNodeData,
@@ -27,6 +32,7 @@ export type {
   GraphFlowNode,
   GraphLayoutMode,
   GraphSelection,
+  GraphViewportObservation,
   LayoutEngine,
   PrepareRendererGraphOptions,
   RendererGraph,

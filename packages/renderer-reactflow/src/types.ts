@@ -19,6 +19,11 @@ export interface GraphCenterRequest {
   readonly zoom?: number;
 }
 
+export interface GraphViewportObservation {
+  readonly anchorEntityId: string | null;
+  readonly zoom: number;
+}
+
 export interface EntityNodeData extends Record<string, unknown> {
   readonly projectionNodeId: ProjectionNodeId;
   readonly entityId: string;
@@ -102,6 +107,9 @@ export interface GraphCanvasProps {
   readonly selection: GraphSelection | null;
   readonly fitRequestKey: number;
   readonly centerRequest?: GraphCenterRequest;
+  readonly onViewportObservation?: (
+    observation: GraphViewportObservation,
+  ) => void;
   readonly onSelectionChange: (selection: GraphSelection | null) => void;
   readonly onToggleEntity: (entityId: string, currentlyOpen: boolean) => void;
 }

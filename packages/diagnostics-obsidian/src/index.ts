@@ -13,6 +13,8 @@ export {
   type CompatibilityProbe,
   type CompatibilityProbeCode,
   type DiagnosticPipelineTimings,
+  type DiagnosticIdentityMetadata,
+  type DiagnosticIdentityStability,
   type DiagnosticReportValidationIssue,
   type DiagnosticReportValidationResult,
   type DiagnosticSourceInventory,

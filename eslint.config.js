@@ -517,6 +517,80 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/view-state/**/*.{ts,tsx}'],
+    ignores: ['packages/view-state/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react',
+              message: 'Saved-view reconciliation must remain UI-independent.',
+            },
+            {
+              name: 'react-dom',
+              message: 'Saved-view reconciliation must remain UI-independent.',
+            },
+            {
+              name: '@icarus-graph-explorer/stable-identity',
+              message:
+                'View state consumes stable canonical IDs, not identity catalogs.',
+            },
+            {
+              name: '@icarus-graph-explorer/diagnostics-obsidian',
+              message:
+                'Report eligibility belongs to an outer application adapter.',
+            },
+            {
+              name: '@icarus-graph-explorer/renderer-reactflow',
+              message:
+                'Saved-view contracts cannot depend on renderer details.',
+            },
+            {
+              name: '@icarus-graph-explorer/web',
+              message: 'Pure view state cannot depend on an application.',
+            },
+            {
+              name: 'node:fs',
+              message: 'Storage belongs in a platform adapter.',
+            },
+            {
+              name: 'node:fs/promises',
+              message: 'Storage belongs in a platform adapter.',
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                'react/*',
+                'react-dom/*',
+                '@xyflow/*',
+                '@dagrejs/*',
+                '@tauri-apps/*',
+                '@react-sigma/*',
+                'sigma/*',
+                'graphology-*',
+                'obsidian-*',
+                '@obsidian/*',
+                '@icarus-graph-explorer/adapter-obsidian/*',
+                '@icarus-graph-explorer/resolver-obsidian/*',
+                '@icarus-graph-explorer/diagnostics-obsidian/*',
+                '@icarus-graph-explorer/stable-identity/*',
+                '@icarus-graph-explorer/explorer-inspection/*',
+                '@icarus-graph-explorer/renderer-reactflow/*',
+                '@icarus-graph-explorer/web/*',
+                'node:fs/*',
+              ],
+              message:
+                'View-state production code may depend only on core and view-projection.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['packages/stable-identity/**/*.{ts,tsx}'],
     ignores: ['packages/stable-identity/**/*.test.{ts,tsx}'],
     rules: {

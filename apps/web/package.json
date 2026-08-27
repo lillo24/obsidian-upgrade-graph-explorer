@@ -13,6 +13,7 @@
     "@icarus-graph-explorer/diagnostics-obsidian": "workspace:*",
     "@icarus-graph-explorer/explorer-inspection": "workspace:*",
     "@icarus-graph-explorer/renderer-reactflow": "workspace:*",
+    "@icarus-graph-explorer/view-state": "workspace:*",
     "@icarus-graph-explorer/view-projection": "workspace:*",
     "react": "19.2.8",
     "react-dom": "19.2.8"
