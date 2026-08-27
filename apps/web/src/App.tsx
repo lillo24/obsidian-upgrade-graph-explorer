@@ -33,6 +33,7 @@ export function App() {
   const [report, setReport] = useState<ObsidianDiagnosticReport>(SAMPLE_REPORT);
   const [reportName, setReportName] = useState('Synthetic Sample');
   const [reportRevision, setReportRevision] = useState(0);
+  const [graphMaximized, setGraphMaximized] = useState(false);
   const [loadError, setLoadError] = useState<string>();
   const [statusFilter, setStatusFilter] = useState<ResolutionFilter>('all');
   const [search, setSearch] = useState('');
@@ -79,7 +80,7 @@ export function App() {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       setLoadError(
-        `Could not load ${file.name}: ${message} Select a schema-v1 KG5 report or restore the synthetic sample.`,
+        `Could not load ${file.name}: ${message} Select a validated schema-v1 diagnostic report or restore the synthetic sample.`,
       );
     }
   }
@@ -94,25 +95,25 @@ export function App() {
   }
 
   return (
-    <>
+    <div
+      className={`app-shell${graphMaximized ? ' app-shell--graph-maximized' : ''}`}
+    >
       <a className="skip-link" href="#main-content">
         Skip to main content
       </a>
-      <header className="app-header">
-        <div>
-          <p className="eyebrow">Local-first · Read-only</p>
-          <h1 translate="no">Icarus Graph Explorer</h1>
-          <p className="header-description">
-            Explore the structure and references already captured in a validated
-            diagnostic report.
-          </p>
-        </div>
-        <div className="report-loader" aria-describedby="privacy-note">
-          <label className="file-label" htmlFor="report-file">
-            Load Diagnostic Report
+      <header className="app-bar">
+        <h1 translate="no">Icarus Graph Explorer</h1>
+        <div className="report-actions" aria-describedby="privacy-note">
+          <label
+            className="report-open-button"
+            htmlFor="report-file"
+            title="Reports stay in this browser tab and are not uploaded."
+          >
+            Open Report
           </label>
           <input
             accept="application/json,.json"
+            className="report-file-input"
             id="report-file"
             name="diagnostic-report"
             onChange={(event) => void loadReport(event)}
@@ -123,20 +124,27 @@ export function App() {
             onClick={restoreSample}
             type="button"
           >
-            Load Synthetic Sample
+            Sample
           </button>
-          <p id="privacy-note">
+          <span className="report-name" title={reportName} translate="no">
+            {reportName}
+          </span>
+          <span className="visually-hidden" id="privacy-note">
             The selected JSON stays in this browser tab. Nothing is uploaded.
-          </p>
-          <p className="load-message" aria-live="polite">
-            {loadError ?? `Viewing: ${reportName}`}
-          </p>
+          </span>
         </div>
+        {loadError === undefined ? null : (
+          <p className="report-error" role="alert">
+            {loadError}
+          </p>
+        )}
       </header>
 
       <main className="diagnostic-shell" id="main-content">
         <GraphExplorer
           key={reportRevision}
+          maximized={graphMaximized}
+          onMaximizedChange={setGraphMaximized}
           {...(report.identity === undefined
             ? {}
             : { identityStability: report.identity.stability })}
@@ -200,10 +208,6 @@ export function App() {
           <EvidencePanel lookups={lookups} report={report} />
         </details>
       </main>
-      <footer className="app-footer">
-        KG9 restores stable local graph views from one generated report. Source
-        text and product-grade vault access remain deferred to KG11.
-      </footer>
-    </>
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 # Web Structural Graph Explorer
 
-Status: **STABLE — KG9B synthetic and ignored real-report persistence gates pass.**
+Status: **STABLE — UX1 graph workspace shell and KG9B persistence gates pass.**
 
 This package owns the browser SPA, validated KG5 report selection, KG6 graph
 interaction state, guarded browser persistence, graph selection, canonical
@@ -27,7 +27,7 @@ apps/web/
   tsconfig.json       Strict browser/JSX compilation settings.
   src/
     main.tsx          Root validation and React startup.
-    App.tsx           Report selection, reset boundary, and secondary evidence UI.
+    App.tsx           Compact report bar, maximized-shell state, reset boundary, and secondary evidence UI.
     graph-state.ts    Pure disclosure/focus/filter interaction reducer.
     navigation.ts     Shared reveal/filter-widening/navigation planner.
     persistence/      Stable-report eligibility, hydration, and localStorage adapter.
@@ -57,6 +57,30 @@ KG11 = product folder access and watching
 
 Malformed schema versions, snapshots, diagnostics, probes, or inventory fields
 produce an actionable inline error while the last valid report remains visible.
+
+## Graph-first workspace shell
+
+The normal product shell uses a compact report bar and gives the graph workspace
+the remaining viewport-driven height. **Maximize Graph** is an application mode,
+not the browser Fullscreen API: the existing `GraphExplorer` and `GraphCanvas`
+instances remain mounted in place while the workspace becomes a fixed `100dvh`
+surface. Page chrome and diagnostic evidence are hidden, body scrolling is
+locked, and **Exit Maximize** or `Escape` restores the prior body overflow value.
+Maximizing is intentionally transient and never requests `fitView`, so selection,
+viewport, disclosure, focus, filters, and saved KG9 view state remain unchanged.
+
+The Inspector is also transient and closed by default. Opening it adds a bounded
+desktop column; at 900px and below it overlays the canvas as a drawer so the graph
+does not lose its usable width. Closing the Inspector unmounts only its presentation
+column and does not clear or change graph selection. Selecting another graph item
+while it is closed does not reopen it, and reopening resolves the current selection.
+Neither shell preference is part of the persisted-view schema.
+
+Successful persistence and navigation messages remain in visually hidden
+`aria-live` regions. Projection, storage, report-loading, and navigation failures
+use explicit visible alerts; failure visibility is not inferred from message text.
+The KG5 evidence explorer remains collapsed below the graph in normal mode and
+uses no layout space in maximized mode.
 
 ## Saved graph view
 

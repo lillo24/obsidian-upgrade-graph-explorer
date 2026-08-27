@@ -47,6 +47,7 @@ import {
 } from '../persistence/storage';
 import { EntitySearch } from './EntitySearch';
 import { GraphFilters } from './GraphFilters';
+import { activateMaximizedGraphMode } from './maximized-graph-mode';
 import { ProvenanceInspector } from './ProvenanceInspector';
 
 interface ProjectionSuccess {
@@ -82,10 +83,14 @@ function selectionExists(
 
 export function GraphExplorer({
   identityStability,
+  maximized,
+  onMaximizedChange,
   snapshot,
   storage,
 }: {
   readonly identityStability?: DiagnosticIdentityStability;
+  readonly maximized: boolean;
+  readonly onMaximizedChange: (maximized: boolean) => void;
   readonly snapshot: KnowledgeSnapshot;
   readonly storage?: StorageLike | null;
 }) {
@@ -145,15 +150,22 @@ export function GraphExplorer({
     PersistedViewportAnchor | undefined
   >(restoredViewportHidden ? undefined : hydration.viewport);
   const persistenceWritable = useRef(hydration.writable);
-  const [persistenceStatus, setPersistenceStatus] = useState(
+  const [persistenceAnnouncement, setPersistenceAnnouncement] = useState(
     restoredViewportHidden
       ? `${hydration.status} The saved viewport anchor is hidden by the restored view, so the graph was fitted.`
       : hydration.status,
   );
-  const [transientResetKey, setTransientResetKey] = useState(0);
-  const [navigationStatus, setNavigationStatus] = useState(
-    'Select a graph element to inspect it, or use Find to reveal a hidden entity.',
+  const [persistenceError, setPersistenceError] = useState<string | undefined>(
+    eligibility === 'stable' && !hydration.writable
+      ? hydration.status
+      : undefined,
   );
+  const [transientResetKey, setTransientResetKey] = useState(0);
+  const [navigationAnnouncement, setNavigationAnnouncement] = useState(
+    'Select a graph element to inspect it, or use Search to reveal a hidden entity.',
+  );
+  const [navigationError, setNavigationError] = useState<string>();
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [initialSerializedView] = useState(() =>
     hydration.writable
       ? serializePersistedWorkspaceView(
@@ -189,6 +201,20 @@ export function GraphExplorer({
     node?.kind === 'entity' ? node : undefined;
 
   useEffect(() => {
+    if (!maximized || typeof document === 'undefined') return;
+    return activateMaximizedGraphMode(
+      {
+        bodyStyle: document.body.style,
+        addKeydownListener: (listener) =>
+          window.addEventListener('keydown', listener),
+        removeKeydownListener: (listener) =>
+          window.removeEventListener('keydown', listener),
+      },
+      () => onMaximizedChange(false),
+    );
+  }, [maximized, onMaximizedChange]);
+
+  useEffect(() => {
     if (
       eligibility !== 'stable' ||
       !persistenceWritable.current ||
@@ -210,7 +236,7 @@ export function GraphExplorer({
       if (!saved.ok) {
         persistenceWritable.current = false;
         queueMicrotask(() =>
-          setPersistenceStatus(
+          setPersistenceError(
             `${saved.message} The graph remains usable in memory.`,
           ),
         );
@@ -221,7 +247,7 @@ export function GraphExplorer({
       const message = error instanceof Error ? error.message : String(error);
       persistenceWritable.current = false;
       queueMicrotask(() =>
-        setPersistenceStatus(
+        setPersistenceError(
           `Could not prepare the saved graph view: ${message} The graph remains usable in memory.`,
         ),
       );
@@ -268,7 +294,7 @@ export function GraphExplorer({
         entityId,
       );
       if (!plan.ok) {
-        setNavigationStatus(`${origin}: ${plan.message}`);
+        setNavigationError(`${origin}: ${plan.message}`);
         return;
       }
       dispatch({ type: 'apply-navigation', state: plan.state });
@@ -278,7 +304,8 @@ export function GraphExplorer({
         nodeId: plan.projectionNodeId,
         zoom: 1.1,
       }));
-      setNavigationStatus(`${origin}: ${plan.announcement}`);
+      setNavigationError(undefined);
+      setNavigationAnnouncement(`${origin}: ${plan.announcement}`);
     },
     [projectionWorkspace, viewState],
   );
@@ -287,7 +314,8 @@ export function GraphExplorer({
     if (focusEntity === undefined) return;
     dispatch({ type: 'enter-focus', entityId: focusEntity.entityId });
     setFitRequestKey((current) => current + 1);
-    setNavigationStatus(
+    setNavigationError(undefined);
+    setNavigationAnnouncement(
       `Focused ${focusEntity.entityKind} in ${focusEntity.sourcePath}.`,
     );
   }
@@ -296,7 +324,10 @@ export function GraphExplorer({
     dispatch({ type: 'exit-focus' });
     setSelection(null);
     setFitRequestKey((current) => current + 1);
-    setNavigationStatus('Exited focus and restored structural disclosure.');
+    setNavigationError(undefined);
+    setNavigationAnnouncement(
+      'Exited focus and restored structural disclosure.',
+    );
   }
 
   function changeHops(hops: 1 | 2 | 3): void {
@@ -311,7 +342,7 @@ export function GraphExplorer({
 
   function resetSavedView(): void {
     if (persistenceStorage === undefined) {
-      setPersistenceStatus(
+      setPersistenceError(
         'Could not reset the saved view because browser storage is unavailable.',
       );
       return;
@@ -322,7 +353,7 @@ export function GraphExplorer({
     );
     if (!cleared.ok) {
       persistenceWritable.current = false;
-      setPersistenceStatus(
+      setPersistenceError(
         `${cleared.message} The graph remains usable in memory.`,
       );
       return;
@@ -341,27 +372,19 @@ export function GraphExplorer({
     setTransientResetKey((current) => current + 1);
     setFitRequestKey((current) => current + 1);
     persistenceWritable.current = true;
-    setPersistenceStatus('Saved graph view reset.');
-    setNavigationStatus(
+    setPersistenceError(undefined);
+    setPersistenceAnnouncement('Saved graph view reset.');
+    setNavigationError(undefined);
+    setNavigationAnnouncement(
       'Saved view reset to documents-only; search and selection were cleared.',
     );
   }
 
   return (
-    <section className="graph-workspace" aria-labelledby="graph-title">
-      <div className="graph-heading">
-        <div>
-          <p className="eyebrow">KG9 · Durable Local View</p>
-          <h2 id="graph-title">Knowledge Graph</h2>
-        </div>
-        {projection === undefined ? null : (
-          <p className="graph-counts" aria-live="polite">
-            <strong>{projection.nodes.length}</strong> nodes ·{' '}
-            <strong>{projection.edges.length}</strong> edges
-          </p>
-        )}
-      </div>
-
+    <section
+      className={`graph-workspace${maximized ? ' graph-workspace--maximized' : ''}`}
+      aria-label="Knowledge graph workspace"
+    >
       <EntitySearch
         key={transientResetKey}
         onNavigate={navigateToEntity}
@@ -459,6 +482,36 @@ export function GraphExplorer({
             </>
           )}
         </div>
+        <div
+          className="control-group control-group--workspace"
+          aria-label="Workspace controls"
+          role="group"
+        >
+          {projection === undefined ? null : (
+            <span className="graph-counts" aria-live="polite">
+              {projection.nodes.length} nodes · {projection.edges.length} edges
+            </span>
+          )}
+          {eligibility === 'stable' ? (
+            <button onClick={resetSavedView} type="button">
+              Reset saved view
+            </button>
+          ) : null}
+          <button
+            aria-pressed={inspectorOpen}
+            onClick={() => setInspectorOpen((current) => !current)}
+            type="button"
+          >
+            Inspector
+          </button>
+          <button
+            aria-pressed={maximized}
+            onClick={() => onMaximizedChange(!maximized)}
+            type="button"
+          >
+            {maximized ? 'Exit Maximize' : 'Maximize Graph'}
+          </button>
+        </div>
       </div>
 
       <GraphFilters
@@ -466,22 +519,27 @@ export function GraphExplorer({
         pathScopes={pathScopes}
         state={viewState}
       />
-      <div className="persistence-status">
-        <p aria-live="polite" aria-atomic="true">
-          {persistenceStatus}
-        </p>
-        {eligibility === 'stable' ? (
-          <button onClick={resetSavedView} type="button">
-            Reset saved view
-          </button>
-        ) : null}
-      </div>
-      <p className="navigation-status" aria-live="polite" aria-atomic="true">
-        {navigationStatus}
+      <p className="visually-hidden" aria-live="polite" aria-atomic="true">
+        {persistenceAnnouncement}
       </p>
+      <p className="visually-hidden" aria-live="polite" aria-atomic="true">
+        {navigationAnnouncement}
+      </p>
+      {persistenceError === undefined ? null : (
+        <p className="graph-alert" role="alert">
+          {persistenceError}
+        </p>
+      )}
+      {navigationError === undefined ? null : (
+        <p className="graph-alert" role="alert">
+          {navigationError}
+        </p>
+      )}
 
       {result.ok ? (
-        <div className="graph-stage">
+        <div
+          className={`graph-stage${inspectorOpen ? ' graph-stage--inspector-open' : ''}`}
+        >
           <GraphCanvas
             {...(centerRequest === undefined ? {} : { centerRequest })}
             expandedEntityIds={viewState.disclosure.expandedEntityIds}
@@ -493,18 +551,20 @@ export function GraphExplorer({
             projection={result.projection}
             selection={activeSelection}
           />
-          <ProvenanceInspector
-            key={
-              activeSelection === null
-                ? 'empty'
-                : `${activeSelection.kind}:${activeSelection.id}`
-            }
-            onClear={clearSelection}
-            onNavigate={navigateToEntity}
-            projection={result.projection}
-            selection={activeSelection}
-            workspace={inspectionWorkspace}
-          />
+          {inspectorOpen ? (
+            <ProvenanceInspector
+              key={
+                activeSelection === null
+                  ? 'empty'
+                  : `${activeSelection.kind}:${activeSelection.id}`
+              }
+              onClear={clearSelection}
+              onNavigate={navigateToEntity}
+              projection={result.projection}
+              selection={activeSelection}
+              workspace={inspectionWorkspace}
+            />
+          ) : null}
         </div>
       ) : (
         <p className="graph-failure" role="alert">
