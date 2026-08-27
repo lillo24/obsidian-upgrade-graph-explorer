@@ -13,7 +13,7 @@ The roadmap is a sequencing map, not a claim that future features exist. Each mi
 | **KG6 — View-projection architecture**                       | Renderer-independent granularity, collapse/endpoint roll-up, aggregated provenance, focus-neighborhood, and supported filter contracts.            | **Complete** — projection, provenance, validation, and benchmark gates passed.                      |
 | **KG7 — Structural graph MVP**                               | Projection-driven hierarchical graph with focused scalability interactions and distinct non-resolved states.                                       | **Complete** — renderer mapping, layout, interaction, and browser-validation gates passed.          |
 | **KG8 — Inspector, backlinks, search + navigation**          | Provenance-first inspection, incoming/outgoing references, ambiguity candidates, and search/navigation over projected data.                        | **Complete** — source-neutral inspection, navigation, and browser-validation gates passed.          |
-| **KG9 — Persistence + stable identity**                      | Local persistence for renderer-independent application view state and identities robust across normal edits.                                       | **Next** — KG8 exposes the transient interaction state requiring persistence decisions.             |
+| **KG9 — Persistence + stable identity**                      | Local persistence for renderer-independent application view state and identities robust across normal edits.                                       | **In progress** — KG9A stable-identity foundation is complete; KG9B view persistence is next.       |
 | **KG10 — Incremental workspace engine**                      | File-granular reparsing and snapshot deltas.                                                                                                       | Correct full-snapshot behavior and identity rules are established.                                  |
 | **KG11 — Tauri local-vault workflow**                        | Desktop folder access and watching through a narrow source-provider adapter.                                                                       | Web/core boundaries are stable; platform APIs remain outside generic packages.                      |
 | **KG12 — Performance + worker hardening**                    | Explicit workload budgets, measurement-led worker split, and projection/focus/collapse optimization.                                               | KG5 harness, incremental engine, and renderer measurements provide real workload evidence.          |
@@ -44,10 +44,15 @@ candidates, canonical search, KG6-backed filters, and targeted reveal/center
 navigation. Rich live snippets or open-in-source behavior still depends on KG11
 source access; pathfinding is not a gate for the core inspector.
 
-KG9 may persist fold state, pins/manual positions, selected view mode, filters,
-saved views, and viewport, but never renderer objects as canonical truth. KG12
-will use the KG5 harness plus later renderer evidence to set workload profiles,
-budgets, worker splits, and projection/focus/collapse benchmarks.
+KG9A provides private app-owned workspace/entity/reference identity across
+supported normal edits through conservative post-resolution reconciliation.
+KG9B may persist renderer-independent disclosure, selected view mode, filters,
+focus, and semantically anchored viewport state, but never renderer objects as
+canonical truth. Search, inspector selection, and graph selection should remain
+transient by default. Manual positions/pins have no supported interaction to
+persist, and saved views remain evidence-gated. KG12 will use the KG5 harness
+plus later renderer evidence to set workload profiles, budgets, worker splits,
+and projection/focus/collapse benchmarks.
 
 Post-MVP analytics—typed conceptual relations, pathfinding variants,
 centrality, betweenness, communities, connected components, co-citation,

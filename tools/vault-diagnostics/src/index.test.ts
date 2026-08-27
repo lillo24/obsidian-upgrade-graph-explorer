@@ -7,6 +7,11 @@ import { describe, expect, it } from 'vitest';
 
 import { parseDiagnosticCliArguments } from './arguments';
 import { discoverVault } from './discovery';
+import {
+  assertIdentityStoreOutsideVault,
+  prepareIdentityStore,
+  writeIdentityCatalogAtomically,
+} from './identity-store';
 import { writePrivateReport } from './output';
 import { buildReportFromSources, runVaultDiagnostics } from './pipeline';
 
@@ -121,5 +126,105 @@ describe('vault diagnostic runner', () => {
       excludes: ['code', 'archive/private'],
       verbose: true,
     });
+    if (!('help' in parsed)) {
+      expect(parsed.identityStorePath).toBe(
+        join(repositoryRoot, 'output', 'diagnostics', 'report.identity.json'),
+      );
+      expect(parsed.workspaceIdWasExplicit).toBe(true);
+      expect(parsed.resetIdentity).toBe(false);
+    }
+  });
+
+  it('creates private identity state, emits stable reports, and reuses all unchanged IDs', async () => {
+    const vault = await temporaryVault();
+    const privateDirectory = await temporaryVault();
+    const identityStorePath = join(privateDirectory, 'report.identity.json');
+    await Promise.all([
+      writeFile(join(vault, 'A.md'), '# Topic\n\n[[B]]', 'utf8'),
+      writeFile(join(vault, 'B.md'), '# Target', 'utf8'),
+    ]);
+    const initialState = await prepareIdentityStore({
+      vaultPath: vault,
+      identityStorePath,
+      reset: false,
+      workspaceIdFactory: () => 'opaque-workspace-test',
+    });
+    const first = await runVaultDiagnostics({
+      vaultPath: vault,
+      workspaceId: initialState.catalog.workspaceId,
+      excludes: [],
+      identityCatalog: initialState.catalog,
+    });
+    expect(first.identity).toBeDefined();
+    expect(
+      first.report.snapshot.entities.every(({ id }) =>
+        id.startsWith('stable:'),
+      ),
+    ).toBe(true);
+    await writeIdentityCatalogAtomically(
+      identityStorePath,
+      first.identity!.catalog,
+    );
+
+    const loadedState = await prepareIdentityStore({
+      vaultPath: vault,
+      identityStorePath,
+      reset: false,
+    });
+    const second = await runVaultDiagnostics({
+      vaultPath: vault,
+      workspaceId: loadedState.catalog.workspaceId,
+      excludes: [],
+      identityCatalog: loadedState.catalog,
+    });
+    await writeIdentityCatalogAtomically(
+      identityStorePath,
+      second.identity!.catalog,
+    );
+
+    expect(second.report.snapshot.entities.map(({ id }) => id)).toEqual(
+      first.report.snapshot.entities.map(({ id }) => id),
+    );
+    expect(second.identity?.summary.documents.allocatedNew).toBe(0);
+    expect(second.identity?.summary.sections.allocatedNew).toBe(0);
+    expect(second.identity?.summary.references.allocatedNew).toBe(0);
+  });
+
+  it('rejects vault-local stores and corrupt/conflicting state unless reset is explicit', async () => {
+    const vault = await temporaryVault();
+    const privateDirectory = await temporaryVault();
+    const identityStorePath = join(privateDirectory, 'identity.json');
+    await expect(
+      assertIdentityStoreOutsideVault(
+        vault,
+        join(vault, '.private', 'identity.json'),
+      ),
+    ).rejects.toThrow('outside the selected Markdown vault');
+
+    await writeFile(identityStorePath, '{not-json', 'utf8');
+    await expect(
+      prepareIdentityStore({
+        vaultPath: vault,
+        identityStorePath,
+        reset: false,
+      }),
+    ).rejects.toThrow('not valid JSON');
+    const reset = await prepareIdentityStore({
+      vaultPath: vault,
+      identityStorePath,
+      reset: true,
+      explicitWorkspaceId: 'reset-workspace',
+    });
+    expect(reset).toMatchObject({ created: true, reset: true });
+    expect(reset.catalog.workspaceId).toBe('reset-workspace');
+    await writeIdentityCatalogAtomically(identityStorePath, reset.catalog);
+    await expect(
+      prepareIdentityStore({
+        vaultPath: vault,
+        identityStorePath,
+        reset: false,
+        explicitWorkspaceId: 'conflicting-workspace',
+      }),
+    ).rejects.toThrow('conflicts with the existing identity catalog');
   });
 });

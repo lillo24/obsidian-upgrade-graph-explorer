@@ -1,11 +1,13 @@
 # Local Vault Diagnostics
 
-Status: **STABLE — KG5 scanner behavior is temp-directory tested and real-vault validated.**
+Status: **STABLE — KG5 acquisition and KG9A private identity lifecycle are temp-directory tested and real-vault validated.**
 
 This development-only workspace package is the sole KG5 filesystem boundary.
 It recursively acquires one explicitly selected local vault, then calls KG3,
-KG4, and the pure diagnostics package. It is not product vault access and does
-not introduce a reusable source-provider abstraction.
+KG4, optional source-neutral stable reconciliation, and the pure diagnostics
+package. It owns the current Node filesystem adapter for private identity
+catalogs. It is not product vault access and does not introduce a reusable
+source-provider abstraction.
 
 The CLI uses pinned development runner `tsx@4.23.12`. Its maintained `esbuild`
 binary installer is the only dependency build script allowlisted in
@@ -20,7 +22,8 @@ runtime.
 src/
   arguments.ts        Small fail-loud CLI parser.
   discovery.ts        Symlink-safe discovery, strict UTF-8 reads, and inventory.
-  pipeline.ts         Timed parse → resolve → report orchestration.
+  pipeline.ts         Timed parse → resolve → stabilize → report orchestration.
+  identity-store.ts   Strict private load/create/reset and atomic catalog replacement.
   output.ts           Explicit JSON report writing.
   cli.ts              Aggregate-only command output and exit behavior.
   benchmark-config.ts Deterministic smoke/small/medium/large workload profiles.
@@ -35,15 +38,24 @@ src/
 pnpm diagnose:vault -- --vault "C:/path/to/vault" \
   --out output/diagnostics/local-report.json \
   --exclude "path/to/non-vault-area" \
-  --workspace-id local-validation \
   --verbose
 ```
 
-`--vault` is required. `--exclude` is repeatable. The workspace ID defaults to
-the root folder basename and is development-only; an absolute private path is
-never used as canonical identity. Relative vault/output arguments resolve from
-the repository root even though pnpm runs the filtered package from its own
-folder. Console output is aggregate unless `--verbose` adds coarse timings.
+`--vault` is required and `--exclude` is repeatable. With `--out`, the tool
+defaults `--identity-store` to an adjacent `*.identity.json` file. A new store
+uses explicit `--workspace-id` when supplied; otherwise the CLI generates one
+opaque UUID once. Existing stores always reuse their workspace ID and reject a
+conflicting explicit ID. A run without `--out` or `--identity-store` remains
+transient and keeps the root-basename default.
+
+`--reset-identity` requires persistent output/state and clearly discards
+continuity before creating a new catalog. Invalid JSON, unsupported schemas,
+broken relationships, and workspace mismatches fail explicitly instead of
+resetting. Identity stores inside the selected vault are rejected, including
+through an existing symlink ancestor. Relative arguments resolve from the
+repository root even though pnpm runs the filtered package from its own folder.
+Console output is aggregate unless `--verbose` adds coarse timings and identity
+reuse/allocation counts; it does not print catalog titles or paths.
 
 All hidden directories/files and `node_modules/` are ignored. Configured
 workspace-relative prefixes are excluded. Symlinks are never followed. Every
@@ -54,6 +66,10 @@ non-Markdown paths exist only for compatibility probes.
 The recommended `output/diagnostics/` destination is narrowly gitignored.
 Reports remain private because they contain paths, headings, targets, spans,
 and relationships even though they contain no full source text or snippets.
+Catalogs are separate private files with similarly sensitive observations and
+must not be committed or shared. After successful report construction and any
+requested report write, the next validated catalog is written to a temporary
+sibling, closed, and renamed over the old catalog.
 
 ## Synthetic browser sample
 
@@ -63,6 +79,8 @@ pnpm --filter @icarus-graph-explorer/vault-diagnostics generate:sample
 
 This deterministically rebuilds the committed, formatted report from
 `tests/fixtures/workspaces/diagnostic-sample/`. It never uses a real vault.
+It intentionally retains deterministic transient fixture IDs and does not
+create or require a persistent catalog.
 
 ## Browser boundary
 
@@ -85,5 +103,7 @@ layout, then reports layout mode, node/edge counts, and any explicit layout
 warning. KG8 additionally measures canonical inspection-index construction, one
 global entity query, one document-subtree inspection, and one aggregated-edge
 provenance inspection with their result counts. Run small and medium for the
-KG8 evidence set. Timings are local evidence, never CI budgets. Normal tests
+KG8 evidence set. KG9A adds cold stable-ID assignment and warm reconciliation
+against a deterministic offset-shift plus inserted-section revision, including
+reused/new counts. Timings are local evidence, never CI budgets. Normal tests
 execute only a tiny correctness workload.

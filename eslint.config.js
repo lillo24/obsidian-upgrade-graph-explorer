@@ -517,6 +517,85 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/stable-identity/**/*.{ts,tsx}'],
+    ignores: ['packages/stable-identity/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react',
+              message: 'Stable identity must remain UI-independent.',
+            },
+            {
+              name: 'react-dom',
+              message: 'Stable identity must remain UI-independent.',
+            },
+            {
+              name: '@icarus-graph-explorer/adapter-obsidian',
+              message:
+                'Stable identity consumes source-neutral canonical data.',
+            },
+            {
+              name: '@icarus-graph-explorer/resolver-obsidian',
+              message: 'Stable identity runs after source-specific resolution.',
+            },
+            {
+              name: '@icarus-graph-explorer/diagnostics-obsidian',
+              message: 'Diagnostics consume stable snapshots, not the reverse.',
+            },
+            {
+              name: '@icarus-graph-explorer/view-projection',
+              message:
+                'View projection consumes stable snapshots, not the reverse.',
+            },
+            {
+              name: 'node:fs',
+              message:
+                'Identity-catalog persistence belongs in a platform adapter.',
+            },
+            {
+              name: 'node:fs/promises',
+              message:
+                'Identity-catalog persistence belongs in a platform adapter.',
+            },
+            {
+              name: 'node:crypto',
+              message:
+                'Opaque workspace-ID generation belongs in the outer application.',
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                'react/*',
+                'react-dom/*',
+                '@xyflow/*',
+                '@tauri-apps/*',
+                '@react-sigma/*',
+                'sigma/*',
+                'graphology-*',
+                'obsidian-*',
+                '@obsidian/*',
+                '@icarus-graph-explorer/adapter-obsidian/*',
+                '@icarus-graph-explorer/resolver-obsidian/*',
+                '@icarus-graph-explorer/diagnostics-obsidian/*',
+                '@icarus-graph-explorer/view-projection/*',
+                '@icarus-graph-explorer/explorer-inspection/*',
+                '@icarus-graph-explorer/renderer-reactflow/*',
+                '@icarus-graph-explorer/web/*',
+                'node:fs/*',
+              ],
+              message:
+                'Stable-identity production code may depend only on source-neutral core.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['packages/renderer-reactflow/**/*.{ts,tsx}'],
     ignores: ['packages/renderer-reactflow/**/*.test.{ts,tsx}'],
     extends: [reactHooks.configs.flat.recommended],

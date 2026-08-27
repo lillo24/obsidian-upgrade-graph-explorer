@@ -188,6 +188,12 @@ importers:
         specifier: 24.13.3
         version: 24.13.3
 
+  packages/stable-identity:
+    dependencies:
+      '@icarus-graph-explorer/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/view-projection:
     dependencies:
       '@icarus-graph-explorer/core':
@@ -214,6 +220,9 @@ importers:
       '@icarus-graph-explorer/resolver-obsidian':
         specifier: workspace:*
         version: link:../../packages/resolver-obsidian
+      '@icarus-graph-explorer/stable-identity':
+        specifier: workspace:*
+        version: link:../../packages/stable-identity
       '@icarus-graph-explorer/view-projection':
         specifier: workspace:*
         version: link:../../packages/view-projection
