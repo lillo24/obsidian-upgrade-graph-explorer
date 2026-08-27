@@ -514,6 +514,43 @@ describe('stable identity reconciliation', () => {
     expect(movedDuplicates.summary.references.ambiguousNotReused).toBe(3);
   });
 
+  it('preserves an authored reference occurrence across global resolution changes', () => {
+    const note: DocumentSpec = {
+      key: 'note',
+      path: 'Note.md',
+      sections: [{ key: 'topic', title: 'Topic', level: 1, offset: 10 }],
+      references: [
+        {
+          key: 'target-link',
+          sourceKey: 'topic',
+          rawTarget: 'Target',
+          offset: 15,
+        },
+      ],
+    };
+    const first = reconcileRevision('missing', [note]);
+    const second = reconcileRevision(
+      'resolved',
+      [
+        {
+          ...note,
+          references: [
+            { ...note.references![0]!, targetKey: 'target-document' },
+          ],
+        },
+        { key: 'target-document', path: 'Target.md' },
+      ],
+      first.catalog,
+    );
+
+    expect(first.snapshot.references[0]?.resolution.status).toBe('unresolved');
+    expect(second.snapshot.references[0]?.resolution.status).toBe('resolved');
+    expect(second.snapshot.references[0]?.id).toBe(
+      first.snapshot.references[0]?.id,
+    );
+    expect(second.summary.references.reusedExact).toBe(1);
+  });
+
   it('remaps resolved targets and every ambiguous candidate to stable entity IDs', () => {
     const result = reconcileRevision('base', [
       {

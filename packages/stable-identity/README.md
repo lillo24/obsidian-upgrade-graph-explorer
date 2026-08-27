@@ -43,9 +43,11 @@ APIs, filesystem access, and Node UUID generation at this boundary.
 - Blocks reuse an exact locator or, when the unmatched sibling counts agree,
   their ordinal under a matched parent. Changed/duplicated groups are not
   guessed.
-- References are reconciled after entity remapping. One unique semantic
-  signature survives an offset shift; duplicate identical occurrences require
-  unchanged unique offsets or receive new IDs.
+- References are reconciled after entity remapping by stable source owner,
+  authored kind, and raw target. Resolution is deliberately excluded because
+  whole-workspace target changes may reclassify an unchanged occurrence. One
+  unique occurrence survives an offset shift; duplicates require unchanged
+  unique offsets or receive new IDs.
 
 Titles, paths, offsets, and structural fingerprints are matching evidence, not
 the stable ID. One old ID can be used at most once. Ambiguity allocates a new ID

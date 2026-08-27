@@ -38,6 +38,7 @@ import {
   isBenchmarkProfile,
   type BenchmarkProfile,
 } from './benchmark-config';
+import { measureIncrementalWorkspace } from './incremental-benchmark';
 import { buildReportFromSources } from './pipeline';
 
 function selectedProfile(args: readonly string[]): BenchmarkProfile {
@@ -217,9 +218,10 @@ function main(): void {
   const profile = selectedProfile(process.argv.slice(2));
   const config = BENCHMARK_PROFILES[profile];
   const workspaceId = `synthetic-${profile}`;
+  const markdownDocuments = generateSyntheticWorkspace(config);
   const run = buildReportFromSources({
     workspaceId,
-    markdownDocuments: generateSyntheticWorkspace(config),
+    markdownDocuments,
     nonMarkdownPaths: [],
     discoveryReadMs: 0,
     identityCatalog: createStableIdentityCatalog(workspaceId),
@@ -229,6 +231,10 @@ function main(): void {
       'Synthetic benchmark did not perform cold identity assignment.',
     );
   }
+  const incremental = measureIncrementalWorkspace(
+    workspaceId,
+    markdownDocuments,
+  );
   const warmSnapshot = normalIdentityEdit(run.report.snapshot);
   const warmStart = performance.now();
   const warmIdentity = reconcileStableIdentity({
@@ -356,6 +362,7 @@ function main(): void {
             ...identityCounts(warmIdentity.summary),
           },
         },
+        incremental,
         projection: {
           canonicalEntities: run.report.snapshot.entities.length,
           canonicalReferences: run.report.snapshot.references.length,

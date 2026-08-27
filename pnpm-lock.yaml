@@ -191,6 +191,12 @@ importers:
         specifier: 24.13.3
         version: 24.13.3
 
+  packages/snapshot-delta:
+    dependencies:
+      '@icarus-graph-explorer/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/stable-identity:
     dependencies:
       '@icarus-graph-explorer/core':
@@ -216,6 +222,24 @@ importers:
         specifier: workspace:*
         version: link:../stable-identity
 
+  packages/workspace-engine-obsidian:
+    dependencies:
+      '@icarus-graph-explorer/adapter-obsidian':
+        specifier: workspace:*
+        version: link:../adapter-obsidian
+      '@icarus-graph-explorer/core':
+        specifier: workspace:*
+        version: link:../core
+      '@icarus-graph-explorer/resolver-obsidian':
+        specifier: workspace:*
+        version: link:../resolver-obsidian
+      '@icarus-graph-explorer/snapshot-delta':
+        specifier: workspace:*
+        version: link:../snapshot-delta
+      '@icarus-graph-explorer/stable-identity':
+        specifier: workspace:*
+        version: link:../stable-identity
+
   tools/vault-diagnostics:
     dependencies:
       '@icarus-graph-explorer/adapter-obsidian':
@@ -236,12 +260,18 @@ importers:
       '@icarus-graph-explorer/resolver-obsidian':
         specifier: workspace:*
         version: link:../../packages/resolver-obsidian
+      '@icarus-graph-explorer/snapshot-delta':
+        specifier: workspace:*
+        version: link:../../packages/snapshot-delta
       '@icarus-graph-explorer/stable-identity':
         specifier: workspace:*
         version: link:../../packages/stable-identity
       '@icarus-graph-explorer/view-projection':
         specifier: workspace:*
         version: link:../../packages/view-projection
+      '@icarus-graph-explorer/workspace-engine-obsidian':
+        specifier: workspace:*
+        version: link:../../packages/workspace-engine-obsidian
     devDependencies:
       '@types/node':
         specifier: 24.13.3
