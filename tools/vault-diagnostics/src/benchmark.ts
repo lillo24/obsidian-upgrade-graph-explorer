@@ -12,7 +12,10 @@ import {
   type ViewProjection,
   type ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
-import { prepareRendererGraph } from '@icarus-graph-explorer/renderer-reactflow/prepare';
+import {
+  layoutRendererGraph,
+  mapProjectionToReactFlow,
+} from '@icarus-graph-explorer/renderer-reactflow/prepare';
 
 import {
   BENCHMARK_PROFILES,
@@ -83,10 +86,15 @@ function measureRenderer(
   projection: ViewProjection,
   layoutMode: 'structure' | 'focus',
 ) {
-  const start = performance.now();
-  const graph = prepareRendererGraph(projection, { layoutMode });
+  const mappingStart = performance.now();
+  const mapped = mapProjectionToReactFlow(projection, layoutMode, new Set());
+  const mappingMs = elapsed(mappingStart);
+  const layoutStart = performance.now();
+  const graph = layoutRendererGraph(mapped.nodes, mapped.edges, layoutMode);
   return {
-    timingMs: elapsed(start),
+    layoutMode,
+    mappingMs,
+    layoutMs: elapsed(layoutStart),
     nodes: graph.nodes.length,
     edges: graph.edges.length,
     layoutWarning: graph.layoutWarning,
@@ -152,9 +160,7 @@ function main(): void {
   );
   const rendererScenarios = Object.fromEntries(
     Object.entries(scenarioStates)
-      .filter(([name]) =>
-        ['documentsOnly', 'expandedHierarchy', 'oneHopFocus'].includes(name),
-      )
+      .filter(([name]) => ['documentsOnly', 'oneHopFocus'].includes(name))
       .map(([name, state]) => {
         const projection = projectView(projectionWorkspace, state);
         return [

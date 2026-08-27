@@ -20,6 +20,8 @@ export function prepareRendererGraph(
   );
 }
 
+export { layoutRendererGraph, mapProjectionToReactFlow };
+
 export type {
   GraphLayoutMode,
   LayoutEngine,
