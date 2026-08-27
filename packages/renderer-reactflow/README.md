@@ -1,6 +1,6 @@
 # React Flow Structural Renderer
 
-Status: **STABLE — KG7 mapping, layout, and interaction contracts are pure-test-backed.**
+Status: **STABLE — KG9B mapping, layout, interaction, and semantic viewport contracts are pure-test-backed.**
 
 This renderer package turns one KG6 `ViewProjection` into a deterministic,
 read-only React Flow scene. It owns renderer IDs, fixed node geometry, Dagre
@@ -26,6 +26,7 @@ src/
   layout.ts              Fixed-size Dagre layout and explicit grid fallback.
   highlight.ts           Direct incident-node/edge visual emphasis.
   center-request.ts      Keyed projected-node viewport-center resolution.
+  semantic-viewport.ts   Viewport-center to canonical-entity bookmark observation.
   prepare.ts             Pure mapping + layout benchmark/test entry point.
   disclosure-context.tsx Stable entity-disclosure callback boundary.
   nodes.tsx              Memoized entity and diagnostic custom nodes.
@@ -63,6 +64,15 @@ ID and optional zoom. After the matching projection/layout exists, the renderer
 uses that node's prepared center with duration `0`; stale IDs are consumed
 safely. Centering is independent from selection and full-graph fit, and the
 renderer still has no canonical or inspection dependency.
+
+KG9B adds an optional interaction-end observation. Using the actual container
+dimensions and React Flow transform, the renderer selects the nearest visible
+entity node and reports only its canonical `entityId` plus zoom. Diagnostic
+nodes are never anchors, raw transforms never cross the boundary, equal-distance
+ties are deterministic, and high-frequency move frames are ignored. An initial
+saved center request suppresses the competing initial fit and is applied after
+React Flow initializes; missing or filtered anchors remain an application-owned
+fit fallback.
 
 `onlyRenderVisibleElements` is intentionally left at React Flow's default.
 KG7's local synthetic and real-report browser runs remained responsive, and the

@@ -3,6 +3,17 @@ import { describe, expect, it } from 'vitest';
 import { graphStateReducer, initialGraphState } from './graph-state';
 
 describe('graph projection interaction state', () => {
+  it('resets to the conservative documents-only state', () => {
+    const changed = graphStateReducer(initialGraphState(), {
+      type: 'set-depth',
+      depth: 1,
+    });
+
+    expect(graphStateReducer(changed, { type: 'reset-view' })).toEqual(
+      initialGraphState(),
+    );
+  });
+
   it('expands and collapses entities without mutating prior state', () => {
     const initial = initialGraphState();
     const expanded = graphStateReducer(initial, {

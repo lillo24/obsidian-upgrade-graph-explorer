@@ -9,8 +9,10 @@ import {
   type EdgeMouseHandler,
   type NodeMouseHandler,
   type OnEdgesChange,
+  type OnMove,
   type OnNodesChange,
   type OnSelectionChangeFunc,
+  type ReactFlowInstance,
 } from '@xyflow/react';
 
 import { GRAPH_EDGE_TYPES, GRAPH_NODE_TYPES } from './component-maps';
@@ -18,6 +20,7 @@ import { resolveGraphCenterRequest } from './center-request';
 import { EntityDisclosureProvider } from './disclosure-context';
 import { applyRendererHighlight } from './highlight';
 import { prepareRendererGraph } from './prepare';
+import { observeSemanticViewport } from './semantic-viewport';
 import type {
   GraphCanvasProps,
   GraphFlowEdge,
@@ -32,6 +35,7 @@ function GraphCanvasInner({
   layoutMode,
   onSelectionChange,
   onToggleEntity,
+  onViewportObservation,
   projection,
   selection,
 }: GraphCanvasProps) {
@@ -39,6 +43,8 @@ function GraphCanvasInner({
   const { fitView, setCenter } = useReactFlow<GraphFlowNode, GraphFlowEdge>();
   const previousFitRequest = useRef(fitRequestKey);
   const previousCenterRequest = useRef<number | null>(null);
+  const viewportInitialized = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const prepared = useMemo(
     () =>
       prepareRendererGraph(projection, {
@@ -78,21 +84,41 @@ function GraphCanvasInner({
     void fitView({ duration: 0, padding: 0.14, maxZoom: 1.35 });
   }, [fitRequestKey, fitView]);
 
+  const applyCenterRequest = useCallback(
+    (
+      request: GraphCanvasProps['centerRequest'],
+      center: typeof setCenter = setCenter,
+    ) => {
+      const resolved = resolveGraphCenterRequest(
+        prepared,
+        request,
+        previousCenterRequest.current,
+      );
+      if (resolved === null) return;
+      previousCenterRequest.current = resolved.handledKey;
+      if (resolved.instruction === null) return;
+      const { x, y, zoom } = resolved.instruction;
+      const boundedZoom =
+        zoom === undefined ? undefined : Math.min(2, Math.max(0.08, zoom));
+      void center(x, y, {
+        duration: 0,
+        ...(boundedZoom === undefined ? {} : { zoom: boundedZoom }),
+      });
+    },
+    [prepared, setCenter],
+  );
+  const initializeViewport = useCallback(
+    (instance: ReactFlowInstance<GraphFlowNode, GraphFlowEdge>) => {
+      viewportInitialized.current = true;
+      applyCenterRequest(centerRequest, instance.setCenter);
+    },
+    [applyCenterRequest, centerRequest],
+  );
+
   useEffect(() => {
-    const resolved = resolveGraphCenterRequest(
-      prepared,
-      centerRequest,
-      previousCenterRequest.current,
-    );
-    if (resolved === null) return;
-    previousCenterRequest.current = resolved.handledKey;
-    if (resolved.instruction === null) return;
-    const { x, y, zoom } = resolved.instruction;
-    void setCenter(x, y, {
-      duration: 0,
-      ...(zoom === undefined ? {} : { zoom }),
-    });
-  }, [centerRequest, prepared, setCenter]);
+    if (!viewportInitialized.current) return;
+    applyCenterRequest(centerRequest);
+  }, [applyCenterRequest, centerRequest]);
 
   const selectNode = useCallback<NodeMouseHandler<GraphFlowNode>>(
     (_event, node) =>
@@ -184,6 +210,20 @@ function GraphCanvasInner({
     },
     [edges, onSelectionChange],
   );
+  const observeViewport = useCallback<OnMove>(
+    (event, viewport) => {
+      if (event === null || onViewportObservation === undefined) return;
+      const bounds = containerRef.current?.getBoundingClientRect();
+      if (bounds === undefined) return;
+      onViewportObservation(
+        observeSemanticViewport(prepared, viewport, {
+          width: bounds.width,
+          height: bounds.height,
+        }),
+      );
+    },
+    [onViewportObservation, prepared],
+  );
 
   if (projection.nodes.length === 0) {
     return (
@@ -198,6 +238,7 @@ function GraphCanvasInner({
     <div
       className="graph-canvas"
       aria-label="Projected knowledge graph"
+      ref={containerRef}
       role="region"
     >
       {prepared.layoutWarning === null ? null : (
@@ -215,7 +256,7 @@ function GraphCanvasInner({
           edgesFocusable
           edgesReconnectable={false}
           elementsSelectable
-          fitView
+          fitView={centerRequest === undefined}
           fitViewOptions={{ duration: 0, padding: 0.14, maxZoom: 1.35 }}
           minZoom={0.08}
           nodeTypes={GRAPH_NODE_TYPES}
@@ -227,10 +268,12 @@ function GraphCanvasInner({
           onEdgeMouseEnter={hoverEdge}
           onEdgeMouseLeave={clearHover}
           onEdgesChange={syncEdgeChanges}
+          onInit={initializeViewport}
           onNodeClick={selectNode}
           onNodeMouseEnter={hoverNode}
           onNodeMouseLeave={clearHover}
           onNodesChange={syncNodeChanges}
+          onMoveEnd={observeViewport}
           onPaneClick={clearSelection}
           onSelectionChange={syncKeyboardSelection}
           panOnDrag

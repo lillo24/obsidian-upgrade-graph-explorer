@@ -57,6 +57,7 @@ function sampleReport() {
     snapshot: resolved.snapshot,
     diagnostics: resolved.diagnostics,
     documents,
+    identity: { stability: 'transient' },
     nonMarkdownPaths: SAMPLE_RESOURCES,
   });
 }
@@ -130,6 +131,7 @@ describe('Obsidian diagnostic reports', () => {
     const invalid = {
       ...report,
       schemaVersion: 2,
+      identity: { stability: 'durable' },
       sourceInventory: { ...report.sourceInventory, markdownFileCount: 999 },
       probes: [
         {
@@ -151,6 +153,7 @@ describe('Obsidian diagnostic reports', () => {
     expect(result.valid ? [] : result.issues.map(({ path }) => path)).toEqual(
       expect.arrayContaining([
         '$.schemaVersion',
+        '$.identity.stability',
         '$.sourceInventory.markdownFileCount',
         '$.probes[0].code',
         '$.probes[0].referenceId',
@@ -159,6 +162,15 @@ describe('Obsidian diagnostic reports', () => {
         '$.diagnostics[0].sourcePath',
       ]),
     );
+  });
+
+  it('accepts legacy schema-v1 reports without identity provenance', () => {
+    const legacy = { ...sampleReport() };
+    delete legacy.identity;
+    const result = validateObsidianDiagnosticReport(legacy);
+
+    expect(result.valid).toBe(true);
+    expect(result.valid ? result.value.identity : 'invalid').toBeUndefined();
   });
 
   it('generates configurable deterministic workspaces for pipeline smoke runs', () => {

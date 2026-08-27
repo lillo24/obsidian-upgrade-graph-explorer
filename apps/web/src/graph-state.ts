@@ -46,7 +46,8 @@ export type GraphStateAction =
       readonly status: ReferenceResolutionStatus;
       readonly enabled: boolean;
     }
-  | { readonly type: 'apply-navigation'; readonly state: ViewProjectionState };
+  | { readonly type: 'apply-navigation'; readonly state: ViewProjectionState }
+  | { readonly type: 'reset-view' };
 
 export function initialGraphState(): ViewProjectionState {
   return documentOnlyProjectionState();
@@ -189,5 +190,7 @@ export function graphStateReducer(
       });
     case 'apply-navigation':
       return action.state;
+    case 'reset-view':
+      return initialGraphState();
   }
 }

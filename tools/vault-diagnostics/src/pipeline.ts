@@ -57,6 +57,7 @@ export function buildReportFromSources(
     snapshot,
     diagnostics: resolution.diagnostics,
     documents,
+    identity: { stability: identity === undefined ? 'transient' : 'stable' },
     nonMarkdownPaths: input.nonMarkdownPaths,
   });
   const reportConstructionMs = elapsed(reportStart);
@@ -75,6 +76,7 @@ export function buildReportFromSources(
     snapshot,
     diagnostics: resolution.diagnostics,
     documents,
+    identity: { stability: identity === undefined ? 'transient' : 'stable' },
     nonMarkdownPaths: input.nonMarkdownPaths,
     timings,
   });

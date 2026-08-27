@@ -73,6 +73,8 @@ export function App() {
       setReport(validation.value);
       setReportName(file.name);
       setReportRevision((current) => current + 1);
+      setStatusFilter('all');
+      setSearch('');
       setLoadError(undefined);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -86,6 +88,8 @@ export function App() {
     setReport(SAMPLE_REPORT);
     setReportName('Synthetic Sample');
     setReportRevision((current) => current + 1);
+    setStatusFilter('all');
+    setSearch('');
     setLoadError(undefined);
   }
 
@@ -131,7 +135,13 @@ export function App() {
       </header>
 
       <main className="diagnostic-shell" id="main-content">
-        <GraphExplorer key={reportRevision} snapshot={report.snapshot} />
+        <GraphExplorer
+          key={reportRevision}
+          {...(report.identity === undefined
+            ? {}
+            : { identityStability: report.identity.stability })}
+          snapshot={report.snapshot}
+        />
 
         <details className="diagnostic-evidence">
           <summary>Inspect diagnostic evidence</summary>
@@ -191,8 +201,8 @@ export function App() {
         </details>
       </main>
       <footer className="app-footer">
-        KG8 explains canonical provenance from one generated report. Source text
-        and product-grade vault access remain deferred to KG11.
+        KG9 restores stable local graph views from one generated report. Source
+        text and product-grade vault access remain deferred to KG11.
       </footer>
     </>
   );

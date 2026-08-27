@@ -2,8 +2,18 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { App } from './App';
+import sampleReport from './sample-report.json';
 
 describe('provenance-first graph explorer shell', () => {
+  it('bundles a deterministic stable-identity sample for reload persistence QA', () => {
+    expect(sampleReport.identity).toEqual({ stability: 'stable' });
+    expect(
+      sampleReport.snapshot.entities.every(({ id }) =>
+        id.startsWith('stable:'),
+      ),
+    ).toBe(true);
+  });
+
   it('renders the validated synthetic report, canonical find, filters, and inspector', () => {
     const markup = renderToStaticMarkup(<App />);
 

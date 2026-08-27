@@ -1,17 +1,18 @@
 # Web Structural Graph Explorer
 
-Status: **STABLE — KG8 synthetic and ignored real-report navigation gates pass.**
+Status: **STABLE — KG9B synthetic and ignored real-report persistence gates pass.**
 
-This package owns the browser SPA, validated KG5 report selection, transient KG6
-projection/filter state, graph selection, canonical navigation orchestration,
-and provenance-first inspection UI. It accepts one
+This package owns the browser SPA, validated KG5 report selection, KG6 graph
+interaction state, guarded browser persistence, graph selection, canonical
+navigation orchestration, and provenance-first inspection UI. It accepts one
 runtime-validated report selected by the user or the committed neutral sample.
-It does not scan folders, upload reports, persist state, modify canonical truth,
-or derive renderer semantics.
+It does not scan folders, upload reports, modify canonical truth, persist
+renderer layouts/raw transforms, or derive renderer semantics.
 
 ```text
 selected report JSON → runtime validation → canonical inspection/search
-                                   └───────→ KG6 projection → KG7 renderer
+                                   └───────→ KG9B saved view → KG6 projection
+                                                          → KG7 renderer
                                                      ↘ KG8 inspector/navigation
                                    ↘ secondary KG5 evidence UI
 ```
@@ -29,6 +30,7 @@ apps/web/
     App.tsx           Report selection, reset boundary, and secondary evidence UI.
     graph-state.ts    Pure disclosure/focus/filter interaction reducer.
     navigation.ts     Shared reveal/filter-widening/navigation planner.
+    persistence/      Stable-report eligibility, hydration, and localStorage adapter.
     report-view.ts    Pure reference/hierarchy presentation transformations.
     sample-report.json Deterministic private-safe report generated from fixtures.
     components/       Primary graph workspace and secondary diagnostic panels.
@@ -38,9 +40,9 @@ apps/web/
 
 The `components/README.md` maps the presentation components. The graph workspace
 creates one reusable `ProjectionWorkspace` and `InspectionWorkspace` per loaded
-snapshot and passes only a `ViewProjection` plus viewport requests to
+snapshot and passes only a `ViewProjection` plus semantic viewport requests to
 `@icarus-graph-explorer/renderer-reactflow`. Loading or restoring a report keys
-a complete graph-state/selection/search/viewport reset.
+a complete transient selection/search reset and workspace-specific hydration.
 
 ## Report loading and privacy
 
@@ -55,6 +57,29 @@ KG11 = product folder access and watching
 
 Malformed schema versions, snapshots, diagnostics, probes, or inventory fields
 produce an actionable inline error while the last valid report remains visible.
+
+## Saved graph view
+
+Cross-session persistence activates only when a report explicitly declares
+`identity.stability: "stable"`. Transient and legacy schema-v1 reports remain
+usable in memory and never read or write saved state. The schema-v1 saved record
+is keyed by encoded stable workspace ID and contains only structural disclosure,
+focus, user-facing path/entity/status filters, and an optional canonical entity
+plus positive zoom bookmark.
+
+Hydration and source-evolution reconciliation happen synchronously before the
+autosave effect. Stale disclosure IDs, focus roots, path scopes, and viewport
+anchors are dropped with non-fatal status; collapsed disclosure wins conflicts.
+Corrupt, inaccessible, or unsupported stored values are not overwritten or
+silently deleted. Writes stop after one failure. **Reset saved view** deletes
+only that workspace's view, restores documents-only defaults, clears transient
+search/selection, and fits the graph. It never resets the KG9A catalog.
+
+The browser key contains no report filename, vault basename, or path. Search,
+hover, graph/inspector selection, pagination, renderer graph data, Dagre
+coordinates, and raw viewport x/y remain transient. Browser reload restores the
+bundled stable sample automatically; a user-selected report file must still be
+selected again because KG9B does not persist browser file handles.
 
 ## Graph interaction boundary
 
@@ -91,8 +116,8 @@ switch or performance budget is introduced before KG12 evidence requires it.
 The hierarchy tree under “Inspect diagnostic evidence” remains KG5 diagnostic
 UI only. Its expanded state is separate from KG6 projection state. Report mode
 provides paths, breadcrumbs, raw targets, and exact spans, but no source text,
-preview, live filesystem access, open-in-source action, write-back, or
-persistence.
+preview, live filesystem access, open-in-source action, or write-back. Its own
+expanded evidence-tree state remains transient and separate from KG9B.
 
 ## Local validation
 

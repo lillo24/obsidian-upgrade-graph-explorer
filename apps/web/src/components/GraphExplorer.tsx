@@ -1,12 +1,26 @@
-import { useCallback, useMemo, useReducer, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 
 import type { EntityId, KnowledgeSnapshot } from '@icarus-graph-explorer/core';
+import type { DiagnosticIdentityStability } from '@icarus-graph-explorer/diagnostics-obsidian';
 import { createInspectionWorkspace } from '@icarus-graph-explorer/explorer-inspection';
 import {
   GraphCanvas,
   type GraphCenterRequest,
   type GraphSelection,
+  type GraphViewportObservation,
 } from '@icarus-graph-explorer/renderer-reactflow';
+import {
+  createPersistedWorkspaceView,
+  serializePersistedWorkspaceView,
+  type PersistedViewportAnchor,
+} from '@icarus-graph-explorer/view-state';
 import {
   createProjectionWorkspace,
   projectView,
@@ -21,6 +35,16 @@ import {
   type GraphStateAction,
 } from '../graph-state';
 import { planEntityNavigation, topLevelPathScopes } from '../navigation';
+import {
+  hydrateGraphView,
+  persistenceEligibility,
+} from '../persistence/session';
+import {
+  browserStorage,
+  clearWorkspaceView,
+  saveWorkspaceView,
+  type StorageLike,
+} from '../persistence/storage';
 import { EntitySearch } from './EntitySearch';
 import { GraphFilters } from './GraphFilters';
 import { ProvenanceInspector } from './ProvenanceInspector';
@@ -57,33 +81,30 @@ function selectionExists(
 }
 
 export function GraphExplorer({
+  identityStability,
   snapshot,
+  storage,
 }: {
+  readonly identityStability?: DiagnosticIdentityStability;
   readonly snapshot: KnowledgeSnapshot;
+  readonly storage?: StorageLike | null;
 }) {
-  const [viewState, dispatch] = useReducer(
-    graphStateReducer,
-    undefined,
-    initialGraphState,
-  );
-  const [selection, setSelection] = useState<GraphSelection | null>(null);
-  const [fitRequestKey, setFitRequestKey] = useState(0);
-  const [centerRequest, setCenterRequest] = useState<GraphCenterRequest>();
-  const [navigationStatus, setNavigationStatus] = useState(
-    'Select a graph element to inspect it, or use Find to reveal a hidden entity.',
-  );
   const projectionWorkspace = useMemo(
     () => createProjectionWorkspace(snapshot),
     [snapshot],
   );
-  const inspectionWorkspace = useMemo(
-    () => createInspectionWorkspace(snapshot),
-    [snapshot],
+  const [persistenceStorage] = useState(() =>
+    storage === null ? undefined : (storage ?? browserStorage()),
   );
-  const pathScopes = useMemo(
-    () => topLevelPathScopes(projectionWorkspace),
-    [projectionWorkspace],
+  const eligibility = persistenceEligibility(identityStability);
+  const [hydration] = useState(() =>
+    hydrateGraphView({
+      eligibility,
+      storage: persistenceStorage,
+      workspace: projectionWorkspace,
+    }),
   );
+  const [viewState, dispatch] = useReducer(graphStateReducer, hydration.state);
   const result = useMemo<ProjectionResult>(() => {
     try {
       return {
@@ -95,7 +116,66 @@ export function GraphExplorer({
       return { ok: false, message: `Graph projection failed: ${message}` };
     }
   }, [projectionWorkspace, viewState]);
-
+  const restoredAnchor =
+    result.ok && hydration.viewport !== undefined
+      ? result.projection.nodes.find(
+          (candidate) =>
+            candidate.kind === 'entity' &&
+            candidate.entityId === hydration.viewport?.anchorEntityId,
+        )
+      : undefined;
+  const restoredViewportHidden =
+    hydration.viewport !== undefined && restoredAnchor === undefined;
+  const [selection, setSelection] = useState<GraphSelection | null>(null);
+  const [fitRequestKey, setFitRequestKey] = useState(
+    restoredViewportHidden ? 1 : 0,
+  );
+  const [centerRequest, setCenterRequest] = useState<
+    GraphCenterRequest | undefined
+  >(() =>
+    restoredAnchor === undefined || hydration.viewport === undefined
+      ? undefined
+      : {
+          key: 1,
+          nodeId: restoredAnchor.id,
+          zoom: hydration.viewport.zoom,
+        },
+  );
+  const [viewportBookmark, setViewportBookmark] = useState<
+    PersistedViewportAnchor | undefined
+  >(restoredViewportHidden ? undefined : hydration.viewport);
+  const persistenceWritable = useRef(hydration.writable);
+  const [persistenceStatus, setPersistenceStatus] = useState(
+    restoredViewportHidden
+      ? `${hydration.status} The saved viewport anchor is hidden by the restored view, so the graph was fitted.`
+      : hydration.status,
+  );
+  const [transientResetKey, setTransientResetKey] = useState(0);
+  const [navigationStatus, setNavigationStatus] = useState(
+    'Select a graph element to inspect it, or use Find to reveal a hidden entity.',
+  );
+  const [initialSerializedView] = useState(() =>
+    hydration.writable
+      ? serializePersistedWorkspaceView(
+          createPersistedWorkspaceView({
+            workspace: projectionWorkspace,
+            state: hydration.state,
+            ...(hydration.viewport === undefined
+              ? {}
+              : { viewport: hydration.viewport }),
+          }),
+        )
+      : undefined,
+  );
+  const lastSerializedView = useRef(initialSerializedView);
+  const inspectionWorkspace = useMemo(
+    () => createInspectionWorkspace(snapshot),
+    [snapshot],
+  );
+  const pathScopes = useMemo(
+    () => topLevelPathScopes(projectionWorkspace),
+    [projectionWorkspace],
+  );
   const projection = result.ok ? result.projection : undefined;
   const activeSelection =
     projection !== undefined && selectionExists(projection, selection)
@@ -107,6 +187,52 @@ export function GraphExplorer({
       : selectedNode(projection, activeSelection);
   const focusEntity: ProjectedEntityNode | undefined =
     node?.kind === 'entity' ? node : undefined;
+
+  useEffect(() => {
+    if (
+      eligibility !== 'stable' ||
+      !persistenceWritable.current ||
+      persistenceStorage === undefined
+    ) {
+      return;
+    }
+    try {
+      const persisted = createPersistedWorkspaceView({
+        workspace: projectionWorkspace,
+        state: viewState,
+        ...(viewportBookmark === undefined
+          ? {}
+          : { viewport: viewportBookmark }),
+      });
+      const serialized = serializePersistedWorkspaceView(persisted);
+      if (serialized === lastSerializedView.current) return;
+      const saved = saveWorkspaceView(persistenceStorage, persisted);
+      if (!saved.ok) {
+        persistenceWritable.current = false;
+        queueMicrotask(() =>
+          setPersistenceStatus(
+            `${saved.message} The graph remains usable in memory.`,
+          ),
+        );
+        return;
+      }
+      lastSerializedView.current = serialized;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      persistenceWritable.current = false;
+      queueMicrotask(() =>
+        setPersistenceStatus(
+          `Could not prepare the saved graph view: ${message} The graph remains usable in memory.`,
+        ),
+      );
+    }
+  }, [
+    eligibility,
+    persistenceStorage,
+    projectionWorkspace,
+    viewState,
+    viewportBookmark,
+  ]);
 
   const toggleEntity = useCallback(
     (entityId: string, currentlyOpen: boolean) =>
@@ -122,6 +248,18 @@ export function GraphExplorer({
     [],
   );
   const clearSelection = useCallback(() => setSelection(null), []);
+  const observeViewport = useCallback(
+    (observation: GraphViewportObservation) =>
+      setViewportBookmark(
+        observation.anchorEntityId === null
+          ? undefined
+          : {
+              anchorEntityId: observation.anchorEntityId,
+              zoom: observation.zoom,
+            },
+      ),
+    [],
+  );
   const navigateToEntity = useCallback(
     (entityId: EntityId, origin: string) => {
       const plan = planEntityNavigation(
@@ -171,11 +309,49 @@ export function GraphExplorer({
     setFitRequestKey((current) => current + 1);
   }
 
+  function resetSavedView(): void {
+    if (persistenceStorage === undefined) {
+      setPersistenceStatus(
+        'Could not reset the saved view because browser storage is unavailable.',
+      );
+      return;
+    }
+    const cleared = clearWorkspaceView(
+      persistenceStorage,
+      projectionWorkspace.snapshot().workspace.id,
+    );
+    if (!cleared.ok) {
+      persistenceWritable.current = false;
+      setPersistenceStatus(
+        `${cleared.message} The graph remains usable in memory.`,
+      );
+      return;
+    }
+    const defaults = initialGraphState();
+    lastSerializedView.current = serializePersistedWorkspaceView(
+      createPersistedWorkspaceView({
+        workspace: projectionWorkspace,
+        state: defaults,
+      }),
+    );
+    dispatch({ type: 'reset-view' });
+    setSelection(null);
+    setCenterRequest(undefined);
+    setViewportBookmark(undefined);
+    setTransientResetKey((current) => current + 1);
+    setFitRequestKey((current) => current + 1);
+    persistenceWritable.current = true;
+    setPersistenceStatus('Saved graph view reset.');
+    setNavigationStatus(
+      'Saved view reset to documents-only; search and selection were cleared.',
+    );
+  }
+
   return (
     <section className="graph-workspace" aria-labelledby="graph-title">
       <div className="graph-heading">
         <div>
-          <p className="eyebrow">KG8 · Explainable Navigation</p>
+          <p className="eyebrow">KG9 · Durable Local View</p>
           <h2 id="graph-title">Knowledge Graph</h2>
         </div>
         {projection === undefined ? null : (
@@ -187,6 +363,7 @@ export function GraphExplorer({
       </div>
 
       <EntitySearch
+        key={transientResetKey}
         onNavigate={navigateToEntity}
         workspace={inspectionWorkspace}
       />
@@ -289,6 +466,16 @@ export function GraphExplorer({
         pathScopes={pathScopes}
         state={viewState}
       />
+      <div className="persistence-status">
+        <p aria-live="polite" aria-atomic="true">
+          {persistenceStatus}
+        </p>
+        {eligibility === 'stable' ? (
+          <button onClick={resetSavedView} type="button">
+            Reset saved view
+          </button>
+        ) : null}
+      </div>
       <p className="navigation-status" aria-live="polite" aria-atomic="true">
         {navigationStatus}
       </p>
@@ -302,6 +489,7 @@ export function GraphExplorer({
             layoutMode={viewState.focus === undefined ? 'structure' : 'focus'}
             onSelectionChange={changeSelection}
             onToggleEntity={toggleEntity}
+            onViewportObservation={observeViewport}
             projection={result.projection}
             selection={activeSelection}
           />

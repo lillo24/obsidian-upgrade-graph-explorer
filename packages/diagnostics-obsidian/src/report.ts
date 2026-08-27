@@ -46,6 +46,7 @@ export function buildObsidianDiagnosticReport(
       markdownFileCount: input.documents.length,
       nonMarkdownFileCount: nonMarkdownPaths.length,
     },
+    identity: input.identity,
     ...(input.timings === undefined ? {} : { timings: input.timings }),
   };
   const reportValidation = validateObsidianDiagnosticReport(candidate);
