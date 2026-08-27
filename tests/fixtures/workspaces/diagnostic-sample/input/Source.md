@@ -1,10 +1,13 @@
 # Overview
 
 [[Target]]
+[[Target]]
 [[Missing]]
 [[Note]]
 [[case target]]
 [[Target#overview]]
+[[#Nested]]
+[[../Outside]]
 ![[assets/image.png]]
 ![[missing.pdf]]
 ![[logo.png]]

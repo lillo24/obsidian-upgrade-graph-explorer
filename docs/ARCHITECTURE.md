@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner, validated diagnostic report, and browser explorer, and KG6 implements renderer-independent view projection. Renderers, persistence, and product filesystem access remain planned work.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, and KG7 implements the first structural renderer. Persistence and product filesystem access remain planned work.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -76,6 +76,16 @@ roll-up, aggregated reference provenance, internal collapsed relationships, and
 projection-only diagnostic targets. Source adapters, filesystem/platform APIs,
 renderers, layout engines, application code, and graph libraries are
 mechanically excluded from its production source.
+
+`packages/renderer-reactflow` depends inward on view-projection and adapts one
+completed projection to read-only React Flow nodes/edges. It owns collision-safe
+renderer IDs, fixed node geometry, deterministic Dagre structure/focus layout,
+direct-neighborhood emphasis, semantic visual components, and viewport behavior.
+It does not inspect canonical truth, reroute endpoints, aggregate references,
+apply focus/filter policy, load reports, read files, or persist state. ESLint
+mechanically excludes those inward and sideways dependencies. Its pure
+`./prepare` entry lets the diagnostic harness measure mapping/layout without
+mounting React.
 
 `tools/vault-diagnostics` is the sole KG5 filesystem boundary. It recursively
 discovers one explicitly selected vault, reads strict UTF-8 Markdown, inventories
@@ -252,11 +262,12 @@ remain KG11 responsibilities behind a narrow provider boundary.
 
 ## UI, renderer, and platform roles
 
-React and Vite implement the SPA shell; they are outer-layer delivery choices, not domain dependencies. React Flow is the planned first structural renderer because the early product emphasizes interactive, hierarchical views. Sigma is conditional and may be added only when benchmark evidence demonstrates a need for a separate high-density global renderer. Graphology may later provide derived runtime indexes and algorithms, but its data structure is not canonical or persisted.
+React and Vite implement the SPA shell; they are outer-layer delivery choices, not domain dependencies. React Flow is the implemented first structural renderer because the early product emphasizes interactive, hierarchical views. It receives only KG6 projections and uses deterministic Dagre layout. Sigma is conditional and may be added only when benchmark evidence demonstrates a need for a separate high-density global renderer. Graphology may later provide derived runtime indexes and algorithms, but its data structure is not canonical or persisted.
 
 Tauri is deferred until the local-vault workflow milestone. It may provide desktop filesystem capabilities through a narrow source-provider boundary. Tauri commands, paths, events, and handles must not leak into generic core packages. Browser and future platform providers should remain viable.
 
-None of React Flow, Sigma, Graphology, or Tauri is installed through KG5.
+React Flow and Dagre are installed only in the KG7 renderer package. Sigma,
+Graphology, and Tauri remain uninstalled.
 
 ## Performance principles
 
@@ -273,9 +284,11 @@ Performance work begins with boundaries and measurement:
 KG5 provides deterministic smoke/small/medium/large pipeline workloads and
 coarse real-vault phase timings. KG6 extends the same harness with projection
 index construction plus documents-only, top-level, expanded, one-hop focus, and
-resolution-filter scenarios and projected counts. They are investigative
-evidence only: no CI timing threshold or renderer conclusion is established
-before KG12.
+resolution-filter scenarios and projected counts. KG7 additionally measures
+one-to-one React Flow mapping and Dagre structure/focus layout for representative
+small and medium projections. They are investigative evidence only: no CI
+timing threshold or high-density renderer conclusion is established before
+KG12.
 
 Rust, WASM, universal graph abstractions, and million-node optimization are not foundation requirements.
 
@@ -290,6 +303,13 @@ is automation-tested locally without adding a browser-test dependency. A
 product end-to-end suite remains a future choice. Real-vault validation stays
 local and diagnostic; any committed regression must be synthetic and free of
 private theory content.
+
+KG7 adds pure one-to-one renderer mapping, collision-safe identity,
+deterministic structure/focus layout, layout-failure, direct-neighborhood
+highlight, stable component-map, and interaction-state tests. Synthetic and
+gitignored real-report browser checks cover disclosure, selection, focus,
+viewport controls, non-resolved states, and responsive layout without adding a
+permanent browser-test dependency or committing screenshots.
 
 ## Changing these decisions
 

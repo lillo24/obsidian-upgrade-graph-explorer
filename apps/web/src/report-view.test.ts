@@ -19,11 +19,11 @@ const views = buildReferenceViews(report, lookups);
 
 describe('diagnostic report view transformations', () => {
   it('filters every explicit resolution state without changing report data', () => {
-    expect(filterReferenceViews(views, 'resolved', '')).toHaveLength(1);
+    expect(filterReferenceViews(views, 'resolved', '')).toHaveLength(3);
     expect(filterReferenceViews(views, 'ambiguous', '')).toHaveLength(1);
     expect(filterReferenceViews(views, 'unresolved', '')).toHaveLength(6);
-    expect(filterReferenceViews(views, 'invalid', '')).toHaveLength(0);
-    expect(report.snapshot.references).toHaveLength(8);
+    expect(filterReferenceViews(views, 'invalid', '')).toHaveLength(1);
+    expect(report.snapshot.references).toHaveLength(11);
   });
 
   it('searches source paths, owner labels, targets, and candidate labels', () => {
@@ -31,7 +31,7 @@ describe('diagnostic report view transformations', () => {
     expect(filterReferenceViews(views, 'all', 'folder-a/note')).toHaveLength(1);
     expect(
       filterReferenceViews(views, 'all', 'overview / nested'),
-    ).toHaveLength(0);
+    ).toHaveLength(1);
   });
 
   it('filters hierarchy documents by path or descendant section title', () => {

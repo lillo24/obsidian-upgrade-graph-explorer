@@ -9,6 +9,7 @@ import {
 
 import './App.css';
 import { EvidencePanel } from './components/EvidencePanel';
+import { GraphExplorer } from './components/GraphExplorer';
 import { HierarchyPanel } from './components/HierarchyPanel';
 import { ReferencesPanel } from './components/ReferencesPanel';
 import { SummaryPanel } from './components/SummaryPanel';
@@ -31,6 +32,7 @@ const SAMPLE_REPORT = sampleValidation.value;
 export function App() {
   const [report, setReport] = useState<ObsidianDiagnosticReport>(SAMPLE_REPORT);
   const [reportName, setReportName] = useState('Synthetic Sample');
+  const [reportRevision, setReportRevision] = useState(0);
   const [loadError, setLoadError] = useState<string>();
   const [statusFilter, setStatusFilter] = useState<ResolutionFilter>('all');
   const [search, setSearch] = useState('');
@@ -70,6 +72,7 @@ export function App() {
       }
       setReport(validation.value);
       setReportName(file.name);
+      setReportRevision((current) => current + 1);
       setLoadError(undefined);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -82,6 +85,7 @@ export function App() {
   function restoreSample(): void {
     setReport(SAMPLE_REPORT);
     setReportName('Synthetic Sample');
+    setReportRevision((current) => current + 1);
     setLoadError(undefined);
   }
 
@@ -92,11 +96,11 @@ export function App() {
       </a>
       <header className="app-header">
         <div>
-          <p className="eyebrow">KG5 · Local Diagnostic Workflow</p>
-          <h1 translate="no">Icarus Diagnostic Explorer</h1>
+          <p className="eyebrow">Local-first · Read-only</p>
+          <h1 translate="no">Icarus Graph Explorer</h1>
           <p className="header-description">
-            Inspect canonical Markdown structure and resolution evidence before
-            graph projections harden assumptions.
+            Explore the structure and references already captured in a validated
+            diagnostic report.
           </p>
         </div>
         <div className="report-loader" aria-describedby="privacy-note">
@@ -127,60 +131,68 @@ export function App() {
       </header>
 
       <main className="diagnostic-shell" id="main-content">
-        <section className="filter-bar" aria-labelledby="filter-title">
-          <div>
-            <p className="eyebrow">Local Inspection</p>
-            <h2 id="filter-title">Filter Evidence</h2>
-          </div>
-          <div className="filter-controls">
-            <label>
-              Search Paths, Titles, or Targets
-              <input
-                autoComplete="off"
-                name="diagnostic-search"
-                onChange={(event) => setSearch(event.currentTarget.value)}
-                placeholder="Example: folder or target…"
-                type="search"
-                value={search}
-              />
-            </label>
-            <label>
-              Resolution Status
-              <select
-                autoComplete="off"
-                name="resolution-status"
-                onChange={(event) =>
-                  setStatusFilter(event.currentTarget.value as ResolutionFilter)
-                }
-                value={statusFilter}
-              >
-                <option value="all">All States</option>
-                <option value="resolved">Resolved</option>
-                <option value="unresolved">Unresolved</option>
-                <option value="ambiguous">Ambiguous</option>
-                <option value="invalid">Invalid</option>
-              </select>
-            </label>
-          </div>
-        </section>
+        <GraphExplorer key={reportRevision} report={report} />
 
-        <SummaryPanel summary={summary} />
-        <div className="primary-grid">
-          <HierarchyPanel
-            documentIds={hierarchyDocumentIds}
-            lookups={lookups}
-          />
-          <ReferencesPanel
-            key={`${report.snapshot.workspace.id}:${statusFilter}:${deferredSearch}`}
-            searchIsPending={search !== deferredSearch}
-            total={referenceViews.length}
-            views={visibleReferences}
-          />
-        </div>
-        <EvidencePanel lookups={lookups} report={report} />
+        <details className="diagnostic-evidence">
+          <summary>Inspect diagnostic evidence</summary>
+          <section className="filter-bar" aria-labelledby="filter-title">
+            <div>
+              <p className="eyebrow">Local Inspection</p>
+              <h2 id="filter-title">Filter Evidence</h2>
+            </div>
+            <div className="filter-controls">
+              <label>
+                Search Paths, Titles, or Targets
+                <input
+                  autoComplete="off"
+                  name="diagnostic-search"
+                  onChange={(event) => setSearch(event.currentTarget.value)}
+                  placeholder="Example: folder or target…"
+                  type="search"
+                  value={search}
+                />
+              </label>
+              <label>
+                Resolution Status
+                <select
+                  autoComplete="off"
+                  name="resolution-status"
+                  onChange={(event) =>
+                    setStatusFilter(
+                      event.currentTarget.value as ResolutionFilter,
+                    )
+                  }
+                  value={statusFilter}
+                >
+                  <option value="all">All States</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="unresolved">Unresolved</option>
+                  <option value="ambiguous">Ambiguous</option>
+                  <option value="invalid">Invalid</option>
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <SummaryPanel summary={summary} />
+          <div className="primary-grid">
+            <HierarchyPanel
+              documentIds={hierarchyDocumentIds}
+              lookups={lookups}
+            />
+            <ReferencesPanel
+              key={`${report.snapshot.workspace.id}:${statusFilter}:${deferredSearch}`}
+              searchIsPending={search !== deferredSearch}
+              total={referenceViews.length}
+              views={visibleReferences}
+            />
+          </div>
+          <EvidencePanel lookups={lookups} report={report} />
+        </details>
       </main>
       <footer className="app-footer">
-        KG5 reads one generated report. Product-grade vault access remains KG11.
+        KG7 renders one generated report. Product-grade vault access remains
+        KG11.
       </footer>
     </>
   );

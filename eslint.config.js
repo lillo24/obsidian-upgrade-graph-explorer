@@ -433,4 +433,68 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ['packages/renderer-reactflow/**/*.{ts,tsx}'],
+    ignores: ['packages/renderer-reactflow/**/*.test.{ts,tsx}'],
+    extends: [reactHooks.configs.flat.recommended],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@icarus-graph-explorer/core',
+              message:
+                'The renderer consumes the KG6 projection contract, not canonical truth.',
+            },
+            {
+              name: '@icarus-graph-explorer/adapter-obsidian',
+              message:
+                'Source-specific interpretation is outside the renderer.',
+            },
+            {
+              name: '@icarus-graph-explorer/resolver-obsidian',
+              message: 'Canonical resolution is outside the renderer.',
+            },
+            {
+              name: '@icarus-graph-explorer/diagnostics-obsidian',
+              message: 'Report handling is an application responsibility.',
+            },
+            {
+              name: '@icarus-graph-explorer/web',
+              message: 'Renderer packages cannot depend on an application.',
+            },
+            {
+              name: 'node:fs',
+              message: 'The renderer is an in-memory projection consumer.',
+            },
+            {
+              name: 'node:fs/promises',
+              message: 'The renderer is an in-memory projection consumer.',
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                '@icarus-graph-explorer/core/*',
+                '@icarus-graph-explorer/adapter-obsidian/*',
+                '@icarus-graph-explorer/resolver-obsidian/*',
+                '@icarus-graph-explorer/diagnostics-obsidian/*',
+                '@icarus-graph-explorer/web/*',
+                '@tauri-apps/*',
+                '@react-sigma/*',
+                'sigma/*',
+                'graphology-*',
+                'obsidian-*',
+                '@obsidian/*',
+                'node:fs/*',
+              ],
+              message:
+                'Renderer production code may depend only on projection and renderer-layer libraries.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );
