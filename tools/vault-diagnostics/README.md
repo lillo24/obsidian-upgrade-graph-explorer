@@ -79,8 +79,9 @@ pnpm benchmark:pipeline -- --profile large
 
 Profiles are deterministic and measure parse/adapt, resolution, report
 construction, projection-index construction, documents-only/top-level/expanded
-projection, one-hop focus, and resolution filtering. For structural, expanded,
-and focus scenarios it also measures pure React Flow mapping plus Dagre layout
-and reports node/edge counts or an explicit layout warning. Run small and medium
-for the KG7 evidence set. Timings are local evidence, never CI budgets. Normal
-tests execute only a tiny correctness workload.
+projection, one-hop focus, and resolution filtering. For documents-only
+structure and one-hop focus it separately measures React Flow mapping and Dagre
+layout, then reports layout mode, node/edge counts, and any explicit layout
+warning. Run small and medium for the KG7 evidence set. Timings are local
+evidence, never CI budgets. Normal tests execute only a tiny correctness
+workload.

@@ -66,9 +66,9 @@ explicit workload budget.
 
 Production code depends only on KG6 view projection, React, React Flow, and
 Dagre. ESLint rejects canonical/core, source adapters, diagnostics, application,
-filesystem, platform, Sigma, and Graphology imports. The `./prepare` subpath is
-pure and does not mount React, so the opt-in benchmark can measure mapping and
-layout without a browser.
+filesystem, platform, Sigma, and Graphology imports. The `./prepare` subpath
+exposes pure mapping and layout phases separately, so the opt-in benchmark can
+measure both without mounting React or opening a browser.
 
 ## Local validation
 
