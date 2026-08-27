@@ -25,6 +25,7 @@ src/
   mapping.ts             One-to-one semantic React Flow node/edge mapping.
   layout.ts              Fixed-size Dagre layout and explicit grid fallback.
   highlight.ts           Direct incident-node/edge visual emphasis.
+  center-request.ts      Keyed projected-node viewport-center resolution.
   prepare.ts             Pure mapping + layout benchmark/test entry point.
   disclosure-context.tsx Stable entity-disclosure callback boundary.
   nodes.tsx              Memoized entity and diagnostic custom nodes.
@@ -56,6 +57,12 @@ connected, edges cannot be reconnected, and Delete is disabled. First render
 fits the viewport; application-requested focus changes may fit again, while
 ordinary disclosure does not aggressively reset the user's viewport. Motion
 durations are zero and CSS honors reduced-motion preferences.
+
+KG8 adds an optional keyed `GraphCenterRequest` containing only a projected node
+ID and optional zoom. After the matching projection/layout exists, the renderer
+uses that node's prepared center with duration `0`; stale IDs are consumed
+safely. Centering is independent from selection and full-graph fit, and the
+renderer still has no canonical or inspection dependency.
 
 `onlyRenderVisibleElements` is intentionally left at React Flow's default.
 KG7's local synthetic and real-report browser runs remained responsive, and the

@@ -1,9 +1,24 @@
-import type { EntityId } from '@icarus-graph-explorer/core';
+import type { EntityId, EntityKind } from '@icarus-graph-explorer/core';
 import {
   documentOnlyProjectionState,
   type FocusProjectionState,
+  type ReferenceResolutionStatus,
+  type ViewProjectionFilters,
   type ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
+
+export const ALL_ENTITY_KINDS = [
+  'document',
+  'section',
+  'block',
+] as const satisfies readonly EntityKind[];
+
+export const ALL_REFERENCE_STATUSES = [
+  'resolved',
+  'unresolved',
+  'ambiguous',
+  'invalid',
+] as const satisfies readonly ReferenceResolutionStatus[];
 
 export type GraphStateAction =
   | {
@@ -19,7 +34,19 @@ export type GraphStateAction =
   | {
       readonly type: 'set-focus-direction';
       readonly direction: FocusProjectionState['direction'];
-    };
+    }
+  | { readonly type: 'set-path-scope'; readonly pathPrefix: string | null }
+  | {
+      readonly type: 'toggle-entity-kind';
+      readonly entityKind: EntityKind;
+      readonly enabled: boolean;
+    }
+  | {
+      readonly type: 'toggle-reference-status';
+      readonly status: ReferenceResolutionStatus;
+      readonly enabled: boolean;
+    }
+  | { readonly type: 'apply-navigation'; readonly state: ViewProjectionState };
 
 export function initialGraphState(): ViewProjectionState {
   return documentOnlyProjectionState();
@@ -31,6 +58,45 @@ function withoutId(ids: readonly EntityId[], entityId: EntityId): EntityId[] {
 
 function withId(ids: readonly EntityId[], entityId: EntityId): EntityId[] {
   return [...new Set([...ids, entityId])].sort();
+}
+
+function updatedFilterValues<T extends string>(
+  current: readonly T[] | undefined,
+  all: readonly T[],
+  value: T,
+  enabled: boolean,
+): readonly T[] | undefined {
+  const values = new Set(current ?? all);
+  if (enabled) values.add(value);
+  else values.delete(value);
+  const sorted = all.filter((candidate) => values.has(candidate));
+  return sorted.length === all.length ? undefined : sorted;
+}
+
+function withFilters(
+  state: ViewProjectionState,
+  update: (filters: ViewProjectionFilters) => ViewProjectionFilters,
+): ViewProjectionState {
+  const filters = update(state.filters ?? {});
+  const hasFilters =
+    filters.pathPrefixes !== undefined ||
+    filters.text !== undefined ||
+    filters.entityKinds !== undefined ||
+    filters.referenceStatuses !== undefined;
+  return {
+    disclosure: state.disclosure,
+    ...(state.focus === undefined ? {} : { focus: state.focus }),
+    ...(hasFilters ? { filters } : {}),
+  };
+}
+
+function withoutFilter(
+  filters: ViewProjectionFilters,
+  key: keyof ViewProjectionFilters,
+): ViewProjectionFilters {
+  const next = { ...filters };
+  delete next[key];
+  return next;
 }
 
 export function graphStateReducer(
@@ -91,5 +157,37 @@ export function graphStateReducer(
             ...state,
             focus: { ...state.focus, direction: action.direction },
           };
+    case 'set-path-scope':
+      return withFilters(state, (filters) =>
+        action.pathPrefix === null
+          ? withoutFilter(filters, 'pathPrefixes')
+          : { ...filters, pathPrefixes: [action.pathPrefix] },
+      );
+    case 'toggle-entity-kind':
+      return withFilters(state, (filters) => {
+        const entityKinds = updatedFilterValues(
+          filters.entityKinds,
+          ALL_ENTITY_KINDS,
+          action.entityKind,
+          action.enabled,
+        );
+        return entityKinds === undefined
+          ? withoutFilter(filters, 'entityKinds')
+          : { ...filters, entityKinds };
+      });
+    case 'toggle-reference-status':
+      return withFilters(state, (filters) => {
+        const referenceStatuses = updatedFilterValues(
+          filters.referenceStatuses,
+          ALL_REFERENCE_STATUSES,
+          action.status,
+          action.enabled,
+        );
+        return referenceStatuses === undefined
+          ? withoutFilter(filters, 'referenceStatuses')
+          : { ...filters, referenceStatuses };
+      });
+    case 'apply-navigation':
+      return action.state;
   }
 }

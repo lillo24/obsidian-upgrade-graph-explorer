@@ -1,4 +1,9 @@
 export { GraphCanvas } from './GraphCanvas';
+export { resolveGraphCenterRequest } from './center-request';
+export type {
+  GraphCenterInstruction,
+  ResolvedGraphCenterRequest,
+} from './center-request';
 export { GRAPH_EDGE_TYPES, GRAPH_NODE_TYPES } from './component-maps';
 export { applyRendererHighlight } from './highlight';
 export type { HighlightedRendererGraph } from './highlight';
@@ -16,6 +21,7 @@ export type {
   EntityFlowNode,
   EntityNodeData,
   GraphCanvasProps,
+  GraphCenterRequest,
   GraphEdgeData,
   GraphFlowEdge,
   GraphFlowNode,

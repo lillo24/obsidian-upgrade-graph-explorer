@@ -352,6 +352,89 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/explorer-inspection/**/*.{ts,tsx}'],
+    ignores: ['packages/explorer-inspection/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react',
+              message: 'Inspection read models must remain UI-independent.',
+            },
+            {
+              name: 'react-dom',
+              message: 'Inspection read models must remain UI-independent.',
+            },
+            {
+              name: '@xyflow/react',
+              message: 'Renderer libraries cannot define inspection truth.',
+            },
+            {
+              name: '@dagrejs/dagre',
+              message: 'Layout is outside source-neutral inspection.',
+            },
+            {
+              name: '@icarus-graph-explorer/renderer-reactflow',
+              message:
+                'Inspection consumes projection contracts, not renderers.',
+            },
+            {
+              name: '@icarus-graph-explorer/adapter-obsidian',
+              message: 'Inspection must remain source-neutral.',
+            },
+            {
+              name: '@icarus-graph-explorer/resolver-obsidian',
+              message: 'Inspection consumes canonical resolution results only.',
+            },
+            {
+              name: '@icarus-graph-explorer/diagnostics-obsidian',
+              message:
+                'Primary inspection cannot depend on diagnostic reports.',
+            },
+            {
+              name: '@icarus-graph-explorer/web',
+              message: 'Inspection packages cannot depend on an application.',
+            },
+            {
+              name: 'node:fs',
+              message: 'Inspection is an in-memory pure read-model boundary.',
+            },
+            {
+              name: 'node:fs/promises',
+              message: 'Inspection is an in-memory pure read-model boundary.',
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                'react/*',
+                'react-dom/*',
+                '@xyflow/*',
+                '@dagrejs/*',
+                '@tauri-apps/*',
+                '@react-sigma/*',
+                'sigma/*',
+                'graphology-*',
+                'obsidian-*',
+                '@obsidian/*',
+                '@icarus-graph-explorer/renderer-reactflow/*',
+                '@icarus-graph-explorer/adapter-obsidian/*',
+                '@icarus-graph-explorer/resolver-obsidian/*',
+                '@icarus-graph-explorer/diagnostics-obsidian/*',
+                '@icarus-graph-explorer/web/*',
+                'node:fs/*',
+              ],
+              message:
+                'Inspection production code may depend only on core and view-projection.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['packages/view-projection/**/*.{ts,tsx}'],
     ignores: ['packages/view-projection/**/*.test.{ts,tsx}'],
     rules: {

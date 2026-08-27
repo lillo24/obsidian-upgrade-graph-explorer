@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import { App } from './App';
 
-describe('structural graph explorer shell', () => {
-  it('renders the validated synthetic report and projection controls', () => {
+describe('provenance-first graph explorer shell', () => {
+  it('renders the validated synthetic report, canonical find, filters, and inspector', () => {
     const markup = renderToStaticMarkup(<App />);
 
     expect(markup).toContain('Icarus Graph Explorer');
@@ -13,7 +13,11 @@ describe('structural graph explorer shell', () => {
     expect(markup).toContain('Canonical Hierarchy');
     expect(markup).toContain('Compatibility Probes');
     expect(markup).toContain('Nothing is uploaded');
-    expect(markup).toContain('Structural Graph');
+    expect(markup).toContain('Knowledge Graph');
+    expect(markup).toContain('Find Hidden Entities');
+    expect(markup).toContain('Graph Filters');
+    expect(markup).toContain('Provenance Inspector');
+    expect(markup).toContain('no Markdown source text');
     expect(markup).toContain('Documents');
     expect(markup).toContain('Focus Selected');
   });

@@ -109,8 +109,8 @@ describe('Obsidian diagnostic reports', () => {
     expect(summary).toMatchObject({
       documents: 5,
       blocks: 3,
-      references: 11,
-      resolved: 3,
+      references: 31,
+      resolved: 23,
       unresolved: 6,
       ambiguous: 1,
       invalid: 1,

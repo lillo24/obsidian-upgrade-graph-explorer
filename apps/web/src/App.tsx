@@ -131,7 +131,7 @@ export function App() {
       </header>
 
       <main className="diagnostic-shell" id="main-content">
-        <GraphExplorer key={reportRevision} report={report} />
+        <GraphExplorer key={reportRevision} snapshot={report.snapshot} />
 
         <details className="diagnostic-evidence">
           <summary>Inspect diagnostic evidence</summary>
@@ -191,8 +191,8 @@ export function App() {
         </details>
       </main>
       <footer className="app-footer">
-        KG7 renders one generated report. Product-grade vault access remains
-        KG11.
+        KG8 explains canonical provenance from one generated report. Source text
+        and product-grade vault access remain deferred to KG11.
       </footer>
     </>
   );

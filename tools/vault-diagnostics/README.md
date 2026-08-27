@@ -24,7 +24,7 @@ src/
   output.ts           Explicit JSON report writing.
   cli.ts              Aggregate-only command output and exit behavior.
   benchmark-config.ts Deterministic smoke/small/medium/large workload profiles.
-  benchmark.ts        Opt-in pipeline/projection/renderer timing without budgets.
+  benchmark.ts        Opt-in pipeline/projection/renderer/inspection timing.
   generate-sample.ts  Regenerates the committed neutral browser sample.
   index.test.ts       Temporary-directory scanner and failure contracts.
 ```
@@ -82,6 +82,8 @@ construction, projection-index construction, documents-only/top-level/expanded
 projection, one-hop focus, and resolution filtering. For documents-only
 structure and one-hop focus it separately measures React Flow mapping and Dagre
 layout, then reports layout mode, node/edge counts, and any explicit layout
-warning. Run small and medium for the KG7 evidence set. Timings are local
-evidence, never CI budgets. Normal tests execute only a tiny correctness
-workload.
+warning. KG8 additionally measures canonical inspection-index construction, one
+global entity query, one document-subtree inspection, and one aggregated-edge
+provenance inspection with their result counts. Run small and medium for the
+KG8 evidence set. Timings are local evidence, never CI budgets. Normal tests
+execute only a tiny correctness workload.

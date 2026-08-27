@@ -12,8 +12,8 @@ The roadmap is a sequencing map, not a claim that future features exist. Each mi
 | **KG5 — Diagnostic explorer + real-vault validation**        | Validated private-report workflow, canonical hierarchy/reference inspection, compatibility probes, and non-gating pipeline evidence.               | **Complete** — synthetic and real-vault validation gates passed without committing private content. |
 | **KG6 — View-projection architecture**                       | Renderer-independent granularity, collapse/endpoint roll-up, aggregated provenance, focus-neighborhood, and supported filter contracts.            | **Complete** — projection, provenance, validation, and benchmark gates passed.                      |
 | **KG7 — Structural graph MVP**                               | Projection-driven hierarchical graph with focused scalability interactions and distinct non-resolved states.                                       | **Complete** — renderer mapping, layout, interaction, and browser-validation gates passed.          |
-| **KG8 — Inspector, backlinks, search + navigation**          | Provenance-first inspection, incoming/outgoing references, ambiguity candidates, and search/navigation over projected data.                        | **Next** — KG7 supports stable selection and navigation semantics.                                  |
-| **KG9 — Persistence + stable identity**                      | Local persistence for renderer-independent application view state and identities robust across normal edits.                                       | Real interaction patterns reveal what must survive sessions.                                        |
+| **KG8 — Inspector, backlinks, search + navigation**          | Provenance-first inspection, incoming/outgoing references, ambiguity candidates, and search/navigation over projected data.                        | **Complete** — source-neutral inspection, navigation, and browser-validation gates passed.          |
+| **KG9 — Persistence + stable identity**                      | Local persistence for renderer-independent application view state and identities robust across normal edits.                                       | **Next** — KG8 exposes the transient interaction state requiring persistence decisions.             |
 | **KG10 — Incremental workspace engine**                      | File-granular reparsing and snapshot deltas.                                                                                                       | Correct full-snapshot behavior and identity rules are established.                                  |
 | **KG11 — Tauri local-vault workflow**                        | Desktop folder access and watching through a narrow source-provider adapter.                                                                       | Web/core boundaries are stable; platform APIs remain outside generic packages.                      |
 | **KG12 — Performance + worker hardening**                    | Explicit workload budgets, measurement-led worker split, and projection/focus/collapse optimization.                                               | KG5 harness, incremental engine, and renderer measurements provide real workload evidence.          |
@@ -38,10 +38,11 @@ link roll-up, select, focus mode, hover-neighborhood emphasis, structural and
 local/focus layout, and distinct unresolved/ambiguous/invalid treatment. Any
 ghost representation is a projection/UI marker, never canonical source truth.
 
-KG8 should expose exact path and span provenance, section breadcrumbs,
-incoming/outgoing references, the reason each edge exists, ambiguity candidates,
-and search/filter navigation. Rich live snippets or open-in-source behavior
-depends on KG11 source access; pathfinding is not a gate for the core inspector.
+KG8 exposes exact path/span provenance, section breadcrumbs, subtree
+incoming/outgoing references, aggregated-edge explanations, ambiguity
+candidates, canonical search, KG6-backed filters, and targeted reveal/center
+navigation. Rich live snippets or open-in-source behavior still depends on KG11
+source access; pathfinding is not a gate for the core inspector.
 
 KG9 may persist fold state, pins/manual positions, selected view mode, filters,
 saved views, and viewport, but never renderer objects as canonical truth. KG12

@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, and KG7 implements the first structural renderer. Persistence and product filesystem access remain planned work.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, and KG8 implements source-neutral inspection/search plus provenance-first navigation. Persistence and product filesystem access remain planned work.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -34,9 +34,8 @@ SourceProvider
   → workspace / parser / source adapter / resolver
   → canonical snapshot and deltas
   → derived indexes
-  → view projection
-  → renderer
-  → UI
+  ├─→ explorer inspection/search → UI inspector
+  └─→ view projection → renderer → UI graph
 
 ViewStateStore
   → view projection / UI
@@ -77,6 +76,15 @@ projection-only diagnostic targets. Source adapters, filesystem/platform APIs,
 renderers, layout engines, application code, and graph libraries are
 mechanically excluded from its production source.
 
+`packages/explorer-inspection` depends inward on core and view-projection. It
+builds canonical hierarchy/reference/search indexes once per snapshot and emits
+plain deterministic entity, occurrence, subtree-relationship, projected
+selection, and search read models. It never reroutes or aggregates references:
+edge explanation resolves the existing KG6 `referenceIds[]` and compares exact
+canonical endpoints with visible projected endpoints. React, renderers, source
+adapters/diagnostics, filesystem/platform APIs, and graph libraries are
+mechanically excluded from production source.
+
 `packages/renderer-reactflow` depends inward on view-projection and adapts one
 completed projection to read-only React Flow nodes/edges. It owns collision-safe
 renderer IDs, fixed node geometry, deterministic Dagre structure/focus layout,
@@ -86,6 +94,11 @@ apply focus/filter policy, load reports, read files, or persist state. ESLint
 mechanically excludes those inward and sideways dependencies. Its pure
 `./prepare` entry lets the diagnostic harness measure mapping/layout without
 mounting React.
+
+KG8 adds a keyed projected-node center request to the renderer boundary.
+Centering uses prepared renderer coordinates only after the new projection and
+layout exist. It remains separate from selection and full-graph fit; no
+canonical or inspection truth enters the renderer.
 
 `tools/vault-diagnostics` is the sole KG5 filesystem boundary. It recursively
 discovers one explicitly selected vault, reads strict UTF-8 Markdown, inventories
@@ -227,7 +240,11 @@ with respect to Markdown.
 
 KG5 search, resolution filters, disclosure state, and pagination are transient
 diagnostic UI state. They are not KG6 projection contracts or KG9 persisted view
-state.
+state. KG8 global search is a separate canonical inspection operation: it finds
+entities hidden by disclosure and filters without mutating projection state.
+KG8 graph filters remain KG6 state. Explicit navigation exits focus, reveals
+the canonical ancestor chain through KG6, widens only filters that exclude the
+target, then selects and centers the resulting projected node.
 
 Renderers receive `ViewProjection` plain data formed from canonical source truth
 plus renderer-independent state. Structural disclosure happens before each
@@ -286,7 +303,9 @@ coarse real-vault phase timings. KG6 extends the same harness with projection
 index construction plus documents-only, top-level, expanded, one-hop focus, and
 resolution-filter scenarios and projected counts. KG7 additionally measures
 one-to-one React Flow mapping and Dagre structure/focus layout for representative
-small and medium projections. They are investigative evidence only: no CI
+small and medium projections. KG8 adds inspection-index construction, canonical
+search, entity-subtree inspection, and aggregated-edge provenance timings with
+result counts. They are investigative evidence only: no CI
 timing threshold or high-density renderer conclusion is established before
 KG12.
 
@@ -310,6 +329,14 @@ highlight, stable component-map, and interaction-state tests. Synthetic and
 gitignored real-report browser checks cover disclosure, selection, focus,
 viewport controls, non-resolved states, and responsive layout without adding a
 permanent browser-test dependency or committing screenshots.
+
+KG8 adds pure canonical indexing, hierarchy traversal, breadcrumb, exact
+occurrence, subtree backlink/outgoing/candidate-mention, internal relationship,
+projected edge/node provenance, deterministic search, disclosure reveal,
+filter-conflict navigation, and center-request tests. Synthetic and gitignored
+real-report browser checks cover hidden-entity search/reveal, inspector
+navigation, graph filters, focus exit, bounded lists, accessibility, and narrow
+layout without adding a browser-test dependency or private artifacts.
 
 ## Changing these decisions
 

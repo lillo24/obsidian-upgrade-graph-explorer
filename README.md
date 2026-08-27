@@ -2,7 +2,7 @@
 
 Icarus Graph Explorer is an early-stage, hierarchical knowledge-graph explorer for Markdown workspaces. Its intended model treats documents, their nested sections, and optional addressable blocks as distinct entities so references can retain their precise source and target locations.
 
-KG0 established the repository foundation, KG1 added the versioned canonical model, KG2 added deterministic CommonMark document/section structure parsing, KG3 added tested Obsidian syntax interpretation, KG4 added conservative workspace resolution plus validated canonical snapshot assembly, KG5 added a local diagnostic-report workflow, KG6 added renderer-independent disclosure and focus, and KG7 adds the projection-driven React Flow structural graph. Product vault access remains deferred.
+KG0 established the repository foundation, KG1 added the versioned canonical model, KG2 added deterministic CommonMark document/section structure parsing, KG3 added tested Obsidian syntax interpretation, KG4 added conservative workspace resolution plus validated canonical snapshot assembly, KG5 added a local diagnostic-report workflow, KG6 added renderer-independent disclosure and focus, KG7 added the projection-driven React Flow structural graph, and KG8 adds source-neutral provenance inspection, backlinks, canonical search, and targeted graph navigation. Product vault access remains deferred.
 
 The application is local-first and read-only with respect to Markdown. The initial architecture has no backend, account, cloud upload, telemetry, or source-file write path.
 
@@ -29,8 +29,9 @@ pnpm dev
 Vite prints the local development URL. The page starts with a private-safe
 synthetic structural graph and can load one locally generated report JSON
 through the browser File API. The graph defaults to documents, supports
-progressive structural disclosure and local focus, and keeps KG5 evidence in a
-secondary expandable section.
+progressive structural disclosure and local focus, searches the complete
+canonical snapshot for hidden entities, explains exact relationship
+occurrences, and keeps KG5 evidence in a secondary expandable section.
 
 Generate a private local report with the development-only scanner:
 
@@ -50,8 +51,9 @@ Run the opt-in deterministic pipeline harness with:
 pnpm benchmark:pipeline -- --profile medium
 ```
 
-Its timings cover the source pipeline, representative view projections, and
-React Flow mapping/Dagre layout as local evidence, not CI budgets.
+Its timings cover the source pipeline, representative view projections, React
+Flow mapping/Dagre layout, canonical inspection indexes, search, subtree
+inspection, and edge provenance as local evidence, not CI budgets.
 
 ## Validation
 
