@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, and KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration. KG10 incremental workspace processing is next; product filesystem access remains KG11.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, and KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas. Product filesystem access remains KG11.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -31,10 +31,10 @@ Dependencies point from source/platform details and UI toward stable domain cont
 
 ```text
 SourceProvider
-  → workspace / parser / source adapter / resolver
+  → workspace engine / parser / source adapter / resolver
   → transient canonical snapshot
   → stable-identity reconciliation
-  → stable canonical snapshot and future deltas
+  → stable canonical snapshot → source-neutral snapshot delta
   → derived indexes
   ├─→ explorer inspection/search → UI inspector
   └─→ view projection → renderer → UI graph
@@ -45,7 +45,7 @@ stable report identity provenance
   → view projection / semantic renderer viewport request
 ```
 
-The canonical snapshot is a versioned plain-data envelope containing workspace identity, entity arrays, and reference arrays. Future delta formats must follow the same serializable boundary. Neither may contain React elements, renderer objects, Graphology graphs, Tauri handles, parser ASTs, or source-provider objects. This keeps worker transfer, deterministic tests, caching, and renderer replacement possible.
+The canonical snapshot is a versioned plain-data envelope containing workspace identity, entity arrays, and reference arrays. The KG10 delta is likewise versioned, source-neutral, and serializable. Neither may contain React elements, renderer objects, Graphology graphs, Tauri handles, parser ASTs, or source-provider objects. This keeps worker transfer, deterministic tests, caching, and renderer replacement possible.
 
 `packages/core` is currently the innermost workspace boundary. It must not import React, React DOM, React Flow, Sigma, Graphology, Tauri, Obsidian application APIs, or code from `apps/web`. ESLint mechanically rejects those obvious imports. Later packages should be created only when they contain real implementation, with dependency direction enforced at their narrowest stable boundary.
 
@@ -80,6 +80,20 @@ result as schema version 1. It has no Markdown/Obsidian, diagnostics,
 projection, renderer, application, filesystem, platform, or UUID-generation
 dependency. Catalog persistence and workspace-UUID creation belong to the
 outer application boundary.
+
+`packages/snapshot-delta` depends inward on core only. It validates and derives
+one exact plain-data change between two stable schema-v1 snapshots of the same
+workspace, then applies it with stale-base, index, identity, and resulting-core
+validation. It knows nothing about parsing, Obsidian, identity catalogs,
+filesystem acquisition, rendering, or UI state.
+
+`packages/workspace-engine-obsidian` composes adapter-obsidian,
+resolver-obsidian, stable-identity, and snapshot-delta. It owns one immutable
+in-memory parsed-document cache and atomic source-change batches. It reparses
+upserts only, reuses cached IR for deletes and moves, then intentionally runs
+complete KG4 resolution and KG9A reconciliation before emitting the next
+stable snapshot and exact delta. Filesystem watching, persistence, source
+retention after parsing, and application subscriptions remain outside it.
 
 `packages/view-projection` depends inward on core only. It validates and indexes
 one canonical snapshot, then derives plain visible nodes/edges from structural
@@ -244,8 +258,10 @@ non-empty graph-structural fingerprint. Sections reuse exact structure beneath
 a matched stable parent; one unique non-empty subtree/reference fingerprint may
 also preserve a heading rename or cross-parent move. Blocks use matched-parent
 locators or unchanged sibling cardinality/ordinal only. References reconcile
-after entities through stable source and resolution signatures. Duplicate
-identical references require unchanged unique offsets. Matching is staged and
+after entities through stable source owner, authored kind, and raw target;
+resolution is excluded because a target edit in another file can reclassify an
+otherwise unchanged occurrence. Duplicate identical references require
+unchanged unique offsets. Matching is staged and
 one-to-one. Weak or duplicate evidence receives a new ID; there is no fuzzy,
 nearest-candidate, semantic/AI, or array-order tie-breaker.
 
@@ -258,6 +274,48 @@ historical identity resurrection is attempted. New IDs are opaque sequence
 values and never derive from path/title/offset. Persistent workspace identity
 comes from an explicit ID or an outer-layer UUID generated once and then reused
 from the catalog.
+
+## Incremental workspace processing
+
+KG10 makes parsing incremental without pretending that workspace semantics are
+local:
+
+```text
+previous engine + atomic normalized source changes
+  → validate the complete batch
+  → parse only upserts; reuse cached parsed IR for deletes and moves
+  → resolve the complete parsed workspace through KG4
+  → reconcile the complete snapshot through KG9A
+  → diff previous and next stable snapshots
+  → next immutable engine + exact schema-v1 delta
+```
+
+The engine accepts `upsert`, `delete`, and `move` changes and reports reparsed
+paths plus reused parsed-document counts. A move changes the cached root path
+without reparsing; KG4 remains responsible for all path-dependent semantics.
+Equivalent batches are normalized deterministically. Duplicate path touches,
+missing sources, occupied move destinations, parse failures, resolution
+failures, identity failures, and delta failures return an explicit failure and
+no next engine, snapshot, catalog, or revision.
+
+Every successful batch still performs whole-workspace resolution. Adding a
+target can resolve references in unchanged files; deleting it can unresolve
+them; changing a heading or block anchor can alter target resolution or
+ambiguity globally. KG9A then preserves each unchanged authored reference ID
+through those resolution changes. Local-only resolution invalidation would be
+incorrect and remains unimplemented until evidence supports a proven index.
+
+The source-neutral delta classifies records by stable ID and carries exact
+before/after records and indexes. Source span and resolution changes are
+updates, not removal/addition, when identity survives. A narrowly used
+`afterOrder` records a pure reorder that changed-record indexes cannot express.
+Application validates the base and the resulting core snapshot, so
+`apply(old, diff(old, next))` exactly equals `next` or fails loudly.
+
+The engine is deliberately an in-memory domain service, not KG11's watcher.
+Rename continuity is strongest when a provider supplies one `move` or one
+atomic coalesced delete-plus-upsert. Committing a deletion before a later add
+loses the observation because KG9A has no tombstone resurrection contract.
 
 ## Diagnostic report workflow
 
@@ -409,7 +467,10 @@ one-to-one React Flow mapping and Dagre structure/focus layout for representativ
 small and medium projections. KG8 adds inspection-index construction, canonical
 search, entity-subtree inspection, and aggregated-edge provenance timings with
 result counts. KG9A adds cold assignment and warm deterministic normal-edit
-reconciliation counts/timings for small and medium profiles. They are
+reconciliation counts/timings for small and medium profiles. KG10 adds
+independent edit, add, delete, and move cases with changed/reparsed/reused file
+counts, delta counts, incremental timings, full-rebuild timings, and exact
+snapshot/catalog/delta-application oracle checks. They are
 investigative evidence only: no CI
 timing threshold or high-density renderer conclusion is established before
 KG12.
@@ -460,6 +521,15 @@ Synthetic reload, transient/report-switch, and gitignored real stable-report
 browser checks cover hydration, transient state reset, disclosure/focus,
 semantic zoom restoration, and console cleanliness without adding a browser
 test dependency or committing private artifacts.
+
+KG10 adds source-neutral delta round trips, stale-base and malformed-delta
+rejection, pure reorder reconstruction, immutable engine revisions,
+file-granular reparse counts, atomic batch failures, deterministic equivalent
+batches, move/rename continuity, offset shifts, and global resolution changes
+from added/deleted/renamed targets. Every synthetic update is compared with an
+independent full rebuild using the same previous identity catalog. The opt-in
+real-vault check performs one in-memory edit, prints aggregates only, writes no
+source/catalog/report, and asserts the same exact oracles.
 
 ## Changing these decisions
 

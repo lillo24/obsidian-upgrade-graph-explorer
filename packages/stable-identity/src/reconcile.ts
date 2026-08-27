@@ -66,34 +66,16 @@ function append<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   else existing.push(value);
 }
 
-function resolutionSignature(resolution: ReferenceResolution): string {
-  switch (resolution.status) {
-    case 'resolved':
-      return JSON.stringify([resolution.status, resolution.targetEntityId]);
-    case 'ambiguous':
-      return JSON.stringify([
-        resolution.status,
-        [...resolution.candidateEntityIds].sort(),
-        resolution.reason ?? null,
-      ]);
-    case 'unresolved':
-      return JSON.stringify([resolution.status, resolution.reason ?? null]);
-    case 'invalid':
-      return JSON.stringify([resolution.status, resolution.reason]);
-  }
-}
-
 function referenceSignature(
   reference: Pick<
     StableReferenceObservation,
-    'sourceEntityId' | 'kind' | 'rawTarget' | 'resolution'
+    'sourceEntityId' | 'kind' | 'rawTarget'
   >,
 ): string {
   return JSON.stringify([
     reference.sourceEntityId,
     reference.kind,
     reference.rawTarget,
-    resolutionSignature(reference.resolution),
   ]);
 }
 
@@ -679,7 +661,6 @@ function reconcileReferences(
       referenceSignature({
         ...current.original,
         sourceEntityId: current.sourceEntityId,
-        resolution: current.resolution,
       }),
       current,
     );

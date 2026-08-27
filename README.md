@@ -2,7 +2,7 @@
 
 Icarus Graph Explorer is an early-stage, hierarchical knowledge-graph explorer for Markdown workspaces. Its intended model treats documents, their nested sections, and optional addressable blocks as distinct entities so references can retain their precise source and target locations.
 
-KG0 established the repository foundation, KG1 added the versioned canonical model, KG2 added deterministic CommonMark document/section structure parsing, KG3 added tested Obsidian syntax interpretation, KG4 added conservative workspace resolution plus validated canonical snapshot assembly, KG5 added a local diagnostic-report workflow, KG6 added renderer-independent disclosure and focus, KG7 added the projection-driven React Flow structural graph, KG8 added source-neutral provenance inspection, backlinks, canonical search, and targeted graph navigation, and KG9 completed private app-owned stable identity plus local renderer-independent view restoration. KG10 incremental workspace processing is next; product vault access remains KG11.
+KG0 established the repository foundation, KG1 added the versioned canonical model, KG2 added deterministic CommonMark document/section structure parsing, KG3 added tested Obsidian syntax interpretation, KG4 added conservative workspace resolution plus validated canonical snapshot assembly, KG5 added a local diagnostic-report workflow, KG6 added renderer-independent disclosure and focus, KG7 added the projection-driven React Flow structural graph, KG8 added source-neutral provenance inspection, backlinks, canonical search, and targeted graph navigation, KG9 completed private app-owned stable identity plus local renderer-independent view restoration, and KG10 added file-granular parsed-document caching with exact stable snapshot deltas. Product vault access remains KG11.
 
 The application is local-first and read-only with respect to Markdown. The initial architecture has no backend, account, cloud upload, telemetry, or source-file write path.
 
@@ -61,7 +61,8 @@ pnpm benchmark:pipeline -- --profile medium
 Its timings cover the source pipeline, cold/warm stable identity,
 representative view projections, React
 Flow mapping/Dagre layout, canonical inspection indexes, search, subtree
-inspection, and edge provenance as local evidence, not CI budgets.
+inspection, edge provenance, and incremental edit/add/delete/move scenarios
+against exact full-rebuild oracles as local evidence, not CI budgets.
 
 ## Validation
 

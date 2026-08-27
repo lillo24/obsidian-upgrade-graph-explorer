@@ -1,6 +1,6 @@
 # Local Vault Diagnostics
 
-Status: **STABLE — KG9B report provenance and KG9A private identity lifecycle are tested and real-vault validated.**
+Status: **STABLE — KG10 incremental correctness and the existing private identity lifecycle are tested and real-vault validated.**
 
 This development-only workspace package is the sole KG5 filesystem boundary.
 It recursively acquires one explicitly selected local vault, then calls KG3,
@@ -27,7 +27,9 @@ src/
   output.ts           Explicit JSON report writing.
   cli.ts              Aggregate-only command output and exit behavior.
   benchmark-config.ts Deterministic smoke/small/medium/large workload profiles.
-  benchmark.ts        Opt-in pipeline/projection/renderer/inspection timing.
+  benchmark.ts        Opt-in full-pipeline plus incremental timing entry point.
+  incremental-benchmark.ts Edit/add/delete/move timings with exact rebuild oracles.
+  validate-incremental-real.ts Aggregate-only, in-memory private validation.
   generate-sample.ts  Regenerates the committed neutral browser sample.
   index.test.ts       Temporary-directory scanner and failure contracts.
 ```
@@ -110,5 +112,22 @@ global entity query, one document-subtree inspection, and one aggregated-edge
 provenance inspection with their result counts. Run small and medium for the
 KG8 evidence set. KG9A adds cold stable-ID assignment and warm reconciliation
 against a deterministic offset-shift plus inserted-section revision, including
-reused/new counts. Timings are local evidence, never CI budgets. Normal tests
+reused/new counts. KG10 adds independent one-file edit, add, delete, and move
+scenarios. Each reports changed/reparsed/reused file counts, delta counts,
+incremental and full-rebuild timings, and exact snapshot/catalog/delta-apply
+oracle results. Timings are local evidence, never CI budgets. Normal tests
 execute only a tiny correctness workload.
+
+An opt-in private check can validate one real workspace using an existing
+identity catalog:
+
+```bash
+pnpm --filter @icarus-graph-explorer/vault-diagnostics \
+  validate:incremental-real -- --vault "C:/path/to/vault" \
+  --identity-store "C:/private/path/catalog.identity.json"
+```
+
+It appends a harmless comment to one source in memory, compares the incremental
+result with a complete rebuild from the same previous catalog, applies the
+delta as a second exact oracle, and prints aggregate counts/timings only. It
+does not write the source, identity catalog, or a diagnostic report.

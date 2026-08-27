@@ -7,6 +7,7 @@
     "benchmark": "tsx src/benchmark.ts",
     "diagnose": "tsx src/cli.ts",
     "generate:sample": "tsx src/generate-sample.ts",
+    "validate:incremental-real": "tsx src/validate-incremental-real.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -16,8 +17,10 @@
     "@icarus-graph-explorer/explorer-inspection": "workspace:*",
     "@icarus-graph-explorer/renderer-reactflow": "workspace:*",
     "@icarus-graph-explorer/resolver-obsidian": "workspace:*",
+    "@icarus-graph-explorer/snapshot-delta": "workspace:*",
     "@icarus-graph-explorer/stable-identity": "workspace:*",
-    "@icarus-graph-explorer/view-projection": "workspace:*"
+    "@icarus-graph-explorer/view-projection": "workspace:*",
+    "@icarus-graph-explorer/workspace-engine-obsidian": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "24.13.3",
