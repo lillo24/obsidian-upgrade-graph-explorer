@@ -26,19 +26,10 @@ export const EntitySearch = memo(function EntitySearch({
 
   return (
     <section className="entity-search" aria-labelledby="entity-search-title">
-      <div className="entity-search__heading">
-        <div>
-          <p className="eyebrow">Canonical Search</p>
-          <h3 id="entity-search-title">Find Hidden Entities</h3>
-        </div>
-        <p>
-          Names, headings, breadcrumbs, paths, and block lines—not Markdown body
-          text.
-        </p>
-      </div>
+      <h3 id="entity-search-title">Search</h3>
       <div className="entity-search__control" role="search">
-        <label htmlFor="canonical-entity-search">
-          Find Documents or Headings
+        <label className="visually-hidden" htmlFor="canonical-entity-search">
+          Find documents, headings, paths, or blocks
         </label>
         <input
           autoComplete="off"
@@ -51,7 +42,7 @@ export const EntitySearch = memo(function EntitySearch({
         />
       </div>
       <p
-        className="entity-search__status"
+        className={hasQuery ? 'entity-search__status' : 'visually-hidden'}
         aria-live="polite"
         aria-atomic="true"
       >

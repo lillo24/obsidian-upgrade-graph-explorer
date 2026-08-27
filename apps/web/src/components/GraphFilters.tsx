@@ -116,8 +116,8 @@ export const GraphFilters = memo(function GraphFilters({
           ))}
         </fieldset>
         <p>
-          Entity filters select content matches. KG6 may retain structural
-          ancestors as context. Canonical Find remains global.
+          Entity filters select content matches. Structural ancestors may remain
+          as context. Search remains global.
         </p>
       </div>
     </details>
