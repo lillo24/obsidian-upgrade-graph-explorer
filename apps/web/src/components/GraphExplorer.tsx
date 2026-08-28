@@ -26,6 +26,7 @@ import {
   projectView,
   type ProjectedEntityNode,
   type ProjectedNode,
+  type SectionHeadingLevel,
   type ViewProjection,
 } from '@icarus-graph-explorer/view-projection';
 
@@ -61,6 +62,10 @@ interface ProjectionFailure {
 }
 
 type ProjectionResult = ProjectionSuccess | ProjectionFailure;
+
+const HEADING_LIMIT_OPTIONS = [
+  1, 2, 3, 4, 5, 6,
+] as const satisfies readonly SectionHeadingLevel[];
 
 function selectedNode(
   projection: ViewProjection,
@@ -425,6 +430,36 @@ export function GraphExplorer({
               type="checkbox"
             />
             Blocks
+          </label>
+          <label
+            className="heading-limit-control"
+            title="Limits sections by their Markdown heading level. This is different from Top-Level, which means direct structural sections."
+          >
+            Headings
+            <select
+              aria-label="Heading limit"
+              autoComplete="off"
+              name="heading-limit"
+              onChange={(event) =>
+                dispatch({
+                  type: 'set-heading-limit',
+                  maxSectionLevel:
+                    event.currentTarget.value === ''
+                      ? null
+                      : (Number(
+                          event.currentTarget.value,
+                        ) as SectionHeadingLevel),
+                })
+              }
+              value={viewState.disclosure.maxSectionLevel ?? ''}
+            >
+              <option value="">No limit</option>
+              {HEADING_LIMIT_OPTIONS.map((level) => (
+                <option key={level} value={level}>
+                  {'#'.repeat(level)}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
         <div

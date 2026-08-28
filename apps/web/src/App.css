@@ -1540,6 +1540,7 @@ a:focus-visible {
   .secondary-button,
   .entity-search input,
   .control-group button,
+  .control-group select,
   .control-group .graph-checkbox,
   .graph-filters > summary,
   .graph-filters fieldset label,

@@ -38,6 +38,9 @@ export function createPersistedWorkspaceView({
     projection: {
       disclosure: {
         defaultDepth: state.disclosure.defaultDepth,
+        ...(state.disclosure.maxSectionLevel === undefined
+          ? {}
+          : { maxSectionLevel: state.disclosure.maxSectionLevel }),
         expandedEntityIds: sortedUnique(
           state.disclosure.expandedEntityIds,
         ).filter((entityId) => !collapsed.has(entityId)),

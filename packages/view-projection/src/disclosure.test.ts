@@ -48,6 +48,68 @@ describe('structural disclosure', () => {
     ]);
   });
 
+  it('applies a literal Markdown heading ceiling independently of structural depth', () => {
+    const topLevel = topLevelSectionProjectionState();
+    const h1Only: ViewProjectionState = {
+      ...topLevel,
+      disclosure: { ...topLevel.disclosure, maxSectionLevel: 1 },
+    };
+    const throughH2: ViewProjectionState = {
+      ...topLevel,
+      disclosure: { ...topLevel.disclosure, maxSectionLevel: 2 },
+    };
+
+    expect(entityIds(h1Only)).toEqual([
+      'a-overview',
+      'c-third',
+      'doc-a',
+      'doc-b',
+      'doc-c',
+    ]);
+    expect(entityIds(h1Only)).not.toContain('b-target');
+    expect(entityIds(throughH2)).toContain('b-target');
+  });
+
+  it('does not let explicit expansion bypass the heading ceiling', () => {
+    const limited: ViewProjectionState = {
+      disclosure: {
+        defaultDepth: 1,
+        maxSectionLevel: 1,
+        expandedEntityIds: [
+          'doc-a',
+          'a-overview',
+          'a-detail',
+          'doc-b',
+          'b-target',
+        ],
+        collapsedEntityIds: [],
+        includeBlocks: true,
+      },
+    };
+    const widened: ViewProjectionState = {
+      ...limited,
+      disclosure: { ...limited.disclosure, maxSectionLevel: 4 },
+    };
+    const unlimited: ViewProjectionState = {
+      ...limited,
+      disclosure: {
+        defaultDepth: limited.disclosure.defaultDepth,
+        expandedEntityIds: limited.disclosure.expandedEntityIds,
+        collapsedEntityIds: limited.disclosure.collapsedEntityIds,
+        includeBlocks: limited.disclosure.includeBlocks,
+      },
+    };
+
+    for (const hiddenId of ['a-detail', 'a-deep', 'b-target', 'b-leaf']) {
+      expect(entityIds(limited)).not.toContain(hiddenId);
+    }
+    expect(entityIds(widened)).toEqual(
+      expect.arrayContaining(['a-detail', 'b-target', 'b-leaf']),
+    );
+    expect(entityIds(widened)).not.toContain('a-deep');
+    expect(entityIds(unlimited)).toContain('a-deep');
+  });
+
   it('supports progressive expansion one parent at a time', () => {
     const state = documentOnlyProjectionState();
     const withDocument = {

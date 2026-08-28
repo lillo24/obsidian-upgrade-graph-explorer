@@ -61,6 +61,48 @@ describe('canonical entity reveal state', () => {
     expect(projectedEntityIds(workspace, revealed)).toContain('a-block');
   });
 
+  it('minimally widens a heading ceiling for a deeper section or block', () => {
+    const workspace = createProjectionWorkspace(projectionFixture());
+    const h1Only: ViewProjectionState = {
+      ...documentOnlyProjectionState(),
+      disclosure: {
+        ...documentOnlyProjectionState().disclosure,
+        maxSectionLevel: 1,
+      },
+    };
+    const section = revealEntityInViewState(workspace, h1Only, 'a-deep');
+    const block = revealEntityInViewState(workspace, h1Only, 'a-block');
+
+    expect(section.disclosure.maxSectionLevel).toBe(5);
+    expect(projectedEntityIds(workspace, section)).toContain('a-deep');
+    expect(block.disclosure.maxSectionLevel).toBe(3);
+    expect(block.disclosure.includeBlocks).toBe(true);
+    expect(projectedEntityIds(workspace, block)).toContain('a-block');
+  });
+
+  it('preserves an unlimited or already-wide heading policy', () => {
+    const workspace = createProjectionWorkspace(projectionFixture());
+    const unlimited = revealEntityInViewState(
+      workspace,
+      documentOnlyProjectionState(),
+      'a-deep',
+    );
+    const alreadyWide = revealEntityInViewState(
+      workspace,
+      {
+        ...documentOnlyProjectionState(),
+        disclosure: {
+          ...documentOnlyProjectionState().disclosure,
+          maxSectionLevel: 6,
+        },
+      },
+      'a-detail',
+    );
+
+    expect(unlimited.disclosure.maxSectionLevel).toBeUndefined();
+    expect(alreadyWide.disclosure.maxSectionLevel).toBe(6);
+  });
+
   it('preserves focus and filters because the helper owns disclosure only', () => {
     const workspace = createProjectionWorkspace(projectionFixture());
     const state: ViewProjectionState = {

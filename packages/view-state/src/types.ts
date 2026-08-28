@@ -7,6 +7,7 @@ import type {
 import type {
   FocusProjectionState,
   ReferenceResolutionStatus,
+  SectionHeadingLevel,
   ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
 
@@ -20,6 +21,7 @@ export interface PersistedViewportAnchor {
 export interface PersistedProjectionState {
   readonly disclosure: {
     readonly defaultDepth: 0 | 1;
+    readonly maxSectionLevel?: SectionHeadingLevel;
     readonly expandedEntityIds: readonly EntityId[];
     readonly collapsedEntityIds: readonly EntityId[];
     readonly includeBlocks: boolean;

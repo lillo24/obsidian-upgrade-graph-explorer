@@ -62,6 +62,7 @@ function fullState(): ViewProjectionState {
   return {
     disclosure: {
       defaultDepth: 1,
+      maxSectionLevel: 1,
       expandedEntityIds: ['section-one', 'doc-a'],
       collapsedEntityIds: ['doc-b'],
       includeBlocks: true,
@@ -97,6 +98,48 @@ describe('persisted workspace view', () => {
     );
 
     expect(validation).toEqual({ valid: true, value, issues: [] });
+  });
+
+  it('accepts old schema-v1 views without a heading ceiling as no limit', () => {
+    const value = persisted();
+    const oldDisclosure = { ...value.projection.disclosure };
+    delete oldDisclosure.maxSectionLevel;
+    const oldValue = {
+      ...value,
+      projection: {
+        ...value.projection,
+        disclosure: oldDisclosure,
+      },
+    };
+    const validation = validatePersistedWorkspaceView(oldValue);
+
+    expect(validation.valid).toBe(true);
+    if (!validation.valid) return;
+    expect(
+      restorePersistedWorkspaceView(
+        createProjectionWorkspace(snapshot()),
+        validation.value,
+      ).state.disclosure.maxSectionLevel,
+    ).toBeUndefined();
+  });
+
+  it.each([0, 7, '1'])('rejects invalid heading ceiling %s', (level) => {
+    const value = persisted();
+    const validation = validatePersistedWorkspaceView({
+      ...value,
+      projection: {
+        ...value.projection,
+        disclosure: {
+          ...value.projection.disclosure,
+          maxSectionLevel: level,
+        },
+      },
+    });
+
+    expect(validation.valid).toBe(false);
+    expect(
+      validation.valid ? [] : validation.issues.map(({ path }) => path),
+    ).toContain('$.projection.disclosure.maxSectionLevel');
   });
 
   it('restores all supported state exactly against the same workspace', () => {

@@ -17,6 +17,7 @@ export type EntityNavigationPlan =
       readonly state: ViewProjectionState;
       readonly projectionNodeId: ProjectionNodeId;
       readonly filterChanges: readonly NavigationFilterChange[];
+      readonly headingLimitWidened: boolean;
       readonly announcement: string;
     }
   | { readonly ok: false; readonly message: string };
@@ -133,6 +134,9 @@ export function planEntityNavigation(
     ...(state.filters === undefined ? {} : { filters: state.filters }),
   };
   const revealed = revealEntityInViewState(workspace, unfocused, entityId);
+  const headingLimitWidened =
+    state.disclosure.maxSectionLevel !== undefined &&
+    revealed.disclosure.maxSectionLevel !== state.disclosure.maxSectionLevel;
   const filtered = navigationFilters(revealed.filters, target);
   const nextState: ViewProjectionState = {
     disclosure: revealed.disclosure,
@@ -153,7 +157,12 @@ export function planEntityNavigation(
     state: nextState,
     projectionNodeId: projectedNode.id,
     filterChanges: filtered.changes,
-    announcement: `Revealed ${target.kind} in ${fileName(target.source.path)}.${changeAnnouncement(filtered.changes)}`,
+    headingLimitWidened,
+    announcement: `Revealed ${target.kind} in ${fileName(target.source.path)}.${
+      headingLimitWidened
+        ? ` Heading limit widened to ${'#'.repeat(revealed.disclosure.maxSectionLevel ?? 1)} to reveal the target.`
+        : ''
+    }${changeAnnouncement(filtered.changes)}`,
   };
 }
 

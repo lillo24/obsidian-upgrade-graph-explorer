@@ -36,6 +36,36 @@ describe('endpoint roll-up and provenance', () => {
     ]);
   });
 
+  it('rolls and aggregates references from heading-limited sections', () => {
+    const projection = projectSnapshot(projectionFixture(), {
+      disclosure: {
+        defaultDepth: 1,
+        maxSectionLevel: 1,
+        expandedEntityIds: ['a-overview', 'a-detail', 'b-target'],
+        collapsedEntityIds: [],
+        includeBlocks: false,
+      },
+    });
+    const edge = projection.edges.find(
+      (candidate): candidate is ProjectedReferenceEdge =>
+        candidate.kind === 'reference' &&
+        candidate.referenceIds.includes('r-a-detail-to-b-leaf'),
+    );
+    const source = projection.nodes.find(
+      (node) => node.id === edge?.sourceNodeId,
+    );
+    const target = projection.nodes.find(
+      (node) => node.id === edge?.targetNodeId,
+    );
+
+    expect(edge?.referenceIds).toEqual([
+      'r-a-deep-to-b-target',
+      'r-a-detail-to-b-leaf',
+    ]);
+    expect(source).toMatchObject({ kind: 'entity', entityId: 'a-overview' });
+    expect(target).toMatchObject({ kind: 'entity', entityId: 'doc-b' });
+  });
+
   it('keeps same-node rolled references as internal provenance without a self-loop', () => {
     const projection = projectSnapshot(
       projectionFixture(),

@@ -1,6 +1,6 @@
 import type { EntityId } from '@icarus-graph-explorer/core';
 
-import type { ViewProjectionState } from './types';
+import type { SectionHeadingLevel, ViewProjectionState } from './types';
 import type { ProjectionWorkspace } from './workspace';
 
 function sortedIds(ids: ReadonlySet<EntityId>): readonly EntityId[] {
@@ -19,13 +19,31 @@ export function revealEntityInViewState(
   const target = workspace.requireEntity(entityId);
   const expanded = new Set(state.disclosure.expandedEntityIds);
   const collapsed = new Set(state.disclosure.collapsedEntityIds);
+  let requiredHeadingLevel: SectionHeadingLevel | undefined =
+    target.kind === 'section'
+      ? (target.level as SectionHeadingLevel)
+      : undefined;
 
   let ancestor = workspace.parent(target.id);
   while (ancestor !== undefined) {
     expanded.add(ancestor.id);
     collapsed.delete(ancestor.id);
+    if (ancestor.kind === 'section') {
+      requiredHeadingLevel = Math.max(
+        requiredHeadingLevel ?? 1,
+        ancestor.level,
+      ) as SectionHeadingLevel;
+    }
     ancestor = workspace.parent(ancestor.id);
   }
+
+  const currentHeadingLevel = state.disclosure.maxSectionLevel;
+  const widenedHeadingLevel =
+    currentHeadingLevel !== undefined &&
+    requiredHeadingLevel !== undefined &&
+    requiredHeadingLevel > currentHeadingLevel
+      ? requiredHeadingLevel
+      : currentHeadingLevel;
 
   return {
     ...state,
@@ -35,6 +53,9 @@ export function revealEntityInViewState(
       collapsedEntityIds: sortedIds(collapsed),
       includeBlocks:
         target.kind === 'block' ? true : state.disclosure.includeBlocks,
+      ...(widenedHeadingLevel === undefined
+        ? {}
+        : { maxSectionLevel: widenedHeadingLevel }),
     },
   };
 }

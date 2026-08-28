@@ -133,12 +133,27 @@ function validateDisclosure(
       'collapsedEntityIds',
       'includeBlocks',
     ],
-    [],
+    ['maxSectionLevel'],
     path,
     issues,
   );
   if (value.defaultDepth !== 0 && value.defaultDepth !== 1) {
     issue(issues, `${path}.defaultDepth`, 'Expected 0 or 1.');
+  }
+  if (
+    Object.hasOwn(value, 'maxSectionLevel') &&
+    value.maxSectionLevel !== 1 &&
+    value.maxSectionLevel !== 2 &&
+    value.maxSectionLevel !== 3 &&
+    value.maxSectionLevel !== 4 &&
+    value.maxSectionLevel !== 5 &&
+    value.maxSectionLevel !== 6
+  ) {
+    issue(
+      issues,
+      `${path}.maxSectionLevel`,
+      'Expected an integer from 1 to 6.',
+    );
   }
   uniqueStringArray(
     value.expandedEntityIds,

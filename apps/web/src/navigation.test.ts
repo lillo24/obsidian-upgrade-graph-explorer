@@ -52,6 +52,20 @@ const snapshot: KnowledgeSnapshot = {
       },
     },
     {
+      id: 'section-deep',
+      kind: 'section',
+      parentId: 'section-a',
+      title: 'Deep heading',
+      level: 3,
+      source: {
+        path: 'alpha/A.md',
+        span: {
+          start: { line: 6, column: 1, offset: 60 },
+          end: { line: 7, column: 1, offset: 70 },
+        },
+      },
+    },
+    {
       id: 'doc-b',
       kind: 'document',
       source: {
@@ -120,6 +134,33 @@ describe('shared canonical navigation planning', () => {
       'projected-text-cleared',
     ]);
     expect(plan.announcement).toMatch(/scope cleared/u);
+  });
+
+  it('widens a heading limit only enough to reveal a deeper search target', () => {
+    const workspace = createProjectionWorkspace(snapshot);
+    const state: ViewProjectionState = {
+      ...documentOnlyProjectionState(),
+      disclosure: {
+        ...documentOnlyProjectionState().disclosure,
+        maxSectionLevel: 1,
+      },
+    };
+    const plan = planEntityNavigation(workspace, state, 'section-deep');
+
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.headingLimitWidened).toBe(true);
+    expect(plan.state.disclosure.maxSectionLevel).toBe(3);
+    expect(plan.state.disclosure.expandedEntityIds).toEqual([
+      'doc-a',
+      'section-a',
+    ]);
+    expect(plan.announcement).toContain('Heading limit widened to ###');
+    expect(
+      projectView(workspace, plan.state).nodes.some(
+        (node) => node.kind === 'entity' && node.entityId === 'section-deep',
+      ),
+    ).toBe(true);
   });
 
   it('supports breadcrumb/backlink/candidate callers without mutating inputs', () => {

@@ -18,7 +18,7 @@ import {
 import { GRAPH_EDGE_TYPES, GRAPH_NODE_TYPES } from './component-maps';
 import { resolveGraphCenterRequest } from './center-request';
 import { EntityDisclosureProvider } from './disclosure-context';
-import { applyRendererHighlight } from './highlight';
+import { applyRendererInteractionState } from './highlight';
 import { prepareRendererGraph } from './prepare';
 import { observeSemanticViewport } from './semantic-viewport';
 import type {
@@ -53,30 +53,12 @@ function GraphCanvasInner({
       }),
     [expandedEntityIds, layoutMode, projection],
   );
-  const highlighted = useMemo(
-    () => applyRendererHighlight(prepared, hovered ?? selection),
+  const interactive = useMemo(
+    () => applyRendererInteractionState(prepared, hovered, selection),
     [hovered, prepared, selection],
   );
-  const nodes = useMemo(
-    () =>
-      highlighted.nodes.map((node) => ({
-        ...node,
-        selected:
-          selection?.kind === 'node' &&
-          node.data.projectionNodeId === selection.id,
-      })),
-    [highlighted.nodes, selection],
-  );
-  const edges = useMemo(
-    () =>
-      highlighted.edges.map((edge) => ({
-        ...edge,
-        selected:
-          selection?.kind === 'edge' &&
-          edge.data?.projectionEdgeId === selection.id,
-      })),
-    [highlighted.edges, selection],
-  );
+  const nodes = useMemo(() => [...interactive.nodes], [interactive.nodes]);
+  const edges = useMemo(() => [...interactive.edges], [interactive.edges]);
 
   useEffect(() => {
     if (previousFitRequest.current === fitRequestKey) return;

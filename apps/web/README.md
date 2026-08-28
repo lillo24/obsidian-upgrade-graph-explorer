@@ -1,6 +1,6 @@
 # Web Structural Graph Explorer
 
-Status: **STABLE — UX2 inspector, UX1 shell, and KG9B persistence gates pass.**
+Status: **STABLE — UX3 interaction/heading controls and prior UX gates pass.**
 
 This package owns the browser SPA, validated KG5 report selection, KG6 graph
 interaction state, guarded browser persistence, graph selection, canonical
@@ -97,8 +97,9 @@ Cross-session persistence activates only when a report explicitly declares
 `identity.stability: "stable"`. Transient and legacy schema-v1 reports remain
 usable in memory and never read or write saved state. The schema-v1 saved record
 is keyed by encoded stable workspace ID and contains only structural disclosure,
-focus, user-facing path/entity/status filters, and an optional canonical entity
-plus positive zoom bookmark.
+the optional literal heading ceiling, focus, user-facing path/entity/status
+filters, and an optional canonical entity plus positive zoom bookmark. Older
+schema-v1 records without the optional ceiling restore with no heading limit.
 
 Hydration and source-evolution reconciliation happen synchronously before the
 autosave effect. Stale disclosure IDs, focus roots, path scopes, and viewport
@@ -124,6 +125,18 @@ primary inspector resolves projected selection to canonical descriptors and
 exact occurrences, then keeps that internal model behind a user-facing boundary:
 normal relationship summaries count only outgoing links and backlinks, while
 candidate mentions and internal collapsed relationships remain technical context.
+
+Hover temporarily emphasizes a node or edge's direct neighborhood and fades
+unrelated rendered content only until pointer leave. Click or keyboard selection
+keeps the chosen element visibly selected without persistent graph-wide fading.
+Focus remains a reduced projection rather than a visual opacity treatment.
+
+The compact **Headings** control is separate from Documents/Top-Level structural
+depth. `#` through `######` are literal canonical Markdown heading ceilings;
+**No limit** preserves prior disclosure. Explicit expansion cannot bypass the
+ceiling, and references from hidden headings retain normal endpoint roll-up and
+aggregation. Navigation to a deeper canonical search result minimally widens an
+active ceiling before revealing, selecting, and centering the target.
 
 Blocks remain opt-in through the labelled **Blocks** checkbox and still require
 explicit expansion of their visible parent, preserving KG6's conservative block

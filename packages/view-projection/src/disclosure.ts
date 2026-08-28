@@ -67,6 +67,11 @@ export function calculateDisclosure(
   const visitChildren = (parentId: EntityId, depth: number): void => {
     if (collapsed.has(parentId)) return;
     for (const child of workspace.children(parentId)) {
+      const withinHeadingLimit =
+        child.kind !== 'section' ||
+        state.maxSectionLevel === undefined ||
+        child.level <= state.maxSectionLevel;
+      if (!withinHeadingLimit) continue;
       const visibleByDepth =
         child.kind === 'section' && depth <= state.defaultDepth;
       const visibleByExpansion =
