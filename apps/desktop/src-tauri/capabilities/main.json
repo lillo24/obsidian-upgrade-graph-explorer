@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "One-shot selected-vault reads and private app-local identity state for the main window.",
+  "description": "Selected-vault reads, recursive watch acquisition, and private app-local identity state for the main window.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -9,6 +9,8 @@
     "fs:read-dirs",
     "fs:read-files",
     "fs:read-meta",
+    "fs:allow-watch",
+    "fs:allow-unwatch",
     "fs:create-app-specific-dirs",
     "fs:allow-app-read-recursive",
     "fs:allow-app-write-recursive",

@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, and KG11A implements Tauri-selected one-shot product vault acquisition with private app-local identity persistence. Live filesystem updates remain KG11B.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, KG11A implements Tauri-selected one-shot product vault acquisition with private app-local identity persistence, and KG11B1 implements recursive watch acquisition plus deterministic source-change planning. Live KG10/UI application and full resync remain KG11B2.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -103,11 +103,14 @@ filesystem I/O and knows nothing about either platform runtime.
 
 `packages/source-provider-tauri` is an outer platform adapter. It depends on
 core, stable-identity, vault-discovery-policy, and the official Tauri v2 API,
-dialog, and filesystem packages. It owns native directory selection, one-shot
-strict-UTF-8 source acquisition, path-only non-Markdown inventory, and private
-application-data registry/catalog persistence. It deliberately does not own
-KG10, diagnostics, React, projection, rendering, or watchers. An injectable
-narrow bridge keeps all provider tests independent of a native runtime.
+dialog, and filesystem packages. It owns native directory selection, full and
+targeted strict-UTF-8 source acquisition, path-only non-Markdown inventory,
+recursive watcher acquisition, event coalescing, deterministic source-change
+planning, and private application-data registry/catalog persistence. It
+deliberately does not own KG10 application, diagnostics, React, projection,
+rendering, live subscriptions, or full resync orchestration. An injectable
+narrow bridge and scheduler keep all provider tests independent of a native
+runtime.
 
 `packages/view-projection` depends inward on core only. It validates and indexes
 one canonical snapshot, then derives plain visible nodes/edges from structural
@@ -332,7 +335,7 @@ Rename continuity is strongest when a provider supplies one `move` or one
 atomic coalesced delete-plus-upsert. Committing a deletion before a later add
 loses the observation because KG9A has no tombstone resurrection contract.
 
-## Desktop one-shot vault acquisition
+## Desktop vault acquisition and watch planning
 
 KG11A wraps the existing Vite/React frontend in a minimal Tauri v2 shell:
 
@@ -370,8 +373,26 @@ hydrates state for a known stable workspace.
 Tauri dialog-selected filesystem scope expires with the process. KG11A never
 grants blanket home/drive scope or silently reopens a previous arbitrary root;
 the user reselects it after restart, then exact registry matching reuses stable
-identity. Watchers, event coalescing, live KG10 batches, and out-of-sync rescan
-remain KG11B.
+identity.
+
+KG11B1 enables the pinned Tauri filesystem watch feature and recursive
+`watchImmediate` on that session-scoped root. The bridge reduces native event
+facts to package-owned plain data; absolute paths are normalized to safe
+workspace-relative paths before public delivery. Access and access-time
+metadata activity is discarded to avoid provider reads feeding a watch loop,
+as are batches containing only ignored paths. Remaining signals are
+deduplicated after a 250 ms quiet period or a 1,000 ms hard limit, with
+serialized flushes and explicit disposal.
+
+Events are hints rather than source changes. Each bounded batch re-observes
+only affected files or directory subtrees with the KG11A hidden/exclude,
+symlink, Markdown, and fatal-UTF-8 policy, then compares the result with the
+retained complete inventory. Plans contain deterministic Markdown
+upsert/delete/move operations, the complete next inventory, and non-Markdown
+change state. Exact source equality must be unique in both inventories before a
+move is inferred. Unsafe, root-wide, out-of-root, native rescan, unreadable, or
+inconsistent observations request resync. KG11B2 will own serialized KG10
+application, persistence, UI preservation, and the resync execution itself.
 
 ## Diagnostic report workflow
 
@@ -493,17 +514,19 @@ Remote capabilities, collaboration, or source editing would require an explicit 
 The KG5 browser File API reads one user-selected report in memory and performs
 no upload. KG11A desktop mode reads one explicitly selected vault locally
 through a narrow provider, writes only private app-owned identity state outside
-the vault, and keeps its report in memory. Watching and live source updates
-remain KG11B.
+the vault, and keeps its report in memory. KG11B1 watches only that dynamically
+scoped root and exposes neither native absolute paths nor raw events. Live
+source application remains KG11B2.
 
 ## UI, renderer, and platform roles
 
 React and Vite implement the SPA shell; they are outer-layer delivery choices, not domain dependencies. React Flow is the implemented first structural renderer because the early product emphasizes interactive, hierarchical views. It receives only KG6 projections and uses deterministic Dagre layout. Sigma is conditional and may be added only when benchmark evidence demonstrates a need for a separate high-density global renderer. Graphology may later provide derived runtime indexes and algorithms, but its data structure is not canonical or persisted.
 
-Tauri v2 now hosts the existing frontend for KG11A and provides dialog plus
-filesystem capabilities through a narrow source-provider boundary. Tauri
+Tauri v2 hosts the existing frontend and provides dialog plus filesystem
+read/watch capabilities through a narrow source-provider boundary. Tauri
 commands, absolute paths, events, and handles do not leak into generic core
-packages. Browser mode remains viable without loading the desktop-only provider.
+packages or the application-facing watch/change-plan contracts. Browser mode
+remains viable without loading the desktop-only provider.
 
 React Flow and Dagre are installed only in the KG7 renderer package. Sigma and
 Graphology remain uninstalled. Tauri dependencies are isolated to the desktop
@@ -513,7 +536,7 @@ shell and `source-provider-tauri`.
 
 Performance work begins with boundaries and measurement:
 
-- keep KG10 file-granular parsing behind one-shot KG11A acquisition and future KG11B change batches;
+- keep KG10 file-granular parsing behind KG11A acquisition and future KG11B2 application of KG11B1 change plans;
 - communicate through serializable snapshots and deltas;
 - introduce workers only after measured UI-thread cost justifies them;
 - project only the graph needed for the active view;
@@ -592,6 +615,14 @@ from added/deleted/renamed targets. Every synthetic update is compared with an
 independent full rebuild using the same previous identity catalog. The opt-in
 real-vault check performs one in-memory edit, prints aggregates only, writes no
 source/catalog/report, and asserts the same exact oracles.
+
+KG11B1 adds fake-bridge and injected-scheduler tests for recursive native watch
+mapping, path containment/filtering, quiet and maximum burst behavior,
+serialized flushes, cleanup, targeted subtree discovery, net no-op/edit/create/
+delete/non-Markdown state, strict UTF-8 failure, explicit resync, unique move
+evidence, duplicate ambiguity, and deterministic ordering. Platform-specific
+event sequences are checked only with an aggregate temporary synthetic Windows
+vault and do not become a stable public contract.
 
 ## Changing these decisions
 

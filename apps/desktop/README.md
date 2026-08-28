@@ -1,6 +1,6 @@
 # Desktop Shell
 
-Status: **STABLE — KG11A compile, capability, and one-shot vault-open gates pass.**
+Status: **STABLE — KG11B1 compile, capability, and synthetic watch gates pass.**
 
 This package owns the minimal Tauri v2 process around the existing
 `apps/web` Vite application. Rust registers only the dialog and filesystem
@@ -14,7 +14,7 @@ src-tauri/
   Cargo.toml                 Minimal pinned Rust dependencies.
   Cargo.lock                 Reproducible Rust dependency graph.
   tauri.conf.json            Existing-web build/dev wiring and window config.
-  capabilities/main.json     Dialog, selected-root reads, and app-data scope.
+  capabilities/main.json     Dialog, selected-root read/watch, and app-data scope.
   src/lib.rs                 Tauri/plugin initialization.
   src/main.rs                Desktop executable entry point.
   icons/                     Tauri-generated desktop icon formats.
@@ -55,11 +55,14 @@ outside KG11A. Ordinary `pnpm dev` remains browser-only.
 
 The main window can open a native directory dialog. Tauri adds the selected
 directory to filesystem scope for that process, after which the TypeScript
-source provider performs one read-only recursive acquisition. The static
-capability does not grant `$HOME/**`, a drive root, or another blanket vault
-scope. App-owned registry/catalog state is restricted to the application-local
-data directory.
+source provider can perform read-only recursive acquisition and watching. The
+Rust filesystem plugin enables its pinned `watch` feature, and the main
+capability adds only `fs:allow-watch` and `fs:allow-unwatch`; it does not grant
+`$HOME/**`, a drive root, or another blanket vault scope. App-owned
+registry/catalog state is restricted to the application-local data directory.
 
 Dialog-added scope is not durable. Restarting requires the user to select the
 vault again; an exact normalized private registry match then recovers its stable
-workspace identity. KG11A does not watch files or silently reopen a prior root.
+workspace identity. KG11B1 provides watch acquisition and source-change plans
+only. The desktop app does not yet apply them to KG10 or the UI; that remains
+KG11B2.

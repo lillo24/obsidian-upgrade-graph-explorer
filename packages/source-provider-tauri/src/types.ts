@@ -43,12 +43,84 @@ export interface DiscoverSelectedVaultOptions {
   readonly excludes?: readonly string[];
 }
 
+export type VaultWatchCategory =
+  'create' | 'modify' | 'remove' | 'rename' | 'other';
+
+export interface VaultWatchBatch {
+  readonly paths: readonly WorkspacePath[];
+  readonly categories: readonly VaultWatchCategory[];
+  readonly requiresResync: boolean;
+  /** Relative-path-safe explanations only; absolute native paths are never exposed. */
+  readonly reasons: readonly string[];
+}
+
+export interface WatchSelectedVaultOptions extends DiscoverSelectedVaultOptions {
+  /** Burst quiet period. Defaults to 250 ms. */
+  readonly quietWindowMs?: number;
+  /** Hard cap from the first pending signal. Defaults to 1,000 ms. */
+  readonly maximumWaitMs?: number;
+}
+
+export interface VaultWatchSubscription {
+  /** Idempotently stops native delivery, timers, and future listener calls. */
+  stop(): Promise<void>;
+}
+
+export type VaultSourceChange =
+  | {
+      readonly kind: 'upsert';
+      readonly path: WorkspacePath;
+      readonly source: string;
+    }
+  | {
+      readonly kind: 'delete';
+      readonly path: WorkspacePath;
+    }
+  | {
+      readonly kind: 'move';
+      readonly fromPath: WorkspacePath;
+      readonly toPath: WorkspacePath;
+    };
+
+export interface VaultSourceChangePlan {
+  readonly markdownChanges: readonly VaultSourceChange[];
+  readonly nextInventory: VaultSourceInventory;
+  readonly nonMarkdownChanged: boolean;
+  readonly affectedPaths: readonly WorkspacePath[];
+}
+
+export type VaultChangeReconciliationResult =
+  | {
+      readonly status: 'planned';
+      readonly plan: VaultSourceChangePlan;
+    }
+  | {
+      readonly status: 'resync-required';
+      readonly reason: string;
+      readonly affectedPaths: readonly WorkspacePath[];
+    };
+
+export interface ReconcileSelectedVaultChangesInput {
+  readonly selection: VaultSelection;
+  readonly previousInventory: VaultSourceInventory;
+  readonly watchBatch: VaultWatchBatch;
+}
+
 export interface TauriSourceProvider {
   selectVaultDirectory(): Promise<VaultSelection | undefined>;
   discoverSelectedVault(
     selection: VaultSelection,
     options?: DiscoverSelectedVaultOptions,
   ): Promise<VaultSourceInventory>;
+  watchSelectedVault(
+    selection: VaultSelection,
+    listener: (batch: VaultWatchBatch) => void | Promise<void>,
+    options?: WatchSelectedVaultOptions,
+  ): Promise<VaultWatchSubscription>;
+  reconcileSelectedVaultChanges(
+    input: ReconcileSelectedVaultChangesInput,
+    options?: DiscoverSelectedVaultOptions,
+  ): Promise<VaultChangeReconciliationResult>;
   loadOrPrepareWorkspaceIdentity(
     selection: VaultSelection,
     options?: PrepareWorkspaceIdentityOptions,

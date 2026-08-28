@@ -15,8 +15,19 @@ import {
   readFile,
   remove,
   rename,
+  watchImmediate,
   writeTextFile,
+  type WatchEvent,
 } from '@tauri-apps/plugin-fs';
+
+export type NativeWatchCategory =
+  'access' | 'create' | 'modify' | 'remove' | 'rename' | 'other';
+
+export interface NativeWatchEvent {
+  readonly category: NativeWatchCategory;
+  readonly paths: readonly string[];
+  readonly requiresResync: boolean;
+}
 
 export interface NativeDirectoryEntry {
   readonly name: string;
@@ -36,6 +47,10 @@ export interface TauriNativeBridge {
   readDirectory(path: string): Promise<readonly NativeDirectoryEntry[]>;
   readFileBytes(path: string): Promise<Uint8Array>;
   inspectPath(path: string): Promise<NativeFileInfo>;
+  watchDirectory(
+    path: string,
+    listener: (event: NativeWatchEvent) => void,
+  ): Promise<() => void>;
   appLocalDataDirectory(): Promise<string>;
   basename(path: string): Promise<string>;
   dirname(path: string): Promise<string>;
@@ -51,6 +66,31 @@ export interface TauriNativeBridge {
   ): Promise<void>;
   renamePath(fromPath: string, toPath: string): Promise<void>;
   removeFile(path: string): Promise<void>;
+}
+
+function watchCategory(event: WatchEvent): NativeWatchCategory {
+  if (typeof event.type === 'string') return 'other';
+  if ('access' in event.type) return 'access';
+  if ('create' in event.type) return 'create';
+  if ('remove' in event.type) return 'remove';
+  if ('modify' in event.type) {
+    if (
+      event.type.modify.kind === 'metadata' &&
+      event.type.modify.mode === 'access-time'
+    ) {
+      return 'access';
+    }
+    return event.type.modify.kind === 'rename' ? 'rename' : 'modify';
+  }
+  return 'other';
+}
+
+function requestsResync(event: WatchEvent): boolean {
+  if (event.type === 'any' && event.paths.length === 0) return true;
+  if (event.type === 'other' && event.paths.length === 0) return true;
+  if (typeof event.attrs !== 'object' || event.attrs === null) return false;
+  const flag = Reflect.get(event.attrs, 'flag');
+  return flag === 'rescan' || flag === 'Rescan';
 }
 
 export function createTauriNativeBridge(): TauriNativeBridge {
@@ -70,6 +110,26 @@ export function createTauriNativeBridge(): TauriNativeBridge {
     readDirectory: (path) => readDir(path),
     readFileBytes: (path) => readFile(path),
     inspectPath: (path) => lstat(path),
+    watchDirectory: async (path, listener) => {
+      let active = true;
+      const unwatch = await watchImmediate(
+        path,
+        (event) => {
+          if (!active) return;
+          listener({
+            category: watchCategory(event),
+            paths: event.paths,
+            requiresResync: requestsResync(event),
+          });
+        },
+        { recursive: true },
+      );
+      return () => {
+        if (!active) return;
+        active = false;
+        unwatch();
+      };
+    },
     appLocalDataDirectory: appLocalDataDir,
     basename,
     dirname,
