@@ -70,6 +70,7 @@ function saved(workspaceId: string) {
       disclosure: {
         ...documentOnlyProjectionState().disclosure,
         defaultDepth: 1,
+        maxSectionLevel: 2,
       },
     },
     viewport: { anchorEntityId: `${workspaceId}-document`, zoom: 1.1 },
@@ -192,11 +193,13 @@ describe('browser saved-view storage', () => {
     });
 
     expect(one.state.disclosure.defaultDepth).toBe(1);
+    expect(one.state.disclosure.maxSectionLevel).toBe(2);
     expect(one.viewport).toEqual({
       anchorEntityId: 'one-document',
       zoom: 1.1,
     });
     expect(two.state.disclosure.defaultDepth).toBe(0);
+    expect(two.state.disclosure.maxSectionLevel).toBeUndefined();
     expect(storage.writes).toBe(0);
   });
 });

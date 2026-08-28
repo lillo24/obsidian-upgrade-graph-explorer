@@ -35,11 +35,17 @@ describe('graph projection interaction state', () => {
   });
 
   it('preserves disclosure while focus enters, changes, and exits', () => {
-    const disclosed = graphStateReducer(initialGraphState(), {
-      type: 'toggle-entity',
-      entityId: 'entity-a',
-      currentlyOpen: false,
-    });
+    const disclosed = graphStateReducer(
+      graphStateReducer(initialGraphState(), {
+        type: 'set-heading-limit',
+        maxSectionLevel: 2,
+      }),
+      {
+        type: 'toggle-entity',
+        entityId: 'entity-a',
+        currentlyOpen: false,
+      },
+    );
     const focused = graphStateReducer(disclosed, {
       type: 'enter-focus',
       entityId: 'entity-a',
@@ -71,6 +77,24 @@ describe('graph projection interaction state', () => {
       includeBlocks: true,
     });
     expect(initial.disclosure.includeBlocks).toBe(false);
+  });
+
+  it('sets and removes the literal heading ceiling without changing structural depth', () => {
+    const initial = initialGraphState();
+    const limited = graphStateReducer(initial, {
+      type: 'set-heading-limit',
+      maxSectionLevel: 1,
+    });
+    const unlimited = graphStateReducer(limited, {
+      type: 'set-heading-limit',
+      maxSectionLevel: null,
+    });
+
+    expect(limited.disclosure).toMatchObject({
+      defaultDepth: 0,
+      maxSectionLevel: 1,
+    });
+    expect(unlimited).toEqual(initial);
   });
 
   it('maps practical path, entity-kind, and status controls to KG6 filters', () => {
@@ -120,5 +144,17 @@ describe('graph projection interaction state', () => {
         state: navigated,
       }),
     ).toBe(navigated);
+  });
+
+  it('reset clears the heading ceiling back to no limit', () => {
+    const limited = graphStateReducer(initialGraphState(), {
+      type: 'set-heading-limit',
+      maxSectionLevel: 3,
+    });
+
+    expect(
+      graphStateReducer(limited, { type: 'reset-view' }).disclosure
+        .maxSectionLevel,
+    ).toBeUndefined();
   });
 });

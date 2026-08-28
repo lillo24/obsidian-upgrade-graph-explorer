@@ -59,3 +59,32 @@ export function applyRendererHighlight(
     })),
   };
 }
+
+/**
+ * Applies persistent React Flow selection independently from transient hover
+ * emphasis. Selection never creates neighborhood de-emphasis.
+ */
+export function applyRendererInteractionState(
+  graph: RendererGraph,
+  hovered: GraphSelection | null,
+  selection: GraphSelection | null,
+): HighlightedRendererGraph {
+  const highlighted = applyRendererHighlight(graph, hovered);
+  if (selection === null) return highlighted;
+
+  return {
+    ...highlighted,
+    nodes: highlighted.nodes.map((node) => ({
+      ...node,
+      selected:
+        selection.kind === 'node' &&
+        node.data.projectionNodeId === selection.id,
+    })),
+    edges: highlighted.edges.map((edge) => ({
+      ...edge,
+      selected:
+        selection.kind === 'edge' &&
+        edge.data?.projectionEdgeId === selection.id,
+    })),
+  };
+}

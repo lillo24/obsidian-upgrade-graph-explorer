@@ -1,6 +1,6 @@
 # View State
 
-Status: **STABLE — KG9B schema and source-evolution reconciliation are pure-test-backed.**
+Status: **STABLE — UX3 heading preference and KG9B reconciliation are pure-test-backed.**
 
 This package owns the renderer-independent, versioned saved-view contract and
 its reconciliation against a current KG6 `ProjectionWorkspace`. It persists
@@ -29,6 +29,10 @@ Unknown entity IDs, removed focus roots, obsolete path scopes, and missing
 viewport anchors are dropped without inventing replacements. A workspace-ID
 mismatch is rejected. `filters.text`, search, selection, renderer IDs, raw
 viewport coordinates, layouts, source text, and timestamps are never stored.
+
+Schema v1 accepts an optional literal Markdown heading ceiling in structural
+disclosure. New records persist it when active; older schema-v1 records without
+the field remain valid and restore as no limit. Reset/default state omits it.
 
 The production dependency boundary is core plus view-projection only. Browser
 `localStorage` is one outer adapter in `apps/web`, not part of this contract.

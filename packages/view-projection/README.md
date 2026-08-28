@@ -1,6 +1,6 @@
 # View Projection
 
-Status: **STABLE — KG6 projection semantics are runtime-validated and pure-test-backed.**
+Status: **STABLE — UX3 heading disclosure and KG6 projection semantics are pure-test-backed.**
 
 This source-neutral package turns canonical `KnowledgeSnapshot` truth plus
 temporary renderer-independent view state into the visible graph consumed by
@@ -77,6 +77,13 @@ entity reveals its immediate children; recursive disclosure requires each
 parent to be expanded. A collapsed entity remains visible but hides all of its
 descendants and takes precedence over expansion/default depth.
 
+Optional `maxSectionLevel` is a separate literal Markdown heading ceiling using
+canonical `SectionEntity.level`. It applies to both default depth and explicit
+expansion, so an H2 cannot appear under an H1-only ceiling even when its parent
+is expanded. Omitting the field preserves the prior unlimited behavior. Hidden
+heading endpoints continue through the same nearest-visible-ancestor roll-up
+and aggregation path as collapsed structural content.
+
 Blocks are conservative: `includeBlocks` must be true **and** the block's
 visible parent must be explicitly expanded. Default depth alone never reveals
 blocks. Each visible entity reports how many canonical descendants remain
@@ -84,9 +91,10 @@ structurally hidden. Filtering does not rewrite that structural disclosure
 metadata.
 
 `revealEntityInViewState` opens and uncollapses the target's ancestor chain. It
-also enables blocks when the target is a block. It deliberately leaves focus
-and filters unchanged: application navigation owns exiting focus and widening
-only filters that conflict with an explicit target.
+also enables blocks when the target is a block and minimally widens an existing
+heading ceiling to include the target and its structural section ancestors. It
+deliberately leaves focus and filters unchanged: application navigation owns
+exiting focus and widening only filters that conflict with an explicit target.
 
 Unknown expanded/collapsed IDs and expand/collapse conflicts produce sorted,
 non-fatal projection issues. A missing or structurally hidden focus root returns

@@ -1,6 +1,6 @@
 # React Flow Structural Renderer
 
-Status: **STABLE — KG9B mapping, layout, interaction, and semantic viewport contracts are pure-test-backed.**
+Status: **STABLE — UX3 interaction semantics and KG9B renderer contracts are pure-test-backed.**
 
 This renderer package turns one KG6 `ViewProjection` into a deterministic,
 read-only React Flow scene. It owns renderer IDs, fixed node geometry, Dagre
@@ -58,6 +58,13 @@ connected, edges cannot be reconnected, and Delete is disabled. First render
 fits the viewport; application-requested focus changes may fit again, while
 ordinary disclosure does not aggressively reset the user's viewport. Motion
 durations are zero and CSS honors reduced-motion preferences.
+
+Hover is transient renderer-local neighborhood emphasis: the hovered node or
+edge and its direct endpoints remain emphasized while unrelated content fades.
+Pointer leave removes those classes immediately. Selection is independent and
+uses React Flow's persistent selected state without fading unrelated content;
+Focus remains projection-level graph isolation owned by KG6. Hover changes map
+prepared renderer elements only and never rerun projection or layout.
 
 KG8 adds an optional keyed `GraphCenterRequest` containing only a projected node
 ID and optional zoom. After the matching projection/layout exists, the renderer

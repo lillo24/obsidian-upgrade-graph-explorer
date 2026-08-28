@@ -128,6 +128,11 @@ export function restorePersistedWorkspaceView(
   const state: ViewProjectionState = {
     disclosure: {
       defaultDepth: persisted.projection.disclosure.defaultDepth,
+      ...(persisted.projection.disclosure.maxSectionLevel === undefined
+        ? {}
+        : {
+            maxSectionLevel: persisted.projection.disclosure.maxSectionLevel,
+          }),
       expandedEntityIds,
       collapsedEntityIds,
       includeBlocks: persisted.projection.disclosure.includeBlocks,

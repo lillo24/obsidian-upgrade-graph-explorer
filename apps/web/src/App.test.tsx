@@ -75,6 +75,9 @@ describe('graph-first explorer shell', () => {
     expect(normalMarkup).toContain(
       'aria-pressed="false" type="button">Inspector</button>',
     );
+    expect(normalMarkup).toContain('aria-label="Heading limit"');
+    expect(normalMarkup).toContain('value="" selected="">No limit</option>');
+    expect(normalMarkup).toContain('<option value="1">#</option>');
     expect(normalMarkup).not.toContain('Provenance Inspector');
     expect(normalMarkup).not.toContain('graph-stage--inspector-open');
     expect(maximizedMarkup).toContain(

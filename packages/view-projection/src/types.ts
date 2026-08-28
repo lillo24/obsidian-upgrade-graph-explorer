@@ -9,6 +9,7 @@ export type ProjectionNodeId = string;
 export type ProjectionEdgeId = string;
 export type ReferenceResolutionStatus =
   'resolved' | 'unresolved' | 'ambiguous' | 'invalid';
+export type SectionHeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
 export type DiagnosticReferenceStatus = Exclude<
   ReferenceResolutionStatus,
   'resolved'
@@ -17,6 +18,8 @@ export type DiagnosticReferenceStatus = Exclude<
 export interface StructuralDisclosureState {
   /** Documents only at 0; documents plus direct sections at 1. */
   readonly defaultDepth: 0 | 1;
+  /** Optional literal Markdown heading ceiling; absent means no limit. */
+  readonly maxSectionLevel?: SectionHeadingLevel;
   /** Reveals an entity's immediate children, subject to collapse precedence. */
   readonly expandedEntityIds: readonly EntityId[];
   /** Hides an entity's descendants without hiding the entity itself. */

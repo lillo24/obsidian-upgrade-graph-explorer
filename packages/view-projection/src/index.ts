@@ -18,6 +18,7 @@ export type {
   ProjectionIssueCode,
   ProjectionNodeId,
   ReferenceResolutionStatus,
+  SectionHeadingLevel,
   StructuralDisclosureState,
   ViewProjection,
   ViewProjectionFilters,

@@ -5,7 +5,7 @@ graph plus secondary KG5 evidence. They do not load files, validate JSON, alter
 canonical truth, or own a platform storage implementation.
 
 - `GraphExplorer.tsx` composes report-scoped projection/inspection workspaces,
-  compact disclosure/focus/filter/workspace controls, shared canonical
+  compact structural/heading/focus/filter/workspace controls, shared canonical
   navigation, graph selection, transient maximized/Inspector behavior,
   saved-view hydration/alert/reset orchestration, and semantic renderer viewport
   requests. It keeps the canvas mounted across shell changes and does not

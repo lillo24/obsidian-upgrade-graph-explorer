@@ -3,6 +3,7 @@ import {
   documentOnlyProjectionState,
   type FocusProjectionState,
   type ReferenceResolutionStatus,
+  type SectionHeadingLevel,
   type ViewProjectionFilters,
   type ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
@@ -27,6 +28,10 @@ export type GraphStateAction =
       readonly currentlyOpen: boolean;
     }
   | { readonly type: 'set-depth'; readonly depth: 0 | 1 }
+  | {
+      readonly type: 'set-heading-limit';
+      readonly maxSectionLevel: SectionHeadingLevel | null;
+    }
   | { readonly type: 'set-include-blocks'; readonly includeBlocks: boolean }
   | { readonly type: 'enter-focus'; readonly entityId: EntityId }
   | { readonly type: 'exit-focus' }
@@ -123,6 +128,15 @@ export function graphStateReducer(
         ...state,
         disclosure: { ...state.disclosure, defaultDepth: action.depth },
       };
+    case 'set-heading-limit': {
+      const disclosure = { ...state.disclosure };
+      if (action.maxSectionLevel === null) {
+        delete disclosure.maxSectionLevel;
+      } else {
+        disclosure.maxSectionLevel = action.maxSectionLevel;
+      }
+      return { ...state, disclosure };
+    }
     case 'set-include-blocks':
       return {
         ...state,
