@@ -1,5 +1,5 @@
 import type { RendererViewport } from './semantic-viewport';
-import type { RendererGraph } from './types';
+import type { RendererGraph, TrackpadZoomMode } from './types';
 
 export const GRAPH_MIN_ZOOM = 0.08;
 export const GRAPH_MAX_ZOOM = 2;
@@ -24,6 +24,16 @@ export interface DisclosureAnchor {
     readonly y: number;
   };
   readonly zoom: number;
+}
+
+export type WheelNavigationAction = 'pan' | 'zoom';
+
+/** Decide gesture ownership before React Flow handles an ordinary wheel event. */
+export function wheelActionForMode(
+  mode: TrackpadZoomMode,
+  ctrlKey: boolean,
+): WheelNavigationAction {
+  return mode === 'scroll-zoom' || ctrlKey ? 'zoom' : 'pan';
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {

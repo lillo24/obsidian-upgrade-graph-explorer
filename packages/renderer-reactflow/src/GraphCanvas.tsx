@@ -42,6 +42,7 @@ import {
   GRAPH_VIEWPORT_OBSERVATION_DELAY_MS,
   viewportAfterWheelZoom,
   viewportForDisclosureAnchor,
+  wheelActionForMode,
   type DisclosureAnchor,
 } from './viewport-navigation';
 
@@ -108,6 +109,7 @@ function GraphCanvasInner({
   onViewportObservation,
   projection,
   selection,
+  trackpadZoomMode,
 }: GraphCanvasProps) {
   const [hovered, setHovered] = useState<GraphSelection | null>(null);
   const { fitView, getViewport, setCenter, setViewport } = useReactFlow<
@@ -323,9 +325,13 @@ function GraphCanvasInner({
       ) {
         return;
       }
+      if (wheelActionForMode(trackpadZoomMode, event.ctrlKey) === 'pan') {
+        return;
+      }
       const bounds = container.getBoundingClientRect();
       if (bounds.width <= 0 || bounds.height <= 0) return;
       event.preventDefault();
+      event.stopPropagation();
       const nextViewport = viewportAfterWheelZoom(getViewport(), {
         deltaY: event.deltaY,
         deltaMode: event.deltaMode,
@@ -338,9 +344,12 @@ function GraphCanvasInner({
       void setViewport(nextViewport, { duration: 0 });
       scheduleViewportObservation(nextViewport);
     };
-    container.addEventListener('wheel', handleWheel, { passive: false });
-    return () => container.removeEventListener('wheel', handleWheel);
-  }, [getViewport, scheduleViewportObservation, setViewport]);
+    container.addEventListener('wheel', handleWheel, {
+      capture: true,
+      passive: false,
+    });
+    return () => container.removeEventListener('wheel', handleWheel, true);
+  }, [getViewport, scheduleViewportObservation, setViewport, trackpadZoomMode]);
 
   const toggleEntityAnchored = useCallback(
     (entityId: string, currentlyOpen: boolean) => {
@@ -385,6 +394,7 @@ function GraphCanvasInner({
     <div
       className="graph-canvas"
       aria-label="Projected knowledge graph"
+      data-trackpad-zoom-mode={trackpadZoomMode}
       ref={containerRef}
       role="region"
     >
@@ -425,6 +435,7 @@ function GraphCanvasInner({
           onPaneClick={clearSelection}
           onSelectionChange={syncKeyboardSelection}
           panOnDrag
+          panOnScroll={trackpadZoomMode === 'pinch-zoom'}
           proOptions={{ hideAttribution: false }}
           selectionOnDrag={false}
           zoomOnDoubleClick={false}

@@ -9,6 +9,7 @@ import {
   GRAPH_MIN_ZOOM,
   GRAPH_ZOOM_SENSITIVITY,
   normalizedWheelZoomDelta,
+  wheelActionForMode,
   viewportAfterWheelZoom,
   viewportForDisclosureAnchor,
 } from './viewport-navigation';
@@ -31,6 +32,13 @@ function graphAt(documentX: number, documentY: number): RendererGraph {
 }
 
 describe('viewport navigation', () => {
+  it('routes wheel input according to the explicit trackpad preference', () => {
+    expect(wheelActionForMode('scroll-zoom', false)).toBe('zoom');
+    expect(wheelActionForMode('scroll-zoom', true)).toBe('zoom');
+    expect(wheelActionForMode('pinch-zoom', false)).toBe('pan');
+    expect(wheelActionForMode('pinch-zoom', true)).toBe('zoom');
+  });
+
   it('uses the documented strong D3-compatible wheel normalization', () => {
     expect(GRAPH_ZOOM_SENSITIVITY).toBe(1.8);
     expect(

@@ -9,6 +9,8 @@ import type {
 
 export type GraphLayoutMode = 'structure' | 'focus';
 
+export type TrackpadZoomMode = 'scroll-zoom' | 'pinch-zoom';
+
 export type GraphSelection =
   | { readonly kind: 'node'; readonly id: ProjectionNodeId }
   | { readonly kind: 'edge'; readonly id: ProjectionEdgeId };
@@ -109,6 +111,7 @@ export interface GraphCanvasProps {
   readonly fitRequestKey: number;
   readonly centerRequest?: GraphCenterRequest;
   readonly maximized?: boolean;
+  readonly trackpadZoomMode: TrackpadZoomMode;
   readonly onMaximizedChange?: (maximized: boolean) => void;
   readonly onViewportObservation?: (
     observation: GraphViewportObservation,

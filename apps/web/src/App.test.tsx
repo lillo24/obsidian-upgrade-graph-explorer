@@ -6,7 +6,9 @@ import type { TauriSourceProvider } from '@icarus-graph-explorer/source-provider
 
 import { App } from './App';
 import { GraphExplorer } from './components/GraphExplorer';
+import { GraphSettings } from './components/GraphSettings';
 import { activateMaximizedGraphMode } from './components/maximized-graph-mode';
+import { GRAPH_PREFERENCES_STORAGE_KEY } from './preferences/graph-preferences';
 import sampleReport from './sample-report.json';
 
 const validation = validateObsidianDiagnosticReport(sampleReport);
@@ -100,6 +102,9 @@ describe('graph-first explorer shell', () => {
     expect(normalMarkup).not.toContain('Provenance Inspector');
     expect(normalMarkup).not.toContain('graph-stage--inspector-open');
     expect(normalMarkup).toContain('aria-label="Fit graph to view"');
+    expect(normalMarkup).toContain('aria-label="Open Settings"');
+    expect(normalMarkup).toContain('data-trackpad-zoom-mode="scroll-zoom"');
+    expect(normalMarkup).not.toContain('class="graph-floating-controls"');
     expect(normalMarkup).toContain(
       'aria-label="Maximize graph" aria-pressed="false"',
     );
@@ -110,8 +115,55 @@ describe('graph-first explorer shell', () => {
     expect(maximizedMarkup).toContain(
       'aria-label="Restore graph" aria-pressed="true"',
     );
+    expect(maximizedMarkup).toContain('class="graph-floating-controls"');
+    expect(maximizedMarkup).toContain(
+      'aria-controls="graph-tools-panel" aria-expanded="false"',
+    );
+    expect(maximizedMarkup).toContain(
+      'class="graph-tools-surface" hidden="" id="graph-tools-panel"',
+    );
+    expect(maximizedMarkup.match(/class="entity-search"/g)).toHaveLength(1);
+    expect(maximizedMarkup).toContain('aria-label="Open Inspector"');
     expect(maximizedMarkup).toContain('Graph Filters');
     expect(maximizedMarkup).toContain('Focus Selected');
+  });
+
+  it('uses one shared settings UI and hydrates the global trackpad choice', () => {
+    const settingsMarkup = renderToStaticMarkup(
+      <GraphSettings
+        onOpenChange={() => undefined}
+        onTrackpadZoomModeChange={() => undefined}
+        open
+        trackpadZoomMode="pinch-zoom"
+        warning="Preference is session-only."
+      />,
+    );
+    expect(settingsMarkup).toContain('<legend>Trackpad zoom</legend>');
+    expect(settingsMarkup).toContain('Scroll to zoom');
+    expect(settingsMarkup).toContain('Pinch to zoom');
+    expect(settingsMarkup).toContain(
+      'type="radio" name="trackpad-zoom-mode" checked="" value="pinch-zoom"',
+    );
+    expect(settingsMarkup).toContain(
+      'class="graph-settings__warning" role="alert"',
+    );
+
+    const persistedMarkup = renderToStaticMarkup(
+      <GraphExplorer
+        identityStability="stable"
+        maximized
+        onMaximizedChange={() => undefined}
+        snapshot={report.snapshot}
+        storage={{
+          ...storage,
+          getItem: (key) =>
+            key === GRAPH_PREFERENCES_STORAGE_KEY
+              ? '{"trackpadZoomMode":"pinch-zoom"}'
+              : null,
+        }}
+      />,
+    );
+    expect(persistedMarkup).toContain('data-trackpad-zoom-mode="pinch-zoom"');
   });
 
   it('keeps successful persistence status visually hidden and exposes storage failures', () => {
