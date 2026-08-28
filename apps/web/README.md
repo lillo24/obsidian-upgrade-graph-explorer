@@ -1,9 +1,9 @@
 # Web Structural Graph Explorer
 
-Status: **STABLE — KG11A source orchestration, UX3 interaction/heading controls, and prior UX/KG gates pass.**
+Status: **STABLE — KG11 live orchestration, view preservation, and prior UX/KG gates pass.**
 
 This package owns the browser SPA, validated KG5 report selection, Tauri-only
-one-shot vault orchestration, KG6 graph interaction state, guarded browser persistence, graph selection, canonical
+live vault orchestration, KG6 graph interaction state, guarded browser persistence, graph selection, canonical
 navigation orchestration, and provenance-first inspection UI. It accepts one
 runtime-validated report selected by the user or the committed neutral sample.
 It does not implement native I/O, upload reports, modify canonical truth, persist
@@ -16,8 +16,9 @@ selected report JSON → runtime validation → canonical inspection/search
                                                      ↘ KG8 inspector/navigation
                                    ↘ secondary KG5 evidence UI
 
-Tauri Open Vault → source-provider inventory + private identity session
-                 → KG10 once → in-memory report → the same graph/UI path
+Tauri Open Vault → watcher + buffered one-shot acquisition
+                 → serialized source plans → KG10 candidate + report
+                 → identity commit → in-place graph/UI update
 ```
 
 ## File map
@@ -33,6 +34,7 @@ apps/web/
     App.tsx           Browser/desktop source controls, session state, reset boundary, and evidence UI.
     desktop-runtime.ts Lazy official Tauri detection and provider creation.
     desktop-vault.ts Lazy KG10 initialization, report construction, and truthful identity commit orchestration.
+    desktop-live-vault.ts Serialized watch, candidate commit, pause, and full-resync lifecycle.
     graph-state.ts    Pure disclosure/focus/filter interaction reducer.
     navigation.ts     Shared reveal/filter-widening/navigation planner.
     persistence/      Stable-report eligibility, hydration, and localStorage adapter.
@@ -44,10 +46,11 @@ apps/web/
 ```
 
 The `components/README.md` maps the presentation components. The graph workspace
-creates one reusable `ProjectionWorkspace` and `InspectionWorkspace` per loaded
-snapshot and passes only a `ViewProjection` plus semantic viewport requests to
-`@icarus-graph-explorer/renderer-reactflow`. Loading or restoring a report keys
-a complete transient selection/search reset and workspace-specific hydration.
+creates projection/inspection workspaces for each committed snapshot and passes
+only a `ViewProjection` plus semantic viewport requests to
+`@icarus-graph-explorer/renderer-reactflow`. A real source-session switch keys
+a complete transient selection/search reset and workspace-specific hydration;
+live revisions reconcile current state and update the mounted explorer in place.
 
 ## Report loading and privacy
 
@@ -58,15 +61,23 @@ uploaded. Desktop mode adds local product acquisition without changing browser m
 ```text
 KG5   = select one generated report file
 KG11A = selected-folder one-shot acquisition
-KG11B = product watching and live updates
+KG11B = coalesced watching, transactional live updates, and resync
 ```
 
 Malformed schema versions, snapshots, diagnostics, probes, or inventory fields
 produce an actionable inline error while the last valid report remains visible.
-In Tauri runtime, **Open Vault** uses a dynamically imported platform provider;
-cancel is inert, source failures retain the prior report, and successful opens
-reset transient search/selection while stable KG9B state hydrates by workspace.
-The initialized engine and selected provider session remain in memory for KG11B.
+In Tauri runtime, **Open Vault** uses dynamically imported platform code; cancel
+is inert, source failures retain the prior report/live session, and successful
+opens reset transient search/selection while stable KG9B state hydrates by
+workspace. Watching starts before initial discovery, startup batches are
+buffered, and only a stable identity-persisted open becomes live.
+
+The plain `desktop-live-vault.ts` controller serializes watch batches and manual
+rescans. It maps provider plans to KG10, builds a candidate report, persists the
+candidate catalog, and only then publishes one matching runtime/report state.
+Non-Markdown-only plans rebuild compatibility evidence without KG10; net no-ops
+retain the report object. Report, internal, or identity-write failures retain
+the last committed state and pause until a successful **Rescan Vault**.
 
 ## Graph-first workspace shell
 
@@ -119,6 +130,13 @@ Corrupt, inaccessible, or unsupported stored values are not overwritten or
 silently deleted. Writes stop after one failure. **Reset saved view** deletes
 only that workspace's view, restores documents-only defaults, clears transient
 search/selection, and fits the graph. It never resets the KG9A catalog.
+
+Live snapshot reconciliation is not localStorage hydration. It keeps surviving
+disclosure, focus, heading/block choices, filters, and semantic viewport by
+stable canonical ID, removes only stale IDs/path scopes, and then lets ordinary
+autosave persist that current state under the same workspace ID. Search,
+Inspector visibility, maximize mode, and surviving selection stay in memory;
+selection clears with an announcement only when its projected element vanishes.
 
 The browser key contains no report filename, vault basename, or path. Search,
 hover, graph/inspector selection, pagination, renderer graph data, Dagre

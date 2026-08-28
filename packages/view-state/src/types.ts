@@ -76,3 +76,10 @@ export interface RestoredWorkspaceView {
   readonly viewport?: PersistedViewportAnchor;
   readonly issues: readonly ViewRestoreIssue[];
 }
+
+/** Reconciled in-memory view state for a newer snapshot of the same workspace. */
+export interface ReconciledCurrentWorkspaceView {
+  readonly state: ViewProjectionState;
+  readonly viewport?: PersistedViewportAnchor;
+  readonly issues: readonly ViewRestoreIssue[];
+}

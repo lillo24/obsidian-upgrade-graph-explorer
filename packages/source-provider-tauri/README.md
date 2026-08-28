@@ -1,6 +1,6 @@
 # Tauri Source Provider
 
-Status: **STABLE — KG11B1 acquisition, watch planning, identity, and fake-bridge tests pass.**
+Status: **STABLE — KG11 acquisition, watch planning, repeated identity commits, and fake-bridge tests pass.**
 
 This outer platform package owns native folder selection, read-only vault
 discovery, recursive watch acquisition, deterministic source-change planning,
@@ -87,13 +87,19 @@ entry pointing to a catalog that was not written. Invalid, missing, corrupt, or
 mismatched known state fails explicitly and offers a confirmed reset path; it
 is never silently recreated.
 
+After a new or reset session publishes its first registry association, later
+commits in that same in-memory session replace only the catalog. Failed catalog
+or registry writes do not advance this private session state, so retry remains
+transactional and the public identity-session value stays immutable.
+
 Matching is exact after lexical/platform normalization. Moving or renaming a
 vault root creates a new association in KG11A. The app cannot automatically
 reopen a prior root because native dialog scope lasts only for the process.
 
-KG11B1 stops at source planning. Applying changes to KG10, committing the next
-identity/report state, preserving the live KG9 view, and executing full resync
-remain KG11B2 responsibilities.
+The provider still stops at source planning. KG11B2 application orchestration
+in `apps/web` now applies those plans to KG10, commits candidate identity/report
+state, preserves the live KG9 view, and executes full resync without moving
+platform or application responsibilities into this adapter.
 
 ## Local validation
 

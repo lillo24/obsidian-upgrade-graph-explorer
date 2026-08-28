@@ -48,6 +48,7 @@ class FakeBridge implements TauriNativeBridge {
   readonly unreadableDirectories = new Set<string>();
   readonly unreadableFiles = new Set<string>();
   readonly renameFailures = new Set<string>();
+  readonly renamedTargets: string[] = [];
   selected?: string;
 
   addDirectory(path: string): void {
@@ -180,6 +181,7 @@ class FakeBridge implements TauriNativeBridge {
     if (value === undefined) throw new Error('missing source');
     this.files.set(to, value);
     this.files.delete(from);
+    this.renamedTargets.push(to);
   }
 
   async removeFile(path: string): Promise<void> {
@@ -437,6 +439,70 @@ describe('Tauri source provider', () => {
     expect([...bridge.files.keys()].some((path) => path.endsWith('.tmp'))).toBe(
       false,
     );
+  });
+
+  it('registers new and reset sessions once while allowing repeated catalog commits', async () => {
+    for (const reset of [false, true]) {
+      const bridge = new FakeBridge();
+      bridge.addDirectory('/vault');
+      if (reset) persistedRegistry(bridge, '/vault', 'old-workspace');
+      const sourceProvider = provider(bridge);
+      const session = await sourceProvider.loadOrPrepareWorkspaceIdentity(
+        selection(),
+        reset ? { reset: true } : {},
+      );
+
+      await sourceProvider.commitWorkspaceIdentity(session, session.catalog);
+      await sourceProvider.commitWorkspaceIdentity(session, session.catalog);
+      await sourceProvider.commitWorkspaceIdentity(session, session.catalog);
+
+      expect(
+        bridge.renamedTargets.filter((target) => target === REGISTRY),
+      ).toHaveLength(1);
+      expect(
+        bridge.renamedTargets.filter(
+          (target) => target === catalogPath(session.workspaceId),
+        ),
+      ).toHaveLength(3);
+    }
+  });
+
+  it('retries a failed first registry association before switching to catalog-only commits', async () => {
+    const bridge = new FakeBridge();
+    bridge.addDirectory('/vault');
+    bridge.renameFailures.add(REGISTRY);
+    const sourceProvider = provider(bridge);
+    const session =
+      await sourceProvider.loadOrPrepareWorkspaceIdentity(selection());
+
+    await expect(
+      sourceProvider.commitWorkspaceIdentity(session, session.catalog),
+    ).rejects.toThrow('Cannot safely replace private application state');
+    bridge.renameFailures.delete(REGISTRY);
+    await sourceProvider.commitWorkspaceIdentity(session, session.catalog);
+    await sourceProvider.commitWorkspaceIdentity(session, session.catalog);
+
+    expect(
+      bridge.renamedTargets.filter((target) => target === REGISTRY),
+    ).toHaveLength(1);
+  });
+
+  it('does not advance a new session when its catalog replacement fails', async () => {
+    const bridge = new FakeBridge();
+    bridge.addDirectory('/vault');
+    const sourceProvider = provider(bridge);
+    const session =
+      await sourceProvider.loadOrPrepareWorkspaceIdentity(selection());
+    bridge.renameFailures.add(catalogPath(session.workspaceId));
+
+    await expect(
+      sourceProvider.commitWorkspaceIdentity(session, session.catalog),
+    ).rejects.toThrow('Cannot safely replace private application state');
+    expect(bridge.text(REGISTRY)).toBeUndefined();
+    bridge.renameFailures.delete(catalogPath(session.workspaceId));
+    await sourceProvider.commitWorkspaceIdentity(session, session.catalog);
+
+    expect(bridge.text(REGISTRY)).toContain(session.workspaceId);
   });
 
   it('supports explicit confirmed identity and corrupt-registry recovery', async () => {

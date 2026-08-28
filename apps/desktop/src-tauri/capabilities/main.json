@@ -12,8 +12,8 @@
     "fs:allow-watch",
     "fs:allow-unwatch",
     "fs:create-app-specific-dirs",
-    "fs:allow-app-read-recursive",
-    "fs:allow-app-write-recursive",
-    "fs:allow-app-meta-recursive"
+    "fs:allow-applocaldata-read-recursive",
+    "fs:allow-applocaldata-write-recursive",
+    "fs:allow-applocaldata-meta-recursive"
   ]
 }

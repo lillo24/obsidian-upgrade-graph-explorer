@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, KG11A implements Tauri-selected one-shot product vault acquisition with private app-local identity persistence, and KG11B1 implements recursive watch acquisition plus deterministic source-change planning. Live KG10/UI application and full resync remain KG11B2.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, and KG11 implements Tauri-selected, coalesced live vault acquisition with transactional KG10 application, full resync, and in-place view preservation. KG12 performance and worker hardening is next.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -112,6 +112,13 @@ rendering, live subscriptions, or full resync orchestration. An injectable
 narrow bridge and scheduler keep all provider tests independent of a native
 runtime.
 
+`apps/web/src/desktop-live-vault.ts` is the non-React application orchestration
+boundary between that provider and KG10. It owns one live runtime, watcher
+subscription, serialized operation queue, buffered bootstrap, paused/dirty
+state, candidate report/catalog commit ordering, disposal checks, and full
+resync. It publishes only matching committed runtime/report snapshots. React
+owns source-session activation and presentation, not the mutation transaction.
+
 `packages/view-projection` depends inward on core only. It validates and indexes
 one canonical snapshot, then derives plain visible nodes/edges from structural
 disclosure, focus, and filter state. It owns nearest-visible-ancestor endpoint
@@ -123,8 +130,11 @@ mechanically excluded from its production source.
 `packages/view-state` depends inward on core and view-projection only. It owns a
 versioned plain-data subset of KG6 disclosure, focus, user-facing filters, and a
 semantic canonical-entity viewport bookmark. It strictly validates saved data,
-reconciles it against the current `ProjectionWorkspace`, drops stale identities
-without fuzzy replacement, and emits non-fatal restore issues. React, renderers,
+reconciles persisted or current in-memory state against a
+`ProjectionWorkspace`, drops stale identities/path scopes without fuzzy
+replacement, and emits non-fatal issues. Current reconciliation additionally
+retains the transient text filter and semantic viewport during live evolution.
+React, renderers,
 diagnostics, stable-identity catalogs, filesystems, storage APIs, and platform
 code are mechanically excluded from production source. Browser localStorage is
 an outer adapter, not the durable domain contract.
@@ -391,8 +401,17 @@ retained complete inventory. Plans contain deterministic Markdown
 upsert/delete/move operations, the complete next inventory, and non-Markdown
 change state. Exact source equality must be unique in both inventories before a
 move is inferred. Unsafe, root-wide, out-of-root, native rescan, unreadable, or
-inconsistent observations request resync. KG11B2 will own serialized KG10
-application, persistence, UI preservation, and the resync execution itself.
+inconsistent observations request resync. The application layer owns serialized
+KG10 application, persistence, UI preservation, and resync execution.
+
+KG11B2 now starts watching before one-shot discovery, buffers startup batches,
+and gives one plain controller a promise queue shared by watcher updates and
+manual rescan. Markdown plans become KG10 candidates; the controller builds a
+stable report, commits the catalog, and only then adopts runtime, inventory,
+and report together. Non-Markdown-only plans rebuild compatibility evidence
+without KG10, while net no-ops retain the report object. Explicit source desync
+and KG10 input failure perform one complete reinitialization using the current
+committed catalog. Other failures pause with the last committed graph visible.
 
 ## Diagnostic report workflow
 
@@ -512,11 +531,11 @@ success-shaped empty value.
 Remote capabilities, collaboration, or source editing would require an explicit later trust decision. Private workspace material must not enter repository fixtures or logs. Bugs discovered in the Icarus vault must be reduced to small synthetic examples before they are committed.
 
 The KG5 browser File API reads one user-selected report in memory and performs
-no upload. KG11A desktop mode reads one explicitly selected vault locally
-through a narrow provider, writes only private app-owned identity state outside
-the vault, and keeps its report in memory. KG11B1 watches only that dynamically
-scoped root and exposes neither native absolute paths nor raw events. Live
-source application remains KG11B2.
+no upload. KG11 desktop mode reads and watches one explicitly selected vault
+locally through a narrow provider, writes only private app-owned identity state
+outside the vault, and keeps reports in memory. Native absolute paths and raw
+events do not cross the provider. Live application and resync never write the
+selected source tree.
 
 ## UI, renderer, and platform roles
 
@@ -536,7 +555,7 @@ shell and `source-provider-tauri`.
 
 Performance work begins with boundaries and measurement:
 
-- keep KG10 file-granular parsing behind KG11A acquisition and future KG11B2 application of KG11B1 change plans;
+- keep KG10 file-granular parsing behind KG11 acquisition and transactional application of provider change plans;
 - communicate through serializable snapshots and deltas;
 - introduce workers only after measured UI-thread cost justifies them;
 - project only the graph needed for the active view;
@@ -556,9 +575,11 @@ reconciliation counts/timings for small and medium profiles. KG10 adds
 independent edit, add, delete, and move cases with changed/reparsed/reused file
 counts, delta counts, incremental timings, full-rebuild timings, and exact
 snapshot/catalog/delta-application oracle checks. They are
-investigative evidence only: no CI
-timing threshold or high-density renderer conclusion is established before
-KG12.
+supplemented by KG11 application timings for source reconciliation, KG10,
+report construction, identity persistence, total live processing, and full
+resync. The provider's 250 ms quiet window is batching latency and remains
+separate. These are investigative evidence only: no CI timing threshold or
+high-density renderer conclusion is established before KG12.
 
 Rust, WASM, universal graph abstractions, and million-node optimization are not foundation requirements.
 
@@ -623,6 +644,13 @@ delete/non-Markdown state, strict UTF-8 failure, explicit resync, unique move
 evidence, duplicate ambiguity, and deterministic ordering. Platform-specific
 event sequences are checked only with an aggregate temporary synthetic Windows
 vault and do not become a stable public contract.
+
+KG11B2 adds native-free live-controller tests for watcher-first bootstrap,
+serialized bursts, Markdown/non-Markdown/no-op application, transactional
+rollback, pause/recovery, automatic and manual full resync, events during
+resync, source disposal, repeated provider catalog commits, and source-neutral
+current-view reconciliation. Temporary synthetic desktop mutation and private
+real-vault rescan remain aggregate local QA; no private artifact is committed.
 
 ## Changing these decisions
 

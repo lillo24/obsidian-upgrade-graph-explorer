@@ -3,7 +3,10 @@ export {
   serializePersistedWorkspaceView,
   type CreatePersistedWorkspaceViewInput,
 } from './persist';
-export { restorePersistedWorkspaceView } from './restore';
+export {
+  reconcileCurrentWorkspaceView,
+  restorePersistedWorkspaceView,
+} from './restore';
 export {
   PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION,
   type PersistedProjectionState,
@@ -11,6 +14,7 @@ export {
   type PersistedViewValidationResult,
   type PersistedViewportAnchor,
   type PersistedWorkspaceView,
+  type ReconciledCurrentWorkspaceView,
   type RestoredWorkspaceView,
   type ViewRestoreIssue,
   type ViewRestoreIssueCode,

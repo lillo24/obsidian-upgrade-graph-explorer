@@ -3,6 +3,18 @@ import { describe, expect, it } from 'vitest';
 import { graphStateReducer, initialGraphState } from './graph-state';
 
 describe('graph projection interaction state', () => {
+  it('replaces state atomically after live snapshot reconciliation', () => {
+    const state = initialGraphState();
+    const replacement = {
+      ...state,
+      disclosure: { ...state.disclosure, includeBlocks: true },
+    };
+
+    expect(
+      graphStateReducer(state, { type: 'replace-state', state: replacement }),
+    ).toBe(replacement);
+  });
+
   it('resets to the conservative documents-only state', () => {
     const changed = graphStateReducer(initialGraphState(), {
       type: 'set-depth',

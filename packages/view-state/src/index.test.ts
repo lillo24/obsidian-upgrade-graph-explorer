@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createPersistedWorkspaceView,
+  reconcileCurrentWorkspaceView,
   restorePersistedWorkspaceView,
   serializePersistedWorkspaceView,
   validatePersistedWorkspaceView,
@@ -472,5 +473,58 @@ describe('persisted workspace view', () => {
         'viewport-anchor-missing',
       ]),
     );
+  });
+});
+
+describe('current workspace view reconciliation', () => {
+  it('preserves surviving live state, including transient text and viewport', () => {
+    const state = fullState();
+    const viewport = { anchorEntityId: 'section-one', zoom: 0.9 } as const;
+    const reconciled = reconcileCurrentWorkspaceView(
+      createProjectionWorkspace(snapshot()),
+      state,
+      viewport,
+    );
+
+    expect(reconciled.state).toEqual({
+      ...state,
+      disclosure: {
+        ...state.disclosure,
+        expandedEntityIds: ['doc-a', 'section-one'],
+      },
+    });
+    expect(reconciled.state.filters?.text).toBe('must not persist');
+    expect(reconciled.viewport).toBe(viewport);
+    expect(reconciled.issues).toEqual([]);
+  });
+
+  it('drops only state invalidated by a live snapshot without mutating inputs', () => {
+    const state = fullState();
+    const before = JSON.stringify(state);
+    const evolved = createProjectionWorkspace(
+      snapshot(ENTITIES.filter(({ id }) => id === 'doc-b')),
+    );
+    const reconciled = reconcileCurrentWorkspaceView(evolved, state, {
+      anchorEntityId: 'section-one',
+      zoom: 1.1,
+    });
+
+    expect(reconciled.state.disclosure.expandedEntityIds).toEqual([]);
+    expect(reconciled.state.disclosure.collapsedEntityIds).toEqual(['doc-b']);
+    expect(reconciled.state.focus).toBeUndefined();
+    expect(reconciled.state.filters).toEqual({
+      text: 'must not persist',
+      entityKinds: ['section', 'block'],
+      referenceStatuses: ['resolved', 'ambiguous'],
+    });
+    expect(reconciled.viewport).toBeUndefined();
+    expect(reconciled.issues.map(({ code }) => code)).toEqual([
+      'unknown-expanded-entity',
+      'unknown-expanded-entity',
+      'focus-root-missing',
+      'path-filter-no-longer-matches',
+      'viewport-anchor-missing',
+    ]);
+    expect(JSON.stringify(state)).toBe(before);
   });
 });
