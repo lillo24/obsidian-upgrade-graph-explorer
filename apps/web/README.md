@@ -71,11 +71,12 @@ The initialized engine and selected provider session remain in memory for KG11B.
 ## Graph-first workspace shell
 
 The normal product shell uses a compact report bar and gives the graph workspace
-the remaining viewport-driven height. **Maximize Graph** is an application mode,
+the remaining viewport-driven height. **Maximize graph**, exposed in the canvas
+control stack, is an application mode,
 not the browser Fullscreen API: the existing `GraphExplorer` and `GraphCanvas`
 instances remain mounted in place while the workspace becomes a fixed `100dvh`
 surface. Page chrome and diagnostic evidence are hidden, body scrolling is
-locked, and **Exit Maximize** or `Escape` restores the prior body overflow value.
+locked, and **Restore graph** or `Escape` restores the prior body overflow value.
 Maximizing is intentionally transient and never requests `fitView`, so selection,
 viewport, disclosure, focus, filters, and saved KG9 view state remain unchanged.
 

@@ -1,11 +1,11 @@
 # React Flow Structural Renderer
 
-Status: **STABLE — UX3 interaction semantics and KG9B renderer contracts are pure-test-backed.**
+Status: **STABLE — UX4A viewport ergonomics and KG9B renderer contracts are pure-test-backed.**
 
 This renderer package turns one KG6 `ViewProjection` into a deterministic,
 read-only React Flow scene. It owns renderer IDs, fixed node geometry, Dagre
 layout, semantic node/edge presentation, direct-neighborhood emphasis, viewport
-controls, and accessible disclosure controls. It does not inspect canonical
+navigation, anchored disclosure, and accessible canvas controls. It does not inspect canonical
 references, roll endpoints, aggregate links, apply focus/filter policy, read
 reports, access files, or persist view state.
 
@@ -27,12 +27,13 @@ src/
   highlight.ts           Direct incident-node/edge visual emphasis.
   center-request.ts      Keyed projected-node viewport-center resolution.
   semantic-viewport.ts   Viewport-center to canonical-entity bookmark observation.
+  viewport-navigation.ts Wheel zoom, focal-point, and disclosure-anchor geometry.
   prepare.ts             Pure mapping + layout benchmark/test entry point.
   disclosure-context.tsx Stable entity-disclosure callback boundary.
   nodes.tsx              Memoized entity and diagnostic custom nodes.
   edges.tsx              Memoized hierarchy/reference custom edge.
   component-maps.ts      Module-scope stable React Flow type maps.
-  GraphCanvas.tsx        Read-only viewport, selection, hover, and fit behavior.
+  GraphCanvas.tsx        Read-only viewport, selection, hover, disclosure, and controls.
   styles.css             Node, edge, control, and reduced-motion presentation.
   *.test.ts              Mapping, layout failure, determinism, and highlight tests.
 ```
@@ -58,6 +59,30 @@ connected, edges cannot be reconnected, and Delete is disabled. First render
 fits the viewport; application-requested focus changes may fit again, while
 ordinary disclosure does not aggressively reset the user's viewport. Motion
 durations are zero and CSS honors reduced-motion preferences.
+
+UX4A replaces React Flow's scroll zoom with a non-passive, renderer-local wheel
+handler. Its D3-compatible delta normalization uses the named sensitivity
+constant `GRAPH_ZOOM_SENSITIVITY = 1.8`, clamps to the shared `0.08`–`2` zoom
+bounds, and preserves the graph point beneath the mouse or precision-touchpad
+focal point. React Flow pinch handling remains enabled. Native wheel events over
+the viewport controls or an explicitly marked scroll region are not captured.
+Wheel-driven semantic viewport persistence is debounced to one observation 120
+ms after the final tick; raw transforms and high-frequency frames still do not
+cross the renderer boundary.
+
+Disclosure captures the toggled entity's screen-space center and current zoom,
+then restores that point after the new projection and layout commit. Only the
+viewport translation changes: zoom, selection, focus, Inspector state, and
+disclosure semantics remain owned by their existing layers. A missing anchor is
+cleared safely without fitting. File cards remain `224 × 112`, Heading nodes are
+compact `200 × 96` lozenges, and Block nodes remain `168 × 80`; their visible
+type labels are File, Heading, and Block while canonical entity kinds are
+unchanged.
+
+The bottom-left control stack owns zoom in/out, a custom **Fit graph to view**
+button, and the optional application maximize/restore callback. The fit icon is
+graph-specific, maximize and restore use conventional corner glyphs, and the
+built-in React Flow Fit and interactive-lock buttons are hidden.
 
 Hover is transient renderer-local neighborhood emphasis: the hovered node or
 edge and its direct endpoints remain emphasized while unrelated content fades.

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { rendererEdgeId, rendererNodeId } from './ids';
-import { mapProjectionToReactFlow } from './mapping';
+import {
+  ENTITY_NODE_DIMENSIONS,
+  ENTITY_TYPE_LABELS,
+  mapProjectionToReactFlow,
+} from './mapping';
 import { rendererTestProjection } from './test-fixture';
 
 describe('React Flow projection mapping', () => {
@@ -41,6 +45,7 @@ describe('React Flow projection mapping', () => {
 
     expect(documentNode?.data).toMatchObject({
       title: 'Alpha',
+      typeLabel: 'File',
       isExpanded: true,
       internalReferenceCount: 2,
       visibleDescendantCount: 1,
@@ -57,6 +62,29 @@ describe('React Flow projection mapping', () => {
     expect(referenceEdge).toMatchObject({
       sourceHandle: 'source-right',
       targetHandle: 'target-left',
+    });
+    expect(
+      mapped.nodes.find(
+        (candidate) => candidate.data.projectionNodeId === 'projection-section',
+      ),
+    ).toMatchObject({
+      className: 'graph-node graph-node--section',
+      width: 200,
+      height: 96,
+      data: { typeLabel: 'Heading' },
+    });
+  });
+
+  it('keeps File, Heading, and Block labels and silhouettes explicit', () => {
+    expect(ENTITY_TYPE_LABELS).toEqual({
+      document: 'File',
+      section: 'Heading',
+      block: 'Block',
+    });
+    expect(ENTITY_NODE_DIMENSIONS).toEqual({
+      document: { width: 224, height: 112 },
+      section: { width: 200, height: 96 },
+      block: { width: 168, height: 80 },
     });
   });
 

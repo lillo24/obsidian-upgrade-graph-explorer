@@ -31,6 +31,14 @@
     filter 120ms ease;
 }
 
+.graph-canvas .react-flow__node.graph-node--document {
+  border-radius: 1rem;
+}
+
+.graph-canvas .react-flow__node.graph-node--section {
+  border-radius: 1.6rem;
+}
+
 .graph-canvas .react-flow__node:focus-visible {
   outline: 3px solid #c78310;
   outline-offset: 4px;
@@ -69,13 +77,20 @@
 }
 
 .entity-card--document {
-  border-top: 4px solid #245e74;
-  background: linear-gradient(145deg, #ffffff, #edf7f8);
+  border: 2px solid #789ca9;
+  border-top: 5px solid #245e74;
+  border-radius: 1rem;
+  background: linear-gradient(145deg, #ffffff 20%, #e7f4f6);
+  box-shadow: 0 0.7rem 1.55rem rgb(28 72 88 / 16%);
 }
 
 .entity-card--section {
-  border-top: 4px solid #665d8c;
-  background: linear-gradient(145deg, #ffffff, #f4f2fa);
+  padding: 0.65rem 1rem;
+  border: 2px solid #8b82ae;
+  border-left-width: 5px;
+  border-radius: 1.6rem;
+  background: linear-gradient(145deg, #ffffff 15%, #eeeafa);
+  box-shadow: 0 0.45rem 1rem rgb(75 65 117 / 13%);
 }
 
 .entity-card--block {
@@ -322,6 +337,28 @@
 
 .graph-canvas .react-flow__controls-button:hover {
   background: #e8f1f3;
+}
+
+.graph-canvas .react-flow__controls-button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 3px solid #c78310;
+  outline-offset: -3px;
+}
+
+.graph-canvas .graph-control-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.graph-canvas .graph-control-icon circle {
+  fill: currentColor;
+  stroke: none;
 }
 
 .graph-layout-warning {

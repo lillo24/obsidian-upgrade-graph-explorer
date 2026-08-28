@@ -59,7 +59,11 @@ source provider can perform read-only recursive acquisition and watching. The
 Rust filesystem plugin enables its pinned `watch` feature, and the main
 capability adds only `fs:allow-watch` and `fs:allow-unwatch`; it does not grant
 `$HOME/**`, a drive root, or another blanket vault scope. App-owned
-registry/catalog state is restricted to the application-local data directory.
+data directory. At startup the shell resolves that directory through Tauri and
+adds both its logical path and effective canonical path to the runtime
+filesystem scope. The second path is required when a Windows app container
+virtualizes application-local files; both scopes remain restricted to private
+application state, and command permissions remain capability-gated.
 
 Dialog-added scope is not durable. Restarting requires the user to select the
 vault again; an exact normalized private registry match then recovers its stable

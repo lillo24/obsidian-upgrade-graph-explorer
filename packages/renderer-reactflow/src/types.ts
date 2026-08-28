@@ -28,6 +28,7 @@ export interface EntityNodeData extends Record<string, unknown> {
   readonly projectionNodeId: ProjectionNodeId;
   readonly entityId: string;
   readonly entityKind: 'document' | 'section' | 'block';
+  readonly typeLabel: 'File' | 'Heading' | 'Block';
   readonly title: string;
   readonly detail: string;
   readonly sourcePath: string;
@@ -107,6 +108,8 @@ export interface GraphCanvasProps {
   readonly selection: GraphSelection | null;
   readonly fitRequestKey: number;
   readonly centerRequest?: GraphCenterRequest;
+  readonly maximized?: boolean;
+  readonly onMaximizedChange?: (maximized: boolean) => void;
   readonly onViewportObservation?: (
     observation: GraphViewportObservation,
   ) => void;
