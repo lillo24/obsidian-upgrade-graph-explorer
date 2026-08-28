@@ -15,7 +15,7 @@ The roadmap is a sequencing map, not a claim that future features exist. Each mi
 | **KG8 — Inspector, backlinks, search + navigation**          | Provenance-first inspection, incoming/outgoing references, ambiguity candidates, and search/navigation over projected data.                        | **Complete** — source-neutral inspection, navigation, and browser-validation gates passed.          |
 | **KG9 — Persistence + stable identity**                      | Local persistence for renderer-independent application view state and identities robust across normal edits.                                       | **Complete** — KG9A identity and KG9B view/semantic-viewport restoration gates passed.              |
 | **KG10 — Incremental workspace engine**                      | File-granular reparsing and exact stable snapshot deltas while preserving whole-workspace semantics.                                               | **Complete** — cache, delta, global invalidation, identity, oracle, and real-vault gates passed.    |
-| **KG11 — Tauri local-vault workflow**                        | Desktop folder access and watching through a narrow source-provider adapter.                                                                       | Web/core boundaries are stable; platform APIs remain outside generic packages.                      |
+| **KG11 — Tauri local-vault workflow**                        | Desktop folder access and watching through a narrow source-provider adapter.                                                                       | **In progress** — KG11A one-shot desktop acquisition is complete; KG11B live watching is next.      |
 | **KG12 — Performance + worker hardening**                    | Explicit workload budgets, measurement-led worker split, and projection/focus/collapse optimization.                                               | KG5 harness, incremental engine, and renderer measurements provide real workload evidence.          |
 | **KG13 — Global graph decision / renderer, benchmark-gated** | Decide whether a separate high-density renderer is justified; WebGL/Pixi/Sigma viability is not evidence to replace the structural renderer early. | KG12 benchmarks and product need provide evidence; otherwise no Sigma dependency is added.          |
 | **KG14 — Product-quality exploration**                       | Accessibility, resilience, onboarding, polished exploration workflows, and release-quality hardening.                                              | Core workflows and renderer choices are evidence-backed and stable.                                 |
@@ -52,10 +52,12 @@ browser localStorage adapter activates only for explicitly stable reports.
 Search, inspector selection, and graph selection remain transient. Manual
 positions/pins and named saved views have no supported interaction or evidence
 to implement. KG10 now reparses changed files only while retaining complete
-resolution and reconciliation, then emits exact source-neutral deltas. KG11 is
-next and will provide product-local acquisition/watching behind that engine;
-rename continuity depends on move/coalescing evidence rather than tombstone
-guessing. KG12 will use the KG5 harness
+resolution and reconciliation, then emits exact source-neutral deltas. KG11A
+now provides Tauri-selected, one-shot product-local acquisition plus app-local
+workspace/catalog identity behind that engine. KG11B is next: it will add
+watching, event coalescing, live KG10 updates, and full resync for out-of-sync
+conditions; rename continuity depends on move/coalescing evidence rather than
+tombstone guessing. KG12 will use the KG5 harness
 plus later renderer evidence to set workload profiles, budgets, worker splits,
 and projection/focus/collapse benchmarks.
 

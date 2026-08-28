@@ -6,3 +6,5 @@ history-implementations/
 .codex/skills/
 skills-lock.json
 pnpm-lock.yaml
+apps/desktop/src-tauri/gen/schemas/
+apps/desktop/src-tauri/target/

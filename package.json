@@ -10,6 +10,9 @@
   "scripts": {
     "dev": "pnpm --filter @icarus-graph-explorer/web dev",
     "build": "pnpm --filter @icarus-graph-explorer/web build",
+    "desktop:dev": "pnpm --filter @icarus-graph-explorer/desktop dev",
+    "desktop:build": "pnpm --filter @icarus-graph-explorer/desktop build:no-bundle",
+    "desktop:check": "pnpm --filter @icarus-graph-explorer/desktop check",
     "diagnose:vault": "pnpm --filter @icarus-graph-explorer/vault-diagnostics diagnose",
     "benchmark:pipeline": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark",
     "test": "vitest run",

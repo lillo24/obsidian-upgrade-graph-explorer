@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, and KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas. Product filesystem access remains KG11.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, and KG11A implements Tauri-selected one-shot product vault acquisition with private app-local identity persistence. Live filesystem updates remain KG11B.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -30,7 +30,7 @@ Core terminology must remain source-neutral. `Document`, `Section`, `Reference`,
 Dependencies point from source/platform details and UI toward stable domain contracts, never in the reverse direction. Names will evolve, but this direction is an invariant:
 
 ```text
-SourceProvider
+browser report input / Tauri SourceProvider
   → workspace engine / parser / source adapter / resolver
   → transient canonical snapshot
   → stable-identity reconciliation
@@ -95,6 +95,20 @@ complete KG4 resolution and KG9A reconciliation before emitting the next
 stable snapshot and exact delta. Filesystem watching, persistence, source
 retention after parsing, and application subscriptions remain outside it.
 
+`packages/vault-discovery-policy` depends inward on core only and owns the pure
+lexical rules shared by the Node KG5 scanner and Tauri KG11A provider: hidden
+and `node_modules` skipping, normalized excludes, Markdown classification,
+deterministic ordering, and safe workspace-path construction. It performs no
+filesystem I/O and knows nothing about either platform runtime.
+
+`packages/source-provider-tauri` is an outer platform adapter. It depends on
+core, stable-identity, vault-discovery-policy, and the official Tauri v2 API,
+dialog, and filesystem packages. It owns native directory selection, one-shot
+strict-UTF-8 source acquisition, path-only non-Markdown inventory, and private
+application-data registry/catalog persistence. It deliberately does not own
+KG10, diagnostics, React, projection, rendering, or watchers. An injectable
+narrow bridge keeps all provider tests independent of a native runtime.
+
 `packages/view-projection` depends inward on core only. It validates and indexes
 one canonical snapshot, then derives plain visible nodes/edges from structural
 disclosure, focus, and filter state. It owns nearest-visible-ancestor endpoint
@@ -144,14 +158,15 @@ Dagre coordinates, and per-frame movement never cross into saved view state.
 Restoration reuses the KG8 center request after layout; missing or filtered
 anchors use normal fit without widening the restored view.
 
-`tools/vault-diagnostics` is the current development filesystem boundary. It recursively
+`tools/vault-diagnostics` is the Node development filesystem boundary. It recursively
 discovers one explicitly selected vault, reads strict UTF-8 Markdown, inventories
 non-Markdown paths without reading their contents, and invokes KG3 → KG4 →
 KG9A stable identity → diagnostics. It also owns the private catalog file
 adapter: strict load, explicit reset, vault-local-path rejection, and validated
 temporary-sibling replacement after report success. The browser receives only
-a generated report; it never receives a catalog or folder handle. This tool is
-development infrastructure, not the KG11 product source-provider design.
+a generated report; it never receives a catalog or folder handle. This tool
+remains development infrastructure and does not share I/O with the KG11A
+product provider; only their small pure discovery policy is shared.
 
 ## Markdown structural parsing
 
@@ -312,10 +327,51 @@ updates, not removal/addition, when identity survives. A narrowly used
 Application validates the base and the resulting core snapshot, so
 `apply(old, diff(old, next))` exactly equals `next` or fails loudly.
 
-The engine is deliberately an in-memory domain service, not KG11's watcher.
+The engine is deliberately an in-memory domain service, not KG11B's watcher.
 Rename continuity is strongest when a provider supplies one `move` or one
 atomic coalesced delete-plus-upsert. Committing a deletion before a later add
 loses the observation because KG9A has no tombstone resurrection contract.
+
+## Desktop one-shot vault acquisition
+
+KG11A wraps the existing Vite/React frontend in a minimal Tauri v2 shell:
+
+```text
+native Open Vault dialog
+  → session-scoped selected root
+  → Tauri source provider + private identity session
+  → initialize KG10 once
+  → engine snapshot/diagnostics/parsed documents
+  → in-memory diagnostic report
+  → existing graph, inspector, and saved-view path
+```
+
+The source provider recursively reads strict-UTF-8 Markdown and inventories
+non-Markdown paths without reading their content. It skips hidden entries and
+`node_modules`, honors normalized excludes, never follows symlinks, and emits
+only normalized workspace-relative paths to processing layers. Absolute roots
+remain in the native session and a private version-1 application-data registry.
+
+The registry maps one exact normalized root to an opaque workspace ID; one
+validated KG9A catalog lives in the adjacent private identity directory. New
+associations write the catalog before the registry, and every replacement uses
+a temporary sibling plus rename. Missing, corrupt, unsupported, or mismatched
+known identity state fails explicitly until the user confirms a separate
+identity reset. Root moves are not guessed or fingerprinted.
+
+The application initializes KG10 once and builds diagnostics from
+`engine.parsedDocuments()`, so it does not reparse sources. The initialized
+engine, inventory, provider session, and selection remain in memory for KG11B.
+The report is marked stable only after private identity persistence succeeds;
+a write failure produces an explicit transient-session warning. Opening a
+vault resets transient search/selection while the existing KG9B boundary
+hydrates state for a known stable workspace.
+
+Tauri dialog-selected filesystem scope expires with the process. KG11A never
+grants blanket home/drive scope or silently reopens a previous arbitrary root;
+the user reselects it after restart, then exact registry matching reuses stable
+identity. Watchers, event coalescing, live KG10 batches, and out-of-sync rescan
+remain KG11B.
 
 ## Diagnostic report workflow
 
@@ -435,23 +491,29 @@ success-shaped empty value.
 Remote capabilities, collaboration, or source editing would require an explicit later trust decision. Private workspace material must not enter repository fixtures or logs. Bugs discovered in the Icarus vault must be reduced to small synthetic examples before they are committed.
 
 The KG5 browser File API reads one user-selected report in memory and performs
-no upload. Product-grade folder selection, file watching, and live source access
-remain KG11 responsibilities behind a narrow provider boundary.
+no upload. KG11A desktop mode reads one explicitly selected vault locally
+through a narrow provider, writes only private app-owned identity state outside
+the vault, and keeps its report in memory. Watching and live source updates
+remain KG11B.
 
 ## UI, renderer, and platform roles
 
 React and Vite implement the SPA shell; they are outer-layer delivery choices, not domain dependencies. React Flow is the implemented first structural renderer because the early product emphasizes interactive, hierarchical views. It receives only KG6 projections and uses deterministic Dagre layout. Sigma is conditional and may be added only when benchmark evidence demonstrates a need for a separate high-density global renderer. Graphology may later provide derived runtime indexes and algorithms, but its data structure is not canonical or persisted.
 
-Tauri is deferred until the local-vault workflow milestone. It may provide desktop filesystem capabilities through a narrow source-provider boundary. Tauri commands, paths, events, and handles must not leak into generic core packages. Browser and future platform providers should remain viable.
+Tauri v2 now hosts the existing frontend for KG11A and provides dialog plus
+filesystem capabilities through a narrow source-provider boundary. Tauri
+commands, absolute paths, events, and handles do not leak into generic core
+packages. Browser mode remains viable without loading the desktop-only provider.
 
-React Flow and Dagre are installed only in the KG7 renderer package. Sigma,
-Graphology, and Tauri remain uninstalled.
+React Flow and Dagre are installed only in the KG7 renderer package. Sigma and
+Graphology remain uninstalled. Tauri dependencies are isolated to the desktop
+shell and `source-provider-tauri`.
 
 ## Performance principles
 
 Performance work begins with boundaries and measurement:
 
-- parse one supplied file deterministically now; add file-granular incremental orchestration in KG10;
+- keep KG10 file-granular parsing behind one-shot KG11A acquisition and future KG11B change batches;
 - communicate through serializable snapshots and deltas;
 - introduce workers only after measured UI-thread cost justifies them;
 - project only the graph needed for the active view;

@@ -13,12 +13,15 @@
     "@icarus-graph-explorer/diagnostics-obsidian": "workspace:*",
     "@icarus-graph-explorer/explorer-inspection": "workspace:*",
     "@icarus-graph-explorer/renderer-reactflow": "workspace:*",
+    "@icarus-graph-explorer/source-provider-tauri": "workspace:*",
     "@icarus-graph-explorer/view-state": "workspace:*",
     "@icarus-graph-explorer/view-projection": "workspace:*",
+    "@icarus-graph-explorer/workspace-engine-obsidian": "workspace:*",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@icarus-graph-explorer/stable-identity": "workspace:*",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
     "@vitejs/plugin-react": "6.1.0",

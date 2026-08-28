@@ -1,4 +1,11 @@
-import { useDeferredValue, useMemo, useState, type ChangeEvent } from 'react';
+import {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from 'react';
 
 import {
   createDiagnosticLookups,
@@ -6,6 +13,11 @@ import {
   validateObsidianDiagnosticReport,
   type ObsidianDiagnosticReport,
 } from '@icarus-graph-explorer/diagnostics-obsidian';
+import type {
+  TauriSourceProvider,
+  VaultSelection,
+  WorkspaceIdentityRecovery,
+} from '@icarus-graph-explorer/source-provider-tauri';
 
 import './App.css';
 import { EvidencePanel } from './components/EvidencePanel';
@@ -20,6 +32,8 @@ import {
   type ResolutionFilter,
 } from './report-view';
 import sampleReportJson from './sample-report.json';
+import type { DesktopVaultRuntime, OpenedDesktopVault } from './desktop-vault';
+import { browserStorage, clearWorkspaceView } from './persistence/storage';
 
 const sampleValidation = validateObsidianDiagnosticReport(sampleReportJson);
 if (!sampleValidation.valid) {
@@ -29,12 +43,29 @@ if (!sampleValidation.valid) {
 }
 const SAMPLE_REPORT = sampleValidation.value;
 
-export function App() {
+interface IdentityRecoveryState {
+  readonly selection: VaultSelection;
+  readonly recovery: WorkspaceIdentityRecovery;
+}
+
+export interface AppProps {
+  /** Tests may inject the native provider; ordinary browser mode detects lazily. */
+  readonly desktopSourceProvider?: TauriSourceProvider;
+}
+
+export function App({ desktopSourceProvider }: AppProps = {}) {
   const [report, setReport] = useState<ObsidianDiagnosticReport>(SAMPLE_REPORT);
   const [reportName, setReportName] = useState('Synthetic Sample');
   const [reportRevision, setReportRevision] = useState(0);
   const [graphMaximized, setGraphMaximized] = useState(false);
   const [loadError, setLoadError] = useState<string>();
+  const [sourceStatus, setSourceStatus] = useState<string>();
+  const [identityRecovery, setIdentityRecovery] =
+    useState<IdentityRecoveryState>();
+  const [detectedDesktopProvider, setDetectedDesktopProvider] =
+    useState<TauriSourceProvider>();
+  const desktopRuntimeRef = useRef<DesktopVaultRuntime | undefined>(undefined);
+  const [vaultOpening, setVaultOpening] = useState(false);
   const [statusFilter, setStatusFilter] = useState<ResolutionFilter>('all');
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
@@ -55,6 +86,118 @@ export function App() {
     () => matchingHierarchyDocumentIds(report, lookups, deferredSearch),
     [deferredSearch, lookups, report],
   );
+
+  const desktopProvider = desktopSourceProvider ?? detectedDesktopProvider;
+
+  useEffect(() => {
+    if (desktopSourceProvider !== undefined) return;
+    let active = true;
+    void import('./desktop-runtime')
+      .then(({ desktopSourceProvider: detect }) => {
+        if (active) setDetectedDesktopProvider(detect());
+      })
+      .catch(() => {
+        // Browser mode remains fully functional if the desktop-only chunk is unavailable.
+      });
+    return () => {
+      active = false;
+    };
+  }, [desktopSourceProvider]);
+
+  function activateDesktopVault(opened: OpenedDesktopVault): void {
+    const identitySummary = opened.identityPersisted
+      ? `stable identity (${opened.identityCounts.entitiesReused} entities and ${opened.identityCounts.referencesReused} references reused; ${opened.identityCounts.entitiesNew} entities and ${opened.identityCounts.referencesNew} references new)`
+      : 'transient identity';
+    const timingSummary = `source ${opened.timings.sourceAcquisitionMs} ms, KG10 ${opened.timings.workspaceInitializationMs} ms, report ${opened.timings.diagnosticConstructionMs} ms, identity persistence ${opened.timings.identityPersistenceMs} ms`;
+    let status = `${
+      opened.warning ?? `Opened ${opened.displayName} locally.`
+    } ${opened.report.sourceInventory.markdownFileCount} Markdown documents, ${opened.report.snapshot.entities.length} entities, and ${opened.report.snapshot.references.length} references; ${identitySummary}; ${timingSummary}.`;
+    if (opened.previousWorkspaceId !== undefined) {
+      const storage = browserStorage();
+      if (storage !== undefined) {
+        const cleared = clearWorkspaceView(storage, opened.previousWorkspaceId);
+        if (!cleared.ok) status = `${status} ${cleared.message}`;
+      }
+    }
+    setReport(opened.report);
+    desktopRuntimeRef.current = opened.runtime;
+    setReportName(opened.displayName);
+    setReportRevision((current) => current + 1);
+    setStatusFilter('all');
+    setSearch('');
+    setLoadError(undefined);
+    setSourceStatus(status);
+    setIdentityRecovery(undefined);
+  }
+
+  async function openVault(): Promise<void> {
+    if (desktopProvider === undefined || vaultOpening) return;
+    setVaultOpening(true);
+    let desktopVault: typeof import('./desktop-vault') | undefined;
+    try {
+      desktopVault = await import('./desktop-vault');
+      const result =
+        await desktopVault.selectAndOpenDesktopVault(desktopProvider);
+      if (result.status === 'opened') activateDesktopVault(result);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setLoadError(
+        `Could not open the selected vault: ${message} The current workspace remains loaded.`,
+      );
+      if (
+        desktopVault !== undefined &&
+        error instanceof desktopVault.DesktopVaultOpenError &&
+        error.recovery !== undefined
+      ) {
+        setIdentityRecovery({
+          selection: error.selection,
+          recovery: error.recovery,
+        });
+      } else {
+        setIdentityRecovery(undefined);
+      }
+    } finally {
+      setVaultOpening(false);
+    }
+  }
+
+  async function resetLocalIdentity(): Promise<void> {
+    if (
+      desktopProvider === undefined ||
+      identityRecovery === undefined ||
+      vaultOpening
+    ) {
+      return;
+    }
+    const registryReset =
+      identityRecovery.recovery === 'replace-corrupt-registry';
+    const confirmed = window.confirm(
+      registryReset
+        ? 'Replace the corrupt local workspace registry? Existing catalog files will remain private but their associations may need to be recreated.'
+        : 'Reset local identity for this vault? Stable IDs and its saved graph view continuity will change.',
+    );
+    if (!confirmed) return;
+    setVaultOpening(true);
+    try {
+      const { openSelectedDesktopVault } = await import('./desktop-vault');
+      const opened = await openSelectedDesktopVault(
+        desktopProvider,
+        identityRecovery.selection,
+        {
+          reset: true,
+          ...(registryReset ? { replaceCorruptRegistry: true } : {}),
+        },
+      );
+      activateDesktopVault(opened);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setLoadError(
+        `Could not reset local identity and open the vault: ${message} The current workspace remains loaded.`,
+      );
+    } finally {
+      setVaultOpening(false);
+    }
+  }
 
   async function loadReport(
     event: ChangeEvent<HTMLInputElement>,
@@ -77,6 +220,9 @@ export function App() {
       setStatusFilter('all');
       setSearch('');
       setLoadError(undefined);
+      setSourceStatus(undefined);
+      setIdentityRecovery(undefined);
+      desktopRuntimeRef.current = undefined;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       setLoadError(
@@ -92,6 +238,9 @@ export function App() {
     setStatusFilter('all');
     setSearch('');
     setLoadError(undefined);
+    setSourceStatus(undefined);
+    setIdentityRecovery(undefined);
+    desktopRuntimeRef.current = undefined;
   }
 
   return (
@@ -104,6 +253,16 @@ export function App() {
       <header className="app-bar">
         <h1 translate="no">Icarus Graph Explorer</h1>
         <div className="report-actions" aria-describedby="privacy-note">
+          {desktopProvider === undefined ? null : (
+            <button
+              className="secondary-button"
+              disabled={vaultOpening}
+              onClick={() => void openVault()}
+              type="button"
+            >
+              {vaultOpening ? 'Opening Vault…' : 'Open Vault'}
+            </button>
+          )}
           <label
             className="report-open-button"
             htmlFor="report-file"
@@ -130,12 +289,37 @@ export function App() {
             {reportName}
           </span>
           <span className="visually-hidden" id="privacy-note">
-            The selected JSON stays in this browser tab. Nothing is uploaded.
+            Browser reports stay in this tab. Desktop vaults are read locally.
+            Nothing is uploaded.
           </span>
         </div>
         {loadError === undefined ? null : (
           <p className="report-error" role="alert">
             {loadError}
+          </p>
+        )}
+        {identityRecovery === undefined ? null : (
+          <button
+            className="identity-reset-button"
+            disabled={vaultOpening}
+            onClick={() => void resetLocalIdentity()}
+            type="button"
+          >
+            {identityRecovery.recovery === 'replace-corrupt-registry'
+              ? 'Reset local identity registry'
+              : 'Reset local identity for this vault'}
+          </button>
+        )}
+        {sourceStatus === undefined ? null : (
+          <p
+            className={
+              report.identity?.stability === 'stable'
+                ? 'source-status'
+                : 'source-status source-status--warning'
+            }
+            aria-live="polite"
+          >
+            {sourceStatus}
           </p>
         )}
       </header>

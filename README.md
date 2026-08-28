@@ -2,7 +2,7 @@
 
 Icarus Graph Explorer is an early-stage, hierarchical knowledge-graph explorer for Markdown workspaces. Its intended model treats documents, their nested sections, and optional addressable blocks as distinct entities so references can retain their precise source and target locations.
 
-KG0 established the repository foundation, KG1 added the versioned canonical model, KG2 added deterministic CommonMark document/section structure parsing, KG3 added tested Obsidian syntax interpretation, KG4 added conservative workspace resolution plus validated canonical snapshot assembly, KG5 added a local diagnostic-report workflow, KG6 added renderer-independent disclosure and focus, KG7 added the projection-driven React Flow structural graph, KG8 added source-neutral provenance inspection, backlinks, canonical search, and targeted graph navigation, KG9 completed private app-owned stable identity plus local renderer-independent view restoration, and KG10 added file-granular parsed-document caching with exact stable snapshot deltas. Product vault access remains KG11.
+KG0 established the repository foundation, KG1 added the versioned canonical model, KG2 added deterministic CommonMark document/section structure parsing, KG3 added tested Obsidian syntax interpretation, KG4 added conservative workspace resolution plus validated canonical snapshot assembly, KG5 added a local diagnostic-report workflow, KG6 added renderer-independent disclosure and focus, KG7 added the projection-driven React Flow structural graph, KG8 added source-neutral provenance inspection, backlinks, canonical search, and targeted graph navigation, KG9 completed private app-owned stable identity plus local renderer-independent view restoration, KG10 added file-granular parsed-document caching with exact stable snapshot deltas, and KG11A adds a Tauri desktop shell with secure one-shot local-vault acquisition. Live filesystem updates remain KG11B.
 
 The application is local-first and read-only with respect to Markdown. The initial architecture has no backend, account, cloud upload, telemetry, or source-file write path.
 
@@ -36,6 +36,20 @@ Reports that explicitly declare stable identity also restore disclosure, focus,
 visible graph filters, and a semantic entity-plus-zoom viewport bookmark from
 browser-local storage. Search and selection remain transient. Legacy or
 transient reports stay fully usable without cross-session persistence.
+
+For the KG11A desktop application:
+
+```bash
+pnpm desktop:check
+pnpm desktop:dev
+pnpm desktop:build
+```
+
+The native **Open Vault** action reads one explicitly selected folder locally,
+initializes KG10, and renders the result through the same graph/inspector UI.
+The vault is never modified or uploaded. Native folder authorization lasts for
+the process, so the folder must be selected again after restart; app-local
+identity and the stable saved graph view are then recovered by exact root match.
 
 Generate a private local report with the development-only scanner:
 

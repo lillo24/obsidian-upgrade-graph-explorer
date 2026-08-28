@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { validateObsidianDiagnosticReport } from '@icarus-graph-explorer/diagnostics-obsidian';
+import type { TauriSourceProvider } from '@icarus-graph-explorer/source-provider-tauri';
 
 import { App } from './App';
 import { GraphExplorer } from './components/GraphExplorer';
@@ -16,6 +17,9 @@ const storage = {
   removeItem: () => undefined,
   setItem: () => undefined,
 };
+const desktopProvider = {
+  selectVaultDirectory: async () => undefined,
+} as TauriSourceProvider;
 
 describe('graph-first explorer shell', () => {
   it('bundles a deterministic stable-identity sample for reload persistence QA', () => {
@@ -37,6 +41,7 @@ describe('graph-first explorer shell', () => {
     expect(markup).toContain('Canonical Hierarchy');
     expect(markup).toContain('Compatibility Probes');
     expect(markup).toContain('Nothing is uploaded');
+    expect(markup).not.toContain('Open Vault');
     expect(markup).toContain('Search');
     expect(markup).toContain('Graph Filters');
     expect(markup).toContain('Documents');
@@ -50,6 +55,17 @@ describe('graph-first explorer shell', () => {
     expect(markup).not.toContain('KG9 · Durable Local View');
     expect(markup).not.toContain('<h2>Knowledge Graph</h2>');
     expect(markup).not.toContain('class="app-footer"');
+  });
+
+  it('shows one-shot Open Vault only when a Tauri source provider is available', () => {
+    const markup = renderToStaticMarkup(
+      <App desktopSourceProvider={desktopProvider} />,
+    );
+
+    expect(markup).toContain('Open Vault');
+    expect(markup).toContain('Open Report');
+    expect(markup).toContain('Sample');
+    expect(markup).toContain('Desktop vaults are read locally');
   });
 
   it('starts with the inspector closed and renders the maximized shell without replacing graph controls', () => {

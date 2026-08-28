@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "One-shot selected-vault reads and private app-local identity state for the main window.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "fs:read-dirs",
+    "fs:read-files",
+    "fs:read-meta",
+    "fs:create-app-specific-dirs",
+    "fs:allow-app-read-recursive",
+    "fs:allow-app-write-recursive",
+    "fs:allow-app-meta-recursive"
+  ]
+}
