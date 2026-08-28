@@ -11,6 +11,7 @@ import {
 import type {
   TauriSourceProvider,
   VaultSelection,
+  VaultWatchSubscription,
   WorkspaceIdentitySession,
 } from '@icarus-graph-explorer/source-provider-tauri';
 import {
@@ -49,6 +50,14 @@ class FakeProvider implements TauriSourceProvider {
 
   async discoverSelectedVault() {
     return this.inventory;
+  }
+
+  async watchSelectedVault(): Promise<VaultWatchSubscription> {
+    return { stop: async () => undefined };
+  }
+
+  async reconcileSelectedVaultChanges(): Promise<never> {
+    throw new Error('Live reconciliation is outside this KG11A test fake.');
   }
 
   async loadOrPrepareWorkspaceIdentity(

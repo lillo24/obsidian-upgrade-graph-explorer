@@ -5,6 +5,7 @@ import {
 
 import { createTauriNativeBridge, type TauriNativeBridge } from './bridge';
 import { discoverSelectedVault } from './discovery';
+import { reconcileSelectedVaultChanges } from './reconciliation';
 import {
   catalogPath,
   privateStatePaths,
@@ -22,9 +23,12 @@ import {
   type TauriWorkspaceRegistry,
   type WorkspaceIdentitySession,
 } from './types';
+import { watchSelectedVault } from './watch';
+import type { WatchScheduler } from './watch-burst';
 
 interface ProviderOptions {
   readonly bridge?: TauriNativeBridge;
+  readonly watchScheduler?: WatchScheduler;
   readonly workspaceIdFactory?: () => string;
   readonly temporaryTokenFactory?: () => string;
 }
@@ -64,6 +68,18 @@ export function createTauriSourceProvider(
     selectVaultDirectory: () => selectVaultDirectory(bridge),
     discoverSelectedVault: (selection, discoveryOptions) =>
       discoverSelectedVault(bridge, selection, discoveryOptions),
+    watchSelectedVault: (selection, listener, watchOptions) =>
+      watchSelectedVault(
+        bridge,
+        selection,
+        listener,
+        watchOptions,
+        options.watchScheduler === undefined
+          ? {}
+          : { scheduler: options.watchScheduler },
+      ),
+    reconcileSelectedVaultChanges: (input, discoveryOptions) =>
+      reconcileSelectedVaultChanges(bridge, input, discoveryOptions),
     async loadOrPrepareWorkspaceIdentity(selection, prepareOptions = {}) {
       const normalizedRoot = await normalizedRootPath(
         bridge,

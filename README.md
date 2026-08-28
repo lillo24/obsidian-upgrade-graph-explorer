@@ -2,7 +2,7 @@
 
 Icarus Graph Explorer is an early-stage, hierarchical knowledge-graph explorer for Markdown workspaces. Its intended model treats documents, their nested sections, and optional addressable blocks as distinct entities so references can retain their precise source and target locations.
 
-KG0 established the repository foundation, KG1 added the versioned canonical model, KG2 added deterministic CommonMark document/section structure parsing, KG3 added tested Obsidian syntax interpretation, KG4 added conservative workspace resolution plus validated canonical snapshot assembly, KG5 added a local diagnostic-report workflow, KG6 added renderer-independent disclosure and focus, KG7 added the projection-driven React Flow structural graph, KG8 added source-neutral provenance inspection, backlinks, canonical search, and targeted graph navigation, KG9 completed private app-owned stable identity plus local renderer-independent view restoration, KG10 added file-granular parsed-document caching with exact stable snapshot deltas, and KG11A adds a Tauri desktop shell with secure one-shot local-vault acquisition. Live filesystem updates remain KG11B.
+KG0 established the repository foundation, KG1 added the versioned canonical model, KG2 added deterministic CommonMark document/section structure parsing, KG3 added tested Obsidian syntax interpretation, KG4 added conservative workspace resolution plus validated canonical snapshot assembly, KG5 added a local diagnostic-report workflow, KG6 added renderer-independent disclosure and focus, KG7 added the projection-driven React Flow structural graph, KG8 added source-neutral provenance inspection, backlinks, canonical search, and targeted graph navigation, KG9 completed private app-owned stable identity plus local renderer-independent view restoration, KG10 added file-granular parsed-document caching with exact stable snapshot deltas, KG11A added secure one-shot Tauri vault acquisition, and KG11B1 adds recursive watch acquisition plus deterministic source-change planning. Applying those plans to KG10 and the live UI remains KG11B2.
 
 The application is local-first and read-only with respect to Markdown. The initial architecture has no backend, account, cloud upload, telemetry, or source-file write path.
 
@@ -50,6 +50,8 @@ initializes KG10, and renders the result through the same graph/inspector UI.
 The vault is never modified or uploaded. Native folder authorization lasts for
 the process, so the folder must be selected again after restart; app-local
 identity and the stable saved graph view are then recovered by exact root match.
+The source provider can now watch that selected root and produce read-only
+change plans, but the desktop UI deliberately remains one-shot until KG11B2.
 
 Generate a private local report with the development-only scanner:
 

@@ -123,6 +123,10 @@ class FakeBridge implements TauriNativeBridge {
     };
   }
 
+  async watchDirectory(): Promise<() => void> {
+    return () => undefined;
+  }
+
   async appLocalDataDirectory(): Promise<string> {
     return APP_DATA;
   }
