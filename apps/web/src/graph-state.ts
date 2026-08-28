@@ -52,6 +52,7 @@ export type GraphStateAction =
       readonly enabled: boolean;
     }
   | { readonly type: 'apply-navigation'; readonly state: ViewProjectionState }
+  | { readonly type: 'replace-state'; readonly state: ViewProjectionState }
   | { readonly type: 'reset-view' };
 
 export function initialGraphState(): ViewProjectionState {
@@ -203,6 +204,7 @@ export function graphStateReducer(
           : { ...filters, referenceStatuses };
       });
     case 'apply-navigation':
+    case 'replace-state':
       return action.state;
     case 'reset-view':
       return initialGraphState();

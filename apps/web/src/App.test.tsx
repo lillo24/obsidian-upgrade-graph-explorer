@@ -59,7 +59,7 @@ describe('graph-first explorer shell', () => {
     expect(markup).not.toContain('class="app-footer"');
   });
 
-  it('shows one-shot Open Vault only when a Tauri source provider is available', () => {
+  it('shows live Open Vault only when a Tauri source provider is available', () => {
     const markup = renderToStaticMarkup(
       <App desktopSourceProvider={desktopProvider} />,
     );
@@ -68,6 +68,7 @@ describe('graph-first explorer shell', () => {
     expect(markup).toContain('Open Report');
     expect(markup).toContain('Sample');
     expect(markup).toContain('Desktop vaults are read locally');
+    expect(markup).not.toContain('Rescan Vault');
   });
 
   it('starts with the inspector closed and renders the maximized shell without replacing graph controls', () => {

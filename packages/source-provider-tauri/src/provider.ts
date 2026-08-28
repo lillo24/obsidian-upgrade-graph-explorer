@@ -37,6 +37,7 @@ interface PrivateIdentitySession {
   readonly normalizedRootPath: string;
   readonly paths: PrivateStatePaths;
   readonly registry: TauriWorkspaceRegistry;
+  registered: boolean;
 }
 
 function randomId(): string {
@@ -126,6 +127,7 @@ export function createTauriSourceProvider(
         normalizedRootPath: normalizedRoot,
         paths,
         registry,
+        registered: association === 'existing',
       });
       return session;
     },
@@ -160,7 +162,7 @@ export function createTauriSourceProvider(
         serializeIdentityCatalog(validation.value),
         temporaryTokenFactory(),
       );
-      if (session.association === 'existing') return;
+      if (privateSession.registered) return;
 
       const nextRegistry: TauriWorkspaceRegistry = {
         schemaVersion: 1,
@@ -180,6 +182,7 @@ export function createTauriSourceProvider(
         serializeRegistry(nextRegistry),
         temporaryTokenFactory(),
       );
+      privateSession.registered = true;
     },
   };
 }

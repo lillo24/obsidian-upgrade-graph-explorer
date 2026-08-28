@@ -32,7 +32,12 @@ import {
   type ResolutionFilter,
 } from './report-view';
 import sampleReportJson from './sample-report.json';
-import type { DesktopVaultRuntime, OpenedDesktopVault } from './desktop-vault';
+import type { OpenedDesktopVault } from './desktop-vault';
+import type {
+  DesktopLiveVaultController,
+  DesktopLiveVaultPhase,
+  DesktopLiveVaultSnapshot,
+} from './desktop-live-vault';
 import { browserStorage, clearWorkspaceView } from './persistence/storage';
 
 const sampleValidation = validateObsidianDiagnosticReport(sampleReportJson);
@@ -48,6 +53,23 @@ interface IdentityRecoveryState {
   readonly recovery: WorkspaceIdentityRecovery;
 }
 
+const LIVE_PHASE_LABELS: Record<DesktopLiveVaultPhase, string> = {
+  'catching-up': 'Catching up',
+  live: 'Live',
+  updating: 'Updating',
+  resyncing: 'Resyncing',
+  paused: 'Paused',
+};
+
+function liveSourceStatus(
+  displayName: string,
+  snapshot: DesktopLiveVaultSnapshot,
+): string {
+  const counts = `${snapshot.report.sourceInventory.markdownFileCount} Markdown · ${snapshot.report.snapshot.entities.length} entities`;
+  const recovery = snapshot.phase === 'paused' ? ` · ${snapshot.message}` : '';
+  return `${LIVE_PHASE_LABELS[snapshot.phase]} · ${displayName} · ${counts}${recovery}`;
+}
+
 export interface AppProps {
   /** Tests may inject the native provider; ordinary browser mode detects lazily. */
   readonly desktopSourceProvider?: TauriSourceProvider;
@@ -56,7 +78,7 @@ export interface AppProps {
 export function App({ desktopSourceProvider }: AppProps = {}) {
   const [report, setReport] = useState<ObsidianDiagnosticReport>(SAMPLE_REPORT);
   const [reportName, setReportName] = useState('Synthetic Sample');
-  const [reportRevision, setReportRevision] = useState(0);
+  const [sourceSessionKey, setSourceSessionKey] = useState(0);
   const [graphMaximized, setGraphMaximized] = useState(false);
   const [loadError, setLoadError] = useState<string>();
   const [sourceStatus, setSourceStatus] = useState<string>();
@@ -64,7 +86,12 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     useState<IdentityRecoveryState>();
   const [detectedDesktopProvider, setDetectedDesktopProvider] =
     useState<TauriSourceProvider>();
-  const desktopRuntimeRef = useRef<DesktopVaultRuntime | undefined>(undefined);
+  const liveControllerRef = useRef<DesktopLiveVaultController | undefined>(
+    undefined,
+  );
+  const liveUnsubscribeRef = useRef<(() => void) | undefined>(undefined);
+  const sourceRequestGeneration = useRef(0);
+  const [livePhase, setLivePhase] = useState<DesktopLiveVaultPhase>();
   const [vaultOpening, setVaultOpening] = useState(false);
   const [statusFilter, setStatusFilter] = useState<ResolutionFilter>('all');
   const [search, setSearch] = useState('');
@@ -104,14 +131,42 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     };
   }, [desktopSourceProvider]);
 
-  function activateDesktopVault(opened: OpenedDesktopVault): void {
-    const identitySummary = opened.identityPersisted
-      ? `stable identity (${opened.identityCounts.entitiesReused} entities and ${opened.identityCounts.referencesReused} references reused; ${opened.identityCounts.entitiesNew} entities and ${opened.identityCounts.referencesNew} references new)`
-      : 'transient identity';
-    const timingSummary = `source ${opened.timings.sourceAcquisitionMs} ms, KG10 ${opened.timings.workspaceInitializationMs} ms, report ${opened.timings.diagnosticConstructionMs} ms, identity persistence ${opened.timings.identityPersistenceMs} ms`;
-    let status = `${
-      opened.warning ?? `Opened ${opened.displayName} locally.`
-    } ${opened.report.sourceInventory.markdownFileCount} Markdown documents, ${opened.report.snapshot.entities.length} entities, and ${opened.report.snapshot.references.length} references; ${identitySummary}; ${timingSummary}.`;
+  useEffect(
+    () => () => {
+      sourceRequestGeneration.current += 1;
+      liveUnsubscribeRef.current?.();
+      const controller = liveControllerRef.current;
+      liveControllerRef.current = undefined;
+      if (controller !== undefined)
+        void controller.stop().catch(() => undefined);
+    },
+    [],
+  );
+
+  function stopActiveLiveController(): void {
+    liveUnsubscribeRef.current?.();
+    liveUnsubscribeRef.current = undefined;
+    const controller = liveControllerRef.current;
+    liveControllerRef.current = undefined;
+    if (controller !== undefined) {
+      void controller.stop().catch((error: unknown) => {
+        setLoadError(
+          `The previous live watcher could not be stopped cleanly: ${
+            error instanceof Error ? error.message : String(error)
+          } Stale callbacks remain isolated from the current source.`,
+        );
+      });
+    }
+    setLivePhase(undefined);
+  }
+
+  function activateDesktopVault(
+    opened: OpenedDesktopVault,
+    controller?: DesktopLiveVaultController,
+  ): void {
+    let status =
+      opened.warning ??
+      `Opened ${opened.displayName} locally with ${opened.report.sourceInventory.markdownFileCount} Markdown documents.`;
     if (opened.previousWorkspaceId !== undefined) {
       const storage = browserStorage();
       if (storage !== undefined) {
@@ -119,27 +174,57 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
         if (!cleared.ok) status = `${status} ${cleared.message}`;
       }
     }
-    setReport(opened.report);
-    desktopRuntimeRef.current = opened.runtime;
+    stopActiveLiveController();
     setReportName(opened.displayName);
-    setReportRevision((current) => current + 1);
+    setSourceSessionKey((current) => current + 1);
     setStatusFilter('all');
     setSearch('');
     setLoadError(undefined);
-    setSourceStatus(status);
     setIdentityRecovery(undefined);
+    if (controller === undefined) {
+      setReport(opened.report);
+      setSourceStatus(status);
+      return;
+    }
+
+    liveControllerRef.current = controller;
+    const applySnapshot = (snapshot: DesktopLiveVaultSnapshot) => {
+      if (liveControllerRef.current !== controller) return;
+      setReport((current) =>
+        current === snapshot.report ? current : snapshot.report,
+      );
+      setLivePhase(snapshot.phase);
+      setSourceStatus(liveSourceStatus(opened.displayName, snapshot));
+    };
+    liveUnsubscribeRef.current = controller.subscribe(applySnapshot);
+    applySnapshot(controller.snapshot());
   }
 
   async function openVault(): Promise<void> {
     if (desktopProvider === undefined || vaultOpening) return;
+    const requestGeneration = sourceRequestGeneration.current + 1;
+    sourceRequestGeneration.current = requestGeneration;
     setVaultOpening(true);
     let desktopVault: typeof import('./desktop-vault') | undefined;
     try {
-      desktopVault = await import('./desktop-vault');
-      const result =
-        await desktopVault.selectAndOpenDesktopVault(desktopProvider);
-      if (result.status === 'opened') activateDesktopVault(result);
+      const selection = await desktopProvider.selectVaultDirectory();
+      if (selection === undefined) return;
+      const [desktopVaultModule, liveVaultModule] = await Promise.all([
+        import('./desktop-vault'),
+        import('./desktop-live-vault'),
+      ]);
+      desktopVault = desktopVaultModule;
+      const result = await liveVaultModule.openLiveDesktopVault(
+        desktopProvider,
+        selection,
+      );
+      if (sourceRequestGeneration.current !== requestGeneration) {
+        await result.controller?.stop();
+        return;
+      }
+      activateDesktopVault(result.opened, result.controller);
     } catch (error: unknown) {
+      if (sourceRequestGeneration.current !== requestGeneration) return;
       const message = error instanceof Error ? error.message : String(error);
       setLoadError(
         `Could not open the selected vault: ${message} The current workspace remains loaded.`,
@@ -169,6 +254,8 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     ) {
       return;
     }
+    const requestGeneration = sourceRequestGeneration.current + 1;
+    sourceRequestGeneration.current = requestGeneration;
     const registryReset =
       identityRecovery.recovery === 'replace-corrupt-registry';
     const confirmed = window.confirm(
@@ -179,8 +266,8 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     if (!confirmed) return;
     setVaultOpening(true);
     try {
-      const { openSelectedDesktopVault } = await import('./desktop-vault');
-      const opened = await openSelectedDesktopVault(
+      const { openLiveDesktopVault } = await import('./desktop-live-vault');
+      const result = await openLiveDesktopVault(
         desktopProvider,
         identityRecovery.selection,
         {
@@ -188,8 +275,13 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
           ...(registryReset ? { replaceCorruptRegistry: true } : {}),
         },
       );
-      activateDesktopVault(opened);
+      if (sourceRequestGeneration.current !== requestGeneration) {
+        await result.controller?.stop();
+        return;
+      }
+      activateDesktopVault(result.opened, result.controller);
     } catch (error: unknown) {
+      if (sourceRequestGeneration.current !== requestGeneration) return;
       const message = error instanceof Error ? error.message : String(error);
       setLoadError(
         `Could not reset local identity and open the vault: ${message} The current workspace remains loaded.`,
@@ -205,6 +297,7 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = '';
     if (file === undefined) return;
+    sourceRequestGeneration.current += 1;
     try {
       const parsed: unknown = JSON.parse(await file.text());
       const validation = validateObsidianDiagnosticReport(parsed);
@@ -214,15 +307,15 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
           `${first?.path ?? '$'}: ${first?.message ?? 'Report validation failed.'}`,
         );
       }
+      stopActiveLiveController();
       setReport(validation.value);
       setReportName(file.name);
-      setReportRevision((current) => current + 1);
+      setSourceSessionKey((current) => current + 1);
       setStatusFilter('all');
       setSearch('');
       setLoadError(undefined);
       setSourceStatus(undefined);
       setIdentityRecovery(undefined);
-      desktopRuntimeRef.current = undefined;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       setLoadError(
@@ -232,15 +325,22 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
   }
 
   function restoreSample(): void {
+    sourceRequestGeneration.current += 1;
+    stopActiveLiveController();
     setReport(SAMPLE_REPORT);
     setReportName('Synthetic Sample');
-    setReportRevision((current) => current + 1);
+    setSourceSessionKey((current) => current + 1);
     setStatusFilter('all');
     setSearch('');
     setLoadError(undefined);
     setSourceStatus(undefined);
     setIdentityRecovery(undefined);
-    desktopRuntimeRef.current = undefined;
+  }
+
+  async function rescanVault(): Promise<void> {
+    const controller = liveControllerRef.current;
+    if (controller === undefined) return;
+    await controller.rescan();
   }
 
   return (
@@ -285,6 +385,16 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
           >
             Sample
           </button>
+          {livePhase === undefined ? null : (
+            <button
+              className="secondary-button"
+              disabled={vaultOpening || livePhase === 'resyncing'}
+              onClick={() => void rescanVault()}
+              type="button"
+            >
+              Rescan Vault
+            </button>
+          )}
           <span className="report-name" title={reportName} translate="no">
             {reportName}
           </span>
@@ -310,23 +420,25 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
               : 'Reset local identity for this vault'}
           </button>
         )}
-        {sourceStatus === undefined ? null : (
+        {!vaultOpening && sourceStatus === undefined ? null : (
           <p
             className={
-              report.identity?.stability === 'stable'
+              report.identity?.stability === 'stable' && livePhase !== 'paused'
                 ? 'source-status'
                 : 'source-status source-status--warning'
             }
             aria-live="polite"
           >
-            {sourceStatus}
+            {vaultOpening
+              ? 'Opening · the current workspace remains active'
+              : sourceStatus}
           </p>
         )}
       </header>
 
       <main className="diagnostic-shell" id="main-content">
         <GraphExplorer
-          key={reportRevision}
+          key={sourceSessionKey}
           maximized={graphMaximized}
           onMaximizedChange={setGraphMaximized}
           {...(report.identity === undefined

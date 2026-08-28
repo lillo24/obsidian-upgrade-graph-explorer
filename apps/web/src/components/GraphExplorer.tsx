@@ -18,6 +18,7 @@ import {
 } from '@icarus-graph-explorer/renderer-reactflow';
 import {
   createPersistedWorkspaceView,
+  reconcileCurrentWorkspaceView,
   serializePersistedWorkspaceView,
   type PersistedViewportAnchor,
 } from '@icarus-graph-explorer/view-state';
@@ -115,17 +116,22 @@ export function GraphExplorer({
     }),
   );
   const [viewState, dispatch] = useReducer(graphStateReducer, hydration.state);
+  const currentReconciliation = useMemo(
+    () => reconcileCurrentWorkspaceView(projectionWorkspace, viewState),
+    [projectionWorkspace, viewState],
+  );
+  const activeViewState = currentReconciliation.state;
   const result = useMemo<ProjectionResult>(() => {
     try {
       return {
         ok: true,
-        projection: projectView(projectionWorkspace, viewState),
+        projection: projectView(projectionWorkspace, activeViewState),
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       return { ok: false, message: `Graph projection failed: ${message}` };
     }
-  }, [projectionWorkspace, viewState]);
+  }, [activeViewState, projectionWorkspace]);
   const restoredAnchor =
     result.ok && hydration.viewport !== undefined
       ? result.projection.nodes.find(
@@ -204,6 +210,78 @@ export function GraphExplorer({
       : selectedNode(projection, activeSelection);
   const focusEntity: ProjectedEntityNode | undefined =
     node?.kind === 'entity' ? node : undefined;
+  const previousProjectionWorkspace = useRef(projectionWorkspace);
+
+  useEffect(() => {
+    if (previousProjectionWorkspace.current === projectionWorkspace) return;
+    const reconciled = reconcileCurrentWorkspaceView(
+      projectionWorkspace,
+      viewState,
+      viewportBookmark,
+    );
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      previousProjectionWorkspace.current = projectionWorkspace;
+      if (reconciled.state !== viewState) {
+        dispatch({ type: 'replace-state', state: reconciled.state });
+      }
+      if (viewportBookmark === undefined) return;
+      if (reconciled.viewport === undefined) {
+        setViewportBookmark(undefined);
+        setCenterRequest(undefined);
+        setFitRequestKey((current) => current + 1);
+        setNavigationAnnouncement(
+          'The previous viewport anchor was removed by a live update, so the graph was fitted.',
+        );
+        return;
+      }
+      if (!result.ok) return;
+      const anchor = result.projection.nodes.find(
+        (candidate) =>
+          candidate.kind === 'entity' &&
+          candidate.entityId === reconciled.viewport?.anchorEntityId,
+      );
+      if (anchor === undefined) {
+        setCenterRequest(undefined);
+        setFitRequestKey((current) => current + 1);
+        setNavigationAnnouncement(
+          'The previous viewport anchor is hidden by the current live view, so the graph was fitted.',
+        );
+        return;
+      }
+      setCenterRequest((current) => ({
+        key: (current?.key ?? 0) + 1,
+        nodeId: anchor.id,
+        zoom: reconciled.viewport!.zoom,
+      }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectionWorkspace, result, viewState, viewportBookmark]);
+
+  useEffect(() => {
+    if (
+      previousProjectionWorkspace.current === projectionWorkspace ||
+      selection === null ||
+      projection === undefined ||
+      selectionExists(projection, selection)
+    ) {
+      return;
+    }
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setSelection(null);
+      setNavigationAnnouncement(
+        'The selected graph element was removed by a live update; selection was cleared.',
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [projection, projectionWorkspace, selection]);
 
   useEffect(() => {
     if (!maximized || typeof document === 'undefined') return;
@@ -230,7 +308,7 @@ export function GraphExplorer({
     try {
       const persisted = createPersistedWorkspaceView({
         workspace: projectionWorkspace,
-        state: viewState,
+        state: activeViewState,
         ...(viewportBookmark === undefined
           ? {}
           : { viewport: viewportBookmark }),
@@ -261,7 +339,7 @@ export function GraphExplorer({
     eligibility,
     persistenceStorage,
     projectionWorkspace,
-    viewState,
+    activeViewState,
     viewportBookmark,
   ]);
 
@@ -295,7 +373,7 @@ export function GraphExplorer({
     (entityId: EntityId, origin: string) => {
       const plan = planEntityNavigation(
         projectionWorkspace,
-        viewState,
+        activeViewState,
         entityId,
       );
       if (!plan.ok) {
@@ -312,7 +390,7 @@ export function GraphExplorer({
       setNavigationError(undefined);
       setNavigationAnnouncement(`${origin}: ${plan.announcement}`);
     },
-    [projectionWorkspace, viewState],
+    [activeViewState, projectionWorkspace],
   );
 
   function enterFocus(): void {
@@ -404,14 +482,14 @@ export function GraphExplorer({
         >
           <span>Structure</span>
           <button
-            aria-pressed={viewState.disclosure.defaultDepth === 0}
+            aria-pressed={activeViewState.disclosure.defaultDepth === 0}
             onClick={() => dispatch({ type: 'set-depth', depth: 0 })}
             type="button"
           >
             Documents
           </button>
           <button
-            aria-pressed={viewState.disclosure.defaultDepth === 1}
+            aria-pressed={activeViewState.disclosure.defaultDepth === 1}
             onClick={() => dispatch({ type: 'set-depth', depth: 1 })}
             type="button"
           >
@@ -419,7 +497,7 @@ export function GraphExplorer({
           </button>
           <label className="graph-checkbox">
             <input
-              checked={viewState.disclosure.includeBlocks}
+              checked={activeViewState.disclosure.includeBlocks}
               name="include-blocks"
               onChange={(event) =>
                 dispatch({
@@ -451,7 +529,7 @@ export function GraphExplorer({
                         ) as SectionHeadingLevel),
                 })
               }
-              value={viewState.disclosure.maxSectionLevel ?? ''}
+              value={activeViewState.disclosure.maxSectionLevel ?? ''}
             >
               <option value="">No limit</option>
               {HEADING_LIMIT_OPTIONS.map((level) => (
@@ -467,7 +545,7 @@ export function GraphExplorer({
           aria-label="Focus controls"
           role="group"
         >
-          {viewState.focus === undefined ? (
+          {activeViewState.focus === undefined ? (
             <button
               disabled={focusEntity === undefined}
               onClick={enterFocus}
@@ -491,7 +569,7 @@ export function GraphExplorer({
                   onChange={(event) =>
                     changeHops(Number(event.currentTarget.value) as 1 | 2 | 3)
                   }
-                  value={viewState.focus.hops}
+                  value={activeViewState.focus.hops}
                 >
                   <option value="1">1</option>
                   <option value="2">2</option>
@@ -507,7 +585,7 @@ export function GraphExplorer({
                         'incoming' | 'outgoing' | 'both',
                     )
                   }
-                  value={viewState.focus.direction}
+                  value={activeViewState.focus.direction}
                 >
                   <option value="both">Both</option>
                   <option value="incoming">Incoming</option>
@@ -545,7 +623,7 @@ export function GraphExplorer({
       <GraphFilters
         onAction={applyGraphAction}
         pathScopes={pathScopes}
-        state={viewState}
+        state={activeViewState}
       />
       <p className="visually-hidden" aria-live="polite" aria-atomic="true">
         {persistenceAnnouncement}
@@ -570,9 +648,11 @@ export function GraphExplorer({
         >
           <GraphCanvas
             {...(centerRequest === undefined ? {} : { centerRequest })}
-            expandedEntityIds={viewState.disclosure.expandedEntityIds}
+            expandedEntityIds={activeViewState.disclosure.expandedEntityIds}
             fitRequestKey={fitRequestKey}
-            layoutMode={viewState.focus === undefined ? 'structure' : 'focus'}
+            layoutMode={
+              activeViewState.focus === undefined ? 'structure' : 'focus'
+            }
             maximized={maximized}
             onMaximizedChange={onMaximizedChange}
             onSelectionChange={changeSelection}

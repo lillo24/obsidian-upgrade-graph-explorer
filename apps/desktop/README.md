@@ -1,6 +1,6 @@
 # Desktop Shell
 
-Status: **STABLE — KG11B1 compile, capability, and synthetic watch gates pass.**
+Status: **STABLE — KG11 live update, resync, capability, and controller gates pass.**
 
 This package owns the minimal Tauri v2 process around the existing
 `apps/web` Vite application. Rust registers only the dialog and filesystem
@@ -59,14 +59,19 @@ source provider can perform read-only recursive acquisition and watching. The
 Rust filesystem plugin enables its pinned `watch` feature, and the main
 capability adds only `fs:allow-watch` and `fs:allow-unwatch`; it does not grant
 `$HOME/**`, a drive root, or another blanket vault scope. App-owned
-data directory. At startup the shell resolves that directory through Tauri and
-adds both its logical path and effective canonical path to the runtime
-filesystem scope. The second path is required when a Windows app container
-virtualizes application-local files; both scopes remain restricted to private
-application state, and command permissions remain capability-gated.
+registry/catalog state is restricted to the application-local data directory.
+The capability names that grant those private reads, writes, and metadata
+checks target `$APPLOCALDATA` explicitly. At startup the shell resolves that
+directory through Tauri and adds both its logical path and effective canonical
+path to the runtime filesystem scope. The second path is required when a
+Windows app container virtualizes application-local files; both scopes remain
+restricted to private application state, and command permissions remain
+capability-gated. Keep these scopes aligned with `appLocalDataDir()` if the
+storage root changes.
 
 Dialog-added scope is not durable. Restarting requires the user to select the
 vault again; an exact normalized private registry match then recovers its stable
-workspace identity. KG11B1 provides watch acquisition and source-change plans
-only. The desktop app does not yet apply them to KG10 or the UI; that remains
-KG11B2.
+workspace identity. The web application controller applies coalesced provider
+plans transactionally to KG10, keeps the watcher active through recovery scans,
+and publishes a replacement graph/report only after stable catalog persistence.
+Source files and assets remain read-only; only app-local identity state changes.

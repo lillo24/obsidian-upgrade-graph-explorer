@@ -8,7 +8,10 @@ canonical truth, or own a platform storage implementation.
   compact structural/heading/focus/filter/workspace controls, shared canonical
   navigation, graph selection, transient maximized/Inspector behavior,
   saved-view hydration/alert/reset orchestration, and semantic renderer viewport
-  requests. It keeps the canvas mounted across shell changes and does not
+  requests. Across live snapshots it reconciles current KG6 state before
+  projection, rebuilds inspection/search indexes, preserves surviving selection
+  and semantic viewport context, and safely clears missing selections. It keeps
+  the canvas mounted across shell/live changes and does not
   re-derive graph edges or persist renderer coordinates or shell visibility.
   Maximize/restore is passed to the renderer as a narrow callback so the canvas
   control stack is its only visible trigger.
@@ -28,8 +31,10 @@ canonical truth, or own a platform storage implementation.
 - `ReferencesPanel.tsx` pages filtered references and exposes provenance details.
 - `EvidencePanel.tsx` keeps diagnostics and non-canonical probes visibly separate.
 
-`App.tsx` owns compact report selection, report identity provenance, maximized
-shell state, and transient secondary diagnostic filters. `graph-state.ts` owns
+`App.tsx` owns compact source/live status, source-session switching, report
+identity provenance, maximized shell state, and transient secondary diagnostic
+filters. `desktop-live-vault.ts` owns non-React serialized live transactions,
+pause/recovery, and watcher lifecycle. `graph-state.ts` owns
 pure KG6 interaction transitions, `navigation.ts` owns the verified target-reveal
 plan, and `report-view.ts` owns secondary evidence transformations.
 `../persistence/` owns the localStorage adapter and pre-autosave hydration; the
