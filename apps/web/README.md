@@ -1,12 +1,12 @@
 # Web Structural Graph Explorer
 
-Status: **STABLE — UX3 interaction/heading controls and prior UX gates pass.**
+Status: **STABLE — KG11A source orchestration, UX3 interaction/heading controls, and prior UX/KG gates pass.**
 
-This package owns the browser SPA, validated KG5 report selection, KG6 graph
-interaction state, guarded browser persistence, graph selection, canonical
+This package owns the browser SPA, validated KG5 report selection, Tauri-only
+one-shot vault orchestration, KG6 graph interaction state, guarded browser persistence, graph selection, canonical
 navigation orchestration, and provenance-first inspection UI. It accepts one
 runtime-validated report selected by the user or the committed neutral sample.
-It does not scan folders, upload reports, modify canonical truth, persist
+It does not implement native I/O, upload reports, modify canonical truth, persist
 renderer layouts/raw transforms, or derive renderer semantics.
 
 ```text
@@ -15,6 +15,9 @@ selected report JSON → runtime validation → canonical inspection/search
                                                           → KG7 renderer
                                                      ↘ KG8 inspector/navigation
                                    ↘ secondary KG5 evidence UI
+
+Tauri Open Vault → source-provider inventory + private identity session
+                 → KG10 once → in-memory report → the same graph/UI path
 ```
 
 ## File map
@@ -27,7 +30,9 @@ apps/web/
   tsconfig.json       Strict browser/JSX compilation settings.
   src/
     main.tsx          Root validation and React startup.
-    App.tsx           Compact report bar, maximized-shell state, reset boundary, and secondary evidence UI.
+    App.tsx           Browser/desktop source controls, session state, reset boundary, and evidence UI.
+    desktop-runtime.ts Lazy official Tauri detection and provider creation.
+    desktop-vault.ts Lazy KG10 initialization, report construction, and truthful identity commit orchestration.
     graph-state.ts    Pure disclosure/focus/filter interaction reducer.
     navigation.ts     Shared reveal/filter-widening/navigation planner.
     persistence/      Stable-report eligibility, hydration, and localStorage adapter.
@@ -48,15 +53,20 @@ a complete transient selection/search reset and workspace-specific hydration.
 
 “Load Diagnostic Report” uses the browser File API for one explicitly selected
 JSON file. The report is parsed and validated in browser memory and is never
-uploaded. This is intentionally different from product-grade live vault access:
+uploaded. Desktop mode adds local product acquisition without changing browser mode:
 
 ```text
-KG5  = select one generated report file
-KG11 = product folder access and watching
+KG5   = select one generated report file
+KG11A = selected-folder one-shot acquisition
+KG11B = product watching and live updates
 ```
 
 Malformed schema versions, snapshots, diagnostics, probes, or inventory fields
 produce an actionable inline error while the last valid report remains visible.
+In Tauri runtime, **Open Vault** uses a dynamically imported platform provider;
+cancel is inert, source failures retain the prior report, and successful opens
+reset transient search/selection while stable KG9B state hydrates by workspace.
+The initialized engine and selected provider session remain in memory for KG11B.
 
 ## Graph-first workspace shell
 
@@ -173,4 +183,5 @@ pnpm --filter @icarus-graph-explorer/web typecheck
 pnpm exec vitest run apps/web
 pnpm --filter @icarus-graph-explorer/web build
 pnpm dev
+pnpm desktop:dev
 ```

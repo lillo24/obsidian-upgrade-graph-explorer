@@ -2,7 +2,7 @@
 
 Status: **STABLE — KG10 incremental correctness and the existing private identity lifecycle are tested and real-vault validated.**
 
-This development-only workspace package is the sole KG5 filesystem boundary.
+This development-only workspace package is the Node KG5 filesystem boundary.
 It recursively acquires one explicitly selected local vault, then calls KG3,
 KG4, optional source-neutral stable reconciliation, and the pure diagnostics
 package. It owns the current Node filesystem adapter for private identity
@@ -92,7 +92,8 @@ snapshot and does not expose the private catalog.
 ## Browser boundary
 
 KG5 loads one generated JSON report selected by the user. It does not give the
-browser a directory handle. Product-grade folder access and watching remain KG11.
+browser a directory handle. KG11A now provides product one-shot folder access
+through a separate Tauri provider. Watching and live updates remain KG11B.
 
 ## Performance harness
 

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Icarus Graph Explorer">
+  <rect width="512" height="512" rx="112" fill="#101723"/>
+  <path d="M148 342 256 150l108 192M190 268h132" fill="none" stroke="#f7d36a" stroke-linecap="round" stroke-linejoin="round" stroke-width="36"/>
+  <circle cx="148" cy="342" r="34" fill="#f6f8fb"/>
+  <circle cx="256" cy="150" r="34" fill="#f6f8fb"/>
+  <circle cx="364" cy="342" r="34" fill="#f6f8fb"/>
+</svg>

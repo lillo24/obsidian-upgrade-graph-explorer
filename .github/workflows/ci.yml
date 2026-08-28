@@ -34,3 +34,47 @@ jobs:
 
       - name: Validate repository
         run: pnpm check
+
+  desktop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Install Tauri system prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential \
+            curl \
+            file \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            wget
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+
+      - name: Enable pinned pnpm
+        run: corepack enable
+
+      - name: Install stable Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check desktop shell
+        run: pnpm desktop:check
+
+      - name: Build desktop shell without bundling
+        run: pnpm desktop:build
