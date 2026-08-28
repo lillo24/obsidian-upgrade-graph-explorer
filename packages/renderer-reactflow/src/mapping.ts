@@ -15,8 +15,14 @@ import type {
 
 export const ENTITY_NODE_DIMENSIONS = {
   document: { width: 224, height: 112 },
-  section: { width: 208, height: 104 },
+  section: { width: 200, height: 96 },
   block: { width: 168, height: 80 },
+} as const;
+
+export const ENTITY_TYPE_LABELS = {
+  document: 'File',
+  section: 'Heading',
+  block: 'Block',
 } as const;
 
 export const DIAGNOSTIC_NODE_DIMENSIONS = { width: 208, height: 94 } as const;
@@ -48,13 +54,14 @@ function mapEntityNode(
   visibleDescendantCount: number,
 ): EntityFlowNode {
   const dimensions = ENTITY_NODE_DIMENSIONS[node.entityKind];
+  const typeLabel = ENTITY_TYPE_LABELS[node.entityKind];
   const title = entityTitle(node);
   const isExpanded =
     expandedEntityIds.has(node.entityId) || visibleParentNodeIds.has(node.id);
   const disclosure = node.hasHiddenChildren
     ? `${node.hiddenDescendantCount} hidden descendant${node.hiddenDescendantCount === 1 ? '' : 's'}`
     : 'No hidden descendants';
-  const ariaLabel = `${node.entityKind} ${title}, ${entityDetail(node)}, ${disclosure}`;
+  const ariaLabel = `${typeLabel} ${title}, ${entityDetail(node)}, ${disclosure}`;
   return {
     id: rendererNodeId(node.id),
     type: 'entity',
@@ -73,6 +80,7 @@ function mapEntityNode(
       projectionNodeId: node.id,
       entityId: node.entityId,
       entityKind: node.entityKind,
+      typeLabel,
       title,
       detail: entityDetail(node),
       sourcePath: node.sourcePath,

@@ -10,6 +10,8 @@ canonical truth, or own a platform storage implementation.
   saved-view hydration/alert/reset orchestration, and semantic renderer viewport
   requests. It keeps the canvas mounted across shell changes and does not
   re-derive graph edges or persist renderer coordinates or shell visibility.
+  Maximize/restore is passed to the renderer as a narrow callback so the canvas
+  control stack is its only visible trigger.
 - `EntitySearch.tsx` performs bounded deferred search over the full canonical
   inspection index, independently from visible graph filters.
 - `GraphFilters.tsx` maps practical path, content-kind, and reference-status

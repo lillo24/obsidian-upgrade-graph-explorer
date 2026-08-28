@@ -1,7 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Background,
   BackgroundVariant,
+  ControlButton,
   Controls,
   ReactFlow,
   ReactFlowProvider,
@@ -27,12 +35,74 @@ import type {
   GraphFlowNode,
   GraphSelection,
 } from './types';
+import {
+  captureDisclosureAnchor,
+  GRAPH_MAX_ZOOM,
+  GRAPH_MIN_ZOOM,
+  GRAPH_VIEWPORT_OBSERVATION_DELAY_MS,
+  viewportAfterWheelZoom,
+  viewportForDisclosureAnchor,
+  type DisclosureAnchor,
+} from './viewport-navigation';
+
+const GRAPH_FIT_VIEW_OPTIONS = {
+  duration: 0,
+  padding: 0.14,
+  maxZoom: 1.35,
+} as const;
+
+const GRAPH_WHEEL_IGNORE_SELECTOR =
+  '.react-flow__controls, .nowheel, [data-graph-wheel-ignore], [data-graph-scroll-container]';
+
+function FitGraphIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="graph-control-icon"
+      focusable="false"
+      viewBox="0 0 24 24"
+    >
+      <path d="M8 4H4v4M16 4h4v4M20 16v4h-4M8 20H4v-4" />
+      <circle cx="8.5" cy="12.5" r="1.7" />
+      <circle cx="15.5" cy="9.5" r="1.7" />
+      <path d="m10 12 4-2" />
+    </svg>
+  );
+}
+
+function MaximizeGraphIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="graph-control-icon"
+      focusable="false"
+      viewBox="0 0 24 24"
+    >
+      <path d="M9 4H4v5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
+    </svg>
+  );
+}
+
+function RestoreGraphIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="graph-control-icon"
+      focusable="false"
+      viewBox="0 0 24 24"
+    >
+      <path d="M4 9h5V4M20 9h-5V4M15 20v-5h5M9 20v-5H4" />
+    </svg>
+  );
+}
 
 function GraphCanvasInner({
   centerRequest,
   expandedEntityIds,
   fitRequestKey,
   layoutMode,
+  maximized,
+  onMaximizedChange,
   onSelectionChange,
   onToggleEntity,
   onViewportObservation,
@@ -40,11 +110,18 @@ function GraphCanvasInner({
   selection,
 }: GraphCanvasProps) {
   const [hovered, setHovered] = useState<GraphSelection | null>(null);
-  const { fitView, setCenter } = useReactFlow<GraphFlowNode, GraphFlowEdge>();
+  const { fitView, getViewport, setCenter, setViewport } = useReactFlow<
+    GraphFlowNode,
+    GraphFlowEdge
+  >();
   const previousFitRequest = useRef(fitRequestKey);
   const previousCenterRequest = useRef<number | null>(null);
   const viewportInitialized = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const pendingDisclosureAnchor = useRef<DisclosureAnchor | null>(null);
+  const viewportObservationTimer = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const prepared = useMemo(
     () =>
       prepareRendererGraph(projection, {
@@ -59,12 +136,6 @@ function GraphCanvasInner({
   );
   const nodes = useMemo(() => [...interactive.nodes], [interactive.nodes]);
   const edges = useMemo(() => [...interactive.edges], [interactive.edges]);
-
-  useEffect(() => {
-    if (previousFitRequest.current === fitRequestKey) return;
-    previousFitRequest.current = fitRequestKey;
-    void fitView({ duration: 0, padding: 0.14, maxZoom: 1.35 });
-  }, [fitRequestKey, fitView]);
 
   const applyCenterRequest = useCallback(
     (
@@ -81,7 +152,9 @@ function GraphCanvasInner({
       if (resolved.instruction === null) return;
       const { x, y, zoom } = resolved.instruction;
       const boundedZoom =
-        zoom === undefined ? undefined : Math.min(2, Math.max(0.08, zoom));
+        zoom === undefined
+          ? undefined
+          : Math.min(GRAPH_MAX_ZOOM, Math.max(GRAPH_MIN_ZOOM, zoom));
       void center(x, y, {
         duration: 0,
         ...(boundedZoom === undefined ? {} : { zoom: boundedZoom }),
@@ -192,9 +265,9 @@ function GraphCanvasInner({
     },
     [edges, onSelectionChange],
   );
-  const observeViewport = useCallback<OnMove>(
-    (event, viewport) => {
-      if (event === null || onViewportObservation === undefined) return;
+  const reportViewport = useCallback(
+    (viewport: ReturnType<typeof getViewport>) => {
+      if (onViewportObservation === undefined) return;
       const bounds = containerRef.current?.getBoundingClientRect();
       if (bounds === undefined) return;
       onViewportObservation(
@@ -205,6 +278,98 @@ function GraphCanvasInner({
       );
     },
     [onViewportObservation, prepared],
+  );
+  const scheduleViewportObservation = useCallback(
+    (viewport: ReturnType<typeof getViewport>) => {
+      if (onViewportObservation === undefined) return;
+      if (viewportObservationTimer.current !== null) {
+        clearTimeout(viewportObservationTimer.current);
+      }
+      viewportObservationTimer.current = setTimeout(() => {
+        viewportObservationTimer.current = null;
+        reportViewport(viewport);
+      }, GRAPH_VIEWPORT_OBSERVATION_DELAY_MS);
+    },
+    [onViewportObservation, reportViewport],
+  );
+  const fitGraph = useCallback(async () => {
+    await fitView(GRAPH_FIT_VIEW_OPTIONS);
+    reportViewport(getViewport());
+  }, [fitView, getViewport, reportViewport]);
+
+  useEffect(() => {
+    if (previousFitRequest.current === fitRequestKey) return;
+    previousFitRequest.current = fitRequestKey;
+    void fitGraph();
+  }, [fitGraph, fitRequestKey]);
+
+  useEffect(
+    () => () => {
+      if (viewportObservationTimer.current !== null) {
+        clearTimeout(viewportObservationTimer.current);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container === null) return;
+    const handleWheel = (event: WheelEvent): void => {
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest(GRAPH_WHEEL_IGNORE_SELECTOR) !== null
+      ) {
+        return;
+      }
+      const bounds = container.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0) return;
+      event.preventDefault();
+      const nextViewport = viewportAfterWheelZoom(getViewport(), {
+        deltaY: event.deltaY,
+        deltaMode: event.deltaMode,
+        ctrlKey: event.ctrlKey,
+        pointer: {
+          x: event.clientX - bounds.left,
+          y: event.clientY - bounds.top,
+        },
+      });
+      void setViewport(nextViewport, { duration: 0 });
+      scheduleViewportObservation(nextViewport);
+    };
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, [getViewport, scheduleViewportObservation, setViewport]);
+
+  const toggleEntityAnchored = useCallback(
+    (entityId: string, currentlyOpen: boolean) => {
+      pendingDisclosureAnchor.current = captureDisclosureAnchor(
+        prepared,
+        entityId,
+        getViewport(),
+      );
+      onToggleEntity(entityId, currentlyOpen);
+    },
+    [getViewport, onToggleEntity, prepared],
+  );
+
+  useLayoutEffect(() => {
+    const anchor = pendingDisclosureAnchor.current;
+    if (anchor === null) return;
+    pendingDisclosureAnchor.current = null;
+    const nextViewport = viewportForDisclosureAnchor(prepared, anchor);
+    if (nextViewport === null) return;
+    void setViewport(nextViewport, { duration: 0 });
+    reportViewport(nextViewport);
+  }, [prepared, reportViewport, setViewport]);
+
+  const observeViewport = useCallback<OnMove>(
+    (event, viewport) => {
+      if (event === null) return;
+      reportViewport(viewport);
+    },
+    [reportViewport],
   );
 
   if (projection.nodes.length === 0) {
@@ -228,7 +393,7 @@ function GraphCanvasInner({
           {prepared.layoutWarning}
         </p>
       )}
-      <EntityDisclosureProvider onToggleEntity={onToggleEntity}>
+      <EntityDisclosureProvider onToggleEntity={toggleEntityAnchored}>
         <ReactFlow<GraphFlowNode, GraphFlowEdge>
           aria-label="Interactive projected knowledge graph"
           colorMode="light"
@@ -239,8 +404,9 @@ function GraphCanvasInner({
           edgesReconnectable={false}
           elementsSelectable
           fitView={centerRequest === undefined}
-          fitViewOptions={{ duration: 0, padding: 0.14, maxZoom: 1.35 }}
-          minZoom={0.08}
+          fitViewOptions={GRAPH_FIT_VIEW_OPTIONS}
+          maxZoom={GRAPH_MAX_ZOOM}
+          minZoom={GRAPH_MIN_ZOOM}
           nodeTypes={GRAPH_NODE_TYPES}
           nodes={nodes}
           nodesConnectable={false}
@@ -262,6 +428,8 @@ function GraphCanvasInner({
           proOptions={{ hideAttribution: false }}
           selectionOnDrag={false}
           zoomOnDoubleClick={false}
+          zoomOnPinch
+          zoomOnScroll={false}
         >
           <Background
             color="#cbd5da"
@@ -270,9 +438,36 @@ function GraphCanvasInner({
           />
           <Controls
             aria-label="Graph viewport controls"
-            fitViewOptions={{ duration: 0, padding: 0.14, maxZoom: 1.35 }}
+            fitViewOptions={GRAPH_FIT_VIEW_OPTIONS}
+            showFitView={false}
             showInteractive={false}
-          />
+          >
+            <ControlButton
+              aria-label="Fit graph to view"
+              className="graph-control-button--fit"
+              onClick={() => void fitGraph()}
+              title="Fit graph to view"
+            >
+              <FitGraphIcon />
+            </ControlButton>
+            {onMaximizedChange === undefined ? null : (
+              <ControlButton
+                aria-label={
+                  maximized === true ? 'Restore graph' : 'Maximize graph'
+                }
+                aria-pressed={maximized === true}
+                className="graph-control-button--maximize"
+                onClick={() => onMaximizedChange(maximized !== true)}
+                title={maximized === true ? 'Restore graph' : 'Maximize graph'}
+              >
+                {maximized === true ? (
+                  <RestoreGraphIcon />
+                ) : (
+                  <MaximizeGraphIcon />
+                )}
+              </ControlButton>
+            )}
+          </Controls>
         </ReactFlow>
       </EntityDisclosureProvider>
     </div>

@@ -12,6 +12,7 @@ export { layoutRendererGraph } from './layout';
 export {
   DIAGNOSTIC_NODE_DIMENSIONS,
   ENTITY_NODE_DIMENSIONS,
+  ENTITY_TYPE_LABELS,
   mapProjectionToReactFlow,
 } from './mapping';
 export { prepareRendererGraph } from './prepare';
@@ -20,6 +21,17 @@ export type {
   RendererViewport,
   ViewportContainerSize,
 } from './semantic-viewport';
+export {
+  captureDisclosureAnchor,
+  GRAPH_MAX_ZOOM,
+  GRAPH_MIN_ZOOM,
+  GRAPH_VIEWPORT_OBSERVATION_DELAY_MS,
+  GRAPH_ZOOM_SENSITIVITY,
+  normalizedWheelZoomDelta,
+  viewportAfterWheelZoom,
+  viewportForDisclosureAnchor,
+} from './viewport-navigation';
+export type { DisclosureAnchor, WheelZoomInput } from './viewport-navigation';
 export type {
   DiagnosticFlowNode,
   DiagnosticNodeData,

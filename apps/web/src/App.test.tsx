@@ -47,7 +47,9 @@ describe('graph-first explorer shell', () => {
     expect(markup).toContain('Documents');
     expect(markup).toContain('Focus Selected');
     expect(markup).toContain('Inspector');
-    expect(markup).toContain('Maximize Graph');
+    expect(markup).toContain('aria-label="Fit graph to view"');
+    expect(markup).toContain('aria-label="Maximize graph"');
+    expect(markup).not.toContain('>Maximize Graph</button>');
     expect(markup).toContain(
       '<details class="diagnostic-evidence"><summary>Inspect diagnostic evidence</summary>',
     );
@@ -96,11 +98,16 @@ describe('graph-first explorer shell', () => {
     expect(normalMarkup).toContain('<option value="1">#</option>');
     expect(normalMarkup).not.toContain('Provenance Inspector');
     expect(normalMarkup).not.toContain('graph-stage--inspector-open');
+    expect(normalMarkup).toContain('aria-label="Fit graph to view"');
+    expect(normalMarkup).toContain(
+      'aria-label="Maximize graph" aria-pressed="false"',
+    );
+    expect(normalMarkup).not.toContain('react-flow__controls-fitview');
     expect(maximizedMarkup).toContain(
       'graph-workspace graph-workspace--maximized',
     );
     expect(maximizedMarkup).toContain(
-      'aria-pressed="true" type="button">Exit Maximize</button>',
+      'aria-label="Restore graph" aria-pressed="true"',
     );
     expect(maximizedMarkup).toContain('Graph Filters');
     expect(maximizedMarkup).toContain('Focus Selected');

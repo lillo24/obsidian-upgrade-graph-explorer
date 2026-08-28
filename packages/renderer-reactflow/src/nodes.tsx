@@ -52,7 +52,7 @@ function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
     >
       <NodeHandles />
       <div className="entity-card__topline">
-        <span className="entity-kind">{data.entityKind}</span>
+        <span className="entity-kind">{data.typeLabel}</span>
         {focusLabel === null ? null : (
           <span className="focus-distance">{focusLabel}</span>
         )}

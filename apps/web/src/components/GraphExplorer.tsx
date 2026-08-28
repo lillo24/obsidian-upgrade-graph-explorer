@@ -539,13 +539,6 @@ export function GraphExplorer({
           >
             Inspector
           </button>
-          <button
-            aria-pressed={maximized}
-            onClick={() => onMaximizedChange(!maximized)}
-            type="button"
-          >
-            {maximized ? 'Exit Maximize' : 'Maximize Graph'}
-          </button>
         </div>
       </div>
 
@@ -580,6 +573,8 @@ export function GraphExplorer({
             expandedEntityIds={viewState.disclosure.expandedEntityIds}
             fitRequestKey={fitRequestKey}
             layoutMode={viewState.focus === undefined ? 'structure' : 'focus'}
+            maximized={maximized}
+            onMaximizedChange={onMaximizedChange}
             onSelectionChange={changeSelection}
             onToggleEntity={toggleEntity}
             onViewportObservation={observeViewport}
