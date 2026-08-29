@@ -28,6 +28,7 @@ export {
   GRAPH_VIEWPORT_OBSERVATION_DELAY_MS,
   GRAPH_ZOOM_SENSITIVITY,
   normalizedWheelZoomDelta,
+  wheelActionForMode,
   viewportAfterWheelZoom,
   viewportForDisclosureAnchor,
 } from './viewport-navigation';
@@ -48,4 +49,5 @@ export type {
   LayoutEngine,
   PrepareRendererGraphOptions,
   RendererGraph,
+  TrackpadZoomMode,
 } from './types';

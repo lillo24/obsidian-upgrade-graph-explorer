@@ -51,6 +51,12 @@ opens it in a native window. `desktop:build` performs a release build without
 an installer/bundle; signing, packaging, updater, and release automation are
 outside KG11A. Ordinary `pnpm dev` remains browser-only.
 
+The main window enables Tauri's `zoomHotkeysEnabled` input path because Wry
+otherwise disables WebView2 precision-touchpad pinch before the graph can
+receive its ctrl-modified wheel signal. The graph's non-passive wheel handler
+still owns that gesture and prevents WebView page zoom while applying focal
+canvas zoom. Keep this window setting aligned with the renderer gesture model.
+
 ## Security boundary
 
 The main window can open a native directory dialog. Tauri adds the selected

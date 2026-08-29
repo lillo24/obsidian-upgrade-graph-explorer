@@ -61,11 +61,16 @@ ordinary disclosure does not aggressively reset the user's viewport. Motion
 durations are zero and CSS honors reduced-motion preferences.
 
 UX4A replaces React Flow's scroll zoom with a non-passive, renderer-local wheel
-handler. Its D3-compatible delta normalization uses the named sensitivity
-constant `GRAPH_ZOOM_SENSITIVITY = 1.8`, clamps to the shared `0.08`–`2` zoom
-bounds, and preserves the graph point beneath the mouse or precision-touchpad
-focal point. React Flow pinch handling remains enabled. Native wheel events over
-the viewport controls or an explicitly marked scroll region are not captured.
+handler. UX4B makes its ownership explicit through `TrackpadZoomMode`: the
+default `scroll-zoom` mode captures ordinary and Ctrl-wheel input for focal
+zoom, while `pinch-zoom` captures only Ctrl-wheel pinch zoom and delegates
+ordinary two-finger movement to React Flow's public pan-on-scroll path. The
+capture-phase handoff prevents React Flow and the custom handler from applying
+the same gesture twice. D3-compatible delta normalization uses the named
+sensitivity constant `GRAPH_ZOOM_SENSITIVITY = 1.8`, clamps to the shared
+`0.08`–`2` zoom bounds, and preserves the graph point beneath the mouse or
+precision-touchpad focal point. Native wheel events over the viewport controls
+or an explicitly marked scroll region are not captured.
 Wheel-driven semantic viewport persistence is debounced to one observation 120
 ms after the final tick; raw transforms and high-frequency frames still do not
 cross the renderer boundary.

@@ -15,6 +15,7 @@ import {
   type GraphCenterRequest,
   type GraphSelection,
   type GraphViewportObservation,
+  type TrackpadZoomMode,
 } from '@icarus-graph-explorer/renderer-reactflow';
 import {
   createPersistedWorkspaceView,
@@ -47,8 +48,13 @@ import {
   saveWorkspaceView,
   type StorageLike,
 } from '../persistence/storage';
+import {
+  loadGraphPreferences,
+  saveGraphPreferences,
+} from '../preferences/graph-preferences';
 import { EntitySearch } from './EntitySearch';
 import { GraphFilters } from './GraphFilters';
+import { GraphSettings } from './GraphSettings';
 import { activateMaximizedGraphMode } from './maximized-graph-mode';
 import { ProvenanceInspector } from './ProvenanceInspector';
 
@@ -63,6 +69,7 @@ interface ProjectionFailure {
 }
 
 type ProjectionResult = ProjectionSuccess | ProjectionFailure;
+type WorkspaceOverlay = 'settings' | 'tools' | null;
 
 const HEADING_LIMIT_OPTIONS = [
   1, 2, 3, 4, 5, 6,
@@ -87,6 +94,37 @@ function selectionExists(
     : projection.edges.some((edge) => edge.id === selection.id);
 }
 
+function ToolsIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="graph-shell-icon"
+      focusable="false"
+      viewBox="0 0 24 24"
+    >
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  );
+}
+
+function ProjectionIssues({
+  projection,
+}: {
+  readonly projection: ViewProjection | undefined;
+}) {
+  if (projection === undefined || projection.issues.length === 0) return null;
+  return (
+    <details className="projection-issues">
+      <summary>{projection.issues.length} Projection Issues</summary>
+      <ul>
+        {projection.issues.map((issue) => (
+          <li key={`${issue.code}:${issue.subject}`}>{issue.message}</li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 export function GraphExplorer({
   identityStability,
   maximized,
@@ -107,6 +145,16 @@ export function GraphExplorer({
   const [persistenceStorage] = useState(() =>
     storage === null ? undefined : (storage ?? browserStorage()),
   );
+  const [preferenceLoad] = useState(() =>
+    loadGraphPreferences(persistenceStorage),
+  );
+  const [trackpadZoomMode, setTrackpadZoomMode] = useState<TrackpadZoomMode>(
+    preferenceLoad.preferences.trackpadZoomMode,
+  );
+  const [preferenceWarning, setPreferenceWarning] = useState<
+    string | undefined
+  >(preferenceLoad.warning ?? undefined);
+  const [activeOverlay, setActiveOverlay] = useState<WorkspaceOverlay>(null);
   const eligibility = persistenceEligibility(identityStability);
   const [hydration] = useState(() =>
     hydrateGraphView({
@@ -293,7 +341,10 @@ export function GraphExplorer({
         removeKeydownListener: (listener) =>
           window.removeEventListener('keydown', listener),
       },
-      () => onMaximizedChange(false),
+      () => {
+        setActiveOverlay(null);
+        onMaximizedChange(false);
+      },
     );
   }, [maximized, onMaximizedChange]);
 
@@ -369,6 +420,37 @@ export function GraphExplorer({
       ),
     [],
   );
+  const changeMaximized = useCallback(
+    (nextMaximized: boolean) => {
+      setActiveOverlay(null);
+      onMaximizedChange(nextMaximized);
+    },
+    [onMaximizedChange],
+  );
+  const changeTrackpadZoomMode = useCallback(
+    (mode: TrackpadZoomMode) => {
+      setTrackpadZoomMode(mode);
+      const saved = saveGraphPreferences(persistenceStorage, {
+        trackpadZoomMode: mode,
+      });
+      setPreferenceWarning(saved.ok ? undefined : saved.message);
+    },
+    [persistenceStorage],
+  );
+  const changeSettingsOpen = useCallback(
+    (open: boolean) => setActiveOverlay(open ? 'settings' : null),
+    [],
+  );
+  const toggleTools = useCallback(
+    () => setActiveOverlay((current) => (current === 'tools' ? null : 'tools')),
+    [],
+  );
+  const closeTools = useCallback(() => setActiveOverlay(null), []);
+  const toggleInspector = useCallback(
+    () => setInspectorOpen((current) => !current),
+    [],
+  );
+  const closeInspector = useCallback(() => setInspectorOpen(false), []);
   const navigateToEntity = useCallback(
     (entityId: EntityId, origin: string) => {
       const plan = planEntityNavigation(
@@ -468,183 +550,248 @@ export function GraphExplorer({
       className={`graph-workspace${maximized ? ' graph-workspace--maximized' : ''}`}
       aria-label="Knowledge graph workspace"
     >
-      <EntitySearch
-        key={transientResetKey}
-        onNavigate={navigateToEntity}
-        workspace={inspectionWorkspace}
-      />
+      {maximized ? (
+        <div
+          aria-label="Canvas tools"
+          className="graph-floating-controls"
+          role="group"
+        >
+          <button
+            aria-controls="graph-tools-panel"
+            aria-expanded={activeOverlay === 'tools'}
+            className="graph-tools-trigger"
+            onClick={toggleTools}
+            type="button"
+          >
+            <ToolsIcon />
+            <span>Tools</span>
+          </button>
+          <GraphSettings
+            onOpenChange={changeSettingsOpen}
+            onTrackpadZoomModeChange={changeTrackpadZoomMode}
+            open={activeOverlay === 'settings'}
+            trackpadZoomMode={trackpadZoomMode}
+            {...(preferenceWarning === undefined
+              ? {}
+              : { warning: preferenceWarning })}
+          />
+        </div>
+      ) : null}
 
-      <div className="graph-toolbar" aria-label="Graph view controls">
-        <div
-          className="control-group"
-          aria-label="Structural depth"
-          role="group"
-        >
-          <span>Structure</span>
-          <button
-            aria-pressed={activeViewState.disclosure.defaultDepth === 0}
-            onClick={() => dispatch({ type: 'set-depth', depth: 0 })}
-            type="button"
-          >
-            Documents
+      <div
+        className="graph-tools-surface"
+        hidden={maximized && activeOverlay !== 'tools'}
+        id="graph-tools-panel"
+      >
+        <div className="graph-tools-panel__heading">
+          <h2>Tools</h2>
+          <button onClick={closeTools} type="button">
+            Close Tools
           </button>
-          <button
-            aria-pressed={activeViewState.disclosure.defaultDepth === 1}
-            onClick={() => dispatch({ type: 'set-depth', depth: 1 })}
-            type="button"
-          >
-            Top-Level
-          </button>
-          <label className="graph-checkbox">
-            <input
-              checked={activeViewState.disclosure.includeBlocks}
-              name="include-blocks"
-              onChange={(event) =>
-                dispatch({
-                  type: 'set-include-blocks',
-                  includeBlocks: event.currentTarget.checked,
-                })
-              }
-              type="checkbox"
-            />
-            Blocks
-          </label>
-          <label
-            className="heading-limit-control"
-            title="Limits sections by their Markdown heading level. This is different from Top-Level, which means direct structural sections."
-          >
-            Headings
-            <select
-              aria-label="Heading limit"
-              autoComplete="off"
-              name="heading-limit"
-              onChange={(event) =>
-                dispatch({
-                  type: 'set-heading-limit',
-                  maxSectionLevel:
-                    event.currentTarget.value === ''
-                      ? null
-                      : (Number(
-                          event.currentTarget.value,
-                        ) as SectionHeadingLevel),
-                })
-              }
-              value={activeViewState.disclosure.maxSectionLevel ?? ''}
-            >
-              <option value="">No limit</option>
-              {HEADING_LIMIT_OPTIONS.map((level) => (
-                <option key={level} value={level}>
-                  {'#'.repeat(level)}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
-        <div
-          className="control-group control-group--focus"
-          aria-label="Focus controls"
-          role="group"
-        >
-          {activeViewState.focus === undefined ? (
-            <button
-              disabled={focusEntity === undefined}
-              onClick={enterFocus}
-              title={
-                focusEntity === undefined
-                  ? 'Select an entity node to focus it.'
-                  : 'Show its local reference neighborhood.'
-              }
-              type="button"
+        <div className="graph-tools-panel__body" data-graph-scroll-container>
+          <EntitySearch
+            key={transientResetKey}
+            onNavigate={navigateToEntity}
+            workspace={inspectionWorkspace}
+          />
+
+          <div className="graph-toolbar" aria-label="Graph view controls">
+            <div
+              className="control-group"
+              aria-label="Structural depth"
+              role="group"
             >
-              Focus Selected
-            </button>
-          ) : (
-            <>
-              <button onClick={exitFocus} type="button">
-                Exit Focus
+              <span>Structure</span>
+              <button
+                aria-pressed={activeViewState.disclosure.defaultDepth === 0}
+                onClick={() => dispatch({ type: 'set-depth', depth: 0 })}
+                type="button"
+              >
+                Documents
               </button>
-              <label>
-                Hops
-                <select
+              <button
+                aria-pressed={activeViewState.disclosure.defaultDepth === 1}
+                onClick={() => dispatch({ type: 'set-depth', depth: 1 })}
+                type="button"
+              >
+                Top-Level
+              </button>
+              <label className="graph-checkbox">
+                <input
+                  checked={activeViewState.disclosure.includeBlocks}
+                  name="include-blocks"
                   onChange={(event) =>
-                    changeHops(Number(event.currentTarget.value) as 1 | 2 | 3)
+                    dispatch({
+                      type: 'set-include-blocks',
+                      includeBlocks: event.currentTarget.checked,
+                    })
                   }
-                  value={activeViewState.focus.hops}
+                  type="checkbox"
+                />
+                Blocks
+              </label>
+              <label
+                className="heading-limit-control"
+                title="Limits sections by their Markdown heading level. This is different from Top-Level, which means direct structural sections."
+              >
+                Headings
+                <select
+                  aria-label="Heading limit"
+                  autoComplete="off"
+                  name="heading-limit"
+                  onChange={(event) =>
+                    dispatch({
+                      type: 'set-heading-limit',
+                      maxSectionLevel:
+                        event.currentTarget.value === ''
+                          ? null
+                          : (Number(
+                              event.currentTarget.value,
+                            ) as SectionHeadingLevel),
+                    })
+                  }
+                  value={activeViewState.disclosure.maxSectionLevel ?? ''}
                 >
-                  <option value="1">1</option>
-                  <option value="2">2</option>
-                  <option value="3">3</option>
+                  <option value="">No limit</option>
+                  {HEADING_LIMIT_OPTIONS.map((level) => (
+                    <option key={level} value={level}>
+                      {'#'.repeat(level)}
+                    </option>
+                  ))}
                 </select>
               </label>
-              <label>
-                Direction
-                <select
-                  onChange={(event) =>
-                    changeDirection(
-                      event.currentTarget.value as
-                        'incoming' | 'outgoing' | 'both',
-                    )
+            </div>
+            <div
+              className="control-group control-group--focus"
+              aria-label="Focus controls"
+              role="group"
+            >
+              {activeViewState.focus === undefined ? (
+                <button
+                  disabled={focusEntity === undefined}
+                  onClick={enterFocus}
+                  title={
+                    focusEntity === undefined
+                      ? 'Select an entity node to focus it.'
+                      : 'Show its local reference neighborhood.'
                   }
-                  value={activeViewState.focus.direction}
+                  type="button"
                 >
-                  <option value="both">Both</option>
-                  <option value="incoming">Incoming</option>
-                  <option value="outgoing">Outgoing</option>
-                </select>
-              </label>
-            </>
-          )}
-        </div>
-        <div
-          className="control-group control-group--workspace"
-          aria-label="Workspace controls"
-          role="group"
-        >
-          {projection === undefined ? null : (
-            <span className="graph-counts" aria-live="polite">
-              {projection.nodes.length} nodes · {projection.edges.length} edges
-            </span>
-          )}
-          {eligibility === 'stable' ? (
-            <button onClick={resetSavedView} type="button">
-              Reset saved view
-            </button>
-          ) : null}
-          <button
-            aria-pressed={inspectorOpen}
-            onClick={() => setInspectorOpen((current) => !current)}
-            type="button"
-          >
-            Inspector
-          </button>
+                  Focus Selected
+                </button>
+              ) : (
+                <>
+                  <button onClick={exitFocus} type="button">
+                    Exit Focus
+                  </button>
+                  <label>
+                    Hops
+                    <select
+                      onChange={(event) =>
+                        changeHops(
+                          Number(event.currentTarget.value) as 1 | 2 | 3,
+                        )
+                      }
+                      value={activeViewState.focus.hops}
+                    >
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                    </select>
+                  </label>
+                  <label>
+                    Direction
+                    <select
+                      onChange={(event) =>
+                        changeDirection(
+                          event.currentTarget.value as
+                            'incoming' | 'outgoing' | 'both',
+                        )
+                      }
+                      value={activeViewState.focus.direction}
+                    >
+                      <option value="both">Both</option>
+                      <option value="incoming">Incoming</option>
+                      <option value="outgoing">Outgoing</option>
+                    </select>
+                  </label>
+                </>
+              )}
+            </div>
+            <div
+              className="control-group control-group--workspace"
+              aria-label="Workspace controls"
+              role="group"
+            >
+              {projection === undefined ? null : (
+                <span className="graph-counts" aria-live="polite">
+                  {projection.nodes.length} nodes · {projection.edges.length}{' '}
+                  edges
+                </span>
+              )}
+              {eligibility === 'stable' ? (
+                <button onClick={resetSavedView} type="button">
+                  Reset saved view
+                </button>
+              ) : null}
+              {maximized ? null : (
+                <GraphSettings
+                  onOpenChange={changeSettingsOpen}
+                  onTrackpadZoomModeChange={changeTrackpadZoomMode}
+                  open={activeOverlay === 'settings'}
+                  trackpadZoomMode={trackpadZoomMode}
+                  {...(preferenceWarning === undefined
+                    ? {}
+                    : { warning: preferenceWarning })}
+                />
+              )}
+              <button
+                aria-pressed={inspectorOpen}
+                onClick={toggleInspector}
+                type="button"
+              >
+                Inspector
+              </button>
+            </div>
+          </div>
+
+          <GraphFilters
+            onAction={applyGraphAction}
+            pathScopes={pathScopes}
+            state={activeViewState}
+          />
+          {maximized ? <ProjectionIssues projection={projection} /> : null}
         </div>
       </div>
-
-      <GraphFilters
-        onAction={applyGraphAction}
-        pathScopes={pathScopes}
-        state={activeViewState}
-      />
       <p className="visually-hidden" aria-live="polite" aria-atomic="true">
         {persistenceAnnouncement}
       </p>
       <p className="visually-hidden" aria-live="polite" aria-atomic="true">
         {navigationAnnouncement}
       </p>
-      {persistenceError === undefined ? null : (
-        <p className="graph-alert" role="alert">
-          {persistenceError}
-        </p>
-      )}
-      {navigationError === undefined ? null : (
-        <p className="graph-alert" role="alert">
-          {navigationError}
-        </p>
-      )}
+      <div className="graph-alert-stack">
+        {persistenceError === undefined ? null : (
+          <p className="graph-alert" role="alert">
+            {persistenceError}
+          </p>
+        )}
+        {navigationError === undefined ? null : (
+          <p className="graph-alert" role="alert">
+            {navigationError}
+          </p>
+        )}
+      </div>
 
       {result.ok ? (
         <div
-          className={`graph-stage${inspectorOpen ? ' graph-stage--inspector-open' : ''}`}
+          className={`graph-stage${
+            inspectorOpen
+              ? maximized
+                ? ' graph-stage--inspector-drawer-open'
+                : ' graph-stage--inspector-open'
+              : ''
+          }`}
         >
           <GraphCanvas
             {...(centerRequest === undefined ? {} : { centerRequest })}
@@ -654,13 +801,25 @@ export function GraphExplorer({
               activeViewState.focus === undefined ? 'structure' : 'focus'
             }
             maximized={maximized}
-            onMaximizedChange={onMaximizedChange}
+            onMaximizedChange={changeMaximized}
             onSelectionChange={changeSelection}
             onToggleEntity={toggleEntity}
             onViewportObservation={observeViewport}
             projection={result.projection}
             selection={activeSelection}
+            trackpadZoomMode={trackpadZoomMode}
           />
+          {maximized && !inspectorOpen ? (
+            <button
+              aria-label="Open Inspector"
+              className="graph-inspector-handle"
+              onClick={toggleInspector}
+              type="button"
+            >
+              <span aria-hidden="true">‹</span>
+              <span>Open Inspector</span>
+            </button>
+          ) : null}
           {inspectorOpen ? (
             <ProvenanceInspector
               key={
@@ -669,6 +828,7 @@ export function GraphExplorer({
                   : `${activeSelection.kind}:${activeSelection.id}`
               }
               onClear={clearSelection}
+              {...(maximized ? { onClose: closeInspector } : {})}
               onNavigate={navigateToEntity}
               projection={result.projection}
               selection={activeSelection}
@@ -681,16 +841,7 @@ export function GraphExplorer({
           {result.message}
         </p>
       )}
-      {projection === undefined || projection.issues.length === 0 ? null : (
-        <details className="projection-issues">
-          <summary>{projection.issues.length} Projection Issues</summary>
-          <ul>
-            {projection.issues.map((issue) => (
-              <li key={`${issue.code}:${issue.subject}`}>{issue.message}</li>
-            ))}
-          </ul>
-        </details>
-      )}
+      {maximized ? null : <ProjectionIssues projection={projection} />}
     </section>
   );
 }

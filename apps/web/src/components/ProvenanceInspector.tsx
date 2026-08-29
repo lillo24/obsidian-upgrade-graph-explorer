@@ -19,6 +19,7 @@ interface ProvenanceInspectorProps {
   readonly projection: ViewProjection;
   readonly selection: GraphSelection | null;
   readonly onClear: () => void;
+  readonly onClose?: () => void;
   readonly onNavigate: (entityId: EntityId, origin: string) => void;
 }
 
@@ -822,6 +823,7 @@ function EdgeInspector({
 
 export const ProvenanceInspector = memo(function ProvenanceInspector({
   onClear,
+  onClose,
   onNavigate,
   projection,
   selection,
@@ -854,11 +856,18 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
     <aside className="selection-panel" aria-label="Inspector">
       <div className="selection-panel__heading">
         <h3>Inspector</h3>
-        {selection === null ? null : (
-          <button onClick={onClear} type="button">
-            Clear selection
-          </button>
-        )}
+        <div className="selection-panel__actions">
+          {selection === null ? null : (
+            <button onClick={onClear} type="button">
+              Clear selection
+            </button>
+          )}
+          {onClose === undefined ? null : (
+            <button onClick={onClose} type="button">
+              Close Inspector
+            </button>
+          )}
+        </div>
       </div>
       {inspected === null ? (
         <p className="selection-empty">
