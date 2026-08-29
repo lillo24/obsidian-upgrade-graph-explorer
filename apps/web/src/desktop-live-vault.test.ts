@@ -544,6 +544,25 @@ describe('desktop live vault controller', () => {
     expect(controller.snapshot().phase).toBe('live');
   });
 
+  it('assigns a new runtime-only correlation token to every adopted batch', async () => {
+    const provider = new FakeLiveProvider();
+    provider.reconciliations.push(
+      planned({ nextInventory: provider.currentInventory }),
+      planned({ nextInventory: provider.currentInventory }),
+    );
+    const { controller } = await openedController(provider);
+
+    await provider.emit();
+    await controller.whenIdle();
+    const first = controller.snapshot().lastUpdate?.correlationId;
+    await provider.emit();
+    await controller.whenIdle();
+    const second = controller.snapshot().lastUpdate?.correlationId;
+
+    expect(first).toBe('live-1');
+    expect(second).toBe('live-2');
+  });
+
   it('does not adopt an in-flight update after the controller is stopped', async () => {
     const provider = new FakeLiveProvider();
     const changed = inventory('# Changed');

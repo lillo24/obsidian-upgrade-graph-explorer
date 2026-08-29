@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "benchmark": "tsx src/benchmark.ts",
+    "benchmark:performance": "tsx src/performance-benchmark.ts",
     "diagnose": "tsx src/cli.ts",
     "generate:sample": "tsx src/generate-sample.ts",
     "validate:incremental-real": "tsx src/validate-incremental-real.ts",
@@ -15,6 +16,7 @@
     "@icarus-graph-explorer/core": "workspace:*",
     "@icarus-graph-explorer/diagnostics-obsidian": "workspace:*",
     "@icarus-graph-explorer/explorer-inspection": "workspace:*",
+    "@icarus-graph-explorer/performance": "workspace:*",
     "@icarus-graph-explorer/renderer-reactflow": "workspace:*",
     "@icarus-graph-explorer/resolver-obsidian": "workspace:*",
     "@icarus-graph-explorer/snapshot-delta": "workspace:*",

@@ -2,7 +2,7 @@
 
 Icarus Graph Explorer is an early-stage, hierarchical knowledge-graph explorer for Markdown workspaces. Its intended model treats documents, their nested sections, and optional addressable blocks as distinct entities so references can retain their precise source and target locations.
 
-KG0 established the repository foundation, KG1 added the versioned canonical model, KG2 added deterministic CommonMark document/section structure parsing, KG3 added tested Obsidian syntax interpretation, KG4 added conservative workspace resolution plus validated canonical snapshot assembly, KG5 added a local diagnostic-report workflow, KG6 added renderer-independent disclosure and focus, KG7 added the projection-driven React Flow structural graph, KG8 added source-neutral provenance inspection, backlinks, canonical search, and targeted graph navigation, KG9 completed private app-owned stable identity plus local renderer-independent view restoration, KG10 added file-granular parsed-document caching with exact stable snapshot deltas, and KG11 completes the Tauri local-vault workflow from secure selection through coalesced live updates, transactional KG10 application, recovery resync, and in-place view preservation. KG12 performance and worker hardening is next.
+KG0 established the repository foundation, KG1 added the versioned canonical model, KG2 added deterministic CommonMark document/section structure parsing, KG3 added tested Obsidian syntax interpretation, KG4 added conservative workspace resolution plus validated canonical snapshot assembly, KG5 added a local diagnostic-report workflow, KG6 added renderer-independent disclosure and focus, KG7 added the projection-driven React Flow structural graph, KG8 added source-neutral provenance inspection, backlinks, canonical search, and targeted graph navigation, KG9 completed private app-owned stable identity plus local renderer-independent view restoration, KG10 added file-granular parsed-document caching with exact stable snapshot deltas, and KG11 completes the Tauri local-vault workflow from secure selection through coalesced live updates, transactional KG10 application, recovery resync, and in-place view preservation. KG12A now establishes repeated performance baselines, Class A/B/C budgets, and the evidence-led KG12B worker scope.
 
 The application is local-first and read-only with respect to Markdown. The initial architecture has no backend, account, cloud upload, telemetry, or source-file write path.
 
@@ -74,13 +74,19 @@ Run the opt-in deterministic pipeline harness with:
 
 ```bash
 pnpm benchmark:pipeline -- --profile medium
+pnpm benchmark:performance -- --profile medium \
+  --output output/performance/medium.json
 ```
 
 Its timings cover the source pipeline, cold/warm stable identity,
 representative view projections, React
 Flow mapping/Dagre layout, canonical inspection indexes, search, subtree
 inspection, edge provenance, and incremental edit/add/delete/move scenarios
-against exact full-rebuild oracles as local evidence, not CI budgets.
+against exact full-rebuild oracles as local evidence, not CI budgets. The
+KG12A command adds repeated statistics, all required projection shapes,
+operation counts, explicit unsafe-phase omissions, and a strict aggregate-only
+result schema. Raw results stay ignored. See
+[`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for budgets and the KG12B decision.
 
 ## Validation
 
@@ -101,6 +107,7 @@ pnpm build
 ## Repository guidance
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) is the engineering source of truth for dependency direction and product boundaries.
+- [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) records KG12A workloads, budgets, evidence, and the KG12B decision.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) distinguishes implemented work from deliberately deferred milestones.
 - [`docs/decisions/`](docs/decisions/) records costly foundational decisions.
 - [`AGENTS.md`](AGENTS.md) is the short entry point for coding agents.

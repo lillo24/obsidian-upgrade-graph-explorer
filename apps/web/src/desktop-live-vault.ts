@@ -41,6 +41,8 @@ export interface DesktopLiveUpdateTimings {
 }
 
 export interface DesktopLiveUpdateSummary {
+  /** Runtime-only token joining live processing to the matching UI paint. */
+  readonly correlationId: string;
   readonly kind: DesktopLiveUpdateKind;
   readonly affectedPathCount: number;
   readonly timings: DesktopLiveUpdateTimings;
@@ -148,6 +150,12 @@ function createController(input: {
   let pendingBatches = 0;
   let queue: Promise<void> = Promise.resolve();
   let stopPromise: Promise<void> | undefined;
+  let correlationSequence = 0;
+
+  function nextCorrelationId(): string {
+    correlationSequence += 1;
+    return `live-${correlationSequence}`;
+  }
 
   function publish(update: Partial<DesktopLiveVaultSnapshot>): void {
     if (disposed) return;
@@ -210,6 +218,7 @@ function createController(input: {
       report: inputState.report,
       runtime: inputState.runtime,
       lastUpdate: {
+        correlationId: nextCorrelationId(),
         kind: inputState.kind,
         affectedPathCount: inputState.affectedPathCount,
         timings,
@@ -316,6 +325,7 @@ function createController(input: {
           ? 'Catching up with changes observed while the vault opened.'
           : 'Live vault updates are active.',
         lastUpdate: {
+          correlationId: nextCorrelationId(),
           kind: 'no-op',
           affectedPathCount: plan.affectedPaths.length,
           timings: {

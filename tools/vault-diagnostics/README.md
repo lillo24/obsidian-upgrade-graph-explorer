@@ -1,6 +1,6 @@
 # Local Vault Diagnostics
 
-Status: **STABLE — KG10 incremental correctness and the existing private identity lifecycle are tested and real-vault validated.**
+Status: **STABLE — KG12A repeatable aggregate performance contracts extend the KG10 diagnostic harness.**
 
 This development-only workspace package is the Node KG5 filesystem boundary.
 It recursively acquires one explicitly selected local vault, then calls KG3,
@@ -29,6 +29,8 @@ src/
   benchmark-config.ts Deterministic smoke/small/medium/large workload profiles.
   benchmark.ts        Opt-in full-pipeline plus incremental timing entry point.
   incremental-benchmark.ts Edit/add/delete/move timings with exact rebuild oracles.
+  performance-benchmark.ts Repeated versioned pipeline/projection/renderer/inspection results.
+  performance-policy.ts Class budgets plus measured KG12B worker/cache decisions.
   validate-incremental-real.ts Aggregate-only, in-memory private validation.
   generate-sample.ts  Regenerates the committed neutral browser sample.
   index.test.ts       Temporary-directory scanner and failure contracts.
@@ -101,6 +103,8 @@ through a separate Tauri provider. Watching and live updates remain KG11B.
 pnpm benchmark:pipeline -- --profile small
 pnpm benchmark:pipeline -- --profile medium
 pnpm benchmark:pipeline -- --profile large
+pnpm benchmark:performance -- --profile small \
+  --output output/performance/small.json
 ```
 
 Profiles are deterministic and measure parse/adapt, resolution, report
@@ -118,6 +122,15 @@ scenarios. Each reports changed/reparsed/reused file counts, delta counts,
 incremental and full-rebuild timings, and exact snapshot/catalog/delta-apply
 oracle results. Timings are local evidence, never CI budgets. Normal tests
 execute only a tiny correctness workload.
+
+`benchmark:performance` is the KG12A contract. It covers every stable
+projection profile, records canonical and projected counts separately, performs
+explicit warm-ups/repeats, emits median/p95/maximum plus raw local samples, and
+validates the result before printing or writing. Output paths passed through the
+root command resolve from the caller's directory even though pnpm executes in
+this package. Use only the ignored `output/performance/` destination. Repeated
+Dagre is explicitly omitted above 2,500 projected nodes after the measured
+structural cliff; the JSON records the reason instead of a zero-time success.
 
 An opt-in private check can validate one real workspace using an existing
 identity catalog:

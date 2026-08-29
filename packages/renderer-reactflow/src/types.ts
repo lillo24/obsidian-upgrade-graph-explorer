@@ -1,4 +1,5 @@
 import type { Edge, Node, XYPosition } from '@xyflow/react';
+import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performance';
 import type {
   DiagnosticReferenceStatus,
   ProjectionEdgeId,
@@ -78,6 +79,8 @@ export interface PrepareRendererGraphOptions {
   readonly layoutMode: GraphLayoutMode;
   readonly expandedEntityIds?: readonly string[];
   readonly layoutEngine?: LayoutEngine;
+  /** Optional KG12 runtime-only measurements; omitted in normal product use. */
+  readonly performance?: PerformanceInstrumentation;
 }
 
 export interface LayoutInputNode {
@@ -108,6 +111,10 @@ export interface GraphCanvasProps {
   readonly layoutMode: GraphLayoutMode;
   readonly expandedEntityIds: readonly string[];
   readonly selection: GraphSelection | null;
+  /** Disabled by default and never persisted by the renderer. */
+  readonly performance?: PerformanceInstrumentation;
+  /** Runtime-only token used to correlate a live adoption through paint. */
+  readonly performanceUpdateKey?: string;
   readonly fitRequestKey: number;
   readonly centerRequest?: GraphCenterRequest;
   readonly maximized?: boolean;

@@ -5,22 +5,28 @@ import {
   type InspectionWorkspace,
 } from '@icarus-graph-explorer/explorer-inspection';
 import type { EntityId } from '@icarus-graph-explorer/core';
+import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performance';
 
 interface EntitySearchProps {
   readonly workspace: InspectionWorkspace;
   readonly onNavigate: (entityId: EntityId, origin: string) => void;
+  readonly performance?: PerformanceInstrumentation;
 }
 
 export const EntitySearch = memo(function EntitySearch({
   onNavigate,
+  performance,
   workspace,
 }: EntitySearchProps) {
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
-  const results = useMemo(
-    () => searchEntities(workspace, deferredQuery, { limit: 30 }),
-    [deferredQuery, workspace],
-  );
+  const results = useMemo(() => {
+    const search = () =>
+      searchEntities(workspace, deferredQuery, { limit: 30 });
+    return performance === undefined
+      ? search()
+      : performance.measure('search', 'searches', search);
+  }, [deferredQuery, performance, workspace]);
   const hasQuery = deferredQuery.trim().length > 0;
   const pending = query !== deferredQuery;
 

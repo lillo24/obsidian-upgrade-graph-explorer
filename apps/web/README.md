@@ -1,6 +1,6 @@
 # Web Structural Graph Explorer
 
-Status: **STABLE — KG11 live orchestration, view preservation, and prior UX/KG gates pass.**
+Status: **STABLE — KG12A adds optional memory-only correlation without changing normal product behavior.**
 
 This package owns the browser SPA, validated KG5 report selection, Tauri-only
 live vault orchestration, KG6 graph interaction state, guarded browser persistence, graph selection, canonical
@@ -35,6 +35,7 @@ apps/web/
     desktop-runtime.ts Lazy official Tauri detection and provider creation.
     desktop-vault.ts Lazy KG10 initialization, report construction, and truthful identity commit orchestration.
     desktop-live-vault.ts Serialized watch, candidate commit, pause, and full-resync lifecycle.
+    performance.ts    Query-gated browser recorder and local inspection API.
     graph-state.ts    Pure disclosure/focus/filter interaction reducer.
     navigation.ts     Shared reveal/filter-widening/navigation planner.
     persistence/      Stable-report eligibility, hydration, and localStorage adapter.
@@ -144,6 +145,17 @@ coordinates, and raw viewport x/y remain transient. Browser reload restores the
 bundled stable sample automatically; a user-selected report file must still be
 selected again because KG9B does not persist browser file handles.
 
+KG12A instrumentation requires either `?performance=1` in a browser or an
+explicit `VITE_ICARUS_PERFORMANCE=1` diagnostic build for Tauri. It records
+named pure, commit, paint, viewport, search, inspection, and live-adoption
+phases in memory and exposes a local `window.icarusPerformance` inspection API.
+Normal builds/loads do not create a recorder or API. The Vite variable changes
+only instrumentation availability and must be set before `desktop:dev` or
+`desktop:build`; debug/native timings must be labeled by build mode. Live
+controller correlation tokens are monotonic within one controller, survive
+only long enough to join I16/I17/I18 processing to the matching paint, and
+never enter reports or persistence.
+
 ## Graph interaction boundary
 
 The default view is documents-only; top-level sections and explicit per-entity
@@ -185,7 +197,8 @@ fuzzy, semantic, or Markdown body search.
 Opaque entity IDs use prebuilt maps. Canonical search is deferred and memoized;
 search results are capped at 30; provenance groups render 20 rows at a time;
 secondary references remain paged in groups of 100. No renderer virtualization
-switch or performance budget is introduced before KG12 evidence requires it.
+switch is introduced. KG12A budgets and the KG12B worker decision are documented
+in `docs/PERFORMANCE.md`.
 
 ## Scope boundary
 
