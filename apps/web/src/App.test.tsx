@@ -63,10 +63,11 @@ describe('graph-first explorer shell', () => {
     expect(markup).not.toContain('Compatibility Probes');
     expect(markup).not.toContain('Open Vault');
     expect(markup).toContain('Search');
-    expect(markup).toContain('Graph Filters');
+    expect(markup).toContain('>Filters<');
     expect(markup).toContain('Documents');
     expect(markup).toContain('Focus Selected');
-    expect(markup).toContain('Inspector');
+    expect(markup).toContain('aria-label="Open Inspector"');
+    expect(markup).not.toContain('>Inspector</button>');
     expect(markup).toContain('aria-label="Fit graph to view"');
     expect(markup).toContain('aria-label="Maximize graph"');
     expect(markup).not.toContain('>Maximize Graph</button>');
@@ -179,12 +180,14 @@ describe('graph-first explorer shell', () => {
       />,
     );
 
+    expect(normalMarkup).toContain('class="graph-inspector-toggle"');
+    expect(normalMarkup).toContain('aria-label="Open Inspector"');
+    expect(normalMarkup).not.toContain('>Inspector</button>');
+    expect(normalMarkup).not.toContain('Heading Depth');
+    expect(normalMarkup).toContain('class="graph-inspector-handle"');
     expect(normalMarkup).toContain(
-      'aria-pressed="false" type="button">Inspector</button>',
+      '<span aria-hidden="true">‹</span></button>',
     );
-    expect(normalMarkup).toContain('aria-label="Heading limit"');
-    expect(normalMarkup).toContain('value="" selected="">No limit</option>');
-    expect(normalMarkup).toContain('<option value="1">#</option>');
     expect(normalMarkup).not.toContain('Provenance Inspector');
     expect(normalMarkup).not.toContain('graph-stage--inspector-open');
     expect(normalMarkup).toContain('aria-label="Fit graph to view"');
@@ -210,7 +213,8 @@ describe('graph-first explorer shell', () => {
     );
     expect(maximizedMarkup.match(/class="entity-search"/g)).toHaveLength(1);
     expect(maximizedMarkup).toContain('aria-label="Open Inspector"');
-    expect(maximizedMarkup).toContain('Graph Filters');
+    expect(maximizedMarkup).toContain('class="graph-inspector-handle"');
+    expect(maximizedMarkup).toContain('>Filters<');
     expect(maximizedMarkup).toContain('Focus Selected');
   });
 

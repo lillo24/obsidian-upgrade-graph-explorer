@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { graphStateReducer, initialGraphState } from './graph-state';
+import {
+  graphStateReducer,
+  initialGraphState,
+  normalizeGraphState,
+} from './graph-state';
 
 describe('graph projection interaction state', () => {
   it('replaces state atomically after live snapshot reconciliation', () => {
@@ -89,6 +93,48 @@ describe('graph projection interaction state', () => {
       includeBlocks: true,
     });
     expect(initial.disclosure.includeBlocks).toBe(false);
+  });
+
+  it('normalizes legacy block filters so the visible Blocks opt-in cannot be contradicted', () => {
+    const legacy = {
+      ...initialGraphState(),
+      disclosure: {
+        ...initialGraphState().disclosure,
+        includeBlocks: true,
+      },
+      filters: { entityKinds: ['document'] as const },
+    };
+    const normalized = normalizeGraphState(legacy);
+
+    expect(normalized.disclosure.includeBlocks).toBe(true);
+    expect(normalized.filters?.entityKinds).toEqual(['document', 'block']);
+    expect(normalizeGraphState(normalized)).toBe(normalized);
+  });
+
+  it('drops a redundant legacy block filter without changing a disabled Blocks opt-in', () => {
+    const legacy = {
+      ...initialGraphState(),
+      filters: { entityKinds: ['document', 'section'] as const },
+    };
+    const normalized = normalizeGraphState(legacy);
+
+    expect(normalized.disclosure.includeBlocks).toBe(false);
+    expect(normalized.filters).toBeUndefined();
+  });
+
+  it('keeps block eligibility normalized while Documents and Sections remain filterable', () => {
+    const withoutDocuments = graphStateReducer(initialGraphState(), {
+      type: 'toggle-entity-kind',
+      entityKind: 'document',
+      enabled: false,
+    });
+    const withBlocks = graphStateReducer(withoutDocuments, {
+      type: 'set-include-blocks',
+      includeBlocks: true,
+    });
+
+    expect(withBlocks.disclosure.includeBlocks).toBe(true);
+    expect(withBlocks.filters?.entityKinds).toEqual(['section', 'block']);
   });
 
   it('sets and removes the literal heading ceiling without changing structural depth', () => {
