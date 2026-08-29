@@ -31,7 +31,8 @@ synthetic structural graph and can load one locally generated report JSON
 through the browser File API. The graph defaults to documents, supports
 progressive structural disclosure and local focus, searches the complete
 canonical snapshot for hidden entities, explains exact relationship
-occurrences, and keeps KG5 evidence in a secondary expandable section.
+occurrences, and keeps KG5 evidence in a secondary Developer dialog launched
+from Settings.
 Reports that explicitly declare stable identity also restore disclosure, focus,
 visible graph filters, and a semantic entity-plus-zoom viewport bookmark from
 browser-local storage. Search and selection remain transient. Legacy or
@@ -45,15 +46,17 @@ pnpm desktop:dev
 pnpm desktop:build
 ```
 
-The native **Open Vault** action reads and watches one explicitly selected
-folder locally, initializes KG10, and renders committed updates through the
-same graph/inspector UI without remounting the current workspace.
+The native **Settings → Source → Open Vault** action reads and watches one
+explicitly selected folder locally, initializes KG10, and renders committed
+updates through the same graph/inspector UI without remounting the current
+workspace.
 The vault is never modified or uploaded. Native folder authorization lasts for
 the process, so the folder must be selected again after restart; app-local
 identity and the stable saved graph view are then recovered by exact root match.
 Watcher bursts use a 250 ms quiet window and feed serialized, transactional
-updates. **Rescan Vault** performs a complete read-only recovery using the same
-stable workspace/catalog and preserves the current renderer-independent view.
+updates. **Settings → Source → Rescan Vault** performs a complete read-only
+recovery using the same stable workspace/catalog and preserves the current
+renderer-independent view.
 
 Generate a private local report with the development-only scanner:
 

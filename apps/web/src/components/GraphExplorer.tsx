@@ -6,6 +6,7 @@ import {
   useReducer,
   useRef,
   useState,
+  type ReactNode,
 } from 'react';
 
 import type { EntityId, KnowledgeSnapshot } from '@icarus-graph-explorer/core';
@@ -128,14 +129,17 @@ function ProjectionIssues({
 }
 
 export function GraphExplorer({
+  applicationOverlayOpen = false,
   identityStability,
   maximized,
   onMaximizedChange,
   performance,
   performanceUpdateKey,
+  settingsContent,
   snapshot,
   storage,
 }: {
+  readonly applicationOverlayOpen?: boolean;
   readonly identityStability?: DiagnosticIdentityStability;
   readonly maximized: boolean;
   readonly onMaximizedChange: (maximized: boolean) => void;
@@ -143,6 +147,7 @@ export function GraphExplorer({
   readonly performance?: PerformanceInstrumentation;
   /** Runtime-only live-update correlation token; never persisted. */
   readonly performanceUpdateKey?: string;
+  readonly settingsContent?: ReactNode;
   readonly snapshot: KnowledgeSnapshot;
   readonly storage?: StorageLike | null;
 }) {
@@ -379,6 +384,17 @@ export function GraphExplorer({
   }, [maximized, onMaximizedChange]);
 
   useEffect(() => {
+    if (!applicationOverlayOpen || activeOverlay === null) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setActiveOverlay(null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeOverlay, applicationOverlayOpen]);
+
+  useEffect(() => {
     if (
       eligibility !== 'stable' ||
       !persistenceWritable.current ||
@@ -604,7 +620,9 @@ export function GraphExplorer({
             {...(preferenceWarning === undefined
               ? {}
               : { warning: preferenceWarning })}
-          />
+          >
+            {settingsContent}
+          </GraphSettings>
         </div>
       ) : null}
 
@@ -775,7 +793,9 @@ export function GraphExplorer({
                   {...(preferenceWarning === undefined
                     ? {}
                     : { warning: preferenceWarning })}
-                />
+                >
+                  {settingsContent}
+                </GraphSettings>
               )}
               <button
                 aria-pressed={inspectorOpen}

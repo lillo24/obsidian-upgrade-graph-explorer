@@ -31,7 +31,7 @@ apps/web/
   tsconfig.json       Strict browser/JSX compilation settings.
   src/
     main.tsx          Root validation and React startup.
-    App.tsx           Browser/desktop source controls, session state, reset boundary, and evidence UI.
+    App.tsx           Browser/desktop source ownership, session state, Settings composition, and evidence state.
     desktop-runtime.ts Lazy official Tauri detection and provider creation.
     desktop-vault.ts Lazy KG10 initialization, report construction, and truthful identity commit orchestration.
     desktop-live-vault.ts Serialized watch, candidate commit, pause, and full-resync lifecycle.
@@ -55,9 +55,9 @@ live revisions reconcile current state and update the mounted explorer in place.
 
 ## Report loading and privacy
 
-“Load Diagnostic Report” uses the browser File API for one explicitly selected
-JSON file. The report is parsed and validated in browser memory and is never
-uploaded. Desktop mode adds local product acquisition without changing browser mode:
+**Settings → Source → Open Report** uses the browser File API for one explicitly
+selected JSON file. The report is parsed and validated in browser memory and is
+never uploaded. Desktop mode adds local product acquisition without changing browser mode:
 
 ```text
 KG5   = select one generated report file
@@ -66,8 +66,8 @@ KG11B = coalesced watching, transactional live updates, and resync
 ```
 
 Malformed schema versions, snapshots, diagnostics, probes, or inventory fields
-produce an actionable inline error while the last valid report remains visible.
-In Tauri runtime, **Open Vault** uses dynamically imported platform code; cancel
+produce an actionable floating notice while the last valid report remains visible.
+In Tauri runtime, **Open Vault** under Settings uses dynamically imported platform code; cancel
 is inert, source failures retain the prior report/live session, and successful
 opens reset transient search/selection while stable KG9B state hydrates by
 workspace. Watching starts before initial discovery, startup batches are
@@ -82,15 +82,20 @@ the last committed state and pause until a successful **Rescan Vault**.
 
 ## Graph-first workspace shell
 
-The normal product shell uses a compact report bar and gives the graph workspace
-the remaining viewport-driven height. **Maximize graph**, exposed in the canvas
-control stack, is an application mode,
-not the browser Fullscreen API: the existing `GraphExplorer` and `GraphCanvas`
-instances remain mounted in place while the workspace becomes a fixed `100dvh`
-surface. Page chrome and diagnostic evidence are hidden, body scrolling is
-locked, and **Restore graph** or `Escape` restores the prior body overflow value.
-Maximizing is intentionally transient and never requests `fitView`, so selection,
-viewport, disclosure, focus, filters, and saved KG9 view state remain unchanged.
+The normal product shell is the graph workspace: it reaches all viewport edges
+without a permanent app header, centered page wrapper, or outer card framing.
+Source switching, safe source status, rescan, and exceptional identity recovery
+live in **Settings → Source**. Routine healthy status stays there; opening,
+catch-up, resync, paused, and failure states use compact floating notices that do
+not reduce canvas height.
+
+**Maximize graph**, exposed in the canvas control stack, remains an application
+mode, not the browser Fullscreen API. The existing `GraphExplorer` and
+`GraphCanvas` instances remain mounted in place while the workspace becomes a
+fixed `100dvh` surface. Body scrolling is locked, and **Restore graph** or
+`Escape` restores the prior body overflow value. Maximizing is intentionally
+transient and never requests `fitView`, so selection, viewport, disclosure,
+focus, filters, and saved KG9 view state remain unchanged.
 
 The Inspector is also transient and closed by default. Opening it adds a bounded
 desktop column; at 900px and below it overlays the canvas as a drawer so the graph
@@ -111,8 +116,9 @@ most 20 entries initially and reveal further entries in bounded increments.
 Successful persistence and navigation messages remain in visually hidden
 `aria-live` regions. Projection, storage, report-loading, and navigation failures
 use explicit visible alerts; failure visibility is not inferred from message text.
-The KG5 evidence explorer remains collapsed below the graph in normal mode and
-uses no layout space in maximized mode.
+The secondary KG5 evidence explorer is launched from **Settings → Developer**
+and uses a modal, internally scrolling surface. Opening or closing it does not
+resize or remount the graph workspace.
 
 ## Saved graph view
 
@@ -202,7 +208,7 @@ in `docs/PERFORMANCE.md`.
 
 ## Scope boundary
 
-The hierarchy tree under “Inspect diagnostic evidence” remains KG5 diagnostic
+The hierarchy tree in **Developer → Diagnostic Evidence** remains KG5 diagnostic
 UI only. Its expanded state is separate from KG6 projection state. Report mode
 provides paths, breadcrumbs, raw targets, and exact spans, but no source text,
 preview, live filesystem access, open-in-source action, or write-back. Its own
