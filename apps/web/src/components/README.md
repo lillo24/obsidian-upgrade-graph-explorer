@@ -5,8 +5,9 @@ graph plus secondary KG5 evidence. They do not load files, validate JSON, alter
 canonical truth, or own a platform storage implementation.
 
 - `GraphExplorer.tsx` composes report-scoped projection/inspection workspaces,
-  compact structural/heading/focus/filter/workspace controls, shared canonical
-  navigation, graph selection, transient maximized overlays/Inspector drawer,
+  compact structural/focus/workspace controls, controlled Filters and Settings
+  overlays, shared canonical navigation, graph selection, the transient unified
+  Inspector drawer,
   saved-view hydration/alert/reset orchestration, and semantic renderer viewport
   requests. Across live snapshots it reconciles current KG6 state before
   projection, rebuilds inspection/search indexes, preserves surviving selection
@@ -32,16 +33,23 @@ canonical truth, or own a platform storage implementation.
   source failures above the canvas without consuming workspace layout.
 - `EntitySearch.tsx` performs bounded deferred search over the full canonical
   inspection index, independently from visible graph filters.
-- `GraphFilters.tsx` maps practical path, content-kind, and reference-status
-  controls directly to KG6 filter state.
+- `GraphFilters.tsx` owns the controlled toolbar trigger and responsive nonmodal
+  panel for path, entity content, heading depth, and reference status. Blocks is
+  represented once through disclosure state; `graph-filters-overlay.ts` gives
+  the panel first ownership of Escape and restores trigger focus.
+  `graph-workspace-overlays.ts` owns the pure Settings/Filters/Tools exclusivity
+  policy without coupling transient chrome to KG6 projection state.
 - `maximized-graph-mode.ts` owns the reversible body scroll lock and Escape-key
-  exit listener for the transient application maximize mode. Maximized Tools,
-  Settings, and Inspector visibility remains session-only shell state.
+  exit listener for the transient application maximize mode. The graph shell
+  closes a nearer Tools, Settings, or Filters surface before leaving maximized
+  mode. Their visibility and Inspector visibility remain session-only state.
 - `ProvenanceInspector.tsx` presents user-facing identity, breadcrumbs,
   outgoing links, backlinks, connection occurrences, structural containment,
   and plain-language link problems in bounded groups. Canonical IDs, exact
   ranges, resolution metadata, ambiguous candidate mentions, and collapsed
-  internal occurrences stay in a closed-by-default technical disclosure.
+  internal occurrences stay in a closed-by-default technical disclosure. It is
+  always an overlay drawer, keeps clear-selection separate from collapse, and
+  resets bounded content only when the inspected selection changes.
 - `SummaryPanel.tsx` renders derived canonical/evidence counts.
 - `HierarchyPanel.tsx` lazily expands document, section, and block ownership.
 - `ReferencesPanel.tsx` pages filtered references and exposes provenance details.
@@ -52,8 +60,10 @@ provenance, maximized shell state, diagnostic-dialog state, and transient
 secondary diagnostic filters. Presentation-only Settings sections receive this
 state through a narrow composition seam. `desktop-live-vault.ts` owns non-React
 serialized live transactions, pause/recovery, and watcher lifecycle.
-`graph-state.ts` owns
-pure KG6 interaction transitions, `navigation.ts` owns the verified target-reveal
+`graph-state.ts` owns pure KG6 interaction transitions and web-boundary
+normalization that keeps legacy entity-kind filters internally eligible for
+blocks while `disclosure.includeBlocks` remains the sole visible opt-in.
+`navigation.ts` owns the verified target-reveal
 plan, and `report-view.ts` owns secondary evidence transformations.
 `../persistence/` owns the localStorage adapter and pre-autosave hydration; the
 source-neutral schema/reconciliation lives in `packages/view-state`.

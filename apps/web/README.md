@@ -97,12 +97,14 @@ fixed `100dvh` surface. Body scrolling is locked, and **Restore graph** or
 transient and never requests `fitView`, so selection, viewport, disclosure,
 focus, filters, and saved KG9 view state remain unchanged.
 
-The Inspector is also transient and closed by default. Opening it adds a bounded
-desktop column; at 900px and below it overlays the canvas as a drawer so the graph
-does not lose its usable width. Closing the Inspector unmounts only its presentation
-column and does not clear or change graph selection. Selecting another graph item
-while it is closed does not reopen it, and reopening resolves the current selection.
-Neither shell preference is part of the persisted-view schema.
+The Inspector is also transient and closed by default. In normal and maximized
+views, the toolbar sidebar icon or compact right-edge handle opens the same
+bounded overlay drawer without changing graph-stage width. Its chevron collapse
+control is distinct from **Clear selection**. Closing the Inspector unmounts only
+its presentation surface and does not clear or change graph selection. Selecting
+another graph item while it is closed does not reopen it, and reopening resolves
+the current selection. Neither shell preference is part of the persisted-view
+schema.
 
 The normal Inspector view is deliberately user-facing: entities show their name,
 kind, location, outgoing links, and backlinks; reference edges show the actual
@@ -133,6 +135,10 @@ schema-v1 records without the optional ceiling restore with no heading limit.
 Hydration and source-evolution reconciliation happen synchronously before the
 autosave effect. Stale disclosure IDs, focus roots, path scopes, and viewport
 anchors are dropped with non-fatal status; collapsed disclosure wins conflicts.
+Legacy schema-v1 entity-kind filters are normalized at the web boundary so block
+eligibility cannot contradict the single visible **Blocks** choice; the saved
+schema version does not change. `disclosure.includeBlocks` remains the user
+intent that decides whether blocks may be projected.
 Corrupt, inaccessible, or unsupported stored values are not overwritten or
 silently deleted. Writes stop after one failure. **Reset saved view** deletes
 only that workspace's view, restores documents-only defaults, clears transient
@@ -178,17 +184,19 @@ unrelated rendered content only until pointer leave. Click or keyboard selection
 keeps the chosen element visibly selected without persistent graph-wide fading.
 Focus remains a reduced projection rather than a visual opacity treatment.
 
-The compact **Headings** control is separate from Documents/Top-Level structural
-depth. `#` through `######` are literal canonical Markdown heading ceilings;
-**No limit** preserves prior disclosure. Explicit expansion cannot bypass the
-ceiling, and references from hidden headings retain normal endpoint roll-up and
-aggregation. Navigation to a deeper canonical search result minimally widens an
-active ceiling before revealing, selecting, and centering the target.
+**Heading Depth** lives in the toolbar's floating **Filters** panel and remains
+separate from Documents/Top-Level structural depth. `#` through `######` are
+literal canonical Markdown heading ceilings; **No limit** preserves prior
+disclosure. Explicit expansion cannot bypass the ceiling, and references from
+hidden headings retain normal endpoint roll-up and aggregation. Navigation to a
+deeper canonical search result minimally widens an active ceiling before
+revealing, selecting, and centering the target.
 
-Blocks remain opt-in through the labelled **Blocks** checkbox and still require
-explicit expansion of their visible parent, preserving KG6's conservative block
-disclosure rule. Open branches retain a collapse control even when all of their
-descendants are visible.
+Blocks remain opt-in through the one labelled **Blocks** checkbox under
+**Filters → Entity Content** and still require explicit expansion of their
+visible parent, preserving KG6's conservative block disclosure rule. Documents
+and Sections remain ordinary entity filters. Open branches retain a collapse
+control even when all of their descendants are visible.
 
 Global Find searches the full canonical snapshot, including entities hidden by
 disclosure or graph filters. Selecting any search, breadcrumb, source,
@@ -196,7 +204,9 @@ backlink, resolved-target, or ambiguity-candidate action uses one navigation
 pipeline: exit focus, reveal ancestors through KG6, widen only conflicting
 path/entity/text filters with an announcement, reproject, select, and request a
 renderer-only center. Graph filters expose derived top-level path scopes,
-entity content kinds, and reference statuses. Search is exact/prefix/substring
+entity content kinds, heading depth, and reference statuses in a controlled
+nonmodal panel. In normal mode it overlays the graph; inside maximized Tools it
+reflows within that surface's single vertical scroll owner. Search is exact/prefix/substring
 over names, headings, breadcrumbs, paths, and block line labels; it is not
 fuzzy, semantic, or Markdown body search.
 

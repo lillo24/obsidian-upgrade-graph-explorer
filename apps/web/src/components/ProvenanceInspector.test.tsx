@@ -37,6 +37,7 @@ function renderInspector(
   return renderToStaticMarkup(
     <ProvenanceInspector
       onClear={() => undefined}
+      onClose={() => undefined}
       onNavigate={() => undefined}
       projection={projection}
       selection={selection}
@@ -73,6 +74,9 @@ describe('user-facing provenance inspector', () => {
     const markup = renderInspector(documentProjection, null);
 
     expect(markup).toContain('aria-label="Inspector"');
+    expect(markup).toContain('aria-label="Close Inspector"');
+    expect(markup).not.toContain('>Close Inspector</button>');
+    expect(markup).not.toContain('Clear selection');
     expect(markup).toContain('Select a file, section, or connection.');
     expect(markup).not.toContain('Technical details');
   });
@@ -88,6 +92,8 @@ describe('user-facing provenance inspector', () => {
     expect(normal).toContain('>File<');
     expect(normal).toContain('<h4>Source</h4>');
     expect(normal).toContain('aria-label="Relationship summary"');
+    expect(normal).toContain('Clear selection');
+    expect(normal).toContain('class="selection-panel__collapse"');
     expect(normal).toContain('outgoing ·');
     expect(normal).toContain('backlinks');
     expect(normal).toContain('<h4>Outgoing</h4>');

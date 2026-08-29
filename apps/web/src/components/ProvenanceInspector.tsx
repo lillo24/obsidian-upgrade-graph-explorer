@@ -1,4 +1,11 @@
-import { memo, useMemo, useState, type ReactNode } from 'react';
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 
 import type { EntityId } from '@icarus-graph-explorer/core';
 import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performance';
@@ -20,7 +27,7 @@ interface ProvenanceInspectorProps {
   readonly projection: ViewProjection;
   readonly selection: GraphSelection | null;
   readonly onClear: () => void;
-  readonly onClose?: () => void;
+  readonly onClose: () => void;
   readonly onNavigate: (entityId: EntityId, origin: string) => void;
   readonly performance?: PerformanceInstrumentation;
 }
@@ -832,6 +839,7 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
   selection,
   workspace,
 }: ProvenanceInspectorProps) {
+  const collapseButtonRef = useRef<HTMLButtonElement>(null);
   const inspected = useMemo<
     | {
         readonly ok: true;
@@ -858,10 +866,26 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
       return { ok: false, message: `Inspection failed: ${message}` };
     }
   }, [performance, projection, selection, workspace]);
+  const contentKey =
+    selection === null ? 'empty' : `${selection.kind}:${selection.id}`;
+
+  useEffect(() => {
+    collapseButtonRef.current?.focus();
+  }, []);
 
   return (
     <aside className="selection-panel" aria-label="Inspector">
       <div className="selection-panel__heading">
+        <button
+          aria-label="Close Inspector"
+          className="selection-panel__collapse"
+          onClick={onClose}
+          ref={collapseButtonRef}
+          title="Close Inspector"
+          type="button"
+        >
+          <span aria-hidden="true">›</span>
+        </button>
         <h3>Inspector</h3>
         <div className="selection-panel__actions">
           {selection === null ? null : (
@@ -869,32 +893,32 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
               Clear selection
             </button>
           )}
-          {onClose === undefined ? null : (
-            <button onClick={onClose} type="button">
-              Close Inspector
-            </button>
-          )}
         </div>
       </div>
-      {inspected === null ? (
-        <p className="selection-empty">
-          Select a file, section, or connection.
-        </p>
-      ) : !inspected.ok ? (
-        <p className="inspector-error" role="alert">
-          {inspected.message} Clear the selection and choose a visible graph
-          element.
-        </p>
-      ) : inspected.value.kind === 'entity' ? (
-        <EntityInspector inspection={inspected.value} onNavigate={onNavigate} />
-      ) : inspected.value.kind === 'diagnostic' ? (
-        <DiagnosticInspector
-          inspection={inspected.value}
-          onNavigate={onNavigate}
-        />
-      ) : (
-        <EdgeInspector inspection={inspected.value} onNavigate={onNavigate} />
-      )}
+      <div className="selection-panel__body" key={contentKey}>
+        {inspected === null ? (
+          <p className="selection-empty">
+            Select a file, section, or connection.
+          </p>
+        ) : !inspected.ok ? (
+          <p className="inspector-error" role="alert">
+            {inspected.message} Clear the selection and choose a visible graph
+            element.
+          </p>
+        ) : inspected.value.kind === 'entity' ? (
+          <EntityInspector
+            inspection={inspected.value}
+            onNavigate={onNavigate}
+          />
+        ) : inspected.value.kind === 'diagnostic' ? (
+          <DiagnosticInspector
+            inspection={inspected.value}
+            onNavigate={onNavigate}
+          />
+        ) : (
+          <EdgeInspector inspection={inspected.value} onNavigate={onNavigate} />
+        )}
+      </div>
     </aside>
   );
 });

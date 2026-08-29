@@ -14,6 +14,11 @@ export const ALL_ENTITY_KINDS = [
   'block',
 ] as const satisfies readonly EntityKind[];
 
+export const USER_FILTERABLE_ENTITY_KINDS = [
+  'document',
+  'section',
+] as const satisfies readonly Exclude<EntityKind, 'block'>[];
+
 export const ALL_REFERENCE_STATUSES = [
   'resolved',
   'unresolved',
@@ -43,7 +48,7 @@ export type GraphStateAction =
   | { readonly type: 'set-path-scope'; readonly pathPrefix: string | null }
   | {
       readonly type: 'toggle-entity-kind';
-      readonly entityKind: EntityKind;
+      readonly entityKind: Exclude<EntityKind, 'block'>;
       readonly enabled: boolean;
     }
   | {
@@ -90,11 +95,11 @@ function withFilters(
     filters.text !== undefined ||
     filters.entityKinds !== undefined ||
     filters.referenceStatuses !== undefined;
-  return {
+  return normalizeGraphState({
     disclosure: state.disclosure,
     ...(state.focus === undefined ? {} : { focus: state.focus }),
     ...(hasFilters ? { filters } : {}),
-  };
+  });
 }
 
 function withoutFilter(
@@ -104,6 +109,49 @@ function withoutFilter(
   const next = { ...filters };
   delete next[key];
   return next;
+}
+
+function sameEntityKinds(
+  left: readonly EntityKind[],
+  right: readonly EntityKind[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+
+/**
+ * Normalizes legacy duplicate Blocks state at the web boundary. Blocks remain
+ * internally eligible in entityKinds while disclosure.includeBlocks is the
+ * single user-facing opt-in that decides whether they can be projected.
+ */
+export function normalizeGraphState(
+  state: ViewProjectionState,
+): ViewProjectionState {
+  const current = state.filters?.entityKinds;
+  if (current === undefined) return state;
+  const allowed = new Set<EntityKind>([...current, 'block']);
+  const normalized = ALL_ENTITY_KINDS.filter((kind) => allowed.has(kind));
+  const entityKinds =
+    normalized.length === ALL_ENTITY_KINDS.length ? undefined : normalized;
+  if (entityKinds !== undefined && sameEntityKinds(current, entityKinds)) {
+    return state;
+  }
+  const nextFilters =
+    entityKinds === undefined
+      ? withoutFilter(state.filters ?? {}, 'entityKinds')
+      : { ...(state.filters ?? {}), entityKinds };
+  const hasFilters =
+    nextFilters.pathPrefixes !== undefined ||
+    nextFilters.text !== undefined ||
+    nextFilters.entityKinds !== undefined ||
+    nextFilters.referenceStatuses !== undefined;
+  return {
+    disclosure: state.disclosure,
+    ...(state.focus === undefined ? {} : { focus: state.focus }),
+    ...(hasFilters ? { filters: nextFilters } : {}),
+  };
 }
 
 export function graphStateReducer(
@@ -139,13 +187,13 @@ export function graphStateReducer(
       return { ...state, disclosure };
     }
     case 'set-include-blocks':
-      return {
+      return normalizeGraphState({
         ...state,
         disclosure: {
           ...state.disclosure,
           includeBlocks: action.includeBlocks,
         },
-      };
+      });
     case 'enter-focus':
       return {
         ...state,
@@ -205,7 +253,7 @@ export function graphStateReducer(
       });
     case 'apply-navigation':
     case 'replace-state':
-      return action.state;
+      return normalizeGraphState(action.state);
     case 'reset-view':
       return initialGraphState();
   }

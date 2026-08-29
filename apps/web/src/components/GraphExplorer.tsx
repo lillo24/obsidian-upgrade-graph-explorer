@@ -6,6 +6,7 @@ import {
   useReducer,
   useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from 'react';
 
@@ -31,13 +32,13 @@ import {
   projectView,
   type ProjectedEntityNode,
   type ProjectedNode,
-  type SectionHeadingLevel,
   type ViewProjection,
 } from '@icarus-graph-explorer/view-projection';
 
 import {
   graphStateReducer,
   initialGraphState,
+  normalizeGraphState,
   type GraphStateAction,
 } from '../graph-state';
 import { planEntityNavigation, topLevelPathScopes } from '../navigation';
@@ -58,6 +59,10 @@ import {
 import { EntitySearch } from './EntitySearch';
 import { GraphFilters } from './GraphFilters';
 import { GraphSettings } from './GraphSettings';
+import {
+  CLOSED_GRAPH_WORKSPACE_OVERLAYS,
+  graphWorkspaceOverlayReducer,
+} from './graph-workspace-overlays';
 import { activateMaximizedGraphMode } from './maximized-graph-mode';
 import { ProvenanceInspector } from './ProvenanceInspector';
 
@@ -72,11 +77,6 @@ interface ProjectionFailure {
 }
 
 type ProjectionResult = ProjectionSuccess | ProjectionFailure;
-type WorkspaceOverlay = 'settings' | 'tools' | null;
-
-const HEADING_LIMIT_OPTIONS = [
-  1, 2, 3, 4, 5, 6,
-] as const satisfies readonly SectionHeadingLevel[];
 
 function selectedNode(
   projection: ViewProjection,
@@ -106,6 +106,20 @@ function ToolsIcon() {
       viewBox="0 0 24 24"
     >
       <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  );
+}
+
+function InspectorSidebarIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="graph-shell-icon"
+      focusable="false"
+      viewBox="0 0 24 24"
+    >
+      <rect height="16" rx="2" width="18" x="3" y="4" />
+      <path d="M15 4v16" />
     </svg>
   );
 }
@@ -173,7 +187,10 @@ export function GraphExplorer({
   const [preferenceWarning, setPreferenceWarning] = useState<
     string | undefined
   >(preferenceLoad.warning ?? undefined);
-  const [activeOverlay, setActiveOverlay] = useState<WorkspaceOverlay>(null);
+  const [{ activeOverlay, filtersOpen }, dispatchWorkspaceOverlay] = useReducer(
+    graphWorkspaceOverlayReducer,
+    CLOSED_GRAPH_WORKSPACE_OVERLAYS,
+  );
   const eligibility = persistenceEligibility(identityStability);
   const [hydration] = useState(() =>
     hydrateGraphView({
@@ -182,7 +199,11 @@ export function GraphExplorer({
       workspace: projectionWorkspace,
     }),
   );
-  const [viewState, dispatch] = useReducer(graphStateReducer, hydration.state);
+  const [initialViewState] = useState(() =>
+    normalizeGraphState(hydration.state),
+  );
+  const legacyBlockFilterNormalized = initialViewState !== hydration.state;
+  const [viewState, dispatch] = useReducer(graphStateReducer, initialViewState);
   const currentReconciliation = useMemo(
     () => reconcileCurrentWorkspaceView(projectionWorkspace, viewState),
     [projectionWorkspace, viewState],
@@ -234,9 +255,15 @@ export function GraphExplorer({
   >(restoredViewportHidden ? undefined : hydration.viewport);
   const persistenceWritable = useRef(hydration.writable);
   const [persistenceAnnouncement, setPersistenceAnnouncement] = useState(
-    restoredViewportHidden
-      ? `${hydration.status} The saved viewport anchor is hidden by the restored view, so the graph was fitted.`
-      : hydration.status,
+    `${
+      restoredViewportHidden
+        ? `${hydration.status} The saved viewport anchor is hidden by the restored view, so the graph was fitted.`
+        : hydration.status
+    }${
+      legacyBlockFilterNormalized
+        ? ' Legacy Blocks filtering was normalized to the current view controls.'
+        : ''
+    }`,
   );
   const [persistenceError, setPersistenceError] = useState<string | undefined>(
     eligibility === 'stable' && !hydration.writable
@@ -249,12 +276,15 @@ export function GraphExplorer({
   );
   const [navigationError, setNavigationError] = useState<string>();
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const inspectorToolbarRef = useRef<HTMLButtonElement>(null);
+  const inspectorHandleRef = useRef<HTMLButtonElement>(null);
+  const inspectorRestoreTarget = useRef<HTMLButtonElement | null>(null);
   const [initialSerializedView] = useState(() =>
     hydration.writable
       ? serializePersistedWorkspaceView(
           createPersistedWorkspaceView({
             workspace: projectionWorkspace,
-            state: hydration.state,
+            state: initialViewState,
             ...(hydration.viewport === undefined
               ? {}
               : { viewport: hydration.viewport }),
@@ -377,22 +407,29 @@ export function GraphExplorer({
           window.removeEventListener('keydown', listener),
       },
       () => {
-        setActiveOverlay(null);
+        if (activeOverlay !== null || filtersOpen) {
+          dispatchWorkspaceOverlay({ type: 'close-all' });
+          return;
+        }
         onMaximizedChange(false);
       },
     );
-  }, [maximized, onMaximizedChange]);
+  }, [activeOverlay, filtersOpen, maximized, onMaximizedChange]);
 
   useEffect(() => {
-    if (!applicationOverlayOpen || activeOverlay === null) return;
+    if (!applicationOverlayOpen || (activeOverlay === null && !filtersOpen)) {
+      return;
+    }
     let cancelled = false;
     queueMicrotask(() => {
-      if (!cancelled) setActiveOverlay(null);
+      if (!cancelled) {
+        dispatchWorkspaceOverlay({ type: 'close-all' });
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [activeOverlay, applicationOverlayOpen]);
+  }, [activeOverlay, applicationOverlayOpen, filtersOpen]);
 
   useEffect(() => {
     if (
@@ -468,7 +505,7 @@ export function GraphExplorer({
   );
   const changeMaximized = useCallback(
     (nextMaximized: boolean) => {
-      setActiveOverlay(null);
+      dispatchWorkspaceOverlay({ type: 'close-all' });
       onMaximizedChange(nextMaximized);
     },
     [onMaximizedChange],
@@ -483,20 +520,41 @@ export function GraphExplorer({
     },
     [persistenceStorage],
   );
-  const changeSettingsOpen = useCallback(
-    (open: boolean) => setActiveOverlay(open ? 'settings' : null),
-    [],
+  const changeSettingsOpen = useCallback((open: boolean) => {
+    dispatchWorkspaceOverlay({ type: 'change-settings', open });
+  }, []);
+  const changeFiltersOpen = useCallback(
+    (open: boolean) => {
+      dispatchWorkspaceOverlay({ type: 'change-filters', maximized, open });
+    },
+    [maximized],
   );
-  const toggleTools = useCallback(
-    () => setActiveOverlay((current) => (current === 'tools' ? null : 'tools')),
-    [],
-  );
-  const closeTools = useCallback(() => setActiveOverlay(null), []);
+  const toggleTools = useCallback(() => {
+    dispatchWorkspaceOverlay({ type: 'toggle-tools' });
+  }, []);
+  const closeTools = useCallback(() => {
+    dispatchWorkspaceOverlay({ type: 'close-tools' });
+  }, []);
+  const closeInspector = useCallback(() => {
+    setInspectorOpen(false);
+    queueMicrotask(() => {
+      const target = inspectorRestoreTarget.current;
+      if (target?.isConnected && target.closest('[hidden]') === null) {
+        target.focus();
+      } else inspectorHandleRef.current?.focus();
+    });
+  }, []);
   const toggleInspector = useCallback(
-    () => setInspectorOpen((current) => !current),
-    [],
+    (event: ReactMouseEvent<HTMLButtonElement>) => {
+      if (inspectorOpen) {
+        closeInspector();
+        return;
+      }
+      inspectorRestoreTarget.current = event.currentTarget;
+      setInspectorOpen(true);
+    },
+    [closeInspector, inspectorOpen],
   );
-  const closeInspector = useCallback(() => setInspectorOpen(false), []);
   const navigateToEntity = useCallback(
     (entityId: EntityId, origin: string) => {
       const plan = planEntityNavigation(
@@ -666,51 +724,15 @@ export function GraphExplorer({
               >
                 Top-Level
               </button>
-              <label className="graph-checkbox">
-                <input
-                  checked={activeViewState.disclosure.includeBlocks}
-                  name="include-blocks"
-                  onChange={(event) =>
-                    dispatch({
-                      type: 'set-include-blocks',
-                      includeBlocks: event.currentTarget.checked,
-                    })
-                  }
-                  type="checkbox"
-                />
-                Blocks
-              </label>
-              <label
-                className="heading-limit-control"
-                title="Limits sections by their Markdown heading level. This is different from Top-Level, which means direct structural sections."
-              >
-                Headings
-                <select
-                  aria-label="Heading limit"
-                  autoComplete="off"
-                  name="heading-limit"
-                  onChange={(event) =>
-                    dispatch({
-                      type: 'set-heading-limit',
-                      maxSectionLevel:
-                        event.currentTarget.value === ''
-                          ? null
-                          : (Number(
-                              event.currentTarget.value,
-                            ) as SectionHeadingLevel),
-                    })
-                  }
-                  value={activeViewState.disclosure.maxSectionLevel ?? ''}
-                >
-                  <option value="">No limit</option>
-                  {HEADING_LIMIT_OPTIONS.map((level) => (
-                    <option key={level} value={level}>
-                      {'#'.repeat(level)}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
+            <GraphFilters
+              contained={maximized}
+              onAction={applyGraphAction}
+              onOpenChange={changeFiltersOpen}
+              open={filtersOpen}
+              pathScopes={pathScopes}
+              state={activeViewState}
+            />
             <div
               className="control-group control-group--focus"
               aria-label="Focus controls"
@@ -798,20 +820,20 @@ export function GraphExplorer({
                 </GraphSettings>
               )}
               <button
+                aria-label={
+                  inspectorOpen ? 'Close Inspector' : 'Open Inspector'
+                }
                 aria-pressed={inspectorOpen}
+                className="graph-inspector-toggle"
                 onClick={toggleInspector}
+                ref={inspectorToolbarRef}
+                title="Inspector"
                 type="button"
               >
-                Inspector
+                <InspectorSidebarIcon />
               </button>
             </div>
           </div>
-
-          <GraphFilters
-            onAction={applyGraphAction}
-            pathScopes={pathScopes}
-            state={activeViewState}
-          />
           {maximized ? <ProjectionIssues projection={projection} /> : null}
         </div>
       </div>
@@ -837,11 +859,7 @@ export function GraphExplorer({
       {result.ok ? (
         <div
           className={`graph-stage${
-            inspectorOpen
-              ? maximized
-                ? ' graph-stage--inspector-drawer-open'
-                : ' graph-stage--inspector-open'
-              : ''
+            inspectorOpen ? ' graph-stage--inspector-drawer-open' : ''
           }`}
         >
           <GraphCanvas
@@ -864,26 +882,22 @@ export function GraphExplorer({
             selection={activeSelection}
             trackpadZoomMode={trackpadZoomMode}
           />
-          {maximized && !inspectorOpen ? (
+          {!inspectorOpen ? (
             <button
               aria-label="Open Inspector"
               className="graph-inspector-handle"
               onClick={toggleInspector}
+              ref={inspectorHandleRef}
+              title="Inspector"
               type="button"
             >
               <span aria-hidden="true">‹</span>
-              <span>Open Inspector</span>
             </button>
           ) : null}
           {inspectorOpen ? (
             <ProvenanceInspector
-              key={
-                activeSelection === null
-                  ? 'empty'
-                  : `${activeSelection.kind}:${activeSelection.id}`
-              }
               onClear={clearSelection}
-              {...(maximized ? { onClose: closeInspector } : {})}
+              onClose={closeInspector}
               onNavigate={navigateToEntity}
               {...(performance === undefined ? {} : { performance })}
               projection={result.projection}
