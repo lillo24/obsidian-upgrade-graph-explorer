@@ -12,6 +12,7 @@ import {
   USER_FILTERABLE_ENTITY_KINDS,
   type GraphStateAction,
 } from '../graph-state';
+import { activeGraphFilterCount } from './graph-filter-count';
 import { activateGraphFiltersEscape } from './graph-filters-overlay';
 
 interface GraphFiltersProps {
@@ -38,22 +39,6 @@ const STATUS_LABELS: Readonly<Record<ReferenceResolutionStatus, string>> = {
 const HEADING_LIMIT_OPTIONS = [
   1, 2, 3, 4, 5, 6,
 ] as const satisfies readonly SectionHeadingLevel[];
-
-export function activeGraphFilterCount(state: ViewProjectionState): number {
-  const filters = state.filters;
-  const visibleEntityKinds = filters?.entityKinds?.filter(
-    (kind): kind is Exclude<EntityKind, 'block'> => kind !== 'block',
-  );
-  const entityContentActive =
-    state.disclosure.includeBlocks ||
-    (visibleEntityKinds !== undefined && visibleEntityKinds.length < 2);
-  return (
-    (filters?.pathPrefixes === undefined ? 0 : 1) +
-    (entityContentActive ? 1 : 0) +
-    (state.disclosure.maxSectionLevel === undefined ? 0 : 1) +
-    (filters?.referenceStatuses === undefined ? 0 : 1)
-  );
-}
 
 export const GraphFilters = memo(function GraphFilters({
   contained,

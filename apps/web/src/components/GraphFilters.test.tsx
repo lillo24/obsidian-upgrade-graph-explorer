@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 import type { ViewProjectionState } from '@icarus-graph-explorer/view-projection';
 
 import { initialGraphState, normalizeGraphState } from '../graph-state';
-import { activeGraphFilterCount, GraphFilters } from './GraphFilters';
+import { activeGraphFilterCount } from './graph-filter-count';
+import { GraphFilters } from './GraphFilters';
 
 function renderFilters(
   state: ViewProjectionState,

@@ -35,7 +35,8 @@ canonical truth, or own a platform storage implementation.
   inspection index, independently from visible graph filters.
 - `GraphFilters.tsx` owns the controlled toolbar trigger and responsive nonmodal
   panel for path, entity content, heading depth, and reference status. Blocks is
-  represented once through disclosure state; `graph-filters-overlay.ts` gives
+  represented once through disclosure state; `graph-filter-count.ts` derives
+  its user-visible active-group badge, while `graph-filters-overlay.ts` gives
   the panel first ownership of Escape and restores trigger focus.
   `graph-workspace-overlays.ts` owns the pure Settings/Filters/Tools exclusivity
   policy without coupling transient chrome to KG6 projection state.
