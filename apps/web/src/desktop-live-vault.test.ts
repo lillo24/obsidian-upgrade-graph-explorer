@@ -16,6 +16,13 @@ import {
   initializeObsidianWorkspaceEngine,
   type WorkspaceEngineFailureStage,
 } from '@icarus-graph-explorer/workspace-engine-obsidian';
+import {
+  WORKSPACE_WORKER_PROTOCOL_VERSION,
+  WorkspaceProcessorError,
+  createInProcessWorkspaceProcessor,
+  createWorkspaceWorkerRuntime,
+  type DesktopWorkspaceProcessor,
+} from '@icarus-graph-explorer/workspace-worker';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -139,33 +146,48 @@ function liveServices(
     readonly failReportCall?: number;
     readonly failApplyStage?: WorkspaceEngineFailureStage;
     readonly onApply?: () => void;
+    readonly customizeProcessor?: (
+      processor: DesktopWorkspaceProcessor,
+      index: number,
+    ) => DesktopWorkspaceProcessor;
   } = {},
 ): DesktopLiveVaultServices {
   let tick = 0;
   let reportCalls = 0;
+  let processorCount = 0;
   return {
     now: () => (tick += 1),
-    initializeEngine: initializeObsidianWorkspaceEngine,
-    applyChanges(engine, changes) {
-      input.onApply?.();
-      if (input.failApplyStage !== undefined) {
-        return {
-          ok: false,
-          failure: {
-            stage: input.failApplyStage,
-            code: 'injected-failure',
-            message: 'injected engine failure',
+    createProcessor() {
+      processorCount += 1;
+      const processor = createInProcessWorkspaceProcessor(
+        createWorkspaceWorkerRuntime({
+          now: () => (tick += 1),
+          nextCandidateId: () => `candidate-${tick}`,
+          initializeEngine: initializeObsidianWorkspaceEngine,
+          applyChanges(engine, changes) {
+            input.onApply?.();
+            if (input.failApplyStage !== undefined) {
+              return {
+                ok: false,
+                failure: {
+                  stage: input.failApplyStage,
+                  code: 'injected-failure',
+                  message: 'injected engine failure',
+                },
+              };
+            }
+            return applyObsidianWorkspaceChanges(engine, changes);
           },
-        };
-      }
-      return applyObsidianWorkspaceChanges(engine, changes);
-    },
-    buildReport(reportInput): ObsidianDiagnosticReport {
-      reportCalls += 1;
-      if (reportCalls === input.failReportCall) {
-        throw new Error('report validation failed');
-      }
-      return buildObsidianDiagnosticReport(reportInput);
+          buildReport(reportInput): ObsidianDiagnosticReport {
+            reportCalls += 1;
+            if (reportCalls === input.failReportCall) {
+              throw new Error('report validation failed');
+            }
+            return buildObsidianDiagnosticReport(reportInput);
+          },
+        }),
+      );
+      return input.customizeProcessor?.(processor, processorCount) ?? processor;
     },
   };
 }
@@ -205,7 +227,7 @@ describe('desktop live vault controller', () => {
       dirty: false,
       lastUpdate: { kind: 'incremental' },
     });
-    expect(controller.snapshot().runtime.engine.revision).toBe(1);
+    expect(controller.snapshot().runtime.revision).toBe(1);
     expect(provider.commits).toBe(2);
     await controller.stop();
   });
@@ -255,7 +277,7 @@ describe('desktop live vault controller', () => {
 
     expect(provider.previousInventories).toEqual([inventory(), second]);
     expect(controller.snapshot().runtime.inventory).toBe(third);
-    expect(controller.snapshot().runtime.engine.revision).toBe(2);
+    expect(controller.snapshot().runtime.revision).toBe(2);
     expect(provider.commits).toBe(3);
   });
 
@@ -274,13 +296,15 @@ describe('desktop live vault controller', () => {
       provider,
       liveServices({ onApply: () => (applyCalls += 1) }),
     );
-    const engine = controller.snapshot().runtime.engine;
+    const processor = controller.snapshot().runtime.processor;
+    const revision = controller.snapshot().runtime.revision;
 
     await provider.emit({ ...BATCH, paths: ['image.png'] });
     await controller.whenIdle();
 
     expect(controller.snapshot().lastUpdate?.kind).toBe('non-markdown');
-    expect(controller.snapshot().runtime.engine).toBe(engine);
+    expect(controller.snapshot().runtime.processor).toBe(processor);
+    expect(controller.snapshot().runtime.revision).toBe(revision);
     expect(
       controller.snapshot().report.sourceInventory.nonMarkdownFileCount,
     ).toBe(1);
@@ -317,7 +341,19 @@ describe('desktop live vault controller', () => {
         ],
       }),
     );
-    const { controller } = await openedController(provider);
+    let discardCalls = 0;
+    const { controller } = await openedController(
+      provider,
+      liveServices({
+        customizeProcessor: (processor) => ({
+          ...processor,
+          async discardCandidate(candidateId) {
+            discardCalls += 1;
+            return processor.discardCandidate(candidateId);
+          },
+        }),
+      }),
+    );
     const committed = controller.snapshot();
     provider.currentInventory = changed;
     provider.commitFailures = 1;
@@ -331,6 +367,7 @@ describe('desktop live vault controller', () => {
     });
     expect(controller.snapshot().runtime).toBe(committed.runtime);
     expect(controller.snapshot().report).toBe(committed.report);
+    expect(discardCalls).toBe(1);
 
     await controller.rescan();
     expect(controller.snapshot()).toMatchObject({
@@ -338,8 +375,8 @@ describe('desktop live vault controller', () => {
       dirty: false,
       lastUpdate: { kind: 'full-resync' },
     });
-    expect(controller.snapshot().runtime.engine.workspaceId).toBe(
-      committed.runtime.engine.workspaceId,
+    expect(controller.snapshot().runtime.workspaceId).toBe(
+      committed.runtime.workspaceId,
     );
   });
 
@@ -405,6 +442,117 @@ describe('desktop live vault controller', () => {
     expect(provider.commits).toBe(1);
   });
 
+  it('rescans with a replacement worker after persistence succeeds but commit acknowledgement fails', async () => {
+    const provider = new FakeLiveProvider();
+    const changed = inventory('# A\n\n## Candidate');
+    provider.currentInventory = changed;
+    provider.reconciliations.push(
+      planned({
+        nextInventory: changed,
+        markdownChanges: [
+          {
+            kind: 'upsert',
+            path: 'A.md',
+            source: '# A\n\n## Candidate',
+          },
+        ],
+      }),
+    );
+    let firstCommitCalls = 0;
+    let processors = 0;
+    const services = liveServices({
+      customizeProcessor: (processor, index) => {
+        processors = Math.max(processors, index);
+        if (index !== 1) return processor;
+        return {
+          ...processor,
+          async commitCandidate(candidateId) {
+            firstCommitCalls += 1;
+            if (firstCommitCalls === 2) {
+              processor.terminate();
+              throw new WorkspaceProcessorError({
+                protocolVersion: WORKSPACE_WORKER_PROTOCOL_VERSION,
+                requestId: 'injected',
+                kind: 'failure',
+                category: 'transport',
+                code: 'worker-crashed',
+                message: 'worker crashed before commit acknowledgement',
+              });
+            }
+            return processor.commitCandidate(candidateId);
+          },
+        };
+      },
+    });
+    const { controller } = await openedController(provider, services);
+    const previousReport = controller.snapshot().report;
+
+    await provider.emit();
+    await controller.whenIdle();
+
+    expect(controller.snapshot()).toMatchObject({
+      phase: 'live',
+      dirty: false,
+      lastUpdate: { kind: 'full-resync' },
+    });
+    expect(controller.snapshot().report).not.toBe(previousReport);
+    expect(processors).toBe(2);
+    expect(provider.discoverCalls).toBe(2);
+    expect(provider.commits).toBe(3);
+  });
+
+  it('pauses on worker transport failure and manual Rescan creates a replacement', async () => {
+    const provider = new FakeLiveProvider();
+    const changed = inventory('# Changed');
+    provider.currentInventory = changed;
+    provider.reconciliations.push(
+      planned({
+        nextInventory: changed,
+        markdownChanges: [
+          { kind: 'upsert', path: 'A.md', source: '# Changed' },
+        ],
+      }),
+    );
+    let processors = 0;
+    const services = liveServices({
+      customizeProcessor: (processor, index) => {
+        processors = Math.max(processors, index);
+        if (index !== 1) return processor;
+        return {
+          ...processor,
+          async prepareChanges() {
+            processor.terminate();
+            throw new WorkspaceProcessorError({
+              protocolVersion: WORKSPACE_WORKER_PROTOCOL_VERSION,
+              requestId: 'injected',
+              kind: 'failure',
+              category: 'transport',
+              code: 'worker-crashed',
+              message: 'worker transport failed',
+            });
+          },
+        };
+      },
+    });
+    const { controller } = await openedController(provider, services);
+    const priorReport = controller.snapshot().report;
+
+    await provider.emit();
+    await controller.whenIdle();
+    expect(controller.snapshot()).toMatchObject({
+      phase: 'paused',
+      dirty: true,
+    });
+    expect(controller.snapshot().report).toBe(priorReport);
+
+    await controller.rescan();
+    expect(controller.snapshot()).toMatchObject({
+      phase: 'live',
+      lastUpdate: { kind: 'full-resync' },
+    });
+    expect(processors).toBe(2);
+  });
+
   it('automatically performs a full resync when the provider requires one', async () => {
     const provider = new FakeLiveProvider();
     provider.currentInventory = inventory('# Resynced');
@@ -414,14 +562,14 @@ describe('desktop live vault controller', () => {
       affectedPaths: ['A.md'],
     });
     const { controller } = await openedController(provider);
-    const workspaceId = controller.snapshot().runtime.engine.workspaceId;
+    const workspaceId = controller.snapshot().runtime.workspaceId;
 
     await provider.emit({ ...BATCH, requiresResync: true });
     await controller.whenIdle();
 
     expect(provider.discoverCalls).toBe(2);
     expect(controller.snapshot().lastUpdate?.kind).toBe('full-resync');
-    expect(controller.snapshot().runtime.engine.workspaceId).toBe(workspaceId);
+    expect(controller.snapshot().runtime.workspaceId).toBe(workspaceId);
     expect(provider.commits).toBe(2);
   });
 

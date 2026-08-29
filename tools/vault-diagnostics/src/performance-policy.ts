@@ -44,7 +44,7 @@ export const PERFORMANCE_WORKER_DECISIONS = [
     workload: 'W1-workspace-engine-diagnostics',
     decision: 'worker-in-KG12B',
     evidence:
-      'KG10 reparses changed files but still performs whole-workspace resolution, identity, delta, and diagnostic construction; medium/large transactions exceed direct main-thread budgets.',
+      'Implemented in KG12B1 as a stateful sequential worker with transactional candidate commit; medium/large direct work exceeded main-thread budgets.',
   },
   {
     workload: 'W2-projection',
@@ -103,4 +103,4 @@ export const RENDERER_SCALE_CLIFF =
   'The structural renderer cliff is Dagre layout over fully expanded projections: cost grows sharply once thousands of nodes and hierarchy/reference edges are simultaneously projected, well before mapping or inspection becomes dominant.';
 
 export const KG12B_SCOPE =
-  'Move W1 workspace-engine plus diagnostic transactions and W3 Dagre layout behind latest-result-wins workers with serializable request/result contracts; keep W2 projection and W4 inspection on the main thread, retain existing memoization, and add no new general-purpose cache.';
+  'KG12B1 moves stateful sequential W1 workspace-engine plus diagnostic transactions behind a versioned worker protocol. KG12B2 keeps W3 separate as a stateless latest-layout-wins worker; W2 projection and W4 inspection remain on the main thread with existing memoization and no new general-purpose cache.';

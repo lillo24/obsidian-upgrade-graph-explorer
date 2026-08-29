@@ -71,6 +71,9 @@ importers:
       '@icarus-graph-explorer/workspace-engine-obsidian':
         specifier: workspace:*
         version: link:../../packages/workspace-engine-obsidian
+      '@icarus-graph-explorer/workspace-worker':
+        specifier: workspace:*
+        version: link:../../packages/workspace-worker
       react:
         specifier: 19.2.8
         version: 19.2.8
@@ -290,6 +293,21 @@ importers:
         specifier: workspace:*
         version: link:../stable-identity
 
+  packages/workspace-worker:
+    dependencies:
+      '@icarus-graph-explorer/core':
+        specifier: workspace:*
+        version: link:../core
+      '@icarus-graph-explorer/diagnostics-obsidian':
+        specifier: workspace:*
+        version: link:../diagnostics-obsidian
+      '@icarus-graph-explorer/stable-identity':
+        specifier: workspace:*
+        version: link:../stable-identity
+      '@icarus-graph-explorer/workspace-engine-obsidian':
+        specifier: workspace:*
+        version: link:../workspace-engine-obsidian
+
   tools/vault-diagnostics:
     dependencies:
       '@icarus-graph-explorer/adapter-obsidian':
@@ -328,6 +346,9 @@ importers:
       '@icarus-graph-explorer/workspace-engine-obsidian':
         specifier: workspace:*
         version: link:../../packages/workspace-engine-obsidian
+      '@icarus-graph-explorer/workspace-worker':
+        specifier: workspace:*
+        version: link:../../packages/workspace-worker
     devDependencies:
       '@types/node':
         specifier: 24.13.3

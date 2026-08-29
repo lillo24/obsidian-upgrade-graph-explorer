@@ -15,9 +15,14 @@ import type {
   WorkspaceIdentitySession,
 } from '@icarus-graph-explorer/source-provider-tauri';
 import {
+  applyObsidianWorkspaceChanges,
   initializeObsidianWorkspaceEngine,
-  type InitializeObsidianWorkspaceEngineInput,
 } from '@icarus-graph-explorer/workspace-engine-obsidian';
+import {
+  createInProcessWorkspaceProcessor,
+  createWorkspaceWorkerRuntime,
+  type DesktopWorkspaceProcessor,
+} from '@icarus-graph-explorer/workspace-worker';
 
 import {
   openSelectedDesktopVault,
@@ -42,6 +47,7 @@ class FakeProvider implements TauriSourceProvider {
   catalog = createStableIdentityCatalog('desktop-workspace');
   commitError?: Error;
   commits = 0;
+  discoverCalls = 0;
   identityOptions: unknown;
 
   async selectVaultDirectory(): Promise<VaultSelection | undefined> {
@@ -49,6 +55,7 @@ class FakeProvider implements TauriSourceProvider {
   }
 
   async discoverSelectedVault() {
+    this.discoverCalls += 1;
     return this.inventory;
   }
 
@@ -57,7 +64,7 @@ class FakeProvider implements TauriSourceProvider {
   }
 
   async reconcileSelectedVaultChanges(): Promise<never> {
-    throw new Error('Live reconciliation is outside this KG11A test fake.');
+    throw new Error('Live reconciliation is outside this test fake.');
   }
 
   async loadOrPrepareWorkspaceIdentity(
@@ -83,39 +90,59 @@ class FakeProvider implements TauriSourceProvider {
   }
 }
 
-function measuredServices() {
+function measuredServices(
+  customize?: (
+    processor: DesktopWorkspaceProcessor,
+    processorIndex: number,
+  ) => DesktopWorkspaceProcessor,
+) {
   let time = 0;
   let initializations = 0;
+  let processors = 0;
   const reportInputs: BuildObsidianDiagnosticReportInput[] = [];
   const services: DesktopVaultServices = {
     now: () => (time += 1),
-    initializeEngine(input: InitializeObsidianWorkspaceEngineInput) {
-      initializations += 1;
-      return initializeObsidianWorkspaceEngine(input);
-    },
-    buildReport(input: BuildObsidianDiagnosticReportInput) {
-      reportInputs.push(input);
-      return buildObsidianDiagnosticReport(input);
+    createProcessor() {
+      processors += 1;
+      const processor = createInProcessWorkspaceProcessor(
+        createWorkspaceWorkerRuntime({
+          now: () => (time += 1),
+          nextCandidateId: () => `candidate-${time}`,
+          initializeEngine(input) {
+            initializations += 1;
+            return initializeObsidianWorkspaceEngine(input);
+          },
+          applyChanges: applyObsidianWorkspaceChanges,
+          buildReport(input) {
+            reportInputs.push(input);
+            return buildObsidianDiagnosticReport(input);
+          },
+        }),
+      );
+      return customize?.(processor, processors) ?? processor;
     },
   };
   return {
     services,
     initializations: () => initializations,
+    processors: () => processors,
     reportInputs,
   };
 }
 
-describe('desktop vault application orchestration', () => {
+describe('desktop vault worker orchestration', () => {
   it('leaves the application unchanged after directory-dialog cancellation', async () => {
     const provider = new FakeProvider();
     provider.selection = undefined;
-    await expect(selectAndOpenDesktopVault(provider)).resolves.toEqual({
-      status: 'cancelled',
-    });
+    const measured = measuredServices();
+    await expect(
+      selectAndOpenDesktopVault(provider, measured.services),
+    ).resolves.toEqual({ status: 'cancelled' });
     expect(provider.commits).toBe(0);
+    expect(measured.processors()).toBe(0);
   });
 
-  it('initializes KG10 once, reuses its parsed documents, and marks a persisted report stable', async () => {
+  it('awaits worker preparation, persists, commits, and exposes no engine', async () => {
     const provider = new FakeProvider();
     const measured = measuredServices();
     const opened = await selectAndOpenDesktopVault(provider, measured.services);
@@ -130,10 +157,14 @@ describe('desktop vault application orchestration', () => {
       nonMarkdownFileCount: 1,
     });
     expect(measured.reportInputs).toHaveLength(1);
-    expect(measured.reportInputs[0]?.documents).toEqual(
-      opened.runtime.engine.parsedDocuments(),
-    );
-    expect(opened.runtime.engine.parsedDocumentCount).toBe(2);
+    expect(
+      measured.reportInputs[0]?.documents.map((value) => value.structure.path),
+    ).toEqual(['A.md', 'B.md']);
+    expect(opened.runtime).not.toHaveProperty('engine');
+    expect(opened.runtime).toMatchObject({
+      workspaceId: 'desktop-workspace',
+      revision: 0,
+    });
     expect(opened.identityCounts).toEqual({
       entitiesReused: 0,
       entitiesNew: 4,
@@ -142,10 +173,17 @@ describe('desktop vault application orchestration', () => {
     });
   });
 
-  it('downgrades truthfully to transient when identity persistence fails', async () => {
+  it('discards and terminates the candidate when identity persistence fails', async () => {
     const provider = new FakeProvider();
     provider.commitError = new Error('app-data write denied');
-    const measured = measuredServices();
+    let terminated = 0;
+    const measured = measuredServices((processor) => ({
+      ...processor,
+      terminate() {
+        terminated += 1;
+        processor.terminate();
+      },
+    }));
     const opened = await openSelectedDesktopVault(
       provider,
       SELECTION,
@@ -157,13 +195,60 @@ describe('desktop vault application orchestration', () => {
     expect(opened.identityPersisted).toBe(false);
     expect(opened.report.identity).toEqual({ stability: 'transient' });
     expect(opened.warning).toContain('app-data write denied');
-    expect(measured.reportInputs).toHaveLength(2);
+    expect(terminated).toBe(1);
+    expect(measured.reportInputs).toHaveLength(1);
   });
 
-  it('reuses every unchanged identity when the same stable workspace is opened again', async () => {
+  it('recovers with a replacement worker if commit acknowledgement fails after persistence', async () => {
     const provider = new FakeProvider();
-    const first = await openSelectedDesktopVault(provider, SELECTION);
-    const second = await openSelectedDesktopVault(provider, SELECTION);
+    let firstTerminated = false;
+    const measured = measuredServices((processor, index) =>
+      index === 1
+        ? {
+            ...processor,
+            commitCandidate: async () => {
+              throw new Error('worker crashed before commit acknowledgement');
+            },
+            terminate() {
+              firstTerminated = true;
+              processor.terminate();
+            },
+          }
+        : processor,
+    );
+
+    const opened = await openSelectedDesktopVault(
+      provider,
+      SELECTION,
+      {},
+      measured.services,
+    );
+
+    expect(opened.identityPersisted).toBe(true);
+    expect(opened.report.identity).toEqual({ stability: 'stable' });
+    expect(measured.processors()).toBe(2);
+    expect(measured.initializations()).toBe(2);
+    expect(provider.commits).toBe(2);
+    expect(provider.discoverCalls).toBe(2);
+    expect(firstTerminated).toBe(true);
+  });
+
+  it('reuses every unchanged identity when the stable workspace opens again', async () => {
+    const provider = new FakeProvider();
+    const measured = measuredServices();
+    const first = await openSelectedDesktopVault(
+      provider,
+      SELECTION,
+      {},
+      measured.services,
+    );
+    first.runtime.processor.terminate();
+    const second = await openSelectedDesktopVault(
+      provider,
+      SELECTION,
+      {},
+      measured.services,
+    );
 
     expect(first.identityCounts.entitiesNew).toBeGreaterThan(0);
     expect(second.identityCounts).toEqual({
@@ -172,28 +257,30 @@ describe('desktop vault application orchestration', () => {
       referencesReused: first.report.snapshot.references.length,
       referencesNew: 0,
     });
-    expect(second.report.snapshot.workspace.id).toBe(
-      first.report.snapshot.workspace.id,
-    );
   });
 
-  it('propagates source failures instead of producing a success-shaped empty report', async () => {
+  it('propagates source failures without creating a worker or empty report', async () => {
     const provider = new FakeProvider();
     provider.discoverSelectedVault = async () => {
       throw new Error('Cannot read vault directory Folder.');
     };
-    await expect(openSelectedDesktopVault(provider, SELECTION)).rejects.toThrow(
-      'Cannot read vault directory Folder',
-    );
+    const measured = measuredServices();
+    await expect(
+      openSelectedDesktopVault(provider, SELECTION, {}, measured.services),
+    ).rejects.toThrow('Cannot read vault directory Folder');
     expect(provider.commits).toBe(0);
+    expect(measured.processors()).toBe(0);
   });
 
   it('passes confirmed reset options through the selected-vault retry', async () => {
     const provider = new FakeProvider();
-    await openSelectedDesktopVault(provider, SELECTION, {
-      reset: true,
-      replaceCorruptRegistry: true,
-    });
+    const measured = measuredServices();
+    await openSelectedDesktopVault(
+      provider,
+      SELECTION,
+      { reset: true, replaceCorruptRegistry: true },
+      measured.services,
+    );
     expect(provider.identityOptions).toEqual({
       reset: true,
       replaceCorruptRegistry: true,

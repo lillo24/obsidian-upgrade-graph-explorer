@@ -6,6 +6,7 @@
   "scripts": {
     "benchmark": "tsx src/benchmark.ts",
     "benchmark:performance": "tsx src/performance-benchmark.ts",
+    "benchmark:workspace-worker": "tsx src/workspace-worker-responsiveness.ts",
     "diagnose": "tsx src/cli.ts",
     "generate:sample": "tsx src/generate-sample.ts",
     "validate:incremental-real": "tsx src/validate-incremental-real.ts",
@@ -23,7 +24,8 @@
     "@icarus-graph-explorer/stable-identity": "workspace:*",
     "@icarus-graph-explorer/vault-discovery-policy": "workspace:*",
     "@icarus-graph-explorer/view-projection": "workspace:*",
-    "@icarus-graph-explorer/workspace-engine-obsidian": "workspace:*"
+    "@icarus-graph-explorer/workspace-engine-obsidian": "workspace:*",
+    "@icarus-graph-explorer/workspace-worker": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "24.13.3",

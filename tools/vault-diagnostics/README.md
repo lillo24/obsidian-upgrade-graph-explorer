@@ -1,6 +1,6 @@
 # Local Vault Diagnostics
 
-Status: **STABLE — KG12A repeatable aggregate performance contracts extend the KG10 diagnostic harness.**
+Status: **STABLE — KG12B1 adds aggregate W1 worker responsiveness evidence to the KG12A harness.**
 
 This development-only workspace package is the Node KG5 filesystem boundary.
 It recursively acquires one explicitly selected local vault, then calls KG3,
@@ -31,6 +31,8 @@ src/
   incremental-benchmark.ts Edit/add/delete/move timings with exact rebuild oracles.
   performance-benchmark.ts Repeated versioned pipeline/projection/renderer/inspection results.
   performance-policy.ts Class budgets plus measured KG12B worker/cache decisions.
+  workspace-worker-thread.ts Node host for the production W1 protocol/runtime.
+  workspace-worker-responsiveness.ts Direct-versus-worker event-loop evidence.
   validate-incremental-real.ts Aggregate-only, in-memory private validation.
   generate-sample.ts  Regenerates the committed neutral browser sample.
   index.test.ts       Temporary-directory scanner and failure contracts.
@@ -105,6 +107,8 @@ pnpm benchmark:pipeline -- --profile medium
 pnpm benchmark:pipeline -- --profile large
 pnpm benchmark:performance -- --profile small \
   --output output/performance/small.json
+pnpm benchmark:workspace-worker -- --profile medium
+pnpm benchmark:workspace-worker -- --profile large
 ```
 
 Profiles are deterministic and measure parse/adapt, resolution, report
@@ -131,6 +135,14 @@ root command resolve from the caller's directory even though pnpm executes in
 this package. Use only the ignored `output/performance/` destination. Repeated
 Dagre is explicitly omitted above 2,500 projected nodes after the measured
 structural cliff; the JSON records the reason instead of a zero-time success.
+
+`benchmark:workspace-worker` runs the same deterministic W1 initialization
+directly and through a warm worker thread while a 16 ms event-loop probe stays
+active. It reports internal compute, round trip, p95/maximum scheduling gap,
+and exact report/catalog equality. Output is aggregate-only and is not a CI
+timing gate. The browser production build separately proves the Vite Dedicated
+Worker entry; this Node host exists only for repeatable local responsiveness
+evidence.
 
 An opt-in private check can validate one real workspace using an existing
 identity catalog:

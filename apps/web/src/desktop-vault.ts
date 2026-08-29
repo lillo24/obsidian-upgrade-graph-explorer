@@ -1,5 +1,5 @@
 import {
-  buildObsidianDiagnosticReport,
+  validateObsidianDiagnosticReport,
   type ObsidianDiagnosticReport,
 } from '@icarus-graph-explorer/diagnostics-obsidian';
 import {
@@ -11,16 +11,22 @@ import {
   type WorkspaceIdentityRecovery,
   type WorkspaceIdentitySession,
 } from '@icarus-graph-explorer/source-provider-tauri';
+import type { StableIdentityCatalog } from '@icarus-graph-explorer/stable-identity';
 import {
-  initializeObsidianWorkspaceEngine,
-  type InitializeObsidianWorkspaceEngineResult,
-  type ObsidianWorkspaceEngine,
-} from '@icarus-graph-explorer/workspace-engine-obsidian';
+  type DesktopWorkspaceProcessor,
+  type DesktopWorkspaceProcessorFactory,
+  type PreparedWorkspaceResult,
+} from '@icarus-graph-explorer/workspace-worker';
+
+import { createDesktopWorkspaceProcessor } from './workers/workspace-worker-client';
 
 export interface DesktopVaultTimings {
   readonly sourceAcquisitionMs: number;
   readonly workspaceInitializationMs: number;
   readonly diagnosticConstructionMs: number;
+  readonly workerComputeMs: number;
+  readonly workerRoundTripMs: number;
+  readonly mainThreadHighGapMs: number;
   readonly identityPersistenceMs: number;
 }
 
@@ -35,7 +41,11 @@ export interface DesktopVaultRuntime {
   readonly selection: VaultSelection;
   readonly inventory: VaultSourceInventory;
   readonly identitySession: WorkspaceIdentitySession;
-  readonly engine: ObsidianWorkspaceEngine;
+  readonly workspaceId: string;
+  readonly revision: number;
+  /** Last catalog known to have completed app-local durable persistence. */
+  readonly durableIdentityCatalog: StableIdentityCatalog;
+  readonly processor: DesktopWorkspaceProcessor;
 }
 
 export interface OpenedDesktopVault {
@@ -77,38 +87,20 @@ export class DesktopVaultOpenError extends Error {
 
 export interface DesktopVaultServices {
   readonly now: () => number;
-  readonly initializeEngine: typeof initializeObsidianWorkspaceEngine;
-  readonly buildReport: typeof buildObsidianDiagnosticReport;
+  readonly createProcessor: DesktopWorkspaceProcessorFactory;
 }
 
 const DEFAULT_SERVICES: DesktopVaultServices = {
   now: () => performance.now(),
-  initializeEngine: initializeObsidianWorkspaceEngine,
-  buildReport: buildObsidianDiagnosticReport,
+  createProcessor: createDesktopWorkspaceProcessor,
 };
 
 function elapsed(start: number, services: DesktopVaultServices): number {
   return Number((services.now() - start).toFixed(3));
 }
 
-function initializationFailure(
-  result: Extract<
-    InitializeObsidianWorkspaceEngineResult,
-    { readonly ok: false }
-  >,
-  selection: VaultSelection,
-): DesktopVaultOpenError {
-  return new DesktopVaultOpenError(
-    `Workspace initialization failed at ${result.failure.stage}: ${result.failure.message}`,
-    selection,
-  );
-}
-
 function identityCounts(
-  result: Extract<
-    InitializeObsidianWorkspaceEngineResult,
-    { readonly ok: true }
-  >,
+  result: PreparedWorkspaceResult,
 ): DesktopVaultIdentityCounts {
   const entityKinds = [
     result.identitySummary.documents,
@@ -131,22 +123,106 @@ function identityCounts(
   };
 }
 
-function buildReport(
-  initialized: Extract<
-    InitializeObsidianWorkspaceEngineResult,
-    { readonly ok: true }
-  >,
-  inventory: VaultSourceInventory,
-  stability: 'stable' | 'transient',
-  services: DesktopVaultServices,
+function transientReport(
+  report: ObsidianDiagnosticReport,
+  selection: VaultSelection,
 ): ObsidianDiagnosticReport {
-  return services.buildReport({
-    snapshot: initialized.snapshot,
-    diagnostics: initialized.resolutionDiagnostics,
-    documents: initialized.engine.parsedDocuments(),
-    nonMarkdownPaths: inventory.nonMarkdownPaths,
-    identity: { stability },
+  const validation = validateObsidianDiagnosticReport({
+    ...report,
+    identity: { stability: 'transient' },
   });
+  if (!validation.valid) {
+    throw new DesktopVaultOpenError(
+      `Transient diagnostic report validation failed: ${
+        validation.issues[0]?.message ?? 'unknown validation failure'
+      }`,
+      selection,
+    );
+  }
+  return validation.value;
+}
+
+async function prepareInitialization(
+  processor: DesktopWorkspaceProcessor,
+  identitySession: WorkspaceIdentitySession,
+  inventory: VaultSourceInventory,
+  selection: VaultSelection,
+): Promise<PreparedWorkspaceResult> {
+  try {
+    return await processor.prepareInitialize({
+      workspaceId: identitySession.workspaceId,
+      documents: inventory.markdownDocuments,
+      identityCatalog: identitySession.catalog,
+      nonMarkdownPaths: inventory.nonMarkdownPaths,
+    });
+  } catch (error: unknown) {
+    processor.terminate();
+    throw new DesktopVaultOpenError(
+      `Workspace worker initialization failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      selection,
+      { cause: error },
+    );
+  }
+}
+
+async function recoverCommitFailure(input: {
+  readonly failedProcessor: DesktopWorkspaceProcessor;
+  readonly sourceProvider: TauriSourceProvider;
+  readonly selection: VaultSelection;
+  readonly identitySession: WorkspaceIdentitySession;
+  readonly durableCatalog: StableIdentityCatalog;
+  readonly services: DesktopVaultServices;
+}): Promise<{
+  readonly processor: DesktopWorkspaceProcessor;
+  readonly prepared: PreparedWorkspaceResult;
+  readonly inventory: VaultSourceInventory;
+  readonly sourceAcquisitionMs: number;
+  readonly persistenceMs: number;
+}> {
+  input.failedProcessor.terminate();
+  const replacement = input.services.createProcessor();
+  const replacementSession: WorkspaceIdentitySession = {
+    ...input.identitySession,
+    catalog: input.durableCatalog,
+  };
+  try {
+    const acquisitionStart = input.services.now();
+    const inventory = await input.sourceProvider.discoverSelectedVault(
+      input.selection,
+    );
+    const sourceAcquisitionMs = elapsed(acquisitionStart, input.services);
+    const prepared = await replacement.prepareInitialize({
+      workspaceId: replacementSession.workspaceId,
+      documents: inventory.markdownDocuments,
+      identityCatalog: input.durableCatalog,
+      nonMarkdownPaths: inventory.nonMarkdownPaths,
+    });
+    const persistenceStart = input.services.now();
+    await input.sourceProvider.commitWorkspaceIdentity(
+      replacementSession,
+      prepared.nextIdentityCatalog,
+    );
+    const persistenceMs = elapsed(persistenceStart, input.services);
+    await replacement.commitCandidate(prepared.candidateId);
+    return {
+      processor: replacement,
+      prepared,
+      inventory,
+      sourceAcquisitionMs,
+      persistenceMs,
+    };
+  } catch (error: unknown) {
+    replacement.terminate();
+    throw new DesktopVaultOpenError(
+      `Workspace worker commit failed after identity persistence, and replacement recovery failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      input.selection,
+      { cause: error },
+    );
+  }
 }
 
 export async function openSelectedDesktopVault(
@@ -175,54 +251,70 @@ export async function openSelectedDesktopVault(
       },
     );
   }
-  const sourceAcquisitionMs = elapsed(acquisitionStart, services);
+  let sourceAcquisitionMs = elapsed(acquisitionStart, services);
 
-  const initializationStart = services.now();
-  const initialized = services.initializeEngine({
-    workspaceId: identitySession.workspaceId,
-    documents: inventory.markdownDocuments,
-    identityCatalog: identitySession.catalog,
-  });
-  const workspaceInitializationMs = elapsed(initializationStart, services);
-  if (!initialized.ok) throw initializationFailure(initialized, selection);
-
-  const diagnosticStart = services.now();
-  let stableReport;
-  try {
-    stableReport = buildReport(initialized, inventory, 'stable', services);
-  } catch (error: unknown) {
-    throw new DesktopVaultOpenError(
-      `Diagnostic report construction failed: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-      selection,
-      { cause: error },
-    );
-  }
-  let diagnosticConstructionMs = elapsed(diagnosticStart, services);
-
-  const persistenceStart = services.now();
+  let processor = services.createProcessor();
+  const prepared = await prepareInitialization(
+    processor,
+    identitySession,
+    inventory,
+    selection,
+  );
+  let activePrepared = prepared;
   let identityPersisted = true;
   let warning: string | undefined;
-  let report = stableReport;
+  let identityPersistenceMs: number;
+  const persistenceStart = services.now();
   try {
     await sourceProvider.commitWorkspaceIdentity(
       identitySession,
-      initialized.identityCatalog,
+      prepared.nextIdentityCatalog,
     );
+    identityPersistenceMs = elapsed(persistenceStart, services);
   } catch (error: unknown) {
     identityPersisted = false;
+    identityPersistenceMs = elapsed(persistenceStart, services);
     warning = `The vault is open for this session, but stable identity could not be saved: ${
       error instanceof Error ? error.message : String(error)
     } Saved-view restoration is disabled for this transient session.`;
-    const transientStart = services.now();
-    report = buildReport(initialized, inventory, 'transient', services);
-    diagnosticConstructionMs = Number(
-      (diagnosticConstructionMs + elapsed(transientStart, services)).toFixed(3),
-    );
+    try {
+      await processor.discardCandidate(prepared.candidateId);
+    } catch (discardError: unknown) {
+      warning = `${warning} The uncommitted worker candidate could not be discarded cleanly (${String(
+        discardError instanceof Error ? discardError.message : discardError,
+      )}); its worker was terminated.`;
+    } finally {
+      processor.terminate();
+    }
   }
-  const identityPersistenceMs = elapsed(persistenceStart, services);
 
+  if (identityPersisted) {
+    try {
+      await processor.commitCandidate(prepared.candidateId);
+    } catch {
+      const recovered = await recoverCommitFailure({
+        failedProcessor: processor,
+        sourceProvider,
+        selection,
+        identitySession,
+        durableCatalog: prepared.nextIdentityCatalog,
+        services,
+      });
+      processor = recovered.processor;
+      activePrepared = recovered.prepared;
+      inventory = recovered.inventory;
+      sourceAcquisitionMs = Number(
+        (sourceAcquisitionMs + recovered.sourceAcquisitionMs).toFixed(3),
+      );
+      identityPersistenceMs = Number(
+        (identityPersistenceMs + recovered.persistenceMs).toFixed(3),
+      );
+    }
+  }
+
+  const report = identityPersisted
+    ? activePrepared.report
+    : transientReport(prepared.report, selection);
   return {
     status: 'opened',
     displayName: identitySession.selection.displayName,
@@ -234,16 +326,26 @@ export async function openSelectedDesktopVault(
       : {}),
     timings: {
       sourceAcquisitionMs,
-      workspaceInitializationMs,
-      diagnosticConstructionMs,
+      workspaceInitializationMs: activePrepared.timings.workspaceUpdateMs,
+      diagnosticConstructionMs: activePrepared.timings.diagnosticConstructionMs,
+      workerComputeMs: activePrepared.timings.workerComputeMs,
+      workerRoundTripMs:
+        activePrepared.timings.workerRoundTripMs ??
+        activePrepared.timings.workerComputeMs,
+      mainThreadHighGapMs: activePrepared.timings.mainThreadHighGapMs ?? 0,
       identityPersistenceMs,
     },
-    identityCounts: identityCounts(initialized),
+    identityCounts: identityCounts(activePrepared),
     runtime: {
       selection,
       inventory,
       identitySession,
-      engine: initialized.engine,
+      workspaceId: activePrepared.workspaceId,
+      revision: activePrepared.toRevision,
+      durableIdentityCatalog: identityPersisted
+        ? activePrepared.nextIdentityCatalog
+        : identitySession.catalog,
+      processor,
     },
   };
 }

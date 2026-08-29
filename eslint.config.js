@@ -694,6 +694,39 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/workspace-worker/**/*.{ts,tsx}'],
+    ignores: ['packages/workspace-worker/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                '@xyflow/*',
+                '@dagrejs/*',
+                '@tauri-apps/*',
+                '@icarus-graph-explorer/source-provider-tauri',
+                '@icarus-graph-explorer/source-provider-tauri/*',
+                '@icarus-graph-explorer/renderer-reactflow',
+                '@icarus-graph-explorer/renderer-reactflow/*',
+                '@icarus-graph-explorer/web',
+                '@icarus-graph-explorer/web/*',
+                'node:*',
+              ],
+              message:
+                'The workspace-worker package is a platform-independent protocol/state machine; browser Worker, Tauri, UI, and filesystem concerns belong outside it.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['packages/stable-identity/**/*.{ts,tsx}'],
     ignores: ['packages/stable-identity/**/*.test.{ts,tsx}'],
     rules: {
