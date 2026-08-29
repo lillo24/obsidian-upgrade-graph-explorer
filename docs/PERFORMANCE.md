@@ -1,6 +1,6 @@
 # Performance baseline and KG12B decision
 
-Status: **STABLE — KG12A measurement contracts, budgets, and worker decision are complete.**
+Status: **STABLE — KG12A baselines and KG12B1 W1 worker implementation/evidence are complete.**
 
 KG12A measures the final UX4B application without changing its product
 behavior. The evidence supports a narrow KG12B: move whole-workspace
@@ -53,6 +53,45 @@ Recorded environment on 2026-08-29: Windows `10.0.26200` x64, Intel Core Ultra
 7 258V, Node `v24.13.0`, pnpm `11.19.0`, commit `6cc57a1798b0` before KG12A.
 Environment metadata excludes hostnames, usernames, workspace IDs/names,
 paths, queries, source text, and live correlation tokens.
+
+## KG12B1 W1 responsiveness evidence
+
+`pnpm benchmark:workspace-worker -- --profile medium` and `--profile large`
+compare the same deterministic initialization through direct main-thread W1
+and a warm Node worker-thread host around the production protocol/runtime.
+They run a 16 ms event-loop probe throughout, verify exact report/catalog
+equality, and print aggregate-only JSON. The worker-thread host is local
+transport evidence; the Vite production build separately proves the browser
+Dedicated Worker bundle and desktop-only lazy boundary.
+
+Recorded on the KG12A machine on 2026-08-29:
+
+| Profile | Mode   |  Compute / round trip | Event-loop p95 / max | High-gap reduction |
+| ------- | ------ | --------------------: | -------------------: | -----------------: |
+| Medium  | Direct |            1,653.7 ms | 1,669.3 / 1,669.3 ms |                  — |
+| Medium  | Worker |  1,747.9 / 2,619.3 ms |       37.2 / 43.7 ms |              38.2× |
+| Large   | Direct |            7,166.6 ms | 7,167.1 / 7,167.1 ms |                  — |
+| Large   | Worker | 7,466.7 / 11,728.9 ms |       34.0 / 72.6 ms |              98.8× |
+
+The worker does not promise lower wall-clock time. Native structured clone plus
+deliberate message yielding increases round trip, while main-thread blockage
+falls by one to two orders of magnitude. The local Node p95 remains slightly
+above the 32 ms Class A reference, so release-like Tauri UI QA remains the
+authoritative interaction check rather than turning this machine-specific
+number into a CI gate.
+
+Release-build Tauri QA passed on 2026-08-29. Initial open, external Markdown
+updates, rapid saves, source rescan, source-switch isolation, synthetic/report
+modes, restart identity/view restoration, and worker loading/structured-clone
+console checks all behaved as expected. This records only the aggregate result;
+no private vault identifiers, paths, content, queries, or screenshots are
+retained.
+
+Initialization/resync documents and large prepared report/catalog arrays are
+split into bounded ordered structured-clone frames. Each frame retains protocol
+version/request correlation, the receiving side validates order/completeness,
+and both sides yield between frames. No JSON serialization, parsed documents,
+engine object, full delta, source path, or identifier enters the result.
 
 ## Baseline findings
 
@@ -140,10 +179,11 @@ commit-to-next-paint and phase/counter paths in memory. It does not use
 localStorage, write files, upload telemetry, or retain private arguments.
 
 KG11 live updates add a monotonically increasing controller-local correlation
-token. The application begins I16/I17/I18, records existing source/KG10/report/
-identity/total timings, adopts the report, and carries the token through the
-matching graph commit and paint. The token is runtime-only and absent from the
-machine-readable result schema.
+token. The application begins I16/I17/I18, records source, worker-internal W1,
+worker round-trip, main-thread high gap, identity persistence, total, and
+existing UI-derived timings, adopts the report, and carries the token through
+the matching graph commit and paint. The token is runtime-only and absent from
+the machine-readable result schema.
 
 The production build was checked both with and without the query flag. The
 instrumented sample changed structural depth and maximized/restored normally;
@@ -188,17 +228,19 @@ missing-favicon request, with no reported application failure.
 
 ## Worker decision for KG12B
 
-| Workload              | Decision         | Reason                                                                                                                       |
-| --------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| W1 KG10 + diagnostics | Worker in KG12B  | Whole-workspace resolution, identity, delta, and report work reaches multi-second large costs despite file-granular parsing. |
-| W2 projection         | Keep main-thread | Bounded/focus projections are smaller; existing memoization prevents unrelated interaction runs.                             |
-| W3 Dagre              | Worker in KG12B  | It dominates derived-view latency and crosses the budget at the small expanded scene.                                        |
-| W4 inspection         | Keep main-thread | Snapshot index is memoized and selected/search operations are bounded; retain instrumentation for large-tail review.         |
+| Workload              | Decision           | Reason                                                                                                               |
+| --------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| W1 KG10 + diagnostics | Complete in KG12B1 | Stateful sequential worker preserves the KG10 cache and KG11 prepare/persist/commit transaction.                     |
+| W2 projection         | Keep main-thread   | Bounded/focus projections are smaller; existing memoization prevents unrelated interaction runs.                     |
+| W3 Dagre              | Worker in KG12B    | It dominates derived-view latency and crosses the budget at the small expanded scene.                                |
+| W4 inspection         | Keep main-thread   | Snapshot index is memoized and selected/search operations are bounded; retain instrumentation for large-tail review. |
 
-KG12B must use serializable requests/results, latest-result-wins adoption, stale
-result rejection, explicit worker errors, and the same canonical/projection
-correctness oracles. It must not combine W1 and W3 into a universal graph
-abstraction or start KG13 renderer replacement.
+KG12B1 uses versioned serializable requests/results, revision and candidate
+guards, explicit worker errors, and exact direct-pipeline correctness oracles.
+W1 cannot drop same-workspace results because its cache and durable catalog are
+stateful. KG12B2 W3 must instead use latest-result-wins adoption and stale
+layout rejection. The two workers must not become a universal graph abstraction
+or start KG13 renderer replacement.
 
 ## Cache decision
 

@@ -1,22 +1,18 @@
-import {
-  buildObsidianDiagnosticReport,
-  type ObsidianDiagnosticReport,
-} from '@icarus-graph-explorer/diagnostics-obsidian';
+import type { ObsidianDiagnosticReport } from '@icarus-graph-explorer/diagnostics-obsidian';
 import type {
   PrepareWorkspaceIdentityOptions,
   TauriSourceProvider,
   VaultSelection,
   VaultSourceChange,
+  VaultSourceInventory,
   VaultWatchBatch,
   VaultWatchSubscription,
 } from '@icarus-graph-explorer/source-provider-tauri';
 import {
-  applyObsidianWorkspaceChanges,
-  initializeObsidianWorkspaceEngine,
-  type ApplyObsidianWorkspaceChangesResult,
-  type ObsidianWorkspaceEngine,
-  type WorkspaceSourceChange,
-} from '@icarus-graph-explorer/workspace-engine-obsidian';
+  WorkspaceProcessorError,
+  type PreparedWorkspaceResult,
+  type WorkspaceWorkerTimings,
+} from '@icarus-graph-explorer/workspace-worker';
 
 import {
   DesktopVaultOpenError,
@@ -36,6 +32,9 @@ export interface DesktopLiveUpdateTimings {
   readonly sourceReconciliationMs: number;
   readonly workspaceUpdateMs: number;
   readonly diagnosticConstructionMs: number;
+  readonly workerComputeMs: number;
+  readonly workerRoundTripMs: number;
+  readonly mainThreadHighGapMs: number;
   readonly identityPersistenceMs: number;
   readonly totalMs: number;
 }
@@ -72,15 +71,15 @@ export interface OpenLiveDesktopVaultResult {
   readonly controller?: DesktopLiveVaultController;
 }
 
-export interface DesktopLiveVaultServices extends DesktopVaultServices {
-  readonly applyChanges: typeof applyObsidianWorkspaceChanges;
-}
+export type DesktopLiveVaultServices = DesktopVaultServices;
 
 const DEFAULT_SERVICES: DesktopLiveVaultServices = {
   now: () => performance.now(),
-  initializeEngine: initializeObsidianWorkspaceEngine,
-  applyChanges: applyObsidianWorkspaceChanges,
-  buildReport: buildObsidianDiagnosticReport,
+  createProcessor: () => {
+    throw new Error(
+      'Desktop worker services were not initialized by openLiveDesktopVault.',
+    );
+  },
 };
 
 function elapsed(start: number, services: DesktopLiveVaultServices): number {
@@ -91,40 +90,31 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function buildStableReport(
-  engine: ObsidianWorkspaceEngine,
-  nonMarkdownPaths: DesktopVaultRuntime['inventory']['nonMarkdownPaths'],
-  services: DesktopLiveVaultServices,
-): ObsidianDiagnosticReport {
-  return services.buildReport({
-    snapshot: engine.snapshot,
-    diagnostics: engine.resolutionDiagnostics,
-    documents: engine.parsedDocuments(),
-    nonMarkdownPaths,
-    identity: { stability: 'stable' },
-  });
-}
-
-function engineChanges(
-  changes: readonly VaultSourceChange[],
-): readonly WorkspaceSourceChange[] {
-  return changes.map((change) => ({ ...change }));
-}
-
 function initialTimings(): DesktopLiveUpdateTimings {
   return {
     sourceReconciliationMs: 0,
     workspaceUpdateMs: 0,
     diagnosticConstructionMs: 0,
+    workerComputeMs: 0,
+    workerRoundTripMs: 0,
+    mainThreadHighGapMs: 0,
     identityPersistenceMs: 0,
     totalMs: 0,
   };
 }
 
-function failedEngineMessage(
-  result: Extract<ApplyObsidianWorkspaceChangesResult, { readonly ok: false }>,
-): string {
-  return `Workspace update failed at ${result.failure.stage}: ${result.failure.message}`;
+function workerTimings(timings: WorkspaceWorkerTimings) {
+  return {
+    workspaceUpdateMs: timings.workspaceUpdateMs,
+    diagnosticConstructionMs: timings.diagnosticConstructionMs,
+    workerComputeMs: timings.workerComputeMs,
+    workerRoundTripMs: timings.workerRoundTripMs ?? timings.workerComputeMs,
+    mainThreadHighGapMs: timings.mainThreadHighGapMs ?? 0,
+  };
+}
+
+function engineChanges(changes: readonly VaultSourceChange[]) {
+  return changes.map((change) => ({ ...change }));
 }
 
 function createController(input: {
@@ -151,6 +141,7 @@ function createController(input: {
   let queue: Promise<void> = Promise.resolve();
   let stopPromise: Promise<void> | undefined;
   let correlationSequence = 0;
+  let lastDurableIdentityCatalog = input.opened.runtime.durableIdentityCatalog;
 
   function nextCorrelationId(): string {
     correlationSequence += 1;
@@ -184,31 +175,15 @@ function createController(input: {
     return queue;
   }
 
-  async function persistAndAdopt(inputState: {
+  function adopt(inputState: {
     readonly runtime: DesktopVaultRuntime;
     readonly report: ObsidianDiagnosticReport;
     readonly kind: DesktopLiveUpdateKind;
     readonly affectedPathCount: number;
     readonly timings: DesktopLiveUpdateTimings;
     readonly totalStart: number;
-    readonly persistIdentity: boolean;
-  }): Promise<void> {
-    let identityPersistenceMs = 0;
-    if (inputState.persistIdentity) {
-      if (disposed) return;
-      const persistenceStart = input.services.now();
-      await input.sourceProvider.commitWorkspaceIdentity(
-        inputState.runtime.identitySession,
-        inputState.runtime.engine.identityCatalog,
-      );
-      identityPersistenceMs = elapsed(persistenceStart, input.services);
-    }
+  }): void {
     if (disposed) return;
-    const timings: DesktopLiveUpdateTimings = {
-      ...inputState.timings,
-      identityPersistenceMs,
-      totalMs: elapsed(inputState.totalStart, input.services),
-    };
     current = {
       phase: bootstrapping ? 'catching-up' : 'live',
       dirty: pendingBatches > 1,
@@ -221,10 +196,182 @@ function createController(input: {
         correlationId: nextCorrelationId(),
         kind: inputState.kind,
         affectedPathCount: inputState.affectedPathCount,
-        timings,
+        timings: {
+          ...inputState.timings,
+          totalMs: elapsed(inputState.totalStart, input.services),
+        },
       },
     };
     for (const listener of listeners) listener(current);
+  }
+
+  async function prepareReplacement(
+    inventory: VaultSourceInventory,
+    durableCatalog: DesktopVaultRuntime['durableIdentityCatalog'],
+  ): Promise<{
+    readonly prepared: PreparedWorkspaceResult;
+    readonly runtime: DesktopVaultRuntime;
+    readonly identityPersistenceMs: number;
+  }> {
+    const previousProcessor = current.runtime.processor;
+    previousProcessor.terminate();
+    const processor = input.services.createProcessor();
+    try {
+      const prepared = await processor.prepareInitialize({
+        workspaceId: current.runtime.workspaceId,
+        documents: inventory.markdownDocuments,
+        identityCatalog: durableCatalog,
+        nonMarkdownPaths: inventory.nonMarkdownPaths,
+      });
+      const persistenceStart = input.services.now();
+      await input.sourceProvider.commitWorkspaceIdentity(
+        current.runtime.identitySession,
+        prepared.nextIdentityCatalog,
+      );
+      lastDurableIdentityCatalog = prepared.nextIdentityCatalog;
+      const identityPersistenceMs = elapsed(persistenceStart, input.services);
+      await processor.commitCandidate(prepared.candidateId);
+      return {
+        prepared,
+        identityPersistenceMs,
+        runtime: {
+          ...current.runtime,
+          inventory,
+          revision: prepared.toRevision,
+          durableIdentityCatalog: prepared.nextIdentityCatalog,
+          processor,
+        },
+      };
+    } catch (error: unknown) {
+      processor.terminate();
+      throw error;
+    }
+  }
+
+  async function recoverAfterCommitFailure(inputState: {
+    readonly durableCatalog: DesktopVaultRuntime['durableIdentityCatalog'];
+    readonly totalStart: number;
+    readonly affectedPathCount: number;
+  }): Promise<void> {
+    publish({
+      phase: 'resyncing',
+      dirty: true,
+      message:
+        'The worker stopped after identity was saved. Rebuilding from the current vault.',
+    });
+    const sourceStart = input.services.now();
+    const inventory = await input.sourceProvider.discoverSelectedVault(
+      current.runtime.selection,
+    );
+    const sourceReconciliationMs = elapsed(sourceStart, input.services);
+    if (disposed) return;
+    const replacement = await prepareReplacement(
+      inventory,
+      inputState.durableCatalog,
+    );
+    adopt({
+      runtime: replacement.runtime,
+      report: replacement.prepared.report,
+      kind: 'full-resync',
+      affectedPathCount: inputState.affectedPathCount,
+      timings: {
+        ...initialTimings(),
+        sourceReconciliationMs,
+        ...workerTimings(replacement.prepared.timings),
+        identityPersistenceMs: replacement.identityPersistenceMs,
+      },
+      totalStart: inputState.totalStart,
+    });
+  }
+
+  async function persistCommitAndAdopt(inputState: {
+    readonly prepared: PreparedWorkspaceResult;
+    readonly inventory: VaultSourceInventory;
+    readonly kind: 'incremental' | 'full-resync';
+    readonly affectedPathCount: number;
+    readonly timings: DesktopLiveUpdateTimings;
+    readonly totalStart: number;
+  }): Promise<void> {
+    const persistenceStart = input.services.now();
+    try {
+      await input.sourceProvider.commitWorkspaceIdentity(
+        current.runtime.identitySession,
+        inputState.prepared.nextIdentityCatalog,
+      );
+      lastDurableIdentityCatalog = inputState.prepared.nextIdentityCatalog;
+    } catch (error: unknown) {
+      try {
+        await current.runtime.processor.discardCandidate(
+          inputState.prepared.candidateId,
+        );
+      } catch {
+        current.runtime.processor.terminate();
+      }
+      throw error;
+    }
+    const identityPersistenceMs = elapsed(persistenceStart, input.services);
+    if (disposed) return;
+    try {
+      await current.runtime.processor.commitCandidate(
+        inputState.prepared.candidateId,
+      );
+    } catch {
+      await recoverAfterCommitFailure({
+        durableCatalog: lastDurableIdentityCatalog,
+        totalStart: inputState.totalStart,
+        affectedPathCount: inputState.affectedPathCount,
+      });
+      return;
+    }
+    if (disposed) return;
+    adopt({
+      runtime: {
+        ...current.runtime,
+        inventory: inputState.inventory,
+        revision: inputState.prepared.toRevision,
+        durableIdentityCatalog: inputState.prepared.nextIdentityCatalog,
+      },
+      report: inputState.prepared.report,
+      kind: inputState.kind,
+      affectedPathCount: inputState.affectedPathCount,
+      timings: {
+        ...inputState.timings,
+        identityPersistenceMs,
+      },
+      totalStart: inputState.totalStart,
+    });
+  }
+
+  async function prepareHealthyResync(inventory: VaultSourceInventory): Promise<
+    | { readonly kind: 'current'; readonly prepared: PreparedWorkspaceResult }
+    | {
+        readonly kind: 'replacement';
+        readonly prepared: PreparedWorkspaceResult;
+        readonly runtime: DesktopVaultRuntime;
+        readonly identityPersistenceMs: number;
+      }
+  > {
+    try {
+      return {
+        kind: 'current',
+        prepared: await current.runtime.processor.prepareResync({
+          documents: inventory.markdownDocuments,
+          nonMarkdownPaths: inventory.nonMarkdownPaths,
+        }),
+      };
+    } catch (error: unknown) {
+      if (
+        !(error instanceof WorkspaceProcessorError) ||
+        (error.category !== 'transport' && error.category !== 'terminated')
+      ) {
+        throw error;
+      }
+      const replacement = await prepareReplacement(
+        inventory,
+        lastDurableIdentityCatalog,
+      );
+      return { kind: 'replacement', ...replacement };
+    }
   }
 
   async function fullResync(
@@ -243,44 +390,34 @@ function createController(input: {
     );
     const sourceReconciliationMs = elapsed(sourceStart, input.services);
     if (disposed) return;
-
-    const workspaceStart = input.services.now();
-    const initialized = input.services.initializeEngine({
-      workspaceId: current.runtime.engine.workspaceId,
-      documents: inventory.markdownDocuments,
-      identityCatalog: current.runtime.engine.identityCatalog,
-    });
-    const workspaceUpdateMs = elapsed(workspaceStart, input.services);
-    if (!initialized.ok) {
-      throw new Error(
-        `Full resync failed at ${initialized.failure.stage}: ${initialized.failure.message}`,
-      );
+    const result = await prepareHealthyResync(inventory);
+    if (result.kind === 'replacement') {
+      adopt({
+        runtime: result.runtime,
+        report: result.prepared.report,
+        kind: 'full-resync',
+        affectedPathCount,
+        timings: {
+          ...initialTimings(),
+          sourceReconciliationMs,
+          ...workerTimings(result.prepared.timings),
+          identityPersistenceMs: result.identityPersistenceMs,
+        },
+        totalStart,
+      });
+      return;
     }
-    const candidateRuntime: DesktopVaultRuntime = {
-      ...current.runtime,
+    await persistCommitAndAdopt({
+      prepared: result.prepared,
       inventory,
-      engine: initialized.engine,
-    };
-    const diagnosticStart = input.services.now();
-    const report = buildStableReport(
-      initialized.engine,
-      inventory.nonMarkdownPaths,
-      input.services,
-    );
-    const diagnosticConstructionMs = elapsed(diagnosticStart, input.services);
-    await persistAndAdopt({
-      runtime: candidateRuntime,
-      report,
       kind: 'full-resync',
       affectedPathCount,
       timings: {
         ...initialTimings(),
         sourceReconciliationMs,
-        workspaceUpdateMs,
-        diagnosticConstructionMs,
+        ...workerTimings(result.prepared.timings),
       },
       totalStart,
-      persistIdentity: true,
     });
   }
 
@@ -317,7 +454,6 @@ function createController(input: {
       sourceReconciliationMs,
     };
     if (plan.markdownChanges.length === 0 && !plan.nonMarkdownChanged) {
-      if (disposed) return;
       publish({
         phase: bootstrapping ? 'catching-up' : 'live',
         dirty: pendingBatches > 1,
@@ -338,65 +474,59 @@ function createController(input: {
     }
 
     if (plan.markdownChanges.length === 0) {
-      const diagnosticStart = input.services.now();
-      const report = buildStableReport(
-        current.runtime.engine,
-        plan.nextInventory.nonMarkdownPaths,
-        input.services,
-      );
-      const diagnosticConstructionMs = elapsed(diagnosticStart, input.services);
-      await persistAndAdopt({
+      const built = await current.runtime.processor.buildCommittedReport({
+        nonMarkdownPaths: plan.nextInventory.nonMarkdownPaths,
+      });
+      if (built.revision !== current.runtime.revision) {
+        throw new Error(
+          `Diagnostic worker revision changed unexpectedly: expected ${current.runtime.revision}, received ${built.revision}.`,
+        );
+      }
+      adopt({
         runtime: { ...current.runtime, inventory: plan.nextInventory },
-        report,
+        report: built.report,
         kind: 'non-markdown',
         affectedPathCount: plan.affectedPaths.length,
-        timings: { ...baseTimings, diagnosticConstructionMs },
+        timings: {
+          ...baseTimings,
+          ...workerTimings(built.timings),
+        },
         totalStart,
-        persistIdentity: false,
       });
       return;
     }
 
-    const workspaceStart = input.services.now();
-    const applied = input.services.applyChanges(
-      current.runtime.engine,
-      engineChanges(plan.markdownChanges),
-    );
-    const workspaceUpdateMs = elapsed(workspaceStart, input.services);
-    if (!applied.ok) {
-      if (applied.failure.stage === 'input') {
+    let prepared: PreparedWorkspaceResult;
+    try {
+      prepared = await current.runtime.processor.prepareChanges({
+        expectedRevision: current.runtime.revision,
+        changes: engineChanges(plan.markdownChanges),
+        nonMarkdownPaths: plan.nextInventory.nonMarkdownPaths,
+      });
+    } catch (error: unknown) {
+      if (
+        error instanceof WorkspaceProcessorError &&
+        error.category === 'workspace' &&
+        error.stage === 'input'
+      ) {
         await fullResync(
-          `incremental input was rejected (${applied.failure.message})`,
+          `incremental input was rejected (${error.message})`,
           plan.affectedPaths.length,
         );
         return;
       }
-      throw new Error(failedEngineMessage(applied));
+      throw error;
     }
-    const candidateRuntime: DesktopVaultRuntime = {
-      ...current.runtime,
+    await persistCommitAndAdopt({
+      prepared,
       inventory: plan.nextInventory,
-      engine: applied.engine,
-    };
-    const diagnosticStart = input.services.now();
-    const report = buildStableReport(
-      applied.engine,
-      plan.nextInventory.nonMarkdownPaths,
-      input.services,
-    );
-    const diagnosticConstructionMs = elapsed(diagnosticStart, input.services);
-    await persistAndAdopt({
-      runtime: candidateRuntime,
-      report,
       kind: 'incremental',
       affectedPathCount: plan.affectedPaths.length,
       timings: {
         ...baseTimings,
-        workspaceUpdateMs,
-        diagnosticConstructionMs,
+        ...workerTimings(prepared.timings),
       },
       totalStart,
-      persistIdentity: true,
     });
   }
 
@@ -435,6 +565,7 @@ function createController(input: {
       if (stopPromise !== undefined) return stopPromise;
       disposed = true;
       listeners.clear();
+      current.runtime.processor.terminate();
       stopPromise = input.subscription.stop();
       return stopPromise;
     },
@@ -456,16 +587,23 @@ function createController(input: {
 }
 
 /**
- * Starts native watching before the one-shot open so no startup edit can fall
- * between acquisition and subscription. Buffered batches are then serialized
- * through the same controller queue used for later watch and manual work.
+ * Starts native watching before source acquisition so no startup edit can fall
+ * between discovery and subscription. The local-vault path then creates its
+ * dedicated processor; browser Sample/Open Report paths never reach this code.
  */
 export async function openLiveDesktopVault(
   sourceProvider: TauriSourceProvider,
   selection: VaultSelection,
   identityOptions: PrepareWorkspaceIdentityOptions = {},
-  services: DesktopLiveVaultServices = DEFAULT_SERVICES,
+  services?: DesktopLiveVaultServices,
 ): Promise<OpenLiveDesktopVaultResult> {
+  const resolvedServices =
+    services ??
+    ({
+      ...DEFAULT_SERVICES,
+      createProcessor: (await import('./workers/workspace-worker-client'))
+        .createDesktopWorkspaceProcessor,
+    } satisfies DesktopLiveVaultServices);
   const bufferedBatches: VaultWatchBatch[] = [];
   const batchSink: {
     accept?: DesktopLiveVaultController['acceptWatchBatch'];
@@ -493,7 +631,7 @@ export async function openLiveDesktopVault(
       sourceProvider,
       selection,
       identityOptions,
-      services,
+      resolvedServices,
     );
   } catch (error: unknown) {
     await subscription.stop();
@@ -508,7 +646,7 @@ export async function openLiveDesktopVault(
     opened,
     subscription,
     bufferedBatches,
-    services,
+    services: resolvedServices,
   });
   batchSink.accept = controller.acceptWatchBatch;
   return { opened, controller };

@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, and KG11 implements Tauri-selected, coalesced live vault acquisition with transactional KG10 application, full resync, and in-place view preservation. KG12A now supplies the performance baseline, budgets, and KG12B worker decision.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, and KG11 implements Tauri-selected, coalesced live vault acquisition with transactional KG10 application, full resync, and in-place view preservation. KG12A supplies the performance baseline and worker split; KG12B1 now runs stateful W1 workspace processing and diagnostics in a dedicated worker without changing KG11 transaction semantics.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -95,6 +95,15 @@ complete KG4 resolution and KG9A reconciliation before emitting the next
 stable snapshot and exact delta. Filesystem watching, persistence, source
 retention after parsing, and application subscriptions remain outside it.
 
+`packages/workspace-worker` owns the versioned plain-data W1 protocol and the
+EMPTY/COMMITTED/PENDING transaction state machine. In desktop production its
+dedicated worker owns the KG10 engine/cache and diagnostic construction. Large
+initialization/resync and prepared-result arrays are split into ordered native
+structured-clone frames so one transfer does not monopolize the UI event loop.
+The package has no Worker global, Tauri handle, filesystem access, React value,
+or synchronous production fallback; the Vite worker entry/client live in the
+web application.
+
 `packages/vault-discovery-policy` depends inward on core only and owns the pure
 lexical rules shared by the Node KG5 scanner and Tauri KG11A provider: hidden
 and `node_modules` skipping, normalized excludes, Markdown classification,
@@ -113,10 +122,13 @@ narrow bridge and scheduler keep all provider tests independent of a native
 runtime.
 
 `apps/web/src/desktop-live-vault.ts` is the non-React application orchestration
-boundary between that provider and KG10. It owns one live runtime, watcher
+boundary between that provider and the W1 processor. It owns one live runtime, watcher
 subscription, serialized operation queue, buffered bootstrap, paused/dirty
 state, candidate report/catalog commit ordering, disposal checks, and full
-resync. It publishes only matching committed runtime/report snapshots. React
+resync. Main persists the prepared catalog before asking the worker to commit;
+a missing acknowledgement triggers fresh-source replacement-worker recovery
+from the newly durable catalog. It publishes only matching committed
+runtime/report snapshots. React
 owns source-session activation and presentation, not the mutation transaction.
 
 `packages/view-projection` depends inward on core only. It validates and indexes
@@ -586,8 +598,9 @@ warm-ups, repeated samples, median/p95/max, canonical/projected counts, explicit
 phase omissions, and deterministic I1–I18 operation counts. Instrumentation is
 absent by default and memory-only when enabled; live correlation IDs remain
 runtime-only. The measured split keeps W2 projection and W4 inspection on the
-main thread, while KG12B is scoped to latest-result-wins workers for W1
-whole-workspace processing and W3 Dagre layout. See `docs/PERFORMANCE.md`.
+main thread. KG12B1 implements W1 as a sequential stateful transactional
+worker; latest-result-wins is intentionally reserved for the separate stateless
+W3 Dagre worker planned for KG12B2. See `docs/PERFORMANCE.md`.
 
 Rust, WASM, universal graph abstractions, and million-node optimization are not foundation requirements.
 

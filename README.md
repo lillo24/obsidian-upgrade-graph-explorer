@@ -2,7 +2,7 @@
 
 Icarus Graph Explorer is an early-stage, hierarchical knowledge-graph explorer for Markdown workspaces. Its intended model treats documents, their nested sections, and optional addressable blocks as distinct entities so references can retain their precise source and target locations.
 
-KG0 established the repository foundation, KG1 added the versioned canonical model, KG2 added deterministic CommonMark document/section structure parsing, KG3 added tested Obsidian syntax interpretation, KG4 added conservative workspace resolution plus validated canonical snapshot assembly, KG5 added a local diagnostic-report workflow, KG6 added renderer-independent disclosure and focus, KG7 added the projection-driven React Flow structural graph, KG8 added source-neutral provenance inspection, backlinks, canonical search, and targeted graph navigation, KG9 completed private app-owned stable identity plus local renderer-independent view restoration, KG10 added file-granular parsed-document caching with exact stable snapshot deltas, and KG11 completes the Tauri local-vault workflow from secure selection through coalesced live updates, transactional KG10 application, recovery resync, and in-place view preservation. KG12A now establishes repeated performance baselines, Class A/B/C budgets, and the evidence-led KG12B worker scope.
+KG0 established the repository foundation, KG1 added the versioned canonical model, KG2 added deterministic CommonMark document/section structure parsing, KG3 added tested Obsidian syntax interpretation, KG4 added conservative workspace resolution plus validated canonical snapshot assembly, KG5 added a local diagnostic-report workflow, KG6 added renderer-independent disclosure and focus, KG7 added the projection-driven React Flow structural graph, KG8 added source-neutral provenance inspection, backlinks, canonical search, and targeted graph navigation, KG9 completed private app-owned stable identity plus local renderer-independent view restoration, KG10 added file-granular parsed-document caching with exact stable snapshot deltas, and KG11 completes the Tauri local-vault workflow from secure selection through coalesced live updates, transactional KG10 application, recovery resync, and in-place view preservation. KG12A establishes repeated baselines and Class A/B/C budgets; KG12B1 now moves stateful KG10 plus diagnostics into a dedicated transactional worker.
 
 The application is local-first and read-only with respect to Markdown. The initial architecture has no backend, account, cloud upload, telemetry, or source-file write path.
 
@@ -47,7 +47,7 @@ pnpm desktop:build
 ```
 
 The native **Settings → Source → Open Vault** action reads and watches one
-explicitly selected folder locally, initializes KG10, and renders committed
+explicitly selected folder locally, initializes KG10 in a dedicated worker, and renders committed
 updates through the same graph/inspector UI without remounting the current
 workspace.
 The vault is never modified or uploaded. Native folder authorization lasts for
@@ -79,6 +79,8 @@ Run the opt-in deterministic pipeline harness with:
 pnpm benchmark:pipeline -- --profile medium
 pnpm benchmark:performance -- --profile medium \
   --output output/performance/medium.json
+pnpm benchmark:workspace-worker -- --profile medium
+pnpm benchmark:workspace-worker -- --profile large
 ```
 
 Its timings cover the source pipeline, cold/warm stable identity,
@@ -89,7 +91,7 @@ against exact full-rebuild oracles as local evidence, not CI budgets. The
 KG12A command adds repeated statistics, all required projection shapes,
 operation counts, explicit unsafe-phase omissions, and a strict aggregate-only
 result schema. Raw results stay ignored. See
-[`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for budgets and the KG12B decision.
+[`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for budgets, worker evidence, and the KG12B split.
 
 ## Validation
 
@@ -110,7 +112,7 @@ pnpm build
 ## Repository guidance
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) is the engineering source of truth for dependency direction and product boundaries.
-- [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) records KG12A workloads, budgets, evidence, and the KG12B decision.
+- [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) records KG12A workloads/budgets and KG12B1 worker evidence.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) distinguishes implemented work from deliberately deferred milestones.
 - [`docs/decisions/`](docs/decisions/) records costly foundational decisions.
 - [`AGENTS.md`](AGENTS.md) is the short entry point for coding agents.

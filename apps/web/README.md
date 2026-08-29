@@ -1,6 +1,6 @@
 # Web Structural Graph Explorer
 
-Status: **STABLE — KG12A adds optional memory-only correlation without changing normal product behavior.**
+Status: **STABLE — KG12B1 runs desktop W1 processing in a transactional dedicated worker.**
 
 This package owns the browser SPA, validated KG5 report selection, Tauri-only
 live vault orchestration, KG6 graph interaction state, guarded browser persistence, graph selection, canonical
@@ -17,8 +17,8 @@ selected report JSON → runtime validation → canonical inspection/search
                                    ↘ secondary KG5 evidence UI
 
 Tauri Open Vault → watcher + buffered one-shot acquisition
-                 → serialized source plans → KG10 candidate + report
-                 → identity commit → in-place graph/UI update
+                 → worker-held KG10/report candidate
+                 → identity persist → worker commit → in-place graph/UI update
 ```
 
 ## File map
@@ -33,8 +33,9 @@ apps/web/
     main.tsx          Root validation and React startup.
     App.tsx           Browser/desktop source ownership, session state, Settings composition, and evidence state.
     desktop-runtime.ts Lazy official Tauri detection and provider creation.
-    desktop-vault.ts Lazy KG10 initialization, report construction, and truthful identity commit orchestration.
-    desktop-live-vault.ts Serialized watch, candidate commit, pause, and full-resync lifecycle.
+    desktop-vault.ts Lazy worker initialization and truthful identity/worker commit orchestration.
+    desktop-live-vault.ts Serialized watch, worker candidate, pause, replacement, and resync lifecycle.
+    workers/          Vite W1 entry, bounded transport, and promise client.
     performance.ts    Query-gated browser recorder and local inspection API.
     graph-state.ts    Pure disclosure/focus/filter interaction reducer.
     navigation.ts     Shared reveal/filter-widening/navigation planner.
@@ -74,11 +75,14 @@ workspace. Watching starts before initial discovery, startup batches are
 buffered, and only a stable identity-persisted open becomes live.
 
 The plain `desktop-live-vault.ts` controller serializes watch batches and manual
-rescans. It maps provider plans to KG10, builds a candidate report, persists the
-candidate catalog, and only then publishes one matching runtime/report state.
-Non-Markdown-only plans rebuild compatibility evidence without KG10; net no-ops
-retain the report object. Report, internal, or identity-write failures retain
-the last committed state and pause until a successful **Rescan Vault**.
+rescans. Its narrow async processor asks the dedicated worker to prepare KG10
+plus report state, persists the candidate catalog, commits that exact worker
+candidate, and only then publishes one matching runtime/report state.
+Non-Markdown-only plans ask the committed worker for compatibility evidence
+without advancing revision; net no-ops retain the report object. Persistence
+failure discards and pauses. A worker failure after a durable write triggers a
+fresh full scan and replacement worker before adoption; other worker/report
+failures retain the last graph until a successful **Rescan Vault**.
 
 ## Graph-first workspace shell
 
@@ -154,7 +158,8 @@ selected again because KG9B does not persist browser file handles.
 KG12A instrumentation requires either `?performance=1` in a browser or an
 explicit `VITE_ICARUS_PERFORMANCE=1` diagnostic build for Tauri. It records
 named pure, commit, paint, viewport, search, inspection, and live-adoption
-phases in memory and exposes a local `window.icarusPerformance` inspection API.
+phases plus worker compute/round-trip/main-thread-gap evidence in memory and
+exposes a local `window.icarusPerformance` inspection API.
 Normal builds/loads do not create a recorder or API. The Vite variable changes
 only instrumentation availability and must be set before `desktop:dev` or
 `desktop:build`; debug/native timings must be labeled by build mode. Live

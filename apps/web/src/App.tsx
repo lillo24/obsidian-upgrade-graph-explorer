@@ -168,6 +168,34 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     controller?: DesktopLiveVaultController,
   ): void {
     performanceSession?.begin('I1-initial-view-preparation');
+    if (performanceSession !== undefined) {
+      const instrumentation = performanceSession.instrumentation;
+      instrumentation.record(
+        'source-reconciliation',
+        opened.timings.sourceAcquisitionMs,
+      );
+      instrumentation.record(
+        'workspace-update',
+        opened.timings.workspaceInitializationMs,
+      );
+      instrumentation.record(
+        'report-construction',
+        opened.timings.diagnosticConstructionMs,
+      );
+      instrumentation.record('worker-compute', opened.timings.workerComputeMs);
+      instrumentation.record(
+        'worker-round-trip',
+        opened.timings.workerRoundTripMs,
+      );
+      instrumentation.record(
+        'main-thread-gap',
+        opened.timings.mainThreadHighGapMs,
+      );
+      instrumentation.record(
+        'identity-persistence',
+        opened.timings.identityPersistenceMs,
+      );
+    }
     setPerformanceUpdateKey(undefined);
     lastPerformanceCorrelation.current = undefined;
     let status = `Opened ${opened.displayName} locally with ${opened.report.sourceInventory.markdownFileCount} Markdown documents.`;
@@ -227,6 +255,18 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
         instrumentation.record(
           'identity-persistence',
           update.timings.identityPersistenceMs,
+        );
+        instrumentation.record(
+          'worker-compute',
+          update.timings.workerComputeMs,
+        );
+        instrumentation.record(
+          'worker-round-trip',
+          update.timings.workerRoundTripMs,
+        );
+        instrumentation.record(
+          'main-thread-gap',
+          update.timings.mainThreadHighGapMs,
         );
         instrumentation.record('live-total', update.timings.totalMs);
         instrumentation.count('live-adoptions');
