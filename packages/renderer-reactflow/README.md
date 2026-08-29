@@ -1,6 +1,6 @@
 # React Flow Structural Renderer
 
-Status: **STABLE — UX4A viewport ergonomics and KG9B renderer contracts are pure-test-backed.**
+Status: **STABLE — KG12A phase/counter hooks preserve the UX4B renderer contract.**
 
 This renderer package turns one KG6 `ViewProjection` into a deterministic,
 read-only React Flow scene. It owns renderer IDs, fixed node geometry, Dagre
@@ -95,6 +95,13 @@ Pointer leave removes those classes immediately. Selection is independent and
 uses React Flow's persistent selected state without fading unrelated content;
 Focus remains projection-level graph isolation owned by KG6. Hover changes map
 prepared renderer elements only and never rerun projection or layout.
+
+KG12A adds an optional `PerformanceInstrumentation` prop and matching pure
+prepare hook. When omitted—the normal path—there is no recorder. When supplied,
+mapping, Dagre, highlight, viewport, commit, and next-paint counts remain
+in-memory. Tests prove hover/selection add highlight work without another
+mapping/layout operation. No renderer behavior, layout algorithm, dependency,
+or visibility policy changes in KG12A.
 
 KG8 adds an optional keyed `GraphCenterRequest` containing only a projected node
 ID and optional zoom. After the matching projection/layout exists, the renderer

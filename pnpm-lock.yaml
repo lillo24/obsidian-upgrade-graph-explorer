@@ -53,6 +53,9 @@ importers:
       '@icarus-graph-explorer/explorer-inspection':
         specifier: workspace:*
         version: link:../../packages/explorer-inspection
+      '@icarus-graph-explorer/performance':
+        specifier: workspace:*
+        version: link:../../packages/performance
       '@icarus-graph-explorer/renderer-reactflow':
         specifier: workspace:*
         version: link:../../packages/renderer-reactflow
@@ -168,11 +171,16 @@ importers:
         specifier: 24.13.3
         version: 24.13.3
 
+  packages/performance: {}
+
   packages/renderer-reactflow:
     dependencies:
       '@dagrejs/dagre':
         specifier: 3.1.1
         version: 3.1.1
+      '@icarus-graph-explorer/performance':
+        specifier: workspace:*
+        version: link:../performance
       '@icarus-graph-explorer/view-projection':
         specifier: workspace:*
         version: link:../view-projection
@@ -296,6 +304,9 @@ importers:
       '@icarus-graph-explorer/explorer-inspection':
         specifier: workspace:*
         version: link:../../packages/explorer-inspection
+      '@icarus-graph-explorer/performance':
+        specifier: workspace:*
+        version: link:../../packages/performance
       '@icarus-graph-explorer/renderer-reactflow':
         specifier: workspace:*
         version: link:../../packages/renderer-reactflow

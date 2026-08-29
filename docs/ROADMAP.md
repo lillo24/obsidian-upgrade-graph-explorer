@@ -16,7 +16,7 @@ The roadmap is a sequencing map, not a claim that future features exist. Each mi
 | **KG9 — Persistence + stable identity**                      | Local persistence for renderer-independent application view state and identities robust across normal edits.                                       | **Complete** — KG9A identity and KG9B view/semantic-viewport restoration gates passed.                                |
 | **KG10 — Incremental workspace engine**                      | File-granular reparsing and exact stable snapshot deltas while preserving whole-workspace semantics.                                               | **Complete** — cache, delta, global invalidation, identity, oracle, and real-vault gates passed.                      |
 | **KG11 — Tauri local-vault workflow**                        | Desktop folder access and watching through a narrow source-provider adapter.                                                                       | **Complete** — secure selection, coalesced plans, transactional live application, resync, and view preservation pass. |
-| **KG12 — Performance + worker hardening**                    | Explicit workload budgets, measurement-led worker split, and projection/focus/collapse optimization.                                               | **Next** — KG5/KG10/KG11 and renderer measurements now provide real live-workload evidence.                           |
+| **KG12 — Performance + worker hardening**                    | Explicit workload budgets, measurement-led worker split, and projection/focus/collapse optimization.                                               | **In progress** — KG12A baseline/budgets/decision complete; KG12B worker hardening is pending user review/next.       |
 | **KG13 — Global graph decision / renderer, benchmark-gated** | Decide whether a separate high-density renderer is justified; WebGL/Pixi/Sigma viability is not evidence to replace the structural renderer early. | KG12 benchmarks and product need provide evidence; otherwise no Sigma dependency is added.                            |
 | **KG14 — Product-quality exploration**                       | Accessibility, resilience, onboarding, polished exploration workflows, and release-quality hardening.                                              | Core workflows and renderer choices are evidence-backed and stable.                                                   |
 
@@ -62,6 +62,14 @@ identity/report state before adoption, preserves the live view, and executes
 full resync for out-of-sync conditions. KG12 will use the KG5 harness
 plus later renderer evidence to set workload profiles, budgets, worker splits,
 and projection/focus/collapse benchmarks.
+
+KG12A now establishes versioned aggregate measurement contracts, deterministic
+smoke/small/medium/large profiles, I1–I18 operation-count oracles, Class A/B/C
+budgets, and the measured renderer scale cliff. Its decision is narrow: KG12B
+should move whole-workspace KG10/diagnostic transactions and large Dagre layout
+behind latest-result-wins workers, while projection and inspection remain on
+the main thread and existing caches remain unchanged. KG12B has not started and
+is pending user review.
 
 Post-MVP analytics—typed conceptual relations, pathfinding variants,
 centrality, betweenness, communities, connected components, co-citation,

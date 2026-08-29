@@ -860,6 +860,34 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/performance/**/*.{ts,tsx}'],
+    ignores: ['packages/performance/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                '@xyflow/*',
+                '@dagrejs/*',
+                '@tauri-apps/*',
+                '@icarus-graph-explorer/*',
+                'node:*',
+              ],
+              message:
+                'Performance contracts and statistics must remain source-neutral and platform-independent.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['packages/renderer-reactflow/**/*.{ts,tsx}'],
     ignores: ['packages/renderer-reactflow/**/*.test.{ts,tsx}'],
     extends: [reactHooks.configs.flat.recommended],

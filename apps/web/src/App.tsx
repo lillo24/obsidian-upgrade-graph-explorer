@@ -38,6 +38,7 @@ import type {
   DesktopLiveVaultPhase,
   DesktopLiveVaultSnapshot,
 } from './desktop-live-vault';
+import { browserPerformanceSession } from './performance';
 import { browserStorage, clearWorkspaceView } from './persistence/storage';
 
 const sampleValidation = validateObsidianDiagnosticReport(sampleReportJson);
@@ -80,6 +81,8 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
   const [reportName, setReportName] = useState('Synthetic Sample');
   const [sourceSessionKey, setSourceSessionKey] = useState(0);
   const [graphMaximized, setGraphMaximized] = useState(false);
+  const performanceSession = browserPerformanceSession;
+  const [performanceUpdateKey, setPerformanceUpdateKey] = useState<string>();
   const [loadError, setLoadError] = useState<string>();
   const [sourceStatus, setSourceStatus] = useState<string>();
   const [identityRecovery, setIdentityRecovery] =
@@ -91,6 +94,7 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
   );
   const liveUnsubscribeRef = useRef<(() => void) | undefined>(undefined);
   const sourceRequestGeneration = useRef(0);
+  const lastPerformanceCorrelation = useRef<string | undefined>(undefined);
   const [livePhase, setLivePhase] = useState<DesktopLiveVaultPhase>();
   const [vaultOpening, setVaultOpening] = useState(false);
   const [statusFilter, setStatusFilter] = useState<ResolutionFilter>('all');
@@ -164,6 +168,9 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     opened: OpenedDesktopVault,
     controller?: DesktopLiveVaultController,
   ): void {
+    performanceSession?.begin('I1-initial-view-preparation');
+    setPerformanceUpdateKey(undefined);
+    lastPerformanceCorrelation.current = undefined;
     let status =
       opened.warning ??
       `Opened ${opened.displayName} locally with ${opened.report.sourceInventory.markdownFileCount} Markdown documents.`;
@@ -190,6 +197,43 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     liveControllerRef.current = controller;
     const applySnapshot = (snapshot: DesktopLiveVaultSnapshot) => {
       if (liveControllerRef.current !== controller) return;
+      const update = snapshot.lastUpdate;
+      if (
+        performanceSession !== undefined &&
+        update !== undefined &&
+        update.correlationId !== lastPerformanceCorrelation.current &&
+        update.kind !== 'no-op'
+      ) {
+        lastPerformanceCorrelation.current = update.correlationId;
+        performanceSession.begin(
+          update.kind === 'incremental'
+            ? 'I16-live-markdown'
+            : update.kind === 'non-markdown'
+              ? 'I17-live-non-markdown'
+              : 'I18-full-rescan',
+          update.correlationId,
+        );
+        const instrumentation = performanceSession.instrumentation;
+        instrumentation.record(
+          'source-reconciliation',
+          update.timings.sourceReconciliationMs,
+        );
+        instrumentation.record(
+          'workspace-update',
+          update.timings.workspaceUpdateMs,
+        );
+        instrumentation.record(
+          'report-construction',
+          update.timings.diagnosticConstructionMs,
+        );
+        instrumentation.record(
+          'identity-persistence',
+          update.timings.identityPersistenceMs,
+        );
+        instrumentation.record('live-total', update.timings.totalMs);
+        instrumentation.count('live-adoptions');
+        setPerformanceUpdateKey(update.correlationId);
+      }
       setReport((current) =>
         current === snapshot.report ? current : snapshot.report,
       );
@@ -308,6 +352,9 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
         );
       }
       stopActiveLiveController();
+      performanceSession?.begin('I1-initial-view-preparation');
+      setPerformanceUpdateKey(undefined);
+      lastPerformanceCorrelation.current = undefined;
       setReport(validation.value);
       setReportName(file.name);
       setSourceSessionKey((current) => current + 1);
@@ -327,6 +374,9 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
   function restoreSample(): void {
     sourceRequestGeneration.current += 1;
     stopActiveLiveController();
+    performanceSession?.begin('I1-initial-view-preparation');
+    setPerformanceUpdateKey(undefined);
+    lastPerformanceCorrelation.current = undefined;
     setReport(SAMPLE_REPORT);
     setReportName('Synthetic Sample');
     setSourceSessionKey((current) => current + 1);
@@ -346,6 +396,7 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
   return (
     <div
       className={`app-shell${graphMaximized ? ' app-shell--graph-maximized' : ''}`}
+      data-performance-enabled={performanceSession !== undefined}
     >
       <a className="skip-link" href="#main-content">
         Skip to main content
@@ -441,6 +492,12 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
           key={sourceSessionKey}
           maximized={graphMaximized}
           onMaximizedChange={setGraphMaximized}
+          {...(performanceSession === undefined
+            ? {}
+            : { performance: performanceSession.instrumentation })}
+          {...(performanceUpdateKey === undefined
+            ? {}
+            : { performanceUpdateKey })}
           {...(report.identity === undefined
             ? {}
             : { identityStability: report.identity.stability })}

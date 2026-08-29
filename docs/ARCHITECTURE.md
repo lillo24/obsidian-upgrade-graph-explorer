@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, and KG11 implements Tauri-selected, coalesced live vault acquisition with transactional KG10 application, full resync, and in-place view preservation. KG12 performance and worker hardening is next.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, and KG11 implements Tauri-selected, coalesced live vault acquisition with transactional KG10 application, full resync, and in-place view preservation. KG12A now supplies the performance baseline, budgets, and KG12B worker decision.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -580,6 +580,14 @@ report construction, identity persistence, total live processing, and full
 resync. The provider's 250 ms quiet window is batching latency and remains
 separate. These are investigative evidence only: no CI timing threshold or
 high-density renderer conclusion is established before KG12.
+
+KG12A turns those investigative hooks into a versioned aggregate schema with
+warm-ups, repeated samples, median/p95/max, canonical/projected counts, explicit
+phase omissions, and deterministic I1–I18 operation counts. Instrumentation is
+absent by default and memory-only when enabled; live correlation IDs remain
+runtime-only. The measured split keeps W2 projection and W4 inspection on the
+main thread, while KG12B is scoped to latest-result-wins workers for W1
+whole-workspace processing and W3 Dagre layout. See `docs/PERFORMANCE.md`.
 
 Rust, WASM, universal graph abstractions, and million-node optimization are not foundation requirements.
 

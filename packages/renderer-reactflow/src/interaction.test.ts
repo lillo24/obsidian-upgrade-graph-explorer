@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { createRuntimePerformanceRecorder } from '@icarus-graph-explorer/performance';
+
 import { GRAPH_EDGE_TYPES, GRAPH_NODE_TYPES } from './component-maps';
 import {
   applyRendererHighlight,
@@ -162,5 +164,46 @@ describe('renderer interaction helpers', () => {
       'entity',
     ]);
     expect(Object.keys(GRAPH_EDGE_TYPES)).toEqual(['graph']);
+  });
+
+  it('keeps hover and selection on the highlight-only operation path', () => {
+    let clock = 0;
+    const performance = createRuntimePerformanceRecorder({
+      now: () => clock,
+      markNextPaint: () => undefined,
+    });
+    const graph = prepareRendererGraph(rendererTestProjection(), {
+      layoutMode: 'structure',
+      performance,
+      layoutEngine: ({ nodes }) => {
+        clock += 5;
+        return new Map(
+          nodes.map(({ id }, index) => [id, { x: index, y: index }]),
+        );
+      },
+    });
+    performance.measure('highlight', 'highlight-applications', () =>
+      applyRendererInteractionState(
+        graph,
+        {
+          kind: 'node',
+          id: 'projection-section',
+        },
+        null,
+      ),
+    );
+    performance.measure('highlight', 'highlight-applications', () =>
+      applyRendererInteractionState(graph, null, {
+        kind: 'node',
+        id: 'projection-section',
+      }),
+    );
+
+    expect(performance.snapshot().operations).toMatchObject({
+      'renderer-mappings': 1,
+      layouts: 1,
+      'highlight-applications': 2,
+      projections: 0,
+    });
   });
 });

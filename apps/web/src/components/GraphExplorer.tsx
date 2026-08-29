@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useReducer,
   useRef,
@@ -10,6 +11,7 @@ import {
 import type { EntityId, KnowledgeSnapshot } from '@icarus-graph-explorer/core';
 import type { DiagnosticIdentityStability } from '@icarus-graph-explorer/diagnostics-obsidian';
 import { createInspectionWorkspace } from '@icarus-graph-explorer/explorer-inspection';
+import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performance';
 import {
   GraphCanvas,
   type GraphCenterRequest,
@@ -129,19 +131,31 @@ export function GraphExplorer({
   identityStability,
   maximized,
   onMaximizedChange,
+  performance,
+  performanceUpdateKey,
   snapshot,
   storage,
 }: {
   readonly identityStability?: DiagnosticIdentityStability;
   readonly maximized: boolean;
   readonly onMaximizedChange: (maximized: boolean) => void;
+  /** Optional memory-only KG12 instrumentation, enabled by the app boundary. */
+  readonly performance?: PerformanceInstrumentation;
+  /** Runtime-only live-update correlation token; never persisted. */
+  readonly performanceUpdateKey?: string;
   readonly snapshot: KnowledgeSnapshot;
   readonly storage?: StorageLike | null;
 }) {
-  const projectionWorkspace = useMemo(
-    () => createProjectionWorkspace(snapshot),
-    [snapshot],
-  );
+  const projectionWorkspace = useMemo(() => {
+    const create = () => createProjectionWorkspace(snapshot);
+    return performance === undefined
+      ? create()
+      : performance.measure(
+          'projection-workspace',
+          'projection-workspace-builds',
+          create,
+        );
+  }, [performance, snapshot]);
   const [persistenceStorage] = useState(() =>
     storage === null ? undefined : (storage ?? browserStorage()),
   );
@@ -173,13 +187,18 @@ export function GraphExplorer({
     try {
       return {
         ok: true,
-        projection: projectView(projectionWorkspace, activeViewState),
+        projection:
+          performance === undefined
+            ? projectView(projectionWorkspace, activeViewState)
+            : performance.measure('project-view', 'projections', () =>
+                projectView(projectionWorkspace, activeViewState),
+              ),
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       return { ok: false, message: `Graph projection failed: ${message}` };
     }
-  }, [activeViewState, projectionWorkspace]);
+  }, [activeViewState, performance, projectionWorkspace]);
   const restoredAnchor =
     result.ok && hydration.viewport !== undefined
       ? result.projection.nodes.find(
@@ -239,10 +258,16 @@ export function GraphExplorer({
       : undefined,
   );
   const lastSerializedView = useRef(initialSerializedView);
-  const inspectionWorkspace = useMemo(
-    () => createInspectionWorkspace(snapshot),
-    [snapshot],
-  );
+  const inspectionWorkspace = useMemo(() => {
+    const create = () => createInspectionWorkspace(snapshot);
+    return performance === undefined
+      ? create()
+      : performance.measure(
+          'inspection-workspace',
+          'inspection-workspace-builds',
+          create,
+        );
+  }, [performance, snapshot]);
   const pathScopes = useMemo(
     () => topLevelPathScopes(projectionWorkspace),
     [projectionWorkspace],
@@ -259,6 +284,11 @@ export function GraphExplorer({
   const focusEntity: ProjectedEntityNode | undefined =
     node?.kind === 'entity' ? node : undefined;
   const previousProjectionWorkspace = useRef(projectionWorkspace);
+
+  useLayoutEffect(() => {
+    if (performance === undefined) return;
+    performance.markCommit('graph-explorer-commit');
+  });
 
   useEffect(() => {
     if (previousProjectionWorkspace.current === projectionWorkspace) return;
@@ -593,6 +623,7 @@ export function GraphExplorer({
           <EntitySearch
             key={transientResetKey}
             onNavigate={navigateToEntity}
+            {...(performance === undefined ? {} : { performance })}
             workspace={inspectionWorkspace}
           />
 
@@ -805,6 +836,10 @@ export function GraphExplorer({
             onSelectionChange={changeSelection}
             onToggleEntity={toggleEntity}
             onViewportObservation={observeViewport}
+            {...(performance === undefined ? {} : { performance })}
+            {...(performanceUpdateKey === undefined
+              ? {}
+              : { performanceUpdateKey })}
             projection={result.projection}
             selection={activeSelection}
             trackpadZoomMode={trackpadZoomMode}
@@ -830,6 +865,7 @@ export function GraphExplorer({
               onClear={clearSelection}
               {...(maximized ? { onClose: closeInspector } : {})}
               onNavigate={navigateToEntity}
+              {...(performance === undefined ? {} : { performance })}
               projection={result.projection}
               selection={activeSelection}
               workspace={inspectionWorkspace}

@@ -1,0 +1,211 @@
+export const PERFORMANCE_RESULT_SCHEMA_VERSION = 1 as const;
+
+export const PERFORMANCE_WORKLOAD_PROFILES = [
+  'smoke',
+  'small',
+  'medium',
+  'large',
+] as const;
+export type PerformanceWorkloadProfile =
+  (typeof PERFORMANCE_WORKLOAD_PROFILES)[number];
+
+export const PERFORMANCE_CLASSES = ['A', 'B', 'C'] as const;
+export type PerformanceClass = (typeof PERFORMANCE_CLASSES)[number];
+
+export const PERFORMANCE_INTERACTIONS = [
+  'I1-initial-view-preparation',
+  'I2-expand',
+  'I3-collapse',
+  'I4-structural-depth',
+  'I5-graph-filters',
+  'I6-focus-enter',
+  'I7-focus-exit',
+  'I8-hover',
+  'I9-select',
+  'I10-canonical-search',
+  'I11-search-backlink-navigation',
+  'I12-inspector',
+  'I13-maximize-restore',
+  'I14-resize',
+  'I15-pan-zoom',
+  'I16-live-markdown',
+  'I17-live-non-markdown',
+  'I18-full-rescan',
+] as const;
+export type PerformanceInteraction = (typeof PERFORMANCE_INTERACTIONS)[number];
+
+export const PERFORMANCE_PHASES = [
+  'parse-adapt',
+  'resolution',
+  'identity-reconciliation',
+  'source-reconciliation',
+  'workspace-update',
+  'report-construction',
+  'identity-persistence',
+  'live-total',
+  'projection-workspace',
+  'inspection-workspace',
+  'project-view',
+  'renderer-mapping',
+  'dagre-layout',
+  'highlight',
+  'graph-explorer-commit',
+  'graph-canvas-commit',
+  'next-paint',
+  'viewport',
+  'search',
+  'inspection',
+] as const;
+export type PerformancePhase = (typeof PERFORMANCE_PHASES)[number];
+
+export const PERFORMANCE_OPERATIONS = [
+  'projection-workspace-builds',
+  'inspection-workspace-builds',
+  'projections',
+  'renderer-mappings',
+  'layouts',
+  'highlight-applications',
+  'searches',
+  'inspections',
+  'viewport-operations',
+  'live-adoptions',
+] as const;
+export type PerformanceOperation = (typeof PERFORMANCE_OPERATIONS)[number];
+
+export interface PerformanceCanonicalCounts {
+  readonly documents: number;
+  readonly sections: number;
+  readonly blocks: number;
+  readonly entities: number;
+  readonly references: number;
+}
+
+export interface PerformanceProjectedCounts {
+  readonly nodes: number;
+  readonly edges: number;
+  readonly referenceEdges: number;
+  readonly diagnosticNodes: number;
+}
+
+export interface PerformanceSampleSummary {
+  readonly warmupCount: number;
+  readonly sampleCount: number;
+  readonly medianMs: number;
+  readonly p95Ms: number;
+  readonly maximumMs: number;
+  /** Raw timings are allowed only for synthetic or aggregate local output. */
+  readonly valuesMs: readonly number[];
+}
+
+export interface PerformanceOperationCounts {
+  readonly 'projection-workspace-builds': number;
+  readonly 'inspection-workspace-builds': number;
+  readonly projections: number;
+  readonly 'renderer-mappings': number;
+  readonly layouts: number;
+  readonly 'highlight-applications': number;
+  readonly searches: number;
+  readonly inspections: number;
+  readonly 'viewport-operations': number;
+  readonly 'live-adoptions': number;
+}
+
+export interface PerformanceEnvironment {
+  readonly surface: 'node' | 'browser' | 'tauri';
+  readonly gitCommit: string;
+  readonly runtime: string;
+  readonly os: string;
+  readonly architecture: string;
+  readonly cpu: string;
+  readonly browser?: string;
+  readonly webview?: string;
+  readonly tauri?: string;
+}
+
+export interface PerformanceScenarioResult {
+  readonly id: string;
+  readonly label: string;
+  readonly performanceClass: PerformanceClass;
+  readonly profile: PerformanceWorkloadProfile;
+  readonly canonical: PerformanceCanonicalCounts;
+  readonly projected?: PerformanceProjectedCounts;
+  readonly phases: Readonly<
+    Partial<Record<PerformancePhase, PerformanceSampleSummary>>
+  >;
+  readonly operations: PerformanceOperationCounts;
+  readonly layoutMode?: 'structure' | 'focus' | 'none';
+  readonly buildMode?: 'development' | 'production';
+  readonly omittedPhases?: readonly {
+    readonly phase: PerformancePhase;
+    readonly reason: string;
+  }[];
+}
+
+export interface PerformanceBudget {
+  readonly performanceClass: PerformanceClass;
+  readonly boundary: string;
+  readonly medianMs: number;
+  readonly p95Ms: number;
+  readonly rationale: string;
+  readonly enforcement: 'investigative';
+}
+
+export interface PerformanceWorkerDecision {
+  readonly workload:
+    | 'W1-workspace-engine-diagnostics'
+    | 'W2-projection'
+    | 'W3-dagre-layout'
+    | 'W4-inspection';
+  readonly decision: 'main-thread' | 'worker-in-KG12B' | 'defer';
+  readonly evidence: string;
+}
+
+export interface PerformanceCacheDecision {
+  readonly candidate: string;
+  readonly decision: 'retain' | 'add-in-KG12B' | 'do-not-add';
+  readonly evidence: string;
+}
+
+export interface PerformanceResult {
+  readonly schemaVersion: typeof PERFORMANCE_RESULT_SCHEMA_VERSION;
+  readonly generatedAt: string;
+  readonly environment: PerformanceEnvironment;
+  readonly scenarios: readonly PerformanceScenarioResult[];
+  readonly budgets: readonly PerformanceBudget[];
+  readonly decisions: {
+    readonly workers: readonly PerformanceWorkerDecision[];
+    readonly caching: readonly PerformanceCacheDecision[];
+    readonly rendererScaleCliff: string;
+    readonly kg12bScope: string;
+  };
+  readonly note: string;
+}
+
+export interface PerformanceInstrumentation {
+  readonly measure: <Value>(
+    phase: PerformancePhase,
+    operation: PerformanceOperation | undefined,
+    run: () => Value,
+  ) => Value;
+  readonly record: (phase: PerformancePhase, durationMs: number) => void;
+  readonly count: (operation: PerformanceOperation, amount?: number) => void;
+  readonly markCommit: (
+    phase: 'graph-explorer-commit' | 'graph-canvas-commit',
+  ) => void;
+  readonly markNextPaint: () => void;
+}
+
+export function emptyPerformanceOperationCounts(): PerformanceOperationCounts {
+  return {
+    'projection-workspace-builds': 0,
+    'inspection-workspace-builds': 0,
+    projections: 0,
+    'renderer-mappings': 0,
+    layouts: 0,
+    'highlight-applications': 0,
+    searches: 0,
+    inspections: 0,
+    'viewport-operations': 0,
+    'live-adoptions': 0,
+  };
+}

@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 /output/diagnostics/
+/output/performance/
 *.tsbuildinfo
 .DS_Store
 *.local

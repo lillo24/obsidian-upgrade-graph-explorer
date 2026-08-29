@@ -107,6 +107,7 @@ function GraphCanvasInner({
   onSelectionChange,
   onToggleEntity,
   onViewportObservation,
+  performance,
   projection,
   selection,
   trackpadZoomMode,
@@ -129,13 +130,17 @@ function GraphCanvasInner({
       prepareRendererGraph(projection, {
         layoutMode,
         expandedEntityIds,
+        ...(performance === undefined ? {} : { performance }),
       }),
-    [expandedEntityIds, layoutMode, projection],
+    [expandedEntityIds, layoutMode, performance, projection],
   );
-  const interactive = useMemo(
-    () => applyRendererInteractionState(prepared, hovered, selection),
-    [hovered, prepared, selection],
-  );
+  const interactive = useMemo(() => {
+    const apply = () =>
+      applyRendererInteractionState(prepared, hovered, selection);
+    return performance === undefined
+      ? apply()
+      : performance.measure('highlight', 'highlight-applications', apply);
+  }, [hovered, performance, prepared, selection]);
   const nodes = useMemo(() => [...interactive.nodes], [interactive.nodes]);
   const edges = useMemo(() => [...interactive.edges], [interactive.edges]);
 
@@ -272,6 +277,7 @@ function GraphCanvasInner({
       if (onViewportObservation === undefined) return;
       const bounds = containerRef.current?.getBoundingClientRect();
       if (bounds === undefined) return;
+      performance?.count('viewport-operations');
       onViewportObservation(
         observeSemanticViewport(prepared, viewport, {
           width: bounds.width,
@@ -279,7 +285,7 @@ function GraphCanvasInner({
         }),
       );
     },
-    [onViewportObservation, prepared],
+    [onViewportObservation, performance, prepared],
   );
   const scheduleViewportObservation = useCallback(
     (viewport: ReturnType<typeof getViewport>) => {
@@ -372,6 +378,12 @@ function GraphCanvasInner({
     void setViewport(nextViewport, { duration: 0 });
     reportViewport(nextViewport);
   }, [prepared, reportViewport, setViewport]);
+
+  useLayoutEffect(() => {
+    if (performance === undefined) return;
+    performance.markCommit('graph-canvas-commit');
+    performance.markNextPaint();
+  });
 
   const observeViewport = useCallback<OnMove>(
     (event, viewport) => {

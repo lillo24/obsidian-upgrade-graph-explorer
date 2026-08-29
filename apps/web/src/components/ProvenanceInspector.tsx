@@ -1,6 +1,7 @@
 import { memo, useMemo, useState, type ReactNode } from 'react';
 
 import type { EntityId } from '@icarus-graph-explorer/core';
+import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performance';
 import {
   inspectProjectedEdge,
   inspectProjectedNode,
@@ -21,6 +22,7 @@ interface ProvenanceInspectorProps {
   readonly onClear: () => void;
   readonly onClose?: () => void;
   readonly onNavigate: (entityId: EntityId, origin: string) => void;
+  readonly performance?: PerformanceInstrumentation;
 }
 
 interface BoundedSectionProps<Item> {
@@ -825,6 +827,7 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
   onClear,
   onClose,
   onNavigate,
+  performance,
   projection,
   selection,
   workspace,
@@ -839,18 +842,22 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
   >(() => {
     if (selection === null) return null;
     try {
+      const inspect = () =>
+        selection.kind === 'node'
+          ? inspectProjectedNode(workspace, projection, selection.id)
+          : inspectProjectedEdge(workspace, projection, selection.id);
       return {
         ok: true,
         value:
-          selection.kind === 'node'
-            ? inspectProjectedNode(workspace, projection, selection.id)
-            : inspectProjectedEdge(workspace, projection, selection.id),
+          performance === undefined
+            ? inspect()
+            : performance.measure('inspection', 'inspections', inspect),
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       return { ok: false, message: `Inspection failed: ${message}` };
     }
-  }, [projection, selection, workspace]);
+  }, [performance, projection, selection, workspace]);
 
   return (
     <aside className="selection-panel" aria-label="Inspector">
