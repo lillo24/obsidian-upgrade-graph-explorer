@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useDeferredValue,
   useEffect,
   useMemo,
@@ -20,11 +21,12 @@ import type {
 } from '@icarus-graph-explorer/source-provider-tauri';
 
 import './App.css';
-import { EvidencePanel } from './components/EvidencePanel';
+import { DeveloperSettingsSection } from './components/DeveloperSettingsSection';
+import { DiagnosticEvidenceContent } from './components/DiagnosticEvidenceContent';
+import { DiagnosticEvidenceDialog } from './components/DiagnosticEvidenceDialog';
 import { GraphExplorer } from './components/GraphExplorer';
-import { HierarchyPanel } from './components/HierarchyPanel';
-import { ReferencesPanel } from './components/ReferencesPanel';
-import { SummaryPanel } from './components/SummaryPanel';
+import { SourceSettingsSection } from './components/SourceSettingsSection';
+import { WorkspaceNotice } from './components/WorkspaceNotice';
 import {
   buildReferenceViews,
   filterReferenceViews,
@@ -62,13 +64,8 @@ const LIVE_PHASE_LABELS: Record<DesktopLiveVaultPhase, string> = {
   paused: 'Paused',
 };
 
-function liveSourceStatus(
-  displayName: string,
-  snapshot: DesktopLiveVaultSnapshot,
-): string {
-  const counts = `${snapshot.report.sourceInventory.markdownFileCount} Markdown · ${snapshot.report.snapshot.entities.length} entities`;
-  const recovery = snapshot.phase === 'paused' ? ` · ${snapshot.message}` : '';
-  return `${LIVE_PHASE_LABELS[snapshot.phase]} · ${displayName} · ${counts}${recovery}`;
+function liveSourceStatus(snapshot: DesktopLiveVaultSnapshot): string {
+  return snapshot.message;
 }
 
 export interface AppProps {
@@ -85,6 +82,7 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
   const [performanceUpdateKey, setPerformanceUpdateKey] = useState<string>();
   const [loadError, setLoadError] = useState<string>();
   const [sourceStatus, setSourceStatus] = useState<string>();
+  const [sourceWarning, setSourceWarning] = useState<string>();
   const [identityRecovery, setIdentityRecovery] =
     useState<IdentityRecoveryState>();
   const [detectedDesktopProvider, setDetectedDesktopProvider] =
@@ -97,6 +95,7 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
   const lastPerformanceCorrelation = useRef<string | undefined>(undefined);
   const [livePhase, setLivePhase] = useState<DesktopLiveVaultPhase>();
   const [vaultOpening, setVaultOpening] = useState(false);
+  const [diagnosticEvidenceOpen, setDiagnosticEvidenceOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<ResolutionFilter>('all');
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
@@ -171,9 +170,7 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     performanceSession?.begin('I1-initial-view-preparation');
     setPerformanceUpdateKey(undefined);
     lastPerformanceCorrelation.current = undefined;
-    let status =
-      opened.warning ??
-      `Opened ${opened.displayName} locally with ${opened.report.sourceInventory.markdownFileCount} Markdown documents.`;
+    let status = `Opened ${opened.displayName} locally with ${opened.report.sourceInventory.markdownFileCount} Markdown documents.`;
     if (opened.previousWorkspaceId !== undefined) {
       const storage = browserStorage();
       if (storage !== undefined) {
@@ -187,6 +184,7 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     setStatusFilter('all');
     setSearch('');
     setLoadError(undefined);
+    setSourceWarning(opened.warning);
     setIdentityRecovery(undefined);
     if (controller === undefined) {
       setReport(opened.report);
@@ -238,7 +236,7 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
         current === snapshot.report ? current : snapshot.report,
       );
       setLivePhase(snapshot.phase);
-      setSourceStatus(liveSourceStatus(opened.displayName, snapshot));
+      setSourceStatus(liveSourceStatus(snapshot));
     };
     liveUnsubscribeRef.current = controller.subscribe(applySnapshot);
     applySnapshot(controller.snapshot());
@@ -362,6 +360,7 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
       setSearch('');
       setLoadError(undefined);
       setSourceStatus(undefined);
+      setSourceWarning(undefined);
       setIdentityRecovery(undefined);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -384,6 +383,7 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     setSearch('');
     setLoadError(undefined);
     setSourceStatus(undefined);
+    setSourceWarning(undefined);
     setIdentityRecovery(undefined);
   }
 
@@ -393,6 +393,54 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     await controller.rescan();
   }
 
+  const openDiagnosticEvidence = useCallback(
+    () => setDiagnosticEvidenceOpen(true),
+    [],
+  );
+  const closeDiagnosticEvidence = useCallback(
+    () => setDiagnosticEvidenceOpen(false),
+    [],
+  );
+
+  const currentSourceStatus = vaultOpening
+    ? 'Opening'
+    : livePhase === undefined
+      ? report.identity?.stability === 'transient'
+        ? 'Session Only'
+        : 'Ready'
+      : LIVE_PHASE_LABELS[livePhase];
+  const recoveryLabel =
+    identityRecovery?.recovery === 'replace-corrupt-registry'
+      ? 'Reset Local Identity Registry'
+      : identityRecovery === undefined
+        ? undefined
+        : 'Reset Local Identity for This Vault';
+  const sourceNotice =
+    loadError !== undefined
+      ? { message: loadError, tone: 'error' as const }
+      : vaultOpening
+        ? {
+            message: 'Opening Vault… The current workspace remains active.',
+            tone: 'progress' as const,
+          }
+        : livePhase === 'catching-up' || livePhase === 'resyncing'
+          ? {
+              message:
+                sourceStatus ??
+                `${LIVE_PHASE_LABELS[livePhase]} the local vault.`,
+              tone: 'progress' as const,
+            }
+          : livePhase === 'paused'
+            ? {
+                message:
+                  sourceStatus ??
+                  'Live updates are paused. Open Settings to rescan the vault.',
+                tone: 'warning' as const,
+              }
+            : sourceWarning === undefined
+              ? undefined
+              : { message: sourceWarning, tone: 'warning' as const };
+
   return (
     <div
       className={`app-shell${graphMaximized ? ' app-shell--graph-maximized' : ''}`}
@@ -401,94 +449,17 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
       <a className="skip-link" href="#main-content">
         Skip to main content
       </a>
-      <header className="app-bar">
-        <h1 translate="no">Icarus Graph Explorer</h1>
-        <div className="report-actions" aria-describedby="privacy-note">
-          {desktopProvider === undefined ? null : (
-            <button
-              className="secondary-button"
-              disabled={vaultOpening}
-              onClick={() => void openVault()}
-              type="button"
-            >
-              {vaultOpening ? 'Opening Vault…' : 'Open Vault'}
-            </button>
-          )}
-          <label
-            className="report-open-button"
-            htmlFor="report-file"
-            title="Reports stay in this browser tab and are not uploaded."
-          >
-            Open Report
-          </label>
-          <input
-            accept="application/json,.json"
-            className="report-file-input"
-            id="report-file"
-            name="diagnostic-report"
-            onChange={(event) => void loadReport(event)}
-            type="file"
-          />
-          <button
-            className="secondary-button"
-            onClick={restoreSample}
-            type="button"
-          >
-            Sample
-          </button>
-          {livePhase === undefined ? null : (
-            <button
-              className="secondary-button"
-              disabled={vaultOpening || livePhase === 'resyncing'}
-              onClick={() => void rescanVault()}
-              type="button"
-            >
-              Rescan Vault
-            </button>
-          )}
-          <span className="report-name" title={reportName} translate="no">
-            {reportName}
-          </span>
-          <span className="visually-hidden" id="privacy-note">
-            Browser reports stay in this tab. Desktop vaults are read locally.
-            Nothing is uploaded.
-          </span>
-        </div>
-        {loadError === undefined ? null : (
-          <p className="report-error" role="alert">
-            {loadError}
-          </p>
-        )}
-        {identityRecovery === undefined ? null : (
-          <button
-            className="identity-reset-button"
-            disabled={vaultOpening}
-            onClick={() => void resetLocalIdentity()}
-            type="button"
-          >
-            {identityRecovery.recovery === 'replace-corrupt-registry'
-              ? 'Reset local identity registry'
-              : 'Reset local identity for this vault'}
-          </button>
-        )}
-        {!vaultOpening && sourceStatus === undefined ? null : (
-          <p
-            className={
-              report.identity?.stability === 'stable' && livePhase !== 'paused'
-                ? 'source-status'
-                : 'source-status source-status--warning'
-            }
-            aria-live="polite"
-          >
-            {vaultOpening
-              ? 'Opening · the current workspace remains active'
-              : sourceStatus}
-          </p>
-        )}
-      </header>
-
-      <main className="diagnostic-shell" id="main-content">
+      <main
+        aria-labelledby="workspace-title"
+        className="workspace-main"
+        id="main-content"
+        tabIndex={-1}
+      >
+        <h1 className="visually-hidden" id="workspace-title" translate="no">
+          Icarus Graph Explorer
+        </h1>
         <GraphExplorer
+          applicationOverlayOpen={diagnosticEvidenceOpen}
           key={sourceSessionKey}
           maximized={graphMaximized}
           onMaximizedChange={setGraphMaximized}
@@ -501,66 +472,62 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
           {...(report.identity === undefined
             ? {}
             : { identityStability: report.identity.stability })}
+          settingsContent={
+            <>
+              <SourceSettingsSection
+                currentSourceName={reportName}
+                currentStatus={currentSourceStatus}
+                desktopAvailable={desktopProvider !== undefined}
+                entityCount={report.snapshot.entities.length}
+                live={livePhase !== undefined}
+                markdownFileCount={report.sourceInventory.markdownFileCount}
+                onOpenVault={() => void openVault()}
+                onReportChange={(event) => void loadReport(event)}
+                onRescanVault={() => void rescanVault()}
+                onResetLocalIdentity={() => void resetLocalIdentity()}
+                onUseSample={restoreSample}
+                opening={vaultOpening}
+                {...(recoveryLabel === undefined ? {} : { recoveryLabel })}
+                reportIsSample={reportName === 'Synthetic Sample'}
+                rescanDisabled={vaultOpening || livePhase === 'resyncing'}
+                {...(sourceStatus === undefined
+                  ? {}
+                  : { sourceDetail: sourceStatus })}
+                {...(sourceWarning === undefined ? {} : { sourceWarning })}
+              />
+              <DeveloperSettingsSection
+                onOpenDiagnosticEvidence={openDiagnosticEvidence}
+              />
+            </>
+          }
           snapshot={report.snapshot}
         />
-
-        <details className="diagnostic-evidence">
-          <summary>Inspect diagnostic evidence</summary>
-          <section className="filter-bar" aria-labelledby="filter-title">
-            <div>
-              <p className="eyebrow">Local Inspection</p>
-              <h2 id="filter-title">Filter Evidence</h2>
-            </div>
-            <div className="filter-controls">
-              <label>
-                Search Paths, Titles, or Targets
-                <input
-                  autoComplete="off"
-                  name="diagnostic-search"
-                  onChange={(event) => setSearch(event.currentTarget.value)}
-                  placeholder="Example: folder or target…"
-                  type="search"
-                  value={search}
-                />
-              </label>
-              <label>
-                Resolution Status
-                <select
-                  autoComplete="off"
-                  name="resolution-status"
-                  onChange={(event) =>
-                    setStatusFilter(
-                      event.currentTarget.value as ResolutionFilter,
-                    )
-                  }
-                  value={statusFilter}
-                >
-                  <option value="all">All States</option>
-                  <option value="resolved">Resolved</option>
-                  <option value="unresolved">Unresolved</option>
-                  <option value="ambiguous">Ambiguous</option>
-                  <option value="invalid">Invalid</option>
-                </select>
-              </label>
-            </div>
-          </section>
-
-          <SummaryPanel summary={summary} />
-          <div className="primary-grid">
-            <HierarchyPanel
-              documentIds={hierarchyDocumentIds}
-              lookups={lookups}
-            />
-            <ReferencesPanel
-              key={`${report.snapshot.workspace.id}:${statusFilter}:${deferredSearch}`}
-              searchIsPending={search !== deferredSearch}
-              total={referenceViews.length}
-              views={visibleReferences}
-            />
+        {sourceNotice === undefined ? null : (
+          <div className="workspace-notice-stack">
+            <WorkspaceNotice tone={sourceNotice.tone}>
+              {sourceNotice.message}
+            </WorkspaceNotice>
           </div>
-          <EvidencePanel lookups={lookups} report={report} />
-        </details>
+        )}
       </main>
+
+      {diagnosticEvidenceOpen ? (
+        <DiagnosticEvidenceDialog onClose={closeDiagnosticEvidence}>
+          <DiagnosticEvidenceContent
+            deferredSearch={deferredSearch}
+            hierarchyDocumentIds={hierarchyDocumentIds}
+            lookups={lookups}
+            onSearchChange={setSearch}
+            onStatusFilterChange={setStatusFilter}
+            referenceViews={referenceViews}
+            report={report}
+            search={search}
+            statusFilter={statusFilter}
+            summary={summary}
+            visibleReferences={visibleReferences}
+          />
+        </DiagnosticEvidenceDialog>
+      ) : null}
     </div>
   );
 }

@@ -1,8 +1,9 @@
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 
 import type { TrackpadZoomMode } from '@icarus-graph-explorer/renderer-reactflow';
 
 interface GraphSettingsProps {
+  readonly children?: ReactNode;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly onTrackpadZoomModeChange: (mode: TrackpadZoomMode) => void;
@@ -25,6 +26,7 @@ function SettingsIcon() {
 }
 
 export const GraphSettings = memo(function GraphSettings({
+  children,
   onOpenChange,
   onTrackpadZoomModeChange,
   open,
@@ -39,7 +41,7 @@ export const GraphSettings = memo(function GraphSettings({
         aria-label={open ? 'Close Settings' : 'Open Settings'}
         className="graph-settings__trigger"
         onClick={() => onOpenChange(!open)}
-        title="Graph settings"
+        title="Settings"
         type="button"
       >
         <SettingsIcon />
@@ -56,35 +58,46 @@ export const GraphSettings = memo(function GraphSettings({
               Close
             </button>
           </div>
-          <fieldset>
-            <legend>Trackpad zoom</legend>
-            <label>
-              <input
-                checked={trackpadZoomMode === 'scroll-zoom'}
-                name="trackpad-zoom-mode"
-                onChange={() => onTrackpadZoomModeChange('scroll-zoom')}
-                type="radio"
-                value="scroll-zoom"
-              />
-              <span>
-                <strong>Scroll to zoom</strong>
-                <small>Two-finger scrolling zooms toward the pointer.</small>
-              </span>
-            </label>
-            <label>
-              <input
-                checked={trackpadZoomMode === 'pinch-zoom'}
-                name="trackpad-zoom-mode"
-                onChange={() => onTrackpadZoomModeChange('pinch-zoom')}
-                type="radio"
-                value="pinch-zoom"
-              />
-              <span>
-                <strong>Pinch to zoom</strong>
-                <small>Two-finger scrolling pans; pinching zooms.</small>
-              </span>
-            </label>
-          </fieldset>
+          <div className="graph-settings__sections" data-graph-scroll-container>
+            {children}
+            <section
+              aria-labelledby="graph-interaction-settings-heading"
+              className="graph-settings__section"
+            >
+              <h3 id="graph-interaction-settings-heading">Graph Interaction</h3>
+              <fieldset>
+                <legend>Trackpad Zoom</legend>
+                <label>
+                  <input
+                    checked={trackpadZoomMode === 'scroll-zoom'}
+                    name="trackpad-zoom-mode"
+                    onChange={() => onTrackpadZoomModeChange('scroll-zoom')}
+                    type="radio"
+                    value="scroll-zoom"
+                  />
+                  <span>
+                    <strong>Scroll to Zoom</strong>
+                    <small>
+                      Two-finger scrolling zooms toward the pointer.
+                    </small>
+                  </span>
+                </label>
+                <label>
+                  <input
+                    checked={trackpadZoomMode === 'pinch-zoom'}
+                    name="trackpad-zoom-mode"
+                    onChange={() => onTrackpadZoomModeChange('pinch-zoom')}
+                    type="radio"
+                    value="pinch-zoom"
+                  />
+                  <span>
+                    <strong>Pinch to Zoom</strong>
+                    <small>Two-finger scrolling pans; pinching zooms.</small>
+                  </span>
+                </label>
+              </fieldset>
+            </section>
+          </div>
           {warning === undefined ? null : (
             <p className="graph-settings__warning" role="alert">
               {warning}

@@ -1,28 +1,40 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { validateObsidianDiagnosticReport } from '@icarus-graph-explorer/diagnostics-obsidian';
-import type { TauriSourceProvider } from '@icarus-graph-explorer/source-provider-tauri';
+import {
+  createDiagnosticLookups,
+  summarizeDiagnosticReport,
+  validateObsidianDiagnosticReport,
+} from '@icarus-graph-explorer/diagnostics-obsidian';
 
 import { App } from './App';
+import { DeveloperSettingsSection } from './components/DeveloperSettingsSection';
+import { DiagnosticEvidenceContent } from './components/DiagnosticEvidenceContent';
+import { DiagnosticEvidenceDialog } from './components/DiagnosticEvidenceDialog';
 import { GraphExplorer } from './components/GraphExplorer';
 import { GraphSettings } from './components/GraphSettings';
+import { SourceSettingsSection } from './components/SourceSettingsSection';
+import { WorkspaceNotice } from './components/WorkspaceNotice';
 import { activateMaximizedGraphMode } from './components/maximized-graph-mode';
 import { GRAPH_PREFERENCES_STORAGE_KEY } from './preferences/graph-preferences';
+import {
+  buildReferenceViews,
+  filterReferenceViews,
+  matchingHierarchyDocumentIds,
+} from './report-view';
 import sampleReport from './sample-report.json';
 
 const validation = validateObsidianDiagnosticReport(sampleReport);
 if (!validation.valid) throw new Error('The web sample report must be valid.');
 const report = validation.value;
+const diagnosticLookups = createDiagnosticLookups(report.snapshot);
+const diagnosticSummary = summarizeDiagnosticReport(report);
+const referenceViews = buildReferenceViews(report, diagnosticLookups);
 const storage = {
   getItem: () => null,
   removeItem: () => undefined,
   setItem: () => undefined,
 };
-const desktopProvider = {
-  selectVaultDirectory: async () => undefined,
-} as TauriSourceProvider;
-
 describe('graph-first explorer shell', () => {
   it('bundles a deterministic stable-identity sample for reload persistence QA', () => {
     expect(sampleReport.identity).toEqual({ stability: 'stable' });
@@ -33,16 +45,22 @@ describe('graph-first explorer shell', () => {
     ).toBe(true);
   });
 
-  it('renders compact report controls and keeps diagnostics available without product milestone chrome', () => {
+  it('renders an edge-to-edge graph workspace without permanent app or diagnostic chrome', () => {
     const markup = renderToStaticMarkup(<App />);
 
     expect(markup).toContain('Icarus Graph Explorer');
-    expect(markup).toContain('Open Report');
-    expect(markup).toContain('Sample');
-    expect(markup).toContain('Synthetic Sample');
-    expect(markup).toContain('Canonical Hierarchy');
-    expect(markup).toContain('Compatibility Probes');
-    expect(markup).toContain('Nothing is uploaded');
+    expect(markup).toContain('class="visually-hidden" id="workspace-title"');
+    expect(markup).not.toContain('class="app-bar"');
+    expect(markup).not.toContain('class="diagnostic-shell"');
+    expect(markup).toContain('class="workspace-main" id="main-content"');
+    expect(markup).toContain(
+      'class="graph-workspace" aria-label="Knowledge graph workspace"',
+    );
+    expect(markup).not.toContain('workspace-notice-stack');
+    expect(markup).not.toContain('Open Report');
+    expect(markup).not.toContain('Synthetic Sample');
+    expect(markup).not.toContain('Canonical Hierarchy');
+    expect(markup).not.toContain('Compatibility Probes');
     expect(markup).not.toContain('Open Vault');
     expect(markup).toContain('Search');
     expect(markup).toContain('Graph Filters');
@@ -52,25 +70,93 @@ describe('graph-first explorer shell', () => {
     expect(markup).toContain('aria-label="Fit graph to view"');
     expect(markup).toContain('aria-label="Maximize graph"');
     expect(markup).not.toContain('>Maximize Graph</button>');
-    expect(markup).toContain(
-      '<details class="diagnostic-evidence"><summary>Inspect diagnostic evidence</summary>',
-    );
+    expect(markup).not.toContain('diagnostic-evidence');
+    expect(markup).not.toContain('Filter Evidence');
     expect(markup).not.toContain('Local-first · Read-only');
     expect(markup).not.toContain('KG9 · Durable Local View');
     expect(markup).not.toContain('<h2>Knowledge Graph</h2>');
     expect(markup).not.toContain('class="app-footer"');
   });
 
-  it('shows live Open Vault only when a Tauri source provider is available', () => {
-    const markup = renderToStaticMarkup(
-      <App desktopSourceProvider={desktopProvider} />,
+  it('keeps source actions in Settings and exposes Open Vault only for desktop', () => {
+    const sharedProps = {
+      currentSourceName: 'report.json',
+      currentStatus: 'Ready',
+      entityCount: 3,
+      live: false,
+      markdownFileCount: 2,
+      onOpenVault: () => undefined,
+      onReportChange: () => undefined,
+      onRescanVault: () => undefined,
+      onResetLocalIdentity: () => undefined,
+      onUseSample: () => undefined,
+      opening: false,
+      reportIsSample: false,
+      rescanDisabled: false,
+    } as const;
+    const browserMarkup = renderToStaticMarkup(
+      <SourceSettingsSection {...sharedProps} desktopAvailable={false} />,
+    );
+    const desktopMarkup = renderToStaticMarkup(
+      <SourceSettingsSection {...sharedProps} desktopAvailable />,
     );
 
-    expect(markup).toContain('Open Vault');
-    expect(markup).toContain('Open Report');
-    expect(markup).toContain('Sample');
-    expect(markup).toContain('Desktop vaults are read locally');
-    expect(markup).not.toContain('Rescan Vault');
+    expect(browserMarkup).not.toContain('Open Vault');
+    expect(browserMarkup).toContain('for="report-file">Open Report</label>');
+    expect(browserMarkup).toContain('id="report-file"');
+    expect(browserMarkup).toContain('Use Synthetic Sample');
+    expect(browserMarkup).toContain('Sources are read locally');
+    expect(browserMarkup).not.toContain('Rescan Vault');
+    expect(browserMarkup).not.toContain('>Recovery</h4>');
+    expect(desktopMarkup).toContain('Open Vault');
+    expect(desktopMarkup).toContain('Open Report');
+  });
+
+  it('shows live source status, disabled actions, and recovery only when supplied', () => {
+    const markup = renderToStaticMarkup(
+      <SourceSettingsSection
+        currentSourceName="Knowledge Vault"
+        currentStatus="Paused"
+        desktopAvailable
+        entityCount={82}
+        live
+        markdownFileCount={21}
+        onOpenVault={() => undefined}
+        onReportChange={() => undefined}
+        onRescanVault={() => undefined}
+        onResetLocalIdentity={() => undefined}
+        onUseSample={() => undefined}
+        opening
+        recoveryLabel="Reset Local Identity for This Vault"
+        reportIsSample={false}
+        rescanDisabled
+        sourceDetail="Live updates are paused."
+        sourceWarning="Stable identity could not be saved."
+      />,
+    );
+
+    expect(markup).toContain('Knowledge Vault');
+    expect(markup).toContain('<dd>Paused</dd>');
+    expect(markup).toContain('Rescan Vault</button>');
+    expect(markup).toContain('disabled=""');
+    expect(markup).toContain('>Recovery</h4>');
+    expect(markup).toContain('Reset Local Identity for This Vault');
+    expect(markup).toContain('Stable identity could not be saved.');
+    expect(markup).not.toContain('C:\\');
+  });
+
+  it('renders important source errors as non-layout workspace notices', () => {
+    const markup = renderToStaticMarkup(
+      <div className="workspace-notice-stack">
+        <WorkspaceNotice tone="error">
+          The current source was preserved.
+        </WorkspaceNotice>
+      </div>,
+    );
+
+    expect(markup).toContain('class="workspace-notice-stack"');
+    expect(markup).toContain('workspace-notice--error" role="alert"');
+    expect(markup).toContain('The current source was preserved.');
   });
 
   it('starts with the inspector closed and renders the maximized shell without replacing graph controls', () => {
@@ -136,11 +222,36 @@ describe('graph-first explorer shell', () => {
         open
         trackpadZoomMode="pinch-zoom"
         warning="Preference is session-only."
-      />,
+      >
+        <SourceSettingsSection
+          currentSourceName="Synthetic Sample"
+          currentStatus="Ready"
+          desktopAvailable={false}
+          entityCount={3}
+          live={false}
+          markdownFileCount={2}
+          onOpenVault={() => undefined}
+          onReportChange={() => undefined}
+          onRescanVault={() => undefined}
+          onResetLocalIdentity={() => undefined}
+          onUseSample={() => undefined}
+          opening={false}
+          reportIsSample
+          rescanDisabled={false}
+        />
+        <DeveloperSettingsSection onOpenDiagnosticEvidence={() => undefined} />
+      </GraphSettings>,
     );
-    expect(settingsMarkup).toContain('<legend>Trackpad zoom</legend>');
-    expect(settingsMarkup).toContain('Scroll to zoom');
-    expect(settingsMarkup).toContain('Pinch to zoom');
+    expect(settingsMarkup).toContain('<legend>Trackpad Zoom</legend>');
+    expect(settingsMarkup).toContain('Scroll to Zoom');
+    expect(settingsMarkup).toContain('Pinch to Zoom');
+    expect(settingsMarkup.indexOf('>Source</h3>')).toBeLessThan(
+      settingsMarkup.indexOf('>Developer</h3>'),
+    );
+    expect(settingsMarkup.indexOf('>Developer</h3>')).toBeLessThan(
+      settingsMarkup.indexOf('Graph Interaction'),
+    );
+    expect(settingsMarkup).toContain('Open Diagnostic Evidence');
     expect(settingsMarkup).toContain(
       'type="radio" name="trackpad-zoom-mode" checked="" value="pinch-zoom"',
     );
@@ -164,6 +275,43 @@ describe('graph-first explorer shell', () => {
       />,
     );
     expect(persistedMarkup).toContain('data-trackpad-zoom-mode="pinch-zoom"');
+  });
+
+  it('renders diagnostic evidence in a labeled, internally scrollable dialog', () => {
+    const markup = renderToStaticMarkup(
+      <DiagnosticEvidenceDialog onClose={() => undefined}>
+        <DiagnosticEvidenceContent
+          deferredSearch=""
+          hierarchyDocumentIds={matchingHierarchyDocumentIds(
+            report,
+            diagnosticLookups,
+            '',
+          )}
+          lookups={diagnosticLookups}
+          onSearchChange={() => undefined}
+          onStatusFilterChange={() => undefined}
+          referenceViews={referenceViews}
+          report={report}
+          search=""
+          statusFilter="all"
+          summary={diagnosticSummary}
+          visibleReferences={filterReferenceViews(referenceViews, 'all', '')}
+        />
+      </DiagnosticEvidenceDialog>,
+    );
+
+    expect(markup).toContain(
+      '<dialog aria-labelledby="diagnostic-evidence-title"',
+    );
+    expect(markup).toContain('>Diagnostic Evidence</h2>');
+    expect(markup).toContain(
+      'class="diagnostic-dialog__body" data-graph-scroll-container="true"',
+    );
+    expect(markup).toContain('Filter Evidence');
+    expect(markup).toContain('Canonical Hierarchy');
+    expect(markup).toContain('References');
+    expect(markup).toContain('Diagnostics');
+    expect(markup).toContain('Compatibility Probes');
   });
 
   it('keeps successful persistence status visually hidden and exposes storage failures', () => {
