@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#e9eef1" />
+    <meta
+      name="description"
+      content="Development-only Sigma global graph renderer decision spike."
+    />
+    <title>Icarus Global Renderer Spike</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#spike-controls">Skip visual overview</a>
+    <main class="spike-shell">
+      <header class="spike-header">
+        <div>
+          <p class="eyebrow">KG13A · development harness</p>
+          <h1>Global renderer decision spike</h1>
+          <p>
+            File-oriented network overview. Structure remains the hierarchical
+            authority.
+          </p>
+        </div>
+        <dl
+          class="metrics"
+          id="metrics"
+          aria-label="Renderer measurements"
+        ></dl>
+      </header>
+      <section class="workspace" aria-label="Global graph evaluation workspace">
+        <div class="canvas-column">
+          <div
+            id="sigma-container"
+            class="sigma-container"
+            aria-hidden="true"
+          ></div>
+          <p class="canvas-note">
+            This WebGL overview is visual only. Search results and the Inspector
+            expose the same selected-file information in the document.
+          </p>
+        </div>
+        <aside
+          class="control-panel"
+          id="spike-controls"
+          aria-label="Global renderer controls"
+        >
+          <section>
+            <h2>Dataset</h2>
+            <label>
+              Profile
+              <select id="profile" name="profile">
+                <option value="product-small">Product small · 100 files</option>
+                <option value="product-medium">
+                  Product medium · 500 files
+                </option>
+                <option value="stress-1000">Stress · 1k / 2k</option>
+                <option value="stress-5000">Stress · 5k / 10k</option>
+                <option value="stress-10000">Stress · 10k / 20k</option>
+                <option value="stress-25000">Stress · 25k / 50k</option>
+              </select>
+            </label>
+            <label class="check-label">
+              <input id="labels" name="labels" type="checkbox" checked />
+              Adaptive labels
+            </label>
+            <label class="check-label">
+              <input id="edge-events" name="edge-events" type="checkbox" /> Edge
+              click/hover events
+            </label>
+          </section>
+          <section>
+            <h2>Layout and lifecycle</h2>
+            <div class="button-grid">
+              <button id="layout" type="button">Run Worker Layout</button>
+              <button id="reset" type="button">
+                Reset Deterministic Positions
+              </button>
+              <button id="update-one" type="button">Apply 1% Update</button>
+              <button id="update-ten" type="button">Apply 10% Update</button>
+              <button id="recreate" type="button">Destroy / Recreate</button>
+              <button id="interactions" type="button">
+                Run Interaction Sample
+              </button>
+              <button id="bookmark" type="button">
+                Capture Semantic Bookmark
+              </button>
+            </div>
+          </section>
+          <section>
+            <h2>Find files</h2>
+            <label>
+              File name or stable ID
+              <input
+                id="search"
+                name="global-file-search"
+                type="search"
+                autocomplete="off"
+              />
+            </label>
+            <p class="search-help" id="search-help">
+              Search, select, and center without rebuilding the graph.
+            </p>
+            <ul
+              id="search-results"
+              class="search-results"
+              aria-label="File search results"
+            ></ul>
+          </section>
+          <section aria-labelledby="inspector-title">
+            <h2 id="inspector-title">Inspector</h2>
+            <div id="inspector" class="inspector" aria-live="polite">
+              Select a file in the graph or search results.
+            </div>
+          </section>
+          <p id="status" class="status" role="status" aria-live="polite"></p>
+          <details class="measurement-history">
+            <summary>Measurement History</summary>
+            <ol id="measurement-history"></ol>
+          </details>
+        </aside>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

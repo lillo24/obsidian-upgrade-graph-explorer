@@ -331,3 +331,42 @@ existing aggregate-only KG10 validation plus the production browser/Tauri
 runtime recorder; never commit a report, catalog, path, workspace name/ID,
 source-derived query, heading, or screenshot. Synthetic small/medium/large
 evidence remains the reproducible worker-decision basis.
+
+## KG13A global renderer evidence
+
+KG13A isolates WebGL rendering from network layout. The Node harness measures
+real KG6 documents-only mapping and Graphology construction; the production
+browser harness measures Sigma mount/render/interaction and the module-worker
+ForceAtlas2 path. Values below are one local Windows/Chrome evidence set, not CI
+thresholds.
+
+| R1/R2 scene                | First render | 1% reconcile |             Worker layout | High RAF gap |
+| -------------------------- | -----------: | -----------: | ------------------------: | -----------: |
+| 1k nodes / 2k edges        |       6.5 ms |       9.7 ms | 637.4 ms / 100 iterations |      17.0 ms |
+| 5k / 10k                   |      33.5 ms |      20.5 ms |           1,688.6 ms / 30 |      17.1 ms |
+| 10k / 20k                  |      97.2 ms |      42.1 ms |           3,417.9 ms / 30 |      25.7 ms |
+| 25k / 50k optional ceiling |     207.7 ms |     104.0 ms |          11,544.4 ms / 30 |      54.7 ms |
+
+At 10k/20k, enabling edge interaction took a 104.9 ms process/render pass and
+disabling it took 68.6 ms. Global edge events therefore remain off by default.
+At product-small interaction scale, hover renders took 4.4/16.8 ms, selected
+render 23.8 ms, animated search-center 191.0 ms, and animated pan/zoom 183.0 ms
+with a 16.9 ms high RAF gap.
+
+The actual KG6 documents-only profiles contain 600/599, 5,000/4,999, and
+24,000/23,999 projected nodes/edges at small, medium, and large. Mapping medians
+were 1.0, 5.5, and 77.9 ms; Graphology construction medians were 0.5, 4.7, and
+62.8 ms. Synchronous R2 evidence is capped at 5,000 nodes: 100 small iterations
+took 245.5 ms and 20 medium Barnes-Hut iterations took 1,370.1 ms. Interactive
+work always uses the dedicated worker.
+
+The optional 25k/50k ceiling proves rendering capacity, not a product promise.
+Its 11.5-second layout rejects unconditional per-session recomputation at that
+scale. An adopted KG13B must keep worker progress explicit and design a derived
+layout cache outside canonical truth and KG9 state. The production candidate
+bundle contains 256,526 JavaScript bytes across the 178,442-byte main chunk and
+78,084-byte worker, plus 4,595 CSS bytes. The ordinary product bundle has no
+Sigma dependency or chunk in KG13A.
+
+The full candidate architecture, accessibility cost, product-value matrix, and
+passing release Tauri gate are recorded in `docs/GLOBAL_RENDERER_DECISION.md`.

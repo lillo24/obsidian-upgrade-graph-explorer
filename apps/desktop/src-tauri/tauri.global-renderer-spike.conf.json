@@ -1,0 +1,21 @@
+{
+  "productName": "Icarus Global Renderer Spike",
+  "build": {
+    "beforeBuildCommand": "pnpm --dir ../../tools/global-renderer-spike build",
+    "frontendDist": "../../../tools/global-renderer-spike/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Icarus Global Renderer Spike",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 640,
+        "resizable": true,
+        "zoomHotkeysEnabled": true
+      }
+    ]
+  }
+}
