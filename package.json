@@ -17,6 +17,7 @@
     "benchmark:pipeline": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark",
     "benchmark:performance": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:performance",
     "benchmark:workspace-worker": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:workspace-worker",
+    "benchmark:dagre-worker": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:dagre-worker",
     "test": "vitest run",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "pnpm --recursive typecheck",

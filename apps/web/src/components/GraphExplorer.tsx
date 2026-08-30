@@ -56,6 +56,7 @@ import {
   loadGraphPreferences,
   saveGraphPreferences,
 } from '../preferences/graph-preferences';
+import { createDagreLayoutWorkerService } from '../workers/dagre-layout-worker-client';
 import { EntitySearch } from './EntitySearch';
 import { GraphFilters } from './GraphFilters';
 import { GraphSettings } from './GraphSettings';
@@ -175,6 +176,8 @@ export function GraphExplorer({
           create,
         );
   }, [performance, snapshot]);
+  const layoutService = useMemo(() => createDagreLayoutWorkerService(), []);
+  useEffect(() => () => layoutService.dispose(), [layoutService]);
   const [persistenceStorage] = useState(() =>
     storage === null ? undefined : (storage ?? browserStorage()),
   );
@@ -869,6 +872,7 @@ export function GraphExplorer({
             layoutMode={
               activeViewState.focus === undefined ? 'structure' : 'focus'
             }
+            layoutService={layoutService}
             maximized={maximized}
             onMaximizedChange={changeMaximized}
             onSelectionChange={changeSelection}

@@ -177,9 +177,13 @@ describe('renderer interaction helpers', () => {
       performance,
       layoutEngine: ({ nodes }) => {
         clock += 5;
-        return new Map(
-          nodes.map(({ id }, index) => [id, { x: index, y: index }]),
-        );
+        return {
+          positions: nodes.map(({ id }, index) => ({
+            id,
+            x: index,
+            y: index,
+          })),
+        };
       },
     });
     performance.measure('highlight', 'highlight-applications', () =>
