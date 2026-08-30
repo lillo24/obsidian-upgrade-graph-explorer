@@ -14,7 +14,7 @@ export interface GraphPreferences {
 }
 
 export const DEFAULT_GRAPH_PREFERENCES: GraphPreferences = {
-  focusAppearance: 'outline',
+  focusAppearance: 'inverted',
   trackpadZoomMode: 'scroll-zoom',
 };
 

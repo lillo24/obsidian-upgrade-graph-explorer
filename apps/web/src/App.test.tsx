@@ -67,7 +67,7 @@ describe('graph-first explorer shell', () => {
     expect(markup).toContain('Documents');
     expect(markup).not.toContain('Focus Selected');
     expect(markup).not.toContain('aria-label="Focus controls"');
-    expect(markup).toContain('data-focus-appearance="outline"');
+    expect(markup).toContain('data-focus-appearance="inverted"');
     expect(markup).toContain('aria-label="Open Inspector"');
     expect(markup).not.toContain('>Inspector</button>');
     expect(markup).toContain('aria-label="Fit graph to view"');
@@ -295,7 +295,7 @@ describe('graph-first explorer shell', () => {
       />,
     );
     expect(persistedMarkup).toContain('data-trackpad-zoom-mode="pinch-zoom"');
-    expect(persistedMarkup).toContain('data-focus-appearance="outline"');
+    expect(persistedMarkup).toContain('data-focus-appearance="inverted"');
   });
 
   it('renders diagnostic evidence in a labeled, internally scrollable dialog', () => {

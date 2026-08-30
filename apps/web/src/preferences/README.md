@@ -11,9 +11,9 @@ must not be serialized into KG9 workspace state.
 
 The stable v1 payload contains both `focusAppearance` (`outline`, `inverted`, or
 `minimal`) and `trackpadZoomMode` (`scroll-zoom` or `pinch-zoom`). The defaults
-are `outline` and `scroll-zoom`. A pre-UX4C payload containing only the trackpad
-field loads with `outline`; an invalid field falls back independently so a valid
-sibling preference is preserved. The storage key and schema version stay at
+are `inverted` and `scroll-zoom`. A pre-UX4C payload containing only the trackpad
+field loads with `inverted`; an invalid field falls back independently so a
+valid sibling preference is preserved. The storage key and schema version stay at
 `icarus.graph-explorer.preferences.v1`. If storage is unavailable, an in-memory
 change still applies immediately for the current session and the Settings UI
 reports that it will reset when the app closes.

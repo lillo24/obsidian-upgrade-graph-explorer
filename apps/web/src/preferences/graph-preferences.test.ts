@@ -28,7 +28,7 @@ function memoryStorage(
 }
 
 describe('graph preferences', () => {
-  it('defaults to scroll zoom and the outline focus root when storage is absent or empty', () => {
+  it('defaults to scroll zoom and the inverted focus root when storage is absent or empty', () => {
     expect(loadGraphPreferences(undefined)).toEqual({
       preferences: DEFAULT_GRAPH_PREFERENCES,
       warning: null,
@@ -52,7 +52,7 @@ describe('graph preferences', () => {
   it('loads and persists the exact global v1 payload', () => {
     const storage = memoryStorage('{"trackpadZoomMode":"pinch-zoom"}');
     expect(loadGraphPreferences(storage).preferences).toEqual({
-      focusAppearance: 'outline',
+      focusAppearance: 'inverted',
       trackpadZoomMode: 'pinch-zoom',
     });
 
@@ -75,7 +75,7 @@ describe('graph preferences', () => {
         ),
       ).preferences,
     ).toEqual({
-      focusAppearance: 'outline',
+      focusAppearance: 'inverted',
       trackpadZoomMode: 'pinch-zoom',
     });
     expect(
