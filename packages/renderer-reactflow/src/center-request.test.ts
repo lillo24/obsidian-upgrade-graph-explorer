@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveGraphCenterRequest } from './center-request';
+import {
+  resolveGraphCenterRequest,
+  shouldApplyGraphFitRequest,
+} from './center-request';
 import { prepareRendererGraph } from './prepare';
 import { rendererTestProjection } from './test-fixture';
 
@@ -51,5 +54,16 @@ describe('renderer center requests', () => {
 
   it('is independent from graph selection and full-fit request state', () => {
     expect(resolveGraphCenterRequest(graph(), undefined, 8)).toBeNull();
+  });
+
+  it('lets a current semantic center supersede a stale Fit request', () => {
+    expect(shouldApplyGraphFitRequest(1, 2, undefined)).toBe(true);
+    expect(
+      shouldApplyGraphFitRequest(1, 2, {
+        key: 3,
+        nodeId: 'projection-document',
+      }),
+    ).toBe(false);
+    expect(shouldApplyGraphFitRequest(2, 2, undefined)).toBe(false);
   });
 });

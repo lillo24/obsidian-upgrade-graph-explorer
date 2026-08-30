@@ -64,6 +64,11 @@ describe('graph-first explorer shell', () => {
     expect(markup).not.toContain('Open Vault');
     expect(markup).toContain('Search');
     expect(markup).toContain('>Filters<');
+    expect(markup).toContain('aria-label="Graph navigation history"');
+    expect(markup).toContain('aria-label="Back in graph history" disabled=""');
+    expect(markup).toContain(
+      'aria-label="Forward in graph history" disabled=""',
+    );
     expect(markup).toContain('Documents');
     expect(markup).not.toContain('Focus Selected');
     expect(markup).not.toContain('aria-label="Focus controls"');
@@ -198,6 +203,12 @@ describe('graph-first explorer shell', () => {
     expect(normalMarkup).toContain('aria-label="Open Settings"');
     expect(normalMarkup).toContain('data-trackpad-zoom-mode="scroll-zoom"');
     expect(normalMarkup).not.toContain('class="graph-floating-controls"');
+    expect(
+      normalMarkup.match(/aria-label="Back in graph history"/g),
+    ).toHaveLength(1);
+    expect(
+      normalMarkup.match(/aria-label="Forward in graph history"/g),
+    ).toHaveLength(1);
     expect(normalMarkup).toContain(
       'aria-label="Maximize graph" aria-pressed="false"',
     );
@@ -209,6 +220,12 @@ describe('graph-first explorer shell', () => {
       'aria-label="Restore graph" aria-pressed="true"',
     );
     expect(maximizedMarkup).toContain('class="graph-floating-controls"');
+    expect(
+      maximizedMarkup.match(/aria-label="Back in graph history"/g),
+    ).toHaveLength(1);
+    expect(
+      maximizedMarkup.match(/aria-label="Forward in graph history"/g),
+    ).toHaveLength(1);
     expect(maximizedMarkup).toContain(
       'aria-controls="graph-tools-panel" aria-expanded="false"',
     );
@@ -254,6 +271,7 @@ describe('graph-first explorer shell', () => {
       </GraphSettings>,
     );
     expect(settingsMarkup).toContain('>Graph Appearance</h3>');
+    expect(settingsMarkup).toContain('data-graph-history-shortcuts="off"');
     expect(settingsMarkup).toContain('<legend>Focus Root</legend>');
     expect(settingsMarkup).toContain('>Outline</strong>');
     expect(settingsMarkup).toContain('>Inverted</strong>');

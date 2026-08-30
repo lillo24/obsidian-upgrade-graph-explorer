@@ -87,7 +87,9 @@ precision-touchpad focal point. Native wheel events over the viewport controls
 or an explicitly marked scroll region are not captured.
 Wheel-driven semantic viewport persistence is debounced to one observation 120
 ms after the final tick; raw transforms and high-frequency frames still do not
-cross the renderer boundary.
+cross the renderer boundary. User-invoked React Flow zoom controls schedule the
+same trailing semantic observation because their completed moves have no
+originating DOM event.
 
 Disclosure captures the toggled entity's screen-space center and current zoom,
 then restores that point after the new projection and layout commit. Only the
@@ -142,7 +144,9 @@ KG8 adds an optional keyed `GraphCenterRequest` containing only a projected node
 ID and optional zoom. After the matching projection/layout exists, the renderer
 uses that node's prepared center with duration `0`; stale IDs are consumed
 safely. Centering is independent from selection and full-graph fit, and the
-renderer still has no canonical or inspection dependency.
+renderer still has no canonical or inspection dependency. A current center
+request consumes any older Fit token without running it, so rapid semantic
+Back/Forward traversal cannot snap from a newer center to a stale async Fit.
 
 KG9B adds an optional interaction-end observation. Using the actual container
 dimensions and React Flow transform, the renderer selects the nearest visible

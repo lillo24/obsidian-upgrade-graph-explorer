@@ -340,6 +340,44 @@ h2 {
   margin-left: auto;
 }
 
+.graph-history-controls {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.graph-history-controls button {
+  display: inline-flex;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem;
+  border: 1px solid #879da8;
+  border-radius: 0.55rem;
+  color: #183d4d;
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 0.25rem 0.8rem rgb(24 47 61 / 10%);
+  font-size: 1.1rem;
+  font-weight: 850;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.graph-history-controls button:hover:not(:disabled),
+.graph-history-controls button:active:not(:disabled) {
+  border-color: #1c5267;
+  background: #e9f3f5;
+}
+
+.graph-history-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .graph-inspector-toggle {
   width: 2.75rem;
   min-width: 2.75rem;

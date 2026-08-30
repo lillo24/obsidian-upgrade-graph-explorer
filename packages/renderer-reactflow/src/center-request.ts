@@ -11,6 +11,18 @@ export interface ResolvedGraphCenterRequest {
   readonly instruction: GraphCenterInstruction | null;
 }
 
+/**
+ * A current semantic center request supersedes an older Fit token. Consuming
+ * that token prevents a late async layout commit from fitting after centering.
+ */
+export function shouldApplyGraphFitRequest(
+  previousFitKey: number,
+  fitRequestKey: number,
+  centerRequest: GraphCenterRequest | undefined,
+): boolean {
+  return centerRequest === undefined && previousFitKey !== fitRequestKey;
+}
+
 /** Pure request consumption keeps stale/repeated viewport behavior testable. */
 export function resolveGraphCenterRequest(
   graph: RendererGraph,

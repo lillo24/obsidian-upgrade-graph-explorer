@@ -6,6 +6,7 @@ import {
   useReducer,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from 'react';
@@ -32,14 +33,29 @@ import {
   createProjectionWorkspace,
   projectView,
   type ViewProjection,
+  type ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
 
+import { graphHistoryShortcut } from '../graph-history-shortcuts';
 import {
   graphStateReducer,
   initialGraphState,
   normalizeGraphState,
   type GraphStateAction,
 } from '../graph-state';
+import {
+  createGraphHistoryCheckpoint,
+  createGraphNavigationHistory,
+  goBackInGraphHistory,
+  goForwardInGraphHistory,
+  graphHistoryActionPolicy,
+  nextGraphViewportRequestKey,
+  planSemanticViewportRestore,
+  recordGraphNavigation,
+  sameGraphViewState,
+  type GraphHistoryCheckpoint,
+  type GraphNavigationHistory,
+} from '../navigation-history';
 import { planEntityNavigation, topLevelPathScopes } from '../navigation';
 import {
   hydrateGraphView,
@@ -58,6 +74,7 @@ import {
 import { createDagreLayoutWorkerService } from '../workers/dagre-layout-worker-client';
 import { EntitySearch } from './EntitySearch';
 import { GraphFilters } from './GraphFilters';
+import { GraphHistoryControls } from './GraphHistoryControls';
 import { GraphSettings } from './GraphSettings';
 import {
   CLOSED_GRAPH_WORKSPACE_OVERLAYS,
@@ -77,6 +94,24 @@ interface ProjectionFailure {
 }
 
 type ProjectionResult = ProjectionSuccess | ProjectionFailure;
+
+interface PendingHistoryViewportRestore {
+  readonly key: number;
+  readonly viewport?: PersistedViewportAnchor;
+}
+
+const ENTITY_NAVIGATION_ZOOM = 1.1;
+
+const GRAPH_HISTORY_SHORTCUT_EXCLUSION_SELECTOR =
+  'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [data-graph-history-shortcuts="off"]';
+
+function historyShortcutTargetIsExcluded(target: EventTarget | null): boolean {
+  return (
+    typeof Element === 'undefined' ||
+    !(target instanceof Element) ||
+    target.closest(GRAPH_HISTORY_SHORTCUT_EXCLUSION_SELECTOR) !== null
+  );
+}
 
 function selectionExists(
   projection: ViewProjection,
@@ -246,9 +281,23 @@ export function GraphExplorer({
           zoom: hydration.viewport.zoom,
         },
   );
+  // Clearing a request must not reset its identity: the renderer remembers
+  // handled keys across Fit transitions to reject stale async layout work.
+  const centerRequestGeneration = useRef(centerRequest?.key ?? 0);
   const [viewportBookmark, setViewportBookmark] = useState<
     PersistedViewportAnchor | undefined
   >(restoredViewportHidden ? undefined : hydration.viewport);
+  const [navigationHistory, setNavigationHistory] =
+    useState<GraphNavigationHistory>(createGraphNavigationHistory);
+  const navigationHistoryRef = useRef(navigationHistory);
+  const activeViewStateRef = useRef(activeViewState);
+  const viewportBookmarkRef = useRef(viewportBookmark);
+  const pendingHistoryViewportRestoreRef = useRef<
+    PendingHistoryViewportRestore | undefined
+  >(undefined);
+  const historyViewportRestoreGeneration = useRef(0);
+  const [pendingHistoryViewportRestore, setPendingHistoryViewportRestore] =
+    useState<PendingHistoryViewportRestore>();
   const persistenceWritable = useRef(hydration.writable);
   const [persistenceAnnouncement, setPersistenceAnnouncement] = useState(
     `${
@@ -309,14 +358,258 @@ export function GraphExplorer({
       ? selection
       : null;
   const previousProjectionWorkspace = useRef(projectionWorkspace);
+  const previousWorkspaceId = useRef(
+    projectionWorkspace.snapshot().workspace.id,
+  );
+
+  const replaceNavigationHistory = useCallback(
+    (next: GraphNavigationHistory) => {
+      navigationHistoryRef.current = next;
+      setNavigationHistory(next);
+    },
+    [],
+  );
+  const setSemanticViewportBookmark = useCallback(
+    (next: PersistedViewportAnchor | undefined) => {
+      viewportBookmarkRef.current = next;
+      setViewportBookmark(next);
+    },
+    [],
+  );
+  const requestSemanticCenter = useCallback(
+    (request: Omit<GraphCenterRequest, 'key'>) => {
+      const key = nextGraphViewportRequestKey(centerRequestGeneration.current);
+      centerRequestGeneration.current = key;
+      setCenterRequest({ key, ...request });
+    },
+    [],
+  );
+  const cancelPendingHistoryViewportRestore = useCallback(() => {
+    pendingHistoryViewportRestoreRef.current = undefined;
+    setPendingHistoryViewportRestore(undefined);
+  }, []);
+  const clearNavigationHistory = useCallback(() => {
+    replaceNavigationHistory(createGraphNavigationHistory());
+    cancelPendingHistoryViewportRestore();
+  }, [cancelPendingHistoryViewportRestore, replaceNavigationHistory]);
+  const currentHistoryCheckpoint = useCallback(
+    (): GraphHistoryCheckpoint =>
+      createGraphHistoryCheckpoint(
+        activeViewStateRef.current,
+        viewportBookmarkRef.current,
+      ),
+    [],
+  );
+  const commitGraphDestination = useCallback(
+    (
+      nextState: ViewProjectionState,
+      nextViewport: PersistedViewportAnchor | undefined,
+    ): boolean => {
+      const current = currentHistoryCheckpoint();
+      const destination = createGraphHistoryCheckpoint(nextState, nextViewport);
+      const nextHistory = recordGraphNavigation(
+        navigationHistoryRef.current,
+        current,
+        destination,
+      );
+      if (nextHistory === navigationHistoryRef.current) return false;
+      replaceNavigationHistory(nextHistory);
+      cancelPendingHistoryViewportRestore();
+      if (!sameGraphViewState(activeViewStateRef.current, nextState)) {
+        activeViewStateRef.current = nextState;
+        dispatch({ type: 'replace-state', state: nextState });
+      }
+      setSemanticViewportBookmark(nextViewport);
+      return true;
+    },
+    [
+      cancelPendingHistoryViewportRestore,
+      currentHistoryCheckpoint,
+      replaceNavigationHistory,
+      setSemanticViewportBookmark,
+    ],
+  );
+  const commitHistoryGraphAction = useCallback(
+    (
+      action: GraphStateAction,
+      options: { readonly fitDestination?: boolean } = {},
+    ): boolean => {
+      if (graphHistoryActionPolicy(action) !== 'record') {
+        throw new Error(
+          `Graph action "${action.type}" cannot create a history checkpoint.`,
+        );
+      }
+      const nextState = graphStateReducer(activeViewStateRef.current, action);
+      if (sameGraphViewState(activeViewStateRef.current, nextState)) {
+        return false;
+      }
+      const committed = commitGraphDestination(
+        nextState,
+        options.fitDestination ? undefined : viewportBookmarkRef.current,
+      );
+      if (committed) setCenterRequest(undefined);
+      return committed;
+    },
+    [commitGraphDestination],
+  );
+  const requestHistoryViewportRestore = useCallback(
+    (viewport: PersistedViewportAnchor | undefined) => {
+      const request: PendingHistoryViewportRestore = {
+        key: nextGraphViewportRequestKey(
+          historyViewportRestoreGeneration.current,
+        ),
+        ...(viewport === undefined ? {} : { viewport }),
+      };
+      historyViewportRestoreGeneration.current = request.key;
+      pendingHistoryViewportRestoreRef.current = request;
+      setPendingHistoryViewportRestore(request);
+    },
+    [],
+  );
+  const traverseGraphHistory = useCallback(
+    (direction: 'back' | 'forward'): boolean => {
+      const traversal =
+        direction === 'back'
+          ? goBackInGraphHistory(
+              navigationHistoryRef.current,
+              currentHistoryCheckpoint(),
+            )
+          : goForwardInGraphHistory(
+              navigationHistoryRef.current,
+              currentHistoryCheckpoint(),
+            );
+      if (traversal === null) return false;
+
+      const reconciled = reconcileCurrentWorkspaceView(
+        projectionWorkspace,
+        traversal.target.state,
+        traversal.target.viewport,
+      );
+      replaceNavigationHistory(traversal.history);
+      if (!sameGraphViewState(activeViewStateRef.current, reconciled.state)) {
+        activeViewStateRef.current = reconciled.state;
+        dispatch({ type: 'replace-state', state: reconciled.state });
+      }
+      setSemanticViewportBookmark(reconciled.viewport);
+      setCenterRequest(undefined);
+      requestHistoryViewportRestore(reconciled.viewport);
+      setNavigationError(undefined);
+      setNavigationAnnouncement(
+        (direction === 'back'
+          ? 'Went back in graph history.'
+          : 'Went forward in graph history.') +
+          (reconciled.issues.length === 0
+            ? ''
+            : ' Some graph state was adjusted because the source changed.'),
+      );
+      return true;
+    },
+    [
+      currentHistoryCheckpoint,
+      projectionWorkspace,
+      replaceNavigationHistory,
+      requestHistoryViewportRestore,
+      setSemanticViewportBookmark,
+    ],
+  );
+  const goBack = useCallback(
+    () => void traverseGraphHistory('back'),
+    [traverseGraphHistory],
+  );
+  const goForward = useCallback(
+    () => void traverseGraphHistory('forward'),
+    [traverseGraphHistory],
+  );
+  const activateGraphHistoryShortcut = useCallback(
+    (event: ReactKeyboardEvent<HTMLElement>) => {
+      const direction = graphHistoryShortcut({
+        key: event.key,
+        altKey: event.altKey,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        shiftKey: event.shiftKey,
+        repeat: event.repeat,
+        editableTarget: historyShortcutTargetIsExcluded(event.target),
+        graphContext: true,
+        applicationOverlayOpen,
+        canGoBack: navigationHistoryRef.current.past.length > 0,
+        canGoForward: navigationHistoryRef.current.future.length > 0,
+      });
+      if (direction === null || !traverseGraphHistory(direction)) return;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    [applicationOverlayOpen, traverseGraphHistory],
+  );
 
   useLayoutEffect(() => {
     if (performance === undefined) return;
     performance.markCommit('graph-explorer-commit');
   });
 
+  useLayoutEffect(() => {
+    activeViewStateRef.current = activeViewState;
+    viewportBookmarkRef.current = viewportBookmark;
+  }, [activeViewState, viewportBookmark]);
+
+  useEffect(() => {
+    const request = pendingHistoryViewportRestore;
+    if (
+      request === undefined ||
+      !result.ok ||
+      pendingHistoryViewportRestoreRef.current?.key !== request.key
+    ) {
+      return;
+    }
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (
+        cancelled ||
+        pendingHistoryViewportRestoreRef.current?.key !== request.key
+      ) {
+        return;
+      }
+      pendingHistoryViewportRestoreRef.current = undefined;
+      setPendingHistoryViewportRestore((current) =>
+        current?.key === request.key ? undefined : current,
+      );
+      setSelection((current) =>
+        current !== null && selectionExists(result.projection, current)
+          ? current
+          : null,
+      );
+      const restore = planSemanticViewportRestore(
+        result.projection,
+        request.viewport,
+      );
+      if (restore.kind === 'center') {
+        requestSemanticCenter({
+          nodeId: restore.nodeId,
+          zoom: restore.zoom,
+        });
+        return;
+      }
+      setSemanticViewportBookmark(undefined);
+      setCenterRequest(undefined);
+      setFitRequestKey((current) => current + 1);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    pendingHistoryViewportRestore,
+    requestSemanticCenter,
+    result,
+    setSemanticViewportBookmark,
+  ]);
+
   useEffect(() => {
     if (previousProjectionWorkspace.current === projectionWorkspace) return;
+    const currentWorkspaceId = projectionWorkspace.snapshot().workspace.id;
+    if (previousWorkspaceId.current !== currentWorkspaceId) {
+      previousWorkspaceId.current = currentWorkspaceId;
+      clearNavigationHistory();
+    }
     const reconciled = reconcileCurrentWorkspaceView(
       projectionWorkspace,
       viewState,
@@ -327,11 +620,12 @@ export function GraphExplorer({
       if (cancelled) return;
       previousProjectionWorkspace.current = projectionWorkspace;
       if (reconciled.state !== viewState) {
+        activeViewStateRef.current = reconciled.state;
         dispatch({ type: 'replace-state', state: reconciled.state });
       }
       if (viewportBookmark === undefined) return;
       if (reconciled.viewport === undefined) {
-        setViewportBookmark(undefined);
+        setSemanticViewportBookmark(undefined);
         setCenterRequest(undefined);
         setFitRequestKey((current) => current + 1);
         setNavigationAnnouncement(
@@ -346,6 +640,7 @@ export function GraphExplorer({
           candidate.entityId === reconciled.viewport?.anchorEntityId,
       );
       if (anchor === undefined) {
+        setSemanticViewportBookmark(undefined);
         setCenterRequest(undefined);
         setFitRequestKey((current) => current + 1);
         setNavigationAnnouncement(
@@ -353,16 +648,23 @@ export function GraphExplorer({
         );
         return;
       }
-      setCenterRequest((current) => ({
-        key: (current?.key ?? 0) + 1,
+      requestSemanticCenter({
         nodeId: anchor.id,
         zoom: reconciled.viewport!.zoom,
-      }));
+      });
     });
     return () => {
       cancelled = true;
     };
-  }, [projectionWorkspace, result, viewState, viewportBookmark]);
+  }, [
+    clearNavigationHistory,
+    projectionWorkspace,
+    requestSemanticCenter,
+    result,
+    setSemanticViewportBookmark,
+    viewState,
+    viewportBookmark,
+  ]);
 
   useEffect(() => {
     if (
@@ -469,21 +771,25 @@ export function GraphExplorer({
 
   const toggleEntity = useCallback(
     (entityId: string, currentlyOpen: boolean) =>
-      dispatch({ type: 'toggle-entity', entityId, currentlyOpen }),
-    [],
+      void commitHistoryGraphAction({
+        type: 'toggle-entity',
+        entityId,
+        currentlyOpen,
+      }),
+    [commitHistoryGraphAction],
   );
   const changeSelection = useCallback(
     (nextSelection: GraphSelection | null) => setSelection(nextSelection),
     [],
   );
   const applyGraphAction = useCallback(
-    (action: GraphStateAction) => dispatch(action),
-    [],
+    (action: GraphStateAction) => void commitHistoryGraphAction(action),
+    [commitHistoryGraphAction],
   );
   const clearSelection = useCallback(() => setSelection(null), []);
   const observeViewport = useCallback(
     (observation: GraphViewportObservation) =>
-      setViewportBookmark(
+      setSemanticViewportBookmark(
         observation.anchorEntityId === null
           ? undefined
           : {
@@ -491,7 +797,7 @@ export function GraphExplorer({
               zoom: observation.zoom,
             },
       ),
-    [],
+    [setSemanticViewportBookmark],
   );
   const changeMaximized = useCallback(
     (nextMaximized: boolean) => {
@@ -561,24 +867,35 @@ export function GraphExplorer({
     (entityId: EntityId, origin: string) => {
       const plan = planEntityNavigation(
         projectionWorkspace,
-        activeViewState,
+        activeViewStateRef.current,
         entityId,
       );
       if (!plan.ok) {
         setNavigationError(`${origin}: ${plan.message}`);
         return;
       }
-      dispatch({ type: 'apply-navigation', state: plan.state });
+      const targetViewport = {
+        anchorEntityId: entityId,
+        zoom: ENTITY_NAVIGATION_ZOOM,
+      } satisfies PersistedViewportAnchor;
+      commitGraphDestination(plan.state, targetViewport);
+      cancelPendingHistoryViewportRestore();
+      setSemanticViewportBookmark(targetViewport);
       setSelection({ kind: 'node', id: plan.projectionNodeId });
-      setCenterRequest((current) => ({
-        key: (current?.key ?? 0) + 1,
+      requestSemanticCenter({
         nodeId: plan.projectionNodeId,
-        zoom: 1.1,
-      }));
+        zoom: ENTITY_NAVIGATION_ZOOM,
+      });
       setNavigationError(undefined);
       setNavigationAnnouncement(`${origin}: ${plan.announcement}`);
     },
-    [activeViewState, projectionWorkspace],
+    [
+      cancelPendingHistoryViewportRestore,
+      commitGraphDestination,
+      projectionWorkspace,
+      requestSemanticCenter,
+      setSemanticViewportBookmark,
+    ],
   );
 
   const enterFocus = useCallback(
@@ -588,19 +905,27 @@ export function GraphExplorer({
           candidate.kind === 'entity' && candidate.entityId === entityId,
       );
       if (focusEntity === undefined || focusEntity.kind !== 'entity') return;
-      dispatch({ type: 'enter-focus', entityId: focusEntity.entityId });
       setSelection({ kind: 'node', id: focusEntity.id });
+      const committed = commitHistoryGraphAction(
+        { type: 'enter-focus', entityId: focusEntity.entityId },
+        { fitDestination: true },
+      );
+      if (!committed) return;
       setFitRequestKey((current) => current + 1);
       setNavigationError(undefined);
       setNavigationAnnouncement(
         `Focused ${focusEntity.entityKind} in ${focusEntity.sourcePath}.`,
       );
     },
-    [projection],
+    [commitHistoryGraphAction, projection],
   );
 
   function exitFocus(): void {
-    dispatch({ type: 'exit-focus' });
+    const committed = commitHistoryGraphAction(
+      { type: 'exit-focus' },
+      { fitDestination: true },
+    );
+    if (!committed) return;
     setSelection(null);
     setFitRequestKey((current) => current + 1);
     setNavigationError(undefined);
@@ -610,13 +935,25 @@ export function GraphExplorer({
   }
 
   function changeHops(hops: 1 | 2 | 3): void {
-    dispatch({ type: 'set-focus-hops', hops });
-    setFitRequestKey((current) => current + 1);
+    if (
+      commitHistoryGraphAction(
+        { type: 'set-focus-hops', hops },
+        { fitDestination: true },
+      )
+    ) {
+      setFitRequestKey((current) => current + 1);
+    }
   }
 
   function changeDirection(direction: 'incoming' | 'outgoing' | 'both'): void {
-    dispatch({ type: 'set-focus-direction', direction });
-    setFitRequestKey((current) => current + 1);
+    if (
+      commitHistoryGraphAction(
+        { type: 'set-focus-direction', direction },
+        { fitDestination: true },
+      )
+    ) {
+      setFitRequestKey((current) => current + 1);
+    }
   }
 
   function resetSavedView(): void {
@@ -644,10 +981,12 @@ export function GraphExplorer({
         state: defaults,
       }),
     );
+    clearNavigationHistory();
     dispatch({ type: 'reset-view' });
+    activeViewStateRef.current = defaults;
     setSelection(null);
     setCenterRequest(undefined);
-    setViewportBookmark(undefined);
+    setSemanticViewportBookmark(undefined);
     setTransientResetKey((current) => current + 1);
     setFitRequestKey((current) => current + 1);
     persistenceWritable.current = true;
@@ -659,10 +998,14 @@ export function GraphExplorer({
     );
   }
 
+  const canGoBack = navigationHistory.past.length > 0;
+  const canGoForward = navigationHistory.future.length > 0;
+
   return (
     <section
       className={`graph-workspace${maximized ? ' graph-workspace--maximized' : ''}`}
       aria-label="Knowledge graph workspace"
+      onKeyDownCapture={activateGraphHistoryShortcut}
     >
       {maximized ? (
         <div
@@ -670,6 +1013,12 @@ export function GraphExplorer({
           className="graph-floating-controls"
           role="group"
         >
+          <GraphHistoryControls
+            canGoBack={canGoBack}
+            canGoForward={canGoForward}
+            onBack={goBack}
+            onForward={goForward}
+          />
           <button
             aria-controls="graph-tools-panel"
             aria-expanded={activeOverlay === 'tools'}
@@ -716,6 +1065,14 @@ export function GraphExplorer({
           />
 
           <div className="graph-toolbar" aria-label="Graph view controls">
+            {maximized ? null : (
+              <GraphHistoryControls
+                canGoBack={canGoBack}
+                canGoForward={canGoForward}
+                onBack={goBack}
+                onForward={goForward}
+              />
+            )}
             <div
               className="control-group"
               aria-label="Structural depth"
@@ -724,14 +1081,18 @@ export function GraphExplorer({
               <span>Structure</span>
               <button
                 aria-pressed={activeViewState.disclosure.defaultDepth === 0}
-                onClick={() => dispatch({ type: 'set-depth', depth: 0 })}
+                onClick={() =>
+                  commitHistoryGraphAction({ type: 'set-depth', depth: 0 })
+                }
                 type="button"
               >
                 Documents
               </button>
               <button
                 aria-pressed={activeViewState.disclosure.defaultDepth === 1}
-                onClick={() => dispatch({ type: 'set-depth', depth: 1 })}
+                onClick={() =>
+                  commitHistoryGraphAction({ type: 'set-depth', depth: 1 })
+                }
                 type="button"
               >
                 Top-Level
