@@ -101,6 +101,50 @@ describe('persisted workspace view', () => {
     expect(validation).toEqual({ valid: true, value, issues: [] });
   });
 
+  it.each([0, 1, 2, 3] as const)(
+    'round-trips structural depth %i under schema v1',
+    (defaultDepth) => {
+      const workspace = createProjectionWorkspace(snapshot());
+      const value = createPersistedWorkspaceView({
+        workspace,
+        state: {
+          ...fullState(),
+          disclosure: { ...fullState().disclosure, defaultDepth },
+        },
+      });
+      const validation = validatePersistedWorkspaceView(
+        JSON.parse(serializePersistedWorkspaceView(value)),
+      );
+
+      expect(value.schemaVersion).toBe(1);
+      expect(validation.valid).toBe(true);
+      if (!validation.valid) return;
+      expect(
+        restorePersistedWorkspaceView(workspace, validation.value).state
+          .disclosure.defaultDepth,
+      ).toBe(defaultDepth);
+    },
+  );
+
+  it.each([-1, 4, 5, 1.5, '2', null])(
+    'rejects unsupported structural depth %s',
+    (defaultDepth) => {
+      const value = persisted();
+      const validation = validatePersistedWorkspaceView({
+        ...value,
+        projection: {
+          ...value.projection,
+          disclosure: { ...value.projection.disclosure, defaultDepth },
+        },
+      });
+
+      expect(validation.valid).toBe(false);
+      expect(
+        validation.valid ? [] : validation.issues.map(({ path }) => path),
+      ).toContain('$.projection.disclosure.defaultDepth');
+    },
+  );
+
   it('accepts old schema-v1 views without a heading ceiling as no limit', () => {
     const value = persisted();
     const oldDisclosure = { ...value.projection.disclosure };
@@ -477,6 +521,23 @@ describe('persisted workspace view', () => {
 });
 
 describe('current workspace view reconciliation', () => {
+  it.each([0, 1, 2, 3] as const)(
+    'preserves structural depth %i across a same-workspace live reconciliation',
+    (defaultDepth) => {
+      const state: ViewProjectionState = {
+        ...fullState(),
+        disclosure: { ...fullState().disclosure, defaultDepth },
+      };
+
+      expect(
+        reconcileCurrentWorkspaceView(
+          createProjectionWorkspace(snapshot()),
+          state,
+        ).state.disclosure.defaultDepth,
+      ).toBe(defaultDepth);
+    },
+  );
+
   it('preserves surviving live state, including transient text and viewport', () => {
     const state = fullState();
     const viewport = { anchorEntityId: 'section-one', zoom: 0.9 } as const;

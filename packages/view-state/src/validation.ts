@@ -1,5 +1,9 @@
 import type { EntityKind } from '@icarus-graph-explorer/core';
-import type { ReferenceResolutionStatus } from '@icarus-graph-explorer/view-projection';
+import {
+  STRUCTURAL_DEPTHS,
+  type ReferenceResolutionStatus,
+  type StructuralDepth,
+} from '@icarus-graph-explorer/view-projection';
 
 import {
   PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION,
@@ -17,6 +21,7 @@ const REFERENCE_STATUSES = new Set<ReferenceResolutionStatus>([
   'ambiguous',
   'invalid',
 ]);
+const STRUCTURAL_DEPTH_VALUES = new Set<StructuralDepth>(STRUCTURAL_DEPTHS);
 
 function isRecord(value: unknown): value is PlainRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -137,8 +142,8 @@ function validateDisclosure(
     path,
     issues,
   );
-  if (value.defaultDepth !== 0 && value.defaultDepth !== 1) {
-    issue(issues, `${path}.defaultDepth`, 'Expected 0 or 1.');
+  if (!STRUCTURAL_DEPTH_VALUES.has(value.defaultDepth as StructuralDepth)) {
+    issue(issues, `${path}.defaultDepth`, 'Expected 0, 1, 2, or 3.');
   }
   if (
     Object.hasOwn(value, 'maxSectionLevel') &&

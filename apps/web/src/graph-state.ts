@@ -4,6 +4,7 @@ import {
   type FocusProjectionState,
   type ReferenceResolutionStatus,
   type SectionHeadingLevel,
+  type StructuralDepth,
   type ViewProjectionFilters,
   type ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
@@ -32,7 +33,7 @@ export type GraphStateAction =
       readonly entityId: EntityId;
       readonly currentlyOpen: boolean;
     }
-  | { readonly type: 'set-depth'; readonly depth: 0 | 1 }
+  | { readonly type: 'set-depth'; readonly depth: StructuralDepth }
   | {
       readonly type: 'set-heading-limit';
       readonly maxSectionLevel: SectionHeadingLevel | null;

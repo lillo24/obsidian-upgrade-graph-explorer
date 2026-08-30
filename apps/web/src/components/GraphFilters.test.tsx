@@ -45,9 +45,12 @@ describe('graph Filters controls', () => {
     expect(markup).toContain('aria-labelledby="graph-filters-heading"');
     expect(markup).toContain('>Path Scope<');
     expect(markup).toContain('<legend>Entity Content</legend>');
-    expect(markup).toContain('>Heading Depth<');
+    expect(markup).toContain('>Heading limit<');
     expect(markup).toContain('<option value="" selected="">No limit</option>');
     expect(markup).toContain('<option value="6">######</option>');
+    expect(markup).toContain(
+      'Limits sections by literal Markdown heading level. Structure separately controls how many section-tree levels are automatically visible.',
+    );
     expect(markup).toContain('<legend>Reference Status</legend>');
     expect(markup.match(/Blocks/gu)).toHaveLength(1);
     expect(markup).not.toContain('Structural ancestors may remain');
@@ -70,6 +73,7 @@ describe('graph Filters controls', () => {
       ...initial,
       disclosure: {
         ...initial.disclosure,
+        defaultDepth: 3,
         includeBlocks: true,
         maxSectionLevel: 3,
       },

@@ -6,10 +6,15 @@ import {
   createProjectionWorkspace,
   documentOnlyProjectionState,
   projectView,
+  type StructuralDepth,
   type ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
 
-import { initialGraphState, type GraphStateAction } from './graph-state';
+import {
+  graphStateReducer,
+  initialGraphState,
+  type GraphStateAction,
+} from './graph-state';
 import {
   createGraphHistoryCheckpoint,
   createGraphNavigationHistory,
@@ -62,6 +67,40 @@ function stateWithText(text: string): ViewProjectionState {
 }
 
 describe('renderer-independent graph navigation history', () => {
+  it('records and traverses all four structural depths while preserving no-op history', () => {
+    const atDepth = (depth: StructuralDepth) =>
+      graphStateReducer(initialGraphState(), { type: 'set-depth', depth });
+    let history = createGraphNavigationHistory();
+    let current = createGraphHistoryCheckpoint(atDepth(0));
+    for (const depth of [1, 2, 3] as const) {
+      const destination = createGraphHistoryCheckpoint(atDepth(depth));
+      history = recordGraphNavigation(history, current, destination);
+      current = destination;
+    }
+
+    const backToTwo = goBackInGraphHistory(history, current);
+    if (backToTwo === null) throw new Error('Expected Back to depth 2.');
+    expect(backToTwo.target.state.disclosure.defaultDepth).toBe(2);
+    expect(
+      recordGraphNavigation(
+        backToTwo.history,
+        backToTwo.target,
+        createGraphHistoryCheckpoint(atDepth(2)),
+      ),
+    ).toBe(backToTwo.history);
+    expect(backToTwo.history.future).toHaveLength(1);
+
+    const backToOne = goBackInGraphHistory(backToTwo.history, backToTwo.target);
+    if (backToOne === null) throw new Error('Expected Back to depth 1.');
+    expect(backToOne.target.state.disclosure.defaultDepth).toBe(1);
+    const forwardToTwo = goForwardInGraphHistory(
+      backToOne.history,
+      backToOne.target,
+    );
+    if (forwardToTwo === null) throw new Error('Expected Forward to depth 2.');
+    expect(forwardToTwo.target.state.disclosure.defaultDepth).toBe(2);
+  });
+
   it('starts empty and cannot traverse', () => {
     const history = createGraphNavigationHistory();
     const current = createGraphHistoryCheckpoint(initialGraphState());

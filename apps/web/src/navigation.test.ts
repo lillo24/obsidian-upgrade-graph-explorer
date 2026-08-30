@@ -163,6 +163,26 @@ describe('shared canonical navigation planning', () => {
     ).toBe(true);
   });
 
+  it('reveals a deep target without widening the selected structural depth', () => {
+    const workspace = createProjectionWorkspace(snapshot);
+    const state: ViewProjectionState = {
+      ...documentOnlyProjectionState(),
+      disclosure: {
+        ...documentOnlyProjectionState().disclosure,
+        defaultDepth: 1,
+      },
+    };
+    const plan = planEntityNavigation(workspace, state, 'section-deep');
+
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.state.disclosure.defaultDepth).toBe(1);
+    expect(plan.state.disclosure.expandedEntityIds).toEqual([
+      'doc-a',
+      'section-a',
+    ]);
+  });
+
   it('supports breadcrumb/backlink/candidate callers without mutating inputs', () => {
     const workspace = createProjectionWorkspace(snapshot);
     const state = documentOnlyProjectionState();

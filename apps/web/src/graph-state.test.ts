@@ -7,6 +7,35 @@ import {
 } from './graph-state';
 
 describe('graph projection interaction state', () => {
+  it.each([0, 1, 2, 3] as const)(
+    'sets structural depth %i without changing other graph state',
+    (depth) => {
+      const initial = {
+        ...initialGraphState(),
+        disclosure: {
+          ...initialGraphState().disclosure,
+          maxSectionLevel: 3 as const,
+          expandedEntityIds: ['expanded'],
+          collapsedEntityIds: ['collapsed'],
+          includeBlocks: true,
+        },
+        focus: {
+          rootEntityId: 'focus',
+          hops: 2 as const,
+          direction: 'both' as const,
+          hierarchyContext: 'ancestors' as const,
+        },
+        filters: { pathPrefixes: ['folder'] },
+      };
+      const next = graphStateReducer(initial, { type: 'set-depth', depth });
+
+      expect(next).toEqual({
+        ...initial,
+        disclosure: { ...initial.disclosure, defaultDepth: depth },
+      });
+    },
+  );
+
   it('replaces state atomically after live snapshot reconciliation', () => {
     const state = initialGraphState();
     const replacement = {

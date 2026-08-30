@@ -1,9 +1,11 @@
-import type { ViewProjectionState } from './types';
+import type { StructuralDepth, ViewProjectionState } from './types';
 
-export function documentOnlyProjectionState(): ViewProjectionState {
+export function structuralDepthProjectionState(
+  defaultDepth: StructuralDepth,
+): ViewProjectionState {
   return {
     disclosure: {
-      defaultDepth: 0,
+      defaultDepth,
       expandedEntityIds: [],
       collapsedEntityIds: [],
       includeBlocks: false,
@@ -11,13 +13,10 @@ export function documentOnlyProjectionState(): ViewProjectionState {
   };
 }
 
+export function documentOnlyProjectionState(): ViewProjectionState {
+  return structuralDepthProjectionState(0);
+}
+
 export function topLevelSectionProjectionState(): ViewProjectionState {
-  return {
-    disclosure: {
-      defaultDepth: 1,
-      expandedEntityIds: [],
-      collapsedEntityIds: [],
-      includeBlocks: false,
-    },
-  };
+  return structuralDepthProjectionState(1);
 }

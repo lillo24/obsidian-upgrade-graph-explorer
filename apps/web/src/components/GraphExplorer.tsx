@@ -32,6 +32,7 @@ import {
 import {
   createProjectionWorkspace,
   projectView,
+  type StructuralDepth,
   type ViewProjection,
   type ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
@@ -101,6 +102,16 @@ interface PendingHistoryViewportRestore {
 }
 
 const ENTITY_NAVIGATION_ZOOM = 1.1;
+
+const STRUCTURAL_DEPTH_OPTIONS = [
+  { depth: 0, label: 'Files only' },
+  { depth: 1, label: '1 level' },
+  { depth: 2, label: '2 levels' },
+  { depth: 3, label: '3 levels' },
+] as const satisfies readonly {
+  readonly depth: StructuralDepth;
+  readonly label: string;
+}[];
 
 const GRAPH_HISTORY_SHORTCUT_EXCLUSION_SELECTOR =
   'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [data-graph-history-shortcuts="off"]';
@@ -994,7 +1005,7 @@ export function GraphExplorer({
     setPersistenceAnnouncement('Saved graph view reset.');
     setNavigationError(undefined);
     setNavigationAnnouncement(
-      'Saved view reset to documents-only; search and selection were cleared.',
+      'Saved view reset to Files only; search and selection were cleared.',
     );
   }
 
@@ -1079,24 +1090,20 @@ export function GraphExplorer({
               role="group"
             >
               <span>Structure</span>
-              <button
-                aria-pressed={activeViewState.disclosure.defaultDepth === 0}
-                onClick={() =>
-                  commitHistoryGraphAction({ type: 'set-depth', depth: 0 })
-                }
-                type="button"
-              >
-                Documents
-              </button>
-              <button
-                aria-pressed={activeViewState.disclosure.defaultDepth === 1}
-                onClick={() =>
-                  commitHistoryGraphAction({ type: 'set-depth', depth: 1 })
-                }
-                type="button"
-              >
-                Top-Level
-              </button>
+              {STRUCTURAL_DEPTH_OPTIONS.map(({ depth, label }) => (
+                <button
+                  aria-pressed={
+                    activeViewState.disclosure.defaultDepth === depth
+                  }
+                  key={depth}
+                  onClick={() =>
+                    commitHistoryGraphAction({ type: 'set-depth', depth })
+                  }
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
             </div>
             <GraphFilters
               contained={maximized}

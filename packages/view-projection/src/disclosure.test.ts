@@ -6,7 +6,41 @@ import {
 } from './presets';
 import { projectSnapshot } from './project';
 import { projectionFixture } from './test-fixture';
-import type { ProjectedEntityNode, ViewProjectionState } from './types';
+import type {
+  ProjectedEntityNode,
+  StructuralDepth,
+  ViewProjectionState,
+} from './types';
+
+function fixtureWithFourthSection() {
+  const snapshot = projectionFixture();
+  const template = snapshot.entities.find(
+    (entity) => entity.kind === 'section' && entity.id === 'a-deep',
+  );
+  if (template?.kind !== 'section') {
+    throw new Error('Projection fixture is missing its deep Section template.');
+  }
+  return {
+    ...snapshot,
+    entities: [
+      ...snapshot.entities,
+      {
+        ...template,
+        id: 'a-beyond',
+        parentId: 'a-deep',
+        title: 'Beyond',
+        level: 6,
+        source: {
+          path: 'A.md',
+          span: {
+            start: { line: 6, column: 1, offset: 50 },
+            end: { line: 6, column: 2, offset: 51 },
+          },
+        },
+      },
+    ],
+  };
+}
 
 function fixtureWithThreeBlockChildren() {
   const snapshot = projectionFixture();
@@ -32,7 +66,14 @@ function fixtureWithThreeBlockChildren() {
 function entityNodes(
   state: ViewProjectionState,
 ): readonly ProjectedEntityNode[] {
-  return projectSnapshot(projectionFixture(), state).nodes.filter(
+  return entityNodesFrom(projectionFixture(), state);
+}
+
+function entityNodesFrom(
+  snapshot: ReturnType<typeof projectionFixture>,
+  state: ViewProjectionState,
+): readonly ProjectedEntityNode[] {
+  return projectSnapshot(snapshot, state).nodes.filter(
     (node): node is ProjectedEntityNode => node.kind === 'entity',
   );
 }
@@ -67,6 +108,141 @@ describe('structural disclosure', () => {
       'doc-c',
     ]);
   });
+
+  it('supports zero through three canonical section-tree generations independently of heading numbers', () => {
+    const stateAtDepth = (defaultDepth: StructuralDepth) =>
+      ({
+        disclosure: {
+          defaultDepth,
+          expandedEntityIds: [],
+          collapsedEntityIds: [],
+          includeBlocks: false,
+        },
+      }) satisfies ViewProjectionState;
+
+    expect(entityIds(stateAtDepth(0))).not.toContain('a-overview');
+    expect(entityIds(stateAtDepth(1))).toEqual(
+      expect.arrayContaining(['a-overview']),
+    );
+    expect(entityIds(stateAtDepth(1))).not.toContain('a-detail');
+    expect(entityIds(stateAtDepth(2))).toEqual(
+      expect.arrayContaining(['a-overview', 'a-detail']),
+    );
+    expect(entityIds(stateAtDepth(2))).not.toContain('a-deep');
+    expect(entityIds(stateAtDepth(3))).toEqual(
+      expect.arrayContaining(['a-overview', 'a-detail', 'a-deep']),
+    );
+  });
+
+  it('crosses structural depth with an independent literal heading limit', () => {
+    const state = (
+      defaultDepth: StructuralDepth,
+      maxSectionLevel: 1 | 3 | 6 | undefined,
+    ) =>
+      ({
+        disclosure: {
+          defaultDepth,
+          ...(maxSectionLevel === undefined ? {} : { maxSectionLevel }),
+          expandedEntityIds: [],
+          collapsedEntityIds: [],
+          includeBlocks: false,
+        },
+      }) satisfies ViewProjectionState;
+
+    expect(entityIds(state(3, undefined))).toEqual(
+      expect.arrayContaining(['a-overview', 'a-detail', 'a-deep']),
+    );
+    expect(entityIds(state(3, 3))).toEqual(
+      expect.arrayContaining(['a-overview', 'a-detail']),
+    );
+    expect(entityIds(state(3, 3))).not.toContain('a-deep');
+    expect(entityIds(state(3, 1))).toContain('a-overview');
+    expect(entityIds(state(3, 1))).not.toContain('a-detail');
+    expect(entityIds(state(1, 6))).toContain('a-overview');
+    expect(entityIds(state(1, 6))).not.toContain('a-detail');
+  });
+
+  it('keeps manual expansion and collapse precedence independent of the default depth', () => {
+    const expanded: ViewProjectionState = {
+      disclosure: {
+        defaultDepth: 1,
+        expandedEntityIds: ['a-overview', 'a-detail'],
+        collapsedEntityIds: [],
+        includeBlocks: false,
+      },
+    };
+    const collapsed: ViewProjectionState = {
+      disclosure: {
+        defaultDepth: 3,
+        expandedEntityIds: [],
+        collapsedEntityIds: ['a-overview'],
+        includeBlocks: false,
+      },
+    };
+
+    expect(entityIds(expanded)).toEqual(
+      expect.arrayContaining(['a-overview', 'a-detail', 'a-deep']),
+    );
+    expect(entityIds(collapsed)).toContain('a-overview');
+    expect(entityIds(collapsed)).not.toContain('a-detail');
+    expect(entityIds(collapsed)).not.toContain('a-deep');
+  });
+
+  it('never auto-reveals Blocks as a structural-depth generation', () => {
+    const state: ViewProjectionState = {
+      disclosure: {
+        defaultDepth: 3,
+        expandedEntityIds: [],
+        collapsedEntityIds: [],
+        includeBlocks: true,
+      },
+    };
+
+    expect(entityIds(state)).toContain('a-deep');
+    expect(entityIds(state)).not.toContain('a-block');
+    expect(
+      entityIds({
+        ...state,
+        disclosure: {
+          ...state.disclosure,
+          expandedEntityIds: ['a-detail'],
+        },
+      }),
+    ).toContain('a-block');
+  });
+
+  it.each([
+    [0, 'doc-a'],
+    [1, 'a-overview'],
+    [2, 'a-detail'],
+    [3, 'a-deep'],
+  ] as const)(
+    'moves the one-action reveal boundary to structural depth %i',
+    (defaultDepth, boundaryEntityId) => {
+      const nodes = entityNodesFrom(fixtureWithFourthSection(), {
+        disclosure: {
+          defaultDepth,
+          expandedEntityIds: [],
+          collapsedEntityIds: [],
+          includeBlocks: false,
+        },
+      });
+
+      expect(
+        nodes.find((node) => node.entityId === boundaryEntityId),
+      ).toMatchObject({ revealableDescendantCount: 1 });
+      for (const visibleAncestorId of [
+        'doc-a',
+        'a-overview',
+        'a-detail',
+        'a-deep',
+      ].slice(0, defaultDepth)) {
+        expect(
+          nodes.find((node) => node.entityId === visibleAncestorId),
+        ).toMatchObject({ revealableDescendantCount: 0 });
+      }
+    },
+  );
 
   it('applies a literal Markdown heading ceiling independently of structural depth', () => {
     const topLevel = topLevelSectionProjectionState();

@@ -177,7 +177,7 @@ schema version does not change. `disclosure.includeBlocks` remains the user
 intent that decides whether blocks may be projected.
 Corrupt, inaccessible, or unsupported stored values are not overwritten or
 silently deleted. Writes stop after one failure. **Reset saved view** deletes
-only that workspace's view, restores documents-only defaults, clears transient
+only that workspace's view, restores **Files only**, clears transient
 search/selection and both navigation-history stacks, and fits the graph. It
 never resets the KG9A catalog.
 
@@ -217,8 +217,10 @@ never enter reports or persistence.
 
 ## Graph interaction boundary
 
-The default view is documents-only; top-level sections and explicit per-entity
-disclosure remain KG6 state. Selecting an entity enables one-to-three-hop focus
+The default Structure view is **Files only**. **1 level**, **2 levels**, and
+**3 levels** automatically expose that many canonical section-tree generations;
+explicit per-entity disclosure may continue beyond that baseline. Structure
+changes remain ordinary NAV1 semantic actions. Selecting an entity enables one-to-three-hop focus
 with incoming/outgoing/both direction. Selection and hover affect presentation
 only. Diagnostic targets can be selected but never focused or expanded. The
 primary inspector resolves projected selection to canonical descriptors and
@@ -231,9 +233,9 @@ unrelated rendered content only until pointer leave. Click or keyboard selection
 keeps the chosen element visibly selected without persistent graph-wide fading.
 Focus remains a reduced projection rather than a visual opacity treatment.
 
-**Heading Depth** lives in the toolbar's floating **Filters** panel and remains
-separate from Documents/Top-Level structural depth. `#` through `######` are
-literal canonical Markdown heading ceilings; **No limit** preserves prior
+**Heading limit** lives in the toolbar's floating **Filters** panel and remains
+separate from Structure. `#` through `######` are literal canonical Markdown
+heading ceilings; **No limit** preserves prior
 disclosure. Explicit expansion cannot bypass the ceiling, and references from
 hidden headings retain normal endpoint roll-up and aggregation. Navigation to a
 deeper canonical search result minimally widens an active ceiling before

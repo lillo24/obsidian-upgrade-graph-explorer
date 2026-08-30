@@ -172,7 +172,7 @@ export const GraphFilters = memo(function GraphFilters({
               </label>
             </fieldset>
             <label className="heading-limit-control" htmlFor="heading-depth">
-              Heading Depth
+              Heading limit
               <select
                 aria-describedby="heading-depth-description"
                 autoComplete="off"
@@ -199,8 +199,9 @@ export const GraphFilters = memo(function GraphFilters({
                 ))}
               </select>
               <span className="visually-hidden" id="heading-depth-description">
-                Limits sections by Markdown heading level. Top-Level instead
-                means direct structural sections.
+                Limits sections by literal Markdown heading level. Structure
+                separately controls how many section-tree levels are
+                automatically visible.
               </span>
             </label>
             <fieldset>
