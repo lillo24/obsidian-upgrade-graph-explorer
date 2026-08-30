@@ -17,7 +17,7 @@ The roadmap is a sequencing map, not a claim that future features exist. Each mi
 | **KG10 — Incremental workspace engine**                      | File-granular reparsing and exact stable snapshot deltas while preserving whole-workspace semantics.                                               | **Complete** — cache, delta, global invalidation, identity, oracle, and real-vault gates passed.                                    |
 | **KG11 — Tauri local-vault workflow**                        | Desktop folder access and watching through a narrow source-provider adapter.                                                                       | **Complete** — secure selection, coalesced plans, transactional live application, resync, and view preservation pass.               |
 | **KG12 — Performance + worker hardening**                    | Explicit workload budgets, measurement-led worker split, and projection/focus/collapse optimization.                                               | **Complete** — budgets plus separate stateful W1 and stateless latest-result-wins W3 workers passed automated and release QA gates. |
-| **KG13 — Global graph decision / renderer, benchmark-gated** | Decide whether a separate high-density renderer is justified; WebGL/Pixi/Sigma viability is not evidence to replace the structural renderer early. | **Next** — use KG12 wall-time and responsiveness evidence to decide whether a separate high-density renderer adds product value.    |
+| **KG13 — Global graph decision / renderer, benchmark-gated** | Decide whether a separate high-density renderer is justified; WebGL/Pixi/Sigma viability is not evidence to replace the structural renderer early. | **In progress** — KG13A is complete with ADOPT; KG13B documents-only Global product integration is next.                            |
 | **KG14 — Product-quality exploration**                       | Accessibility, resilience, onboarding, polished exploration workflows, and release-quality hardening.                                              | Core workflows and renderer choices are evidence-backed and stable.                                                                 |
 
 Future package names, state libraries, and implementation details are intentionally unspecified until their milestone supplies concrete requirements.
@@ -71,9 +71,14 @@ prepare → persist → commit transactions, replacement-worker recovery, and
 chunked structured-clone transport. KG12B2 implements W3 as a separate
 stateless latest-layout-wins worker with active supersession and stale-result
 rejection. Automated responsiveness, browser, and release desktop gates passed;
-KG12 is complete and KG13 is next. KG13 must treat the remaining Dagre
-wall-time/structural-scale cliff separately from main-thread responsiveness and
-must not replace the structural renderer without product evidence.
+KG12 is complete. KG13A now separates the Global product question from the
+remaining Dagre structural-scale cliff: benchmarks and browser interaction
+evidence support a documents-only Sigma/Graphology Global candidate while
+React Flow remains the Structure renderer. The candidate dependencies and
+runtime are isolated in `tools/global-renderer-spike`; no production mode switch
+or KG13B implementation exists. Production browser and release Tauri graphical,
+precision-touchpad, and accessible DOM fallback gates passed, so KG13A records
+ADOPT and KG13B is next.
 
 Post-MVP analytics—typed conceptual relations, pathfinding variants,
 centrality, betweenness, communities, connected components, co-citation,

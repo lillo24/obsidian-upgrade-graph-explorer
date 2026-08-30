@@ -113,6 +113,9 @@ pnpm benchmark:workspace-worker -- --profile medium
 pnpm benchmark:workspace-worker -- --profile large
 pnpm benchmark:dagre-worker -- --profile small
 pnpm benchmark:dagre-worker -- --profile medium
+pnpm benchmark:global-renderer -- --profile small
+pnpm benchmark:global-renderer -- --profile medium
+pnpm benchmark:global-renderer -- --profile large
 ```
 
 Profiles are deterministic and measure parse/adapt, resolution, report
@@ -155,6 +158,16 @@ adapter, and keeps a 16 ms event-loop probe active. Its A → B → C scenario
 terminates A and B and accepts only C. Output contains counts and aggregate
 timings only—never graph IDs, titles, paths, or topology—and is investigative
 rather than a CI timing threshold.
+
+`benchmark:global-renderer` is the KG13A candidate contract. It creates the
+existing deterministic workspace, projects the real KG6 documents-only view,
+measures plain mapping, Graphology build, and 1%/10% full replacement versus
+stable-key reconciliation, and keeps meaningful ForceAtlas2 timing separate
+from WebGL rendering. It also measures a clustered private-safe stress projection
+and reads aggregate production bundle sizes. Browser/Tauri mount, render,
+interaction, and worker responsiveness stay in the dedicated visual harness
+because Node has no WebGL surface. Add `--include-25k` only to the large profile
+for the optional 25k-node/50k-edge mapping ceiling.
 
 An opt-in private check can validate one real workspace using an existing
 identity catalog:

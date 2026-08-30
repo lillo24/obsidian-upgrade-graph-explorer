@@ -14,6 +14,7 @@ src-tauri/
   Cargo.toml                 Minimal pinned Rust dependencies.
   Cargo.lock                 Reproducible Rust dependency graph.
   tauri.conf.json            Existing-web build/dev wiring and window config.
+  tauri.global-renderer-spike.conf.json KG13A-only release harness override.
   capabilities/main.json     Dialog, selected-root read/watch, and app-data scope.
   src/lib.rs                 Tauri/plugin initialization.
   src/main.rs                Desktop executable entry point.
@@ -45,6 +46,12 @@ pnpm desktop:check
 pnpm desktop:dev
 pnpm desktop:build
 ```
+
+KG13A additionally provides `pnpm desktop:global-renderer:build`. Tauri merges the
+explicit diagnostic config at build time, changes the window/product label, builds
+`tools/global-renderer-spike`, and packages that output instead of `apps/web`.
+This command is only for release-WebView renderer evidence; it does not add a
+Structure/Global switch or change the normal `desktop:build` path.
 
 `desktop:dev` starts the existing web Vite server at `127.0.0.1:1420` and
 opens it in a native window. `desktop:build` performs a release build without
