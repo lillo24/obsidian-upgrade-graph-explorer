@@ -27,7 +27,17 @@ import { GRAPH_EDGE_TYPES, GRAPH_NODE_TYPES } from './component-maps';
 import { resolveGraphCenterRequest } from './center-request';
 import { EntityDisclosureProvider } from './disclosure-context';
 import { applyRendererInteractionState } from './highlight';
-import { prepareRendererGraph } from './prepare';
+import {
+  applyRendererLayoutPositions,
+  createRendererLayoutInput,
+  fallbackRendererGraph,
+} from './layout';
+import {
+  beginRendererLayout,
+  commitRendererLayout,
+  INITIAL_RENDERER_LAYOUT_STATE,
+} from './layout-state';
+import { mapProjectionToReactFlow } from './mapping';
 import { observeSemanticViewport } from './semantic-viewport';
 import type {
   GraphCanvasProps,
@@ -102,6 +112,7 @@ function GraphCanvasInner({
   expandedEntityIds,
   fitRequestKey,
   layoutMode,
+  layoutService,
   maximized,
   onMaximizedChange,
   onSelectionChange,
@@ -121,34 +132,156 @@ function GraphCanvasInner({
   const previousCenterRequest = useRef<number | null>(null);
   const viewportInitialized = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const pendingDisclosureAnchor = useRef<DisclosureAnchor | null>(null);
+  const nextDisclosureAnchor = useRef<DisclosureAnchor | null>(null);
+  const layoutGeneration = useRef(0);
+  const appliedDisclosureGeneration = useRef<number | null>(null);
   const viewportObservationTimer = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
-  const prepared = useMemo(
-    () =>
-      prepareRendererGraph(projection, {
-        layoutMode,
-        expandedEntityIds,
-        ...(performance === undefined ? {} : { performance }),
-      }),
-    [expandedEntityIds, layoutMode, performance, projection],
+  const [rendererLayout, setRendererLayout] = useState(
+    INITIAL_RENDERER_LAYOUT_STATE,
   );
+  const mapped = useMemo(() => {
+    const map = () =>
+      mapProjectionToReactFlow(
+        projection,
+        layoutMode,
+        new Set(expandedEntityIds),
+      );
+    return performance === undefined
+      ? map()
+      : performance.measure('renderer-mapping', 'renderer-mappings', map);
+  }, [expandedEntityIds, layoutMode, performance, projection]);
+  const layoutInput = useMemo(
+    () => createRendererLayoutInput(mapped.nodes, mapped.edges, layoutMode),
+    [layoutMode, mapped.edges, mapped.nodes],
+  );
+  const prepared = rendererLayout.committed?.graph ?? null;
+  const layoutPending =
+    projection.nodes.length > 0 &&
+    rendererLayout.committed?.input !== layoutInput;
+
+  useEffect(() => {
+    if (projection.nodes.length === 0) {
+      layoutService.cancelPending();
+      return;
+    }
+    const generation = ++layoutGeneration.current;
+    const disclosureAnchor = nextDisclosureAnchor.current;
+    nextDisclosureAnchor.current = null;
+    const requestStartedAt =
+      performance === undefined ? 0 : globalThis.performance.now();
+    let current = true;
+    setRendererLayout((state) => beginRendererLayout(state, generation));
+    performance?.count('layouts');
+    void layoutService
+      .layoutLatest(layoutInput)
+      .then((result) => {
+        if (!current || result.status === 'superseded') return;
+        performance?.record('dagre-layout', result.metrics.workerComputeMs);
+        performance?.record(
+          'dagre-worker-compute',
+          result.metrics.workerComputeMs,
+        );
+        performance?.record(
+          'dagre-worker-round-trip',
+          result.metrics.workerRoundTripMs,
+        );
+        performance?.record(
+          'dagre-worker-startup',
+          result.metrics.workerStartupMs,
+        );
+        if (result.metrics.mainThreadHighGapMs !== undefined) {
+          performance?.record(
+            'dagre-main-thread-gap',
+            result.metrics.mainThreadHighGapMs,
+          );
+        }
+        const apply = () =>
+          result.status === 'success'
+            ? applyRendererLayoutPositions(
+                mapped.nodes,
+                mapped.edges,
+                layoutMode,
+                result.output,
+              )
+            : fallbackRendererGraph(
+                mapped.nodes,
+                mapped.edges,
+                layoutMode,
+                result.message,
+              );
+        const graph =
+          performance === undefined
+            ? apply()
+            : performance.measure('dagre-result-apply', undefined, apply);
+        if (performance !== undefined) {
+          performance.record(
+            'dagre-request-adoption',
+            Math.max(0, globalThis.performance.now() - requestStartedAt),
+          );
+        }
+        setRendererLayout((state) =>
+          commitRendererLayout(state, {
+            generation,
+            input: layoutInput,
+            graph,
+            disclosureAnchor,
+          }),
+        );
+      })
+      .catch((error: unknown) => {
+        if (!current) return;
+        const graph = fallbackRendererGraph(
+          mapped.nodes,
+          mapped.edges,
+          layoutMode,
+          error instanceof Error ? error.message : String(error),
+        );
+        setRendererLayout((state) =>
+          commitRendererLayout(state, {
+            generation,
+            input: layoutInput,
+            graph,
+            disclosureAnchor,
+          }),
+        );
+      });
+    return () => {
+      current = false;
+    };
+  }, [
+    layoutInput,
+    layoutMode,
+    layoutService,
+    mapped.edges,
+    mapped.nodes,
+    performance,
+    projection.nodes.length,
+  ]);
   const interactive = useMemo(() => {
+    if (prepared === null) return null;
     const apply = () =>
       applyRendererInteractionState(prepared, hovered, selection);
     return performance === undefined
       ? apply()
       : performance.measure('highlight', 'highlight-applications', apply);
   }, [hovered, performance, prepared, selection]);
-  const nodes = useMemo(() => [...interactive.nodes], [interactive.nodes]);
-  const edges = useMemo(() => [...interactive.edges], [interactive.edges]);
+  const nodes = useMemo(
+    () => (interactive === null ? [] : [...interactive.nodes]),
+    [interactive],
+  );
+  const edges = useMemo(
+    () => (interactive === null ? [] : [...interactive.edges]),
+    [interactive],
+  );
 
   const applyCenterRequest = useCallback(
     (
       request: GraphCanvasProps['centerRequest'],
       center: typeof setCenter = setCenter,
     ) => {
+      if (layoutPending || prepared === null) return;
       const resolved = resolveGraphCenterRequest(
         prepared,
         request,
@@ -167,7 +300,7 @@ function GraphCanvasInner({
         ...(boundedZoom === undefined ? {} : { zoom: boundedZoom }),
       });
     },
-    [prepared, setCenter],
+    [layoutPending, prepared, setCenter],
   );
   const initializeViewport = useCallback(
     (instance: ReactFlowInstance<GraphFlowNode, GraphFlowEdge>) => {
@@ -274,7 +407,12 @@ function GraphCanvasInner({
   );
   const reportViewport = useCallback(
     (viewport: ReturnType<typeof getViewport>) => {
-      if (onViewportObservation === undefined) return;
+      if (
+        layoutPending ||
+        onViewportObservation === undefined ||
+        prepared === null
+      )
+        return;
       const bounds = containerRef.current?.getBoundingClientRect();
       if (bounds === undefined) return;
       performance?.count('viewport-operations');
@@ -285,7 +423,7 @@ function GraphCanvasInner({
         }),
       );
     },
-    [onViewportObservation, performance, prepared],
+    [layoutPending, onViewportObservation, performance, prepared],
   );
   const scheduleViewportObservation = useCallback(
     (viewport: ReturnType<typeof getViewport>) => {
@@ -301,15 +439,17 @@ function GraphCanvasInner({
     [onViewportObservation, reportViewport],
   );
   const fitGraph = useCallback(async () => {
+    if (layoutPending || prepared === null) return;
     await fitView(GRAPH_FIT_VIEW_OPTIONS);
     reportViewport(getViewport());
-  }, [fitView, getViewport, reportViewport]);
+  }, [fitView, getViewport, layoutPending, prepared, reportViewport]);
 
   useEffect(() => {
+    if (layoutPending || prepared === null) return;
     if (previousFitRequest.current === fitRequestKey) return;
     previousFitRequest.current = fitRequestKey;
     void fitGraph();
-  }, [fitGraph, fitRequestKey]);
+  }, [fitGraph, fitRequestKey, layoutPending, prepared]);
 
   useEffect(
     () => () => {
@@ -359,25 +499,32 @@ function GraphCanvasInner({
 
   const toggleEntityAnchored = useCallback(
     (entityId: string, currentlyOpen: boolean) => {
-      pendingDisclosureAnchor.current = captureDisclosureAnchor(
+      if (layoutPending || prepared === null) return;
+      nextDisclosureAnchor.current = captureDisclosureAnchor(
         prepared,
         entityId,
         getViewport(),
       );
       onToggleEntity(entityId, currentlyOpen);
     },
-    [getViewport, onToggleEntity, prepared],
+    [getViewport, layoutPending, onToggleEntity, prepared],
   );
 
   useLayoutEffect(() => {
-    const anchor = pendingDisclosureAnchor.current;
-    if (anchor === null) return;
-    pendingDisclosureAnchor.current = null;
-    const nextViewport = viewportForDisclosureAnchor(prepared, anchor);
+    const committed = rendererLayout.committed;
+    if (
+      committed === null ||
+      committed.disclosureAnchor === null ||
+      appliedDisclosureGeneration.current === committed.generation
+    )
+      return;
+    appliedDisclosureGeneration.current = committed.generation;
+    const anchor = committed.disclosureAnchor;
+    const nextViewport = viewportForDisclosureAnchor(committed.graph, anchor);
     if (nextViewport === null) return;
     void setViewport(nextViewport, { duration: 0 });
     reportViewport(nextViewport);
-  }, [prepared, reportViewport, setViewport]);
+  }, [prepared, rendererLayout.committed, reportViewport, setViewport]);
 
   useLayoutEffect(() => {
     if (performance === undefined) return;
@@ -402,10 +549,39 @@ function GraphCanvasInner({
     );
   }
 
+  if (prepared === null) {
+    return (
+      <div
+        className="graph-layout-pending graph-empty"
+        data-trackpad-zoom-mode={trackpadZoomMode}
+      >
+        <div role="status" aria-live="polite">
+          <strong>Laying out graph…</strong>
+          <span>
+            The graph will remain interactive after positions are ready.
+          </span>
+        </div>
+        {onMaximizedChange === undefined ? null : (
+          <button
+            aria-label={maximized === true ? 'Restore graph' : 'Maximize graph'}
+            aria-pressed={maximized === true}
+            className="graph-layout-pending__maximize"
+            onClick={() => onMaximizedChange(maximized !== true)}
+            title={maximized === true ? 'Restore graph' : 'Maximize graph'}
+            type="button"
+          >
+            {maximized === true ? <RestoreGraphIcon /> : <MaximizeGraphIcon />}
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       className="graph-canvas"
       aria-label="Projected knowledge graph"
+      aria-busy={layoutPending}
       data-trackpad-zoom-mode={trackpadZoomMode}
       ref={containerRef}
       role="region"
@@ -415,7 +591,15 @@ function GraphCanvasInner({
           {prepared.layoutWarning}
         </p>
       )}
-      <EntityDisclosureProvider onToggleEntity={toggleEntityAnchored}>
+      {layoutPending ? (
+        <p className="graph-layout-status" role="status" aria-live="polite">
+          Updating layout…
+        </p>
+      ) : null}
+      <EntityDisclosureProvider
+        disabled={layoutPending}
+        onToggleEntity={toggleEntityAnchored}
+      >
         <ReactFlow<GraphFlowNode, GraphFlowEdge>
           aria-label="Interactive projected knowledge graph"
           colorMode="light"
@@ -468,6 +652,7 @@ function GraphCanvasInner({
             <ControlButton
               aria-label="Fit graph to view"
               className="graph-control-button--fit"
+              disabled={layoutPending}
               onClick={() => void fitGraph()}
               title="Fit graph to view"
             >

@@ -1,4 +1,9 @@
-import type { Edge, Node, XYPosition } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
+import type {
+  DagreLayoutInput,
+  DagreLayoutMode,
+  DagreLayoutOutput,
+} from '@icarus-graph-explorer/dagre-layout';
 import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performance';
 import type {
   DiagnosticReferenceStatus,
@@ -8,7 +13,7 @@ import type {
   ViewProjection,
 } from '@icarus-graph-explorer/view-projection';
 
-export type GraphLayoutMode = 'structure' | 'focus';
+export type GraphLayoutMode = DagreLayoutMode;
 
 export type TrackpadZoomMode = 'scroll-zoom' | 'pinch-zoom';
 
@@ -83,31 +88,39 @@ export interface PrepareRendererGraphOptions {
   readonly performance?: PerformanceInstrumentation;
 }
 
-export interface LayoutInputNode {
-  readonly id: string;
-  readonly width: number;
-  readonly height: number;
+export type LayoutEngine = (input: DagreLayoutInput) => DagreLayoutOutput;
+
+export interface GraphLayoutMetrics {
+  readonly workerComputeMs: number;
+  readonly workerRoundTripMs: number;
+  readonly workerStartupMs: number;
+  readonly mainThreadHighGapMs?: number;
 }
 
-export interface LayoutInputEdge {
-  readonly id: string;
-  readonly source: string;
-  readonly target: string;
-  readonly kind: 'hierarchy' | 'reference';
-}
+export type GraphLayoutResult =
+  | {
+      readonly status: 'success';
+      readonly output: DagreLayoutOutput;
+      readonly metrics: GraphLayoutMetrics;
+    }
+  | {
+      readonly status: 'failure';
+      readonly message: string;
+      readonly metrics: GraphLayoutMetrics;
+    }
+  | { readonly status: 'superseded' };
 
-export interface LayoutEngineInput {
-  readonly mode: GraphLayoutMode;
-  readonly nodes: readonly LayoutInputNode[];
-  readonly edges: readonly LayoutInputEdge[];
+export interface GraphLayoutService {
+  readonly layoutLatest: (
+    input: DagreLayoutInput,
+  ) => Promise<GraphLayoutResult>;
+  readonly cancelPending: () => void;
+  readonly dispose: () => void;
 }
-
-export type LayoutEngine = (
-  input: LayoutEngineInput,
-) => ReadonlyMap<string, XYPosition>;
 
 export interface GraphCanvasProps {
   readonly projection: ViewProjection;
+  readonly layoutService: GraphLayoutService;
   readonly layoutMode: GraphLayoutMode;
   readonly expandedEntityIds: readonly string[];
   readonly selection: GraphSelection | null;

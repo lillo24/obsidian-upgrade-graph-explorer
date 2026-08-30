@@ -1,6 +1,6 @@
 # Web Structural Graph Explorer
 
-Status: **STABLE — KG12B1 runs desktop W1 processing in a transactional dedicated worker.**
+Status: **STABLE — KG12B uses separate stateful W1 and stateless W3 workers.**
 
 This package owns the browser SPA, validated KG5 report selection, Tauri-only
 live vault orchestration, KG6 graph interaction state, guarded browser persistence, graph selection, canonical
@@ -12,7 +12,8 @@ renderer layouts/raw transforms, or derive renderer semantics.
 ```text
 selected report JSON → runtime validation → canonical inspection/search
                                    └───────→ KG9B saved view → KG6 projection
-                                                          → KG7 renderer
+                                                          → renderer mapping
+                                                          → W3 Dagre worker → KG7 canvas
                                                      ↘ KG8 inspector/navigation
                                    ↘ secondary KG5 evidence UI
 
@@ -35,7 +36,7 @@ apps/web/
     desktop-runtime.ts Lazy official Tauri detection and provider creation.
     desktop-vault.ts Lazy worker initialization and truthful identity/worker commit orchestration.
     desktop-live-vault.ts Serialized watch, worker candidate, pause, replacement, and resync lifecycle.
-    workers/          Vite W1 entry, bounded transport, and promise client.
+    workers/          Separate Vite W1/W3 entries and their lifecycle clients.
     performance.ts    Query-gated browser recorder and local inspection API.
     graph-state.ts    Pure disclosure/focus/filter interaction reducer.
     navigation.ts     Shared reveal/filter-widening/navigation planner.
@@ -53,6 +54,21 @@ only a `ViewProjection` plus semantic viewport requests to
 `@icarus-graph-explorer/renderer-reactflow`. A real source-session switch keys
 a complete transient selection/search reset and workspace-specific hydration;
 live revisions reconcile current state and update the mounted explorer in place.
+The graph workspace owns one lazily started W3 layout service for the mounted
+explorer. New projections supersede active layout jobs by replacing that
+worker; an idle worker is reused. A later layout keeps the last committed graph
+interactive until the matching geometry arrives, while an initial layout shows
+an explicit progress surface.
+
+Vite 8.2 client resolution includes the `browser` condition for Dedicated
+Worker builds. A worker-only pre-resolution plugin in `vite.config.ts` routes
+the pinned Markdown named-reference decoder to its published worker-safe
+implementation instead of the DOM implementation that initializes with
+`document.createElement`. The package is already a transitive parser runtime;
+its direct development declaration makes that build-time resolution explicit
+without adding a new external package. The same plugin rejects emitted worker
+chunks containing DOM construction, so this boundary is enforced by every
+production build.
 
 ## Report loading and privacy
 

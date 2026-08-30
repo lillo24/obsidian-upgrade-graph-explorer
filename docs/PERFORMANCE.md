@@ -1,11 +1,12 @@
 # Performance baseline and KG12B decision
 
-Status: **STABLE — KG12A baselines and KG12B1 W1 worker implementation/evidence are complete.**
+Status: **STABLE — KG12 baselines plus W1/W3 worker implementation and evidence are complete.**
 
-KG12A measures the final UX4B application without changing its product
-behavior. The evidence supports a narrow KG12B: move whole-workspace
-transactions and large Dagre layout off the UI thread; keep projection and
-inspection on the main thread; add no new general-purpose cache.
+KG12A measured the final UX4B application without changing its product
+behavior. KG12B implements the resulting narrow split: whole-workspace
+transactions run in stateful W1, Dagre runs in stateless latest-result-wins W3,
+projection and inspection stay on the main thread, and no new general-purpose
+cache is added.
 
 Wall-clock results are investigative local evidence. CI validates schemas,
 operation paths, correctness, builds, and tests, but does not fail on timing.
@@ -92,6 +93,63 @@ split into bounded ordered structured-clone frames. Each frame retains protocol
 version/request correlation, the receiving side validates order/completeness,
 and both sides yield between frames. No JSON serialization, parsed documents,
 engine object, full delta, source path, or identifier enters the result.
+
+## KG12B2 W3 responsiveness evidence
+
+`pnpm benchmark:dagre-worker -- --profile small` and `--profile medium` derive
+production renderer topology from deterministic projections. Small is fully
+expanded; medium uses a bounded 64-entity expansion. The harness compares the
+same Dagre compute directly and through a warm Node worker, verifies exact
+position equality, applies those positions through the production renderer
+adapter, and probes the main event loop every 16 ms. Results are single-run
+local evidence, not portable promises or CI thresholds.
+
+Sequential runs on the KG12A machine on 2026-08-29 produced:
+
+| Profile               |                Small |       Medium bounded |
+| --------------------- | -------------------: | -------------------: |
+| Projected nodes/edges |        1,700 / 2,000 |        6,640 / 7,182 |
+| W3 nodes/edges        |          900 / 1,200 |        1,598 / 2,140 |
+| Direct compute        |           1,644.8 ms |           4,271.9 ms |
+| Worker compute        |           1,629.8 ms |           3,782.1 ms |
+| Worker round trip     |           1,635.8 ms |           3,790.4 ms |
+| Result apply          |               4.8 ms |              17.9 ms |
+| Request → adoption    |           1,640.7 ms |           3,808.3 ms |
+| Direct max/p95 gap    | 1,645.1 / 1,645.1 ms | 4,282.9 / 4,282.9 ms |
+| Worker max/p95 gap    |       32.2 / 31.7 ms |       32.6 / 32.0 ms |
+| High-gap reduction    |                51.1× |               131.2× |
+
+The result separates two facts. Dagre wall time still exceeds the Class B
+budget and remains structural-scale evidence for KG13. Moving it to W3 removes
+the multi-second UI-thread stall: measured worker p95 gaps stayed at about the
+32 ms Class A reference. Result application remains on main. An initial medium
+sample exposed a 248.5 ms diagnostic-placement scan; indexing the first
+incoming edge per diagnostic reduced the final sample to 17.9 ms while the
+direct-versus-worker complete `RendererGraph` oracle stayed exact.
+
+The A → B → C run terminates A and B after bounded 16 ms stale-CPU windows and
+adopts only C. Worker-constructor restart measurements were 0.9–1.3 ms in the
+sequential runs; C completed in 1,920.1 ms small and 4,267.3 ms medium rather
+than waiting for A+B+C. Small supersession max/p95 gaps were 32.3/31.8 ms;
+medium was 55.3/32.3 ms. The medium maximum is above the Class A p95 reference,
+but no timing value is a CI gate and native interaction QA remains
+authoritative.
+
+The production Vite build emits a dedicated 49.88 kB W3 worker chunk. Dagre
+algorithm markers occur only in that chunk. The main application chunk is
+539.11 kB (161.41 kB gzip), down from the KG12B1 575.59 kB (174.57 kB gzip)
+baseline because the synchronous algorithm is no longer included there. The
+existing Vite large-chunk warning remains; KG12B2 does not treat that as a
+reason to begin KG13 or add another cache or renderer.
+
+Release QA exposed a separate W1 packaging defect: Vite selected a DOM-based
+conditional export in the Markdown parser dependency graph, so the Dedicated
+Worker evaluated `document.createElement` during initialization. The
+worker-only resolver now selects the decoder's published worker-safe table and
+the build rejects emitted workers containing DOM construction. That table
+increases the W1 chunk from 243.01 kB to 271.64 kB; the W3 and main chunk sizes
+above are unchanged. This is a correctness cost in the existing parser
+dependency, not a new external package or W1/W3 coupling.
 
 ## Baseline findings
 
@@ -190,6 +248,14 @@ instrumented sample changed structural depth and maximized/restored normally;
 the default URL reported instrumentation disabled and both paths had no console
 warnings.
 
+KG12B2 release QA passed the W3 interaction matrix and the rebuilt native
+Open Vault path. A first release run exposed the DOM-based named-reference
+decoder in W1; after the worker-only resolution fix, the release selected and
+adopted a local Markdown workspace, rendered its graph, changed structural
+depth, and expanded/collapsed nodes without a worker error. This verifies the
+actual Tauri artifact and Vite worker chunks in addition to unit, benchmark,
+browser, and Rust build evidence.
+
 Manual Tauri development QA also passed the complete graph-control and
 synthetic live-change checklist. One user-reported I18 Full Rescan sample
 produced the following aggregate timings; the 250 ms watcher quiet window does
@@ -222,7 +288,7 @@ missing-favicon request, with no reported application failure.
 | Priority | Finding                                                                                                                                                                                                               | Consequence                                                                                                              |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | P0       | None observed on the ordinary interaction surface.                                                                                                                                                                    | Direct manipulation and the complete manual UI matrix remained usable.                                                   |
-| P1       | Dagre crosses the Class B p95 at the small top-level/bounded scenes; medium whole-workspace transactions block for hundreds of milliseconds; the observed explicit rescan spent 9.1 seconds in source reconciliation. | KG12B should workerize W1 and W3, preserve asynchronous source acquisition, and keep progress/error reporting truthful.  |
+| P1       | Dagre crosses the Class B p95 at the small top-level/bounded scenes; medium whole-workspace transactions block for hundreds of milliseconds; the observed explicit rescan spent 9.1 seconds in source reconciliation. | Addressed by separate W1/W3 workers; wall time remains explicit while last-valid state or progress stays visible.        |
 | P2       | Fully expanded and large canonical stress profiles grow to multi-second projection/layout/workspace costs.                                                                                                            | Keep disclosure bounded and carry the quantified cliff into KG13; do not promise fully expanded large-vault interaction. |
 | P3       | Search, aggregate edge inspection, highlighting, and renderer mapping at ordinary projected sizes are measurable but not dominant.                                                                                    | Retain instrumentation and existing memoization; add no optimization complexity now.                                     |
 
@@ -232,15 +298,15 @@ missing-favicon request, with no reported application failure.
 | --------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------- |
 | W1 KG10 + diagnostics | Complete in KG12B1 | Stateful sequential worker preserves the KG10 cache and KG11 prepare/persist/commit transaction.                     |
 | W2 projection         | Keep main-thread   | Bounded/focus projections are smaller; existing memoization prevents unrelated interaction runs.                     |
-| W3 Dagre              | Worker in KG12B    | It dominates derived-view latency and crosses the budget at the small expanded scene.                                |
+| W3 Dagre              | Complete in KG12B2 | Stateless replacement-worker supersession prevents obsolete layouts from serially delaying the current projection.   |
 | W4 inspection         | Keep main-thread   | Snapshot index is memoized and selected/search operations are bounded; retain instrumentation for large-tail review. |
 
 KG12B1 uses versioned serializable requests/results, revision and candidate
 guards, explicit worker errors, and exact direct-pipeline correctness oracles.
 W1 cannot drop same-workspace results because its cache and durable catalog are
-stateful. KG12B2 W3 must instead use latest-result-wins adoption and stale
-layout rejection. The two workers must not become a universal graph abstraction
-or start KG13 renderer replacement.
+stateful. KG12B2 W3 instead uses latest-result-wins adoption, active worker
+replacement, and stale layout rejection. The two workers remain independent;
+no universal graph abstraction or KG13 renderer replacement is introduced.
 
 ## Cache decision
 

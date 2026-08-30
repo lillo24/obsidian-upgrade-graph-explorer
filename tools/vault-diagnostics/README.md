@@ -1,6 +1,6 @@
 # Local Vault Diagnostics
 
-Status: **STABLE — KG12B1 adds aggregate W1 worker responsiveness evidence to the KG12A harness.**
+Status: **STABLE — KG12B adds aggregate W1 and W3 worker responsiveness evidence.**
 
 This development-only workspace package is the Node KG5 filesystem boundary.
 It recursively acquires one explicitly selected local vault, then calls KG3,
@@ -33,6 +33,8 @@ src/
   performance-policy.ts Class budgets plus measured KG12B worker/cache decisions.
   workspace-worker-thread.ts Node host for the production W1 protocol/runtime.
   workspace-worker-responsiveness.ts Direct-versus-worker event-loop evidence.
+  dagre-layout-worker-thread.ts Node host for the production W3 protocol/runtime.
+  dagre-layout-worker-responsiveness.ts Direct/worker/supersession W3 evidence.
   validate-incremental-real.ts Aggregate-only, in-memory private validation.
   generate-sample.ts  Regenerates the committed neutral browser sample.
   index.test.ts       Temporary-directory scanner and failure contracts.
@@ -109,6 +111,8 @@ pnpm benchmark:performance -- --profile small \
   --output output/performance/small.json
 pnpm benchmark:workspace-worker -- --profile medium
 pnpm benchmark:workspace-worker -- --profile large
+pnpm benchmark:dagre-worker -- --profile small
+pnpm benchmark:dagre-worker -- --profile medium
 ```
 
 Profiles are deterministic and measure parse/adapt, resolution, report
@@ -143,6 +147,14 @@ and exact report/catalog equality. Output is aggregate-only and is not a CI
 timing gate. The browser production build separately proves the Vite Dedicated
 Worker entry; this Node host exists only for repeatable local responsiveness
 evidence.
+
+`benchmark:dagre-worker` derives real renderer topology from the deterministic
+small fully-expanded or medium bounded projection, compares direct and worker
+coordinates exactly, applies the worker result through the production renderer
+adapter, and keeps a 16 ms event-loop probe active. Its A → B → C scenario
+terminates A and B and accepts only C. Output contains counts and aggregate
+timings only—never graph IDs, titles, paths, or topology—and is investigative
+rather than a CI timing threshold.
 
 An opt-in private check can validate one real workspace using an existing
 identity catalog:

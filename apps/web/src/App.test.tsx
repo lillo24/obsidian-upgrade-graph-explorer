@@ -68,7 +68,8 @@ describe('graph-first explorer shell', () => {
     expect(markup).toContain('Focus Selected');
     expect(markup).toContain('aria-label="Open Inspector"');
     expect(markup).not.toContain('>Inspector</button>');
-    expect(markup).toContain('aria-label="Fit graph to view"');
+    expect(markup).toContain('Laying out graph…');
+    expect(markup).not.toContain('aria-label="Fit graph to view"');
     expect(markup).toContain('aria-label="Maximize graph"');
     expect(markup).not.toContain('>Maximize Graph</button>');
     expect(markup).not.toContain('diagnostic-evidence');
@@ -190,7 +191,8 @@ describe('graph-first explorer shell', () => {
     );
     expect(normalMarkup).not.toContain('Provenance Inspector');
     expect(normalMarkup).not.toContain('graph-stage--inspector-open');
-    expect(normalMarkup).toContain('aria-label="Fit graph to view"');
+    expect(normalMarkup).toContain('Laying out graph…');
+    expect(normalMarkup).not.toContain('aria-label="Fit graph to view"');
     expect(normalMarkup).toContain('aria-label="Open Settings"');
     expect(normalMarkup).toContain('data-trackpad-zoom-mode="scroll-zoom"');
     expect(normalMarkup).not.toContain('class="graph-floating-controls"');

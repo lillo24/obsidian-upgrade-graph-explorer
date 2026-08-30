@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { layoutRendererGraph } from './layout';
+import { computeDagreLayout } from '@icarus-graph-explorer/dagre-layout/compute';
+
+import {
+  applyRendererLayoutPositions,
+  createRendererLayoutInput,
+  fallbackRendererGraph,
+} from './layout';
+import { layoutRendererGraph } from './layout-sync';
 import { mapProjectionToReactFlow } from './mapping';
 import { prepareRendererGraph } from './prepare';
 import { rendererTestProjection } from './test-fixture';
@@ -66,5 +73,69 @@ describe('deterministic renderer layout', () => {
     expect(first.nodes.map((node) => node.position)).toEqual(
       second.nodes.map((node) => node.position),
     );
+  });
+
+  it('sends only entity topology to Dagre and applies positions exactly', () => {
+    const mapped = mapProjectionToReactFlow(
+      rendererTestProjection(),
+      'structure',
+      new Set(),
+    );
+    const input = createRendererLayoutInput(
+      mapped.nodes,
+      mapped.edges,
+      'structure',
+    );
+    const output = computeDagreLayout(input);
+    const applied = applyRendererLayoutPositions(
+      mapped.nodes,
+      mapped.edges,
+      'structure',
+      output,
+    );
+    const direct = layoutRendererGraph(mapped.nodes, mapped.edges, 'structure');
+
+    const diagnosticIds = new Set(
+      mapped.nodes
+        .filter(({ type }) => type === 'diagnostic')
+        .map(({ id }) => id),
+    );
+    expect(input.nodes).toHaveLength(
+      mapped.nodes.filter(({ type }) => type === 'entity').length,
+    );
+    expect(input.nodes.every(({ id }) => !diagnosticIds.has(id))).toBe(true);
+    expect(
+      input.edges.every(
+        ({ source, target }) =>
+          !diagnosticIds.has(source) && !diagnosticIds.has(target),
+      ),
+    ).toBe(true);
+    expect(applied).toEqual(direct);
+    expect(
+      applied.nodes.find(({ type }) => type === 'diagnostic')?.position,
+    ).toEqual(direct.nodes.find(({ type }) => type === 'diagnostic')?.position);
+  });
+
+  it('keeps the deterministic grid fallback independent from Dagre', () => {
+    const mapped = mapProjectionToReactFlow(
+      rendererTestProjection(),
+      'focus',
+      new Set(),
+    );
+    const first = fallbackRendererGraph(
+      mapped.nodes,
+      mapped.edges,
+      'focus',
+      'worker unavailable',
+    );
+    const second = fallbackRendererGraph(
+      mapped.nodes,
+      mapped.edges,
+      'focus',
+      'worker unavailable',
+    );
+
+    expect(first).toEqual(second);
+    expect(first.layoutWarning).toContain('worker unavailable');
   });
 });
