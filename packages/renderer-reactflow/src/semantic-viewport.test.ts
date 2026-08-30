@@ -54,7 +54,7 @@ describe('semantic viewport observation', () => {
         { x: -250, y: 0, zoom: 1 },
         { width: 208, height: 94 },
       ).anchorEntityId,
-    ).toBe('document-a');
+    ).toBe('section-a');
   });
 
   it('uses renderer ID as a deterministic equal-distance tie breaker', () => {

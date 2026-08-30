@@ -17,6 +17,7 @@ import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performa
 import {
   GraphCanvas,
   type GraphCenterRequest,
+  type FocusAppearance,
   type GraphSelection,
   type GraphViewportObservation,
   type TrackpadZoomMode,
@@ -30,8 +31,6 @@ import {
 import {
   createProjectionWorkspace,
   projectView,
-  type ProjectedEntityNode,
-  type ProjectedNode,
   type ViewProjection,
 } from '@icarus-graph-explorer/view-projection';
 
@@ -77,15 +76,6 @@ interface ProjectionFailure {
 }
 
 type ProjectionResult = ProjectionSuccess | ProjectionFailure;
-
-function selectedNode(
-  projection: ViewProjection,
-  selection: GraphSelection | null,
-): ProjectedNode | undefined {
-  return selection?.kind === 'node'
-    ? projection.nodes.find((node) => node.id === selection.id)
-    : undefined;
-}
 
 function selectionExists(
   projection: ViewProjection,
@@ -183,6 +173,9 @@ export function GraphExplorer({
   );
   const [trackpadZoomMode, setTrackpadZoomMode] = useState<TrackpadZoomMode>(
     preferenceLoad.preferences.trackpadZoomMode,
+  );
+  const [focusAppearance, setFocusAppearance] = useState<FocusAppearance>(
+    preferenceLoad.preferences.focusAppearance,
   );
   const [preferenceWarning, setPreferenceWarning] = useState<
     string | undefined
@@ -312,12 +305,6 @@ export function GraphExplorer({
     projection !== undefined && selectionExists(projection, selection)
       ? selection
       : null;
-  const node =
-    projection === undefined
-      ? undefined
-      : selectedNode(projection, activeSelection);
-  const focusEntity: ProjectedEntityNode | undefined =
-    node?.kind === 'entity' ? node : undefined;
   const previousProjectionWorkspace = useRef(projectionWorkspace);
 
   useLayoutEffect(() => {
@@ -514,11 +501,23 @@ export function GraphExplorer({
     (mode: TrackpadZoomMode) => {
       setTrackpadZoomMode(mode);
       const saved = saveGraphPreferences(persistenceStorage, {
+        focusAppearance,
         trackpadZoomMode: mode,
       });
       setPreferenceWarning(saved.ok ? undefined : saved.message);
     },
-    [persistenceStorage],
+    [focusAppearance, persistenceStorage],
+  );
+  const changeFocusAppearance = useCallback(
+    (appearance: FocusAppearance) => {
+      setFocusAppearance(appearance);
+      const saved = saveGraphPreferences(persistenceStorage, {
+        focusAppearance: appearance,
+        trackpadZoomMode,
+      });
+      setPreferenceWarning(saved.ok ? undefined : saved.message);
+    },
+    [persistenceStorage, trackpadZoomMode],
   );
   const changeSettingsOpen = useCallback((open: boolean) => {
     dispatchWorkspaceOverlay({ type: 'change-settings', open });
@@ -579,15 +578,23 @@ export function GraphExplorer({
     [activeViewState, projectionWorkspace],
   );
 
-  function enterFocus(): void {
-    if (focusEntity === undefined) return;
-    dispatch({ type: 'enter-focus', entityId: focusEntity.entityId });
-    setFitRequestKey((current) => current + 1);
-    setNavigationError(undefined);
-    setNavigationAnnouncement(
-      `Focused ${focusEntity.entityKind} in ${focusEntity.sourcePath}.`,
-    );
-  }
+  const enterFocus = useCallback(
+    (entityId: string): void => {
+      const focusEntity = projection?.nodes.find(
+        (candidate) =>
+          candidate.kind === 'entity' && candidate.entityId === entityId,
+      );
+      if (focusEntity === undefined || focusEntity.kind !== 'entity') return;
+      dispatch({ type: 'enter-focus', entityId: focusEntity.entityId });
+      setSelection({ kind: 'node', id: focusEntity.id });
+      setFitRequestKey((current) => current + 1);
+      setNavigationError(undefined);
+      setNavigationAnnouncement(
+        `Focused ${focusEntity.entityKind} in ${focusEntity.sourcePath}.`,
+      );
+    },
+    [projection],
+  );
 
   function exitFocus(): void {
     dispatch({ type: 'exit-focus' });
@@ -671,6 +678,8 @@ export function GraphExplorer({
             <span>Tools</span>
           </button>
           <GraphSettings
+            focusAppearance={focusAppearance}
+            onFocusAppearanceChange={changeFocusAppearance}
             onOpenChange={changeSettingsOpen}
             onTrackpadZoomModeChange={changeTrackpadZoomMode}
             open={activeOverlay === 'settings'}
@@ -733,63 +742,46 @@ export function GraphExplorer({
               pathScopes={pathScopes}
               state={activeViewState}
             />
-            <div
-              className="control-group control-group--focus"
-              aria-label="Focus controls"
-              role="group"
-            >
-              {activeViewState.focus === undefined ? (
-                <button
-                  disabled={focusEntity === undefined}
-                  onClick={enterFocus}
-                  title={
-                    focusEntity === undefined
-                      ? 'Select an entity node to focus it.'
-                      : 'Show its local reference neighborhood.'
-                  }
-                  type="button"
-                >
-                  Focus Selected
+            {activeViewState.focus === undefined ? null : (
+              <div
+                className="control-group control-group--focus"
+                aria-label="Focus controls"
+                role="group"
+              >
+                <button onClick={exitFocus} type="button">
+                  Exit Focus
                 </button>
-              ) : (
-                <>
-                  <button onClick={exitFocus} type="button">
-                    Exit Focus
-                  </button>
-                  <label>
-                    Hops
-                    <select
-                      onChange={(event) =>
-                        changeHops(
-                          Number(event.currentTarget.value) as 1 | 2 | 3,
-                        )
-                      }
-                      value={activeViewState.focus.hops}
-                    >
-                      <option value="1">1</option>
-                      <option value="2">2</option>
-                      <option value="3">3</option>
-                    </select>
-                  </label>
-                  <label>
-                    Direction
-                    <select
-                      onChange={(event) =>
-                        changeDirection(
-                          event.currentTarget.value as
-                            'incoming' | 'outgoing' | 'both',
-                        )
-                      }
-                      value={activeViewState.focus.direction}
-                    >
-                      <option value="both">Both</option>
-                      <option value="incoming">Incoming</option>
-                      <option value="outgoing">Outgoing</option>
-                    </select>
-                  </label>
-                </>
-              )}
-            </div>
+                <label>
+                  Hops
+                  <select
+                    onChange={(event) =>
+                      changeHops(Number(event.currentTarget.value) as 1 | 2 | 3)
+                    }
+                    value={activeViewState.focus.hops}
+                  >
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                  </select>
+                </label>
+                <label>
+                  Direction
+                  <select
+                    onChange={(event) =>
+                      changeDirection(
+                        event.currentTarget.value as
+                          'incoming' | 'outgoing' | 'both',
+                      )
+                    }
+                    value={activeViewState.focus.direction}
+                  >
+                    <option value="both">Both</option>
+                    <option value="incoming">Incoming</option>
+                    <option value="outgoing">Outgoing</option>
+                  </select>
+                </label>
+              </div>
+            )}
             <div
               className="control-group control-group--workspace"
               aria-label="Workspace controls"
@@ -808,6 +800,8 @@ export function GraphExplorer({
               ) : null}
               {maximized ? null : (
                 <GraphSettings
+                  focusAppearance={focusAppearance}
+                  onFocusAppearanceChange={changeFocusAppearance}
                   onOpenChange={changeSettingsOpen}
                   onTrackpadZoomModeChange={changeTrackpadZoomMode}
                   open={activeOverlay === 'settings'}
@@ -866,11 +860,13 @@ export function GraphExplorer({
             {...(centerRequest === undefined ? {} : { centerRequest })}
             expandedEntityIds={activeViewState.disclosure.expandedEntityIds}
             fitRequestKey={fitRequestKey}
+            focusAppearance={focusAppearance}
             layoutMode={
               activeViewState.focus === undefined ? 'structure' : 'focus'
             }
             maximized={maximized}
             onMaximizedChange={changeMaximized}
+            onFocusEntity={enterFocus}
             onSelectionChange={changeSelection}
             onToggleEntity={toggleEntity}
             onViewportObservation={observeViewport}

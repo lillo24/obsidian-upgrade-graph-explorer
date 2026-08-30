@@ -2,6 +2,7 @@ import { memo, type KeyboardEvent, type MouseEvent } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 
 import { useEntityDisclosure } from './disclosure-context';
+import { shouldToggleDisclosureForClick } from './focus-interaction';
 import type { DiagnosticFlowNode, EntityFlowNode } from './types';
 
 function NodeHandles() {
@@ -20,7 +21,14 @@ function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
 
   function handleDisclosure(event: MouseEvent<HTMLButtonElement>): void {
     event.stopPropagation();
+    if (!shouldToggleDisclosureForClick(event.detail)) return;
     toggleEntity(data.entityId, data.isExpanded);
+  }
+
+  function keepDisclosureDoubleClickLocal(
+    event: MouseEvent<HTMLButtonElement>,
+  ): void {
+    event.stopPropagation();
   }
 
   function handleDisclosureKey(event: KeyboardEvent<HTMLButtonElement>): void {
@@ -37,57 +45,64 @@ function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
     event.stopPropagation();
   }
 
-  const focusLabel =
-    data.focusDistance === null ? null : `Focus distance ${data.focusDistance}`;
   const disclosureCount = data.isExpanded
     ? data.visibleDescendantCount
     : data.hiddenDescendantCount;
   const disclosureDescription = data.isExpanded
     ? `${disclosureCount} visible descendants`
     : `${disclosureCount} hidden descendants`;
+  const hasFooter =
+    data.internalReferenceCount > 0 ||
+    data.hasHiddenChildren ||
+    data.isExpanded;
+  const hasDisclosure = data.hasHiddenChildren || data.isExpanded;
+  const sourceLocation =
+    data.entityKind === 'document'
+      ? data.sourcePath
+      : `${data.sourcePath}, line ${data.sourceStartLine}`;
   return (
     <article
-      className={`entity-card entity-card--${data.entityKind} entity-card--${data.role}`}
+      className={`entity-card entity-card--${data.entityKind} entity-card--${data.role}${hasFooter ? ' entity-card--has-footer' : ''}${hasDisclosure ? ' entity-card--has-disclosure' : ''}`}
+      data-entity-id={data.entityId}
+      data-entity-kind={data.entityKind}
+      data-focus-distance={data.focusDistance ?? undefined}
       data-projection-node-id={data.projectionNodeId}
+      title={`${data.title} — ${sourceLocation} — Double-click to focus`}
     >
       <NodeHandles />
-      <div className="entity-card__topline">
-        <span className="entity-kind">{data.typeLabel}</span>
-        {focusLabel === null ? null : (
-          <span className="focus-distance">{focusLabel}</span>
-        )}
-      </div>
-      <strong className="entity-title" title={data.title}>
-        {data.title}
-      </strong>
-      <span className="entity-detail" title={data.detail} translate="no">
-        {data.detail}
-      </span>
-      <div className="entity-card__footer">
-        {data.internalReferenceCount > 0 ? (
-          <span
-            className="internal-reference-badge"
-            title="References whose visible endpoints collapse into this node"
-          >
-            ↺ {data.internalReferenceCount} internal
-          </span>
-        ) : (
-          <span aria-hidden="true" />
-        )}
-        {data.hasHiddenChildren || data.isExpanded ? (
-          <button
-            aria-label={`${data.isExpanded ? 'Collapse' : 'Expand'} ${data.title}; ${disclosureDescription}`}
-            className="entity-disclosure nodrag nopan"
-            onClick={handleDisclosure}
-            onKeyDown={handleDisclosureKey}
-            onKeyUp={keepDisclosureKeyUpLocal}
-            type="button"
-          >
-            <span aria-hidden="true">{data.isExpanded ? '−' : '+'}</span>
-            <span>{disclosureCount}</span>
-          </button>
-        ) : null}
-      </div>
+      <strong className="entity-title">{data.title}</strong>
+      {data.detail === null ? null : (
+        <span className="entity-detail" title={data.detail} translate="no">
+          {data.detail}
+        </span>
+      )}
+      {hasFooter ? (
+        <div className="entity-card__footer">
+          {data.internalReferenceCount > 0 ? (
+            <span
+              aria-label={`${data.internalReferenceCount} internal reference${data.internalReferenceCount === 1 ? '' : 's'}`}
+              className="internal-reference-badge"
+              title="References whose visible endpoints collapse into this node"
+            >
+              ↺ {data.internalReferenceCount}
+            </span>
+          ) : null}
+          {data.hasHiddenChildren || data.isExpanded ? (
+            <button
+              aria-label={`${data.isExpanded ? 'Collapse' : 'Expand'} ${data.title}; ${disclosureDescription}`}
+              className="entity-disclosure nodrag nopan"
+              onClick={handleDisclosure}
+              onDoubleClick={keepDisclosureDoubleClickLocal}
+              onKeyDown={handleDisclosureKey}
+              onKeyUp={keepDisclosureKeyUpLocal}
+              type="button"
+            >
+              <span aria-hidden="true">{data.isExpanded ? '⌄' : '›'}</span>
+              <span>{disclosureCount}</span>
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </article>
   );
 }

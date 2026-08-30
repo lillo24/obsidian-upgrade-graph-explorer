@@ -65,7 +65,9 @@ describe('graph-first explorer shell', () => {
     expect(markup).toContain('Search');
     expect(markup).toContain('>Filters<');
     expect(markup).toContain('Documents');
-    expect(markup).toContain('Focus Selected');
+    expect(markup).not.toContain('Focus Selected');
+    expect(markup).not.toContain('aria-label="Focus controls"');
+    expect(markup).toContain('data-focus-appearance="outline"');
     expect(markup).toContain('aria-label="Open Inspector"');
     expect(markup).not.toContain('>Inspector</button>');
     expect(markup).toContain('aria-label="Fit graph to view"');
@@ -215,12 +217,15 @@ describe('graph-first explorer shell', () => {
     expect(maximizedMarkup).toContain('aria-label="Open Inspector"');
     expect(maximizedMarkup).toContain('class="graph-inspector-handle"');
     expect(maximizedMarkup).toContain('>Filters<');
-    expect(maximizedMarkup).toContain('Focus Selected');
+    expect(maximizedMarkup).not.toContain('Focus Selected');
+    expect(maximizedMarkup).not.toContain('aria-label="Focus controls"');
   });
 
   it('uses one shared settings UI and hydrates the global trackpad choice', () => {
     const settingsMarkup = renderToStaticMarkup(
       <GraphSettings
+        focusAppearance="inverted"
+        onFocusAppearanceChange={() => undefined}
         onOpenChange={() => undefined}
         onTrackpadZoomModeChange={() => undefined}
         open
@@ -246,6 +251,11 @@ describe('graph-first explorer shell', () => {
         <DeveloperSettingsSection onOpenDiagnosticEvidence={() => undefined} />
       </GraphSettings>,
     );
+    expect(settingsMarkup).toContain('>Graph Appearance</h3>');
+    expect(settingsMarkup).toContain('<legend>Focus Root</legend>');
+    expect(settingsMarkup).toContain('>Outline</strong>');
+    expect(settingsMarkup).toContain('>Inverted</strong>');
+    expect(settingsMarkup).toContain('>Minimal</strong>');
     expect(settingsMarkup).toContain('<legend>Trackpad Zoom</legend>');
     expect(settingsMarkup).toContain('Scroll to Zoom');
     expect(settingsMarkup).toContain('Pinch to Zoom');
@@ -253,11 +263,17 @@ describe('graph-first explorer shell', () => {
       settingsMarkup.indexOf('>Developer</h3>'),
     );
     expect(settingsMarkup.indexOf('>Developer</h3>')).toBeLessThan(
+      settingsMarkup.indexOf('Graph Appearance'),
+    );
+    expect(settingsMarkup.indexOf('Graph Appearance')).toBeLessThan(
       settingsMarkup.indexOf('Graph Interaction'),
     );
     expect(settingsMarkup).toContain('Open Diagnostic Evidence');
     expect(settingsMarkup).toContain(
       'type="radio" name="trackpad-zoom-mode" checked="" value="pinch-zoom"',
+    );
+    expect(settingsMarkup).toContain(
+      'type="radio" name="focus-appearance" checked="" value="inverted"',
     );
     expect(settingsMarkup).toContain(
       'class="graph-settings__warning" role="alert"',
@@ -279,6 +295,7 @@ describe('graph-first explorer shell', () => {
       />,
     );
     expect(persistedMarkup).toContain('data-trackpad-zoom-mode="pinch-zoom"');
+    expect(persistedMarkup).toContain('data-focus-appearance="outline"');
   });
 
   it('renders diagnostic evidence in a labeled, internally scrollable dialog', () => {

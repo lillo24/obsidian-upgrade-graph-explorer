@@ -1,6 +1,6 @@
 # React Flow Structural Renderer
 
-Status: **STABLE — KG12A phase/counter hooks preserve the UX4B renderer contract.**
+Status: **STABLE — UX4C compacts node grammar without changing KG12A phase boundaries.**
 
 This renderer package turns one KG6 `ViewProjection` into a deterministic,
 read-only React Flow scene. It owns renderer IDs, fixed node geometry, Dagre
@@ -25,6 +25,7 @@ src/
   mapping.ts             One-to-one semantic React Flow node/edge mapping.
   layout.ts              Fixed-size Dagre layout and explicit grid fallback.
   highlight.ts           Direct incident-node/edge visual emphasis.
+  focus-interaction.ts   Graph-scoped Enter-to-Focus activation policy.
   center-request.ts      Keyed projected-node viewport-center resolution.
   semantic-viewport.ts   Viewport-center to canonical-entity bookmark observation.
   viewport-navigation.ts Wheel zoom, focal-point, and disclosure-anchor geometry.
@@ -79,10 +80,31 @@ Disclosure captures the toggled entity's screen-space center and current zoom,
 then restores that point after the new projection and layout commit. Only the
 viewport translation changes: zoom, selection, focus, Inspector state, and
 disclosure semantics remain owned by their existing layers. A missing anchor is
-cleared safely without fitting. File cards remain `224 × 112`, Heading nodes are
-compact `200 × 96` lozenges, and Block nodes remain `168 × 80`; their visible
-type labels are File, Heading, and Block while canonical entity kinds are
-unchanged.
+cleared safely without fitting. Document cards are fixed at `200 × 80`, Section
+nodes at `184 × 72`, and Blocks at `152 × 64`. Canonical File, Heading, and Block
+kinds remain in renderer data and accessible names but are not repeated as
+visible labels. Disclosure uses a quiet `›`/`⌄` count control with an unchanged
+touch target and aria description; collapsed internal references remain a
+compact `↺ N` cue.
+
+UX4C keeps single click as selection and adds a narrow `onFocusEntity(entityId)`
+boundary for double-click and graph-scoped Enter on a focused canonical entity.
+Controls, editable targets, repeating key events, diagnostic targets, and edges
+cannot activate Focus. Disclosure stops click, double-click, and keyboard events
+locally. The focus root is derived only from projected `focusDistance === 0`.
+The canvas-level `FocusAppearance` (`outline`, `inverted`, or `minimal`) changes
+CSS presentation only: it is intentionally absent from mapping/layout options
+and prepared-graph memo dependencies. The gold selection ring remains separate
+from every root treatment. Distances 2 and 3 receive bounded visual attenuation,
+while selected or highlighted nodes regain full readability.
+
+Visible entity content is title-first. Unique documents and sections omit a
+detail row; same-named documents use the shortest unique parent suffix, repeated
+section headings add only the document/line context needed to distinguish them,
+and blocks use `Line N` plus compact document context. Full source paths and
+entity kinds remain available in accessible names, native titles, and the
+Inspector. Collision indexing uses maps and path-segment passes rather than
+pairwise comparisons.
 
 The bottom-left control stack owns zoom in/out, a custom **Fit graph to view**
 button, and the optional application maximize/restore callback. The fit icon is

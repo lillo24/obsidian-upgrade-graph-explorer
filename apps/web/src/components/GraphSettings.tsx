@@ -1,10 +1,15 @@
 import { memo, type ReactNode } from 'react';
 
-import type { TrackpadZoomMode } from '@icarus-graph-explorer/renderer-reactflow';
+import type {
+  FocusAppearance,
+  TrackpadZoomMode,
+} from '@icarus-graph-explorer/renderer-reactflow';
 
 interface GraphSettingsProps {
   readonly children?: ReactNode;
+  readonly focusAppearance: FocusAppearance;
   readonly open: boolean;
+  readonly onFocusAppearanceChange: (appearance: FocusAppearance) => void;
   readonly onOpenChange: (open: boolean) => void;
   readonly onTrackpadZoomModeChange: (mode: TrackpadZoomMode) => void;
   readonly trackpadZoomMode: TrackpadZoomMode;
@@ -27,6 +32,8 @@ function SettingsIcon() {
 
 export const GraphSettings = memo(function GraphSettings({
   children,
+  focusAppearance,
+  onFocusAppearanceChange,
   onOpenChange,
   onTrackpadZoomModeChange,
   open,
@@ -60,6 +67,54 @@ export const GraphSettings = memo(function GraphSettings({
           </div>
           <div className="graph-settings__sections" data-graph-scroll-container>
             {children}
+            <section
+              aria-labelledby="graph-appearance-settings-heading"
+              className="graph-settings__section"
+            >
+              <h3 id="graph-appearance-settings-heading">Graph Appearance</h3>
+              <fieldset>
+                <legend>Focus Root</legend>
+                <label>
+                  <input
+                    checked={focusAppearance === 'outline'}
+                    name="focus-appearance"
+                    onChange={() => onFocusAppearanceChange('outline')}
+                    type="radio"
+                    value="outline"
+                  />
+                  <span>
+                    <strong>Outline</strong>
+                    <small>A strong geometric boundary around the root.</small>
+                  </span>
+                </label>
+                <label>
+                  <input
+                    checked={focusAppearance === 'inverted'}
+                    name="focus-appearance"
+                    onChange={() => onFocusAppearanceChange('inverted')}
+                    type="radio"
+                    value="inverted"
+                  />
+                  <span>
+                    <strong>Inverted</strong>
+                    <small>A dark root card with high-contrast content.</small>
+                  </span>
+                </label>
+                <label>
+                  <input
+                    checked={focusAppearance === 'minimal'}
+                    name="focus-appearance"
+                    onChange={() => onFocusAppearanceChange('minimal')}
+                    type="radio"
+                    value="minimal"
+                  />
+                  <span>
+                    <strong>Minimal</strong>
+                    <small>A quiet corner marker and title accent.</small>
+                  </span>
+                </label>
+              </fieldset>
+            </section>
             <section
               aria-labelledby="graph-interaction-settings-heading"
               className="graph-settings__section"

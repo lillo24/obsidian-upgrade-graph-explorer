@@ -14,9 +14,9 @@ import type {
 } from './types';
 
 export const ENTITY_NODE_DIMENSIONS = {
-  document: { width: 224, height: 112 },
-  section: { width: 200, height: 96 },
-  block: { width: 168, height: 80 },
+  document: { width: 200, height: 80 },
+  section: { width: 184, height: 72 },
+  block: { width: 152, height: 64 },
 } as const;
 
 export const ENTITY_TYPE_LABELS = {
@@ -32,36 +32,169 @@ function documentName(path: string): string {
   return name.toLowerCase().endsWith('.md') ? name.slice(0, -3) : name;
 }
 
-function entityTitle(node: ProjectedEntityNode): string {
-  if (node.entityKind === 'document') return documentName(node.sourcePath);
-  if (node.entityKind === 'block') return 'Block';
+function parentSegments(path: string): readonly string[] {
+  const segments = path.split('/').filter((segment) => segment.length > 0);
+  return segments.slice(0, -1);
+}
+
+function parentSuffix(path: string, depth: number): string {
+  const segments = parentSegments(path);
+  return segments.length === 0
+    ? 'workspace root'
+    : segments.slice(-depth).join('/');
+}
+
+interface DocumentPresentation {
+  readonly title: string;
+  readonly detail: string | null;
+  readonly context: string;
+}
+
+interface EntityPresentation {
+  readonly title: string;
+  readonly detail: string | null;
+}
+
+/**
+ * Finds the shortest unique parent suffix for same-named documents. The work is
+ * proportional to the number of path segments, avoiding pairwise comparisons.
+ */
+function documentPresentations(
+  nodes: readonly ProjectedEntityNode[],
+): ReadonlyMap<string, DocumentPresentation> {
+  const paths = [...new Set(nodes.map((node) => node.sourcePath))].sort(
+    (a, b) => a.localeCompare(b),
+  );
+  const pathsByTitle = new Map<string, string[]>();
+  for (const path of paths) {
+    const title = documentName(path);
+    const titledPaths = pathsByTitle.get(title) ?? [];
+    titledPaths.push(path);
+    pathsByTitle.set(title, titledPaths);
+  }
+
+  const result = new Map<string, DocumentPresentation>();
+  for (const [title, titledPaths] of pathsByTitle) {
+    if (titledPaths.length === 1) {
+      result.set(titledPaths[0]!, { title, detail: null, context: title });
+      continue;
+    }
+
+    const unresolved = new Set(titledPaths);
+    const maximumDepth = Math.max(
+      1,
+      ...titledPaths.map((path) => parentSegments(path).length),
+    );
+    for (let depth = 1; depth <= maximumDepth && unresolved.size > 0; depth++) {
+      const suffixCounts = new Map<string, number>();
+      for (const path of titledPaths) {
+        const suffix = parentSuffix(path, depth);
+        suffixCounts.set(suffix, (suffixCounts.get(suffix) ?? 0) + 1);
+      }
+      for (const path of unresolved) {
+        const suffix = parentSuffix(path, depth);
+        if (suffixCounts.get(suffix) !== 1) continue;
+        result.set(path, {
+          title,
+          detail: suffix,
+          context: `${title} · ${suffix}`,
+        });
+        unresolved.delete(path);
+      }
+    }
+    for (const path of unresolved) {
+      result.set(path, { title, detail: path, context: path });
+    }
+  }
+  return result;
+}
+
+function sectionTitle(node: ProjectedEntityNode): string {
   const trimmed = node.title?.trim();
   return trimmed === undefined || trimmed.length === 0
     ? 'Untitled section'
     : trimmed;
 }
 
-function entityDetail(node: ProjectedEntityNode): string {
-  if (node.entityKind === 'document') return node.sourcePath;
-  if (node.entityKind === 'block') return `Line ${node.sourceStartLine}`;
-  return `${node.sourcePath} · line ${node.sourceStartLine}`;
+function entityPresentations(
+  nodes: readonly ProjectedEntityNode[],
+): ReadonlyMap<string, EntityPresentation> {
+  const documents = documentPresentations(nodes);
+  const sectionsByTitle = new Map<string, ProjectedEntityNode[]>();
+  const sectionPathCountsByTitle = new Map<string, Map<string, number>>();
+  for (const node of nodes) {
+    if (node.entityKind !== 'section') continue;
+    const title = sectionTitle(node);
+    const sections = sectionsByTitle.get(title) ?? [];
+    sections.push(node);
+    sectionsByTitle.set(title, sections);
+    const pathCounts = sectionPathCountsByTitle.get(title) ?? new Map();
+    pathCounts.set(node.sourcePath, (pathCounts.get(node.sourcePath) ?? 0) + 1);
+    sectionPathCountsByTitle.set(title, pathCounts);
+  }
+
+  const result = new Map<string, EntityPresentation>();
+  for (const node of nodes) {
+    const document = documents.get(node.sourcePath) ?? {
+      title: documentName(node.sourcePath),
+      detail: null,
+      context: documentName(node.sourcePath),
+    };
+    if (node.entityKind === 'document') {
+      result.set(node.id, { title: document.title, detail: document.detail });
+      continue;
+    }
+    if (node.entityKind === 'block') {
+      result.set(node.id, {
+        title: `Line ${node.sourceStartLine}`,
+        detail: document.context,
+      });
+      continue;
+    }
+
+    const title = sectionTitle(node);
+    const collisions = sectionsByTitle.get(title) ?? [];
+    if (collisions.length === 1) {
+      result.set(node.id, { title, detail: null });
+      continue;
+    }
+    const sameDocumentCount =
+      sectionPathCountsByTitle.get(title)?.get(node.sourcePath) ?? 0;
+    result.set(node.id, {
+      title,
+      detail:
+        sameDocumentCount > 1
+          ? `${document.context} · line ${node.sourceStartLine}`
+          : document.context,
+    });
+  }
+  return result;
 }
 
 function mapEntityNode(
   node: ProjectedEntityNode,
+  presentation: EntityPresentation,
   expandedEntityIds: ReadonlySet<string>,
   visibleParentNodeIds: ReadonlySet<string>,
   visibleDescendantCount: number,
 ): EntityFlowNode {
   const dimensions = ENTITY_NODE_DIMENSIONS[node.entityKind];
   const typeLabel = ENTITY_TYPE_LABELS[node.entityKind];
-  const title = entityTitle(node);
+  const { detail, title } = presentation;
   const isExpanded =
     expandedEntityIds.has(node.entityId) || visibleParentNodeIds.has(node.id);
   const disclosure = node.hasHiddenChildren
     ? `${node.hiddenDescendantCount} hidden descendant${node.hiddenDescendantCount === 1 ? '' : 's'}`
     : 'No hidden descendants';
-  const ariaLabel = `${typeLabel} ${title}, ${entityDetail(node)}, ${disclosure}`;
+  const sourceLocation =
+    node.entityKind === 'document'
+      ? node.sourcePath
+      : `${node.sourcePath}, line ${node.sourceStartLine}`;
+  const ariaLabel = `${typeLabel} ${title}, ${sourceLocation}, ${disclosure}`;
+  const focusClass =
+    node.focusDistance === null
+      ? ''
+      : ` graph-node--focus-distance-${node.focusDistance}`;
   return {
     id: rendererNodeId(node.id),
     type: 'entity',
@@ -75,14 +208,14 @@ function mapEntityNode(
     selectable: true,
     focusable: true,
     ariaLabel,
-    className: `graph-node graph-node--${node.entityKind}`,
+    className: `graph-node graph-node--${node.entityKind} graph-node--role-${node.role}${focusClass}`,
     data: {
       projectionNodeId: node.id,
       entityId: node.entityId,
       entityKind: node.entityKind,
       typeLabel,
       title,
-      detail: entityDetail(node),
+      detail,
       sourcePath: node.sourcePath,
       sourceStartLine: node.sourceStartLine,
       role: node.role,
@@ -142,6 +275,10 @@ export function mapProjectionToReactFlow(
   mode: GraphLayoutMode,
   expandedEntityIds: ReadonlySet<string>,
 ): { readonly nodes: GraphFlowNode[]; readonly edges: GraphFlowEdge[] } {
+  const entityNodes = projection.nodes.filter(
+    (node): node is ProjectedEntityNode => node.kind === 'entity',
+  );
+  const presentationByNodeId = entityPresentations(entityNodes);
   const visibleParentNodeIds = new Set(
     projection.edges
       .filter((edge) => edge.kind === 'hierarchy')
@@ -171,6 +308,10 @@ export function mapProjectionToReactFlow(
       node.kind === 'entity'
         ? mapEntityNode(
             node,
+            presentationByNodeId.get(node.id) ?? {
+              title: documentName(node.sourcePath),
+              detail: null,
+            },
             expandedEntityIds,
             visibleParentNodeIds,
             countVisibleDescendants(node.id),

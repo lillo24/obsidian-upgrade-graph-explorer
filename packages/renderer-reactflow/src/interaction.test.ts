@@ -4,6 +4,10 @@ import { createRuntimePerformanceRecorder } from '@icarus-graph-explorer/perform
 
 import { GRAPH_EDGE_TYPES, GRAPH_NODE_TYPES } from './component-maps';
 import {
+  shouldActivateEntityFocus,
+  shouldToggleDisclosureForClick,
+} from './focus-interaction';
+import {
   applyRendererHighlight,
   applyRendererInteractionState,
 } from './highlight';
@@ -11,6 +15,55 @@ import { prepareRendererGraph } from './prepare';
 import { rendererTestProjection } from './test-fixture';
 
 describe('renderer interaction helpers', () => {
+  it('activates Focus only for non-repeating Enter on a canonical entity node', () => {
+    expect(
+      shouldActivateEntityFocus({
+        key: 'Enter',
+        repeat: false,
+        hasCanonicalEntityTarget: true,
+        originatesInControl: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldActivateEntityFocus({
+        key: 'Enter',
+        repeat: true,
+        hasCanonicalEntityTarget: true,
+        originatesInControl: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldActivateEntityFocus({
+        key: 'Enter',
+        repeat: false,
+        hasCanonicalEntityTarget: false,
+        originatesInControl: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldActivateEntityFocus({
+        key: 'Enter',
+        repeat: false,
+        hasCanonicalEntityTarget: true,
+        originatesInControl: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldActivateEntityFocus({
+        key: 'f',
+        repeat: false,
+        hasCanonicalEntityTarget: true,
+        originatesInControl: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('treats a pointer double-click as one disclosure toggle', () => {
+    expect(shouldToggleDisclosureForClick(0)).toBe(true);
+    expect(shouldToggleDisclosureForClick(1)).toBe(true);
+    expect(shouldToggleDisclosureForClick(2)).toBe(false);
+  });
+
   it('highlights the direct incident neighborhood and de-emphasizes the rest', () => {
     const graph = prepareRendererGraph(rendererTestProjection(), {
       layoutMode: 'structure',
