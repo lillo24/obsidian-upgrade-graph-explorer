@@ -19,6 +19,7 @@ import {
   createProjectionWorkspace,
   documentOnlyProjectionState,
   projectView,
+  structuralDepthProjectionState,
   topLevelSectionProjectionState,
   type ViewProjection,
   type ViewProjectionState,
@@ -257,9 +258,11 @@ function main(): void {
   }
   const documentsOnly = documentOnlyProjectionState();
   const topLevelSections = topLevelSectionProjectionState();
+  const threeStructuralLevels = structuralDepthProjectionState(3);
   const scenarioStates = {
     documentsOnly,
     topLevelSections,
+    threeStructuralLevels,
     expandedHierarchy: {
       disclosure: {
         defaultDepth: 1,

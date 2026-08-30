@@ -6,6 +6,14 @@ import {
   summarizeDiagnosticReport,
   validateObsidianDiagnosticReport,
 } from '@icarus-graph-explorer/diagnostics-obsidian';
+import {
+  createPersistedWorkspaceView,
+  serializePersistedWorkspaceView,
+} from '@icarus-graph-explorer/view-state';
+import {
+  createProjectionWorkspace,
+  documentOnlyProjectionState,
+} from '@icarus-graph-explorer/view-projection';
 
 import { App } from './App';
 import { DeveloperSettingsSection } from './components/DeveloperSettingsSection';
@@ -69,7 +77,12 @@ describe('graph-first explorer shell', () => {
     expect(markup).toContain(
       'aria-label="Forward in graph history" disabled=""',
     );
-    expect(markup).toContain('Documents');
+    expect(markup).toContain('>Files only</button>');
+    expect(markup).toContain('>1 level</button>');
+    expect(markup).toContain('>2 levels</button>');
+    expect(markup).toContain('>3 levels</button>');
+    expect(markup).not.toContain('>Documents</button>');
+    expect(markup).not.toContain('>Top-Level</button>');
     expect(markup).not.toContain('Focus Selected');
     expect(markup).not.toContain('aria-label="Focus controls"');
     expect(markup).toContain('data-focus-appearance="inverted"');
@@ -238,6 +251,38 @@ describe('graph-first explorer shell', () => {
     expect(maximizedMarkup).toContain('>Filters<');
     expect(maximizedMarkup).not.toContain('Focus Selected');
     expect(maximizedMarkup).not.toContain('aria-label="Focus controls"');
+  });
+
+  it('hydrates and exposes an exact persisted structural depth', () => {
+    const workspace = createProjectionWorkspace(report.snapshot);
+    const persisted = serializePersistedWorkspaceView(
+      createPersistedWorkspaceView({
+        workspace,
+        state: {
+          ...documentOnlyProjectionState(),
+          disclosure: {
+            ...documentOnlyProjectionState().disclosure,
+            defaultDepth: 3,
+          },
+        },
+      }),
+    );
+    const markup = renderToStaticMarkup(
+      <GraphExplorer
+        identityStability="stable"
+        maximized={false}
+        onMaximizedChange={() => undefined}
+        snapshot={report.snapshot}
+        storage={{ ...storage, getItem: () => persisted }}
+      />,
+    );
+
+    expect(markup).toContain(
+      '<button aria-pressed="true" type="button">3 levels</button>',
+    );
+    expect(markup).toContain(
+      '<button aria-pressed="false" type="button">Files only</button>',
+    );
   });
 
   it('uses one shared settings UI and hydrates the global trackpad choice', () => {

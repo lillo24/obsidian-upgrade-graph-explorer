@@ -42,7 +42,9 @@ canonical truth, or own a platform storage implementation.
 - `EntitySearch.tsx` performs bounded deferred search over the full canonical
   inspection index, independently from visible graph filters.
 - `GraphFilters.tsx` owns the controlled toolbar trigger and responsive nonmodal
-  panel for path, entity content, heading depth, and reference status. Blocks is
+  panel for path, entity content, literal Markdown Heading limit, and reference
+  status. Structure remains a separate Files only / 1 / 2 / 3 levels control.
+  Blocks is
   represented once through disclosure state; `graph-filter-count.ts` derives
   its user-visible active-group badge, while `graph-filters-overlay.ts` gives
   the panel first ownership of Escape and restores trigger focus.

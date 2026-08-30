@@ -2,6 +2,7 @@ import type { KnowledgeSnapshot } from '@icarus-graph-explorer/core';
 import {
   createProjectionWorkspace,
   documentOnlyProjectionState,
+  type StructuralDepth,
 } from '@icarus-graph-explorer/view-projection';
 import {
   createPersistedWorkspaceView,
@@ -61,7 +62,7 @@ function snapshot(workspaceId: string): KnowledgeSnapshot {
   };
 }
 
-function saved(workspaceId: string) {
+function saved(workspaceId: string, defaultDepth: StructuralDepth = 1) {
   const workspace = createProjectionWorkspace(snapshot(workspaceId));
   return createPersistedWorkspaceView({
     workspace,
@@ -69,7 +70,7 @@ function saved(workspaceId: string) {
       ...documentOnlyProjectionState(),
       disclosure: {
         ...documentOnlyProjectionState().disclosure,
-        defaultDepth: 1,
+        defaultDepth,
         maxSectionLevel: 2,
       },
     },
@@ -202,4 +203,23 @@ describe('browser saved-view storage', () => {
     expect(two.state.disclosure.maxSectionLevel).toBeUndefined();
     expect(storage.writes).toBe(0);
   });
+
+  it.each([2, 3] as const)(
+    'hydrates persisted structural depth %i without a schema migration',
+    (defaultDepth) => {
+      const storage = new MemoryStorage();
+      const value = saved('deep', defaultDepth);
+      saveWorkspaceView(storage, value);
+
+      const hydration = hydrateGraphView({
+        eligibility: 'stable',
+        storage,
+        workspace: createProjectionWorkspace(snapshot('deep')),
+      });
+
+      expect(value.schemaVersion).toBe(1);
+      expect(hydration.state.disclosure.defaultDepth).toBe(defaultDepth);
+      expect(hydration.writable).toBe(true);
+    },
+  );
 });

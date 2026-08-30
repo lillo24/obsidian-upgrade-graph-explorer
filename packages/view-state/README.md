@@ -36,9 +36,11 @@ current transient text filter and every still-valid disclosure, focus, path,
 entity-kind, reference-status, and semantic viewport choice. Missing canonical
 IDs and stale paths are removed deterministically before projection.
 
-Schema v1 accepts an optional literal Markdown heading ceiling in structural
-disclosure. New records persist it when active; older schema-v1 records without
-the field remain valid and restore as no limit. Reset/default state omits it.
+Schema v1 accepts structural `defaultDepth` values 0–3 plus an optional literal
+Markdown heading ceiling. Existing schema-v1 records using depth 0/1 or omitting
+the heading field remain valid; depth 2/3 round-trip without migration or a
+schema bump. New records persist the ceiling only when active, and reset/default
+state omits it.
 
 The production dependency boundary is core plus view-projection only. Browser
 `localStorage` is one outer adapter in `apps/web`, not part of this contract.

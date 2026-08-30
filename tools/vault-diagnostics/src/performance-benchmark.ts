@@ -37,6 +37,7 @@ import {
   createProjectionWorkspace,
   documentOnlyProjectionState,
   projectView,
+  structuralDepthProjectionState,
   topLevelSectionProjectionState,
   type ViewProjection,
   type ViewProjectionState,
@@ -254,6 +255,7 @@ function projectionStates(snapshot: KnowledgeSnapshot): Readonly<
   );
   const documentsOnly = documentOnlyProjectionState();
   const topLevel = topLevelSectionProjectionState();
+  const threeLevels = structuralDepthProjectionState(3);
   return {
     'documents-only': {
       label: 'Documents only',
@@ -263,6 +265,11 @@ function projectionStates(snapshot: KnowledgeSnapshot): Readonly<
     'top-level-sections': {
       label: 'Top-level sections',
       state: topLevel,
+      layoutMode: 'structure',
+    },
+    'three-structural-levels': {
+      label: 'Three structural section levels',
+      state: threeLevels,
       layoutMode: 'structure',
     },
     'bounded-custom-expansion': {

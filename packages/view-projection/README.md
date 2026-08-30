@@ -30,7 +30,7 @@ src/
   base-projection.ts   Endpoint routing, hierarchy, aggregation, and provenance.
   slicing.ts           Reference-hop focus and post-focus projected filters.
   validation.ts        Deserialized-output and cross-record invariant checks.
-  presets.ts           Documents-only and top-level-section state helpers.
+  presets.ts           Generic structural-depth and compatibility state helpers.
   reveal.ts            Canonical-target disclosure helper for navigation.
   project.ts           Public orchestration and one-call snapshot wrapper.
   index.ts             Intentional public surface.
@@ -71,11 +71,13 @@ and retain every exact canonical `ReferenceId`.
 
 ## Structural disclosure
 
-`defaultDepth: 0` shows documents. `defaultDepth: 1` also shows direct document
-sections regardless of their Markdown heading number. Expanding a visible
-entity reveals its immediate children; recursive disclosure requires each
-parent to be expanded. A collapsed entity remains visible but hides all of its
-descendants and takes precedence over expansion/default depth.
+`defaultDepth` uses the shared `StructuralDepth` values `0 | 1 | 2 | 3`.
+Depth 0 shows files/documents only; depths 1, 2, and 3 automatically show that
+many canonical section-tree generations. Structural generations follow
+parent/child hierarchy, not Markdown heading numbers, so an H1 → H3 → H5 chain
+is fully eligible at depth 3. Expanding a visible entity may reveal descendants
+beyond the baseline one parent at a time. A collapsed entity remains visible
+but hides all descendants and takes precedence over expansion/default depth.
 
 Optional `maxSectionLevel` is a separate literal Markdown heading ceiling using
 canonical `SectionEntity.level`. It applies to both default depth and explicit
@@ -85,8 +87,9 @@ heading endpoints continue through the same nearest-visible-ancestor roll-up
 and aggregation path as collapsed structural content.
 
 Blocks are conservative: `includeBlocks` must be true **and** the block's
-visible parent must be explicitly expanded. Default depth alone never reveals
-blocks. Collapsed disclosure metadata reports the number of descendant entity
+visible parent must be explicitly expanded. Blocks are never a structural
+generation, and default depth alone never reveals them. Collapsed disclosure
+metadata reports the number of descendant entity
 nodes that one explicit Expand action can reveal under the current structural
 and entity-filter constraints. It is the one-action visible delta, not total
 canonical subtree size. Preserved expanded descendant IDs can therefore make a

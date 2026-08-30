@@ -23,9 +23,10 @@ canonical knowledge size and the active projected renderer size.
 | medium  |       500 |    4,000 |  4,000 |              8,500 |     16,000 |
 | large   |     2,000 |   20,000 | 20,000 |             42,000 |     80,000 |
 
-Each run covers documents only, top-level sections, bounded custom expansion,
-one-hop and three-hop focus, resolution-state filtering, heading-level
-filtering, combined path/entity filtering, and a fully expanded stress view.
+Each run covers files/documents only, one structural section level, three
+structural section levels, bounded custom expansion, one-hop and three-hop
+focus, resolution-state filtering, heading-level filtering, combined
+path/entity filtering, and a fully expanded stress view.
 The stress projections contain 1,700/2,000 nodes/edges at small,
 16,500/20,000 at medium, and 82,000/100,000 at large.
 

@@ -119,10 +119,10 @@ pnpm benchmark:global-renderer -- --profile large
 ```
 
 Profiles are deterministic and measure parse/adapt, resolution, report
-construction, projection-index construction, documents-only/top-level/expanded
-projection, one-hop focus, and resolution filtering. For documents-only
-structure and one-hop focus it separately measures React Flow mapping and Dagre
-layout, then reports layout mode, node/edge counts, and any explicit layout
+construction, projection-index construction, files-only/one-level/three-level
+and expanded projection, one-hop focus, and resolution filtering. For
+files-only structure and one-hop focus it separately measures React Flow
+mapping and Dagre layout, then reports layout mode, node/edge counts, and any explicit layout
 warning. KG8 additionally measures canonical inspection-index construction, one
 global entity query, one document-subtree inspection, and one aggregated-edge
 provenance inspection with their result counts. Run small and medium for the

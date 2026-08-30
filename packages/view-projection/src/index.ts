@@ -1,7 +1,9 @@
 export {
   documentOnlyProjectionState,
+  structuralDepthProjectionState,
   topLevelSectionProjectionState,
 } from './presets';
+export { STRUCTURAL_DEPTHS } from './types';
 export { projectSnapshot, projectView } from './project';
 export { revealEntityInViewState } from './reveal';
 export type {
@@ -19,6 +21,7 @@ export type {
   ProjectionNodeId,
   ReferenceResolutionStatus,
   SectionHeadingLevel,
+  StructuralDepth,
   StructuralDisclosureState,
   ViewProjection,
   ViewProjectionFilters,
