@@ -727,6 +727,33 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/dagre-layout/**/*.{ts,tsx}'],
+    ignores: ['packages/dagre-layout/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                '@xyflow/*',
+                '@tauri-apps/*',
+                '@icarus-graph-explorer/*',
+                'node:*',
+              ],
+              message:
+                'The Dagre layout package is a stateless plain-data compute boundary; UI, application, platform, workspace, and filesystem concerns belong outside it.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['packages/stable-identity/**/*.{ts,tsx}'],
     ignores: ['packages/stable-identity/**/*.test.{ts,tsx}'],
     rules: {
@@ -952,6 +979,11 @@ export default tseslint.config(
               message: 'Renderer packages cannot depend on an application.',
             },
             {
+              name: '@dagrejs/dagre',
+              message:
+                'Dagre computation belongs exclusively to @icarus-graph-explorer/dagre-layout.',
+            },
+            {
               name: 'node:fs',
               message: 'The renderer is an in-memory projection consumer.',
             },
@@ -968,6 +1000,7 @@ export default tseslint.config(
                 '@icarus-graph-explorer/resolver-obsidian/*',
                 '@icarus-graph-explorer/diagnostics-obsidian/*',
                 '@icarus-graph-explorer/web/*',
+                '@dagrejs/*',
                 '@tauri-apps/*',
                 '@react-sigma/*',
                 'sigma/*',

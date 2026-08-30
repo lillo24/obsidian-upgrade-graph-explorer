@@ -17,12 +17,12 @@ function NodeHandles() {
 }
 
 function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
-  const toggleEntity = useEntityDisclosure();
+  const disclosure = useEntityDisclosure();
 
   function handleDisclosure(event: MouseEvent<HTMLButtonElement>): void {
     event.stopPropagation();
     if (!shouldToggleDisclosureForClick(event.detail)) return;
-    toggleEntity(data.entityId, data.isExpanded);
+    disclosure.toggle(data.entityId, data.isExpanded);
   }
 
   function keepDisclosureDoubleClickLocal(
@@ -35,7 +35,7 @@ function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
     event.stopPropagation();
     if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) {
       event.preventDefault();
-      toggleEntity(data.entityId, data.isExpanded);
+      disclosure.toggle(data.entityId, data.isExpanded);
     }
   }
 
@@ -91,6 +91,7 @@ function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
             <button
               aria-label={`${data.isExpanded ? 'Collapse' : 'Expand'} ${data.title}; ${disclosureDescription}`}
               className="entity-disclosure nodrag nopan"
+              disabled={disclosure.disabled}
               onClick={handleDisclosure}
               onDoubleClick={keepDisclosureDoubleClickLocal}
               onKeyDown={handleDisclosureKey}

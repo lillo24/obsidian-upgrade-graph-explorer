@@ -1,4 +1,4 @@
-import { layoutRendererGraph } from './layout';
+import { layoutRendererGraph } from './layout-sync';
 import { mapProjectionToReactFlow } from './mapping';
 import type { PrepareRendererGraphOptions, RendererGraph } from './types';
 import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
@@ -34,6 +34,11 @@ export function prepareRendererGraph(
 }
 
 export { layoutRendererGraph, mapProjectionToReactFlow };
+export {
+  applyRendererLayoutPositions,
+  createRendererLayoutInput,
+  fallbackRendererGraph,
+} from './layout';
 
 export type {
   GraphLayoutMode,

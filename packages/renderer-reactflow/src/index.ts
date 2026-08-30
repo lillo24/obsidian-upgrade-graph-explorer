@@ -12,14 +12,17 @@ export {
 } from './focus-interaction';
 export type { HighlightedRendererGraph } from './highlight';
 export { rendererEdgeId, rendererNodeId } from './ids';
-export { layoutRendererGraph } from './layout';
+export {
+  applyRendererLayoutPositions,
+  createRendererLayoutInput,
+  fallbackRendererGraph,
+} from './layout';
 export {
   DIAGNOSTIC_NODE_DIMENSIONS,
   ENTITY_NODE_DIMENSIONS,
   ENTITY_TYPE_LABELS,
   mapProjectionToReactFlow,
 } from './mapping';
-export { prepareRendererGraph } from './prepare';
 export { observeSemanticViewport } from './semantic-viewport';
 export type {
   RendererViewport,
@@ -49,10 +52,11 @@ export type {
   GraphFlowEdge,
   GraphFlowNode,
   GraphLayoutMode,
+  GraphLayoutMetrics,
+  GraphLayoutResult,
+  GraphLayoutService,
   GraphSelection,
   GraphViewportObservation,
-  LayoutEngine,
-  PrepareRendererGraphOptions,
   RendererGraph,
   TrackpadZoomMode,
 } from './types';

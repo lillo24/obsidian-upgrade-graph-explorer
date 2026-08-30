@@ -17,13 +17,23 @@
       "import": "./src/prepare.ts",
       "default": "./src/prepare.ts"
     },
+    "./layout": {
+      "types": "./src/layout.ts",
+      "import": "./src/layout.ts",
+      "default": "./src/layout.ts"
+    },
+    "./types": {
+      "types": "./src/types.ts",
+      "import": "./src/types.ts",
+      "default": "./src/types.ts"
+    },
     "./styles.css": "./src/styles.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@dagrejs/dagre": "3.1.1",
+    "@icarus-graph-explorer/dagre-layout": "workspace:*",
     "@icarus-graph-explorer/performance": "workspace:*",
     "@icarus-graph-explorer/view-projection": "workspace:*",
     "@xyflow/react": "12.11.5"

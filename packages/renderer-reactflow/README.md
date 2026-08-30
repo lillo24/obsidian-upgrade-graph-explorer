@@ -1,6 +1,6 @@
 # React Flow Structural Renderer
 
-Status: **STABLE — UX4C compacts node grammar without changing KG12A phase boundaries.**
+Status: **STABLE — UX4C compacts node grammar while KG12B2 delegates Dagre layout to W3.**
 
 This renderer package turns one KG6 `ViewProjection` into a deterministic,
 read-only React Flow scene. It owns renderer IDs, fixed node geometry, Dagre
@@ -12,7 +12,7 @@ reports, access files, or persist view state.
 ```text
 ViewProjection + renderer interaction state
   → one-to-one React Flow mapping
-  → deterministic Dagre coordinates
+  → plain W3 request → deterministic Dagre coordinates
   → structural or focus graph canvas
 ```
 
@@ -23,7 +23,9 @@ src/
   types.ts               Renderer data, selection, layout, and component contracts.
   ids.ts                 Collision-safe projection-to-renderer tuple IDs.
   mapping.ts             One-to-one semantic React Flow node/edge mapping.
-  layout.ts              Fixed-size Dagre layout and explicit grid fallback.
+  layout.ts              Plain layout input/result adaptation and grid fallback.
+  layout-sync.ts         Direct compute entry used only by tests and benchmarks.
+  layout-state.ts        Pure latest-generation commit/anchor state machine.
   highlight.ts           Direct incident-node/edge visual emphasis.
   focus-interaction.ts   Graph-scoped Enter-to-Focus activation policy.
   center-request.ts      Keyed projected-node viewport-center resolution.
@@ -54,6 +56,17 @@ placed deterministically beside their projected source so they do not distort
 structural ranks. Every node type has a fixed measured size. A layout exception
 becomes an explicit warning plus deterministic grid—not a success-shaped empty
 graph.
+
+Production `GraphCanvas` maps the projection on the UI thread and sends only
+plain entity geometry/topology to a caller-owned asynchronous layout service.
+The first graph waits behind an accessible **Laying out graph…** state. Later
+requests retain the last committed graph, selection, hover, and viewport while
+showing **Updating layout…**; disclosure and Fit are temporarily disabled so a
+control cannot target geometry that has not committed. Only the latest
+generation may adopt a result. Center, initial fit, saved viewport restoration,
+and disclosure anchors run only against that matching commit. A worker failure
+adopts the deterministic renderer-side grid and exposes a warning; production
+never falls back to synchronous Dagre.
 
 The graph is deliberately not an authoring surface: nodes cannot be dragged or
 connected, edges cannot be reconnected, and Delete is disabled. First render
@@ -147,11 +160,12 @@ explicit workload budget.
 
 ## Dependency boundary
 
-Production code depends only on KG6 view projection, React, React Flow, and
-Dagre. ESLint rejects canonical/core, source adapters, diagnostics, application,
+Production code depends only on KG6 view projection, React, React Flow, and the
+plain root contract of `@icarus-graph-explorer/dagre-layout`. ESLint rejects
+direct Dagre, canonical/core, source adapters, diagnostics, application,
 filesystem, platform, Sigma, and Graphology imports. The `./prepare` subpath
-exposes pure mapping and layout phases separately, so the opt-in benchmark can
-measure both without mounting React or opening a browser.
+retains direct compute only for tests and diagnostic benchmarks; it is not
+re-exported by the production package root.
 
 ## Local validation
 
