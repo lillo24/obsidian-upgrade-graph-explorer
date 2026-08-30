@@ -1,4 +1,7 @@
-import type { TrackpadZoomMode } from '@icarus-graph-explorer/renderer-reactflow';
+import type {
+  FocusAppearance,
+  TrackpadZoomMode,
+} from '@icarus-graph-explorer/renderer-reactflow';
 
 import type { StorageLike } from '../persistence/storage';
 
@@ -6,10 +9,12 @@ export const GRAPH_PREFERENCES_STORAGE_KEY =
   'icarus.graph-explorer.preferences.v1';
 
 export interface GraphPreferences {
+  readonly focusAppearance: FocusAppearance;
   readonly trackpadZoomMode: TrackpadZoomMode;
 }
 
 export const DEFAULT_GRAPH_PREFERENCES: GraphPreferences = {
+  focusAppearance: 'inverted',
   trackpadZoomMode: 'scroll-zoom',
 };
 
@@ -26,6 +31,10 @@ const SESSION_ONLY_WARNING =
 
 function isTrackpadZoomMode(value: unknown): value is TrackpadZoomMode {
   return value === 'scroll-zoom' || value === 'pinch-zoom';
+}
+
+function isFocusAppearance(value: unknown): value is FocusAppearance {
+  return value === 'outline' || value === 'inverted' || value === 'minimal';
 }
 
 function defaultLoadResult(
@@ -51,18 +60,19 @@ export function loadGraphPreferences(
 
   try {
     const parsed: unknown = JSON.parse(serialized);
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      isTrackpadZoomMode(
-        (parsed as { readonly trackpadZoomMode?: unknown }).trackpadZoomMode,
-      )
-    ) {
+    if (typeof parsed === 'object' && parsed !== null) {
+      const stored = parsed as {
+        readonly focusAppearance?: unknown;
+        readonly trackpadZoomMode?: unknown;
+      };
       return {
         preferences: {
-          trackpadZoomMode: (
-            parsed as { readonly trackpadZoomMode: TrackpadZoomMode }
-          ).trackpadZoomMode,
+          focusAppearance: isFocusAppearance(stored.focusAppearance)
+            ? stored.focusAppearance
+            : DEFAULT_GRAPH_PREFERENCES.focusAppearance,
+          trackpadZoomMode: isTrackpadZoomMode(stored.trackpadZoomMode)
+            ? stored.trackpadZoomMode
+            : DEFAULT_GRAPH_PREFERENCES.trackpadZoomMode,
         },
         warning: null,
       };

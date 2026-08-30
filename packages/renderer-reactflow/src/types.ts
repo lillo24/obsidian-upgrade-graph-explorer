@@ -17,6 +17,8 @@ export type GraphLayoutMode = DagreLayoutMode;
 
 export type TrackpadZoomMode = 'scroll-zoom' | 'pinch-zoom';
 
+export type FocusAppearance = 'outline' | 'inverted' | 'minimal';
+
 export type GraphSelection =
   | { readonly kind: 'node'; readonly id: ProjectionNodeId }
   | { readonly kind: 'edge'; readonly id: ProjectionEdgeId };
@@ -38,7 +40,7 @@ export interface EntityNodeData extends Record<string, unknown> {
   readonly entityKind: 'document' | 'section' | 'block';
   readonly typeLabel: 'File' | 'Heading' | 'Block';
   readonly title: string;
-  readonly detail: string;
+  readonly detail: string | null;
   readonly sourcePath: string;
   readonly sourceStartLine: number;
   readonly role: 'content' | 'context';
@@ -122,6 +124,7 @@ export interface GraphCanvasProps {
   readonly projection: ViewProjection;
   readonly layoutService: GraphLayoutService;
   readonly layoutMode: GraphLayoutMode;
+  readonly focusAppearance: FocusAppearance;
   readonly expandedEntityIds: readonly string[];
   readonly selection: GraphSelection | null;
   /** Disabled by default and never persisted by the renderer. */
@@ -137,5 +140,6 @@ export interface GraphCanvasProps {
     observation: GraphViewportObservation,
   ) => void;
   readonly onSelectionChange: (selection: GraphSelection | null) => void;
+  readonly onFocusEntity: (entityId: string) => void;
   readonly onToggleEntity: (entityId: string, currentlyOpen: boolean) => void;
 }

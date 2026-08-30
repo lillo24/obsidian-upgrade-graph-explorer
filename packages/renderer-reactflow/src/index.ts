@@ -6,6 +6,10 @@ export type {
 } from './center-request';
 export { GRAPH_EDGE_TYPES, GRAPH_NODE_TYPES } from './component-maps';
 export { applyRendererHighlight } from './highlight';
+export {
+  shouldActivateEntityFocus,
+  shouldToggleDisclosureForClick,
+} from './focus-interaction';
 export type { HighlightedRendererGraph } from './highlight';
 export { rendererEdgeId, rendererNodeId } from './ids';
 export {
@@ -41,6 +45,7 @@ export type {
   DiagnosticNodeData,
   EntityFlowNode,
   EntityNodeData,
+  FocusAppearance,
   GraphCanvasProps,
   GraphCenterRequest,
   GraphEdgeData,

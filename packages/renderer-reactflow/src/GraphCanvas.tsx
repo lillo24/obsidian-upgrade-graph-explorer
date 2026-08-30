@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import {
   Background,
@@ -26,6 +27,7 @@ import {
 import { GRAPH_EDGE_TYPES, GRAPH_NODE_TYPES } from './component-maps';
 import { resolveGraphCenterRequest } from './center-request';
 import { EntityDisclosureProvider } from './disclosure-context';
+import { shouldActivateEntityFocus } from './focus-interaction';
 import { applyRendererInteractionState } from './highlight';
 import {
   applyRendererLayoutPositions,
@@ -111,10 +113,12 @@ function GraphCanvasInner({
   centerRequest,
   expandedEntityIds,
   fitRequestKey,
+  focusAppearance,
   layoutMode,
   layoutService,
   maximized,
   onMaximizedChange,
+  onFocusEntity,
   onSelectionChange,
   onToggleEntity,
   onViewportObservation,
@@ -319,6 +323,14 @@ function GraphCanvasInner({
     (_event, node) =>
       onSelectionChange({ kind: 'node', id: node.data.projectionNodeId }),
     [onSelectionChange],
+  );
+  const focusNode = useCallback<NodeMouseHandler<GraphFlowNode>>(
+    (_event, node) => {
+      if (node.type !== 'entity') return;
+      onSelectionChange({ kind: 'node', id: node.data.projectionNodeId });
+      onFocusEntity(node.data.entityId);
+    },
+    [onFocusEntity, onSelectionChange],
   );
   const selectEdge = useCallback<EdgeMouseHandler<GraphFlowEdge>>(
     (_event, edge) => {
@@ -540,6 +552,42 @@ function GraphCanvasInner({
     [reportViewport],
   );
 
+  const activateFocusedNode = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const originatesInControl =
+        target.closest(
+          'button, input, select, textarea, a[href], [contenteditable]:not([contenteditable="false"])',
+        ) !== null;
+      const flowNode = target.closest('.react-flow__node');
+      const entityCard = flowNode?.querySelector<HTMLElement>(
+        '.entity-card[data-entity-id][data-projection-node-id]',
+      );
+      if (
+        !shouldActivateEntityFocus({
+          key: event.key,
+          repeat: event.repeat,
+          hasCanonicalEntityTarget:
+            entityCard !== undefined && entityCard !== null,
+          originatesInControl,
+        }) ||
+        entityCard === undefined ||
+        entityCard === null
+      ) {
+        return;
+      }
+      const entityId = entityCard.dataset.entityId;
+      const projectionNodeId = entityCard.dataset.projectionNodeId;
+      if (entityId === undefined || projectionNodeId === undefined) return;
+      event.preventDefault();
+      event.stopPropagation();
+      onSelectionChange({ kind: 'node', id: projectionNodeId });
+      onFocusEntity(entityId);
+    },
+    [onFocusEntity, onSelectionChange],
+  );
+
   if (projection.nodes.length === 0) {
     return (
       <div className="graph-empty" role="status">
@@ -553,6 +601,7 @@ function GraphCanvasInner({
     return (
       <div
         className="graph-layout-pending graph-empty"
+        data-focus-appearance={focusAppearance}
         data-trackpad-zoom-mode={trackpadZoomMode}
       >
         <div role="status" aria-live="polite">
@@ -582,7 +631,9 @@ function GraphCanvasInner({
       className="graph-canvas"
       aria-label="Projected knowledge graph"
       aria-busy={layoutPending}
+      data-focus-appearance={focusAppearance}
       data-trackpad-zoom-mode={trackpadZoomMode}
+      onKeyDownCapture={activateFocusedNode}
       ref={containerRef}
       role="region"
     >
@@ -624,6 +675,7 @@ function GraphCanvasInner({
           onEdgesChange={syncEdgeChanges}
           onInit={initializeViewport}
           onNodeClick={selectNode}
+          onNodeDoubleClick={focusNode}
           onNodeMouseEnter={hoverNode}
           onNodeMouseLeave={clearHover}
           onNodesChange={syncNodeChanges}

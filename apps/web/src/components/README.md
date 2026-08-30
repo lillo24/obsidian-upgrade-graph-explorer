@@ -15,11 +15,14 @@ canonical truth, or own a platform storage implementation.
   the canvas and the single stateful Search instance mounted across shell/live
   changes and does not re-derive graph edges or persist renderer coordinates or
   shell visibility. Maximize/restore is passed to the renderer as a narrow
-  callback so the canvas control stack remains the mode trigger.
+  callback so the canvas control stack remains the mode trigger. Inactive Focus
+  has no toolbar chrome; canonical nodes enter or retarget Focus through the
+  renderer's direct pointer/keyboard callback while selection remains intact.
 - `GraphSettings.tsx` presents the shared normal/maximized Settings popover and
-  its Graph Interaction section. It accepts narrow App-owned Source/Developer
-  presentation content without importing source providers; global gesture
-  preference storage ownership remains in `../preferences/`.
+  its Graph Appearance and Graph Interaction sections. It accepts narrow
+  App-owned Source/Developer presentation content without importing source
+  providers; global focus-root and gesture preference storage ownership remains
+  in `../preferences/`.
 - `SourceSettingsSection.tsx` presents safe current-source metadata, browser
   report/sample switching, desktop vault/rescan actions, and exceptional local
   identity recovery from callbacks owned by `App.tsx`.
@@ -68,5 +71,5 @@ blocks while `disclosure.includeBlocks` remains the sole visible opt-in.
 plan, and `report-view.ts` owns secondary evidence transformations.
 `../persistence/` owns the localStorage adapter and pre-autosave hydration; the
 source-neutral schema/reconciliation lives in `packages/view-state`.
-`../preferences/` separately owns the global trackpad preference and its
-versioned localStorage key.
+`../preferences/` separately owns global focus-root/trackpad preferences and
+their versioned localStorage key.

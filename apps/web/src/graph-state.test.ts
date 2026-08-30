@@ -70,10 +70,19 @@ describe('graph projection interaction state', () => {
       graphStateReducer(focused, { type: 'set-focus-hops', hops: 3 }),
       { type: 'set-focus-direction', direction: 'incoming' },
     );
-    const restored = graphStateReducer(directed, { type: 'exit-focus' });
+    const retargeted = graphStateReducer(directed, {
+      type: 'enter-focus',
+      entityId: 'entity-b',
+    });
+    const restored = graphStateReducer(retargeted, { type: 'exit-focus' });
 
     expect(directed.focus).toMatchObject({
       rootEntityId: 'entity-a',
+      hops: 3,
+      direction: 'incoming',
+    });
+    expect(retargeted.focus).toMatchObject({
+      rootEntityId: 'entity-b',
       hops: 3,
       direction: 'incoming',
     });
