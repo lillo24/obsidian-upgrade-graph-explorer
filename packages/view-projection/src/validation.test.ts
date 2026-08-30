@@ -87,6 +87,31 @@ describe('projection determinism and validation', () => {
     }
   });
 
+  it('rejects missing or negative actionable disclosure counts', () => {
+    const workspace = createProjectionWorkspace(projectionFixture());
+    const projection = projectView(workspace, documentOnlyProjectionState());
+    const missing = JSON.parse(JSON.stringify(projection)) as {
+      nodes: Record<string, unknown>[];
+    };
+    const missingEntity = missing.nodes.find((node) => node.kind === 'entity');
+    if (missingEntity === undefined)
+      throw new Error('Expected an entity node.');
+    delete missingEntity.revealableDescendantCount;
+
+    const negative = JSON.parse(JSON.stringify(projection)) as {
+      nodes: Record<string, unknown>[];
+    };
+    const negativeEntity = negative.nodes.find(
+      (node) => node.kind === 'entity',
+    );
+    if (negativeEntity === undefined)
+      throw new Error('Expected an entity node.');
+    negativeEntity.revealableDescendantCount = -1;
+
+    expect(validateViewProjection(workspace, missing).valid).toBe(false);
+    expect(validateViewProjection(workspace, negative).valid).toBe(false);
+  });
+
   it('does not mutate frozen canonical snapshot or view state', () => {
     const snapshot = deepFreeze(projectionFixture());
     const state = deepFreeze<ViewProjectionState>({

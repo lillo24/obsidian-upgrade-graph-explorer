@@ -5,6 +5,45 @@ import { useEntityDisclosure } from './disclosure-context';
 import { shouldToggleDisclosureForClick } from './focus-interaction';
 import type { DiagnosticFlowNode, EntityFlowNode } from './types';
 
+export interface EntityDisclosurePresentation {
+  readonly action: 'expand' | 'collapse';
+  readonly ariaLabel: string;
+  readonly count: number;
+  readonly symbol: '›' | '⌄';
+}
+
+export function entityDisclosurePresentation(
+  data: Pick<
+    EntityFlowNode['data'],
+    | 'isExpanded'
+    | 'revealableDescendantCount'
+    | 'title'
+    | 'visibleDescendantCount'
+  >,
+): EntityDisclosurePresentation | null {
+  if (data.isExpanded && data.visibleDescendantCount > 0) {
+    const noun =
+      data.visibleDescendantCount === 1 ? 'descendant' : 'descendants';
+    return {
+      action: 'collapse',
+      ariaLabel: `Collapse ${data.title}; hides ${data.visibleDescendantCount} visible ${noun}`,
+      count: data.visibleDescendantCount,
+      symbol: '⌄',
+    };
+  }
+  if (!data.isExpanded && data.revealableDescendantCount > 0) {
+    const noun =
+      data.revealableDescendantCount === 1 ? 'descendant' : 'descendants';
+    return {
+      action: 'expand',
+      ariaLabel: `Expand ${data.title}; reveals ${data.revealableDescendantCount} ${noun}`,
+      count: data.revealableDescendantCount,
+      symbol: '›',
+    };
+  }
+  return null;
+}
+
 function NodeHandles() {
   return (
     <>
@@ -18,11 +57,15 @@ function NodeHandles() {
 
 function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
   const disclosure = useEntityDisclosure();
+  const disclosurePresentation = entityDisclosurePresentation(data);
 
   function handleDisclosure(event: MouseEvent<HTMLButtonElement>): void {
     event.stopPropagation();
     if (!shouldToggleDisclosureForClick(event.detail)) return;
-    disclosure.toggle(data.entityId, data.isExpanded);
+    disclosure.toggle(
+      data.entityId,
+      disclosurePresentation?.action === 'collapse',
+    );
   }
 
   function keepDisclosureDoubleClickLocal(
@@ -35,7 +78,10 @@ function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
     event.stopPropagation();
     if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) {
       event.preventDefault();
-      disclosure.toggle(data.entityId, data.isExpanded);
+      disclosure.toggle(
+        data.entityId,
+        disclosurePresentation?.action === 'collapse',
+      );
     }
   }
 
@@ -45,17 +91,9 @@ function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
     event.stopPropagation();
   }
 
-  const disclosureCount = data.isExpanded
-    ? data.visibleDescendantCount
-    : data.hiddenDescendantCount;
-  const disclosureDescription = data.isExpanded
-    ? `${disclosureCount} visible descendants`
-    : `${disclosureCount} hidden descendants`;
   const hasFooter =
-    data.internalReferenceCount > 0 ||
-    data.hasHiddenChildren ||
-    data.isExpanded;
-  const hasDisclosure = data.hasHiddenChildren || data.isExpanded;
+    data.internalReferenceCount > 0 || disclosurePresentation !== null;
+  const hasDisclosure = disclosurePresentation !== null;
   const sourceLocation =
     data.entityKind === 'document'
       ? data.sourcePath
@@ -87,9 +125,9 @@ function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
               ↺ {data.internalReferenceCount}
             </span>
           ) : null}
-          {data.hasHiddenChildren || data.isExpanded ? (
+          {disclosurePresentation === null ? null : (
             <button
-              aria-label={`${data.isExpanded ? 'Collapse' : 'Expand'} ${data.title}; ${disclosureDescription}`}
+              aria-label={disclosurePresentation.ariaLabel}
               className="entity-disclosure nodrag nopan"
               disabled={disclosure.disabled}
               onClick={handleDisclosure}
@@ -98,10 +136,10 @@ function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
               onKeyUp={keepDisclosureKeyUpLocal}
               type="button"
             >
-              <span aria-hidden="true">{data.isExpanded ? '⌄' : '›'}</span>
-              <span>{disclosureCount}</span>
+              <span aria-hidden="true">{disclosurePresentation.symbol}</span>
+              <span>{disclosurePresentation.count}</span>
             </button>
-          ) : null}
+          )}
         </div>
       ) : null}
     </article>

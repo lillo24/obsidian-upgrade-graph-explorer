@@ -4,7 +4,7 @@ import type {
   ReferenceId,
 } from '@icarus-graph-explorer/core';
 
-import { calculateDisclosure } from './disclosure';
+import { calculateDisclosure, type DisclosureResult } from './disclosure';
 import {
   diagnosticTargetNodeId,
   entityNodeId,
@@ -88,7 +88,10 @@ function nearestVisibleParentId(
 export function buildBaseProjection(
   workspace: ProjectionWorkspace,
   state: StructuralDisclosureState,
-): ViewProjection {
+): {
+  readonly projection: ViewProjection;
+  readonly disclosure: DisclosureResult;
+} {
   const disclosure = calculateDisclosure(workspace, state);
   const visible = disclosure.visibleEntityIds;
   const routeCache = new Map<EntityId, EntityId>();
@@ -174,8 +177,6 @@ export function buildBaseProjection(
     .entities()
     .filter((entity) => visible.has(entity.id))
     .map((entity) => {
-      const hiddenDescendantCount =
-        disclosure.hiddenDescendantCountByEntityId.get(entity.id) ?? 0;
       return {
         id: entityNodeId(entity.id),
         kind: 'entity',
@@ -184,8 +185,7 @@ export function buildBaseProjection(
         sourcePath: entity.source.path,
         sourceStartLine: entity.source.span.start.line,
         title: titleOf(entity),
-        hasHiddenChildren: hiddenDescendantCount > 0,
-        hiddenDescendantCount,
+        revealableDescendantCount: 0,
         internalReferenceIds: [
           ...(internalByEntityId.get(entity.id) ?? []),
         ].sort(compareText),
@@ -235,12 +235,15 @@ export function buildBaseProjection(
   }));
 
   return {
-    nodes: ([...entityNodes, ...diagnosticNodes] as ProjectedNode[]).sort(
-      (left, right) => compareText(left.id, right.id),
-    ),
-    edges: [...hierarchyEdges, ...referenceEdges].sort((left, right) =>
-      compareText(left.id, right.id),
-    ),
-    issues: disclosure.issues,
+    projection: {
+      nodes: ([...entityNodes, ...diagnosticNodes] as ProjectedNode[]).sort(
+        (left, right) => compareText(left.id, right.id),
+      ),
+      edges: [...hierarchyEdges, ...referenceEdges].sort((left, right) =>
+        compareText(left.id, right.id),
+      ),
+      issues: disclosure.issues,
+    },
+    disclosure,
   };
 }

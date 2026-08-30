@@ -1,6 +1,6 @@
 # View Projection
 
-Status: **STABLE — UX3 heading disclosure and KG6 projection semantics are pure-test-backed.**
+Status: **STABLE — DISC1 actionable disclosure semantics are pure-test-backed.**
 
 This source-neutral package turns canonical `KnowledgeSnapshot` truth plus
 temporary renderer-independent view state into the visible graph consumed by
@@ -86,9 +86,22 @@ and aggregation path as collapsed structural content.
 
 Blocks are conservative: `includeBlocks` must be true **and** the block's
 visible parent must be explicitly expanded. Default depth alone never reveals
-blocks. Each visible entity reports how many canonical descendants remain
-structurally hidden. Filtering does not rewrite that structural disclosure
-metadata.
+blocks. Collapsed disclosure metadata reports the number of descendant entity
+nodes that one explicit Expand action can reveal under the current structural
+and entity-filter constraints. It is the one-action visible delta, not total
+canonical subtree size. Preserved expanded descendant IDs can therefore make a
+reopened branch reveal more than its immediate children.
+
+Candidate IDs stay projection-internal. The ordinary unfiltered path counts a
+single indexed structural traversal. When path, text, or entity-kind filters
+are active, one shared hypothetical disclosure/filter pass finalizes every
+visible owner's candidates together; the package never runs one full
+projection per node. Reference-status filtering does not change entity
+revealability. Because expansion can non-locally change reference endpoint
+roll-up and Focus reachability, Focus mode deliberately suppresses speculative
+Expand metadata; exact Collapse affordances remain available from the final
+visible hierarchy. Explicit expanded/collapsed intent is preserved when Blocks,
+heading limits, filters, or Focus temporarily remove its affordance.
 
 `revealEntityInViewState` opens and uncollapses the target's ancestor chain. It
 also enables blocks when the target is a block and minimally widens an existing
@@ -156,7 +169,8 @@ context never pulls unrelated references.
 
 `validateViewProjection(workspace, unknownValue)` checks plain shapes,
 deterministic ordering, unique node/edge IDs, canonical entity/reference
-membership, endpoints, entity-only hierarchy edges, non-self reference edges,
+membership, non-negative actionable reveal counts, endpoints, entity-only
+hierarchy edges, non-self reference edges,
 diagnostic candidates/provenance, focus metadata, and source-scoped tuple IDs.
 
 For every relationship that survives disclosure/focus/filter policy, its

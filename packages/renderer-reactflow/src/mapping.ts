@@ -174,18 +174,16 @@ function entityPresentations(
 function mapEntityNode(
   node: ProjectedEntityNode,
   presentation: EntityPresentation,
-  expandedEntityIds: ReadonlySet<string>,
-  visibleParentNodeIds: ReadonlySet<string>,
   visibleDescendantCount: number,
 ): EntityFlowNode {
   const dimensions = ENTITY_NODE_DIMENSIONS[node.entityKind];
   const typeLabel = ENTITY_TYPE_LABELS[node.entityKind];
   const { detail, title } = presentation;
-  const isExpanded =
-    expandedEntityIds.has(node.entityId) || visibleParentNodeIds.has(node.id);
-  const disclosure = node.hasHiddenChildren
-    ? `${node.hiddenDescendantCount} hidden descendant${node.hiddenDescendantCount === 1 ? '' : 's'}`
-    : 'No hidden descendants';
+  const isExpanded = visibleDescendantCount > 0;
+  const disclosure =
+    node.revealableDescendantCount > 0
+      ? `${node.revealableDescendantCount} descendant${node.revealableDescendantCount === 1 ? '' : 's'} can be revealed`
+      : 'No descendants can be revealed';
   const sourceLocation =
     node.entityKind === 'document'
       ? node.sourcePath
@@ -220,8 +218,7 @@ function mapEntityNode(
       sourceStartLine: node.sourceStartLine,
       role: node.role,
       focusDistance: node.focusDistance,
-      hasHiddenChildren: node.hasHiddenChildren,
-      hiddenDescendantCount: node.hiddenDescendantCount,
+      revealableDescendantCount: node.revealableDescendantCount,
       visibleDescendantCount,
       isExpanded,
       internalReferenceCount: node.internalReferenceIds.length,
@@ -273,17 +270,11 @@ function edgeHandles(mode: GraphLayoutMode) {
 export function mapProjectionToReactFlow(
   projection: ViewProjection,
   mode: GraphLayoutMode,
-  expandedEntityIds: ReadonlySet<string>,
 ): { readonly nodes: GraphFlowNode[]; readonly edges: GraphFlowEdge[] } {
   const entityNodes = projection.nodes.filter(
     (node): node is ProjectedEntityNode => node.kind === 'entity',
   );
   const presentationByNodeId = entityPresentations(entityNodes);
-  const visibleParentNodeIds = new Set(
-    projection.edges
-      .filter((edge) => edge.kind === 'hierarchy')
-      .map((edge) => edge.sourceNodeId),
-  );
   const visibleChildrenByNodeId = new Map<string, string[]>();
   for (const edge of projection.edges) {
     if (edge.kind !== 'hierarchy') continue;
@@ -312,8 +303,6 @@ export function mapProjectionToReactFlow(
               title: documentName(node.sourcePath),
               detail: null,
             },
-            expandedEntityIds,
-            visibleParentNodeIds,
             countVisibleDescendants(node.id),
           )
         : mapDiagnosticNode(node),

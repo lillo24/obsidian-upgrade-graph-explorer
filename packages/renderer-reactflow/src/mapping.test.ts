@@ -16,11 +16,7 @@ import { rendererTestProjection } from './test-fixture';
 describe('React Flow projection mapping', () => {
   it('maps each KG6 node and edge exactly once without deriving graph semantics', () => {
     const projection = rendererTestProjection();
-    const mapped = mapProjectionToReactFlow(
-      projection,
-      'structure',
-      new Set(['document-a']),
-    );
+    const mapped = mapProjectionToReactFlow(projection, 'structure');
 
     expect(mapped.nodes).toHaveLength(projection.nodes.length);
     expect(mapped.edges).toHaveLength(projection.edges.length);
@@ -33,11 +29,7 @@ describe('React Flow projection mapping', () => {
   });
 
   it('preserves disclosure, internal-link, diagnostic, and aggregation metadata', () => {
-    const mapped = mapProjectionToReactFlow(
-      rendererTestProjection(),
-      'focus',
-      new Set(['document-a']),
-    );
+    const mapped = mapProjectionToReactFlow(rendererTestProjection(), 'focus');
     const documentNode = mapped.nodes.find(
       (node) => node.data.projectionNodeId === 'projection-document',
     );
@@ -54,6 +46,7 @@ describe('React Flow projection mapping', () => {
       typeLabel: 'File',
       isExpanded: true,
       internalReferenceCount: 2,
+      revealableDescendantCount: 2,
       visibleDescendantCount: 1,
     });
     expect(diagnosticNode?.data).toMatchObject({
@@ -110,8 +103,7 @@ describe('React Flow projection mapping', () => {
       sourcePath,
       sourceStartLine,
       title,
-      hasHiddenChildren: false,
-      hiddenDescendantCount: 0,
+      revealableDescendantCount: 0,
       internalReferenceIds: [],
       role: 'content',
       focusDistance: null,
@@ -150,7 +142,7 @@ describe('React Flow projection mapping', () => {
       edges: [],
       issues: [],
     };
-    const mapped = mapProjectionToReactFlow(projection, 'structure', new Set());
+    const mapped = mapProjectionToReactFlow(projection, 'structure');
     const data = new Map(
       mapped.nodes.map((node) => [node.data.projectionNodeId, node.data]),
     );

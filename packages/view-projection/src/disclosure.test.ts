@@ -8,6 +8,27 @@ import { projectSnapshot } from './project';
 import { projectionFixture } from './test-fixture';
 import type { ProjectedEntityNode, ViewProjectionState } from './types';
 
+function fixtureWithThreeBlockChildren() {
+  const snapshot = projectionFixture();
+  const template = snapshot.entities.find(
+    (entity) => entity.kind === 'block' && entity.id === 'a-block',
+  );
+  if (template?.kind !== 'block') {
+    throw new Error('Projection fixture is missing its Block template.');
+  }
+  return {
+    ...snapshot,
+    entities: [
+      ...snapshot.entities,
+      ...['block-one', 'block-two', 'block-three'].map((id) => ({
+        ...template,
+        id,
+        parentId: 'a-deep',
+      })),
+    ],
+  };
+}
+
 function entityNodes(
   state: ViewProjectionState,
 ): readonly ProjectedEntityNode[] {
@@ -23,7 +44,7 @@ function entityIds(state: ViewProjectionState): readonly string[] {
 }
 
 describe('structural disclosure', () => {
-  it('projects documents only and reports every hidden structural descendant', () => {
+  it('reports one-action revealability instead of total hidden subtree size', () => {
     const nodes = entityNodes(documentOnlyProjectionState());
 
     expect(nodes.map((node) => node.entityId).sort()).toEqual([
@@ -32,8 +53,7 @@ describe('structural disclosure', () => {
       'doc-c',
     ]);
     expect(nodes.find((node) => node.entityId === 'doc-a')).toMatchObject({
-      hasHiddenChildren: true,
-      hiddenDescendantCount: 4,
+      revealableDescendantCount: 1,
     });
   });
 
@@ -141,6 +161,80 @@ describe('structural disclosure', () => {
     expect(entityIds(withSubsection)).toContain('a-deep');
   });
 
+  it('counts descendants restored by preserved nested expansion state', () => {
+    const state: ViewProjectionState = {
+      disclosure: {
+        defaultDepth: 0,
+        expandedEntityIds: ['doc-a', 'a-overview', 'a-detail'],
+        collapsedEntityIds: ['doc-a'],
+        includeBlocks: false,
+      },
+    };
+    const document = entityNodes(state).find(
+      (node) => node.entityId === 'doc-a',
+    );
+
+    expect(document).toMatchObject({ revealableDescendantCount: 3 });
+  });
+
+  it('counts mixed children according to Block eligibility', () => {
+    const base: ViewProjectionState = {
+      disclosure: {
+        defaultDepth: 0,
+        expandedEntityIds: ['doc-a', 'a-overview'],
+        collapsedEntityIds: [],
+        includeBlocks: false,
+      },
+    };
+    const countForDetail = (state: ViewProjectionState) =>
+      entityNodes(state).find((node) => node.entityId === 'a-detail')
+        ?.revealableDescendantCount;
+
+    expect(countForDetail(base)).toBe(1);
+    expect(
+      countForDetail({
+        ...base,
+        disclosure: { ...base.disclosure, includeBlocks: true },
+      }),
+    ).toBe(2);
+  });
+
+  it('excludes headings above the literal heading ceiling', () => {
+    const topLevel = topLevelSectionProjectionState();
+    const countForOverview = (maxSectionLevel: 2 | 3) =>
+      entityNodes({
+        ...topLevel,
+        disclosure: { ...topLevel.disclosure, maxSectionLevel },
+      }).find((node) => node.entityId === 'a-overview')
+        ?.revealableDescendantCount;
+
+    expect(countForOverview(2)).toBe(0);
+    expect(countForOverview(3)).toBe(1);
+  });
+
+  it('preserves expanded intent while a heading ceiling hides descendants', () => {
+    const limited: ViewProjectionState = {
+      disclosure: {
+        defaultDepth: 1,
+        maxSectionLevel: 2,
+        expandedEntityIds: ['a-overview'],
+        collapsedEntityIds: [],
+        includeBlocks: false,
+      },
+    };
+    const limitedOverview = entityNodes(limited).find(
+      (node) => node.entityId === 'a-overview',
+    );
+    const widened: ViewProjectionState = {
+      ...limited,
+      disclosure: { ...limited.disclosure, maxSectionLevel: 3 },
+    };
+
+    expect(limitedOverview).toMatchObject({ revealableDescendantCount: 0 });
+    expect(entityIds(widened)).toContain('a-detail');
+    expect(limited.disclosure.expandedEntityIds).toEqual(['a-overview']);
+  });
+
   it('gives collapse precedence and reports conflicting state', () => {
     const state: ViewProjectionState = {
       disclosure: {
@@ -183,6 +277,79 @@ describe('structural disclosure', () => {
         },
       }),
     ).not.toContain('a-block');
+  });
+
+  it('does not count Block-only descendants while Blocks are disabled', () => {
+    const snapshot = fixtureWithThreeBlockChildren();
+    const base: ViewProjectionState = {
+      disclosure: {
+        defaultDepth: 0,
+        expandedEntityIds: ['doc-a', 'a-overview', 'a-detail'],
+        collapsedEntityIds: [],
+        includeBlocks: false,
+      },
+    };
+    const node = projectSnapshot(snapshot, base).nodes.find(
+      (candidate): candidate is ProjectedEntityNode =>
+        candidate.kind === 'entity' && candidate.entityId === 'a-deep',
+    );
+
+    expect(node).toMatchObject({ revealableDescendantCount: 0 });
+
+    const enabled: ViewProjectionState = {
+      ...base,
+      disclosure: { ...base.disclosure, includeBlocks: true },
+    };
+    const enabledNode = projectSnapshot(snapshot, enabled).nodes.find(
+      (candidate): candidate is ProjectedEntityNode =>
+        candidate.kind === 'entity' && candidate.entityId === 'a-deep',
+    );
+    expect(enabledNode).toMatchObject({ revealableDescendantCount: 3 });
+
+    const expanded = projectSnapshot(snapshot, {
+      ...enabled,
+      disclosure: {
+        ...enabled.disclosure,
+        expandedEntityIds: [...enabled.disclosure.expandedEntityIds, 'a-deep'],
+      },
+    });
+    expect(
+      expanded.nodes
+        .flatMap((candidate) =>
+          candidate.kind === 'entity' && candidate.entityKind === 'block'
+            ? [candidate.entityId]
+            : [],
+        )
+        .filter((entityId) => entityId.startsWith('block-')),
+    ).toHaveLength(3);
+  });
+
+  it('recomputes Block revealability from each adopted live snapshot', () => {
+    const initial = fixtureWithThreeBlockChildren();
+    const updated = {
+      ...initial,
+      entities: initial.entities.filter(
+        (entity) => entity.id !== 'block-three',
+      ),
+    };
+    const state: ViewProjectionState = {
+      disclosure: {
+        defaultDepth: 0,
+        expandedEntityIds: ['doc-a', 'a-overview', 'a-detail'],
+        collapsedEntityIds: [],
+        includeBlocks: true,
+      },
+    };
+    const count = (
+      snapshot: ReturnType<typeof fixtureWithThreeBlockChildren>,
+    ) =>
+      projectSnapshot(snapshot, state).nodes.find(
+        (node): node is ProjectedEntityNode =>
+          node.kind === 'entity' && node.entityId === 'a-deep',
+      )?.revealableDescendantCount;
+
+    expect(count(initial)).toBe(3);
+    expect(count(updated)).toBe(2);
   });
 
   it('turns stale disclosure IDs into deterministic non-fatal issues', () => {

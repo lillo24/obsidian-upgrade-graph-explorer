@@ -467,8 +467,8 @@ function EntityInspector({
             },
             { label: 'Descendants', value: scoped.descendantCount },
             {
-              label: 'Structurally hidden descendants',
-              value: inspection.hiddenDescendantCount,
+              label: 'Descendants revealed by Expand',
+              value: inspection.revealableDescendantCount,
             },
             {
               label: 'Possible matches from uncertain links',

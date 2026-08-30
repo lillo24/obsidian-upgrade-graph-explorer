@@ -357,11 +357,7 @@ function projectionScenarios(
     );
     const projection = projected.lastValue;
     const mapped = repeated(options, () =>
-      mapProjectionToReactFlow(
-        projection,
-        scenario.layoutMode,
-        new Set(scenario.state.disclosure.expandedEntityIds),
-      ),
+      mapProjectionToReactFlow(projection, scenario.layoutMode),
     );
     const laidOut =
       projection.nodes.length > MAX_REPEATED_LAYOUT_NODES

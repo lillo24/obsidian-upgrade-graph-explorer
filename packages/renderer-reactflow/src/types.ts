@@ -45,8 +45,7 @@ export interface EntityNodeData extends Record<string, unknown> {
   readonly sourceStartLine: number;
   readonly role: 'content' | 'context';
   readonly focusDistance: number | null;
-  readonly hasHiddenChildren: boolean;
-  readonly hiddenDescendantCount: number;
+  readonly revealableDescendantCount: number;
   readonly visibleDescendantCount: number;
   readonly isExpanded: boolean;
   readonly internalReferenceCount: number;
@@ -84,7 +83,6 @@ export interface RendererGraph {
 
 export interface PrepareRendererGraphOptions {
   readonly layoutMode: GraphLayoutMode;
-  readonly expandedEntityIds?: readonly string[];
   readonly layoutEngine?: LayoutEngine;
   /** Optional KG12 runtime-only measurements; omitted in normal product use. */
   readonly performance?: PerformanceInstrumentation;
@@ -125,7 +123,6 @@ export interface GraphCanvasProps {
   readonly layoutService: GraphLayoutService;
   readonly layoutMode: GraphLayoutMode;
   readonly focusAppearance: FocusAppearance;
-  readonly expandedEntityIds: readonly string[];
   readonly selection: GraphSelection | null;
   /** Disabled by default and never persisted by the renderer. */
   readonly performance?: PerformanceInstrumentation;

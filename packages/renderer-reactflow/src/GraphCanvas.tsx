@@ -114,7 +114,6 @@ function RestoreGraphIcon() {
 
 function GraphCanvasInner({
   centerRequest,
-  expandedEntityIds,
   fitRequestKey,
   focusAppearance,
   layoutMode,
@@ -149,16 +148,11 @@ function GraphCanvasInner({
     INITIAL_RENDERER_LAYOUT_STATE,
   );
   const mapped = useMemo(() => {
-    const map = () =>
-      mapProjectionToReactFlow(
-        projection,
-        layoutMode,
-        new Set(expandedEntityIds),
-      );
+    const map = () => mapProjectionToReactFlow(projection, layoutMode);
     return performance === undefined
       ? map()
       : performance.measure('renderer-mapping', 'renderer-mappings', map);
-  }, [expandedEntityIds, layoutMode, performance, projection]);
+  }, [layoutMode, performance, projection]);
   const layoutInput = useMemo(
     () => createRendererLayoutInput(mapped.nodes, mapped.edges, layoutMode),
     [layoutMode, mapped.edges, mapped.nodes],

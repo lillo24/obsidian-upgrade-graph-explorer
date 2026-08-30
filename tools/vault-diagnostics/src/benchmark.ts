@@ -200,7 +200,7 @@ function measureRenderer(
   layoutMode: 'structure' | 'focus',
 ) {
   const mappingStart = performance.now();
-  const mapped = mapProjectionToReactFlow(projection, layoutMode, new Set());
+  const mapped = mapProjectionToReactFlow(projection, layoutMode);
   const mappingMs = elapsed(mappingStart);
   const layoutStart = performance.now();
   const graph = layoutRendererGraph(mapped.nodes, mapped.edges, layoutMode);

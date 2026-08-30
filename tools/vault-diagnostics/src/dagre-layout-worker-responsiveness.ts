@@ -74,11 +74,7 @@ function createProductionInput(profile: 'small' | 'medium'): {
       includeBlocks: true,
     },
   });
-  const mapped = mapProjectionToReactFlow(
-    projection,
-    'structure',
-    new Set(expandedEntityIds),
-  );
+  const mapped = mapProjectionToReactFlow(projection, 'structure');
   const input = createRendererLayoutInput(
     mapped.nodes,
     mapped.edges,

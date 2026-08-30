@@ -58,8 +58,8 @@ export interface ProjectedEntityNode {
   readonly sourcePath: WorkspacePath;
   readonly sourceStartLine: number;
   readonly title: string | null;
-  readonly hasHiddenChildren: boolean;
-  readonly hiddenDescendantCount: number;
+  /** Descendants that one explicit Expand action can reveal in the final view. */
+  readonly revealableDescendantCount: number;
   readonly internalReferenceIds: readonly ReferenceId[];
   readonly role: 'content' | 'context';
   readonly focusDistance: number | null;

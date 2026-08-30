@@ -1222,7 +1222,6 @@ export function GraphExplorer({
         >
           <GraphCanvas
             {...(centerRequest === undefined ? {} : { centerRequest })}
-            expandedEntityIds={activeViewState.disclosure.expandedEntityIds}
             fitRequestKey={fitRequestKey}
             focusAppearance={focusAppearance}
             layoutMode={

@@ -9,7 +9,6 @@ function graph(): RendererGraph {
   const mapped = mapProjectionToReactFlow(
     rendererTestProjection(),
     'structure',
-    new Set(),
   );
   return {
     nodes: mapped.nodes.map((node) => ({

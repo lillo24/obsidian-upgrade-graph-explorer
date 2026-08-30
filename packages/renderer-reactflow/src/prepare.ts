@@ -7,12 +7,7 @@ export function prepareRendererGraph(
   projection: ViewProjection,
   options: PrepareRendererGraphOptions,
 ): RendererGraph {
-  const map = () =>
-    mapProjectionToReactFlow(
-      projection,
-      options.layoutMode,
-      new Set(options.expandedEntityIds ?? []),
-    );
+  const map = () => mapProjectionToReactFlow(projection, options.layoutMode);
   const mapped =
     options.performance === undefined
       ? map()
