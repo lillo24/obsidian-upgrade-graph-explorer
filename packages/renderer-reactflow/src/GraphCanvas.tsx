@@ -25,7 +25,10 @@ import {
 } from '@xyflow/react';
 
 import { GRAPH_EDGE_TYPES, GRAPH_NODE_TYPES } from './component-maps';
-import { resolveGraphCenterRequest } from './center-request';
+import {
+  resolveGraphCenterRequest,
+  shouldApplyGraphFitRequest,
+} from './center-request';
 import { EntityDisclosureProvider } from './disclosure-context';
 import { shouldActivateEntityFocus } from './focus-interaction';
 import { applyRendererInteractionState } from './highlight';
@@ -438,17 +441,17 @@ function GraphCanvasInner({
     [layoutPending, onViewportObservation, performance, prepared],
   );
   const scheduleViewportObservation = useCallback(
-    (viewport: ReturnType<typeof getViewport>) => {
+    (viewport?: ReturnType<typeof getViewport>) => {
       if (onViewportObservation === undefined) return;
       if (viewportObservationTimer.current !== null) {
         clearTimeout(viewportObservationTimer.current);
       }
       viewportObservationTimer.current = setTimeout(() => {
         viewportObservationTimer.current = null;
-        reportViewport(viewport);
+        reportViewport(viewport ?? getViewport());
       }, GRAPH_VIEWPORT_OBSERVATION_DELAY_MS);
     },
-    [onViewportObservation, reportViewport],
+    [getViewport, onViewportObservation, reportViewport],
   );
   const fitGraph = useCallback(async () => {
     if (layoutPending || prepared === null) return;
@@ -458,10 +461,21 @@ function GraphCanvasInner({
 
   useEffect(() => {
     if (layoutPending || prepared === null) return;
-    if (previousFitRequest.current === fitRequestKey) return;
+    if (
+      !shouldApplyGraphFitRequest(
+        previousFitRequest.current,
+        fitRequestKey,
+        centerRequest,
+      )
+    ) {
+      if (centerRequest !== undefined) {
+        previousFitRequest.current = fitRequestKey;
+      }
+      return;
+    }
     previousFitRequest.current = fitRequestKey;
     void fitGraph();
-  }, [fitGraph, fitRequestKey, layoutPending, prepared]);
+  }, [centerRequest, fitGraph, fitRequestKey, layoutPending, prepared]);
 
   useEffect(
     () => () => {
@@ -698,6 +712,8 @@ function GraphCanvasInner({
           <Controls
             aria-label="Graph viewport controls"
             fitViewOptions={GRAPH_FIT_VIEW_OPTIONS}
+            onZoomIn={() => scheduleViewportObservation()}
+            onZoomOut={() => scheduleViewportObservation()}
             showFitView={false}
             showInteractive={false}
           >

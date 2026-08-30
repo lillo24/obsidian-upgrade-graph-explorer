@@ -1,6 +1,6 @@
 # Web Structural Graph Explorer
 
-Status: **STABLE — KG12B uses separate stateful W1 and stateless W3 workers.**
+Status: **STABLE — NAV1 adds semantic session history above KG9 and KG12B workers.**
 
 This package owns the browser SPA, validated KG5 report selection, Tauri-only
 live vault orchestration, KG6 graph interaction state, guarded browser persistence, graph selection, canonical
@@ -40,6 +40,8 @@ apps/web/
     performance.ts    Query-gated browser recorder and local inspection API.
     graph-state.ts    Pure disclosure/focus/filter interaction reducer.
     navigation.ts     Shared reveal/filter-widening/navigation planner.
+    navigation-history.ts Bounded session history over semantic graph checkpoints.
+    graph-history-shortcuts.ts Exact graph-context Back/Forward shortcut policy.
     persistence/      Stable-report eligibility, hydration, and localStorage adapter.
     report-view.ts    Pure reference/hierarchy presentation transformations.
     sample-report.json Deterministic private-safe report generated from fixtures.
@@ -59,6 +61,13 @@ explorer. New projections supersede active layout jobs by replacing that
 worker; an idle worker is reused. A later layout keeps the last committed graph
 interactive until the matching geometry arrives, while an initial layout shows
 an explicit progress surface.
+
+NAV1 graph history remains a web-layer session concern above KG9 view state.
+Each checkpoint contains one immutable KG6 `ViewProjectionState` reference and
+an optional canonical entity/zoom bookmark; it never contains selection, React
+Flow IDs, transforms, projections, layouts, preferences, or shell state. The
+current view remains App-owned, while bounded past/future stacks retain at most
+100 checkpoints and reconcile an entry only when traversed after a live update.
 
 Vite 8.2 client resolution includes the `browser` condition for Dedicated
 Worker builds. A worker-only pre-resolution plugin in `vite.config.ts` routes
@@ -117,6 +126,13 @@ fixed `100dvh` surface. Body scrolling is locked, and **Restore graph** or
 transient and never requests `fitView`, so selection, viewport, disclosure,
 focus, filters, and saved KG9 view state remain unchanged.
 
+Compact Back/Forward arrows start the normal graph toolbar and stay directly
+reachable beside Tools in maximized mode. `Alt+Left`/`Alt+Right` are primary;
+guarded `Ctrl+Z`/`Ctrl+Shift+Z` and Meta equivalents apply only in eligible
+graph context. Editable controls and the Settings surface retain native text
+undo, unavailable directions are not consumed, and application dialogs disable
+graph shortcuts.
+
 The Inspector is also transient and closed by default. In normal and maximized
 views, the toolbar sidebar icon or compact right-edge handle opens the same
 bounded overlay drawer without changing graph-stage width. Its chevron collapse
@@ -162,7 +178,17 @@ intent that decides whether blocks may be projected.
 Corrupt, inaccessible, or unsupported stored values are not overwritten or
 silently deleted. Writes stop after one failure. **Reset saved view** deletes
 only that workspace's view, restores documents-only defaults, clears transient
-search/selection, and fits the graph. It never resets the KG9A catalog.
+search/selection and both navigation-history stacks, and fits the graph. It
+never resets the KG9A catalog.
+
+Back/Forward history is never persisted. Meaningful Structure, disclosure,
+Focus, filter, and Search/Inspector navigation actions record the current
+semantic checkpoint; selection, hover, pan/zoom/Fit frames, Search typing,
+overlays, maximize, preferences, and live adoption do not. Entity navigation
+updates the canonical bookmark immediately at zoom `1.1`. Traversal converts a
+visible canonical anchor to a keyed projection-node center request after the
+new projection exists, or Fits when the anchor is missing/hidden. The currently
+traversed view continues through normal KG9 autosave.
 
 Live snapshot reconciliation is not localStorage hydration. It keeps surviving
 disclosure, focus, heading/block choices, filters, and semantic viewport by

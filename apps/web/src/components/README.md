@@ -8,8 +8,9 @@ canonical truth, or own a platform storage implementation.
   compact structural/focus/workspace controls, controlled Filters and Settings
   overlays, shared canonical navigation, graph selection, the transient unified
   Inspector drawer,
-  saved-view hydration/alert/reset orchestration, and semantic renderer viewport
-  requests. Across live snapshots it reconciles current KG6 state before
+  saved-view hydration/alert/reset orchestration, transient graph Back/Forward
+  checkpoints, and semantic renderer viewport requests. Across live snapshots it
+  reconciles current KG6 state before
   projection, rebuilds inspection/search indexes, preserves surviving selection
   and semantic viewport context, and safely clears missing selections. It keeps
   the canvas and the single stateful Search instance mounted across shell/live
@@ -18,6 +19,10 @@ canonical truth, or own a platform storage implementation.
   callback so the canvas control stack remains the mode trigger. Inactive Focus
   has no toolbar chrome; canonical nodes enter or retarget Focus through the
   renderer's direct pointer/keyboard callback while selection remains intact.
+- `GraphHistoryControls.tsx` owns the compact, accessible Back/Forward arrow
+  group shared by the normal toolbar and maximized floating controls. It receives
+  only availability and callbacks; graph state, semantic viewport, keyboard
+  policy, and storage remain outside the component.
 - `GraphSettings.tsx` presents the shared normal/maximized Settings popover and
   its Graph Appearance and Graph Interaction sections. It accepts narrow
   App-owned Source/Developer presentation content without importing source
@@ -67,8 +72,11 @@ serialized live transactions, pause/recovery, and watcher lifecycle.
 `graph-state.ts` owns pure KG6 interaction transitions and web-boundary
 normalization that keeps legacy entity-kind filters internally eligible for
 blocks while `disclosure.includeBlocks` remains the sole visible opt-in.
-`navigation.ts` owns the verified target-reveal
-plan, and `report-view.ts` owns secondary evidence transformations.
+`navigation-history.ts` owns the bounded, immutable session history over KG6
+state plus canonical viewport bookmarks, while `graph-history-shortcuts.ts`
+owns exact graph-context keyboard classification. `navigation.ts` owns the
+verified target-reveal plan, and `report-view.ts` owns secondary evidence
+transformations.
 `../persistence/` owns the localStorage adapter and pre-autosave hydration; the
 source-neutral schema/reconciliation lives in `packages/view-state`.
 `../preferences/` separately owns global focus-root/trackpad preferences and

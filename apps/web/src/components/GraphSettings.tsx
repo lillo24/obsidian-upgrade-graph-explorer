@@ -57,6 +57,7 @@ export const GraphSettings = memo(function GraphSettings({
         <section
           aria-labelledby="graph-settings-heading"
           className="graph-settings__popover"
+          data-graph-history-shortcuts="off"
           id="graph-settings-popover"
         >
           <div className="graph-settings__heading">
