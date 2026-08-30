@@ -51,6 +51,8 @@ reroutes or re-aggregates references. Comparing exact canonical endpoints with
 visible projected endpoints explains source/target roll-up. Hierarchy edges
 describe containment without fabricating reference provenance. Diagnostic nodes
 and edges retain raw targets, reasons, exact occurrences, and candidates.
+Projected entity inspection exposes KG6's actionable Expand count separately
+from the canonical subtree descendant count; it does not reinterpret either.
 
 Search covers canonical document basenames/paths, section titles/breadcrumbs,
 and neutral block path/line labels. It is deterministic case-insensitive exact,

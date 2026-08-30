@@ -18,7 +18,6 @@ function graphAt(documentX: number, documentY: number): RendererGraph {
   const mapped = mapProjectionToReactFlow(
     rendererTestProjection(),
     'structure',
-    new Set(),
   );
   return {
     ...mapped,

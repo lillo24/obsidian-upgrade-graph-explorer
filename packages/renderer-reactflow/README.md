@@ -1,6 +1,6 @@
 # React Flow Structural Renderer
 
-Status: **STABLE — UX4C compacts node grammar while KG12B2 delegates Dagre layout to W3.**
+Status: **STABLE — DISC1 disclosure UI and KG12B2 worker layout are test-backed.**
 
 This renderer package turns one KG6 `ViewProjection` into a deterministic,
 read-only React Flow scene. It owns renderer IDs, fixed node geometry, Dagre
@@ -99,8 +99,12 @@ cleared safely without fitting. Document cards are fixed at `200 × 80`, Section
 nodes at `184 × 72`, and Blocks at `152 × 64`. Canonical File, Heading, and Block
 kinds remain in renderer data and accessible names but are not repeated as
 visible labels. Disclosure uses a quiet `›`/`⌄` count control with an unchanged
-touch target and aria description; collapsed internal references remain a
-compact `↺ N` cue.
+44 px touch target. `› N` consumes KG6's actionable count and announces how
+many descendants Expand reveals; `⌄ N` is derived from final hierarchy edges
+and announces how many visible descendants Collapse hides. A preserved
+expanded ID with no final visible descendants renders no `⌄ 0` control, and a
+zero actionable count renders no `› 0` control. Collapsed internal references
+remain a compact `↺ N` cue.
 
 UX4C keeps single click as selection and adds a narrow `onFocusEntity(entityId)`
 boundary for double-click and graph-scoped Enter on a focused canonical entity.

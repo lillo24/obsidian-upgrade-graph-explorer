@@ -96,7 +96,7 @@ export interface ProjectedEntityInspection {
   readonly entity: EntityInspection;
   readonly role: 'content' | 'context';
   readonly focusDistance: number | null;
-  readonly hiddenDescendantCount: number;
+  readonly revealableDescendantCount: number;
   readonly internalRelationships: readonly ReferenceOccurrenceDescriptor[];
 }
 

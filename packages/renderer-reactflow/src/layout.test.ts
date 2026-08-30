@@ -51,7 +51,6 @@ describe('deterministic renderer layout', () => {
     const mapped = mapProjectionToReactFlow(
       rendererTestProjection(),
       'structure',
-      new Set(),
     );
     const failingEngine = () => {
       throw new Error('synthetic engine failure');
@@ -79,7 +78,6 @@ describe('deterministic renderer layout', () => {
     const mapped = mapProjectionToReactFlow(
       rendererTestProjection(),
       'structure',
-      new Set(),
     );
     const input = createRendererLayoutInput(
       mapped.nodes,
@@ -117,11 +115,7 @@ describe('deterministic renderer layout', () => {
   });
 
   it('keeps the deterministic grid fallback independent from Dagre', () => {
-    const mapped = mapProjectionToReactFlow(
-      rendererTestProjection(),
-      'focus',
-      new Set(),
-    );
+    const mapped = mapProjectionToReactFlow(rendererTestProjection(), 'focus');
     const first = fallbackRendererGraph(
       mapped.nodes,
       mapped.edges,

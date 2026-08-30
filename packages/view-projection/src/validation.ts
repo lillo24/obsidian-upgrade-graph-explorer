@@ -133,10 +133,9 @@ function parseEntityNode(
     Number.isInteger(value.sourceStartLine) &&
     value.sourceStartLine >= 1 &&
     (typeof value.title === 'string' || value.title === null) &&
-    typeof value.hasHiddenChildren === 'boolean' &&
-    typeof value.hiddenDescendantCount === 'number' &&
-    Number.isInteger(value.hiddenDescendantCount) &&
-    value.hiddenDescendantCount >= 0 &&
+    typeof value.revealableDescendantCount === 'number' &&
+    Number.isInteger(value.revealableDescendantCount) &&
+    value.revealableDescendantCount >= 0 &&
     (value.role === 'content' || value.role === 'context') &&
     (value.focusDistance === null ||
       (typeof value.focusDistance === 'number' &&
@@ -180,15 +179,6 @@ function parseEntityNode(
       'invalid-shape',
       `${path}.id`,
       'Entity node ID is not canonical.',
-    );
-  }
-  const hiddenDescendantCount = value.hiddenDescendantCount as number;
-  if (value.hasHiddenChildren !== hiddenDescendantCount > 0) {
-    addIssue(
-      issues,
-      'invalid-shape',
-      `${path}.hasHiddenChildren`,
-      'Hidden-child flag must agree with hiddenDescendantCount.',
     );
   }
   if (value.role === 'context' && value.focusDistance !== null) {

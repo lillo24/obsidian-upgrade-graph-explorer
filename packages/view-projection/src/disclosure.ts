@@ -5,7 +5,11 @@ import type { ProjectionIssue, StructuralDisclosureState } from './types';
 
 export interface DisclosureResult {
   readonly visibleEntityIds: ReadonlySet<EntityId>;
-  readonly hiddenDescendantCountByEntityId: ReadonlyMap<EntityId, number>;
+  /** Private candidate IDs finalized against view filters before projection output. */
+  readonly revealableDescendantIdsByEntityId: ReadonlyMap<
+    EntityId,
+    readonly EntityId[]
+  >;
   readonly issues: readonly ProjectionIssue[];
 }
 
@@ -64,6 +68,7 @@ export function calculateDisclosure(
   }
 
   const visible = new Set<EntityId>();
+  const depthByEntityId = new Map<EntityId, number>();
   const visitChildren = (parentId: EntityId, depth: number): void => {
     if (collapsed.has(parentId)) return;
     for (const child of workspace.children(parentId)) {
@@ -79,6 +84,7 @@ export function calculateDisclosure(
         (child.kind !== 'block' || state.includeBlocks);
       if (!visibleByDepth && !visibleByExpansion) continue;
       visible.add(child.id);
+      depthByEntityId.set(child.id, depth);
       visitChildren(child.id, depth + 1);
     }
   };
@@ -86,22 +92,65 @@ export function calculateDisclosure(
   for (const entity of workspace.entities()) {
     if (entity.kind !== 'document') continue;
     visible.add(entity.id);
+    depthByEntityId.set(entity.id, 0);
     visitChildren(entity.id, 1);
   }
 
-  const hiddenCounts = new Map<EntityId, number>();
+  const visibleParentIds = new Set<EntityId>();
   for (const entityId of visible) {
-    hiddenCounts.set(
-      entityId,
-      workspace
-        .descendants(entityId)
-        .filter((descendant) => !visible.has(descendant.id)).length,
+    const parent = workspace.parent(entityId);
+    if (parent !== undefined && visible.has(parent.id)) {
+      visibleParentIds.add(parent.id);
+    }
+  }
+
+  const revealableByEntityId = new Map<EntityId, readonly EntityId[]>();
+  const collectRevealableChildren = (
+    ownerId: EntityId,
+    parentId: EntityId,
+    depth: number,
+    result: EntityId[],
+  ): void => {
+    if (parentId !== ownerId && collapsed.has(parentId)) return;
+    const parentExpanded = parentId === ownerId || expanded.has(parentId);
+    for (const child of workspace.children(parentId)) {
+      const withinHeadingLimit =
+        child.kind !== 'section' ||
+        state.maxSectionLevel === undefined ||
+        child.level <= state.maxSectionLevel;
+      if (!withinHeadingLimit) continue;
+      const visibleByDepth =
+        child.kind === 'section' && depth <= state.defaultDepth;
+      const visibleByExpansion =
+        parentExpanded && (child.kind !== 'block' || state.includeBlocks);
+      if (!visibleByDepth && !visibleByExpansion) continue;
+      if (!visible.has(child.id)) result.push(child.id);
+      collectRevealableChildren(ownerId, child.id, depth + 1, result);
+    }
+  };
+
+  for (const entity of workspace.entities()) {
+    if (!visible.has(entity.id) || visibleParentIds.has(entity.id)) continue;
+
+    // When an already-expanded entity has no visible children, another Expand
+    // action cannot change disclosure state (for example, Blocks are disabled).
+    if (expanded.has(entity.id) && !collapsed.has(entity.id)) continue;
+
+    const descendants: EntityId[] = [];
+    collectRevealableChildren(
+      entity.id,
+      entity.id,
+      (depthByEntityId.get(entity.id) ?? 0) + 1,
+      descendants,
     );
+    if (descendants.length > 0) {
+      revealableByEntityId.set(entity.id, descendants);
+    }
   }
 
   return {
     visibleEntityIds: visible,
-    hiddenDescendantCountByEntityId: hiddenCounts,
+    revealableDescendantIdsByEntityId: revealableByEntityId,
     issues: issues.sort(
       (left, right) =>
         (left.code < right.code ? -1 : left.code > right.code ? 1 : 0) ||

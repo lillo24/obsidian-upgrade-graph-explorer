@@ -123,6 +123,24 @@ describe('focus projection', () => {
     expect(directChild).toMatchObject({ role: 'context', focusDistance: null });
   });
 
+  it('suppresses non-local Expand predictions while Focus is active', () => {
+    const projection = projectSnapshot(projectionFixture(), {
+      ...documentOnlyProjectionState(),
+      focus: {
+        rootEntityId: 'doc-a',
+        hops: 1,
+        direction: 'outgoing',
+        hierarchyContext: 'ancestors-and-children',
+      },
+    });
+
+    expect(
+      entityNodes(projection).every(
+        ({ revealableDescendantCount }) => revealableDescendantCount === 0,
+      ),
+    ).toBe(true);
+  });
+
   it('reports unknown and structurally hidden focus roots without crashing', () => {
     const unknown = projectSnapshot(
       projectionFixture(),
@@ -203,6 +221,45 @@ describe('projected filters', () => {
         .filter((edge) => edge.kind === 'reference')
         .some((edge) => edge.referenceIds.includes('r-b-back')),
     ).toBe(false);
+  });
+
+  it('finalizes reveal counts against entity-kind filters', () => {
+    const documentsOnly = projectSnapshot(projectionFixture(), {
+      ...documentOnlyProjectionState(),
+      filters: { entityKinds: ['document'] },
+    });
+    const documentsAndSections = projectSnapshot(projectionFixture(), {
+      ...documentOnlyProjectionState(),
+      filters: { entityKinds: ['document', 'section'] },
+    });
+    const revealCount = (projection: ViewProjection, entityId: string) =>
+      entityNodes(projection).find((node) => node.entityId === entityId)
+        ?.revealableDescendantCount;
+
+    expect(revealCount(documentsOnly, 'doc-a')).toBe(0);
+    expect(revealCount(documentsAndSections, 'doc-a')).toBe(1);
+  });
+
+  it('keeps path/text retention and reference-status filtering source-neutral', () => {
+    const path = projectSnapshot(projectionFixture(), {
+      ...documentOnlyProjectionState(),
+      filters: { pathPrefixes: ['A.md'] },
+    });
+    const text = projectSnapshot(projectionFixture(), {
+      ...documentOnlyProjectionState(),
+      filters: { text: 'A.md' },
+    });
+    const status = projectSnapshot(projectionFixture(), {
+      ...documentOnlyProjectionState(),
+      filters: { referenceStatuses: ['unresolved'] },
+    });
+    const revealCount = (projection: ViewProjection) =>
+      entityNodes(projection).find((node) => node.entityId === 'doc-a')
+        ?.revealableDescendantCount;
+
+    expect(revealCount(path)).toBe(1);
+    expect(revealCount(text)).toBe(1);
+    expect(revealCount(status)).toBe(1);
   });
 
   it('filters resolution states, clears excluded internal provenance, and removes orphan targets', () => {

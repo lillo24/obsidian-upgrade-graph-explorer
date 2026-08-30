@@ -74,7 +74,7 @@ export function inspectProjectedNode(
     entity: inspectEntity(workspace, node.entityId),
     role: node.role,
     focusDistance: node.focusDistance,
-    hiddenDescendantCount: node.hiddenDescendantCount,
+    revealableDescendantCount: node.revealableDescendantCount,
     internalRelationships: describeReferencesInSourceOrder(
       workspace,
       node.internalReferenceIds,
