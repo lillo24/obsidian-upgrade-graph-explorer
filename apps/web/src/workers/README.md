@@ -1,6 +1,6 @@
 # Desktop Workers
 
-Status: **STABLE — KG12B keeps stateful W1 and stateless W3 worker lifecycles separate.**
+Status: **STABLE — stateful W1 and stateless Structure/Global layout workers remain separate.**
 
 This folder owns browser Worker transport code. Domain state, geometry, and
 protocol behavior live in platform-independent packages; the web application
@@ -13,6 +13,9 @@ workspace-worker-client.test.ts  Fake-transport correlation and failure tests.
 dagre-layout.worker.ts       Stateless W3 request/response entry.
 dagre-layout-worker-client.ts  Lazy latest-layout-wins lifecycle and instrumentation.
 dagre-layout-worker-client.test.ts  Supersession, stale-result, failure, and reuse tests.
+global-layout.worker.ts       Stateless production Global ForceAtlas2/folder-prior entry.
+global-layout-worker-client.ts  Latest-result-wins replacement-worker client.
+global-layout-worker-client.test.ts  Supersession, malformed output, and adoption tests.
 ```
 
 The worker is instantiated only after a local-vault open starts. Sample and
@@ -29,3 +32,11 @@ actively terminates an in-flight worker and replaces it; generation and request
 guards also reject late messages. Protocol, computation, construction, clone,
 and transport failures are explicit. The renderer then uses its deterministic
 grid fallback—never synchronous Dagre on the UI thread.
+
+The Global layout worker receives only the renderer-sigma plain-data request.
+Every semantic/layout change replaces active obsolete work; request IDs and
+strict response validation prevent stale adoption. ForceAtlas2 and the selected
+soft folder prior never run on the UI thread. A worker error remains explicit
+while the last valid deterministic or committed positions stay visible. The
+worker dependency graph is DOM-free and is checked by the same Vite production
+boundary that protects W1.

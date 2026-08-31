@@ -25,10 +25,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@icarus-graph-explorer/view-projection": "workspace:*",
-    "graphology": "0.26.0",
-    "graphology-layout-forceatlas2": "0.10.1",
-    "sigma": "3.0.3"
+    "@icarus-graph-explorer/renderer-sigma": "workspace:*",
+    "@icarus-graph-explorer/view-projection": "workspace:*"
   },
   "devDependencies": {
     "vite": "8.2.2"

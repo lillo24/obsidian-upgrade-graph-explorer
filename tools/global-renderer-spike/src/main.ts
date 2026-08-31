@@ -3,13 +3,17 @@ import {
   mutateFixtureProjection,
   type GlobalFixtureProfile,
 } from './fixtures';
-import { mapProjectionToGlobal, resetDeterministicPositions } from './mapping';
-import { GlobalRendererSession } from './session';
-import type {
-  GlobalNodeAttributes,
-  GlobalRendererInput,
-  GlobalRendererMeasurement,
-} from './types';
+import { createHarnessGlobalLayoutService } from './layout-worker';
+import {
+  DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+  GlobalRendererSession,
+  mapProjectionToGlobal,
+  resetGlobalSeedPositions,
+  type GlobalNodeAttributes,
+  type GlobalRendererInput,
+  type GlobalRendererMeasurement,
+} from '@icarus-graph-explorer/renderer-sigma';
+import type { GlobalLayoutService } from '@icarus-graph-explorer/renderer-sigma/types';
 import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
 
 import './styles.css';
@@ -70,6 +74,7 @@ let profile: GlobalFixtureProfile = 'product-small';
 let projection: ViewProjection = createGlobalFixtureProjection(profile);
 let input: GlobalRendererInput = mapProjectionToGlobal(projection);
 let session: GlobalRendererSession | undefined;
+const layoutService: GlobalLayoutService = createHarnessGlobalLayoutService();
 const measurements: GlobalRendererMeasurement[] = [];
 const numberFormatter = new Intl.NumberFormat();
 
@@ -115,9 +120,15 @@ function selectionInspector(
 
 function createSession(): GlobalRendererSession {
   const created = new GlobalRendererSession(container, input, {
+    settings: DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+    trackpadZoomMode: 'scroll-zoom',
     labels: labelsInput.checked,
     edgeEvents: edgeEventsInput.checked,
-    onNodeSelected: selectionInspector,
+    onNodeSelected: (key, attributes) => {
+      if (key !== undefined && attributes !== undefined) {
+        selectionInspector(key, attributes);
+      }
+    },
   });
   void created.ready
     .then((ready) => {
@@ -259,20 +270,24 @@ async function compareUpdate(fraction: 0.01 | 0.1): Promise<SpikeSnapshot> {
   const currentSession = activeSession();
   const changedProjection = mutateFixtureProjection(projection, fraction);
   const changedInput = mapProjectionToGlobal(changedProjection);
-  const replace = currentSession.update(changedInput, 'replace');
+  let started = performance.now();
+  currentSession.replace(changedInput);
+  const replaceMs = performance.now() - started;
   record({
     operation: `${fraction * 100}%-full-replace`,
-    durationMs: replace.durationMs,
+    durationMs: replaceMs,
   });
-  currentSession.update(input, 'replace');
-  const incremental = currentSession.update(changedInput, 'incremental');
+  currentSession.replace(input);
+  started = performance.now();
+  currentSession.update(changedInput);
+  const incrementalMs = performance.now() - started;
   record({
     operation: `${fraction * 100}%-incremental`,
-    durationMs: incremental.durationMs,
+    durationMs: incrementalMs,
   });
   projection = changedProjection;
   input = changedInput;
-  status.textContent = `${fraction * 100}% update: full replacement ${replace.durationMs.toFixed(1)} ms; incremental mutation ${incremental.durationMs.toFixed(1)} ms. Stable keys retained.`;
+  status.textContent = `${fraction * 100}% update: full replacement ${replaceMs.toFixed(1)} ms; incremental mutation ${incrementalMs.toFixed(1)} ms. Stable keys retained.`;
   return snapshot();
 }
 
@@ -346,7 +361,7 @@ layoutButton.addEventListener('click', () => {
   const currentSession = activeSession();
   const iterations = currentSession.counts().nodes >= 5_000 ? 30 : 100;
   void currentSession
-    .runLayout(iterations)
+    .runLayout(layoutService, input, DEFAULT_GLOBAL_LAYOUT_SETTINGS, iterations)
     .then((measurement) => {
       record(measurement);
       status.textContent = `Worker layout completed ${iterations} iterations in ${measurement.durationMs.toFixed(1)} ms; high UI RAF gap ${measurement.highRafGapMs?.toFixed(1) ?? 'unknown'} ms.`;
@@ -356,7 +371,7 @@ layoutButton.addEventListener('click', () => {
 });
 
 resetButton.addEventListener('click', () => {
-  input = resetDeterministicPositions(input);
+  input = resetGlobalSeedPositions(input);
   activeSession().resetPositions(input);
   status.textContent =
     'Restored deterministic stable-ID seed positions. No coordinates were persisted.';

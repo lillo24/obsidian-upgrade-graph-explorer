@@ -374,3 +374,68 @@ Sigma dependency or chunk in KG13A.
 
 The full candidate architecture, accessibility cost, product-value matrix, and
 passing release Tauri gate are recorded in `docs/GLOBAL_RENDERER_DECISION.md`.
+
+## KG13B1 production Global/Regional evidence
+
+KG13B1 measures the extracted production implementation, not a fork of the
+KG13A spike. The effective product projection is documents-only and
+resolved-only unless reference-status filters were explicitly selected. The
+stress rows retain the 1k/2k, 5k/10k, and 10k/20k renderer-input envelope.
+Values below are local Windows/Node evidence recorded on 2026-08-31 and are not
+CI timing thresholds.
+
+| Profile | Product nodes/edges | Map median/p95 | Graphology build median/p95 | 1% reconcile median/p95 | Stress nodes/edges | Stress map median/p95 |
+| ------- | ------------------: | -------------: | --------------------------: | ----------------------: | -----------------: | --------------------: |
+| Small   |              100/99 | 0.217/0.299 ms |              0.102/0.121 ms |          0.067/0.139 ms |        1,000/2,000 |        1.209/1.963 ms |
+| Medium  |             500/499 | 0.745/1.562 ms |              0.208/0.437 ms |          0.239/1.050 ms |       5,000/10,000 |        8.589/9.495 ms |
+| Large   |         2,000/1,999 | 4.984/8.101 ms |              1.738/2.319 ms |          1.657/2.015 ms |      10,000/20,000 |      27.778/31.453 ms |
+
+The production bundle keeps Sigma/Graphology in the first-use Global chunk and
+ForceAtlas2 in its Worker. The extracted harness emitted 283,101 JavaScript
+bytes across two JavaScript chunks plus 4,595 CSS bytes. The ordinary web build
+emitted a 191.52 kB lazy Global chunk and an 85.07 kB Global Worker; inspection
+of the initial Structure chunk found no Sigma, Graphology, or ForceAtlas2
+module. These are uncompressed artifact sizes.
+
+### Folder-prior comparison
+
+The comparison holds semantic nodes/edges and iteration count constant. Option
+A alternates short ForceAtlas2 chunks with bounded folder adjustments. Option B
+applies one offset field after the reference layout.
+
+| Product scale | Reference-only layout | Option A layout | Option B layout | Reference / A / B within-folder distance | Reference / A / B cross-reference length |
+| ------------- | --------------------: | --------------: | --------------: | ---------------------------------------: | ---------------------------------------: |
+| 100 nodes     |               14.8 ms |          5.6 ms |          4.5 ms |                    28.42 / 27.16 / 28.42 |                    29.88 / 30.80 / 38.01 |
+| 500 nodes     |               96.0 ms |         80.0 ms |         77.6 ms |                 117.77 / 112.69 / 117.77 |                 115.93 / 118.05 / 176.30 |
+| 2,000 nodes   |              201.4 ms |        177.6 ms |        157.8 ms |                 256.93 / 248.91 / 256.93 |                 278.84 / 270.53 / 244.56 |
+
+Option A is selected for product behavior. It consistently improves
+within-folder cohesion while retaining continuously competing reference
+forces; Option B does not improve within-folder cohesion and showed much larger
+cross-reference distortion at the 100/500-node evidence points. Folder
+clustering changes positions only—Graphology semantic edge counts remain
+identical.
+
+An exact memory-cache lookup measured 0–0.002 ms. Changed settings or one
+folder assignment reused all surviving coordinates as warm seeds before
+background relaxation; mean displacement after a one-folder move was 1.13,
+1.02, and 26.24 units at 100, 500, and 2,000 nodes respectively. The cache is
+bounded, page-memory-only, and never stores canonical or source data.
+
+The deterministic Global interaction oracle requires ordinary zoom, pan,
+hover, selection, and Inspector changes to perform zero KG6 projections, zero
+Graphology reconciliation, and zero layout requests. Zoom may update reducer
+styling when its camera ratio crosses far/regional/near thresholds. Projection,
+folder assignment, settings, source topology, and explicit Re-layout are the
+only current layout triggers; the latest-only Worker terminates obsolete work.
+
+Production browser and release Tauri validation passed Global lazy activation,
+WebGL rendering, clustering Off/On, presets/Custom, far↔Regional↔near zoom,
+mouse and physical precision-touchpad input, Search/Inspector/Structure
+handoff, history/restart persistence, live folder/source updates, Rescan, and
+worker/CSP boundaries. Release QA found one camera-ordering defect: an entry
+anchor could be applied to seed positions before the background coordinates
+rendered, allowing the graph to move out of view at commit. Center/Fit requests
+now wait for Sigma's matching `afterRender`; both first-worker and exact-cache
+Structure→Global transitions passed the repeated release check without manual
+Fit.

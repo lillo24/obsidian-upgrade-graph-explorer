@@ -1082,4 +1082,49 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ['packages/renderer-sigma/**/*.{ts,tsx}'],
+    ignores: ['packages/renderer-sigma/**/*.test.{ts,tsx}'],
+    extends: [reactHooks.configs.flat.recommended],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@icarus-graph-explorer/core',
+                '@icarus-graph-explorer/core/*',
+                '@icarus-graph-explorer/adapter-obsidian',
+                '@icarus-graph-explorer/adapter-obsidian/*',
+                '@icarus-graph-explorer/resolver-obsidian',
+                '@icarus-graph-explorer/resolver-obsidian/*',
+                '@icarus-graph-explorer/diagnostics-obsidian',
+                '@icarus-graph-explorer/diagnostics-obsidian/*',
+                '@icarus-graph-explorer/workspace-engine-obsidian',
+                '@icarus-graph-explorer/workspace-engine-obsidian/*',
+                '@icarus-graph-explorer/renderer-reactflow',
+                '@icarus-graph-explorer/renderer-reactflow/*',
+                '@icarus-graph-explorer/dagre-layout',
+                '@icarus-graph-explorer/dagre-layout/*',
+                '@icarus-graph-explorer/performance',
+                '@icarus-graph-explorer/performance/*',
+                '@icarus-graph-explorer/web',
+                '@icarus-graph-explorer/web/*',
+                '@xyflow/*',
+                '@dagrejs/*',
+                '@tauri-apps/*',
+                '@react-sigma/*',
+                'obsidian-*',
+                '@obsidian/*',
+                'node:*',
+              ],
+              message:
+                'The Sigma renderer consumes KG6 projections and renderer-layer libraries only; canonical, source, platform, application, analytics, React Flow, and Dagre concerns stay outside.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );

@@ -2,6 +2,8 @@ import type { DiagnosticIdentityStability } from '@icarus-graph-explorer/diagnos
 import {
   restorePersistedWorkspaceView,
   type PersistedViewportAnchor,
+  type PersistedRendererViewports,
+  type RendererEntryMode,
   type ViewRestoreIssue,
 } from '@icarus-graph-explorer/view-state';
 import {
@@ -16,6 +18,9 @@ export type ViewPersistenceEligibility = 'stable' | 'transient' | 'legacy';
 
 export interface HydratedGraphView {
   readonly state: ViewProjectionState;
+  readonly rendererMode: RendererEntryMode;
+  readonly viewports: PersistedRendererViewports;
+  /** Compatibility alias for the Structure viewport. */
   readonly viewport?: PersistedViewportAnchor;
   readonly issues: readonly ViewRestoreIssue[];
   readonly writable: boolean;
@@ -50,6 +55,8 @@ export function hydrateGraphView({
   if (eligibility !== 'stable') {
     return {
       state: documentOnlyProjectionState(),
+      rendererMode: 'structure',
+      viewports: {},
       issues: [],
       writable: false,
       status:
@@ -61,6 +68,8 @@ export function hydrateGraphView({
   if (storage === undefined) {
     return {
       state: documentOnlyProjectionState(),
+      rendererMode: 'structure',
+      viewports: {},
       issues: [],
       writable: false,
       status:
@@ -72,6 +81,8 @@ export function hydrateGraphView({
   if (loaded.status === 'empty') {
     return {
       state: documentOnlyProjectionState(),
+      rendererMode: 'structure',
+      viewports: {},
       issues: [],
       writable: true,
       status: 'View persistence is active for this stable workspace.',
@@ -80,6 +91,8 @@ export function hydrateGraphView({
   if (loaded.status === 'error') {
     return {
       state: documentOnlyProjectionState(),
+      rendererMode: 'structure',
+      viewports: {},
       issues: [],
       writable: false,
       status: `${loaded.message} The stored value was left unchanged; use Reset saved view to remove it.`,
@@ -89,6 +102,8 @@ export function hydrateGraphView({
     const restored = restorePersistedWorkspaceView(workspace, loaded.value);
     return {
       state: restored.state,
+      rendererMode: restored.rendererMode,
+      viewports: restored.viewports,
       ...(restored.viewport === undefined
         ? {}
         : { viewport: restored.viewport }),
@@ -100,6 +115,8 @@ export function hydrateGraphView({
     const message = error instanceof Error ? error.message : String(error);
     return {
       state: documentOnlyProjectionState(),
+      rendererMode: 'structure',
+      viewports: {},
       issues: [],
       writable: false,
       status: `${message} The stored value was left unchanged; use Reset saved view to remove it.`,

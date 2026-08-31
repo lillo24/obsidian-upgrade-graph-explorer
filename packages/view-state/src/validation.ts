@@ -11,6 +11,7 @@ import {
   type PersistedViewValidationIssue,
   type PersistedViewValidationResult,
   type PersistedWorkspaceView,
+  type PersistedRendererViewports,
 } from './types';
 
 type PlainRecord = Record<string, unknown>;
@@ -286,11 +287,11 @@ function validateProjection(
   if (Object.hasOwn(value, 'filters')) validateFilters(value.filters, issues);
 }
 
-function validateViewport(
+function validateStructureViewport(
   value: unknown,
+  path: string,
   issues: PersistedViewValidationIssue[],
 ): void {
-  const path = '$.viewport';
   if (!isRecord(value)) {
     issue(issues, path, 'Expected a semantic viewport object.');
     return;
@@ -306,6 +307,44 @@ function validateViewport(
   }
 }
 
+function validateGlobalViewport(
+  value: unknown,
+  path: string,
+  issues: PersistedViewValidationIssue[],
+): void {
+  if (!isRecord(value)) {
+    issue(issues, path, 'Expected a semantic Global viewport object.');
+    return;
+  }
+  fields(value, ['anchorEntityId', 'ratio'], [], path, issues);
+  nonEmptyString(value.anchorEntityId, `${path}.anchorEntityId`, issues);
+  if (
+    typeof value.ratio !== 'number' ||
+    !Number.isFinite(value.ratio) ||
+    value.ratio <= 0
+  ) {
+    issue(issues, `${path}.ratio`, 'Expected a positive finite number.');
+  }
+}
+
+function validateViewports(
+  value: unknown,
+  issues: PersistedViewValidationIssue[],
+): void {
+  const path = '$.viewports';
+  if (!isRecord(value)) {
+    issue(issues, path, 'Expected renderer semantic viewports.');
+    return;
+  }
+  fields(value, [], ['structure', 'global'], path, issues);
+  if (Object.hasOwn(value, 'structure')) {
+    validateStructureViewport(value.structure, `${path}.structure`, issues);
+  }
+  if (Object.hasOwn(value, 'global')) {
+    validateGlobalViewport(value.global, `${path}.global`, issues);
+  }
+}
+
 export function validatePersistedWorkspaceView(
   value: unknown,
 ): PersistedViewValidationResult {
@@ -316,10 +355,41 @@ export function validatePersistedWorkspaceView(
       issues: [{ path: '$', message: 'Expected a persisted-view object.' }],
     };
   }
+  if (value.schemaVersion === 1) {
+    fields(
+      value,
+      ['schemaVersion', 'workspaceId', 'projection'],
+      ['viewport'],
+      '$',
+      issues,
+    );
+    nonEmptyString(value.workspaceId, '$.workspaceId', issues);
+    validateProjection(value.projection, issues);
+    if (Object.hasOwn(value, 'viewport')) {
+      validateStructureViewport(value.viewport, '$.viewport', issues);
+    }
+    if (issues.length > 0) return { valid: false, issues };
+    const migrated: PersistedWorkspaceView = {
+      schemaVersion: PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION,
+      workspaceId: value.workspaceId as string,
+      rendererMode: 'structure',
+      projection: value.projection as PersistedWorkspaceView['projection'],
+      ...(Object.hasOwn(value, 'viewport')
+        ? {
+            viewports: {
+              structure: value.viewport as NonNullable<
+                PersistedRendererViewports['structure']
+              >,
+            },
+          }
+        : {}),
+    };
+    return { valid: true, value: migrated, issues: [] };
+  }
   fields(
     value,
-    ['schemaVersion', 'workspaceId', 'projection'],
-    ['viewport'],
+    ['schemaVersion', 'workspaceId', 'rendererMode', 'projection'],
+    ['viewports'],
     '$',
     issues,
   );
@@ -331,9 +401,12 @@ export function validatePersistedWorkspaceView(
     );
   }
   nonEmptyString(value.workspaceId, '$.workspaceId', issues);
+  if (value.rendererMode !== 'structure' && value.rendererMode !== 'global') {
+    issue(issues, '$.rendererMode', 'Expected "structure" or "global".');
+  }
   validateProjection(value.projection, issues);
-  if (Object.hasOwn(value, 'viewport'))
-    validateViewport(value.viewport, issues);
+  if (Object.hasOwn(value, 'viewports'))
+    validateViewports(value.viewports, issues);
 
   return issues.length === 0
     ? {

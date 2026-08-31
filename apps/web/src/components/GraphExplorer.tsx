@@ -6,6 +6,7 @@ import {
   useReducer,
   useRef,
   useState,
+  type ComponentType,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
@@ -28,6 +29,9 @@ import {
   reconcileCurrentWorkspaceView,
   serializePersistedWorkspaceView,
   type PersistedViewportAnchor,
+  type PersistedGlobalViewport,
+  type PersistedRendererViewports,
+  type RendererEntryMode,
 } from '@icarus-graph-explorer/view-state';
 import {
   createProjectionWorkspace,
@@ -36,8 +40,19 @@ import {
   type ViewProjection,
   type ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
+import type {
+  GlobalCenterRequest,
+  GlobalLayoutSettings,
+  GlobalSelection,
+  SemanticGlobalViewport,
+} from '@icarus-graph-explorer/renderer-sigma/types';
 
 import { graphHistoryShortcut } from '../graph-history-shortcuts';
+import {
+  containingDocumentEntityId,
+  effectiveGlobalProjectionState,
+  withExplicitGlobalReferenceStatus,
+} from '../global-view';
 import {
   graphStateReducer,
   initialGraphState,
@@ -82,6 +97,7 @@ import {
 } from '../preferences/graph-preferences';
 import { createDagreLayoutWorkerService } from '../workers/dagre-layout-worker-client';
 import { EntitySearch } from './EntitySearch';
+import { retainGraphSelection } from './controlled-selection';
 import { GraphFilters } from './GraphFilters';
 import { GraphHistoryControls } from './GraphHistoryControls';
 import { GraphSettings } from './GraphSettings';
@@ -91,6 +107,8 @@ import {
 } from './graph-workspace-overlays';
 import { activateMaximizedGraphMode } from './maximized-graph-mode';
 import { ProvenanceInspector } from './ProvenanceInspector';
+import type { GlobalGraphViewProps } from './GlobalGraphView';
+import { useWorkerServiceDisposal } from './use-worker-service-disposal';
 
 interface ProjectionSuccess {
   readonly ok: true;
@@ -106,7 +124,8 @@ type ProjectionResult = ProjectionSuccess | ProjectionFailure;
 
 interface PendingHistoryViewportRestore {
   readonly key: number;
-  readonly viewport?: PersistedViewportAnchor;
+  readonly rendererMode: RendererEntryMode;
+  readonly viewports: PersistedRendererViewports;
 }
 
 interface SavedFilterSession {
@@ -117,6 +136,7 @@ interface SavedFilterSession {
 }
 
 const ENTITY_NAVIGATION_ZOOM = 1.1;
+const GLOBAL_NAVIGATION_RATIO = 0.32;
 
 const STRUCTURAL_DEPTH_OPTIONS = [
   { depth: 0, label: 'Files only' },
@@ -147,6 +167,53 @@ function selectionExists(
   return selection.kind === 'node'
     ? projection.nodes.some((node) => node.id === selection.id)
     : projection.edges.some((edge) => edge.id === selection.id);
+}
+
+function selectedEntityId(
+  projection: ViewProjection | undefined,
+  selection: GraphSelection | null,
+): EntityId | undefined {
+  if (projection === undefined || selection?.kind !== 'node') return undefined;
+  const node = projection.nodes.find(
+    (candidate) => candidate.id === selection.id,
+  );
+  return node?.kind === 'entity' ? node.entityId : undefined;
+}
+
+function RendererModeControl({
+  mode,
+  onChange,
+  globalUnavailable,
+}: {
+  readonly mode: RendererEntryMode;
+  readonly onChange: (mode: RendererEntryMode) => void;
+  readonly globalUnavailable?: string;
+}) {
+  return (
+    <div
+      aria-label="Graph presentation"
+      className="control-group control-group--renderer"
+      role="group"
+    >
+      <span>View</span>
+      <button
+        aria-pressed={mode === 'structure'}
+        onClick={() => onChange('structure')}
+        type="button"
+      >
+        Structure
+      </button>
+      <button
+        aria-pressed={mode === 'global'}
+        disabled={globalUnavailable !== undefined}
+        onClick={() => onChange('global')}
+        title={globalUnavailable}
+        type="button"
+      >
+        Global
+      </button>
+    </div>
+  );
 }
 
 function ToolsIcon() {
@@ -228,7 +295,7 @@ export function GraphExplorer({
         );
   }, [performance, snapshot]);
   const layoutService = useMemo(() => createDagreLayoutWorkerService(), []);
-  useEffect(() => () => layoutService.dispose(), [layoutService]);
+  useWorkerServiceDisposal(layoutService);
   const [persistenceStorage] = useState(() =>
     storage === null ? undefined : (storage ?? browserStorage()),
   );
@@ -241,6 +308,10 @@ export function GraphExplorer({
   const [focusAppearance, setFocusAppearance] = useState<FocusAppearance>(
     preferenceLoad.preferences.focusAppearance,
   );
+  const [globalLayoutSettings, setGlobalLayoutSettings] =
+    useState<GlobalLayoutSettings>(
+      preferenceLoad.preferences.globalLayoutSettings,
+    );
   const [preferenceWarning, setPreferenceWarning] = useState<
     string | undefined
   >(preferenceLoad.warning ?? undefined);
@@ -298,6 +369,13 @@ export function GraphExplorer({
   const [initialViewState] = useState(() =>
     normalizeGraphState(hydration.state),
   );
+  const [rendererMode, setRendererMode] = useState<RendererEntryMode>(
+    hydration.rendererMode,
+  );
+  const rendererModeRef = useRef(rendererMode);
+  const [globalUnavailable, setGlobalUnavailable] = useState<string>();
+  const [GlobalGraphView, setGlobalGraphView] =
+    useState<ComponentType<GlobalGraphViewProps>>();
   const legacyBlockFilterNormalized = initialViewState !== hydration.state;
   const [viewState, dispatch] = useReducer(graphStateReducer, initialViewState);
   const currentReconciliation = useMemo(
@@ -305,7 +383,7 @@ export function GraphExplorer({
     [projectionWorkspace, viewState],
   );
   const activeViewState = currentReconciliation.state;
-  const result = useMemo<ProjectionResult>(() => {
+  const structureResult = useMemo<ProjectionResult>(() => {
     try {
       return {
         ok: true,
@@ -321,16 +399,63 @@ export function GraphExplorer({
       return { ok: false, message: `Graph projection failed: ${message}` };
     }
   }, [activeViewState, performance, projectionWorkspace]);
+  const globalViewState = useMemo(
+    () => effectiveGlobalProjectionState(projectionWorkspace, activeViewState),
+    [activeViewState, projectionWorkspace],
+  );
+  const globalResult = useMemo<ProjectionResult | undefined>(() => {
+    if (rendererMode !== 'global') return undefined;
+    try {
+      const project = () => projectView(projectionWorkspace, globalViewState);
+      return {
+        ok: true,
+        projection:
+          performance === undefined
+            ? project()
+            : performance.measure(
+                'global-projection',
+                'global-projections',
+                project,
+              ),
+      };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { ok: false, message: `Global projection failed: ${message}` };
+    }
+  }, [globalViewState, performance, projectionWorkspace, rendererMode]);
+  const globalProjectionFailure =
+    rendererMode === 'global' && globalResult?.ok === false
+      ? `${globalResult.message} Structure remains available for this session.`
+      : undefined;
+  const globalFailure = globalUnavailable ?? globalProjectionFailure;
+  const effectiveRendererMode: RendererEntryMode =
+    rendererMode === 'global' && globalFailure === undefined
+      ? 'global'
+      : 'structure';
+  const result =
+    effectiveRendererMode === 'global' && globalResult !== undefined
+      ? globalResult
+      : structureResult;
+  const restoredStructureViewport = hydration.viewports.structure;
   const restoredAnchor =
-    result.ok && hydration.viewport !== undefined
-      ? result.projection.nodes.find(
+    structureResult.ok && restoredStructureViewport !== undefined
+      ? structureResult.projection.nodes.find(
           (candidate) =>
             candidate.kind === 'entity' &&
-            candidate.entityId === hydration.viewport?.anchorEntityId,
+            candidate.entityId === restoredStructureViewport.anchorEntityId,
         )
       : undefined;
   const restoredViewportHidden =
-    hydration.viewport !== undefined && restoredAnchor === undefined;
+    restoredStructureViewport !== undefined && restoredAnchor === undefined;
+  const restoredGlobalViewport = hydration.viewports.global;
+  const restoredGlobalAnchor =
+    globalResult?.ok === true && restoredGlobalViewport !== undefined
+      ? globalResult.projection.nodes.find(
+          (candidate) =>
+            candidate.kind === 'entity' &&
+            candidate.entityId === restoredGlobalViewport.anchorEntityId,
+        )
+      : undefined;
   const [selection, setSelection] = useState<GraphSelection | null>(null);
   const [fitRequestKey, setFitRequestKey] = useState(
     restoredViewportHidden ? 1 : 0,
@@ -338,25 +463,49 @@ export function GraphExplorer({
   const [centerRequest, setCenterRequest] = useState<
     GraphCenterRequest | undefined
   >(() =>
-    restoredAnchor === undefined || hydration.viewport === undefined
+    restoredAnchor === undefined || restoredStructureViewport === undefined
       ? undefined
       : {
           key: 1,
           nodeId: restoredAnchor.id,
-          zoom: hydration.viewport.zoom,
+          zoom: restoredStructureViewport.zoom,
         },
   );
   // Clearing a request must not reset its identity: the renderer remembers
   // handled keys across Fit transitions to reject stale async layout work.
   const centerRequestGeneration = useRef(centerRequest?.key ?? 0);
+  const [globalCenterRequest, setGlobalCenterRequest] = useState<
+    GlobalCenterRequest | undefined
+  >(() =>
+    restoredGlobalAnchor === undefined || restoredGlobalViewport === undefined
+      ? undefined
+      : {
+          key: 1,
+          nodeId: restoredGlobalAnchor.id,
+          ratio: restoredGlobalViewport.ratio,
+        },
+  );
+  const globalCenterRequestGeneration = useRef(globalCenterRequest?.key ?? 0);
+  const [globalFitRequestKey, setGlobalFitRequestKey] = useState(
+    rendererMode === 'global' &&
+      restoredGlobalViewport !== undefined &&
+      restoredGlobalAnchor === undefined
+      ? 1
+      : 0,
+  );
+  const [globalLayoutRequestKey, setGlobalLayoutRequestKey] = useState(0);
   const [viewportBookmark, setViewportBookmark] = useState<
     PersistedViewportAnchor | undefined
-  >(restoredViewportHidden ? undefined : hydration.viewport);
+  >(restoredViewportHidden ? undefined : restoredStructureViewport);
+  const [globalViewportBookmark, setGlobalViewportBookmark] = useState<
+    PersistedGlobalViewport | undefined
+  >(restoredGlobalAnchor === undefined ? undefined : restoredGlobalViewport);
   const [navigationHistory, setNavigationHistory] =
     useState<GraphNavigationHistory>(createGraphNavigationHistory);
   const navigationHistoryRef = useRef(navigationHistory);
   const activeViewStateRef = useRef(activeViewState);
   const viewportBookmarkRef = useRef(viewportBookmark);
+  const globalViewportBookmarkRef = useRef(globalViewportBookmark);
   const pendingHistoryViewportRestoreRef = useRef<
     PendingHistoryViewportRestore | undefined
   >(undefined);
@@ -398,9 +547,8 @@ export function GraphExplorer({
           createPersistedWorkspaceView({
             workspace: projectionWorkspace,
             state: initialViewState,
-            ...(hydration.viewport === undefined
-              ? {}
-              : { viewport: hydration.viewport }),
+            rendererMode: hydration.rendererMode,
+            viewports: hydration.viewports,
           }),
         )
       : undefined,
@@ -444,11 +592,28 @@ export function GraphExplorer({
     },
     [],
   );
+  const setGlobalSemanticViewportBookmark = useCallback(
+    (next: PersistedGlobalViewport | undefined) => {
+      globalViewportBookmarkRef.current = next;
+      setGlobalViewportBookmark(next);
+    },
+    [],
+  );
   const requestSemanticCenter = useCallback(
     (request: Omit<GraphCenterRequest, 'key'>) => {
       const key = nextGraphViewportRequestKey(centerRequestGeneration.current);
       centerRequestGeneration.current = key;
       setCenterRequest({ key, ...request });
+    },
+    [],
+  );
+  const requestGlobalSemanticCenter = useCallback(
+    (request: Omit<GlobalCenterRequest, 'key'>) => {
+      const key = nextGraphViewportRequestKey(
+        globalCenterRequestGeneration.current,
+      );
+      globalCenterRequestGeneration.current = key;
+      setGlobalCenterRequest({ key, ...request });
     },
     [],
   );
@@ -464,7 +629,16 @@ export function GraphExplorer({
     (): GraphHistoryCheckpoint =>
       createGraphHistoryCheckpoint(
         activeViewStateRef.current,
-        viewportBookmarkRef.current,
+        undefined,
+        rendererModeRef.current,
+        {
+          ...(viewportBookmarkRef.current === undefined
+            ? {}
+            : { structure: viewportBookmarkRef.current }),
+          ...(globalViewportBookmarkRef.current === undefined
+            ? {}
+            : { global: globalViewportBookmarkRef.current }),
+        },
       ),
     [],
   );
@@ -474,7 +648,17 @@ export function GraphExplorer({
       nextViewport: PersistedViewportAnchor | undefined,
     ): boolean => {
       const current = currentHistoryCheckpoint();
-      const destination = createGraphHistoryCheckpoint(nextState, nextViewport);
+      const destination = createGraphHistoryCheckpoint(
+        nextState,
+        undefined,
+        rendererModeRef.current,
+        {
+          ...(nextViewport === undefined ? {} : { structure: nextViewport }),
+          ...(globalViewportBookmarkRef.current === undefined
+            ? {}
+            : { global: globalViewportBookmarkRef.current }),
+        },
+      );
       const nextHistory = recordGraphNavigation(
         navigationHistoryRef.current,
         current,
@@ -513,20 +697,34 @@ export function GraphExplorer({
       }
       const committed = commitGraphDestination(
         nextState,
-        options.fitDestination ? undefined : viewportBookmarkRef.current,
+        options.fitDestination && rendererModeRef.current === 'structure'
+          ? undefined
+          : viewportBookmarkRef.current,
       );
-      if (committed) setCenterRequest(undefined);
+      if (committed) {
+        if (rendererModeRef.current === 'global') {
+          if (options.fitDestination) {
+            setGlobalSemanticViewportBookmark(undefined);
+            setGlobalCenterRequest(undefined);
+            setGlobalFitRequestKey((current) => current + 1);
+          }
+        } else setCenterRequest(undefined);
+      }
       return committed;
     },
-    [commitGraphDestination],
+    [commitGraphDestination, setGlobalSemanticViewportBookmark],
   );
   const requestHistoryViewportRestore = useCallback(
-    (viewport: PersistedViewportAnchor | undefined) => {
+    (
+      nextRendererMode: RendererEntryMode,
+      viewports: PersistedRendererViewports,
+    ) => {
       const request: PendingHistoryViewportRestore = {
         key: nextGraphViewportRequestKey(
           historyViewportRestoreGeneration.current,
         ),
-        ...(viewport === undefined ? {} : { viewport }),
+        rendererMode: nextRendererMode,
+        viewports,
       };
       historyViewportRestoreGeneration.current = request.key;
       pendingHistoryViewportRestoreRef.current = request;
@@ -551,16 +749,25 @@ export function GraphExplorer({
       const reconciled = reconcileCurrentWorkspaceView(
         projectionWorkspace,
         traversal.target.state,
-        traversal.target.viewport,
+        traversal.target.viewports,
       );
       replaceNavigationHistory(traversal.history);
       if (!sameGraphViewState(activeViewStateRef.current, reconciled.state)) {
         activeViewStateRef.current = reconciled.state;
         dispatch({ type: 'replace-state', state: reconciled.state });
       }
-      setSemanticViewportBookmark(reconciled.viewport);
+      const restoredSessionMode: RendererEntryMode =
+        traversal.target.rendererMode === 'global' &&
+        globalFailure !== undefined
+          ? 'structure'
+          : traversal.target.rendererMode;
+      rendererModeRef.current = restoredSessionMode;
+      setRendererMode(traversal.target.rendererMode);
+      setSemanticViewportBookmark(reconciled.viewports.structure);
+      setGlobalSemanticViewportBookmark(reconciled.viewports.global);
       setCenterRequest(undefined);
-      requestHistoryViewportRestore(reconciled.viewport);
+      setGlobalCenterRequest(undefined);
+      requestHistoryViewportRestore(restoredSessionMode, reconciled.viewports);
       setNavigationError(undefined);
       setNavigationAnnouncement(
         (direction === 'back'
@@ -568,15 +775,20 @@ export function GraphExplorer({
           : 'Went forward in graph history.') +
           (reconciled.issues.length === 0
             ? ''
-            : ' Some graph state was adjusted because the source changed.'),
+            : ' Some graph state was adjusted because the source changed.') +
+          (restoredSessionMode === traversal.target.rendererMode
+            ? ''
+            : ' Global is unavailable, so this checkpoint is shown in Structure for this session.'),
       );
       return true;
     },
     [
       currentHistoryCheckpoint,
+      globalFailure,
       projectionWorkspace,
       replaceNavigationHistory,
       requestHistoryViewportRestore,
+      setGlobalSemanticViewportBookmark,
       setSemanticViewportBookmark,
     ],
   );
@@ -610,6 +822,31 @@ export function GraphExplorer({
     [applicationOverlayOpen, traverseGraphHistory],
   );
 
+  useEffect(() => {
+    if (
+      rendererMode !== 'global' ||
+      GlobalGraphView !== undefined ||
+      globalFailure !== undefined
+    ) {
+      return;
+    }
+    let cancelled = false;
+    void import('./GlobalGraphView')
+      .then((module) => {
+        if (!cancelled) setGlobalGraphView(() => module.default);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : String(error);
+        setGlobalUnavailable(
+          `Global could not be loaded: ${message} Structure remains available for this session.`,
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [GlobalGraphView, globalFailure, rendererMode]);
+
   useLayoutEffect(() => {
     if (performance === undefined) return;
     performance.markCommit('graph-explorer-commit');
@@ -617,14 +854,22 @@ export function GraphExplorer({
 
   useLayoutEffect(() => {
     activeViewStateRef.current = activeViewState;
+    rendererModeRef.current = effectiveRendererMode;
     viewportBookmarkRef.current = viewportBookmark;
-  }, [activeViewState, viewportBookmark]);
+    globalViewportBookmarkRef.current = globalViewportBookmark;
+  }, [
+    activeViewState,
+    effectiveRendererMode,
+    globalViewportBookmark,
+    viewportBookmark,
+  ]);
 
   useEffect(() => {
     const request = pendingHistoryViewportRestore;
     if (
       request === undefined ||
       !result.ok ||
+      request.rendererMode !== effectiveRendererMode ||
       pendingHistoryViewportRestoreRef.current?.key !== request.key
     ) {
       return;
@@ -646,15 +891,34 @@ export function GraphExplorer({
           ? current
           : null,
       );
+      if (request.rendererMode === 'global') {
+        const viewport = request.viewports.global;
+        const anchor =
+          viewport === undefined
+            ? undefined
+            : result.projection.nodes.find(
+                (candidate) =>
+                  candidate.kind === 'entity' &&
+                  candidate.entityId === viewport.anchorEntityId,
+              );
+        if (viewport !== undefined && anchor !== undefined) {
+          requestGlobalSemanticCenter({
+            nodeId: anchor.id,
+            ratio: viewport.ratio,
+          });
+          return;
+        }
+        setGlobalSemanticViewportBookmark(undefined);
+        setGlobalCenterRequest(undefined);
+        setGlobalFitRequestKey((current) => current + 1);
+        return;
+      }
       const restore = planSemanticViewportRestore(
         result.projection,
-        request.viewport,
+        request.viewports.structure,
       );
       if (restore.kind === 'center') {
-        requestSemanticCenter({
-          nodeId: restore.nodeId,
-          zoom: restore.zoom,
-        });
+        requestSemanticCenter({ nodeId: restore.nodeId, zoom: restore.zoom });
         return;
       }
       setSemanticViewportBookmark(undefined);
@@ -665,9 +929,12 @@ export function GraphExplorer({
       cancelled = true;
     };
   }, [
+    effectiveRendererMode,
     pendingHistoryViewportRestore,
+    requestGlobalSemanticCenter,
     requestSemanticCenter,
     result,
+    setGlobalSemanticViewportBookmark,
     setSemanticViewportBookmark,
   ]);
 
@@ -681,7 +948,14 @@ export function GraphExplorer({
     const reconciled = reconcileCurrentWorkspaceView(
       projectionWorkspace,
       viewState,
-      viewportBookmark,
+      {
+        ...(viewportBookmark === undefined
+          ? {}
+          : { structure: viewportBookmark }),
+        ...(globalViewportBookmark === undefined
+          ? {}
+          : { global: globalViewportBookmark }),
+      },
     );
     let cancelled = false;
     queueMicrotask(() => {
@@ -691,8 +965,22 @@ export function GraphExplorer({
         activeViewStateRef.current = reconciled.state;
         dispatch({ type: 'replace-state', state: reconciled.state });
       }
+      setSemanticViewportBookmark(reconciled.viewports.structure);
+      setGlobalSemanticViewportBookmark(reconciled.viewports.global);
+      if (rendererModeRef.current === 'global') {
+        if (
+          globalViewportBookmark !== undefined &&
+          reconciled.viewports.global === undefined
+        ) {
+          setNavigationAnnouncement(
+            'The previous Global viewport anchor was removed by a live update; the current camera was preserved.',
+          );
+        }
+        return;
+      }
       if (viewportBookmark === undefined) return;
-      if (reconciled.viewport === undefined) {
+      const structureViewport = reconciled.viewports.structure;
+      if (structureViewport === undefined) {
         setSemanticViewportBookmark(undefined);
         setCenterRequest(undefined);
         setFitRequestKey((current) => current + 1);
@@ -705,7 +993,7 @@ export function GraphExplorer({
       const anchor = result.projection.nodes.find(
         (candidate) =>
           candidate.kind === 'entity' &&
-          candidate.entityId === reconciled.viewport?.anchorEntityId,
+          candidate.entityId === structureViewport.anchorEntityId,
       );
       if (anchor === undefined) {
         setSemanticViewportBookmark(undefined);
@@ -718,7 +1006,7 @@ export function GraphExplorer({
       }
       requestSemanticCenter({
         nodeId: anchor.id,
-        zoom: reconciled.viewport!.zoom,
+        zoom: structureViewport.zoom,
       });
     });
     return () => {
@@ -726,9 +1014,11 @@ export function GraphExplorer({
     };
   }, [
     clearNavigationHistory,
+    globalViewportBookmark,
     projectionWorkspace,
     requestSemanticCenter,
     result,
+    setGlobalSemanticViewportBookmark,
     setSemanticViewportBookmark,
     viewState,
     viewportBookmark,
@@ -803,9 +1093,15 @@ export function GraphExplorer({
       const persisted = createPersistedWorkspaceView({
         workspace: projectionWorkspace,
         state: activeViewState,
-        ...(viewportBookmark === undefined
-          ? {}
-          : { viewport: viewportBookmark }),
+        rendererMode,
+        viewports: {
+          ...(viewportBookmark === undefined
+            ? {}
+            : { structure: viewportBookmark }),
+          ...(globalViewportBookmark === undefined
+            ? {}
+            : { global: globalViewportBookmark }),
+        },
       });
       const serialized = serializePersistedWorkspaceView(persisted);
       if (serialized === lastSerializedView.current) return;
@@ -834,6 +1130,8 @@ export function GraphExplorer({
     persistenceStorage,
     projectionWorkspace,
     activeViewState,
+    globalViewportBookmark,
+    rendererMode,
     viewportBookmark,
   ]);
 
@@ -847,12 +1145,27 @@ export function GraphExplorer({
     [commitHistoryGraphAction],
   );
   const changeSelection = useCallback(
-    (nextSelection: GraphSelection | null) => setSelection(nextSelection),
+    (nextSelection: GraphSelection | null) =>
+      setSelection((current) => retainGraphSelection(current, nextSelection)),
     [],
   );
   const applyGraphAction = useCallback(
-    (action: GraphStateAction) => void commitHistoryGraphAction(action),
-    [commitHistoryGraphAction],
+    (action: GraphStateAction) => {
+      if (
+        rendererModeRef.current === 'global' &&
+        action.type === 'toggle-reference-status'
+      ) {
+        const nextState = withExplicitGlobalReferenceStatus(
+          activeViewStateRef.current,
+          action.status,
+          action.enabled,
+        );
+        void commitGraphDestination(nextState, viewportBookmarkRef.current);
+        return;
+      }
+      void commitHistoryGraphAction(action);
+    },
+    [commitGraphDestination, commitHistoryGraphAction],
   );
   const applySavedFilter = useCallback(
     (query: string) => {
@@ -943,6 +1256,11 @@ export function GraphExplorer({
     [persistenceStorage, savedFilterSession],
   );
   const clearSelection = useCallback(() => setSelection(null), []);
+  const changeGlobalSelection = useCallback(
+    (nextSelection: GlobalSelection | null) =>
+      setSelection((current) => retainGraphSelection(current, nextSelection)),
+    [],
+  );
   const observeViewport = useCallback(
     (observation: GraphViewportObservation) =>
       setSemanticViewportBookmark(
@@ -954,6 +1272,11 @@ export function GraphExplorer({
             },
       ),
     [setSemanticViewportBookmark],
+  );
+  const observeGlobalViewport = useCallback(
+    (observation: SemanticGlobalViewport | undefined) =>
+      setGlobalSemanticViewportBookmark(observation),
+    [setGlobalSemanticViewportBookmark],
   );
   const changeMaximized = useCallback(
     (nextMaximized: boolean) => {
@@ -967,22 +1290,37 @@ export function GraphExplorer({
       setTrackpadZoomMode(mode);
       const saved = saveGraphPreferences(persistenceStorage, {
         focusAppearance,
+        globalLayoutSettings,
         trackpadZoomMode: mode,
       });
       setPreferenceWarning(saved.ok ? undefined : saved.message);
     },
-    [focusAppearance, persistenceStorage],
+    [focusAppearance, globalLayoutSettings, persistenceStorage],
   );
   const changeFocusAppearance = useCallback(
     (appearance: FocusAppearance) => {
       setFocusAppearance(appearance);
       const saved = saveGraphPreferences(persistenceStorage, {
         focusAppearance: appearance,
+        globalLayoutSettings,
         trackpadZoomMode,
       });
       setPreferenceWarning(saved.ok ? undefined : saved.message);
     },
-    [persistenceStorage, trackpadZoomMode],
+    [globalLayoutSettings, persistenceStorage, trackpadZoomMode],
+  );
+  const changeGlobalLayoutSettings = useCallback(
+    (settings: GlobalLayoutSettings) => {
+      setGlobalLayoutSettings(settings);
+      setGlobalLayoutRequestKey((current) => current + 1);
+      const saved = saveGraphPreferences(persistenceStorage, {
+        focusAppearance,
+        globalLayoutSettings: settings,
+        trackpadZoomMode,
+      });
+      setPreferenceWarning(saved.ok ? undefined : saved.message);
+    },
+    [focusAppearance, persistenceStorage, trackpadZoomMode],
   );
   const changeSettingsOpen = useCallback((open: boolean) => {
     dispatchWorkspaceOverlay({ type: 'change-settings', open });
@@ -1019,8 +1357,197 @@ export function GraphExplorer({
     },
     [closeInspector, inspectorOpen],
   );
+  const changeRendererMode = useCallback(
+    (nextMode: RendererEntryMode) => {
+      if (
+        nextMode === rendererModeRef.current ||
+        (nextMode === 'global' && globalFailure !== undefined)
+      ) {
+        return;
+      }
+      const current = currentHistoryCheckpoint();
+      const recordModeDestination = (
+        structure: PersistedViewportAnchor | undefined,
+        global: PersistedGlobalViewport | undefined,
+      ) => {
+        const destination = createGraphHistoryCheckpoint(
+          activeViewStateRef.current,
+          undefined,
+          nextMode,
+          {
+            ...(structure === undefined ? {} : { structure }),
+            ...(global === undefined ? {} : { global }),
+          },
+        );
+        replaceNavigationHistory(
+          recordGraphNavigation(
+            navigationHistoryRef.current,
+            current,
+            destination,
+          ),
+        );
+      };
+      cancelPendingHistoryViewportRestore();
+
+      const selected = selectedEntityId(projection, selection);
+      if (nextMode === 'global') {
+        const selectedDocument =
+          selected === undefined
+            ? undefined
+            : containingDocumentEntityId(projectionWorkspace, selected);
+        const structureAnchorDocument =
+          viewportBookmarkRef.current === undefined
+            ? undefined
+            : containingDocumentEntityId(
+                projectionWorkspace,
+                viewportBookmarkRef.current.anchorEntityId,
+              );
+        const anchorEntityId =
+          selectedDocument ??
+          structureAnchorDocument ??
+          globalViewportBookmarkRef.current?.anchorEntityId;
+        const projectGlobalDestination = () =>
+          projectView(
+            projectionWorkspace,
+            effectiveGlobalProjectionState(
+              projectionWorkspace,
+              activeViewStateRef.current,
+            ),
+          );
+        const nextProjection =
+          performance === undefined
+            ? projectGlobalDestination()
+            : performance.measure(
+                'global-projection',
+                'global-projections',
+                projectGlobalDestination,
+              );
+        const candidate = nextProjection.nodes.find(
+          (candidate) =>
+            candidate.kind === 'entity' &&
+            candidate.entityId === anchorEntityId,
+        );
+        rendererModeRef.current = 'global';
+        setRendererMode('global');
+        if (candidate === undefined || candidate.kind !== 'entity') {
+          recordModeDestination(viewportBookmarkRef.current, undefined);
+          setSelection(null);
+          setGlobalCenterRequest(undefined);
+          setGlobalFitRequestKey((value) => value + 1);
+        } else {
+          const node = candidate;
+          const savedGlobalViewport = globalViewportBookmarkRef.current;
+          const viewport = {
+            anchorEntityId: node.entityId,
+            ratio:
+              savedGlobalViewport?.anchorEntityId === node.entityId
+                ? savedGlobalViewport.ratio
+                : GLOBAL_NAVIGATION_RATIO,
+          } satisfies PersistedGlobalViewport;
+          recordModeDestination(viewportBookmarkRef.current, viewport);
+          setGlobalSemanticViewportBookmark(viewport);
+          setSelection({ kind: 'node', id: node.id });
+          requestGlobalSemanticCenter({
+            nodeId: node.id,
+            ratio: viewport.ratio,
+          });
+        }
+        setNavigationAnnouncement(
+          'Opened Global overview. Zoom changes visual detail without changing graph topology or layout.',
+        );
+        return;
+      }
+
+      const selectedDocument =
+        selected === undefined
+          ? undefined
+          : containingDocumentEntityId(projectionWorkspace, selected);
+      const anchorEntityId =
+        selectedDocument ??
+        globalViewportBookmarkRef.current?.anchorEntityId ??
+        viewportBookmarkRef.current?.anchorEntityId;
+      const candidate = structureResult.ok
+        ? structureResult.projection.nodes.find(
+            (candidate) =>
+              candidate.kind === 'entity' &&
+              candidate.entityId === anchorEntityId,
+          )
+        : undefined;
+      rendererModeRef.current = 'structure';
+      setRendererMode('structure');
+      if (candidate === undefined || candidate.kind !== 'entity') {
+        recordModeDestination(undefined, globalViewportBookmarkRef.current);
+        setSelection(null);
+        setCenterRequest(undefined);
+        setFitRequestKey((value) => value + 1);
+      } else {
+        const node = candidate;
+        const savedStructureViewport = viewportBookmarkRef.current;
+        const viewport = {
+          anchorEntityId: node.entityId,
+          zoom:
+            savedStructureViewport?.anchorEntityId === node.entityId
+              ? savedStructureViewport.zoom
+              : ENTITY_NAVIGATION_ZOOM,
+        } satisfies PersistedViewportAnchor;
+        recordModeDestination(viewport, globalViewportBookmarkRef.current);
+        setSemanticViewportBookmark(viewport);
+        setSelection({ kind: 'node', id: node.id });
+        requestSemanticCenter({ nodeId: node.id, zoom: viewport.zoom });
+      }
+      setNavigationAnnouncement(
+        'Opened Structure at the current file context.',
+      );
+    },
+    [
+      cancelPendingHistoryViewportRestore,
+      currentHistoryCheckpoint,
+      globalFailure,
+      performance,
+      projection,
+      projectionWorkspace,
+      replaceNavigationHistory,
+      requestGlobalSemanticCenter,
+      requestSemanticCenter,
+      selection,
+      setGlobalSemanticViewportBookmark,
+      setSemanticViewportBookmark,
+      structureResult,
+    ],
+  );
   const navigateToEntity = useCallback(
     (entityId: EntityId, origin: string) => {
+      const target = projectionWorkspace.entity(entityId);
+      if (rendererModeRef.current === 'global' && target?.kind === 'document') {
+        const node = globalResult?.ok
+          ? globalResult.projection.nodes.find(
+              (candidate) =>
+                candidate.kind === 'entity' && candidate.entityId === entityId,
+            )
+          : undefined;
+        if (node === undefined) {
+          setNavigationError(
+            `${origin}: the document is hidden by the current Global filters.`,
+          );
+          return;
+        }
+        const viewport = {
+          anchorEntityId: entityId,
+          ratio: GLOBAL_NAVIGATION_RATIO,
+        } satisfies PersistedGlobalViewport;
+        setGlobalSemanticViewportBookmark(viewport);
+        setSelection({ kind: 'node', id: node.id });
+        requestGlobalSemanticCenter({
+          nodeId: node.id,
+          ratio: viewport.ratio,
+        });
+        setNavigationError(undefined);
+        setNavigationAnnouncement(`${origin}: centered the file in Global.`);
+        return;
+      }
+      if (rendererModeRef.current === 'global') {
+        changeRendererMode('structure');
+      }
       const plan = planEntityNavigation(
         projectionWorkspace,
         activeViewStateRef.current,
@@ -1047,9 +1574,13 @@ export function GraphExplorer({
     },
     [
       cancelPendingHistoryViewportRestore,
+      changeRendererMode,
       commitGraphDestination,
+      globalResult,
       projectionWorkspace,
+      requestGlobalSemanticCenter,
       requestSemanticCenter,
+      setGlobalSemanticViewportBookmark,
       setSemanticViewportBookmark,
     ],
   );
@@ -1135,16 +1666,23 @@ export function GraphExplorer({
       createPersistedWorkspaceView({
         workspace: projectionWorkspace,
         state: defaults,
+        rendererMode: 'structure',
+        viewports: {},
       }),
     );
     clearNavigationHistory();
     dispatch({ type: 'reset-view' });
     activeViewStateRef.current = defaults;
     setSelection(null);
+    rendererModeRef.current = 'structure';
+    setRendererMode('structure');
     setCenterRequest(undefined);
+    setGlobalCenterRequest(undefined);
     setSemanticViewportBookmark(undefined);
+    setGlobalSemanticViewportBookmark(undefined);
     setTransientResetKey((current) => current + 1);
     setFitRequestKey((current) => current + 1);
+    setGlobalFitRequestKey((current) => current + 1);
     persistenceWritable.current = true;
     setPersistenceError(undefined);
     setPersistenceAnnouncement('Saved graph view reset.');
@@ -1187,7 +1725,9 @@ export function GraphExplorer({
           </button>
           <GraphSettings
             focusAppearance={focusAppearance}
+            globalLayoutSettings={globalLayoutSettings}
             onFocusAppearanceChange={changeFocusAppearance}
+            onGlobalLayoutSettingsChange={changeGlobalLayoutSettings}
             onOpenChange={changeSettingsOpen}
             onTrackpadZoomModeChange={changeTrackpadZoomMode}
             open={activeOverlay === 'settings'}
@@ -1229,27 +1769,51 @@ export function GraphExplorer({
                 onForward={goForward}
               />
             )}
-            <div
-              className="control-group"
-              aria-label="Structural depth"
-              role="group"
-            >
-              <span>Structure</span>
-              {STRUCTURAL_DEPTH_OPTIONS.map(({ depth, label }) => (
+            <RendererModeControl
+              {...(globalFailure === undefined
+                ? {}
+                : { globalUnavailable: globalFailure })}
+              mode={effectiveRendererMode}
+              onChange={changeRendererMode}
+            />
+            {effectiveRendererMode === 'structure' ? (
+              <div
+                className="control-group"
+                aria-label="Structural depth"
+                role="group"
+              >
+                <span>Structure</span>
+                {STRUCTURAL_DEPTH_OPTIONS.map(({ depth, label }) => (
+                  <button
+                    aria-pressed={
+                      activeViewState.disclosure.defaultDepth === depth
+                    }
+                    key={depth}
+                    onClick={() =>
+                      commitHistoryGraphAction({ type: 'set-depth', depth })
+                    }
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div
+                aria-label="Global layout controls"
+                className="control-group"
+                role="group"
+              >
                 <button
-                  aria-pressed={
-                    activeViewState.disclosure.defaultDepth === depth
-                  }
-                  key={depth}
                   onClick={() =>
-                    commitHistoryGraphAction({ type: 'set-depth', depth })
+                    setGlobalLayoutRequestKey((current) => current + 1)
                   }
                   type="button"
                 >
-                  {label}
+                  Re-layout
                 </button>
-              ))}
-            </div>
+              </div>
+            )}
             <GraphFilters
               contained={maximized}
               onAction={applyGraphAction}
@@ -1259,6 +1823,7 @@ export function GraphExplorer({
               onSaveCurrentQuery={saveCurrentQuery}
               open={filtersOpen}
               pathScopes={pathScopes}
+              rendererMode={effectiveRendererMode}
               savedFilters={savedFilterSession.registry.filters}
               savedFiltersStatus={savedFilterSession.status}
               savedFiltersWritable={savedFilterSession.writable}
@@ -1323,7 +1888,9 @@ export function GraphExplorer({
               {maximized ? null : (
                 <GraphSettings
                   focusAppearance={focusAppearance}
+                  globalLayoutSettings={globalLayoutSettings}
                   onFocusAppearanceChange={changeFocusAppearance}
+                  onGlobalLayoutSettingsChange={changeGlobalLayoutSettings}
                   onOpenChange={changeSettingsOpen}
                   onTrackpadZoomModeChange={changeTrackpadZoomMode}
                   open={activeOverlay === 'settings'}
@@ -1375,6 +1942,11 @@ export function GraphExplorer({
             {savedFilterError}
           </p>
         )}
+        {globalFailure === undefined ? null : (
+          <p className="graph-alert" role="alert">
+            {globalFailure}
+          </p>
+        )}
       </div>
 
       {result.ok ? (
@@ -1383,28 +1955,58 @@ export function GraphExplorer({
             inspectorOpen ? ' graph-stage--inspector-drawer-open' : ''
           }`}
         >
-          <GraphCanvas
-            {...(centerRequest === undefined ? {} : { centerRequest })}
-            fitRequestKey={fitRequestKey}
-            focusAppearance={focusAppearance}
-            layoutMode={
-              activeViewState.focus === undefined ? 'structure' : 'focus'
-            }
-            layoutService={layoutService}
-            maximized={maximized}
-            onMaximizedChange={changeMaximized}
-            onFocusEntity={enterFocus}
-            onSelectionChange={changeSelection}
-            onToggleEntity={toggleEntity}
-            onViewportObservation={observeViewport}
-            {...(performance === undefined ? {} : { performance })}
-            {...(performanceUpdateKey === undefined
-              ? {}
-              : { performanceUpdateKey })}
-            projection={result.projection}
-            selection={activeSelection}
-            trackpadZoomMode={trackpadZoomMode}
-          />
+          {effectiveRendererMode === 'global' ? (
+            GlobalGraphView === undefined ? (
+              <p className="graph-loading" role="status">
+                Loading Global overview…
+              </p>
+            ) : (
+              <GlobalGraphView
+                {...(globalCenterRequest === undefined
+                  ? {}
+                  : { centerRequest: globalCenterRequest })}
+                fitRequestKey={globalFitRequestKey}
+                {...(performance === undefined
+                  ? {}
+                  : { instrumentation: performance })}
+                layoutRequestKey={globalLayoutRequestKey}
+                onFailure={(message) =>
+                  setGlobalUnavailable(
+                    `Global renderer failed: ${message} Structure remains available for this session.`,
+                  )
+                }
+                onSelectionChange={changeGlobalSelection}
+                onViewportObservation={observeGlobalViewport}
+                projection={result.projection}
+                selection={activeSelection}
+                settings={globalLayoutSettings}
+                trackpadZoomMode={trackpadZoomMode}
+              />
+            )
+          ) : (
+            <GraphCanvas
+              {...(centerRequest === undefined ? {} : { centerRequest })}
+              fitRequestKey={fitRequestKey}
+              focusAppearance={focusAppearance}
+              layoutMode={
+                activeViewState.focus === undefined ? 'structure' : 'focus'
+              }
+              layoutService={layoutService}
+              maximized={maximized}
+              onMaximizedChange={changeMaximized}
+              onFocusEntity={enterFocus}
+              onSelectionChange={changeSelection}
+              onToggleEntity={toggleEntity}
+              onViewportObservation={observeViewport}
+              {...(performance === undefined ? {} : { performance })}
+              {...(performanceUpdateKey === undefined
+                ? {}
+                : { performanceUpdateKey })}
+              projection={result.projection}
+              selection={activeSelection}
+              trackpadZoomMode={trackpadZoomMode}
+            />
+          )}
           {!inspectorOpen ? (
             <button
               aria-label="Open Inspector"
@@ -1422,6 +2024,17 @@ export function GraphExplorer({
               onClear={clearSelection}
               onClose={closeInspector}
               onNavigate={navigateToEntity}
+              {...(effectiveRendererMode === 'global' &&
+              activeSelection?.kind === 'node'
+                ? {
+                    onOpenInStructure: (entityId: EntityId) => {
+                      changeRendererMode('structure');
+                      queueMicrotask(() =>
+                        navigateToEntity(entityId, 'Open in Structure'),
+                      );
+                    },
+                  }
+                : {})}
               {...(performance === undefined ? {} : { performance })}
               projection={result.projection}
               selection={activeSelection}

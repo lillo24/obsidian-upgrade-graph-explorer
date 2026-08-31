@@ -1,4 +1,8 @@
-import type { PersistedViewportAnchor } from '@icarus-graph-explorer/view-state';
+import type {
+  PersistedRendererViewports,
+  PersistedViewportAnchor,
+  RendererEntryMode,
+} from '@icarus-graph-explorer/view-state';
 import type {
   ProjectionNodeId,
   ViewProjection,
@@ -12,8 +16,9 @@ export const GRAPH_NAVIGATION_HISTORY_LIMIT = 100;
 const VIEWPORT_ZOOM_EPSILON = 0.0001;
 
 export interface GraphHistoryCheckpoint {
+  readonly rendererMode: RendererEntryMode;
   readonly state: ViewProjectionState;
-  readonly viewport?: PersistedViewportAnchor;
+  readonly viewports: PersistedRendererViewports;
 }
 
 export interface GraphNavigationHistory {
@@ -106,13 +111,38 @@ function sameViewport(
   );
 }
 
+function sameRendererViewports(
+  left: PersistedRendererViewports,
+  right: PersistedRendererViewports,
+): boolean {
+  return (
+    sameViewport(left.structure, right.structure) &&
+    ((left.global === undefined && right.global === undefined) ||
+      (left.global !== undefined &&
+        right.global !== undefined &&
+        left.global.anchorEntityId === right.global.anchorEntityId &&
+        Math.abs(left.global.ratio - right.global.ratio) <=
+          VIEWPORT_ZOOM_EPSILON))
+  );
+}
+
 export function createGraphHistoryCheckpoint(
   state: ViewProjectionState,
   viewport?: PersistedViewportAnchor,
+  rendererMode: RendererEntryMode = 'structure',
+  viewports: PersistedRendererViewports = {},
 ): GraphHistoryCheckpoint {
   return {
+    rendererMode,
     state,
-    ...(viewport === undefined ? {} : { viewport }),
+    viewports: {
+      ...(viewports.structure !== undefined
+        ? { structure: viewports.structure }
+        : viewport !== undefined
+          ? { structure: viewport }
+          : {}),
+      ...(viewports.global === undefined ? {} : { global: viewports.global }),
+    },
   };
 }
 
@@ -121,8 +151,9 @@ export function sameGraphHistoryCheckpoint(
   right: GraphHistoryCheckpoint,
 ): boolean {
   return (
+    left.rendererMode === right.rendererMode &&
     sameGraphViewState(left.state, right.state) &&
-    sameViewport(left.viewport, right.viewport)
+    sameRendererViewports(left.viewports, right.viewports)
   );
 }
 

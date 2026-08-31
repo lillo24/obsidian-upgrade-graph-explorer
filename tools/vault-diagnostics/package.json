@@ -23,6 +23,7 @@
     "@icarus-graph-explorer/global-renderer-spike": "workspace:*",
     "@icarus-graph-explorer/performance": "workspace:*",
     "@icarus-graph-explorer/renderer-reactflow": "workspace:*",
+    "@icarus-graph-explorer/renderer-sigma": "workspace:*",
     "@icarus-graph-explorer/resolver-obsidian": "workspace:*",
     "@icarus-graph-explorer/snapshot-delta": "workspace:*",
     "@icarus-graph-explorer/stable-identity": "workspace:*",

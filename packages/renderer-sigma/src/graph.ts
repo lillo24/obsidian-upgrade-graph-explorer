@@ -26,6 +26,7 @@ function sameNodeAttributes(
     current.entityId === next.entityId &&
     current.sourcePath === next.sourcePath &&
     current.status === next.status &&
+    current.folderKey === next.folderKey &&
     current.revealableDescendantCount === next.revealableDescendantCount
   );
 }
@@ -151,7 +152,7 @@ export function reconcileGlobalGraph(
   };
 }
 
-export function createNeighborhoodIndex(
+export function createGlobalNeighborhoodIndex(
   input: GlobalRendererInput,
 ): ReadonlyMap<string, ReadonlySet<string>> {
   const mutable = new Map<string, Set<string>>(
