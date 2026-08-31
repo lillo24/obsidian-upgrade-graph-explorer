@@ -96,8 +96,8 @@ canonical subtree size. Preserved expanded descendant IDs can therefore make a
 reopened branch reveal more than its immediate children.
 
 Candidate IDs stay projection-internal. The ordinary unfiltered path counts a
-single indexed structural traversal. When path, text, or entity-kind filters
-are active, one shared hypothetical disclosure/filter pass finalizes every
+single indexed structural traversal. When path, text, entity-kind, or QUERY1
+filters are active, one shared hypothetical disclosure/filter pass finalizes every
 visible owner's candidates together; the package never runs one full
 projection per node. Reference-status filtering does not change entity
 revealability. Because expansion can non-locally change reference endpoint
@@ -160,6 +160,10 @@ dimensions, and never mutate or reroute canonical relationships:
   raw synthetic targets only. It never searches Markdown body text.
 - `entityKinds` selects matching content entities; required visible ancestors
   remain as `context`.
+- `query` stores canonical QUERY1 text. `projectView` parses it once and reuses
+  that expression for the visible and DISC1 candidate passes. Predicates use
+  canonical paths and section titles; invalid external strings fail closed with
+  an `invalid-query` issue.
 - `referenceStatuses` removes nonmatching edges, clears excluded resolved
   internal provenance, and removes orphan synthetic targets.
 

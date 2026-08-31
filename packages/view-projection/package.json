@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@icarus-graph-explorer/core": "workspace:*"
+    "@icarus-graph-explorer/core": "workspace:*",
+    "@icarus-graph-explorer/graph-query": "workspace:*"
   }
 }

@@ -83,6 +83,7 @@ export function sameGraphViewState(
       (leftFilters !== undefined &&
         rightFilters !== undefined &&
         leftFilters.text === rightFilters.text &&
+        leftFilters.query === rightFilters.query &&
         sameValues(leftFilters.pathPrefixes, rightFilters.pathPrefixes) &&
         sameValues(leftFilters.entityKinds, rightFilters.entityKinds) &&
         sameValues(
@@ -197,6 +198,7 @@ export function graphHistoryActionPolicy(
     case 'set-focus-hops':
     case 'set-focus-direction':
     case 'set-path-scope':
+    case 'set-query':
     case 'toggle-entity-kind':
     case 'toggle-reference-status':
     case 'apply-navigation':

@@ -26,7 +26,10 @@ canonical knowledge size and the active projected renderer size.
 Each run covers files/documents only, one structural section level, three
 structural section levels, bounded custom expansion, one-hop and three-hop
 focus, resolution-state filtering, heading-level filtering, combined
-path/entity filtering, and a fully expanded stress view.
+path/entity filtering, a depth-three nontrivial QUERY1 filter, and a fully
+expanded stress view. The query scenario parses once per projection and then
+performs bounded short-circuit evaluation in O(visible entities × AST nodes);
+it does not parse per entity or trigger layout per clause.
 The stress projections contain 1,700/2,000 nodes/edges at small,
 16,500/20,000 at medium, and 82,000/100,000 at large.
 

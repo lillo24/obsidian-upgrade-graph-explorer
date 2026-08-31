@@ -14,6 +14,7 @@ export function activeGraphFilterCount(state: ViewProjectionState): number {
     (filters?.pathPrefixes === undefined ? 0 : 1) +
     (entityContentActive ? 1 : 0) +
     (state.disclosure.maxSectionLevel === undefined ? 0 : 1) +
-    (filters?.referenceStatuses === undefined ? 0 : 1)
+    (filters?.referenceStatuses === undefined ? 0 : 1) +
+    (filters?.query === undefined ? 0 : 1)
   );
 }

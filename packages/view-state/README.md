@@ -30,10 +30,13 @@ Unknown entity IDs, removed focus roots, obsolete path scopes, and missing
 viewport anchors are dropped without inventing replacements. A workspace-ID
 mismatch is rejected. `filters.text`, search, selection, renderer IDs, raw
 viewport coordinates, layouts, source text, and timestamps are never stored.
+An optional active QUERY1 string is stored inside the existing schema-v1
+filters object after canonicalization. Malformed queries are rejected; older
+schema-v1 records without the field remain valid.
 
 Live reconciliation is separate from persisted hydration: it preserves the
 current transient text filter and every still-valid disclosure, focus, path,
-entity-kind, reference-status, and semantic viewport choice. Missing canonical
+entity-kind, reference-status, graph-query, and semantic viewport choice. Missing canonical
 IDs and stale paths are removed deterministically before projection.
 
 Schema v1 accepts structural `defaultDepth` values 0–3 plus an optional literal
@@ -42,7 +45,7 @@ the heading field remain valid; depth 2/3 round-trip without migration or a
 schema bump. New records persist the ceiling only when active, and reset/default
 state omits it.
 
-The production dependency boundary is core plus view-projection only. Browser
+The production dependency boundary is core, graph-query, and view-projection only. Browser
 `localStorage` is one outer adapter in `apps/web`, not part of this contract.
 
 ## Local validation

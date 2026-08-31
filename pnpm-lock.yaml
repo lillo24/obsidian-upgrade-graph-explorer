@@ -56,6 +56,9 @@ importers:
       '@icarus-graph-explorer/explorer-inspection':
         specifier: workspace:*
         version: link:../../packages/explorer-inspection
+      '@icarus-graph-explorer/graph-query':
+        specifier: workspace:*
+        version: link:../../packages/graph-query
       '@icarus-graph-explorer/performance':
         specifier: workspace:*
         version: link:../../packages/performance
@@ -167,6 +170,12 @@ importers:
         specifier: workspace:*
         version: link:../view-projection
 
+  packages/graph-query:
+    dependencies:
+      '@icarus-graph-explorer/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/parser-markdown:
     dependencies:
       '@icarus-graph-explorer/core':
@@ -273,12 +282,18 @@ importers:
       '@icarus-graph-explorer/core':
         specifier: workspace:*
         version: link:../core
+      '@icarus-graph-explorer/graph-query':
+        specifier: workspace:*
+        version: link:../graph-query
 
   packages/view-state:
     dependencies:
       '@icarus-graph-explorer/core':
         specifier: workspace:*
         version: link:../core
+      '@icarus-graph-explorer/graph-query':
+        specifier: workspace:*
+        version: link:../graph-query
       '@icarus-graph-explorer/view-projection':
         specifier: workspace:*
         version: link:../view-projection

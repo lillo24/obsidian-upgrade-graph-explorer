@@ -84,6 +84,71 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/graph-query/**/*.{ts,tsx}'],
+    ignores: ['packages/graph-query/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react',
+              message:
+                'Graph query must remain independent from React and UI frameworks.',
+            },
+            {
+              name: 'react-dom',
+              message:
+                'Graph query must remain independent from React and UI frameworks.',
+            },
+            {
+              name: '@icarus-graph-explorer/view-projection',
+              message:
+                'Graph query evaluates canonical core entities, not projections.',
+            },
+            {
+              name: '@icarus-graph-explorer/view-state',
+              message: 'Persistence depends on graph query, never the reverse.',
+            },
+            {
+              name: '@icarus-graph-explorer/web',
+              message: 'Graph query cannot depend on the web application.',
+            },
+            {
+              name: 'node:fs',
+              message: 'Graph query is a pure in-memory package.',
+            },
+            {
+              name: 'node:fs/promises',
+              message: 'Graph query is a pure in-memory package.',
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                'react/*',
+                'react-dom/*',
+                '@xyflow/*',
+                '@tauri-apps/*',
+                '@react-sigma/*',
+                'sigma/*',
+                'graphology-*',
+                'obsidian-*',
+                '@obsidian/*',
+                '@icarus-graph-explorer/view-projection/*',
+                '@icarus-graph-explorer/view-state/*',
+                '@icarus-graph-explorer/web/*',
+                'node:fs/*',
+              ],
+              message:
+                'UI, projection, persistence, platform, source-specific, and filesystem imports are forbidden in graph query.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['packages/parser-markdown/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [

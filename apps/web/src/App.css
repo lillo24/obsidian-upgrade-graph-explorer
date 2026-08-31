@@ -958,11 +958,142 @@ h2 {
   touch-action: manipulation;
 }
 
-.graph-filters input {
+.graph-filters input[type='checkbox'] {
   width: 1rem;
   height: 1rem;
   margin: 0;
   accent-color: #1c5267;
+}
+
+.advanced-graph-query {
+  display: grid;
+  min-width: 0;
+  grid-column: 1 / -1;
+  gap: 0.65rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #dbe3e7;
+}
+
+.advanced-graph-query__heading,
+.advanced-graph-query__actions,
+.saved-graph-filters li,
+.saved-graph-filters li > span {
+  display: flex;
+  min-width: 0;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.advanced-graph-query__heading {
+  justify-content: space-between;
+}
+
+.advanced-graph-query h4,
+.saved-graph-filters h4 {
+  margin: 0;
+  color: #294957;
+  font-size: 0.78rem;
+}
+
+.advanced-graph-query__heading span,
+.advanced-graph-query p,
+.saved-graph-filters p {
+  margin: 0;
+  color: #526b78;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.advanced-graph-query label,
+.saved-graph-filters label {
+  display: grid;
+  min-width: 0;
+  gap: 0.35rem;
+  color: #455e6a;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.advanced-graph-query textarea,
+.saved-graph-filters input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #9eb0bc;
+  border-radius: 0.5rem;
+  color: #172631;
+  background: #ffffff;
+  font: inherit;
+}
+
+.advanced-graph-query textarea {
+  min-height: 5rem;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  line-height: 1.45;
+}
+
+.advanced-graph-query button,
+.saved-graph-filters button {
+  min-height: 2.75rem;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid #99acb6;
+  border-radius: 0.45rem;
+  color: #1c3d4c;
+  background: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.advanced-graph-query button:disabled,
+.saved-graph-filters button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.graph-filter-error,
+.advanced-graph-query .graph-filter-error {
+  color: #8b1e2d;
+  font-weight: 750;
+}
+
+.saved-graph-filters {
+  display: grid;
+  min-width: 0;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border: 1px solid #dbe3e7;
+  border-radius: 0.6rem;
+  background: #f8fafb;
+}
+
+.saved-graph-filters ul {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.saved-graph-filters li {
+  justify-content: space-between;
+  padding-top: 0.55rem;
+  border-top: 1px solid #dbe3e7;
+}
+
+.saved-graph-filters li > span:first-child {
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.saved-graph-filters code {
+  max-width: 100%;
+  color: #455e6a;
+  font-size: 0.68rem;
+  overflow-wrap: anywhere;
 }
 
 .graph-alert {
@@ -2256,6 +2387,18 @@ a:focus-visible {
 
   .graph-filters__body {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .advanced-graph-query__actions,
+  .saved-graph-filters li {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .advanced-graph-query__actions button,
+  .saved-graph-filters li > span:last-child,
+  .saved-graph-filters li > span:last-child button {
+    width: 100%;
   }
 
   .graph-workspace--maximized .graph-alert-stack {

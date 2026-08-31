@@ -329,6 +329,55 @@ describe('persisted workspace view', () => {
     expect(JSON.stringify(persisted())).not.toContain('must not persist');
   });
 
+  it('persists, canonicalizes, restores, and live-reconciles an active graph query', () => {
+    const workspace = createProjectionWorkspace(snapshot());
+    const state: ViewProjectionState = {
+      ...fullState(),
+      filters: {
+        ...fullState().filters,
+        query: 'sections or path:"folder"',
+      },
+    };
+    const saved = createPersistedWorkspaceView({ workspace, state });
+
+    expect(saved.schemaVersion).toBe(1);
+    expect(saved.projection.filters?.query).toBe(
+      'kind:section OR path:"folder"',
+    );
+    expect(
+      restorePersistedWorkspaceView(workspace, saved).state.filters?.query,
+    ).toBe('kind:section OR path:"folder"');
+    expect(
+      reconcileCurrentWorkspaceView(workspace, state).state.filters?.query,
+    ).toBe('sections or path:"folder"');
+  });
+
+  it('keeps older schema-v1 records valid and rejects malformed saved queries', () => {
+    const value = persisted();
+    expect(validatePersistedWorkspaceView(value).valid).toBe(true);
+    const malformed = validatePersistedWorkspaceView({
+      ...value,
+      projection: {
+        ...value.projection,
+        filters: { ...value.projection.filters, query: 'sections documents' },
+      },
+    });
+
+    expect(malformed.valid).toBe(false);
+    expect(
+      malformed.valid ? [] : malformed.issues.map(({ path }) => path),
+    ).toContain('$.projection.filters.query');
+    expect(() =>
+      createPersistedWorkspaceView({
+        workspace: createProjectionWorkspace(snapshot()),
+        state: {
+          ...fullState(),
+          filters: { ...fullState().filters, query: 'sections documents' },
+        },
+      }),
+    ).toThrow('Cannot persist invalid graph query');
+  });
+
   it('preserves a present viewport anchor and drops a missing anchor', () => {
     const value = persisted();
     const evolved = createProjectionWorkspace(

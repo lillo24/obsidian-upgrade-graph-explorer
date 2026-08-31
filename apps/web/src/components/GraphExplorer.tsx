@@ -59,6 +59,14 @@ import {
 } from '../navigation-history';
 import { planEntityNavigation, topLevelPathScopes } from '../navigation';
 import {
+  addSavedGraphFilter,
+  createEmptySavedGraphFilterRegistry,
+  deleteSavedGraphFilter,
+  loadSavedGraphFilters,
+  saveSavedGraphFilterRegistry,
+  type SavedGraphFilterRegistry,
+} from '../persistence/saved-filters';
+import {
   hydrateGraphView,
   persistenceEligibility,
 } from '../persistence/session';
@@ -99,6 +107,13 @@ type ProjectionResult = ProjectionSuccess | ProjectionFailure;
 interface PendingHistoryViewportRestore {
   readonly key: number;
   readonly viewport?: PersistedViewportAnchor;
+}
+
+interface SavedFilterSession {
+  readonly registry: SavedGraphFilterRegistry;
+  readonly writable: boolean;
+  readonly status: string;
+  readonly error?: string;
 }
 
 const ENTITY_NAVIGATION_ZOOM = 1.1;
@@ -234,6 +249,45 @@ export function GraphExplorer({
     CLOSED_GRAPH_WORKSPACE_OVERLAYS,
   );
   const eligibility = persistenceEligibility(identityStability);
+  const [savedFilterSession, setSavedFilterSession] =
+    useState<SavedFilterSession>(() => {
+      const workspaceId = projectionWorkspace.snapshot().workspace.id;
+      const registry = createEmptySavedGraphFilterRegistry(workspaceId);
+      if (eligibility !== 'stable') {
+        return {
+          registry,
+          writable: false,
+          status:
+            'Saving is unavailable because this workspace does not have stable identity. Advanced queries still work for this session.',
+        };
+      }
+      if (persistenceStorage === undefined) {
+        return {
+          registry,
+          writable: false,
+          status:
+            'Saving is unavailable because browser storage could not be accessed. Advanced queries still work for this session.',
+        };
+      }
+      const loaded = loadSavedGraphFilters(persistenceStorage, workspaceId);
+      if (loaded.status === 'error') {
+        return {
+          registry,
+          writable: false,
+          status:
+            'Saved Filters are unavailable until the stored value is repaired outside the app.',
+          error: `${loaded.message} The stored value was left unchanged.`,
+        };
+      }
+      return {
+        registry: loaded.value,
+        writable: true,
+        status:
+          loaded.status === 'loaded'
+            ? 'Saved Filters are stored for this stable workspace.'
+            : 'No Saved Filters have been stored for this stable workspace.',
+      };
+    });
   const [hydration] = useState(() =>
     hydrateGraphView({
       eligibility,
@@ -325,6 +379,9 @@ export function GraphExplorer({
     eligibility === 'stable' && !hydration.writable
       ? hydration.status
       : undefined,
+  );
+  const [savedFilterError, setSavedFilterError] = useState<string | undefined>(
+    savedFilterSession.error,
   );
   const [transientResetKey, setTransientResetKey] = useState(0);
   const [navigationAnnouncement, setNavigationAnnouncement] = useState(
@@ -797,6 +854,94 @@ export function GraphExplorer({
     (action: GraphStateAction) => void commitHistoryGraphAction(action),
     [commitHistoryGraphAction],
   );
+  const applySavedFilter = useCallback(
+    (query: string) => {
+      const committed = commitHistoryGraphAction({ type: 'set-query', query });
+      setNavigationError(undefined);
+      setNavigationAnnouncement(
+        committed
+          ? 'Applied a Saved Filter query.'
+          : 'That Saved Filter query is already active.',
+      );
+    },
+    [commitHistoryGraphAction],
+  );
+  const saveCurrentQuery = useCallback(
+    (name: string): string | undefined => {
+      const query = activeViewStateRef.current.filters?.query;
+      if (query === undefined) return 'Apply a valid query before saving it.';
+      if (!savedFilterSession.writable || persistenceStorage === undefined) {
+        return savedFilterSession.status;
+      }
+      const candidate = addSavedGraphFilter(
+        savedFilterSession.registry,
+        name,
+        query,
+      );
+      if (!candidate.ok) return candidate.message;
+      const saved = saveSavedGraphFilterRegistry(
+        persistenceStorage,
+        candidate.value,
+      );
+      if (!saved.ok) {
+        setSavedFilterSession((current) => ({
+          ...current,
+          writable: false,
+          status:
+            'Saved Filters are unavailable after a storage write failure.',
+        }));
+        setSavedFilterError(
+          `${saved.message} Confirmed Saved Filters were retained in memory.`,
+        );
+        return saved.message;
+      }
+      setSavedFilterSession((current) => ({
+        ...current,
+        registry: candidate.value,
+        status: 'Saved Filters are stored for this stable workspace.',
+      }));
+      setSavedFilterError(undefined);
+      setPersistenceAnnouncement(`Saved filter "${name.trim()}".`);
+      return undefined;
+    },
+    [persistenceStorage, savedFilterSession],
+  );
+  const removeSavedFilter = useCallback(
+    (name: string): string | undefined => {
+      if (!savedFilterSession.writable || persistenceStorage === undefined) {
+        return savedFilterSession.status;
+      }
+      const candidate = deleteSavedGraphFilter(
+        savedFilterSession.registry,
+        name,
+      );
+      if (!candidate.ok) return candidate.message;
+      const saved = saveSavedGraphFilterRegistry(
+        persistenceStorage,
+        candidate.value,
+      );
+      if (!saved.ok) {
+        setSavedFilterSession((current) => ({
+          ...current,
+          writable: false,
+          status:
+            'Saved Filters are unavailable after a storage write failure.',
+        }));
+        setSavedFilterError(
+          `${saved.message} Confirmed Saved Filters were retained in memory.`,
+        );
+        return saved.message;
+      }
+      setSavedFilterSession((current) => ({
+        ...current,
+        registry: candidate.value,
+      }));
+      setSavedFilterError(undefined);
+      setPersistenceAnnouncement(`Deleted saved filter "${name}".`);
+      return undefined;
+    },
+    [persistenceStorage, savedFilterSession],
+  );
   const clearSelection = useCallback(() => setSelection(null), []);
   const observeViewport = useCallback(
     (observation: GraphViewportObservation) =>
@@ -1108,9 +1253,15 @@ export function GraphExplorer({
             <GraphFilters
               contained={maximized}
               onAction={applyGraphAction}
+              onApplySavedFilter={applySavedFilter}
+              onDeleteSavedFilter={removeSavedFilter}
               onOpenChange={changeFiltersOpen}
+              onSaveCurrentQuery={saveCurrentQuery}
               open={filtersOpen}
               pathScopes={pathScopes}
+              savedFilters={savedFilterSession.registry.filters}
+              savedFiltersStatus={savedFilterSession.status}
+              savedFiltersWritable={savedFilterSession.writable}
               state={activeViewState}
             />
             {activeViewState.focus === undefined ? null : (
@@ -1217,6 +1368,11 @@ export function GraphExplorer({
         {navigationError === undefined ? null : (
           <p className="graph-alert" role="alert">
             {navigationError}
+          </p>
+        )}
+        {savedFilterError === undefined ? null : (
+          <p className="graph-alert" role="alert">
+            {savedFilterError}
           </p>
         )}
       </div>

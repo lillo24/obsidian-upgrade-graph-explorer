@@ -1,4 +1,5 @@
 import type { EntityId, WorkspacePath } from '@icarus-graph-explorer/core';
+import { parseGraphQuery } from '@icarus-graph-explorer/graph-query';
 import type {
   ProjectionWorkspace,
   ViewProjectionFilters,
@@ -82,11 +83,13 @@ function restoreFilters(
       ? {}
       : { referenceStatuses: [...persisted.referenceStatuses] }),
     ...(persisted.text === undefined ? {} : { text: persisted.text }),
+    ...(persisted.query === undefined ? {} : { query: persisted.query }),
   };
   return filters.pathPrefixes === undefined &&
     filters.entityKinds === undefined &&
     filters.referenceStatuses === undefined &&
-    filters.text === undefined
+    filters.text === undefined &&
+    filters.query === undefined
     ? undefined
     : filters;
 }
@@ -137,6 +140,7 @@ function sameViewState(
       (leftFilters !== undefined &&
         rightFilters !== undefined &&
         leftFilters.text === rightFilters.text &&
+        leftFilters.query === rightFilters.query &&
         sameValues(leftFilters.pathPrefixes, rightFilters.pathPrefixes) &&
         sameValues(leftFilters.entityKinds, rightFilters.entityKinds) &&
         sameValues(
@@ -249,6 +253,25 @@ export function restorePersistedWorkspaceView(
     );
   }
 
+  const persistedFilters = persisted.projection.filters;
+  const parsedQuery =
+    persistedFilters?.query === undefined
+      ? undefined
+      : parseGraphQuery(persistedFilters.query);
+  if (parsedQuery !== undefined && !parsedQuery.valid) {
+    throw new Error(
+      'Cannot restore a persisted view with an invalid graph query.',
+    );
+  }
+  const normalizedFilters =
+    persistedFilters === undefined
+      ? undefined
+      : {
+          ...persistedFilters,
+          ...(parsedQuery === undefined
+            ? {}
+            : { query: parsedQuery.canonical }),
+        };
   const state: ViewProjectionState = {
     disclosure: {
       defaultDepth: persisted.projection.disclosure.defaultDepth,
@@ -264,9 +287,7 @@ export function restorePersistedWorkspaceView(
     ...(persisted.projection.focus === undefined
       ? {}
       : { focus: persisted.projection.focus }),
-    ...(persisted.projection.filters === undefined
-      ? {}
-      : { filters: persisted.projection.filters }),
+    ...(normalizedFilters === undefined ? {} : { filters: normalizedFilters }),
   };
   return reconcileWorkspaceView(
     workspace,

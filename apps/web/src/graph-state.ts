@@ -47,6 +47,7 @@ export type GraphStateAction =
       readonly direction: FocusProjectionState['direction'];
     }
   | { readonly type: 'set-path-scope'; readonly pathPrefix: string | null }
+  | { readonly type: 'set-query'; readonly query: string | null }
   | {
       readonly type: 'toggle-entity-kind';
       readonly entityKind: Exclude<EntityKind, 'block'>;
@@ -95,7 +96,8 @@ function withFilters(
     filters.pathPrefixes !== undefined ||
     filters.text !== undefined ||
     filters.entityKinds !== undefined ||
-    filters.referenceStatuses !== undefined;
+    filters.referenceStatuses !== undefined ||
+    filters.query !== undefined;
   return normalizeGraphState({
     disclosure: state.disclosure,
     ...(state.focus === undefined ? {} : { focus: state.focus }),
@@ -147,7 +149,8 @@ export function normalizeGraphState(
     nextFilters.pathPrefixes !== undefined ||
     nextFilters.text !== undefined ||
     nextFilters.entityKinds !== undefined ||
-    nextFilters.referenceStatuses !== undefined;
+    nextFilters.referenceStatuses !== undefined ||
+    nextFilters.query !== undefined;
   return {
     disclosure: state.disclosure,
     ...(state.focus === undefined ? {} : { focus: state.focus }),
@@ -228,6 +231,15 @@ export function graphStateReducer(
           ? withoutFilter(filters, 'pathPrefixes')
           : { ...filters, pathPrefixes: [action.pathPrefix] },
       );
+    case 'set-query': {
+      const current = state.filters?.query;
+      if (current === (action.query ?? undefined)) return state;
+      return withFilters(state, (filters) =>
+        action.query === null
+          ? withoutFilter(filters, 'query')
+          : { ...filters, query: action.query },
+      );
+    }
     case 'toggle-entity-kind':
       return withFilters(state, (filters) => {
         const entityKinds = updatedFilterValues(

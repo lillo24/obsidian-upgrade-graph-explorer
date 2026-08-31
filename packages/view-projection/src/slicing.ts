@@ -1,4 +1,8 @@
 import type { EntityId } from '@icarus-graph-explorer/core';
+import {
+  matchesGraphQuery,
+  type GraphQueryParseResult,
+} from '@icarus-graph-explorer/graph-query';
 
 import { entityNodeId, hierarchyEdgeId } from './ids';
 import type {
@@ -277,10 +281,24 @@ export function applyFilters(
   workspace: ProjectionWorkspace,
   projection: ViewProjection,
   filters: ViewProjectionFilters | undefined,
+  preparedQuery: GraphQueryParseResult | undefined,
 ): ViewProjection {
   if (filters === undefined) return projection;
 
   const issues: ProjectionIssue[] = [...projection.issues];
+  if (preparedQuery !== undefined && !preparedQuery.valid) {
+    const first = preparedQuery.issues[0];
+    issues.push({
+      code: 'invalid-query',
+      subject: filters.query ?? '',
+      message: `Graph query is invalid${
+        first === undefined
+          ? '.'
+          : ` at character ${first.position + 1}: ${first.message}`
+      }`,
+    });
+    return sortedProjection([], [], issues);
+  }
   const validPathPrefixes = new Set<string>();
   if (filters.pathPrefixes !== undefined) {
     for (const prefix of [...new Set(filters.pathPrefixes)].sort(compareText)) {
@@ -305,7 +323,8 @@ export function applyFilters(
   const hasEntityFilter =
     filters.pathPrefixes !== undefined ||
     filters.entityKinds !== undefined ||
-    (filters.text?.trim().length ?? 0) > 0;
+    (filters.text?.trim().length ?? 0) > 0 ||
+    preparedQuery !== undefined;
 
   if (!hasEntityFilter) {
     const referenceEdges = projection.edges.filter(
@@ -352,7 +371,13 @@ export function applyFilters(
       pathMatches(node.sourcePath, validPathPrefixes);
     const kindAllowed =
       entityKinds === undefined || entityKinds.has(node.entityKind);
-    if (!pathAllowed || !kindAllowed) continue;
+    const entity = workspace.entity(node.entityId);
+    const queryAllowed =
+      preparedQuery === undefined ||
+      (preparedQuery.valid &&
+        entity !== undefined &&
+        matchesGraphQuery(entity, preparedQuery.expression));
+    if (!pathAllowed || !kindAllowed || !queryAllowed) continue;
     eligibleEntityNodeIds.add(node.id);
     if (
       normalizedText.length === 0 ||
