@@ -1,7 +1,10 @@
 # Global renderer decision
 
-Status: **ADOPT — KG13A is complete; implement a documents-only Global mode in
-KG13B without replacing the Structure renderer.**
+Status: **ADOPTED — KG13B1 production Global/Regional is complete; Structure
+remains authoritative and Local Free/Structured is next.**
+
+Sections 2–18 retain the KG13A decision evidence. KG13B1's production
+follow-through is recorded in Section 20 and ADR 0013.
 
 ## 1. Decision
 
@@ -13,10 +16,9 @@ Sigma + Graphology = Global
 ```
 
 The decision is **ADOPT** for a documents-only Global mode. Structure remains
-the sole hierarchical/detail renderer. KG13A adds no production mode switch and
-does not begin KG13B. KG13B must retain an explicit per-device unavailable state
-if WebGL or worker initialization fails; it must not emulate Global with a huge
-React Flow fallback.
+the sole hierarchical/detail renderer. KG13B1 implements the initial lazy
+`Structure | Global` entry point, far/Regional/near style LOD, explicit
+per-session WebGL unavailability, and no huge React Flow fallback.
 
 ## 2. Product role
 
@@ -66,7 +68,7 @@ full prototype after Sigma passed the required surface.
 
 ## 4. Candidate architecture
 
-`tools/global-renderer-spike` is deliberately experimental:
+The KG13A evidence originated in `tools/global-renderer-spike`:
 
 ```text
 ViewProjection
@@ -78,7 +80,9 @@ ViewProjection
        └─ ForceAtlas2 request → dedicated worker → derived positions
 ```
 
-It depends only on `view-projection`, Sigma, Graphology, and ForceAtlas2. It has
+KG13B1 moved this implementation into `packages/renderer-sigma`; the harness
+now consumes that production package and keeps only synthetic fixtures,
+controls, and aggregate evidence. The production package has
 no dependency on core truth, source adapters, parsers, diagnostics construction,
 KG10, Tauri APIs, React Flow, or Dagre. Graphology is replaceable renderer state.
 
@@ -218,10 +222,10 @@ chunks: a 178,442-byte main renderer chunk and a 78,084-byte ForceAtlas2 worker,
 plus 4,595 CSS bytes. Main JavaScript gzip is 44.5 kB. No general React wrapper
 or second renderer framework was added.
 
-Dependencies are pinned and isolated to the development tool. The ordinary web
-and desktop applications do not import or bundle Sigma. If KG13B begins, its
-production chunk must remain literal and on-demand so Structure startup does not
-pay this cost.
+Dependencies remain pinned. KG13B1 emits Sigma/Graphology in a literal lazy
+Global chunk and ForceAtlas2 in a dedicated Global worker; the Structure startup
+chunk does not execute those libraries. The KG13A harness also consumes the
+same production package rather than carrying duplicate dependencies.
 
 ## 13. Product-value matrix
 
@@ -291,12 +295,13 @@ used.
 
 ## 19. Roadmap
 
-`KG13 — In progress`, `KG13A — Complete`, `KG13B — Next`.
+`KG13 — In progress`, `KG13A — Complete`, `KG13B1 — Complete`,
+`KG13B2 — Next`.
 KG14 does not become next under the evidence-backed ADOPT result.
 
-## 20. KG13B recommendation — only after ADOPT
+## 20. KG13B1 production follow-through
 
-Integrate only a lazily loaded `Structure | Global` documents/files mode:
+KG13B1 implements a lazily loaded `Structure | Global` documents/files mode:
 
 - reuse KG6 projection/filter/focus and KG8 Inspector/search/navigation;
 - use direct Sigma with one app-owned lifecycle and stable-key reconciliation;
@@ -304,9 +309,19 @@ Integrate only a lazily loaded `Structure | Global` documents/files mode:
 - provide explicit **Open in Structure** handoff;
 - preserve a shared canonical viewport anchor with renderer-specific zoom;
 - run ForceAtlas2 outside the UI thread with progress/latest-result adoption;
-- design a derived layout cache separate from KG9 and canonical truth;
+- use a bounded memory-only derived layout cache separate from KG9 and canonical truth;
 - keep unsupported-WebGL failure explicit and Structure fully available;
 - do not add headings, blocks, analytics, communities, source editing, manual
   positions, or semantic similarity.
 
-Do not implement any of this production integration in KG13A.
+Production also adds an effective resolved-only default, soft path-derived
+folder clustering, Compact/Normal/Spacious plus bounded Custom settings,
+far/Regional/near style-only semantic zoom, schema-v2 renderer viewports, and
+cross-mode Back/Forward. The small A/B comparison selects chunked ForceAtlas2
+plus folder-prior adjustment over the one-shot offset field because it improves
+within-folder distance while keeping cross-folder references more influential.
+
+KG13B2 may use stable Global file positions as anchors for Local
+Free/Structured induced subgraphs. It must keep headings outside Global
+topology and avoid whole-vault relayout. QUERY1/GROUP1 remain independent;
+separate LAYOUT1 is paused/absorbed. Do not implement KG13B2 in KG13B1.

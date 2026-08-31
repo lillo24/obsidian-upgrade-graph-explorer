@@ -5,14 +5,20 @@ import { fileURLToPath } from 'node:url';
 
 import { generateSyntheticWorkspace } from '@icarus-graph-explorer/diagnostics-obsidian';
 import {
-  buildGlobalGraph,
   createGlobalFixtureProjection,
+  type GlobalFixtureProfile,
+} from '@icarus-graph-explorer/global-renderer-spike/core';
+import {
+  buildGlobalGraph,
+  computeGlobalLayout,
+  createGlobalLayoutRequest,
+  DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+  GlobalLayoutCache,
+  globalLayoutFingerprint,
   mapProjectionToGlobal,
   reconcileGlobalGraph,
-  runForceAtlas2Synchronous,
-  type GlobalFixtureProfile,
   type GlobalRendererInput,
-} from '@icarus-graph-explorer/global-renderer-spike/core';
+} from '@icarus-graph-explorer/renderer-sigma/core';
 import { createStableIdentityCatalog } from '@icarus-graph-explorer/stable-identity';
 import {
   createProjectionWorkspace,
@@ -27,6 +33,16 @@ import {
   type BenchmarkProfile,
 } from './benchmark-config';
 import { buildReportFromSources } from './pipeline';
+
+function layoutEvidence(result: ReturnType<typeof computeGlobalLayout>) {
+  return {
+    algorithm: result.algorithm,
+    computeMs: result.computeMs,
+    folderPriorMs: result.folderPriorMs,
+    positionCount: result.positions.length,
+    metrics: result.metrics,
+  };
+}
 
 interface BenchmarkOptions {
   readonly profile: BenchmarkProfile;
@@ -186,10 +202,10 @@ async function main(): Promise<void> {
     identityCatalog: createStableIdentityCatalog(workspaceId),
   }).report;
   const projectionWorkspace = createProjectionWorkspace(report.snapshot);
-  const projection = projectView(
-    projectionWorkspace,
-    documentOnlyProjectionState(),
-  );
+  const projection = projectView(projectionWorkspace, {
+    ...documentOnlyProjectionState(),
+    filters: { referenceStatuses: ['resolved'] },
+  });
   const repeats = options.profile === 'large' ? 3 : 5;
   let mapped: GlobalRendererInput | undefined;
   const mapping = measureRepeated(() => {
@@ -230,7 +246,13 @@ async function main(): Promise<void> {
         readonly omitted: false;
         readonly iterations: number;
         readonly barnesHut: boolean;
-        readonly durationMs: number;
+        readonly referenceOnly: ReturnType<typeof layoutEvidence>;
+        readonly optionAChunkedPrior: ReturnType<typeof layoutEvidence>;
+        readonly optionBOffsetField: ReturnType<typeof layoutEvidence>;
+        readonly exactCacheHit: Distribution;
+        readonly folderMoveWarmSeed: ReturnType<typeof layoutEvidence>;
+        readonly settingsWarmSeed: ReturnType<typeof layoutEvidence>;
+        readonly selected: 'chunked-prior';
       };
   if (layoutIterations === 0) {
     layout = {
@@ -238,13 +260,110 @@ async function main(): Promise<void> {
       reason: `Product projection has ${layoutGraph.order} nodes; fixed-iteration synchronous layout is intentionally capped at 5,000. Use the browser/Tauri worker harness.`,
     };
   } else {
-    const start = performance.now();
-    runForceAtlas2Synchronous(layoutGraph, layoutIterations);
+    const clusteredSettings = DEFAULT_GLOBAL_LAYOUT_SETTINGS;
+    const referenceSettings = {
+      ...DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+      folderClustering: false,
+    };
+    const referenceRequest = createGlobalLayoutRequest(
+      productInput,
+      referenceSettings,
+      layoutIterations,
+      'reference-only',
+    );
+    const clusteredRequest = createGlobalLayoutRequest(
+      productInput,
+      clusteredSettings,
+      layoutIterations,
+      'chunked-prior',
+    );
+    const offsetRequest = createGlobalLayoutRequest(
+      productInput,
+      clusteredSettings,
+      layoutIterations,
+      'offset-field',
+    );
+    const referenceResult = computeGlobalLayout({
+      ...referenceRequest,
+      requestId: 1,
+    });
+    const clusteredResult = computeGlobalLayout({
+      ...clusteredRequest,
+      requestId: 2,
+    });
+    const offsetResult = computeGlobalLayout({
+      ...offsetRequest,
+      requestId: 3,
+    });
+    const warmNodes = productInput.nodes.map((node) => {
+      const position = clusteredResult.positions.find(
+        ({ key }) => key === node.key,
+      );
+      if (position === undefined) {
+        throw new Error(`Clustered layout omitted warm node ${node.key}.`);
+      }
+      return {
+        ...node,
+        attributes: { ...node.attributes, x: position.x, y: position.y },
+      };
+    });
+    const folderMoveInput = {
+      ...productInput,
+      nodes: warmNodes.map((node, index) =>
+        index === 0
+          ? {
+              ...node,
+              attributes: {
+                ...node.attributes,
+                folderKey: `${node.attributes.folderKey ?? '.'}/moved`,
+              },
+            }
+          : node,
+      ),
+    };
+    const spaciousSettings = {
+      ...clusteredSettings,
+      spacingPreset: 'spacious' as const,
+    };
+    const cache = new GlobalLayoutCache();
+    const fingerprint = globalLayoutFingerprint(clusteredRequest);
+    cache.set(fingerprint, clusteredResult.positions);
+    const exactCacheHit = measureRepeated(() => {
+      if (cache.get(fingerprint) === undefined) {
+        throw new Error('Exact Global layout cache hit was unexpectedly lost.');
+      }
+    }, repeats);
     layout = {
       omitted: false,
       iterations: layoutIterations,
       barnesHut: layoutGraph.order >= 1_000,
-      durationMs: Number((performance.now() - start).toFixed(3)),
+      referenceOnly: layoutEvidence(referenceResult),
+      optionAChunkedPrior: layoutEvidence(clusteredResult),
+      optionBOffsetField: layoutEvidence(offsetResult),
+      exactCacheHit,
+      folderMoveWarmSeed: layoutEvidence(
+        computeGlobalLayout({
+          ...createGlobalLayoutRequest(
+            folderMoveInput,
+            clusteredSettings,
+            layoutIterations,
+            'chunked-prior',
+          ),
+          requestId: 4,
+        }),
+      ),
+      settingsWarmSeed: layoutEvidence(
+        computeGlobalLayout({
+          ...createGlobalLayoutRequest(
+            { ...productInput, nodes: warmNodes },
+            spaciousSettings,
+            layoutIterations,
+            'chunked-prior',
+          ),
+          requestId: 5,
+        }),
+      ),
+      selected: 'chunked-prior',
     };
   }
 
@@ -260,7 +379,7 @@ async function main(): Promise<void> {
         profile: options.profile,
         buildMode: 'production',
         productProjection: {
-          mode: 'KG6 documents-only',
+          mode: 'KG6 documents-only with effective resolved-only default',
           nodes: productInput.nodes.length,
           edges: productInput.edges.length,
           diagnosticTargets: projection.nodes.filter(
@@ -280,7 +399,7 @@ async function main(): Promise<void> {
           mapping: stressMapping,
           graphologyBuild: stressBuild,
         },
-        forceAtlas2: layout,
+        forceAtlas2AndFolderPrior: layout,
         bundle: await bundleEvidence(),
         rendererRuntime: {
           measuredBy: 'production browser/Tauri harness',

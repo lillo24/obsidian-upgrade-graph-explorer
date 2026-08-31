@@ -8,6 +8,7 @@ import type {
 import type {
   PersistedWorkspaceView,
   PersistedViewportAnchor,
+  PersistedRendererViewports,
   ReconciledCurrentWorkspaceView,
   RestoredWorkspaceView,
   ViewRestoreIssue,
@@ -149,7 +150,7 @@ function sameViewState(
 function reconcileWorkspaceView(
   workspace: ProjectionWorkspace,
   current: ViewProjectionState,
-  viewport: PersistedViewportAnchor | undefined,
+  viewports: PersistedRendererViewports,
   origin: 'Saved' | 'Current',
   dropExhaustedPathScope: boolean,
 ): ReconciledCurrentWorkspaceView {
@@ -206,22 +207,36 @@ function reconcileWorkspaceView(
     ...(filters === undefined ? {} : { filters }),
   };
   const state = sameViewState(current, reconciled) ? current : reconciled;
-  const restoredViewport =
-    viewport === undefined ||
-    workspace.entity(viewport.anchorEntityId) !== undefined
-      ? viewport
-      : undefined;
-  if (viewport !== undefined && restoredViewport === undefined) {
+  const reconcileViewport = <
+    Viewport extends { readonly anchorEntityId: string },
+  >(
+    viewport: Viewport | undefined,
+    renderer: 'Structure' | 'Global',
+  ): Viewport | undefined => {
+    if (
+      viewport === undefined ||
+      workspace.entity(viewport.anchorEntityId) !== undefined
+    ) {
+      return viewport;
+    }
     issues.push({
       code: 'viewport-anchor-missing',
       subject: viewport.anchorEntityId,
-      message: `${origin} viewport anchor "${viewport.anchorEntityId}" is no longer present; the current graph will be fitted.`,
+      message: `${origin} ${renderer} viewport anchor "${viewport.anchorEntityId}" is no longer present; that graph will be fitted.`,
     });
-  }
+    return undefined;
+  };
+  const structure = reconcileViewport(viewports.structure, 'Structure');
+  const global = reconcileViewport(viewports.global, 'Global');
+  const restoredViewports: PersistedRendererViewports = {
+    ...(structure === undefined ? {} : { structure }),
+    ...(global === undefined ? {} : { global }),
+  };
 
   return {
     state,
-    ...(restoredViewport === undefined ? {} : { viewport: restoredViewport }),
+    viewports: restoredViewports,
+    ...(structure === undefined ? {} : { viewport: structure }),
     issues,
   };
 }
@@ -233,9 +248,14 @@ function reconcileWorkspaceView(
 export function reconcileCurrentWorkspaceView(
   workspace: ProjectionWorkspace,
   current: ViewProjectionState,
-  viewport?: PersistedViewportAnchor,
+  viewportsOrViewport:
+    PersistedRendererViewports | PersistedViewportAnchor = {},
 ): ReconciledCurrentWorkspaceView {
-  return reconcileWorkspaceView(workspace, current, viewport, 'Current', true);
+  const viewports: PersistedRendererViewports =
+    'anchorEntityId' in viewportsOrViewport
+      ? { structure: viewportsOrViewport }
+      : viewportsOrViewport;
+  return reconcileWorkspaceView(workspace, current, viewports, 'Current', true);
 }
 
 export function restorePersistedWorkspaceView(
@@ -268,11 +288,15 @@ export function restorePersistedWorkspaceView(
       ? {}
       : { filters: persisted.projection.filters }),
   };
-  return reconcileWorkspaceView(
+  const reconciled = reconcileWorkspaceView(
     workspace,
     state,
-    persisted.viewport,
+    persisted.viewports ?? {},
     'Saved',
     false,
   );
+  return {
+    ...reconciled,
+    rendererMode: persisted.rendererMode,
+  };
 }

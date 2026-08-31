@@ -9,11 +9,15 @@ must not be serialized into KG9 workspace state.
 - `graph-preferences.test.ts` verifies defaults, validation, exact serialization,
   and storage-failure behavior.
 
-The stable v1 payload contains both `focusAppearance` (`outline`, `inverted`, or
-`minimal`) and `trackpadZoomMode` (`scroll-zoom` or `pinch-zoom`). The defaults
-are `inverted` and `scroll-zoom`. A pre-UX4C payload containing only the trackpad
-field loads with `inverted`; an invalid field falls back independently so a
-valid sibling preference is preserved. The storage key and schema version stay at
+The stable v1 payload contains `focusAppearance` (`outline`, `inverted`, or
+`minimal`), `trackpadZoomMode` (`scroll-zoom` or `pinch-zoom`), and one
+serializable `globalLayoutSettings` value. Global settings own the soft folder
+toggle, Compact/Normal/Spacious preset, and optional bounded Custom values. They
+are presentation preferences, not KG9 workspace state or persistent graph
+coordinates. The defaults are `inverted`, `scroll-zoom`, and Normal with folder
+clustering on. Older payloads load missing Global settings from that default; an
+invalid field falls back independently so valid sibling preferences survive.
+The storage key and schema version stay at
 `icarus.graph-explorer.preferences.v1`. If storage is unavailable, an in-memory
 change still applies immediately for the current session and the Settings UI
 reports that it will reset when the app closes.

@@ -14,11 +14,13 @@ import {
   createProjectionWorkspace,
   documentOnlyProjectionState,
 } from '@icarus-graph-explorer/view-projection';
+import { DEFAULT_GLOBAL_LAYOUT_SETTINGS } from '@icarus-graph-explorer/renderer-sigma/settings';
 
 import { App } from './App';
 import { DeveloperSettingsSection } from './components/DeveloperSettingsSection';
 import { DiagnosticEvidenceContent } from './components/DiagnosticEvidenceContent';
 import { DiagnosticEvidenceDialog } from './components/DiagnosticEvidenceDialog';
+import { retainGraphSelection } from './components/controlled-selection';
 import { GraphExplorer } from './components/GraphExplorer';
 import { GraphSettings } from './components/GraphSettings';
 import { SourceSettingsSection } from './components/SourceSettingsSection';
@@ -44,6 +46,14 @@ const storage = {
   setItem: () => undefined,
 };
 describe('graph-first explorer shell', () => {
+  it('retains controlled selection identity when a renderer echoes it', () => {
+    const current = { kind: 'node', id: 'entity:source' } as const;
+    expect(retainGraphSelection(current, { ...current })).toBe(current);
+    expect(
+      retainGraphSelection(current, { kind: 'node', id: 'entity:target' }),
+    ).toEqual({ kind: 'node', id: 'entity:target' });
+  });
+
   it('bundles a deterministic stable-identity sample for reload persistence QA', () => {
     expect(sampleReport.identity).toEqual({ stability: 'stable' });
     expect(
@@ -289,7 +299,9 @@ describe('graph-first explorer shell', () => {
     const settingsMarkup = renderToStaticMarkup(
       <GraphSettings
         focusAppearance="inverted"
+        globalLayoutSettings={DEFAULT_GLOBAL_LAYOUT_SETTINGS}
         onFocusAppearanceChange={() => undefined}
+        onGlobalLayoutSettingsChange={() => undefined}
         onOpenChange={() => undefined}
         onTrackpadZoomModeChange={() => undefined}
         open
@@ -316,6 +328,9 @@ describe('graph-first explorer shell', () => {
       </GraphSettings>,
     );
     expect(settingsMarkup).toContain('>Graph Appearance</h3>');
+    expect(settingsMarkup).toContain('>Global Layout</h3>');
+    expect(settingsMarkup).toContain('>Folder clustering</strong>');
+    expect(settingsMarkup).toContain('<legend>Spacing</legend>');
     expect(settingsMarkup).toContain('data-graph-history-shortcuts="off"');
     expect(settingsMarkup).toContain('<legend>Focus Root</legend>');
     expect(settingsMarkup).toContain('>Outline</strong>');
@@ -361,6 +376,44 @@ describe('graph-first explorer shell', () => {
     );
     expect(persistedMarkup).toContain('data-trackpad-zoom-mode="pinch-zoom"');
     expect(persistedMarkup).toContain('data-focus-appearance="inverted"');
+  });
+
+  it('restores Global lazily while keeping Structure controls out of its topology', () => {
+    const workspace = createProjectionWorkspace(report.snapshot);
+    const persisted = serializePersistedWorkspaceView(
+      createPersistedWorkspaceView({
+        workspace,
+        state: documentOnlyProjectionState(),
+        rendererMode: 'global',
+        viewports: {
+          global: {
+            anchorEntityId: report.snapshot.entities.find(
+              ({ kind }) => kind === 'document',
+            )!.id,
+            ratio: 0.32,
+          },
+        },
+      }),
+    );
+    const markup = renderToStaticMarkup(
+      <GraphExplorer
+        identityStability="stable"
+        maximized={false}
+        onMaximizedChange={() => undefined}
+        snapshot={report.snapshot}
+        storage={{
+          ...storage,
+          getItem: (key) =>
+            key === GRAPH_PREFERENCES_STORAGE_KEY ? null : persisted,
+        }}
+      />,
+    );
+
+    expect(markup).toContain(
+      '<button aria-pressed="true" type="button">Global</button>',
+    );
+    expect(markup).toContain('Loading Global overview…');
+    expect(markup).not.toContain('aria-label="Structural depth"');
   });
 
   it('renders diagnostic evidence in a labeled, internally scrollable dialog', () => {

@@ -20,7 +20,6 @@ import {
   type OnEdgesChange,
   type OnMove,
   type OnNodesChange,
-  type OnSelectionChangeFunc,
   type ReactFlowInstance,
 } from '@xyflow/react';
 
@@ -357,28 +356,6 @@ function GraphCanvasInner({
     () => onSelectionChange(null),
     [onSelectionChange],
   );
-  const syncKeyboardSelection = useCallback<
-    OnSelectionChangeFunc<GraphFlowNode, GraphFlowEdge>
-  >(
-    ({ edges: selectedEdges, nodes: selectedNodes }) => {
-      const selectedNode = selectedNodes[0];
-      if (selectedNode !== undefined) {
-        onSelectionChange({
-          kind: 'node',
-          id: selectedNode.data.projectionNodeId,
-        });
-        return;
-      }
-      const selectedEdge = selectedEdges[0];
-      const projectionEdgeId = selectedEdge?.data?.projectionEdgeId;
-      onSelectionChange(
-        projectionEdgeId === undefined
-          ? null
-          : { kind: 'edge', id: projectionEdgeId },
-      );
-    },
-    [onSelectionChange],
-  );
   const syncNodeChanges = useCallback<OnNodesChange<GraphFlowNode>>(
     (changes) => {
       const selectedChange = changes.find(
@@ -689,7 +666,6 @@ function GraphCanvasInner({
           onNodesChange={syncNodeChanges}
           onMoveEnd={observeViewport}
           onPaneClick={clearSelection}
-          onSelectionChange={syncKeyboardSelection}
           panOnDrag
           panOnScroll={trackpadZoomMode === 'pinch-zoom'}
           proOptions={{ hideAttribution: false }}

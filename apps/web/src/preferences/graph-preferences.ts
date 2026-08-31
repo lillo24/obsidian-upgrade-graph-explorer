@@ -2,6 +2,11 @@ import type {
   FocusAppearance,
   TrackpadZoomMode,
 } from '@icarus-graph-explorer/renderer-reactflow';
+import {
+  DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+  validateGlobalLayoutSettings,
+  type GlobalLayoutSettings,
+} from '@icarus-graph-explorer/renderer-sigma/settings';
 
 import type { StorageLike } from '../persistence/storage';
 
@@ -10,11 +15,13 @@ export const GRAPH_PREFERENCES_STORAGE_KEY =
 
 export interface GraphPreferences {
   readonly focusAppearance: FocusAppearance;
+  readonly globalLayoutSettings: GlobalLayoutSettings;
   readonly trackpadZoomMode: TrackpadZoomMode;
 }
 
 export const DEFAULT_GRAPH_PREFERENCES: GraphPreferences = {
   focusAppearance: 'inverted',
+  globalLayoutSettings: DEFAULT_GLOBAL_LAYOUT_SETTINGS,
   trackpadZoomMode: 'scroll-zoom',
 };
 
@@ -63,13 +70,25 @@ export function loadGraphPreferences(
     if (typeof parsed === 'object' && parsed !== null) {
       const stored = parsed as {
         readonly focusAppearance?: unknown;
+        readonly globalLayoutSettings?: unknown;
         readonly trackpadZoomMode?: unknown;
       };
+      let globalLayoutSettings = DEFAULT_GLOBAL_LAYOUT_SETTINGS;
+      if (stored.globalLayoutSettings !== undefined) {
+        try {
+          globalLayoutSettings = validateGlobalLayoutSettings(
+            stored.globalLayoutSettings,
+          );
+        } catch {
+          globalLayoutSettings = DEFAULT_GLOBAL_LAYOUT_SETTINGS;
+        }
+      }
       return {
         preferences: {
           focusAppearance: isFocusAppearance(stored.focusAppearance)
             ? stored.focusAppearance
             : DEFAULT_GRAPH_PREFERENCES.focusAppearance,
+          globalLayoutSettings,
           trackpadZoomMode: isTrackpadZoomMode(stored.trackpadZoomMode)
             ? stored.trackpadZoomMode
             : DEFAULT_GRAPH_PREFERENCES.trackpadZoomMode,

@@ -7,6 +7,8 @@ import { restorePersistedWorkspaceView } from './restore';
 import {
   PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION,
   type PersistedViewportAnchor,
+  type PersistedRendererViewports,
+  type RendererEntryMode,
   type PersistedWorkspaceView,
 } from './types';
 import { validatePersistedWorkspaceView } from './validation';
@@ -14,6 +16,9 @@ import { validatePersistedWorkspaceView } from './validation';
 export interface CreatePersistedWorkspaceViewInput {
   readonly workspace: ProjectionWorkspace;
   readonly state: ViewProjectionState;
+  readonly rendererMode?: RendererEntryMode;
+  readonly viewports?: PersistedRendererViewports;
+  /** Legacy caller alias; used only when viewports.structure is absent. */
   readonly viewport?: PersistedViewportAnchor;
 }
 
@@ -28,6 +33,8 @@ function sortedUnique<T extends string>(values: readonly T[]): readonly T[] {
 export function createPersistedWorkspaceView({
   workspace,
   state,
+  rendererMode = 'structure',
+  viewports,
   viewport,
 }: CreatePersistedWorkspaceViewInput): PersistedWorkspaceView {
   const collapsedEntityIds = sortedUnique(state.disclosure.collapsedEntityIds);
@@ -35,6 +42,7 @@ export function createPersistedWorkspaceView({
   const candidate: PersistedWorkspaceView = {
     schemaVersion: PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION,
     workspaceId: workspace.snapshot().workspace.id,
+    rendererMode,
     projection: {
       disclosure: {
         defaultDepth: state.disclosure.defaultDepth,
@@ -68,7 +76,19 @@ export function createPersistedWorkspaceView({
             },
           }),
     },
-    ...(viewport === undefined ? {} : { viewport }),
+    ...((viewports?.structure ?? viewport) === undefined &&
+    viewports?.global === undefined
+      ? {}
+      : {
+          viewports: {
+            ...((viewports?.structure ?? viewport) === undefined
+              ? {}
+              : { structure: viewports?.structure ?? viewport }),
+            ...(viewports?.global === undefined
+              ? {}
+              : { global: viewports.global }),
+          },
+        }),
   };
   const validation = validatePersistedWorkspaceView(candidate);
   if (!validation.valid) {
@@ -81,6 +101,7 @@ export function createPersistedWorkspaceView({
   const normalized: PersistedWorkspaceView = {
     schemaVersion: PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION,
     workspaceId: candidate.workspaceId,
+    rendererMode: restored.rendererMode,
     projection: {
       disclosure: restored.state.disclosure,
       ...(restored.state.focus === undefined
@@ -90,7 +111,10 @@ export function createPersistedWorkspaceView({
         ? {}
         : { filters: restored.state.filters }),
     },
-    ...(restored.viewport === undefined ? {} : { viewport: restored.viewport }),
+    ...(restored.viewports.structure === undefined &&
+    restored.viewports.global === undefined
+      ? {}
+      : { viewports: restored.viewports }),
   };
   return normalized;
 }

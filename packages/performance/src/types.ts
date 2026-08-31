@@ -64,6 +64,17 @@ export const PERFORMANCE_PHASES = [
   'viewport',
   'search',
   'inspection',
+  'global-projection',
+  'global-map',
+  'graphology-reconcile',
+  'global-layout-worker',
+  'folder-prior',
+  'layout-apply',
+  'sigma-mount-render',
+  'semantic-zoom-style',
+  'global-hover',
+  'global-selection',
+  'global-center',
 ] as const;
 export type PerformancePhase = (typeof PERFORMANCE_PHASES)[number];
 
@@ -78,6 +89,14 @@ export const PERFORMANCE_OPERATIONS = [
   'inspections',
   'viewport-operations',
   'live-adoptions',
+  'global-projections',
+  'global-mappings',
+  'graphology-reconciliations',
+  'global-layouts',
+  'global-style-updates',
+  'global-hover-applications',
+  'global-selection-applications',
+  'global-centers',
 ] as const;
 export type PerformanceOperation = (typeof PERFORMANCE_OPERATIONS)[number];
 
@@ -117,6 +136,14 @@ export interface PerformanceOperationCounts {
   readonly inspections: number;
   readonly 'viewport-operations': number;
   readonly 'live-adoptions': number;
+  readonly 'global-projections': number;
+  readonly 'global-mappings': number;
+  readonly 'graphology-reconciliations': number;
+  readonly 'global-layouts': number;
+  readonly 'global-style-updates': number;
+  readonly 'global-hover-applications': number;
+  readonly 'global-selection-applications': number;
+  readonly 'global-centers': number;
 }
 
 export interface PerformanceEnvironment {
@@ -216,5 +243,13 @@ export function emptyPerformanceOperationCounts(): PerformanceOperationCounts {
     inspections: 0,
     'viewport-operations': 0,
     'live-adoptions': 0,
+    'global-projections': 0,
+    'global-mappings': 0,
+    'graphology-reconciliations': 0,
+    'global-layouts': 0,
+    'global-style-updates': 0,
+    'global-hover-applications': 0,
+    'global-selection-applications': 0,
+    'global-centers': 0,
   };
 }

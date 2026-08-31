@@ -153,6 +153,32 @@ describe('renderer-independent graph navigation history', () => {
     });
   });
 
+  it('traverses renderer modes with their independent semantic viewports', () => {
+    const structure = createGraphHistoryCheckpoint(
+      initialGraphState(),
+      undefined,
+      'structure',
+      { structure: { anchorEntityId: 'section-a', zoom: 1.1 } },
+    );
+    const global = createGraphHistoryCheckpoint(
+      initialGraphState(),
+      undefined,
+      'global',
+      { global: { anchorEntityId: 'doc-a', ratio: 0.32 } },
+    );
+    const history = recordGraphNavigation(
+      createGraphNavigationHistory(),
+      structure,
+      global,
+    );
+    const back = goBackInGraphHistory(history, global);
+    if (back === null) throw new Error('Expected cross-mode Back.');
+    const forward = goForwardInGraphHistory(back.history, back.target);
+
+    expect(back.target).toEqual(structure);
+    expect(forward?.target).toEqual(global);
+  });
+
   it('bounds retained checkpoints at 100 and drops the oldest', () => {
     let history = createGraphNavigationHistory();
     for (let index = 0; index <= GRAPH_NAVIGATION_HISTORY_LIMIT; index += 1) {
@@ -248,8 +274,12 @@ describe('renderer-independent graph navigation history', () => {
       zoom: 1.25,
     });
 
-    expect(Object.keys(checkpoint).sort()).toEqual(['state', 'viewport']);
-    expect(Object.keys(checkpoint.viewport ?? {}).sort()).toEqual([
+    expect(Object.keys(checkpoint).sort()).toEqual([
+      'rendererMode',
+      'state',
+      'viewports',
+    ]);
+    expect(Object.keys(checkpoint.viewports.structure ?? {}).sort()).toEqual([
       'anchorEntityId',
       'zoom',
     ]);

@@ -62,6 +62,9 @@ importers:
       '@icarus-graph-explorer/renderer-reactflow':
         specifier: workspace:*
         version: link:../../packages/renderer-reactflow
+      '@icarus-graph-explorer/renderer-sigma':
+        specifier: workspace:*
+        version: link:../../packages/renderer-sigma
       '@icarus-graph-explorer/source-provider-tauri':
         specifier: workspace:*
         version: link:../../packages/source-provider-tauri
@@ -216,6 +219,34 @@ importers:
         specifier: 19.2.8
         version: 19.2.8(react@19.2.8)
 
+  packages/renderer-sigma:
+    dependencies:
+      '@icarus-graph-explorer/view-projection':
+        specifier: workspace:*
+        version: link:../view-projection
+      graphology:
+        specifier: 0.26.0
+        version: 0.26.0(graphology-types@0.24.8)
+      graphology-layout-forceatlas2:
+        specifier: 0.10.1
+        version: 0.10.1(graphology-types@0.24.8)
+      sigma:
+        specifier: 3.0.3
+        version: 3.0.3(graphology-types@0.24.8)
+    devDependencies:
+      '@types/react':
+        specifier: 19.2.18
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: 19.2.5
+        version: 19.2.5(@types/react@19.2.18)
+      react:
+        specifier: 19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: 19.2.8
+        version: 19.2.8(react@19.2.8)
+
   packages/resolver-obsidian:
     dependencies:
       '@icarus-graph-explorer/adapter-obsidian':
@@ -322,18 +353,12 @@ importers:
 
   tools/global-renderer-spike:
     dependencies:
+      '@icarus-graph-explorer/renderer-sigma':
+        specifier: workspace:*
+        version: link:../../packages/renderer-sigma
       '@icarus-graph-explorer/view-projection':
         specifier: workspace:*
         version: link:../../packages/view-projection
-      graphology:
-        specifier: 0.26.0
-        version: 0.26.0(graphology-types@0.24.8)
-      graphology-layout-forceatlas2:
-        specifier: 0.10.1
-        version: 0.10.1(graphology-types@0.24.8)
-      sigma:
-        specifier: 3.0.3
-        version: 3.0.3(graphology-types@0.24.8)
     devDependencies:
       vite:
         specifier: 8.2.2
@@ -365,6 +390,9 @@ importers:
       '@icarus-graph-explorer/renderer-reactflow':
         specifier: workspace:*
         version: link:../../packages/renderer-reactflow
+      '@icarus-graph-explorer/renderer-sigma':
+        specifier: workspace:*
+        version: link:../../packages/renderer-sigma
       '@icarus-graph-explorer/resolver-obsidian':
         specifier: workspace:*
         version: link:../../packages/resolver-obsidian
