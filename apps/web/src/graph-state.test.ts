@@ -242,6 +242,39 @@ describe('graph projection interaction state', () => {
     ).toBe(navigated);
   });
 
+  it('sets and clears only the active query while normalizing empty filters', () => {
+    const scoped = graphStateReducer(initialGraphState(), {
+      type: 'set-path-scope',
+      pathPrefix: 'folder',
+    });
+    const queried = graphStateReducer(scoped, {
+      type: 'set-query',
+      query: 'kind:section',
+    });
+    const same = graphStateReducer(queried, {
+      type: 'set-query',
+      query: 'kind:section',
+    });
+    const cleared = graphStateReducer(queried, {
+      type: 'set-query',
+      query: null,
+    });
+
+    expect(queried.filters).toEqual({
+      pathPrefixes: ['folder'],
+      query: 'kind:section',
+    });
+    expect(same).toBe(queried);
+    expect(cleared.filters).toEqual({ pathPrefixes: ['folder'] });
+    const initial = initialGraphState();
+    expect(
+      graphStateReducer(initial, {
+        type: 'set-query',
+        query: null,
+      }),
+    ).toBe(initial);
+  });
+
   it('reset clears the heading ceiling back to no limit', () => {
     const limited = graphStateReducer(initialGraphState(), {
       type: 'set-heading-limit',

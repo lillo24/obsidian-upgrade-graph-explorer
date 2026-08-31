@@ -32,10 +32,13 @@ Structure or Global anchors are dropped without inventing replacements. A worksp
 mismatch is rejected. `filters.text`, search, selection, renderer IDs, raw
 viewport coordinates, renderer node IDs, layouts, ForceAtlas2 positions,
 layout settings, source text, and timestamps are never stored.
+An optional active QUERY1 string is stored inside the filters object after
+canonicalization. Malformed queries are rejected; older records without the
+field remain valid.
 
 Live reconciliation is separate from persisted hydration: it preserves the
 current transient text filter and every still-valid disclosure, focus, path,
-entity-kind, reference-status, and semantic viewport choice. Missing canonical
+entity-kind, reference-status, graph-query, and semantic viewport choice. Missing canonical
 IDs and stale paths are removed deterministically before projection.
 
 Schema v2 accepts structural `defaultDepth` values 0–3 plus an optional literal
@@ -47,7 +50,7 @@ KG13B2 can add Local Free/Structured state without treating raw coordinates as
 canonical viewport semantics. New records persist the heading ceiling only when
 active, and reset/default state omits it.
 
-The production dependency boundary is core plus view-projection only. Browser
+The production dependency boundary is core, graph-query, and view-projection only. Browser
 `localStorage` is one outer adapter in `apps/web`, not part of this contract.
 
 ## Local validation

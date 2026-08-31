@@ -44,6 +44,8 @@ export interface ViewProjectionFilters {
   readonly text?: string;
   readonly entityKinds?: readonly EntityKind[];
   readonly referenceStatuses?: readonly ReferenceResolutionStatus[];
+  /** Canonical QUERY1 expression; parsed once for each projection. */
+  readonly query?: string;
 }
 
 export interface ViewProjectionState {
@@ -105,7 +107,8 @@ export type ProjectionIssueCode =
   | 'conflicting-disclosure-state'
   | 'unknown-focus-root'
   | 'hidden-focus-root'
-  | 'invalid-path-prefix';
+  | 'invalid-path-prefix'
+  | 'invalid-query';
 
 export interface ProjectionIssue {
   readonly code: ProjectionIssueCode;

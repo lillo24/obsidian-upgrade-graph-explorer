@@ -13,6 +13,7 @@
     "@icarus-graph-explorer/dagre-layout": "workspace:*",
     "@icarus-graph-explorer/diagnostics-obsidian": "workspace:*",
     "@icarus-graph-explorer/explorer-inspection": "workspace:*",
+    "@icarus-graph-explorer/graph-query": "workspace:*",
     "@icarus-graph-explorer/performance": "workspace:*",
     "@icarus-graph-explorer/renderer-reactflow": "workspace:*",
     "@icarus-graph-explorer/renderer-sigma": "workspace:*",

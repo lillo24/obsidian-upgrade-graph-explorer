@@ -314,4 +314,95 @@ describe('projected filters', () => {
     expect(projection.nodes).toEqual([]);
     expect(projection.issues[0]?.code).toBe('invalid-path-prefix');
   });
+
+  it('evaluates canonical QUERY1 paths, titles, levels, and Boolean groups', () => {
+    const projection = projectSnapshot(projectionFixture(), {
+      disclosure: {
+        defaultDepth: 3,
+        expandedEntityIds: [],
+        collapsedEntityIds: [],
+        includeBlocks: false,
+      },
+      filters: {
+        query: '(path:"folder" AND sections AND level<=2) OR title:"deep"',
+      },
+    });
+
+    expect(entityIds(projection)).toEqual([
+      'a-deep',
+      'a-detail',
+      'a-overview',
+      'b-target',
+      'doc-a',
+      'doc-b',
+    ]);
+    expect(
+      entityNodes(projection)
+        .filter(({ role }) => role === 'content')
+        .map(({ entityId }) => entityId)
+        .sort(),
+    ).toEqual(['a-deep', 'b-target']);
+  });
+
+  it('combines QUERY1 with simple filters and applies it after Focus', () => {
+    const projection = projectSnapshot(projectionFixture(), {
+      ...focusState('doc-a', 1),
+      filters: {
+        pathPrefixes: ['folder'],
+        entityKinds: ['document'],
+        query: 'NOT text:"archive"',
+      },
+    });
+
+    expect(entityIds(projection)).toEqual(['doc-b']);
+  });
+
+  it('fails closed for invalid externally constructed queries', () => {
+    const projection = projectSnapshot(projectionFixture(), {
+      ...documentOnlyProjectionState(),
+      filters: { query: 'sections documents' },
+    });
+
+    expect(projection.nodes).toEqual([]);
+    expect(projection.edges).toEqual([]);
+    expect(projection.issues).toContainEqual(
+      expect.objectContaining({ code: 'invalid-query' }),
+    );
+  });
+
+  it('keeps query levels separate from disclosure depth and Blocks eligibility', () => {
+    const state = documentOnlyProjectionState();
+    const levels = projectSnapshot(projectionFixture(), {
+      ...state,
+      filters: { query: 'level<=3' },
+    });
+    const blocks = projectSnapshot(projectionFixture(), {
+      ...state,
+      filters: { query: 'blocks' },
+    });
+
+    expect(state.disclosure.defaultDepth).toBe(0);
+    expect(state.disclosure.includeBlocks).toBe(false);
+    expect(entityIds(levels)).toEqual([]);
+    expect(blocks.nodes).toEqual([]);
+  });
+
+  it('uses QUERY1 in DISC1 actionable reveal counts', () => {
+    const matching = projectSnapshot(projectionFixture(), {
+      ...documentOnlyProjectionState(),
+      filters: {
+        query: 'path:"A.md" AND (documents OR title:"overview")',
+      },
+    });
+    const excluded = projectSnapshot(projectionFixture(), {
+      ...documentOnlyProjectionState(),
+      filters: { query: 'path:"A.md" AND documents' },
+    });
+    const count = (projection: ViewProjection) =>
+      entityNodes(projection).find(({ entityId }) => entityId === 'doc-a')
+        ?.revealableDescendantCount;
+
+    expect(count(matching)).toBe(1);
+    expect(count(excluded)).toBe(0);
+  });
 });

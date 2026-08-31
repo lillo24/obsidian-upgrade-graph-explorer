@@ -163,6 +163,57 @@ describe('shared canonical navigation planning', () => {
     ).toBe(true);
   });
 
+  it('keeps a matching advanced query and clears a conflicting one', () => {
+    const workspace = createProjectionWorkspace(snapshot);
+    const matching = planEntityNavigation(
+      workspace,
+      {
+        ...documentOnlyProjectionState(),
+        filters: { query: 'path:"alpha" AND sections' },
+      },
+      'section-a',
+    );
+    const conflicting = planEntityNavigation(
+      workspace,
+      {
+        ...documentOnlyProjectionState(),
+        filters: {
+          pathPrefixes: ['alpha'],
+          query: 'documents AND path:"beta"',
+        },
+      },
+      'section-a',
+    );
+
+    expect(matching.ok).toBe(true);
+    if (matching.ok) {
+      expect(matching.state.filters?.query).toBe('path:"alpha" AND sections');
+      expect(matching.filterChanges).not.toContain('advanced-query-cleared');
+    }
+    expect(conflicting.ok).toBe(true);
+    if (conflicting.ok) {
+      expect(conflicting.state.filters).toEqual({ pathPrefixes: ['alpha'] });
+      expect(conflicting.filterChanges).toContain('advanced-query-cleared');
+      expect(conflicting.announcement).toContain('Advanced query cleared');
+    }
+  });
+
+  it('clears an invalid externally supplied query instead of failing navigation', () => {
+    const plan = planEntityNavigation(
+      createProjectionWorkspace(snapshot),
+      {
+        ...documentOnlyProjectionState(),
+        filters: { query: 'sections documents' },
+      },
+      'doc-b',
+    );
+
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.state.filters).toBeUndefined();
+    expect(plan.filterChanges).toEqual(['advanced-query-cleared']);
+  });
+
   it('reveals a deep target without widening the selected structural depth', () => {
     const workspace = createProjectionWorkspace(snapshot);
     const state: ViewProjectionState = {

@@ -197,7 +197,15 @@ autosave persist that current state under the same workspace ID. Search,
 Inspector visibility, maximize mode, and surviving selection stay in memory;
 selection clears with an announcement only when its projected element vanishes.
 
-The browser key contains no report filename, vault basename, or path. Search,
+QUERY1 adds one optional canonical advanced-query string to that schema-v1
+active view. Draft text never projects, enters history, or persists. Saved
+Filters are a separate stable-workspace registry containing only `{name,
+query}` definitions; applying one changes only the active query, deleting one
+does not change graph history, and Reset saved view leaves definitions intact.
+Unstable identities still support session-only Advanced query use but disable
+cross-session saving with an explanation.
+
+The browser keys contain no report filename, vault basename, or path. Search,
 hover, graph/inspector selection, pagination, renderer graph data, Dagre
 coordinates, and raw viewport x/y remain transient. Browser reload restores the
 bundled stable sample automatically; a user-selected report file must still be

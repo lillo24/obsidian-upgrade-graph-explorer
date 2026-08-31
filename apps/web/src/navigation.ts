@@ -1,5 +1,9 @@
 import type { EntityId, EntityKind } from '@icarus-graph-explorer/core';
 import {
+  matchesGraphQuery,
+  parseGraphQuery,
+} from '@icarus-graph-explorer/graph-query';
+import {
   projectView,
   revealEntityInViewState,
   type ProjectionNodeId,
@@ -9,7 +13,10 @@ import {
 } from '@icarus-graph-explorer/view-projection';
 
 export type NavigationFilterChange =
-  'path-scope-cleared' | 'entity-kind-included' | 'projected-text-cleared';
+  | 'path-scope-cleared'
+  | 'entity-kind-included'
+  | 'projected-text-cleared'
+  | 'advanced-query-cleared';
 
 export type EntityNavigationPlan =
   | {
@@ -72,6 +79,13 @@ function navigationFilters(
     );
   if (!keepText) changes.push('projected-text-cleared');
 
+  const parsedQuery =
+    filters.query === undefined ? undefined : parseGraphQuery(filters.query);
+  const keepQuery =
+    parsedQuery === undefined ||
+    (parsedQuery.valid && matchesGraphQuery(target, parsedQuery.expression));
+  if (!keepQuery) changes.push('advanced-query-cleared');
+
   const next: ViewProjectionFilters = {
     ...(keepPath && filters.pathPrefixes !== undefined
       ? { pathPrefixes: filters.pathPrefixes }
@@ -87,12 +101,16 @@ function navigationFilters(
     ...(filters.referenceStatuses === undefined
       ? {}
       : { referenceStatuses: filters.referenceStatuses }),
+    ...(keepQuery && filters.query !== undefined
+      ? { query: filters.query }
+      : {}),
   };
   const hasFilters =
     next.pathPrefixes !== undefined ||
     next.text !== undefined ||
     next.entityKinds !== undefined ||
-    next.referenceStatuses !== undefined;
+    next.referenceStatuses !== undefined ||
+    next.query !== undefined;
   return { filters: hasFilters ? next : undefined, changes };
 }
 
@@ -112,6 +130,8 @@ function changeAnnouncement(
         return 'Entity kind included';
       case 'projected-text-cleared':
         return 'Projected text filter cleared';
+      case 'advanced-query-cleared':
+        return 'Advanced query cleared';
     }
   });
   return ` ${labels.join('; ')} to reveal the target.`;

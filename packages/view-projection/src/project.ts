@@ -1,4 +1,5 @@
 import type { KnowledgeSnapshot } from '@icarus-graph-explorer/core';
+import { parseGraphQuery } from '@icarus-graph-explorer/graph-query';
 
 import { buildBaseProjection } from './base-projection';
 import type { DisclosureResult } from './disclosure';
@@ -39,8 +40,14 @@ function hasEntityVisibilityFilter(state: ViewProjectionState): boolean {
   return (
     state.filters?.pathPrefixes !== undefined ||
     state.filters?.entityKinds !== undefined ||
-    (state.filters?.text?.trim().length ?? 0) > 0
+    (state.filters?.text?.trim().length ?? 0) > 0 ||
+    state.filters?.query !== undefined
   );
+}
+
+function preparedQuery(filters: ViewProjectionState['filters']) {
+  if (filters?.query === undefined) return undefined;
+  return parseGraphQuery(filters.query);
 }
 
 function expandAllCandidateOwners(
@@ -65,7 +72,8 @@ export function projectView(
 ): ViewProjection {
   const base = buildBaseProjection(workspace, state.disclosure);
   const focused = applyFocus(workspace, base.projection, state.focus);
-  const filtered = applyFilters(workspace, focused, state.filters);
+  const query = preparedQuery(state.filters);
+  const filtered = applyFilters(workspace, focused, state.filters, query);
   let finalized = filtered;
   if (
     state.focus === undefined &&
@@ -80,6 +88,7 @@ export function projectView(
         workspace,
         candidateBase,
         state.filters,
+        query,
       );
       const retainedCandidateEntityIds = new Set(
         candidateFiltered.nodes.flatMap((node) =>

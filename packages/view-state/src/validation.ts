@@ -1,4 +1,5 @@
 import type { EntityKind } from '@icarus-graph-explorer/core';
+import { parseGraphQuery } from '@icarus-graph-explorer/graph-query';
 import {
   STRUCTURAL_DEPTHS,
   type ReferenceResolutionStatus,
@@ -227,7 +228,7 @@ function validateFilters(
   fields(
     value,
     [],
-    ['pathPrefixes', 'entityKinds', 'referenceStatuses'],
+    ['pathPrefixes', 'entityKinds', 'referenceStatuses', 'query'],
     path,
     issues,
   );
@@ -253,6 +254,21 @@ function validateFilters(
       issues,
       REFERENCE_STATUSES,
     );
+  }
+  if (Object.hasOwn(value, 'query')) {
+    if (nonEmptyString(value.query, `${path}.query`, issues)) {
+      const parsed = parseGraphQuery(value.query);
+      if (!parsed.valid) {
+        const first = parsed.issues[0];
+        issue(
+          issues,
+          `${path}.query`,
+          first === undefined
+            ? 'Expected a valid graph query.'
+            : `Invalid graph query at character ${first.position + 1}: ${first.message}`,
+        );
+      }
+    }
   }
 }
 

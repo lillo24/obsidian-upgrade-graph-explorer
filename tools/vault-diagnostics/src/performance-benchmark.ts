@@ -334,6 +334,17 @@ function projectionStates(snapshot: KnowledgeSnapshot): Readonly<
       },
       layoutMode: 'structure',
     },
+    'depth-three-advanced-query': {
+      label: 'Three structural levels with nontrivial advanced query',
+      state: {
+        ...threeLevels,
+        filters: {
+          query:
+            '(documents OR (sections AND level<=3)) AND NOT path:"archive"',
+        },
+      },
+      layoutMode: 'structure',
+    },
     'fully-expanded-stress': {
       label: 'Fully expanded structural stress',
       state: {

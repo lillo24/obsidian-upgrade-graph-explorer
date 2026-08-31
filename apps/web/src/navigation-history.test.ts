@@ -261,6 +261,7 @@ describe('renderer-independent graph navigation history', () => {
       { ...base, filters: { entityKinds: ['document'] } },
       { ...base, filters: { referenceStatuses: ['resolved'] } },
       { ...base, filters: { text: 'needle' } },
+      { ...base, filters: { query: 'kind:section' } },
     ];
 
     expect(
@@ -299,6 +300,7 @@ describe('renderer-independent graph navigation history', () => {
       { type: 'set-focus-hops', hops: 2 },
       { type: 'set-focus-direction', direction: 'incoming' },
       { type: 'set-path-scope', pathPrefix: 'folder' },
+      { type: 'set-query', query: 'kind:section' },
       {
         type: 'toggle-entity-kind',
         entityKind: 'section',

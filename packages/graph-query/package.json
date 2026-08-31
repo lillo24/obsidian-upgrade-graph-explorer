@@ -1,5 +1,5 @@
 {
-  "name": "@icarus-graph-explorer/view-state",
+  "name": "@icarus-graph-explorer/graph-query",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,11 +15,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@icarus-graph-explorer/core": "workspace:*",
-    "@icarus-graph-explorer/graph-query": "workspace:*",
-    "@icarus-graph-explorer/view-projection": "workspace:*"
-  },
-  "devDependencies": {
-    "@icarus-graph-explorer/stable-identity": "workspace:*"
+    "@icarus-graph-explorer/core": "workspace:*"
   }
 }

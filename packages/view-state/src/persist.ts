@@ -2,6 +2,7 @@ import type {
   ProjectionWorkspace,
   ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
+import { parseGraphQuery } from '@icarus-graph-explorer/graph-query';
 
 import { restorePersistedWorkspaceView } from './restore';
 import {
@@ -37,6 +38,20 @@ export function createPersistedWorkspaceView({
   viewports,
   viewport,
 }: CreatePersistedWorkspaceViewInput): PersistedWorkspaceView {
+  const parsedQuery =
+    state.filters?.query === undefined
+      ? undefined
+      : parseGraphQuery(state.filters.query);
+  if (parsedQuery !== undefined && !parsedQuery.valid) {
+    const first = parsedQuery.issues[0];
+    throw new Error(
+      `Cannot persist invalid graph query${
+        first === undefined
+          ? '.'
+          : ` at character ${first.position + 1}: ${first.message}`
+      }`,
+    );
+  }
   const collapsedEntityIds = sortedUnique(state.disclosure.collapsedEntityIds);
   const collapsed = new Set(collapsedEntityIds);
   const candidate: PersistedWorkspaceView = {
@@ -73,6 +88,9 @@ export function createPersistedWorkspaceView({
                       state.filters.referenceStatuses,
                     ),
                   }),
+              ...(parsedQuery === undefined
+                ? {}
+                : { query: parsedQuery.canonical }),
             },
           }),
     },

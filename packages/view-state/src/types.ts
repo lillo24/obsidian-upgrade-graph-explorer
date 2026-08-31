@@ -45,6 +45,7 @@ export interface PersistedProjectionState {
     readonly pathPrefixes?: readonly WorkspacePath[];
     readonly entityKinds?: readonly EntityKind[];
     readonly referenceStatuses?: readonly ReferenceResolutionStatus[];
+    readonly query?: string;
   };
 }
 
