@@ -205,7 +205,7 @@ describe('browser saved-view storage', () => {
   });
 
   it.each([2, 3] as const)(
-    'hydrates persisted structural depth %i without a schema migration',
+    'hydrates persisted structural depth %i under schema v2',
     (defaultDepth) => {
       const storage = new MemoryStorage();
       const value = saved('deep', defaultDepth);
@@ -217,7 +217,7 @@ describe('browser saved-view storage', () => {
         workspace: createProjectionWorkspace(snapshot('deep')),
       });
 
-      expect(value.schemaVersion).toBe(1);
+      expect(value.schemaVersion).toBe(2);
       expect(hydration.state.disclosure.defaultDepth).toBe(defaultDepth);
       expect(hydration.writable).toBe(true);
     },

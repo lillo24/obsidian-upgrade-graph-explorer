@@ -16,15 +16,24 @@ canonical truth, or own a platform storage implementation.
   the canvas and the single stateful Search instance mounted across shell/live
   changes and does not re-derive graph edges or persist renderer coordinates or
   shell visibility. Maximize/restore is passed to the renderer as a narrow
-  callback so the canvas control stack remains the mode trigger. Inactive Focus
+  callback so the canvas control stack remains the mode trigger. KG13B1 adds
+  the initial lazy Structure/Global renderer entry point, separate semantic
+  viewports, cross-mode history/context, Global-effective KG6 state, and
+  explicit per-session fallback without persisting Graphology or coordinates.
+  This is an initial presentation entry point, not a permanent two-scale product
+  model; Local Free/Structured remains a future extension. Inactive Focus
   has no toolbar chrome; canonical nodes enter or retarget Focus through the
   renderer's direct pointer/keyboard callback while selection remains intact.
 - `GraphHistoryControls.tsx` owns the compact, accessible Back/Forward arrow
   group shared by the normal toolbar and maximized floating controls. It receives
   only availability and callbacks; graph state, semantic viewport, keyboard
   policy, and storage remain outside the component.
+- `controlled-selection.ts` prevents equivalent controlled renderer selection
+  echoes from creating a React Flow update loop during programmatic handoff.
 - `GraphSettings.tsx` presents the shared normal/maximized Settings popover and
-  its Graph Appearance and Graph Interaction sections. It accepts narrow
+  its Graph Appearance, Global Layout, and Graph Interaction sections. Global
+  layout controls edit one validated serializable preference rather than
+  scattering component-local physics values. It accepts narrow
   App-owned Source/Developer presentation content without importing source
   providers; global focus-root and gesture preference storage ownership remains
   in `../preferences/`.
@@ -54,13 +63,19 @@ canonical truth, or own a platform storage implementation.
   exit listener for the transient application maximize mode. The graph shell
   closes a nearer Tools, Settings, or Filters surface before leaving maximized
   mode. Their visibility and Inspector visibility remain session-only state.
+- `GlobalGraphView.tsx` is the only lazy production import of the direct Sigma
+  canvas. It owns the Worker service and a bounded module-lifetime layout cache
+  so Structure startup stays Sigma-free and exact results survive mode switches.
+- `use-worker-service-disposal.ts` owns Strict Mode-safe Worker service leases:
+  same-tick development probes keep the service, while a real unmount disposes it.
 - `ProvenanceInspector.tsx` presents user-facing identity, breadcrumbs,
   outgoing links, backlinks, connection occurrences, structural containment,
   and plain-language link problems in bounded groups. Canonical IDs, exact
   ranges, resolution metadata, ambiguous candidate mentions, and collapsed
   internal occurrences stay in a closed-by-default technical disclosure. It is
   always an overlay drawer, keeps clear-selection separate from collapse, and
-  resets bounded content only when the inspected selection changes.
+  resets bounded content only when the inspected selection changes. A selected
+  Global document also receives the exact **Open in Structure** handoff.
 - `SummaryPanel.tsx` renders derived canonical/evidence counts.
 - `HierarchyPanel.tsx` lazily expands document, section, and block ownership.
 - `ReferencesPanel.tsx` pages filtered references and exposes provenance details.
@@ -74,8 +89,10 @@ serialized live transactions, pause/recovery, and watcher lifecycle.
 `graph-state.ts` owns pure KG6 interaction transitions and web-boundary
 normalization that keeps legacy entity-kind filters internally eligible for
 blocks while `disclosure.includeBlocks` remains the sole visible opt-in.
+`global-view.ts` owns the effective documents-only/resolved-only Global KG6
+state and exact containing-document mapping without mutating Structure state.
 `navigation-history.ts` owns the bounded, immutable session history over KG6
-state plus canonical viewport bookmarks, while `graph-history-shortcuts.ts`
+state plus renderer entry mode and separate canonical viewport bookmarks, while `graph-history-shortcuts.ts`
 owns exact graph-context keyboard classification. `navigation.ts` owns the
 verified target-reveal plan, and `report-view.ts` owns secondary evidence
 transformations.

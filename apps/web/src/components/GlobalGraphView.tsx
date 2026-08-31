@@ -1,0 +1,32 @@
+import { useMemo } from 'react';
+
+import {
+  GlobalGraphCanvas,
+  GlobalLayoutCache,
+  type GlobalGraphCanvasProps,
+} from '@icarus-graph-explorer/renderer-sigma';
+import '@icarus-graph-explorer/renderer-sigma/styles.css';
+
+import { createGlobalLayoutWorkerService } from '../workers/global-layout-worker-client';
+import { useWorkerServiceDisposal } from './use-worker-service-disposal';
+
+export type GlobalGraphViewProps = Omit<
+  GlobalGraphCanvasProps,
+  'layoutCache' | 'layoutService'
+>;
+
+// The lazy module survives component unmounts, so exact derived layouts remain
+// available when a session moves Structure → Global → Structure → Global.
+const layoutCache = new GlobalLayoutCache();
+
+export default function GlobalGraphView(props: GlobalGraphViewProps) {
+  const layoutService = useMemo(() => createGlobalLayoutWorkerService(), []);
+  useWorkerServiceDisposal(layoutService);
+  return (
+    <GlobalGraphCanvas
+      {...props}
+      layoutCache={layoutCache}
+      layoutService={layoutService}
+    />
+  );
+}

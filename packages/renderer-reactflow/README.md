@@ -137,6 +137,12 @@ uses React Flow's persistent selected state without fading unrelated content;
 Focus remains projection-level graph isolation owned by KG6. Hover changes map
 prepared renderer elements only and never rerun projection or layout.
 
+Node and edge change callbacks are the single owner of React Flow keyboard and
+marquee selection updates. `GraphCanvas` intentionally does not mirror the
+aggregate `onSelectionChange` callback back into its controlled selection prop;
+doing both creates a feedback loop when application navigation selects a node
+while switching renderer modes.
+
 KG12A adds an optional `PerformanceInstrumentation` prop and matching pure
 prepare hook. When omitted—the normal path—there is no recorder. When supplied,
 mapping, Dagre, highlight, viewport, commit, and next-paint counts remain

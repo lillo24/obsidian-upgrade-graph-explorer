@@ -4,12 +4,23 @@ import type {
   FocusAppearance,
   TrackpadZoomMode,
 } from '@icarus-graph-explorer/renderer-reactflow';
+import {
+  customGlobalLayoutSettings,
+  GLOBAL_LAYOUT_CUSTOM_RANGES,
+  type GlobalLayoutCustomSettings,
+  type GlobalLayoutSettings,
+  type GlobalSpacingPreset,
+} from '@icarus-graph-explorer/renderer-sigma/settings';
 
 interface GraphSettingsProps {
   readonly children?: ReactNode;
   readonly focusAppearance: FocusAppearance;
+  readonly globalLayoutSettings: GlobalLayoutSettings;
   readonly open: boolean;
   readonly onFocusAppearanceChange: (appearance: FocusAppearance) => void;
+  readonly onGlobalLayoutSettingsChange: (
+    settings: GlobalLayoutSettings,
+  ) => void;
   readonly onOpenChange: (open: boolean) => void;
   readonly onTrackpadZoomModeChange: (mode: TrackpadZoomMode) => void;
   readonly trackpadZoomMode: TrackpadZoomMode;
@@ -33,13 +44,36 @@ function SettingsIcon() {
 export const GraphSettings = memo(function GraphSettings({
   children,
   focusAppearance,
+  globalLayoutSettings,
   onFocusAppearanceChange,
+  onGlobalLayoutSettingsChange,
   onOpenChange,
   onTrackpadZoomModeChange,
   open,
   trackpadZoomMode,
   warning,
 }: GraphSettingsProps) {
+  const changePreset = (spacingPreset: GlobalSpacingPreset) => {
+    onGlobalLayoutSettingsChange({
+      ...globalLayoutSettings,
+      spacingPreset,
+      ...(globalLayoutSettings.custom === undefined
+        ? {}
+        : { custom: customGlobalLayoutSettings(spacingPreset) }),
+    });
+  };
+  const changeCustom = (
+    key: keyof GlobalLayoutCustomSettings,
+    value: number,
+  ) => {
+    const custom =
+      globalLayoutSettings.custom ??
+      customGlobalLayoutSettings(globalLayoutSettings.spacingPreset);
+    onGlobalLayoutSettingsChange({
+      ...globalLayoutSettings,
+      custom: { ...custom, [key]: value },
+    });
+  };
   return (
     <div className="graph-settings">
       <button
@@ -117,6 +151,78 @@ export const GraphSettings = memo(function GraphSettings({
               </fieldset>
             </section>
             <section
+              aria-labelledby="global-layout-settings-heading"
+              className="graph-settings__section"
+            >
+              <h3 id="global-layout-settings-heading">Global Layout</h3>
+              <label className="graph-settings__check">
+                <input
+                  checked={globalLayoutSettings.folderClustering}
+                  name="global-folder-clustering"
+                  onChange={(event) =>
+                    onGlobalLayoutSettingsChange({
+                      ...globalLayoutSettings,
+                      folderClustering: event.currentTarget.checked,
+                    })
+                  }
+                  type="checkbox"
+                />
+                <span>
+                  <strong>Folder clustering</strong>
+                  <small>
+                    Adds a soft spatial preference without creating graph links.
+                  </small>
+                </span>
+              </label>
+              <fieldset>
+                <legend>Spacing</legend>
+                {(['compact', 'normal', 'spacious'] as const).map((preset) => (
+                  <label key={preset}>
+                    <input
+                      checked={globalLayoutSettings.spacingPreset === preset}
+                      name="global-spacing-preset"
+                      onChange={() => changePreset(preset)}
+                      type="radio"
+                      value={preset}
+                    />
+                    <span>
+                      {preset.slice(0, 1).toUpperCase() + preset.slice(1)}
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+              <label className="graph-settings__check">
+                <input
+                  checked={globalLayoutSettings.custom !== undefined}
+                  name="global-custom-layout"
+                  onChange={(event) =>
+                    onGlobalLayoutSettingsChange({
+                      folderClustering: globalLayoutSettings.folderClustering,
+                      spacingPreset: globalLayoutSettings.spacingPreset,
+                      ...(event.currentTarget.checked
+                        ? {
+                            custom: customGlobalLayoutSettings(
+                              globalLayoutSettings.spacingPreset,
+                            ),
+                          }
+                        : {}),
+                    })
+                  }
+                  type="checkbox"
+                />
+                <span>
+                  <strong>Custom controls</strong>
+                  <small>Expose a bounded product-level subset.</small>
+                </span>
+              </label>
+              {globalLayoutSettings.custom === undefined ? null : (
+                <GlobalCustomLayoutControls
+                  onChange={changeCustom}
+                  settings={globalLayoutSettings.custom}
+                />
+              )}
+            </section>
+            <section
               aria-labelledby="graph-interaction-settings-heading"
               className="graph-settings__section"
             >
@@ -164,3 +270,45 @@ export const GraphSettings = memo(function GraphSettings({
     </div>
   );
 });
+
+function GlobalCustomLayoutControls({
+  onChange,
+  settings,
+}: {
+  readonly onChange: (
+    key: keyof GlobalLayoutCustomSettings,
+    value: number,
+  ) => void;
+  readonly settings: GlobalLayoutCustomSettings;
+}) {
+  return (
+    <div className="global-layout-custom-controls">
+      {(
+        [
+          ['linkForce', 'Reference pull', 0.05],
+          ['folderCohesion', 'Folder tendency', 0.005],
+          ['betweenFolderSpacing', 'Folder separation', 0.1],
+          ['nodeSize', 'Node size', 0.25],
+          ['linkThickness', 'Link thickness', 0.05],
+          ['labelThreshold', 'Label threshold', 0.25],
+        ] as const
+      ).map(([key, label, step]) => (
+        <label key={key}>
+          <span>
+            {label} <output>{settings[key]}</output>
+          </span>
+          <input
+            max={GLOBAL_LAYOUT_CUSTOM_RANGES[key].max}
+            min={GLOBAL_LAYOUT_CUSTOM_RANGES[key].min}
+            onChange={(event) =>
+              onChange(key, Number(event.currentTarget.value))
+            }
+            step={step}
+            type="range"
+            value={settings[key]}
+          />
+        </label>
+      ))}
+    </div>
+  );
+}

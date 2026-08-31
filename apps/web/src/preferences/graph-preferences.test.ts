@@ -53,17 +53,19 @@ describe('graph preferences', () => {
     const storage = memoryStorage('{"trackpadZoomMode":"pinch-zoom"}');
     expect(loadGraphPreferences(storage).preferences).toEqual({
       focusAppearance: 'inverted',
+      globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
       trackpadZoomMode: 'pinch-zoom',
     });
 
     expect(
       saveGraphPreferences(storage, {
         focusAppearance: 'minimal',
+        globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
         trackpadZoomMode: 'scroll-zoom',
       }),
     ).toEqual({ ok: true });
     expect(storage.value).toBe(
-      '{"focusAppearance":"minimal","trackpadZoomMode":"scroll-zoom"}',
+      '{"focusAppearance":"minimal","globalLayoutSettings":{"folderClustering":true,"spacingPreset":"normal"},"trackpadZoomMode":"scroll-zoom"}',
     );
   });
 
@@ -76,6 +78,7 @@ describe('graph preferences', () => {
       ).preferences,
     ).toEqual({
       focusAppearance: 'inverted',
+      globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
       trackpadZoomMode: 'pinch-zoom',
     });
     expect(
@@ -86,8 +89,49 @@ describe('graph preferences', () => {
       ).preferences,
     ).toEqual({
       focusAppearance: 'inverted',
+      globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
       trackpadZoomMode: 'scroll-zoom',
     });
+  });
+
+  it('restores serializable Global layout settings and bounds invalid values', () => {
+    const valid = loadGraphPreferences(
+      memoryStorage(
+        JSON.stringify({
+          globalLayoutSettings: {
+            folderClustering: false,
+            spacingPreset: 'spacious',
+          },
+        }),
+      ),
+    );
+    expect(valid.preferences.globalLayoutSettings).toEqual({
+      folderClustering: false,
+      spacingPreset: 'spacious',
+    });
+
+    const invalid = loadGraphPreferences(
+      memoryStorage(
+        JSON.stringify({
+          globalLayoutSettings: {
+            folderClustering: true,
+            spacingPreset: 'normal',
+            custom: {
+              linkForce: 1,
+              folderCohesion: 99,
+              withinFolderSpacing: 1,
+              betweenFolderSpacing: 3,
+              nodeSize: 4,
+              linkThickness: 1,
+              labelThreshold: 7,
+            },
+          },
+        }),
+      ),
+    );
+    expect(invalid.preferences.globalLayoutSettings).toBe(
+      DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
+    );
   });
 
   it('keeps the session usable and returns a visible warning on write failure', () => {
@@ -99,6 +143,7 @@ describe('graph preferences', () => {
     expect(
       saveGraphPreferences(storage, {
         focusAppearance: 'inverted',
+        globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
         trackpadZoomMode: 'pinch-zoom',
       }),
     ).toEqual({

@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, and KG11 implements Tauri-selected, coalesced live vault acquisition with transactional KG10 application, full resync, and in-place view preservation. KG12 supplies the performance baseline and implements separate stateful W1 workspace and stateless W3 Dagre workers without changing KG11 transaction semantics or renderer-independent contracts. KG13A completes the isolated decision spike and adopts a documents-only Sigma/Graphology Global renderer for a later KG13B; it is not wired into the product and does not replace Structure.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, and KG11 implements Tauri-selected, coalesced live vault acquisition with transactional KG10 application, full resync, and in-place view preservation. KG12 supplies the performance baseline and implements separate stateful W1 workspace and stateless W3 Dagre workers without changing KG11 transaction semantics or renderer-independent contracts. KG13A selected direct Sigma/Graphology for a complementary Global renderer. KG13B1 promotes it into the product as a lazy documents-first Global/Regional mode with off-main layout, soft folder geometry, and stable persistence/history seams; Structure remains the hierarchy/detail authority and Local Free/Structured remains KG13B2.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -151,13 +151,16 @@ renderers, layout engines, application code, and graph libraries are
 mechanically excluded from its production source.
 
 `packages/view-state` depends inward on core and view-projection only. It owns a
-versioned plain-data subset of KG6 disclosure, focus, user-facing filters, and a
-semantic canonical-entity viewport bookmark. It strictly validates saved data,
+versioned plain-data subset of KG6 disclosure, focus, user-facing filters,
+renderer entry mode, and separate semantic Structure/Global canonical-entity
+viewport bookmarks. Schema v2 migrates schema-v1 Structure bookmarks
+losslessly. It strictly validates saved data,
 reconciles persisted or current in-memory state against a
 `ProjectionWorkspace`, drops stale identities/path scopes without fuzzy
 replacement, and emits non-fatal issues. Current reconciliation additionally
-retains the transient text filter and semantic viewport during live evolution.
-React, renderers,
+retains the transient text filter and both semantic viewports during live
+evolution. Raw React Flow/Sigma transforms, Graphology/ForceAtlas2 positions,
+and layout settings are excluded. React, renderers,
 diagnostics, stable-identity catalogs, filesystems, storage APIs, and platform
 code are mechanically excluded from production source. Browser localStorage is
 an outer adapter, not the durable domain contract.
@@ -184,14 +187,22 @@ The canvas preserves the last committed geometry while a later request is
 pending and adopts only the latest generation. Failed W3 work uses a
 deterministic renderer-side grid, never synchronous Dagre.
 
-`tools/global-renderer-spike` is the isolated KG13A candidate boundary. It
-consumes only plain KG6 `ViewProjection` data, maps stable projected IDs into a
-derived Graphology graph, renders that graph through one directly owned Sigma
-session, and runs optional ForceAtlas2 layout in a dedicated module worker.
-Graphology keys and positions are renderer-local and are never canonical or
-persisted. The tool has separate browser and Tauri diagnostic entry points and
-is not imported by `apps/web`, the React Flow renderer, or a production mode
-switch.
+`packages/renderer-sigma` depends inward on view-projection plus direct Sigma,
+Graphology, ForceAtlas2, and React. It maps a documents-only KG6 projection into
+derived stable-key renderer state, derives folder membership from normalized
+workspace-relative document paths, reconciles live topology in place, and owns
+the imperative Global camera/reducer lifecycle. Folder metadata is a soft
+layout prior and never a canonical or projected relationship. A plain-data
+latest-result-wins application Worker runs ForceAtlas2 plus the selected
+chunked folder prior. Exact derived positions may be reused from a bounded
+module-lifetime memory cache; no positions persist. Far/Regional/Near semantic
+zoom changes style only. ESLint excludes canonical, source, platform,
+application, analytics, React Flow, Dagre, and Node dependencies.
+
+`tools/global-renderer-spike` is now a production renderer harness rather than
+an implementation fork. It retains only synthetic KG13A fixtures, browser/Tauri
+stress controls, Worker transport, and aggregate evidence while consuming
+renderer-sigma mapping, session, semantic zoom, settings, cache, and layout.
 
 KG8 adds a keyed projected-node center request to the renderer boundary.
 Centering uses prepared renderer coordinates only after the new projection and
@@ -555,11 +566,12 @@ Markdown body text they may contain paths, headings, fingerprints, and raw
 targets, so they must stay in ignored/app-local storage outside the selected
 vault and must not be logged or included in browser reports.
 
-KG9B browser saved views are also private local application data, but their
-scope is intentionally small: stable workspace/entity IDs, disclosure/focus,
-workspace-relative path filters, enum filters, and zoom. They contain no report,
-catalog, source body, absolute path, renderer layout, raw transform, search, or
-selection. Keys use encoded stable workspace IDs rather than filenames, vault
+KG9B/KG13B1 browser saved views are also private local application data, but
+their scope is intentionally small: stable workspace/entity IDs,
+disclosure/focus, workspace-relative path filters, enum filters, renderer entry
+mode, and semantic Structure/Global zoom or ratio. They contain no report,
+catalog, source body, absolute path, renderer layout, raw transform, search,
+selection, or coordinates. Keys use encoded stable workspace IDs rather than filenames, vault
 basenames, or paths. Storage denial/corruption is non-fatal and never becomes a
 success-shaped empty value.
 
@@ -575,14 +587,26 @@ selected source tree.
 ## UI, renderer, and platform roles
 
 React and Vite implement the SPA shell; they are outer-layer delivery choices,
-not domain dependencies. React Flow is the implemented Structure renderer
-because the product needs interactive hierarchical detail, exact provenance,
-and disclosure. It receives only KG6 projections and uses deterministic Dagre
-layout. KG13A evidence supports Sigma plus Graphology as a separate,
-documents-only Global renderer candidate for clusters, hubs, bridges, isolates,
-search, selection, and handoff to Structure. The candidate remains confined to
-the diagnostic tool until its release Tauri gate passes and a later product
-milestone explicitly implements the mode. It does not replace React Flow.
+not domain dependencies. React Flow remains the Structure renderer because the
+product needs interactive hierarchical detail, exact provenance, and
+disclosure. It receives only KG6 projections and uses deterministic Dagre
+layout. A literal lazy import loads direct Sigma/Graphology only on first Global
+activation. Global is documents-first and effectively resolved-only unless the
+user explicitly chose reference statuses. It shares KG6 filters/focus, KG8
+Search/Inspector, and exact canonical context with Structure, but owns only a
+visual overview and Regional style LOD. Search documents stay Global; section
+or block results and **Open in Structure** return to exact hierarchical detail.
+WebGL/startup failure is explicit and falls back to Structure for the current
+session without deleting the persisted Global preference.
+
+This initial `Structure | Global` control is a renderer/presentation entry
+point, not a declaration that the final product has only two scales. KG13B2 may
+derive a bounded Local induced subgraph around stable Global file coordinates
+and render it as Free or Structured. Local headings unfold around their file
+anchor; they must not enter Global topology or trigger whole-vault relayout.
+QUERY1 and GROUP1 remain independent future systems. The separate LAYOUT1 idea
+is paused/absorbed into this Global → Regional → Local spatial architecture;
+manual cluster offsets remain future derived presentation state.
 
 Tauri v2 hosts the existing frontend and provides dialog plus filesystem
 read/watch capabilities through a narrow source-provider boundary. Tauri
@@ -592,9 +616,10 @@ remains viable without loading the desktop-only provider.
 
 React Flow is installed only in the KG7 renderer package. Dagre is installed
 only in the plain W3 compute package and bundled into its dedicated worker,
-not the main application chunk. Sigma, Graphology, and ForceAtlas2 are exact,
-tool-local KG13A dependencies; they do not enter the ordinary web or desktop
-application bundles. Tauri dependencies are isolated to the desktop shell and
+not the main application chunk. Sigma 3.0.3, Graphology 0.26.0, and ForceAtlas2
+0.10.1 are exact production renderer-sigma dependencies emitted only in the
+lazy Global and Global-worker chunks. Structure startup does not execute them.
+Tauri dependencies are isolated to the desktop shell and
 `source-provider-tauri`.
 
 ## Performance principles
@@ -645,6 +670,15 @@ required stress profiles. Raw timing is evidence rather than a portable CI
 threshold. The decision, candidate boundary, rejected alternatives, and
 passing browser/release evidence are recorded in
 `docs/GLOBAL_RENDERER_DECISION.md`.
+
+KG13B1 production keeps that renderer lazy, defaults its KG6 derivation to
+documents/resolved references, moves ForceAtlas2 plus folder prior to a separate
+latest-only Worker, and instruments projection, mapping, reconcile, layout,
+mount, LOD, hover, selection, and center work. Ordinary camera zoom/pan updates
+only the semantic bookmark and style reducer: it performs no KG6 projection,
+Graphology topology reconciliation, or layout request. Current positions warm
+folder/settings/topology changes; exact fingerprints use a bounded memory
+cache. See `docs/PERFORMANCE.md` and ADR 0013.
 
 Rust, WASM, universal graph abstractions, and million-node optimization are not foundation requirements.
 

@@ -29,6 +29,7 @@ interface ProvenanceInspectorProps {
   readonly onClear: () => void;
   readonly onClose: () => void;
   readonly onNavigate: (entityId: EntityId, origin: string) => void;
+  readonly onOpenInStructure?: (entityId: EntityId) => void;
   readonly performance?: PerformanceInstrumentation;
 }
 
@@ -834,6 +835,7 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
   onClear,
   onClose,
   onNavigate,
+  onOpenInStructure,
   performance,
   projection,
   selection,
@@ -868,6 +870,12 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
   }, [performance, projection, selection, workspace]);
   const contentKey =
     selection === null ? 'empty' : `${selection.kind}:${selection.id}`;
+  const structureDocumentId =
+    inspected?.ok === true &&
+    inspected.value.kind === 'entity' &&
+    inspected.value.entity.entity.kind === 'document'
+      ? inspected.value.entity.entity.entityId
+      : undefined;
 
   useEffect(() => {
     collapseButtonRef.current?.focus();
@@ -888,6 +896,15 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
         </button>
         <h3>Inspector</h3>
         <div className="selection-panel__actions">
+          {onOpenInStructure !== undefined &&
+          structureDocumentId !== undefined ? (
+            <button
+              onClick={() => onOpenInStructure(structureDocumentId)}
+              type="button"
+            >
+              Open in Structure
+            </button>
+          ) : null}
           {selection === null ? null : (
             <button onClick={onClear} type="button">
               Clear selection

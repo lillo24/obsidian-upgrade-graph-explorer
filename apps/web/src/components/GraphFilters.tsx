@@ -19,6 +19,7 @@ interface GraphFiltersProps {
   readonly contained: boolean;
   readonly open: boolean;
   readonly pathScopes: readonly string[];
+  readonly rendererMode?: 'structure' | 'global';
   readonly state: ViewProjectionState;
   readonly onAction: (action: GraphStateAction) => void;
   readonly onOpenChange: (open: boolean) => void;
@@ -46,10 +47,15 @@ export const GraphFilters = memo(function GraphFilters({
   onOpenChange,
   open,
   pathScopes,
+  rendererMode = 'structure',
   state,
 }: GraphFiltersProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const filters = state.filters;
+  const displayedReferenceStatuses =
+    rendererMode === 'global' && filters?.referenceStatuses === undefined
+      ? (['resolved'] as const)
+      : filters?.referenceStatuses;
   const activeCount = activeGraphFilterCount(state);
   const closeAndRestoreFocus = useCallback(() => {
     onOpenChange(false);
@@ -137,80 +143,97 @@ export const GraphFilters = memo(function GraphFilters({
                 ))}
               </select>
             </label>
-            <fieldset>
-              <legend>Entity Content</legend>
-              {USER_FILTERABLE_ENTITY_KINDS.map((entityKind) => (
-                <label key={entityKind}>
-                  <input
-                    checked={filters?.entityKinds?.includes(entityKind) ?? true}
-                    name={`graph-entity-${entityKind}`}
+            {rendererMode === 'global' ? (
+              <p className="graph-filter-note">
+                Global always displays files only. Entity and heading controls
+                remain saved for Structure.
+              </p>
+            ) : (
+              <>
+                <fieldset>
+                  <legend>Entity Content</legend>
+                  {USER_FILTERABLE_ENTITY_KINDS.map((entityKind) => (
+                    <label key={entityKind}>
+                      <input
+                        checked={
+                          filters?.entityKinds?.includes(entityKind) ?? true
+                        }
+                        name={`graph-entity-${entityKind}`}
+                        onChange={(event) =>
+                          onAction({
+                            type: 'toggle-entity-kind',
+                            entityKind,
+                            enabled: event.currentTarget.checked,
+                          })
+                        }
+                        type="checkbox"
+                      />
+                      {ENTITY_LABELS[entityKind]}
+                    </label>
+                  ))}
+                  <label>
+                    <input
+                      checked={state.disclosure.includeBlocks}
+                      name="include-blocks"
+                      onChange={(event) =>
+                        onAction({
+                          type: 'set-include-blocks',
+                          includeBlocks: event.currentTarget.checked,
+                        })
+                      }
+                      type="checkbox"
+                    />
+                    Blocks
+                  </label>
+                </fieldset>
+                <label
+                  className="heading-limit-control"
+                  htmlFor="heading-depth"
+                >
+                  Heading limit
+                  <select
+                    aria-describedby="heading-depth-description"
+                    autoComplete="off"
+                    id="heading-depth"
+                    name="heading-depth"
                     onChange={(event) =>
                       onAction({
-                        type: 'toggle-entity-kind',
-                        entityKind,
-                        enabled: event.currentTarget.checked,
+                        type: 'set-heading-limit',
+                        maxSectionLevel:
+                          event.currentTarget.value === ''
+                            ? null
+                            : (Number(
+                                event.currentTarget.value,
+                              ) as SectionHeadingLevel),
                       })
                     }
-                    type="checkbox"
-                  />
-                  {ENTITY_LABELS[entityKind]}
+                    value={state.disclosure.maxSectionLevel ?? ''}
+                  >
+                    <option value="">No limit</option>
+                    {HEADING_LIMIT_OPTIONS.map((level) => (
+                      <option key={level} value={level}>
+                        {'#'.repeat(level)}
+                      </option>
+                    ))}
+                  </select>
+                  <span
+                    className="visually-hidden"
+                    id="heading-depth-description"
+                  >
+                    Limits sections by literal Markdown heading level. Structure
+                    separately controls how many section-tree levels are
+                    automatically visible.
+                  </span>
                 </label>
-              ))}
-              <label>
-                <input
-                  checked={state.disclosure.includeBlocks}
-                  name="include-blocks"
-                  onChange={(event) =>
-                    onAction({
-                      type: 'set-include-blocks',
-                      includeBlocks: event.currentTarget.checked,
-                    })
-                  }
-                  type="checkbox"
-                />
-                Blocks
-              </label>
-            </fieldset>
-            <label className="heading-limit-control" htmlFor="heading-depth">
-              Heading limit
-              <select
-                aria-describedby="heading-depth-description"
-                autoComplete="off"
-                id="heading-depth"
-                name="heading-depth"
-                onChange={(event) =>
-                  onAction({
-                    type: 'set-heading-limit',
-                    maxSectionLevel:
-                      event.currentTarget.value === ''
-                        ? null
-                        : (Number(
-                            event.currentTarget.value,
-                          ) as SectionHeadingLevel),
-                  })
-                }
-                value={state.disclosure.maxSectionLevel ?? ''}
-              >
-                <option value="">No limit</option>
-                {HEADING_LIMIT_OPTIONS.map((level) => (
-                  <option key={level} value={level}>
-                    {'#'.repeat(level)}
-                  </option>
-                ))}
-              </select>
-              <span className="visually-hidden" id="heading-depth-description">
-                Limits sections by literal Markdown heading level. Structure
-                separately controls how many section-tree levels are
-                automatically visible.
-              </span>
-            </label>
+              </>
+            )}
             <fieldset>
               <legend>Reference Status</legend>
               {ALL_REFERENCE_STATUSES.map((status) => (
                 <label key={status}>
                   <input
                     checked={
-                      filters?.referenceStatuses?.includes(status) ?? true
+                      displayedReferenceStatuses?.includes(status) ?? true
                     }
                     name={`graph-status-${status}`}
                     onChange={(event) =>

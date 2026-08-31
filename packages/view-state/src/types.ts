@@ -12,11 +12,24 @@ import type {
   ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
 
-export const PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION = 1 as const;
+export const PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION = 2 as const;
+export type RendererEntryMode = 'structure' | 'global';
 
 export interface PersistedViewportAnchor {
   readonly anchorEntityId: EntityId;
   readonly zoom: number;
+}
+
+export type PersistedStructureViewport = PersistedViewportAnchor;
+
+export interface PersistedGlobalViewport {
+  readonly anchorEntityId: EntityId;
+  readonly ratio: number;
+}
+
+export interface PersistedRendererViewports {
+  readonly structure?: PersistedStructureViewport;
+  readonly global?: PersistedGlobalViewport;
 }
 
 export interface PersistedProjectionState {
@@ -38,8 +51,9 @@ export interface PersistedProjectionState {
 export interface PersistedWorkspaceView {
   readonly schemaVersion: typeof PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION;
   readonly workspaceId: WorkspaceId;
+  readonly rendererMode: RendererEntryMode;
   readonly projection: PersistedProjectionState;
-  readonly viewport?: PersistedViewportAnchor;
+  readonly viewports?: PersistedRendererViewports;
 }
 
 export interface PersistedViewValidationIssue {
@@ -74,6 +88,9 @@ export interface ViewRestoreIssue {
 
 export interface RestoredWorkspaceView {
   readonly state: ViewProjectionState;
+  readonly rendererMode: RendererEntryMode;
+  readonly viewports: PersistedRendererViewports;
+  /** Compatibility alias for the Structure viewport during schema-v2 rollout. */
   readonly viewport?: PersistedViewportAnchor;
   readonly issues: readonly ViewRestoreIssue[];
 }
@@ -81,6 +98,8 @@ export interface RestoredWorkspaceView {
 /** Reconciled in-memory view state for a newer snapshot of the same workspace. */
 export interface ReconciledCurrentWorkspaceView {
   readonly state: ViewProjectionState;
+  readonly viewports: PersistedRendererViewports;
+  /** Compatibility alias for the Structure viewport during schema-v2 rollout. */
   readonly viewport?: PersistedViewportAnchor;
   readonly issues: readonly ViewRestoreIssue[];
 }
