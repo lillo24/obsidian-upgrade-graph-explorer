@@ -1,4 +1,4 @@
-import { memo, useDeferredValue, useMemo, useState } from 'react';
+import { memo, useDeferredValue, useMemo, useReducer } from 'react';
 
 import {
   searchEntities,
@@ -6,6 +6,11 @@ import {
 } from '@icarus-graph-explorer/explorer-inspection';
 import type { EntityId } from '@icarus-graph-explorer/core';
 import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performance';
+
+import {
+  entitySearchDisclosureReducer,
+  INITIAL_ENTITY_SEARCH_DISCLOSURE_STATE,
+} from './entity-search-disclosure';
 
 interface EntitySearchProps {
   readonly workspace: InspectionWorkspace;
@@ -18,7 +23,10 @@ export const EntitySearch = memo(function EntitySearch({
   performance,
   workspace,
 }: EntitySearchProps) {
-  const [query, setQuery] = useState('');
+  const [{ query, resultsOpen }, dispatchDisclosure] = useReducer(
+    entitySearchDisclosureReducer,
+    INITIAL_ENTITY_SEARCH_DISCLOSURE_STATE,
+  );
   const deferredQuery = useDeferredValue(query);
   const results = useMemo(() => {
     const search = () =>
@@ -27,21 +35,52 @@ export const EntitySearch = memo(function EntitySearch({
       ? search()
       : performance.measure('search', 'searches', search);
   }, [deferredQuery, performance, workspace]);
-  const hasQuery = deferredQuery.trim().length > 0;
+  const hasQuery = query.trim().length > 0;
   const pending = query !== deferredQuery;
 
+  const dismissResults = () => dispatchDisclosure({ type: 'dismiss-results' });
+  const reopenResults = () => dispatchDisclosure({ type: 'reopen-results' });
+
   return (
-    <section className="entity-search" aria-labelledby="entity-search-title">
+    <section
+      className="entity-search"
+      aria-labelledby="entity-search-title"
+      onBlur={(event) => {
+        const nextTarget = event.relatedTarget;
+        if (
+          nextTarget instanceof Node &&
+          event.currentTarget.contains(nextTarget)
+        ) {
+          return;
+        }
+        dismissResults();
+      }}
+    >
       <h3 id="entity-search-title">Search</h3>
       <div className="entity-search__control" role="search">
         <label className="visually-hidden" htmlFor="canonical-entity-search">
           Find documents, headings, paths, or blocks
         </label>
         <input
+          aria-controls="canonical-entity-search-results"
+          aria-expanded={resultsOpen && hasQuery}
           autoComplete="off"
           id="canonical-entity-search"
           name="canonical-entity-search"
-          onChange={(event) => setQuery(event.currentTarget.value)}
+          onChange={(event) =>
+            dispatchDisclosure({
+              type: 'change-query',
+              query: event.currentTarget.value,
+            })
+          }
+          onClick={reopenResults}
+          onFocus={reopenResults}
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape') return;
+            event.preventDefault();
+            event.stopPropagation();
+            dismissResults();
+          }}
           placeholder="Example: document, heading, or path…"
           type="search"
           value={query}
@@ -58,30 +97,38 @@ export const EntitySearch = memo(function EntitySearch({
             ? `${results.length} canonical result${results.length === 1 ? '' : 's'}`
             : 'Search includes entities hidden by disclosure and graph filters.'}
       </p>
-      {!hasQuery ? null : results.length === 0 ? (
-        <p className="entity-search__empty">
-          No canonical entity matches this exact, prefix, or substring query.
-        </p>
-      ) : (
-        <ul className="entity-search__results">
-          {results.map(({ entity, match }) => (
-            <li key={entity.entityId}>
-              <button
-                onClick={() => onNavigate(entity.entityId, 'Search Result')}
-                type="button"
-              >
-                <span className={`kind-tag kind-${entity.kind}`}>
-                  {entity.kind}
-                </span>
-                <strong>{entity.displayName}</strong>
-                <span title={entity.sourcePath} translate="no">
-                  {entity.sourcePath}
-                </span>
-                <small>{match.replaceAll('-', ' ')}</small>
-              </button>
-            </li>
-          ))}
-        </ul>
+      {!resultsOpen || !hasQuery ? null : (
+        <div id="canonical-entity-search-results">
+          {results.length === 0 ? (
+            <p className="entity-search__empty">
+              No canonical entity matches this exact, prefix, or substring
+              query.
+            </p>
+          ) : (
+            <ul className="entity-search__results">
+              {results.map(({ entity, match }) => (
+                <li key={entity.entityId}>
+                  <button
+                    onClick={() => {
+                      dismissResults();
+                      onNavigate(entity.entityId, 'Search Result');
+                    }}
+                    type="button"
+                  >
+                    <span className={`kind-tag kind-${entity.kind}`}>
+                      {entity.kind}
+                    </span>
+                    <strong>{entity.displayName}</strong>
+                    <span title={entity.sourcePath} translate="no">
+                      {entity.sourcePath}
+                    </span>
+                    <small>{match.replaceAll('-', ' ')}</small>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </section>
   );

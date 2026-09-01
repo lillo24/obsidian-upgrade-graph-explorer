@@ -8,7 +8,7 @@ import {
 
 describe('graph projection interaction state', () => {
   it.each([0, 1, 2, 3] as const)(
-    'sets structural depth %i without changing other graph state',
+    'sets structural depth %i as a clean preset while preserving other graph state',
     (depth) => {
       const initial = {
         ...initialGraphState(),
@@ -31,10 +31,39 @@ describe('graph projection interaction state', () => {
 
       expect(next).toEqual({
         ...initial,
-        disclosure: { ...initial.disclosure, defaultDepth: depth },
+        disclosure: {
+          ...initial.disclosure,
+          defaultDepth: depth,
+          expandedEntityIds: [],
+          collapsedEntityIds: [],
+        },
       });
     },
   );
+
+  it('allows manual disclosure after a preset and clears it at the next preset', () => {
+    const preset = graphStateReducer(initialGraphState(), {
+      type: 'set-depth',
+      depth: 1,
+    });
+    const expanded = graphStateReducer(preset, {
+      type: 'toggle-entity',
+      entityId: 'entity-a',
+      currentlyOpen: false,
+    });
+    const nextPreset = graphStateReducer(expanded, {
+      type: 'set-depth',
+      depth: 2,
+    });
+
+    expect(expanded.disclosure.expandedEntityIds).toEqual(['entity-a']);
+    expect(nextPreset.disclosure).toEqual({
+      ...expanded.disclosure,
+      defaultDepth: 2,
+      expandedEntityIds: [],
+      collapsedEntityIds: [],
+    });
+  });
 
   it('replaces state atomically after live snapshot reconciliation', () => {
     const state = initialGraphState();

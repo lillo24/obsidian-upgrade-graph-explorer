@@ -15,7 +15,7 @@ describe('entity disclosure presentation', () => {
       action: 'expand',
       ariaLabel: 'Expand Nested; reveals 3 descendants',
       count: 3,
-      symbol: '›',
+      symbol: '+',
     });
   });
 
@@ -31,7 +31,7 @@ describe('entity disclosure presentation', () => {
       action: 'collapse',
       ariaLabel: 'Collapse Nested; hides 3 visible descendants',
       count: 3,
-      symbol: '⌄',
+      symbol: '−',
     });
   });
 

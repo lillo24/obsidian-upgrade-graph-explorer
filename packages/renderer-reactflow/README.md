@@ -134,12 +134,12 @@ disclosure semantics remain owned by their existing layers. A missing anchor is
 cleared safely without fitting. Document cards are fixed at `200 × 80`, Section
 nodes at `184 × 72`, and Blocks at `152 × 64`. Canonical File, Heading, and Block
 kinds remain in renderer data and accessible names but are not repeated as
-visible labels. Disclosure uses a quiet `›`/`⌄` count control with an unchanged
-44 px touch target. `› N` consumes KG6's actionable count and announces how
-many descendants Expand reveals; `⌄ N` is derived from final hierarchy edges
+visible labels. Disclosure uses a shared `+`/`−` count control with an unchanged
+44 px touch target. `+ N` consumes KG6's actionable count and announces how
+many descendants Expand reveals; `− N` is derived from final hierarchy edges
 and announces how many visible descendants Collapse hides. A preserved
-expanded ID with no final visible descendants renders no `⌄ 0` control, and a
-zero actionable count renders no `› 0` control. Collapsed internal references
+expanded ID with no final visible descendants renders no `− 0` control, and a
+zero actionable count renders no `+ 0` control. Collapsed internal references
 remain a compact `↺ N` cue.
 
 UX4C keeps single click as selection and adds a narrow `onFocusEntity(entityId)`

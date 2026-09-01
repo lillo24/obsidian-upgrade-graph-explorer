@@ -38,16 +38,18 @@ canonical truth, or own a platform storage implementation.
   policy, and storage remain outside the component.
 - `StructureDepthControl.tsx` owns the labeled Structure-only depth select and
   `structure-depth-selection.ts` maps its four options onto the existing
-  structural-depth action without redefining KG6 values or behavior.
+  structural-depth action. Choosing a depth is a fresh preset: it clears
+  per-entity expand/collapse exceptions while preserving the independent
+  Heading limit, Blocks option, Focus, and graph filters.
 - `controlled-selection.ts` prevents equivalent controlled renderer selection
   echoes from creating a React Flow update loop during programmatic handoff.
-- `GraphSettings.tsx` presents the shared normal/maximized Settings popover and
-  its Graph Appearance, Global Layout, and Graph Interaction sections. Global
-  layout controls edit one validated serializable preference rather than
-  scattering component-local physics values. It accepts narrow
-  App-owned Source/Developer presentation content without importing source
-  providers; global focus-root and gesture preference storage ownership remains
-  in `../preferences/`.
+- `GraphSettings.tsx` presents the viewport-bounded shared normal/maximized
+  Settings popover. Its transient keyboard-accessible tabs group Graph
+  Appearance/Layout/Interaction separately from the App-owned Source and
+  Diagnostic controls while keeping both panels mounted. `graph-settings-tabs.ts`
+  owns the two-tab keyboard transition. Global layout controls edit one validated
+  serializable preference rather than scattering component-local physics values;
+  global focus-root and gesture preference storage remains in `../preferences/`.
 - `SourceSettingsSection.tsx` presents safe current-source metadata, browser
   report/sample switching, desktop vault/rescan actions, and exceptional local
   identity recovery from callbacks owned by `App.tsx`.
@@ -61,6 +63,9 @@ canonical truth, or own a platform storage implementation.
   source failures above the canvas without consuming workspace layout.
 - `EntitySearch.tsx` performs bounded deferred search over the full canonical
   inspection index, independently from visible graph filters.
+  `entity-search-disclosure.ts` keeps its query and result disclosure separate:
+  navigation and Escape close results without erasing the query, while focus or
+  a click can reopen them.
 - `GraphFilters.tsx` owns the controlled toolbar trigger and responsive nonmodal
   panel for path, entity content, literal Markdown Heading limit, reference
   status, the local Advanced query draft/apply boundary, and workspace-scoped
