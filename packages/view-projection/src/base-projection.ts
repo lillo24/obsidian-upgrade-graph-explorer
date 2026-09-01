@@ -4,7 +4,11 @@ import type {
   ReferenceId,
 } from '@icarus-graph-explorer/core';
 
-import { calculateDisclosure, type DisclosureResult } from './disclosure';
+import {
+  calculateDisclosure,
+  type DisclosureCalculationOptions,
+  type DisclosureResult,
+} from './disclosure';
 import {
   diagnosticTargetNodeId,
   entityNodeId,
@@ -88,11 +92,12 @@ function nearestVisibleParentId(
 export function buildBaseProjection(
   workspace: ProjectionWorkspace,
   state: StructuralDisclosureState,
+  disclosureOptions?: DisclosureCalculationOptions,
 ): {
   readonly projection: ViewProjection;
   readonly disclosure: DisclosureResult;
 } {
-  const disclosure = calculateDisclosure(workspace, state);
+  const disclosure = calculateDisclosure(workspace, state, disclosureOptions);
   const visible = disclosure.visibleEntityIds;
   const routeCache = new Map<EntityId, EntityId>();
   const internalByEntityId = new Map<EntityId, Set<ReferenceId>>();

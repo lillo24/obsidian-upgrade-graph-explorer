@@ -258,12 +258,18 @@ never enter reports or persistence.
 
 ## Graph interaction boundary
 
-The default Structure view is **Files only**. **1 level**, **2 levels**, and
-**3 levels** automatically expose that many canonical section-tree generations;
-explicit per-entity disclosure may continue beyond that baseline. Structure
-changes remain ordinary NAV1 semantic actions. Selecting an entity enables one-to-three-hop focus
-with incoming/outgoing/both direction. Selection and hover affect presentation
-only. Diagnostic targets can be selected but never focused or expanded. The
+The default Structure view is **Files only**. Outside Focus, **1 level**, **2
+levels**, and **3 levels** automatically expose that many canonical section-tree
+generations for every eligible file; explicit per-entity disclosure may continue
+beyond that baseline. Inside Focus, the file-level reference neighborhood is
+established first and remains stable across depth changes. Automatic depth then
+unfolds only the focused file; neighbor files remain collapsed unless the user
+explicitly expands them. A new depth preset still clears prior manual disclosure,
+and manual collapse retains precedence afterward. Structure changes remain
+ordinary NAV1 semantic actions. Selecting an entity enables one-to-three-hop
+focus with incoming/outgoing/both direction. Selection and hover affect
+presentation only. Diagnostic targets can be selected but never focused or
+expanded. The
 primary inspector resolves projected selection to canonical descriptors and
 exact occurrences, then keeps that internal model behind a user-facing boundary:
 normal relationship summaries count only outgoing links and backlinks, while
@@ -274,7 +280,9 @@ unrelated rendered content only until pointer leave. Click or keyboard selection
 keeps the chosen element visibly selected without persistent graph-wide fading.
 Focus remains a reduced projection rather than a visual opacity treatment.
 
-Global **Open Local** is the single scale-down action. It captures only the
+Global **Open Local** is the single scale-down action. The Inspector button and
+document double-click use the same application callback; single-click remains
+selection-only and diagnostic double-click is inert. Entry captures only the
 selected file's runtime viewport point, normalizes the KG6 Focus root to that
 document, reveals its direct headings, and keeps neighboring files collapsed.
 Local projects once, then the user may choose **Free** or **Structured** from an

@@ -55,6 +55,10 @@ export interface GlobalRendererSessionOptions {
     key: string | undefined,
     attributes: GlobalNodeAttributes | undefined,
   ) => void;
+  readonly onNodeActivated?: (
+    key: string,
+    attributes: GlobalNodeAttributes,
+  ) => void;
   readonly onNodeHovered?: (key: string | undefined) => void;
   readonly onViewportObservation?: (
     viewport: SemanticGlobalViewport | undefined,
@@ -278,6 +282,17 @@ export class GlobalRendererSession {
       this.refreshNodeStyles(previous);
     });
     this.renderer.on('clickNode', ({ node }) => this.selectNode(node));
+    this.renderer.on('doubleClickNode', ({ node, preventSigmaDefault }) => {
+      // Sigma 3.0.3 otherwise applies its own camera zoom after this event.
+      // Every node double-click is consumed; only canonical documents activate.
+      preventSigmaDefault();
+      if (!this.graph.hasNode(node)) return;
+      const attributes = this.graph.getNodeAttributes(node);
+      if (attributes.nodeKind !== 'document' || attributes.entityId === null) {
+        return;
+      }
+      this.options.onNodeActivated?.(node, attributes);
+    });
     this.renderer.on('clickStage', () => this.selectNode(undefined));
   }
 

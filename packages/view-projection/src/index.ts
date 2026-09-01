@@ -5,6 +5,7 @@ export {
 } from './presets';
 export { STRUCTURAL_DEPTHS } from './types';
 export { projectSnapshot, projectView } from './project';
+export { projectStructureView } from './structure';
 export {
   containingDocumentEntityId,
   deriveLocalProjectionState,

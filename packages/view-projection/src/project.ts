@@ -2,7 +2,10 @@ import type { KnowledgeSnapshot } from '@icarus-graph-explorer/core';
 import { parseGraphQuery } from '@icarus-graph-explorer/graph-query';
 
 import { buildBaseProjection } from './base-projection';
-import type { DisclosureResult } from './disclosure';
+import type {
+  DisclosureCalculationOptions,
+  DisclosureResult,
+} from './disclosure';
 import { applyFilters, applyFocus } from './slicing';
 import type {
   ProjectedNode,
@@ -66,11 +69,17 @@ function expandAllCandidateOwners(
   };
 }
 
-export function projectView(
+/** Internal seam for projection-only disclosure policies such as Focus depth. */
+export function projectViewWithDisclosurePolicy(
   workspace: ProjectionWorkspace,
   state: ViewProjectionState,
+  disclosureOptions?: DisclosureCalculationOptions,
 ): ViewProjection {
-  const base = buildBaseProjection(workspace, state.disclosure);
+  const base = buildBaseProjection(
+    workspace,
+    state.disclosure,
+    disclosureOptions,
+  );
   const focused = applyFocus(workspace, base.projection, state.focus);
   const query = preparedQuery(state.filters);
   const filtered = applyFilters(workspace, focused, state.filters, query);
@@ -83,6 +92,7 @@ export function projectView(
       const candidateBase = buildBaseProjection(
         workspace,
         expandAllCandidateOwners(state.disclosure, base.disclosure),
+        disclosureOptions,
       ).projection;
       const candidateFiltered = applyFilters(
         workspace,
@@ -121,6 +131,13 @@ export function projectView(
     );
   }
   return validation.value;
+}
+
+export function projectView(
+  workspace: ProjectionWorkspace,
+  state: ViewProjectionState,
+): ViewProjection {
+  return projectViewWithDisclosurePolicy(workspace, state);
 }
 
 export function projectSnapshot(

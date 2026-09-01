@@ -113,6 +113,13 @@ inside the current viewport. Hover and controlled selection also refresh only
 the previous/current node reducers, so their label and emphasis state changes
 without topology, layout, or coordinate work.
 
+Sigma 3.0.3 also applies camera zoom after a node double-click unless the
+renderer event prevents its default. Global consumes every node double-click at
+that event seam, invokes the application-neutral activation callback only for a
+canonical document node, and leaves diagnostic nodes inert. The web boundary
+maps document activation to its existing Open Local/history/transition-anchor
+pipeline; Sigma never learns presentation modes or Local navigation policy.
+
 Stable projected IDs are Graphology keys. Live/filter changes reconcile nodes
 and edges in place, preserve surviving positions and selection, seed additions
 deterministically, and leave the current camera intact while a latest-only

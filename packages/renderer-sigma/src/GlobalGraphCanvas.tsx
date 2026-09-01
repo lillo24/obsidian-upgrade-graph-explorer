@@ -41,6 +41,7 @@ export interface GlobalGraphCanvasProps {
   readonly layoutCache?: GlobalLayoutCache;
   readonly layoutService: GlobalLayoutService;
   readonly onFailure: (message: string) => void;
+  readonly onNodeActivate: (entityId: string) => void;
   readonly onSelectionChange: (selection: GlobalSelection | null) => void;
   readonly onTransitionAnchorApiChange?: (
     api: GlobalTransitionAnchorApi | undefined,
@@ -73,6 +74,7 @@ export function GlobalGraphCanvas({
   layoutCache,
   layoutService,
   onFailure,
+  onNodeActivate,
   onSelectionChange,
   onTransitionAnchorApiChange,
   onViewportObservation,
@@ -91,16 +93,18 @@ export function GlobalGraphCanvas({
   const layoutPending = useRef(true);
   const callbacks = useRef({
     onFailure,
+    onNodeActivate,
     onSelectionChange,
     onViewportObservation,
   });
   useEffect(() => {
     callbacks.current = {
       onFailure,
+      onNodeActivate,
       onSelectionChange,
       onViewportObservation,
     };
-  }, [onFailure, onSelectionChange, onViewportObservation]);
+  }, [onFailure, onNodeActivate, onSelectionChange, onViewportObservation]);
   const input = useMemo(() => {
     const map = () => mapProjectionToGlobal(projection, settings);
     return instrumentation === undefined
@@ -162,6 +166,11 @@ export function GlobalGraphCanvas({
             callbacks.current.onSelectionChange(
               key === undefined ? null : { kind: 'node', id: key },
             ),
+          onNodeActivated: (_key, attributes) => {
+            if (attributes.entityId !== null) {
+              callbacks.current.onNodeActivate(attributes.entityId);
+            }
+          },
           onViewportObservation: (viewport) =>
             callbacks.current.onViewportObservation(viewport),
         }),

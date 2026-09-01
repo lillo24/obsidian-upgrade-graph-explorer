@@ -78,6 +78,37 @@ describe('Local KG6 projection', () => {
     expect(entities).not.toContain('doc-c');
   });
 
+  it('applies reference-status constraints before document Focus traversal', () => {
+    const state = deriveLocalProjectionState(
+      workspace,
+      {
+        disclosure: {
+          defaultDepth: 0,
+          expandedEntityIds: [],
+          collapsedEntityIds: [],
+          includeBlocks: false,
+        },
+        focus: {
+          rootEntityId: 'doc-a',
+          hops: 1,
+          direction: 'both',
+          hierarchyContext: 'ancestors',
+        },
+        filters: { referenceStatuses: ['unresolved'] },
+      },
+      'doc-a',
+    );
+    const projection = projectLocalView(workspace, state);
+
+    expect(
+      projection.nodes.flatMap((node) =>
+        node.kind === 'entity' && node.entityKind === 'document'
+          ? [node.entityId]
+          : [],
+      ),
+    ).toEqual(['doc-a']);
+  });
+
   it('does not mutate the source state or canonical workspace', () => {
     const source = {
       disclosure: {

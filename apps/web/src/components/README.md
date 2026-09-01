@@ -91,6 +91,9 @@ canonical truth, or own a platform storage implementation.
 - `GlobalGraphView.tsx` is the only lazy production import of the direct Sigma
   canvas. It owns the Worker service and a bounded module-lifetime layout cache
   so Structure startup stays Sigma-free and exact results survive mode switches.
+  Its narrow document-activation callback sends Global double-click through the
+  same `GraphExplorer` Open Local/history/transition-anchor path as Inspector;
+  Sigma default double-click zoom is already consumed inside the renderer.
 - `LocalGraphView.tsx` owns the separate Local Free worker client and bounded
   page-lifetime layout cache. An exact hit warms the first canvas draw; otherwise
   it mounts deterministic seed geometry immediately, then adopts only the latest
