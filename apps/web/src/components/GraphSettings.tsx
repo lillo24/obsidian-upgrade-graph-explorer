@@ -1,4 +1,4 @@
-import { memo, type ReactNode } from 'react';
+import { memo, useRef, useState, type ReactNode } from 'react';
 
 import type {
   FocusAppearance,
@@ -11,6 +11,11 @@ import {
   type GlobalLayoutSettings,
   type GlobalSpacingPreset,
 } from '@icarus-graph-explorer/renderer-sigma/settings';
+
+import {
+  graphSettingsTabForKey,
+  type GraphSettingsTab,
+} from './graph-settings-tabs';
 
 interface GraphSettingsProps {
   readonly children?: ReactNode;
@@ -53,6 +58,9 @@ export const GraphSettings = memo(function GraphSettings({
   trackpadZoomMode,
   warning,
 }: GraphSettingsProps) {
+  const [activeTab, setActiveTab] = useState<GraphSettingsTab>('graph');
+  const graphTabRef = useRef<HTMLButtonElement>(null);
+  const sourceTabRef = useRef<HTMLButtonElement>(null);
   const changePreset = (spacingPreset: GlobalSpacingPreset) => {
     onGlobalLayoutSettingsChange({
       ...globalLayoutSettings,
@@ -73,6 +81,13 @@ export const GraphSettings = memo(function GraphSettings({
       ...globalLayoutSettings,
       custom: { ...custom, [key]: value },
     });
+  };
+  const handleTabKey = (key: string) => {
+    const nextTab = graphSettingsTabForKey(activeTab, key);
+    if (nextTab === undefined) return false;
+    setActiveTab(nextTab);
+    (nextTab === 'graph' ? graphTabRef : sourceTabRef).current?.focus();
+    return true;
   };
   return (
     <div className="graph-settings">
@@ -100,171 +115,234 @@ export const GraphSettings = memo(function GraphSettings({
               Close
             </button>
           </div>
+          <div
+            aria-label="Settings sections"
+            className="graph-settings__tabs"
+            role="tablist"
+          >
+            <button
+              aria-controls="graph-settings-graph-panel"
+              aria-selected={activeTab === 'graph'}
+              id="graph-settings-graph-tab"
+              onClick={() => setActiveTab('graph')}
+              onKeyDown={(event) => {
+                if (!handleTabKey(event.key)) return;
+                event.preventDefault();
+              }}
+              ref={graphTabRef}
+              role="tab"
+              tabIndex={activeTab === 'graph' ? 0 : -1}
+              type="button"
+            >
+              Graph
+            </button>
+            <button
+              aria-controls="graph-settings-source-panel"
+              aria-selected={activeTab === 'source'}
+              id="graph-settings-source-tab"
+              onClick={() => setActiveTab('source')}
+              onKeyDown={(event) => {
+                if (!handleTabKey(event.key)) return;
+                event.preventDefault();
+              }}
+              ref={sourceTabRef}
+              role="tab"
+              tabIndex={activeTab === 'source' ? 0 : -1}
+              type="button"
+            >
+              Source &amp; Diagnostics
+            </button>
+          </div>
           <div className="graph-settings__sections" data-graph-scroll-container>
-            {children}
-            <section
-              aria-labelledby="graph-appearance-settings-heading"
-              className="graph-settings__section"
+            <div
+              aria-labelledby="graph-settings-graph-tab"
+              hidden={activeTab !== 'graph'}
+              id="graph-settings-graph-panel"
+              role="tabpanel"
             >
-              <h3 id="graph-appearance-settings-heading">Graph Appearance</h3>
-              <fieldset>
-                <legend>Focus Root</legend>
-                <label>
-                  <input
-                    checked={focusAppearance === 'outline'}
-                    name="focus-appearance"
-                    onChange={() => onFocusAppearanceChange('outline')}
-                    type="radio"
-                    value="outline"
-                  />
-                  <span>
-                    <strong>Outline</strong>
-                    <small>A strong geometric boundary around the root.</small>
-                  </span>
-                </label>
-                <label>
-                  <input
-                    checked={focusAppearance === 'inverted'}
-                    name="focus-appearance"
-                    onChange={() => onFocusAppearanceChange('inverted')}
-                    type="radio"
-                    value="inverted"
-                  />
-                  <span>
-                    <strong>Inverted</strong>
-                    <small>A dark root card with high-contrast content.</small>
-                  </span>
-                </label>
-                <label>
-                  <input
-                    checked={focusAppearance === 'minimal'}
-                    name="focus-appearance"
-                    onChange={() => onFocusAppearanceChange('minimal')}
-                    type="radio"
-                    value="minimal"
-                  />
-                  <span>
-                    <strong>Minimal</strong>
-                    <small>A quiet corner marker and title accent.</small>
-                  </span>
-                </label>
-              </fieldset>
-            </section>
-            <section
-              aria-labelledby="global-layout-settings-heading"
-              className="graph-settings__section"
-            >
-              <h3 id="global-layout-settings-heading">Global Layout</h3>
-              <label className="graph-settings__check">
-                <input
-                  checked={globalLayoutSettings.folderClustering}
-                  name="global-folder-clustering"
-                  onChange={(event) =>
-                    onGlobalLayoutSettingsChange({
-                      ...globalLayoutSettings,
-                      folderClustering: event.currentTarget.checked,
-                    })
-                  }
-                  type="checkbox"
-                />
-                <span>
-                  <strong>Folder clustering</strong>
-                  <small>
-                    Adds a soft spatial preference without creating graph links.
-                  </small>
-                </span>
-              </label>
-              <fieldset>
-                <legend>Spacing</legend>
-                {(['compact', 'normal', 'spacious'] as const).map((preset) => (
-                  <label key={preset}>
+              <section
+                aria-labelledby="graph-appearance-settings-heading"
+                className="graph-settings__section"
+              >
+                <h3 id="graph-appearance-settings-heading">Graph Appearance</h3>
+                <fieldset>
+                  <legend>Focus Root</legend>
+                  <label>
                     <input
-                      checked={globalLayoutSettings.spacingPreset === preset}
-                      name="global-spacing-preset"
-                      onChange={() => changePreset(preset)}
+                      checked={focusAppearance === 'outline'}
+                      name="focus-appearance"
+                      onChange={() => onFocusAppearanceChange('outline')}
                       type="radio"
-                      value={preset}
+                      value="outline"
                     />
                     <span>
-                      {preset.slice(0, 1).toUpperCase() + preset.slice(1)}
+                      <strong>Outline</strong>
+                      <small>
+                        A strong geometric boundary around the root.
+                      </small>
                     </span>
                   </label>
-                ))}
-              </fieldset>
-              <label className="graph-settings__check">
-                <input
-                  checked={globalLayoutSettings.custom !== undefined}
-                  name="global-custom-layout"
-                  onChange={(event) =>
-                    onGlobalLayoutSettingsChange({
-                      folderClustering: globalLayoutSettings.folderClustering,
-                      spacingPreset: globalLayoutSettings.spacingPreset,
-                      ...(event.currentTarget.checked
-                        ? {
-                            custom: customGlobalLayoutSettings(
-                              globalLayoutSettings.spacingPreset,
-                            ),
-                          }
-                        : {}),
-                    })
-                  }
-                  type="checkbox"
-                />
-                <span>
-                  <strong>Custom controls</strong>
-                  <small>Expose a bounded product-level subset.</small>
-                </span>
-              </label>
-              {globalLayoutSettings.custom === undefined ? null : (
-                <GlobalCustomLayoutControls
-                  onChange={changeCustom}
-                  settings={globalLayoutSettings.custom}
-                />
-              )}
-            </section>
-            <section
-              aria-labelledby="graph-interaction-settings-heading"
-              className="graph-settings__section"
-            >
-              <h3 id="graph-interaction-settings-heading">Graph Interaction</h3>
-              <fieldset>
-                <legend>Trackpad Zoom</legend>
-                <label>
+                  <label>
+                    <input
+                      checked={focusAppearance === 'inverted'}
+                      name="focus-appearance"
+                      onChange={() => onFocusAppearanceChange('inverted')}
+                      type="radio"
+                      value="inverted"
+                    />
+                    <span>
+                      <strong>Inverted</strong>
+                      <small>
+                        A dark root card with high-contrast content.
+                      </small>
+                    </span>
+                  </label>
+                  <label>
+                    <input
+                      checked={focusAppearance === 'minimal'}
+                      name="focus-appearance"
+                      onChange={() => onFocusAppearanceChange('minimal')}
+                      type="radio"
+                      value="minimal"
+                    />
+                    <span>
+                      <strong>Minimal</strong>
+                      <small>A quiet corner marker and title accent.</small>
+                    </span>
+                  </label>
+                </fieldset>
+              </section>
+              <section
+                aria-labelledby="global-layout-settings-heading"
+                className="graph-settings__section"
+              >
+                <h3 id="global-layout-settings-heading">Global Layout</h3>
+                <label className="graph-settings__check">
                   <input
-                    checked={trackpadZoomMode === 'scroll-zoom'}
-                    name="trackpad-zoom-mode"
-                    onChange={() => onTrackpadZoomModeChange('scroll-zoom')}
-                    type="radio"
-                    value="scroll-zoom"
+                    checked={globalLayoutSettings.folderClustering}
+                    name="global-folder-clustering"
+                    onChange={(event) =>
+                      onGlobalLayoutSettingsChange({
+                        ...globalLayoutSettings,
+                        folderClustering: event.currentTarget.checked,
+                      })
+                    }
+                    type="checkbox"
                   />
                   <span>
-                    <strong>Scroll to Zoom</strong>
+                    <strong>Folder clustering</strong>
                     <small>
-                      Two-finger scrolling zooms toward the pointer.
+                      Adds a soft spatial preference without creating graph
+                      links.
                     </small>
                   </span>
                 </label>
-                <label>
+                <fieldset>
+                  <legend>Spacing</legend>
+                  {(['compact', 'normal', 'spacious'] as const).map(
+                    (preset) => (
+                      <label key={preset}>
+                        <input
+                          checked={
+                            globalLayoutSettings.spacingPreset === preset
+                          }
+                          name="global-spacing-preset"
+                          onChange={() => changePreset(preset)}
+                          type="radio"
+                          value={preset}
+                        />
+                        <span>
+                          {preset.slice(0, 1).toUpperCase() + preset.slice(1)}
+                        </span>
+                      </label>
+                    ),
+                  )}
+                </fieldset>
+                <label className="graph-settings__check">
                   <input
-                    checked={trackpadZoomMode === 'pinch-zoom'}
-                    name="trackpad-zoom-mode"
-                    onChange={() => onTrackpadZoomModeChange('pinch-zoom')}
-                    type="radio"
-                    value="pinch-zoom"
+                    checked={globalLayoutSettings.custom !== undefined}
+                    name="global-custom-layout"
+                    onChange={(event) =>
+                      onGlobalLayoutSettingsChange({
+                        folderClustering: globalLayoutSettings.folderClustering,
+                        spacingPreset: globalLayoutSettings.spacingPreset,
+                        ...(event.currentTarget.checked
+                          ? {
+                              custom: customGlobalLayoutSettings(
+                                globalLayoutSettings.spacingPreset,
+                              ),
+                            }
+                          : {}),
+                      })
+                    }
+                    type="checkbox"
                   />
                   <span>
-                    <strong>Pinch to Zoom</strong>
-                    <small>Two-finger scrolling pans; pinching zooms.</small>
+                    <strong>Custom controls</strong>
+                    <small>Expose a bounded product-level subset.</small>
                   </span>
                 </label>
-              </fieldset>
-            </section>
+                {globalLayoutSettings.custom === undefined ? null : (
+                  <GlobalCustomLayoutControls
+                    onChange={changeCustom}
+                    settings={globalLayoutSettings.custom}
+                  />
+                )}
+              </section>
+              <section
+                aria-labelledby="graph-interaction-settings-heading"
+                className="graph-settings__section"
+              >
+                <h3 id="graph-interaction-settings-heading">
+                  Graph Interaction
+                </h3>
+                <fieldset>
+                  <legend>Trackpad Zoom</legend>
+                  <label>
+                    <input
+                      checked={trackpadZoomMode === 'scroll-zoom'}
+                      name="trackpad-zoom-mode"
+                      onChange={() => onTrackpadZoomModeChange('scroll-zoom')}
+                      type="radio"
+                      value="scroll-zoom"
+                    />
+                    <span>
+                      <strong>Scroll to Zoom</strong>
+                      <small>
+                        Two-finger scrolling zooms toward the pointer.
+                      </small>
+                    </span>
+                  </label>
+                  <label>
+                    <input
+                      checked={trackpadZoomMode === 'pinch-zoom'}
+                      name="trackpad-zoom-mode"
+                      onChange={() => onTrackpadZoomModeChange('pinch-zoom')}
+                      type="radio"
+                      value="pinch-zoom"
+                    />
+                    <span>
+                      <strong>Pinch to Zoom</strong>
+                      <small>Two-finger scrolling pans; pinching zooms.</small>
+                    </span>
+                  </label>
+                </fieldset>
+              </section>
+            </div>
+            <div
+              aria-labelledby="graph-settings-source-tab"
+              hidden={activeTab !== 'source'}
+              id="graph-settings-source-panel"
+              role="tabpanel"
+            >
+              {children}
+            </div>
+            {warning === undefined ? null : (
+              <p className="graph-settings__warning" role="alert">
+                {warning}
+              </p>
+            )}
           </div>
-          {warning === undefined ? null : (
-            <p className="graph-settings__warning" role="alert">
-              {warning}
-            </p>
-          )}
         </section>
       ) : null}
     </div>

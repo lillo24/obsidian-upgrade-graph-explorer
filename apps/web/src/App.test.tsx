@@ -341,12 +341,14 @@ describe('graph-first explorer shell', () => {
     expect(settingsMarkup.indexOf('>Source</h3>')).toBeLessThan(
       settingsMarkup.indexOf('>Developer</h3>'),
     );
-    expect(settingsMarkup.indexOf('>Developer</h3>')).toBeLessThan(
-      settingsMarkup.indexOf('Graph Appearance'),
-    );
     expect(settingsMarkup.indexOf('Graph Appearance')).toBeLessThan(
       settingsMarkup.indexOf('Graph Interaction'),
     );
+    expect(settingsMarkup.indexOf('Graph Interaction')).toBeLessThan(
+      settingsMarkup.indexOf('>Source</h3>'),
+    );
+    expect(settingsMarkup).toContain('role="tablist"');
+    expect(settingsMarkup).toContain('>Source &amp; Diagnostics</button>');
     expect(settingsMarkup).toContain('Open Diagnostic Evidence');
     expect(settingsMarkup).toContain(
       'type="radio" name="trackpad-zoom-mode" checked="" value="pinch-zoom"',

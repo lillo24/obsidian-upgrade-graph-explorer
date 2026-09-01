@@ -202,6 +202,10 @@ h2 {
   font-size: 0.75rem;
 }
 
+#canonical-entity-search-results {
+  display: contents;
+}
+
 .entity-search__results {
   display: grid;
   grid-column: 1 / -1;
@@ -431,13 +435,13 @@ h2 {
 }
 
 .graph-settings__popover {
-  position: absolute;
+  position: fixed;
   z-index: 60;
-  top: calc(100% + 0.55rem);
-  right: 0;
+  top: 7rem;
+  right: 1rem;
   display: flex;
   width: min(24rem, calc(100vw - 2rem));
-  max-height: calc(100dvh - 5rem);
+  max-height: calc(100dvh - 8rem);
   flex-direction: column;
   padding: 0.9rem;
   overflow: hidden;
@@ -454,6 +458,35 @@ h2 {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 0.8rem;
+}
+
+.graph-settings__tabs {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.45fr);
+  gap: 0.35rem;
+  margin-bottom: 0.7rem;
+  padding: 0.25rem;
+  border-radius: 0.6rem;
+  background: #e9eff2;
+}
+
+.graph-settings__tabs button {
+  min-height: 2.5rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 0.45rem;
+  color: #526b77;
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.graph-settings__tabs button[aria-selected='true'] {
+  border-color: #9eb0bc;
+  color: #1c3d4c;
+  background: #ffffff;
+  box-shadow: 0 0.2rem 0.5rem rgb(24 47 61 / 10%);
 }
 
 .graph-settings__sections {
@@ -1219,10 +1252,10 @@ h2 {
 }
 
 .graph-workspace--maximized .graph-settings__popover {
-  position: fixed;
   top: 4.4rem;
   right: auto;
   left: 1rem;
+  max-height: calc(100dvh - 5.4rem);
 }
 
 .graph-workspace--maximized .graph-tools-surface {
@@ -2513,8 +2546,10 @@ a:focus-visible {
   }
 
   .graph-settings__popover {
+    top: 4.75rem;
+    right: 0.5rem;
     width: min(22rem, calc(100vw - 1rem));
-    max-height: calc(100dvh - 4.25rem);
+    max-height: calc(100dvh - 5.25rem);
   }
 
   .source-settings__actions {

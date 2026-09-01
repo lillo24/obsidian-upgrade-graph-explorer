@@ -40,6 +40,7 @@ src/
   layout-cache.ts          Four-entry memory-only LRU of derived positions.
   lifecycle.ts             WebGL construction result and idempotent session lease.
   style.ts                 Far/Regional/Near LOD and GROUP1A base-accent layer.
+  global-label.ts          Viewport-aware Global label/hover placement after adaptive culling.
   precision-wheel-zoom.ts  Accepted 0.0017 gain, 0.5 px floor, and 90 ms reversal guard.
   session.ts               Imperative Sigma lifecycle and high-frequency interaction ownership.
   viewport-request.ts      Layout-commit gate for semantic center and Fit requests.
@@ -104,6 +105,13 @@ status colors are excluded. `setVisualGroupStyles()` retains the map and
 schedules one partial node reducer refresh without Graphology reconciliation,
 index rebuilding, coordinate or size changes, folder/degree changes,
 fingerprint changes, or a Global worker request.
+
+Sigma 3.0.3's default label and highlight drawing always extends to the right.
+Global replaces only that canvas drawing boundary: adaptive culling still
+chooses ordinary labels, while forced hover/selection labels can flip or clamp
+inside the current viewport. Hover and controlled selection also refresh only
+the previous/current node reducers, so their label and emphasis state changes
+without topology, layout, or coordinate work.
 
 Stable projected IDs are Graphology keys. Live/filter changes reconcile nodes
 and edges in place, preserve surviving positions and selection, seed additions

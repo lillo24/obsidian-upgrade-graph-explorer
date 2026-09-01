@@ -8,6 +8,10 @@ import {
   reconcileGlobalGraph,
   type GlobalGraph,
 } from './graph';
+import {
+  drawViewportAwareGlobalNodeHover,
+  drawViewportAwareGlobalNodeLabel,
+} from './global-label';
 import { createGlobalLayoutRequest } from './layout';
 import {
   normalizeWheelDeltaPixels,
@@ -161,6 +165,8 @@ export class GlobalRendererSession {
       renderEdgeLabels: false,
       renderLabels: options.labels ?? true,
       stagePadding: 24,
+      defaultDrawNodeHover: drawViewportAwareGlobalNodeHover,
+      defaultDrawNodeLabel: drawViewportAwareGlobalNodeLabel,
       nodeReducer: (key, attributes) => this.reduceNode(key, attributes),
       edgeReducer: (key, attributes) => this.reduceEdge(key, attributes),
     });
@@ -254,20 +260,22 @@ export class GlobalRendererSession {
   private bindEvents(): void {
     this.renderer.on('enterNode', ({ node }) => {
       const started = performance.now();
+      const previous = this.hoveredNode;
       this.hoveredNode = node;
       this.options.onNodeHovered?.(node);
       this.options.instrumentation?.count('global-hover-applications');
-      this.renderer.scheduleRender();
+      this.refreshNodeStyles(previous, node);
       this.options.instrumentation?.record(
         'global-hover',
         performance.now() - started,
       );
     });
     this.renderer.on('leaveNode', () => {
+      const previous = this.hoveredNode;
       this.hoveredNode = undefined;
       this.options.onNodeHovered?.(undefined);
       this.options.instrumentation?.count('global-hover-applications');
-      this.renderer.scheduleRender();
+      this.refreshNodeStyles(previous);
     });
     this.renderer.on('clickNode', ({ node }) => this.selectNode(node));
     this.renderer.on('clickStage', () => this.selectNode(undefined));
@@ -376,9 +384,10 @@ export class GlobalRendererSession {
     if (key !== undefined && !this.graph.hasNode(key)) {
       throw new Error(`Cannot hover missing Global node ${key}.`);
     }
+    const previous = this.hoveredNode;
     this.hoveredNode = key;
     return this.measureNextRender('hover-reducer', () =>
-      this.renderer.scheduleRender(),
+      this.refreshNodeStyles(previous, key),
     );
   }
 
@@ -438,13 +447,14 @@ export class GlobalRendererSession {
       throw new Error(`Cannot select missing Global node ${key}.`);
     }
     const started = performance.now();
+    const previous = this.selectedNode;
     this.selectedNode = key;
     this.options.onNodeSelected?.(
       key,
       key === undefined ? undefined : this.graph.getNodeAttributes(key),
     );
     this.options.instrumentation?.count('global-selection-applications');
-    this.renderer.scheduleRender();
+    this.refreshNodeStyles(previous, key);
     this.options.instrumentation?.record(
       'global-selection',
       performance.now() - started,
@@ -454,8 +464,24 @@ export class GlobalRendererSession {
   setControlledSelection(key: string | undefined): void {
     if (key !== undefined && !this.graph.hasNode(key)) return;
     if (key === this.selectedNode) return;
+    const previous = this.selectedNode;
     this.selectedNode = key;
-    this.renderer.scheduleRender();
+    this.refreshNodeStyles(previous, key);
+  }
+
+  private refreshNodeStyles(...keys: (string | undefined)[]): void {
+    const nodes = [...new Set(keys)].filter(
+      (key): key is string => key !== undefined && this.graph.hasNode(key),
+    );
+    if (nodes.length === 0) {
+      this.renderer.scheduleRender();
+      return;
+    }
+    this.renderer.refresh({
+      partialGraph: { nodes },
+      skipIndexation: true,
+      schedule: true,
+    });
   }
 
   createLayoutRequest(

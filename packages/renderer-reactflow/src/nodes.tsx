@@ -13,7 +13,7 @@ export interface EntityDisclosurePresentation {
   readonly action: 'expand' | 'collapse';
   readonly ariaLabel: string;
   readonly count: number;
-  readonly symbol: '›' | '⌄';
+  readonly symbol: '+' | '−';
 }
 
 export function entityDisclosurePresentation(
@@ -32,7 +32,7 @@ export function entityDisclosurePresentation(
       action: 'collapse',
       ariaLabel: `Collapse ${data.title}; hides ${data.visibleDescendantCount} visible ${noun}`,
       count: data.visibleDescendantCount,
-      symbol: '⌄',
+      symbol: '−',
     };
   }
   if (!data.isExpanded && data.revealableDescendantCount > 0) {
@@ -42,7 +42,7 @@ export function entityDisclosurePresentation(
       action: 'expand',
       ariaLabel: `Expand ${data.title}; reveals ${data.revealableDescendantCount} ${noun}`,
       count: data.revealableDescendantCount,
-      symbol: '›',
+      symbol: '+',
     };
   }
   return null;

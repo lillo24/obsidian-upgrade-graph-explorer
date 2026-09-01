@@ -179,7 +179,12 @@ export function graphStateReducer(
     case 'set-depth':
       return {
         ...state,
-        disclosure: { ...state.disclosure, defaultDepth: action.depth },
+        disclosure: {
+          ...state.disclosure,
+          defaultDepth: action.depth,
+          expandedEntityIds: [],
+          collapsedEntityIds: [],
+        },
       };
     case 'set-heading-limit': {
       const disclosure = { ...state.disclosure };
