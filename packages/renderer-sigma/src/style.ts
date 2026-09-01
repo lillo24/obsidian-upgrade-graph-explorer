@@ -4,6 +4,7 @@ import type {
   GlobalVisualLod,
   ResolvedGlobalLayoutSettings,
 } from './types';
+import type { VisualGroupNodePresentation } from '@icarus-graph-explorer/visual-groups';
 
 export function resolveGlobalVisualLod(cameraRatio: number): GlobalVisualLod {
   if (!Number.isFinite(cameraRatio) || cameraRatio <= 0) {
@@ -20,6 +21,7 @@ export interface GlobalNodeStyleContext {
   readonly selected: boolean;
   readonly lod: GlobalVisualLod;
   readonly settings: ResolvedGlobalLayoutSettings;
+  readonly visualGroup?: VisualGroupNodePresentation;
 }
 
 export interface GlobalEdgeStyleContext {
@@ -34,6 +36,10 @@ export function resolveGlobalNodeStyle(
   context: GlobalNodeStyleContext,
 ) {
   const emphasized = context.selected || context.hovered;
+  const baseColor =
+    attributes.nodeKind === 'document' && attributes.entityId !== null
+      ? (context.visualGroup?.accent ?? attributes.color)
+      : attributes.color;
   const visibleByScale =
     context.lod === 'near' ||
     (context.lod === 'regional'
@@ -44,7 +50,7 @@ export function resolveGlobalNodeStyle(
     : context.hovered
       ? '#55a8c2'
       : context.relatedToHover
-        ? attributes.color
+        ? baseColor
         : '#d8e0e3';
   return {
     ...attributes,

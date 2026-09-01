@@ -8,6 +8,7 @@ import {
 } from 'react';
 
 import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
+import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-groups';
 
 import { GlobalLayoutCache } from './layout-cache';
 import {
@@ -51,6 +52,8 @@ export interface GlobalGraphCanvasProps {
   readonly selection: GlobalSelection | null;
   readonly settings: GlobalLayoutSettings;
   readonly trackpadZoomMode: GlobalTrackpadZoomMode;
+  /** Style-only EntityId lookup; excluded from mapping and layout inputs. */
+  readonly visualGroupStyles?: VisualGroupPresentationMap;
 }
 
 function errorMessage(error: unknown): string {
@@ -77,6 +80,7 @@ export function GlobalGraphCanvas({
   selection,
   settings,
   trackpadZoomMode,
+  visualGroupStyles,
 }: GlobalGraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<GlobalRendererSession | undefined>(undefined);
@@ -125,8 +129,10 @@ export function GlobalGraphCanvas({
         cached === undefined ? input : warmGlobalRendererInput(input, cached),
       settings,
       trackpadZoomMode,
+      visualGroupStyles,
     };
   });
+  const appliedVisualGroupStyles = useRef(initial.visualGroupStyles);
   const [ready, setReady] = useState(false);
   const [layoutCommitKey, setLayoutCommitKey] = useState(0);
   const [layoutStatus, setLayoutStatus] = useState(
@@ -145,6 +151,9 @@ export function GlobalGraphCanvas({
         new GlobalRendererSession(container, initial.input, {
           settings: initial.settings,
           trackpadZoomMode: initial.trackpadZoomMode,
+          ...(initial.visualGroupStyles === undefined
+            ? {}
+            : { visualGroupStyles: initial.visualGroupStyles }),
           ...(initial.initialViewport === undefined
             ? {}
             : { initialViewport: initial.initialViewport }),
@@ -201,6 +210,12 @@ export function GlobalGraphCanvas({
   useEffect(() => {
     sessionRef.current?.updateTrackpadZoomMode(trackpadZoomMode);
   }, [trackpadZoomMode]);
+
+  useEffect(() => {
+    if (appliedVisualGroupStyles.current === visualGroupStyles) return;
+    appliedVisualGroupStyles.current = visualGroupStyles;
+    sessionRef.current?.setVisualGroupStyles(visualGroupStyles);
+  }, [visualGroupStyles]);
 
   useEffect(() => {
     sessionRef.current?.setControlledSelection(

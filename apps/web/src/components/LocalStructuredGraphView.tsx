@@ -13,6 +13,7 @@ import {
   type TrackpadZoomMode,
 } from '@icarus-graph-explorer/renderer-reactflow';
 import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
+import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-groups';
 
 import { createDagreLayoutWorkerService } from '../workers/dagre-layout-worker-client';
 import { useWorkerServiceDisposal } from './use-worker-service-disposal';
@@ -45,6 +46,7 @@ export interface LocalStructuredGraphViewProps {
   readonly rootEntityId: string;
   readonly selection: GraphSelection | null;
   readonly trackpadZoomMode: TrackpadZoomMode;
+  readonly visualGroupStyles?: VisualGroupPresentationMap;
 }
 
 // Bounded page-lifetime coordinates only. They never enter saved view state or

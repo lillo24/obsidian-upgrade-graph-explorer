@@ -572,3 +572,33 @@ reported no console warnings or errors. Final release desktop QA passed vault
 opening, Free/Structured switching, disclosure, Search/Inspector, Back/Forward,
 live heading and root-file changes, Rescan, restart restoration, and physical
 precision-touchpad input in both layouts without worker/module/CSP errors.
+
+## GROUP1A Visual Group evidence
+
+GROUP1A classification is deliberately downstream from an already completed
+projection. Definitions compile once when they change; presentation assignment
+is `O(visible entities × enabled groups × bounded QUERY1 AST)` with a
+first-match short circuit; renderer updates consume only an `EntityId` map.
+There is no durable membership cache. `projectView()` accepts no group input,
+so the existing depth-three advanced-query projection workload and its
+operation path remain unchanged.
+
+`pnpm benchmark:visual-groups` uses synthetic 300-entity and 3,000-entity
+visible sets with 4 and 8 enabled groups. It measures compile, primary-map
+assignment, and renderer-style lookup separately, with projection excluded.
+The following local Windows/Node values were recorded on 2026-09-01 as
+median/p95 milliseconds; they are investigative evidence, not CI thresholds.
+
+| Visible entities / groups |       Compile |   Primary map |  Style update |
+| ------------------------: | ------------: | ------------: | ------------: |
+|                   300 / 4 | 0.011 / 0.034 | 0.100 / 0.330 | 0.016 / 0.068 |
+|                   300 / 8 | 0.024 / 0.080 | 0.066 / 0.154 | 0.004 / 0.005 |
+|                 3,000 / 4 | 0.011 / 0.058 | 0.467 / 0.960 | 0.059 / 0.156 |
+|                 3,000 / 8 | 0.014 / 0.092 | 1.013 / 1.300 | 0.042 / 0.055 |
+
+Every benchmark case reports `projectView +0`, topology mapping/reconciliation
+`+0`, layout requests `+0`, and one style update. Renderer tests enforce the
+same boundary directly: React Flow group context is absent from mapping, W3
+input, Local Structured fingerprints, and dimensions; Global and Local Sigma
+session setters schedule one partial, skip-indexation reducer refresh without
+reconciling Graphology or touching a layout service.

@@ -41,6 +41,7 @@
     "@icarus-graph-explorer/dagre-layout": "workspace:*",
     "@icarus-graph-explorer/performance": "workspace:*",
     "@icarus-graph-explorer/view-projection": "workspace:*",
+    "@icarus-graph-explorer/visual-groups": "workspace:*",
     "@xyflow/react": "12.11.5"
   },
   "peerDependencies": {

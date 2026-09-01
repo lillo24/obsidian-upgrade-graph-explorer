@@ -20,6 +20,7 @@
     "benchmark:dagre-worker": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:dagre-worker",
     "benchmark:global-renderer": "pnpm --filter @icarus-graph-explorer/global-renderer-spike build && pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:global-renderer",
     "benchmark:local-renderer": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:local-renderer",
+    "benchmark:visual-groups": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:visual-groups",
     "global-renderer:dev": "pnpm --filter @icarus-graph-explorer/global-renderer-spike dev",
     "global-renderer:build": "pnpm --filter @icarus-graph-explorer/global-renderer-spike build",
     "desktop:global-renderer:build": "pnpm --filter @icarus-graph-explorer/desktop build:global-renderer",

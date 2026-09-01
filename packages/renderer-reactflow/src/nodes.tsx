@@ -4,6 +4,10 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { useEntityDisclosure } from './disclosure-context';
 import { shouldToggleDisclosureForClick } from './focus-interaction';
 import type { DiagnosticFlowNode, EntityFlowNode } from './types';
+import {
+  useVisualGroupPresentation,
+  visualGroupAccentStyle,
+} from './visual-group-presentation';
 
 export interface EntityDisclosurePresentation {
   readonly action: 'expand' | 'collapse';
@@ -58,6 +62,7 @@ function NodeHandles() {
 function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
   const disclosure = useEntityDisclosure();
   const disclosurePresentation = entityDisclosurePresentation(data);
+  const visualGroup = useVisualGroupPresentation(data.entityId);
 
   function handleDisclosure(event: MouseEvent<HTMLButtonElement>): void {
     event.stopPropagation();
@@ -112,6 +117,8 @@ function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
       data-entity-kind={data.entityKind}
       data-focus-distance={data.focusDistance ?? undefined}
       data-projection-node-id={data.projectionNodeId}
+      data-visual-group-color={visualGroup?.color}
+      style={visualGroupAccentStyle(visualGroup)}
       title={`${data.title} — ${sourceLocation} — Double-click to focus`}
     >
       <NodeHandles />

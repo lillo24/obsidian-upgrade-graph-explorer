@@ -77,6 +77,9 @@ importers:
       '@icarus-graph-explorer/view-state':
         specifier: workspace:*
         version: link:../../packages/view-state
+      '@icarus-graph-explorer/visual-groups':
+        specifier: workspace:*
+        version: link:../../packages/visual-groups
       '@icarus-graph-explorer/workspace-engine-obsidian':
         specifier: workspace:*
         version: link:../../packages/workspace-engine-obsidian
@@ -211,6 +214,9 @@ importers:
       '@icarus-graph-explorer/view-projection':
         specifier: workspace:*
         version: link:../view-projection
+      '@icarus-graph-explorer/visual-groups':
+        specifier: workspace:*
+        version: link:../visual-groups
       '@xyflow/react':
         specifier: 12.11.5
         version: 12.11.5(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -233,6 +239,9 @@ importers:
       '@icarus-graph-explorer/view-projection':
         specifier: workspace:*
         version: link:../view-projection
+      '@icarus-graph-explorer/visual-groups':
+        specifier: workspace:*
+        version: link:../visual-groups
       graphology:
         specifier: 0.26.0
         version: 0.26.0(graphology-types@0.24.8)
@@ -333,6 +342,15 @@ importers:
         specifier: workspace:*
         version: link:../stable-identity
 
+  packages/visual-groups:
+    dependencies:
+      '@icarus-graph-explorer/core':
+        specifier: workspace:*
+        version: link:../core
+      '@icarus-graph-explorer/graph-query':
+        specifier: workspace:*
+        version: link:../graph-query
+
   packages/workspace-engine-obsidian:
     dependencies:
       '@icarus-graph-explorer/adapter-obsidian':
@@ -423,6 +441,9 @@ importers:
       '@icarus-graph-explorer/view-projection':
         specifier: workspace:*
         version: link:../../packages/view-projection
+      '@icarus-graph-explorer/visual-groups':
+        specifier: workspace:*
+        version: link:../../packages/visual-groups
       '@icarus-graph-explorer/workspace-engine-obsidian':
         specifier: workspace:*
         version: link:../../packages/workspace-engine-obsidian

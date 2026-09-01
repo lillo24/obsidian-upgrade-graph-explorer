@@ -37,7 +37,14 @@ const edge: GlobalEdgeAttributes = {
 };
 
 describe('Global visual interactions', () => {
-  it.each(['zoom', 'pan', 'hover', 'selection', 'inspector'] as const)(
+  it.each([
+    'zoom',
+    'pan',
+    'hover',
+    'selection',
+    'visual-group-style-change',
+    'inspector',
+  ] as const)(
     '%s does not reproject, reconcile topology, or request layout',
     (interaction) => {
       expect(GLOBAL_INTERACTION_OPERATION_CONTRACTS[interaction]).toMatchObject(

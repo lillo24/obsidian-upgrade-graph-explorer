@@ -49,6 +49,7 @@ import {
 } from './local-structured-layout';
 import { mapProjectionToReactFlow } from './mapping';
 import { observeSemanticViewport } from './semantic-viewport';
+import { VisualGroupPresentationProvider } from './visual-group-presentation';
 import type {
   GraphCanvasProps,
   GraphFlowEdge,
@@ -977,8 +978,10 @@ function GraphCanvasInner({
 
 export function GraphCanvas(props: GraphCanvasProps) {
   return (
-    <ReactFlowProvider>
-      <GraphCanvasInner {...props} />
-    </ReactFlowProvider>
+    <VisualGroupPresentationProvider styles={props.visualGroupStyles}>
+      <ReactFlowProvider>
+        <GraphCanvasInner {...props} />
+      </ReactFlowProvider>
+    </VisualGroupPresentationProvider>
   );
 }

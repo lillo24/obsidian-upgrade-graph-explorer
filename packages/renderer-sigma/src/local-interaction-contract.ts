@@ -3,6 +3,7 @@ export type LocalInteraction =
   | 'pan'
   | 'hover'
   | 'selection'
+  | 'visual-group-style-change'
   | 'inspector'
   | 'disclosure-change'
   | 'focus-change'
@@ -49,6 +50,7 @@ export const LOCAL_INTERACTION_OPERATION_CONTRACTS: Readonly<
   pan: VISUAL_ONLY,
   hover: VISUAL_ONLY,
   selection: VISUAL_ONLY,
+  'visual-group-style-change': VISUAL_ONLY,
   inspector: NO_RENDERER_WORK,
   'disclosure-change': LOCAL_TOPOLOGY,
   'focus-change': LOCAL_TOPOLOGY,

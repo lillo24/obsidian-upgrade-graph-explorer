@@ -8,6 +8,7 @@ import {
 } from 'react';
 
 import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
+import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-groups';
 
 import { LocalLayoutCache } from './local-layout-cache';
 import {
@@ -56,6 +57,8 @@ export interface LocalGraphCanvasProps {
   readonly rootEntityId: string;
   readonly selection: LocalSelection | null;
   readonly trackpadZoomMode: LocalTrackpadZoomMode;
+  /** Style-only EntityId lookup; excluded from topology and layout inputs. */
+  readonly visualGroupStyles?: VisualGroupPresentationMap;
 }
 
 function errorMessage(error: unknown): string {
@@ -85,6 +88,7 @@ export function LocalGraphCanvas({
   rootEntityId,
   selection,
   trackpadZoomMode,
+  visualGroupStyles,
 }: LocalGraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<LocalRendererSession | undefined>(undefined);
@@ -148,8 +152,10 @@ export function LocalGraphCanvas({
       initialTransitionAnchor,
       initialViewport,
       trackpadZoomMode,
+      visualGroupStyles,
     };
   });
+  const appliedVisualGroupStyles = useRef(initial.visualGroupStyles);
   const [ready, setReady] = useState(false);
   const [layoutCommitKey, setLayoutCommitKey] = useState(0);
   const [layoutStatus, setLayoutStatus] = useState(
@@ -168,6 +174,9 @@ export function LocalGraphCanvas({
         new LocalRendererSession(container, initial.input, {
           rootNodeKey: initial.input.rootNodeKey,
           trackpadZoomMode: initial.trackpadZoomMode,
+          ...(initial.visualGroupStyles === undefined
+            ? {}
+            : { visualGroupStyles: initial.visualGroupStyles }),
           ...(initial.initialTransitionAnchor === undefined
             ? {}
             : {
@@ -228,6 +237,12 @@ export function LocalGraphCanvas({
   useEffect(() => {
     sessionRef.current?.updateTrackpadZoomMode(trackpadZoomMode);
   }, [trackpadZoomMode]);
+
+  useEffect(() => {
+    if (appliedVisualGroupStyles.current === visualGroupStyles) return;
+    appliedVisualGroupStyles.current = visualGroupStyles;
+    sessionRef.current?.setVisualGroupStyles(visualGroupStyles);
+  }, [visualGroupStyles]);
 
   useEffect(() => {
     sessionRef.current?.setControlledSelection(

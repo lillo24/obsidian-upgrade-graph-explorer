@@ -166,6 +166,16 @@ diagnostics, stable-identity catalogs, filesystems, storage APIs, and platform
 code are mechanically excluded from production source. Browser localStorage is
 an outer adapter, not the durable domain contract.
 
+`packages/graph-query` depends inward on core and owns QUERY1 parsing,
+canonical formatting, and canonical-entity evaluation. `packages/visual-groups`
+depends only on core plus graph-query. It validates at most 24 ordered
+name/query/palette/enabled definitions, compiles QUERY1 expressions once, and
+resolves first-match plus all-match results into query-free
+`EntityId → {groupName, color, accent}` presentation. It owns no persistence,
+projection, renderer, UI, layout, navigation, or membership cache. The web app
+owns a separate strict schema-v1 workspace registry and derives maps only for
+entity IDs already visible in a completed projection.
+
 `packages/explorer-inspection` depends inward on core and view-projection. It
 builds canonical hierarchy/reference/search indexes once per snapshot and emits
 plain deterministic entity, occurrence, subtree-relationship, projected
@@ -178,7 +188,10 @@ mechanically excluded from production source.
 `packages/renderer-reactflow` depends inward on view-projection and adapts one
 completed projection to read-only React Flow nodes/edges. It owns collision-safe
 renderer IDs, fixed node geometry, plain W3 input/result adaptation,
-direct-neighborhood emphasis, semantic visual components, and viewport behavior.
+direct-neighborhood emphasis, semantic visual components, viewport behavior,
+and an optional GROUP1A presentation context. The group map changes only a
+fixed overlay accent; it is excluded from mapping, layout, fingerprints, and
+geometry.
 It does not inspect canonical truth, reroute endpoints, aggregate references,
 apply focus/filter policy, load reports, read files, or persist state. ESLint
 mechanically excludes those inward and sideways dependencies. Its pure
@@ -197,7 +210,12 @@ layout prior and never a canonical or projected relationship. A plain-data
 latest-result-wins application Worker runs ForceAtlas2 plus the selected
 chunked folder prior. Exact derived positions may be reused from a bounded
 module-lifetime memory cache; no positions persist. Far/Regional/Near semantic
-zoom changes style only. ESLint excludes canonical, source, platform,
+zoom changes style only. Optional GROUP1A maps enter only node reducers: Global
+documents and Local File/Heading/Block nodes may use an accent below LOD and
+interaction emphasis, while diagnostics and edges remain unchanged. Session
+setters schedule partial, skip-indexation reducer refreshes without topology
+reconciliation or layout.
+ESLint excludes canonical, source, platform,
 application, analytics, React Flow, Dagre, and Node dependencies.
 
 `tools/global-renderer-spike` is now a production renderer harness rather than
@@ -614,8 +632,10 @@ anchors the selected node or root transiently and semantic centering is the
 safe fallback. The Free/Structured choice is an existing user preference, not
 canonical or history state. Local headings never enter Global topology, mutate
 its cache, or trigger whole-vault relayout.
-QUERY1 and GROUP1 remain independent future systems. The separate LAYOUT1 idea
-is paused/absorbed into this Global → Regional → Local spatial architecture;
+QUERY1 filtering and GROUP1 visual classification remain independent systems.
+GROUP1A's source-neutral backbone and renderer seams are complete; GROUP1B
+user-facing creation, editing, ordering, and palette configuration is pending.
+The separate LAYOUT1 idea is paused/absorbed into this Global → Regional → Local spatial architecture;
 manual cluster offsets remain future derived presentation state.
 
 Tauri v2 hosts the existing frontend and provides dialog plus filesystem
@@ -631,6 +651,8 @@ not the main application chunk. Sigma 3.0.3, Graphology 0.26.0, and ForceAtlas2
 Sigma presentation and dedicated Global/Local Free worker chunks. Local
 Structured reuses React Flow and W3 and adds no runtime dependency. Structure startup
 does not execute them.
+Visual Groups add one zero-external-dependency workspace package; renderer
+packages import only its resolved presentation type and never QUERY1 rules.
 Tauri dependencies are isolated to the desktop shell and
 `source-provider-tauri`.
 
@@ -802,6 +824,14 @@ and release validation cover the renderer toggle, selection policy, anchored
 transition/refinement, disclosure, Search/Inspector, live updates, history,
 precision input, and explicit Free/Structure recovery without committing
 screenshots or private topology.
+
+GROUP1A adds pure tests for definition/registry validation, canonicalization,
+priority and overlap, QUERY1 semantic equivalence, visible-entity-only map
+derivation, and identical canonical classification across Structure, Global,
+Local Free, and Local Structured. Renderer-local operation oracles require a
+style-map update to perform zero projection, topology mapping/reconciliation,
+layout requests, or geometry changes while scheduling exactly one style
+refresh.
 
 ## Changing these decisions
 

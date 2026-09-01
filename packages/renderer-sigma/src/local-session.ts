@@ -1,5 +1,6 @@
 import Sigma from 'sigma';
 import type { WheelCoords } from 'sigma/types';
+import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-groups';
 
 import {
   buildLocalGraph,
@@ -40,6 +41,7 @@ export interface LocalRendererSessionOptions {
   readonly initialViewportPoint?: LocalViewportPoint;
   readonly initialViewportNodeKey?: string;
   readonly instrumentation?: LocalRendererInstrumentation;
+  readonly visualGroupStyles?: VisualGroupPresentationMap;
   readonly onNodeSelected?: (
     key: string | undefined,
     attributes: LocalNodeAttributes | undefined,
@@ -72,6 +74,7 @@ export class LocalRendererSession {
   private hoveredNode: string | undefined;
   private selectedNode: string | undefined;
   private visualLod: LocalVisualLod;
+  private visualGroupStyles: VisualGroupPresentationMap | undefined;
   private trackpadZoomMode: LocalTrackpadZoomMode;
   private readonly options: LocalRendererSessionOptions;
   private precisionWheelIdleTimer: number | undefined;
@@ -140,6 +143,7 @@ export class LocalRendererSession {
     this.options = options;
     this.rootNodeKey = options.rootNodeKey;
     this.trackpadZoomMode = options.trackpadZoomMode;
+    this.visualGroupStyles = options.visualGroupStyles;
     this.graph = buildLocalGraph(input);
     this.neighborhoods = createLocalNeighborhoodIndex(input);
     const mountStarted = performance.now();
@@ -215,6 +219,10 @@ export class LocalRendererSession {
 
   private reduceNode(key: string, attributes: LocalNodeAttributes) {
     const hovered = key === this.hoveredNode;
+    const visualGroup =
+      attributes.entityId === null
+        ? undefined
+        : this.visualGroupStyles?.get(attributes.entityId);
     return resolveLocalNodeStyle(attributes, {
       hovered,
       relatedToHover:
@@ -223,6 +231,7 @@ export class LocalRendererSession {
         this.neighborhoods.get(this.hoveredNode)?.has(key) === true,
       selected: key === this.selectedNode,
       lod: this.visualLod,
+      ...(visualGroup === undefined ? {} : { visualGroup }),
     });
   }
 
@@ -263,6 +272,18 @@ export class LocalRendererSession {
 
   updateTrackpadZoomMode(mode: LocalTrackpadZoomMode): void {
     this.trackpadZoomMode = mode;
+  }
+
+  setVisualGroupStyles(styles?: VisualGroupPresentationMap): void {
+    this.visualGroupStyles = styles;
+    this.options.instrumentation?.count('local-style-updates');
+    // Sigma 3 applies node reducers during refresh, not a render-only pass.
+    // Repaint existing nodes without rebuilding its node/edge indices.
+    this.renderer.refresh({
+      partialGraph: { nodes: this.graph.nodes() },
+      skipIndexation: true,
+      schedule: true,
+    });
   }
 
   update(input: LocalRendererInput): LocalGraphReconciliation {

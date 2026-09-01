@@ -10,6 +10,9 @@ view contract.
 - `saved-filters.ts` owns the separate schema-v1 `{name, query}` registry for a
   stable workspace, including strict validation, deterministic ordering, a
   50-filter limit, and explicit read/write failures.
+- `visual-groups.ts` owns the separate schema-v1 ordered Visual Group registry,
+  strict canonical QUERY1/palette validation, a 24-group limit, pure priority
+  mutations, and explicit read/write failures. GROUP1B UI wiring is pending.
 - `*.test.ts` uses injected storage doubles; tests never rely on global browser
   storage.
 
@@ -33,3 +36,11 @@ storage. They contain only trimmed names and canonical QUERY1 strings—never
 simple filters, disclosure, Focus, viewport, selection, source paths, or raw
 ASTs. A corrupt registry is left unchanged, and Reset saved view does not
 delete it.
+
+Visual Groups use
+`icarus-graph-explorer:visual-groups:<encodeURIComponent(workspaceId)>`. Their
+exact array order is priority, so serialization preserves it rather than
+sorting. Records contain only name, canonical QUERY1 string, fixed palette
+token, and enabled state. Corrupt values remain untouched, and no group is
+stored in graph-view state, navigation history, projection state, or renderer
+layout caches.

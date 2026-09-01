@@ -3,6 +3,7 @@ export type GlobalInteraction =
   | 'pan'
   | 'hover'
   | 'selection'
+  | 'visual-group-style-change'
   | 'inspector'
   | 'projection-change'
   | 'folder-assignment-change'
@@ -43,6 +44,7 @@ export const GLOBAL_INTERACTION_OPERATION_CONTRACTS: Readonly<
   pan: VISUAL_ONLY,
   hover: VISUAL_ONLY,
   selection: VISUAL_ONLY,
+  'visual-group-style-change': VISUAL_ONLY,
   inspector: NO_RENDERER_WORK,
   'projection-change': {
     projection: 1,

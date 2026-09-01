@@ -44,6 +44,7 @@
   },
   "dependencies": {
     "@icarus-graph-explorer/view-projection": "workspace:*",
+    "@icarus-graph-explorer/visual-groups": "workspace:*",
     "graphology": "0.26.0",
     "graphology-layout-forceatlas2": "0.10.1",
     "sigma": "3.0.3"

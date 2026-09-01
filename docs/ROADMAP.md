@@ -93,10 +93,14 @@ live-update, accessibility, and physical precision-touchpad gates. KG13 is
 complete and KG14 is next; no KG14 work begins in this milestone.
 
 QUERY1 saved queries/filters and GROUP1 visual rule groups remain independent
-future product systems and are not implemented by KG13B2A. The separate LAYOUT1
-idea is paused/absorbed into KG13's Global → Regional → Local spatial
-architecture. Manual folder-cluster offsets and named Saved Views also remain
-future derived presentation work.
+product systems. GROUP1A's source-neutral rule compiler, fixed palette,
+workspace registry logic, visible-entity presentation derivation, and
+style-only seams across Structure, Global, Local Free, and Local Structured are
+complete. GROUP1B user-facing creation, editing, ordering, enabling, and palette
+configuration is pending; no default groups or product controls exist yet. The
+separate LAYOUT1 idea remains paused/absorbed into KG13's Global → Regional →
+Local spatial architecture. Manual folder-cluster offsets and named Saved Views
+also remain future derived presentation work.
 
 Post-MVP analytics—typed conceptual relations, pathfinding variants,
 centrality, betweenness, communities, connected components, co-citation,

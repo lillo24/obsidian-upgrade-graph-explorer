@@ -149,6 +149,49 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/visual-groups/**/*.{ts,tsx}'],
+    ignores: ['packages/visual-groups/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                '@xyflow/*',
+                '@dagrejs/*',
+                '@tauri-apps/*',
+                '@react-sigma/*',
+                'sigma',
+                'sigma/*',
+                'graphology-*',
+                'obsidian-*',
+                '@obsidian/*',
+                '@icarus-graph-explorer/view-projection',
+                '@icarus-graph-explorer/view-projection/*',
+                '@icarus-graph-explorer/view-state',
+                '@icarus-graph-explorer/view-state/*',
+                '@icarus-graph-explorer/renderer-reactflow',
+                '@icarus-graph-explorer/renderer-reactflow/*',
+                '@icarus-graph-explorer/renderer-sigma',
+                '@icarus-graph-explorer/renderer-sigma/*',
+                '@icarus-graph-explorer/web',
+                '@icarus-graph-explorer/web/*',
+                'node:*',
+              ],
+              message:
+                'Visual Groups may depend only on source-neutral core and QUERY1; projection, persistence, UI, renderers, platform, layout, and filesystem concerns stay outside.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['packages/parser-markdown/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [

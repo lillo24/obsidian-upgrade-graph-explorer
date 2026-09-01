@@ -12,6 +12,7 @@ import type {
   ReferenceResolutionStatus,
   ViewProjection,
 } from '@icarus-graph-explorer/view-projection';
+import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-groups';
 
 export type GraphLayoutMode = DagreLayoutMode;
 
@@ -151,6 +152,8 @@ export interface GraphCanvasProps {
   readonly visualVariant?: GraphVisualVariant;
   /** Required by Local Structured for root normalization and emphasis. */
   readonly rootEntityId?: string;
+  /** Optional style-only EntityId lookup; never enters mapping or layout. */
+  readonly visualGroupStyles?: VisualGroupPresentationMap;
   readonly layoutCache?: LocalStructuredLayoutCache;
   readonly focusAppearance: FocusAppearance;
   readonly selection: GraphSelection | null;
