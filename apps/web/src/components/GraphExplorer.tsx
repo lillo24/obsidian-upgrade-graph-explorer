@@ -44,6 +44,7 @@ import {
 import {
   createProjectionWorkspace,
   projectLocalView,
+  projectStructureView,
   projectView,
   type ViewProjection,
   type ViewProjectionState,
@@ -519,9 +520,9 @@ export function GraphExplorer({
         ok: true,
         projection:
           performance === undefined
-            ? projectView(projectionWorkspace, activeViewState)
+            ? projectStructureView(projectionWorkspace, activeViewState)
             : performance.measure('project-view', 'projections', () =>
-                projectView(projectionWorkspace, activeViewState),
+                projectStructureView(projectionWorkspace, activeViewState),
               ),
       };
     } catch (error: unknown) {
@@ -2301,7 +2302,7 @@ export function GraphExplorer({
         structureResult?.ok === true ? structureResult.projection : undefined;
       if (structureProjection === undefined) {
         try {
-          structureProjection = projectView(
+          structureProjection = projectStructureView(
             projectionWorkspace,
             activeViewStateRef.current,
           );
@@ -3126,6 +3127,7 @@ export function GraphExplorer({
                     `Global renderer failed: ${message} Structure remains available for this session.`,
                   )
                 }
+                onNodeActivate={enterLocal}
                 onSelectionChange={changeGlobalSelection}
                 onTransitionAnchorApiChange={changeGlobalTransitionAnchorApi}
                 onViewportObservation={observeGlobalViewport}

@@ -618,6 +618,14 @@ or block results and **Open in Structure** return to exact hierarchical detail.
 WebGL/startup failure is explicit and leaves Structure available without
 deleting the persisted presentation preference.
 
+Structure Focus is a source-neutral two-pass projection. A documents-only,
+prefiltered hop traversal first fixes file membership from the containing
+document of the exact Focus root. A second pass applies full filters and precise
+endpoint routing while automatic structural depth is scoped only to that root
+document. Neighbor files remain manually expandable, and precise heading
+endpoints cannot add or remove files from the established neighborhood. Ordinary
+non-Focus Structure depth remains global.
+
 The production presentation model is `Structure | Global | Local`. Local is
 entered explicitly from a selected Global file. It reuses KG6 Focus and
 disclosure, normalizes the root to a stable document, and projects only that
@@ -632,6 +640,11 @@ anchors the selected node or root transiently and semantic centering is the
 safe fallback. The Free/Structured choice is an existing user preference, not
 canonical or history state. Local headings never enter Global topology, mutate
 its cache, or trigger whole-vault relayout.
+Global document double-click is a shortcut to that exact existing Local-entry
+orchestration. The Sigma 3.0.3 node event prevents its default camera zoom,
+diagnostic nodes do not activate, and the application still owns history,
+selection, transition anchoring, root normalization, and the Free/Structured
+preference.
 QUERY1 filtering and GROUP1 visual classification remain independent systems.
 GROUP1A's source-neutral backbone and renderer seams remain unchanged. GROUP1B
 adds a web-owned workspace session with durable, session-only, corrupt, and

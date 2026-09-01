@@ -36,6 +36,7 @@ import { createStableIdentityCatalog } from '@icarus-graph-explorer/stable-ident
 import {
   createProjectionWorkspace,
   documentOnlyProjectionState,
+  projectStructureView,
   projectView,
   structuralDepthProjectionState,
   topLevelSectionProjectionState,
@@ -371,7 +372,9 @@ function projectionScenarios(
   const canonical = canonicalCounts(snapshot);
   return Object.entries(projectionStates(snapshot)).map(([id, scenario]) => {
     const projected = repeated(options, () =>
-      projectView(workspace, scenario.state),
+      scenario.layoutMode === 'focus'
+        ? projectStructureView(workspace, scenario.state)
+        : projectView(workspace, scenario.state),
     );
     const projection = projected.lastValue;
     const mapped = repeated(options, () =>

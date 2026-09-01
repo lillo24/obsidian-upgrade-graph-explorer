@@ -123,7 +123,8 @@ pnpm benchmark:local-renderer -- --profile stress
 
 Profiles are deterministic and measure parse/adapt, resolution, report
 construction, projection-index construction, files-only/one-level/three-level
-and expanded projection, a depth-three nontrivial QUERY1 filter, one-hop focus,
+and expanded projection, a depth-three nontrivial QUERY1 filter, product
+Structure one-hop focus,
 and resolution filtering. For
 files-only structure and one-hop focus it separately measures React Flow
 mapping and Dagre layout, then reports layout mode, node/edge counts, and any explicit layout

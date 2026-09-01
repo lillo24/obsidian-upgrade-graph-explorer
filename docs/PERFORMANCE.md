@@ -43,7 +43,8 @@ under ignored `output/performance/` and is not committed.
 
 The harness separately times parse/adapt, resolution, stable identity, report
 construction, KG10 updates, projection/inspection workspace construction,
-`projectView`, React Flow mapping, Dagre, search, and inspection. It records
+the ordinary `projectView` path plus product `projectStructureView` for Focus
+scenarios, React Flow mapping, Dagre, search, and inspection. It records
 operation counts as well as duration. A phase that is intentionally unsafe to
 repeat is listed in `omittedPhases`; omission never looks like a zero-time
 success.
@@ -613,3 +614,26 @@ all four renderer seams consume the resulting style-map identity using the
 existing GROUP1A partial-style paths. The existing `benchmark:visual-groups`
 profiles remain the reproducible evidence; GROUP1B adds no new timing threshold
 or external dependency.
+
+## PRE-KG14A2 Structure Focus evidence
+
+The performance harness now sends its Focus scenarios through the same
+`projectStructureView` entry used by the product. That call contains a bounded
+documents-only membership pass plus detailed root-scoped disclosure, but remains
+one user-visible projection operation and requests only the matching W3 layout.
+It performs zero Global projection/layout, Local layout, or workspace work.
+
+Default small and medium profiles passed on 2026-09-01. The optimized medium
+Focus results below are median/p95 milliseconds; they are investigative local
+evidence rather than CI thresholds.
+
+| Scenario        | Nodes / edges | Product projection |  Mapping |   Dagre |
+| --------------- | ------------: | -----------------: | -------: | ------: |
+| One-hop Focus   |       11 / 10 | 132.75 / 145.55 ms |  0.03 ms | 1.66 ms |
+| Three-hop Focus | 5,000 / 4,999 | 170.15 / 199.63 ms | 10.37 ms | omitted |
+
+The documents-only pass deliberately skips DISC1 candidate-count work because
+membership consumes no disclosure controls. The detailed pass still produces
+truthful actionable counts inside the fixed neighborhood. Both medium
+projections remain inside the existing Class B 250 ms p95 budget, so no new
+projection cache or Worker boundary is justified.

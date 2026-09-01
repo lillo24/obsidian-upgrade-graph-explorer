@@ -32,7 +32,9 @@ src/
   validation.ts        Deserialized-output and cross-record invariant checks.
   presets.ts           Generic structural-depth and compatibility state helpers.
   reveal.ts            Canonical-target disclosure helper for navigation.
+  focused-documents.ts Shared containing-document, filtered neighborhood, and detail-retention helpers.
   local.ts             Document-root normalization and bounded two-pass Local projection.
+  structure.ts         Product Structure projection with stable, root-scoped Focus depth.
   project.ts           Public orchestration and one-call snapshot wrapper.
   index.ts             Intentional public surface.
   test-fixture.ts      Neutral canonical fixture shared only by package tests.
@@ -102,10 +104,13 @@ filters are active, one shared hypothetical disclosure/filter pass finalizes eve
 visible owner's candidates together; the package never runs one full
 projection per node. Reference-status filtering does not change entity
 revealability. Because expansion can non-locally change reference endpoint
-roll-up and Focus reachability, Focus mode deliberately suppresses speculative
-Expand metadata; exact Collapse affordances remain available from the final
-visible hierarchy. Explicit expanded/collapsed intent is preserved when Blocks,
-heading limits, filters, or Focus temporarily remove its affordance.
+roll-up and Focus reachability in the generic one-pass `projectView`, that
+low-level Focus path still suppresses speculative Expand metadata. Product
+Structure uses `projectStructureView`: it establishes document reachability
+first, so its second detailed pass can expose truthful one-action Expand counts
+without changing the fixed file neighborhood. Exact Collapse affordances and
+explicit expanded/collapsed intent remain preserved when Blocks, heading
+limits, filters, or Focus temporarily remove an affordance.
 
 `revealEntityInViewState` opens and uncollapses the target's ancestor chain. It
 also enables blocks when the target is a block and minimally widens an existing
@@ -150,6 +155,25 @@ Synthetic diagnostic targets may appear at distance one through their edge but
 are traversal terminals. Context nodes carry no distance or internal reference
 provenance and do not pull unrelated reference edges into the neighborhood.
 
+## Structure Focus projection semantics
+
+Outside Focus, Structure depth remains global across every eligible visible
+document. Inside Structure Focus, `projectStructureView` first normalizes the
+exact file/heading/block Focus root to its containing document and establishes a
+documents-only reference neighborhood. Path and reference-status constraints
+are applied before that bounded hop traversal; text, entity-kind, and QUERY1
+filters remain part of the later detailed pass.
+
+The detailed pass sets ordinary automatic depth to zero and applies the stored
+depth only to a projection-only set of detail document IDs—today the one Focus
+root document. Depths 0/1/2/3 therefore retain the same file IDs while revealing
+zero through three canonical section generations beneath the root. Neighbor
+documents remain collapsed until manually expanded; manual collapse retains
+precedence. Blocks still require both the Blocks opt-in and a genuinely manual
+parent expansion, so root-scoped automatic depth cannot reveal them by itself.
+Visible headings may take over precise reference endpoints without changing the
+precomputed document neighborhood.
+
 ## Local projection semantics
 
 `deriveLocalProjectionState` normalizes a document, section, or block target to
@@ -158,12 +182,13 @@ direction, disclosure IDs, and filters. Automatic depth becomes zero; the root
 is explicitly expanded so its top-level headings appear while every neighbor
 document stays collapsed until explicitly expanded.
 
-`projectLocalView` performs a documents-only Focus pass to establish the
-bounded reference neighborhood, then a normal disclosure/filter/provenance pass
-and retains only entities whose containing documents belong to that
-neighborhood. This prevents revealing a heading from admitting an unrelated
-vault region. It emits ordinary validated `ViewProjection` data—no Local
-canonical model, renderer traversal, folder relation, or copied source truth.
+`projectLocalView` shares the documents-only Focus helper with Structure. It
+applies path/reference-status constraints before traversal, then runs a normal
+disclosure/filter/provenance pass and retains only entities whose containing
+documents belong to that neighborhood. This prevents revealing a heading from
+admitting an unrelated vault region. It emits ordinary validated
+`ViewProjection` data—no Local canonical model, renderer traversal, folder
+relation, or copied source truth.
 
 ## Filter semantics
 

@@ -1,7 +1,11 @@
 import type { EntityId } from '@icarus-graph-explorer/core';
 
 import type { ProjectionWorkspace } from './workspace';
-import type { ProjectionIssue, StructuralDisclosureState } from './types';
+import type {
+  ProjectionIssue,
+  StructuralDepth,
+  StructuralDisclosureState,
+} from './types';
 
 export interface DisclosureResult {
   readonly visibleEntityIds: ReadonlySet<EntityId>;
@@ -11,6 +15,11 @@ export interface DisclosureResult {
     readonly EntityId[]
   >;
   readonly issues: readonly ProjectionIssue[];
+}
+
+/** Projection-only depth overrides; persisted disclosure state stays unchanged. */
+export interface DisclosureCalculationOptions {
+  readonly defaultDepthByDocumentId?: ReadonlyMap<EntityId, StructuralDepth>;
 }
 
 function issue(
@@ -24,6 +33,7 @@ function issue(
 export function calculateDisclosure(
   workspace: ProjectionWorkspace,
   state: StructuralDisclosureState,
+  options: DisclosureCalculationOptions = {},
 ): DisclosureResult {
   const issues: ProjectionIssue[] = [];
   const expanded = new Set<EntityId>();
@@ -69,7 +79,12 @@ export function calculateDisclosure(
 
   const visible = new Set<EntityId>();
   const depthByEntityId = new Map<EntityId, number>();
-  const visitChildren = (parentId: EntityId, depth: number): void => {
+  const defaultDepthByEntityId = new Map<EntityId, StructuralDepth>();
+  const visitChildren = (
+    parentId: EntityId,
+    depth: number,
+    defaultDepth: StructuralDepth,
+  ): void => {
     if (collapsed.has(parentId)) return;
     for (const child of workspace.children(parentId)) {
       const withinHeadingLimit =
@@ -77,23 +92,26 @@ export function calculateDisclosure(
         state.maxSectionLevel === undefined ||
         child.level <= state.maxSectionLevel;
       if (!withinHeadingLimit) continue;
-      const visibleByDepth =
-        child.kind === 'section' && depth <= state.defaultDepth;
+      const visibleByDepth = child.kind === 'section' && depth <= defaultDepth;
       const visibleByExpansion =
         expanded.has(parentId) &&
         (child.kind !== 'block' || state.includeBlocks);
       if (!visibleByDepth && !visibleByExpansion) continue;
       visible.add(child.id);
       depthByEntityId.set(child.id, depth);
-      visitChildren(child.id, depth + 1);
+      defaultDepthByEntityId.set(child.id, defaultDepth);
+      visitChildren(child.id, depth + 1, defaultDepth);
     }
   };
 
   for (const entity of workspace.entities()) {
     if (entity.kind !== 'document') continue;
+    const defaultDepth =
+      options.defaultDepthByDocumentId?.get(entity.id) ?? state.defaultDepth;
     visible.add(entity.id);
     depthByEntityId.set(entity.id, 0);
-    visitChildren(entity.id, 1);
+    defaultDepthByEntityId.set(entity.id, defaultDepth);
+    visitChildren(entity.id, 1, defaultDepth);
   }
 
   const visibleParentIds = new Set<EntityId>();
@@ -109,6 +127,7 @@ export function calculateDisclosure(
     ownerId: EntityId,
     parentId: EntityId,
     depth: number,
+    defaultDepth: StructuralDepth,
     result: EntityId[],
   ): void => {
     if (parentId !== ownerId && collapsed.has(parentId)) return;
@@ -119,13 +138,18 @@ export function calculateDisclosure(
         state.maxSectionLevel === undefined ||
         child.level <= state.maxSectionLevel;
       if (!withinHeadingLimit) continue;
-      const visibleByDepth =
-        child.kind === 'section' && depth <= state.defaultDepth;
+      const visibleByDepth = child.kind === 'section' && depth <= defaultDepth;
       const visibleByExpansion =
         parentExpanded && (child.kind !== 'block' || state.includeBlocks);
       if (!visibleByDepth && !visibleByExpansion) continue;
       if (!visible.has(child.id)) result.push(child.id);
-      collectRevealableChildren(ownerId, child.id, depth + 1, result);
+      collectRevealableChildren(
+        ownerId,
+        child.id,
+        depth + 1,
+        defaultDepth,
+        result,
+      );
     }
   };
 
@@ -141,6 +165,7 @@ export function calculateDisclosure(
       entity.id,
       entity.id,
       (depthByEntityId.get(entity.id) ?? 0) + 1,
+      defaultDepthByEntityId.get(entity.id) ?? state.defaultDepth,
       descendants,
     );
     if (descendants.length > 0) {
