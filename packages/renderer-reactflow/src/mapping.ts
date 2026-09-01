@@ -11,6 +11,7 @@ import type {
   GraphFlowEdge,
   GraphFlowNode,
   GraphLayoutMode,
+  GraphVisualVariant,
 } from './types';
 
 export const ENTITY_NODE_DIMENSIONS = {
@@ -26,6 +27,23 @@ export const ENTITY_TYPE_LABELS = {
 } as const;
 
 export const DIAGNOSTIC_NODE_DIMENSIONS = { width: 208, height: 94 } as const;
+
+/** Measured fixed boxes for the compact Local schematic presentation. */
+export const LOCAL_STRUCTURED_ENTITY_NODE_DIMENSIONS = {
+  document: { width: 156, height: 46 },
+  section: { width: 148, height: 42 },
+  block: { width: 132, height: 38 },
+} as const;
+
+export const LOCAL_STRUCTURED_DIAGNOSTIC_NODE_DIMENSIONS = {
+  width: 148,
+  height: 42,
+} as const;
+
+export interface MapProjectionOptions {
+  readonly visualVariant?: GraphVisualVariant;
+  readonly rootEntityId?: string;
+}
 
 function documentName(path: string): string {
   const name = path.split('/').at(-1) ?? path;
@@ -175,8 +193,13 @@ function mapEntityNode(
   node: ProjectedEntityNode,
   presentation: EntityPresentation,
   visibleDescendantCount: number,
+  visualVariant: GraphVisualVariant,
+  rootEntityId: string | undefined,
 ): EntityFlowNode {
-  const dimensions = ENTITY_NODE_DIMENSIONS[node.entityKind];
+  const dimensions =
+    visualVariant === 'local-structured'
+      ? LOCAL_STRUCTURED_ENTITY_NODE_DIMENSIONS[node.entityKind]
+      : ENTITY_NODE_DIMENSIONS[node.entityKind];
   const typeLabel = ENTITY_TYPE_LABELS[node.entityKind];
   const { detail, title } = presentation;
   const isExpanded = visibleDescendantCount > 0;
@@ -193,6 +216,10 @@ function mapEntityNode(
     node.focusDistance === null
       ? ''
       : ` graph-node--focus-distance-${node.focusDistance}`;
+  const root = rootEntityId === node.entityId;
+  const variantClass =
+    visualVariant === 'local-structured' ? ' graph-node--local-structured' : '';
+  const rootClass = root ? ' graph-node--local-root' : '';
   return {
     id: rendererNodeId(node.id),
     type: 'entity',
@@ -206,7 +233,7 @@ function mapEntityNode(
     selectable: true,
     focusable: true,
     ariaLabel,
-    className: `graph-node graph-node--${node.entityKind} graph-node--role-${node.role}${focusClass}`,
+    className: `graph-node graph-node--${node.entityKind} graph-node--role-${node.role}${focusClass}${variantClass}${rootClass}`,
     data: {
       projectionNodeId: node.id,
       entityId: node.entityId,
@@ -223,32 +250,39 @@ function mapEntityNode(
       isExpanded,
       internalReferenceCount: node.internalReferenceIds.length,
       ariaLabel,
+      visualVariant,
+      root,
     },
   };
 }
 
 function mapDiagnosticNode(
   node: ProjectedReferenceTargetNode,
+  visualVariant: GraphVisualVariant,
 ): DiagnosticFlowNode {
   const candidateText =
     node.status === 'ambiguous'
       ? `, ${node.candidateEntityIds.length} candidates`
       : '';
   const ariaLabel = `${node.status} reference target ${node.rawTarget}, ${node.referenceIds.length} occurrence${node.referenceIds.length === 1 ? '' : 's'}${candidateText}`;
+  const dimensions =
+    visualVariant === 'local-structured'
+      ? LOCAL_STRUCTURED_DIAGNOSTIC_NODE_DIMENSIONS
+      : DIAGNOSTIC_NODE_DIMENSIONS;
   return {
     id: rendererNodeId(node.id),
     type: 'diagnostic',
     position: { x: 0, y: 0 },
-    width: DIAGNOSTIC_NODE_DIMENSIONS.width,
-    height: DIAGNOSTIC_NODE_DIMENSIONS.height,
-    measured: DIAGNOSTIC_NODE_DIMENSIONS,
+    width: dimensions.width,
+    height: dimensions.height,
+    measured: dimensions,
     draggable: false,
     connectable: false,
     deletable: false,
     selectable: true,
     focusable: true,
     ariaLabel,
-    className: `graph-node graph-node--diagnostic graph-node--${node.status}`,
+    className: `graph-node graph-node--diagnostic graph-node--${node.status}${visualVariant === 'local-structured' ? ' graph-node--local-structured' : ''}`,
     data: {
       projectionNodeId: node.id,
       status: node.status,
@@ -257,6 +291,7 @@ function mapDiagnosticNode(
       candidateCount: node.candidateEntityIds.length,
       reasonCount: node.reasons.length,
       ariaLabel,
+      visualVariant,
     },
   };
 }
@@ -270,7 +305,9 @@ function edgeHandles(mode: GraphLayoutMode) {
 export function mapProjectionToReactFlow(
   projection: ViewProjection,
   mode: GraphLayoutMode,
+  options: MapProjectionOptions = {},
 ): { readonly nodes: GraphFlowNode[]; readonly edges: GraphFlowEdge[] } {
+  const visualVariant = options.visualVariant ?? 'standard';
   const entityNodes = projection.nodes.filter(
     (node): node is ProjectedEntityNode => node.kind === 'entity',
   );
@@ -304,8 +341,10 @@ export function mapProjectionToReactFlow(
               detail: null,
             },
             countVisibleDescendants(node.id),
+            visualVariant,
+            options.rootEntityId,
           )
-        : mapDiagnosticNode(node),
+        : mapDiagnosticNode(node, visualVariant),
     );
   const handles = edgeHandles(mode);
   const edges = [...projection.edges]
@@ -327,13 +366,14 @@ export function mapProjectionToReactFlow(
         focusable: true,
         deletable: false,
         ariaLabel,
-        className: `graph-edge graph-edge--${edge.kind}${status === null ? '' : ` graph-edge--${status}`}`,
+        className: `graph-edge graph-edge--${edge.kind}${status === null ? '' : ` graph-edge--${status}`}${visualVariant === 'local-structured' ? ' graph-edge--local-structured' : ''}`,
         data: {
           projectionEdgeId: edge.id,
           kind: edge.kind,
           status,
           referenceCount,
           ariaLabel,
+          visualVariant,
         },
       };
     });

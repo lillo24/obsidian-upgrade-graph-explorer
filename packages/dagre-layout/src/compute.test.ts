@@ -64,8 +64,38 @@ describe('plain Dagre layout', () => {
       nodesep: 38,
       ranksep: 92,
     });
+    expect(dagreGraphSettings('local-structured')).toEqual({
+      rankdir: 'LR',
+      ranker: 'network-simplex',
+      nodesep: 22,
+      ranksep: 58,
+      marginx: 20,
+      marginy: 20,
+    });
     expect(dagreEdgeSettings('hierarchy')).toEqual({ minlen: 1, weight: 8 });
     expect(dagreEdgeSettings('reference')).toEqual({ minlen: 2, weight: 1 });
+  });
+
+  it('computes Local Structured through the same clone-safe worker protocol', () => {
+    const input: DagreLayoutInput = {
+      ...structureInput,
+      mode: 'local-structured',
+    };
+    const request = structuredClone({
+      protocolVersion: DAGRE_LAYOUT_WORKER_PROTOCOL_VERSION,
+      requestId: 13,
+      kind: 'layout' as const,
+      input,
+    });
+    const response = handleDagreLayoutWorkerRequest(request, () => 1);
+
+    expect(response.kind).toBe('success');
+    if (response.kind === 'success') {
+      expect(response.output).toEqual(computeDagreLayout(input));
+      expect(response.output.positions[0]!.x).toBeLessThan(
+        response.output.positions[1]!.x,
+      );
+    }
   });
 
   it('supports empty input and fixed node dimensions', () => {

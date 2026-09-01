@@ -71,6 +71,24 @@ describe('graph preferences', () => {
     );
   });
 
+  it('restores Structured from the existing preference key without changing Local view schema', () => {
+    const storage = memoryStorage(
+      '{"localLayoutMode":"structured","trackpadZoomMode":"pinch-zoom"}',
+    );
+
+    expect(loadGraphPreferences(storage).preferences).toMatchObject({
+      localLayoutMode: 'structured',
+      trackpadZoomMode: 'pinch-zoom',
+    });
+    expect(
+      saveGraphPreferences(storage, {
+        ...DEFAULT_GRAPH_PREFERENCES,
+        localLayoutMode: 'structured',
+      }),
+    ).toEqual({ ok: true });
+    expect(storage.value).toContain('"localLayoutMode":"structured"');
+  });
+
   it('falls back each invalid v1 field independently without changing the key', () => {
     expect(
       loadGraphPreferences(

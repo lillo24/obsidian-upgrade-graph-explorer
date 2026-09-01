@@ -98,9 +98,16 @@ function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
     data.entityKind === 'document'
       ? data.sourcePath
       : `${data.sourcePath}, line ${data.sourceStartLine}`;
+  const structured = data.visualVariant === 'local-structured';
+  const marker =
+    data.entityKind === 'document'
+      ? '▰'
+      : data.entityKind === 'section'
+        ? '◇'
+        : '●';
   return (
     <article
-      className={`entity-card entity-card--${data.entityKind} entity-card--${data.role}${hasFooter ? ' entity-card--has-footer' : ''}${hasDisclosure ? ' entity-card--has-disclosure' : ''}`}
+      className={`entity-card entity-card--${data.entityKind} entity-card--${data.role}${hasFooter ? ' entity-card--has-footer' : ''}${hasDisclosure ? ' entity-card--has-disclosure' : ''}${structured ? ' entity-card--local-structured' : ''}${data.root ? ' entity-card--local-root' : ''}`}
       data-entity-id={data.entityId}
       data-entity-kind={data.entityKind}
       data-focus-distance={data.focusDistance ?? undefined}
@@ -108,7 +115,17 @@ function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
       title={`${data.title} — ${sourceLocation} — Double-click to focus`}
     >
       <NodeHandles />
-      <strong className="entity-title">{data.title}</strong>
+      <div className="entity-card__title-row">
+        {structured ? (
+          <span
+            aria-hidden="true"
+            className={`local-structured-marker local-structured-marker--${data.entityKind}`}
+          >
+            {marker}
+          </span>
+        ) : null}
+        <strong className="entity-title">{data.title}</strong>
+      </div>
       {data.detail === null ? null : (
         <span className="entity-detail" title={data.detail} translate="no">
           {data.detail}
@@ -159,25 +176,41 @@ function DiagnosticNodeComponent({ data }: NodeProps<DiagnosticFlowNode>) {
       : data.reasonCount > 0
         ? `${data.reasonCount} reason${data.reasonCount === 1 ? '' : 's'}`
         : 'No target match';
+  const structured = data.visualVariant === 'local-structured';
   return (
     <article
-      className={`diagnostic-card diagnostic-card--${data.status}`}
+      className={`diagnostic-card diagnostic-card--${data.status}${structured ? ' diagnostic-card--local-structured' : ''}`}
       data-projection-node-id={data.projectionNodeId}
     >
       <NodeHandles />
       <div className="diagnostic-card__topline">
-        <span className="diagnostic-symbol" aria-hidden="true">
-          {statusSymbol}
+        <span
+          className={
+            structured
+              ? 'local-structured-marker local-structured-marker--diagnostic'
+              : 'diagnostic-symbol'
+          }
+          aria-hidden="true"
+        >
+          {structured ? '○' : statusSymbol}
         </span>
-        <strong>{data.status}</strong>
+        <strong>{structured ? data.rawTarget : data.status}</strong>
       </div>
-      <span className="diagnostic-target" title={data.rawTarget} translate="no">
-        {data.rawTarget}
-      </span>
-      <span className="diagnostic-meta">
-        {metadata} · {data.referenceCount}{' '}
-        {data.referenceCount === 1 ? 'reference' : 'references'}
-      </span>
+      {structured ? null : (
+        <>
+          <span
+            className="diagnostic-target"
+            title={data.rawTarget}
+            translate="no"
+          >
+            {data.rawTarget}
+          </span>
+          <span className="diagnostic-meta">
+            {metadata} · {data.referenceCount}{' '}
+            {data.referenceCount === 1 ? 'reference' : 'references'}
+          </span>
+        </>
+      )}
     </article>
   );
 }

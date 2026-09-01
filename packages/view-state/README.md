@@ -44,12 +44,15 @@ IDs and stale paths are removed deterministically before projection.
 Schema v3 accepts structural `defaultDepth` values 0–3 plus an optional literal
 Markdown heading ceiling, `presentationMode: structure | global | local`, a
 Structure canonical anchor plus React Flow zoom, a Global canonical anchor plus
-Sigma ratio, and a Local canonical anchor plus Free ratio. Existing schema-v1
+Sigma ratio, and a Local canonical anchor plus Free ratio and optional
+Structured React Flow zoom. Each Local renderer updates its own scale while
+preserving the other. Existing schema-v1
 records migrate losslessly to Structure. Schema-v2 records preserve their
 explicit Structure/Global renderer mode; an active focus does not guess Local.
 Local restoration normalizes focus to a surviving containing document and exits
-to Global if that root is lost. Raw coordinates, transition points, renderer
-objects, and ForceAtlas2 positions are never accepted. Future schema versions
+to Global if that root is lost. `LocalLayoutMode` remains a separate user
+preference rather than saved semantic history. Raw coordinates, transition
+points, renderer objects, Dagre/ForceAtlas2 positions are never accepted. Future schema versions
 fail loudly. New records persist the heading ceiling only when active, and
 reset/default state omits it.
 

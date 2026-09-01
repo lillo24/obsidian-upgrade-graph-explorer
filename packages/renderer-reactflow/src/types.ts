@@ -15,6 +15,8 @@ import type {
 
 export type GraphLayoutMode = DagreLayoutMode;
 
+export type GraphVisualVariant = 'standard' | 'local-structured';
+
 export type TrackpadZoomMode = 'scroll-zoom' | 'pinch-zoom';
 
 export type FocusAppearance = 'outline' | 'inverted' | 'minimal';
@@ -34,6 +36,25 @@ export interface GraphViewportObservation {
   readonly zoom: number;
 }
 
+export interface GraphViewportPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+/** Narrow renderer boundary used to preserve a semantic node's screen point. */
+export interface GraphTransitionAnchorApi {
+  readonly nodeViewportPoint: (
+    nodeId: ProjectionNodeId,
+  ) => GraphViewportPoint | undefined;
+}
+
+export interface GraphTransitionAnchor {
+  readonly key: number;
+  readonly nodeId: ProjectionNodeId;
+  readonly point: GraphViewportPoint;
+  readonly zoom?: number;
+}
+
 export interface EntityNodeData extends Record<string, unknown> {
   readonly projectionNodeId: ProjectionNodeId;
   readonly entityId: string;
@@ -50,6 +71,8 @@ export interface EntityNodeData extends Record<string, unknown> {
   readonly isExpanded: boolean;
   readonly internalReferenceCount: number;
   readonly ariaLabel: string;
+  readonly visualVariant: GraphVisualVariant;
+  readonly root: boolean;
 }
 
 export interface DiagnosticNodeData extends Record<string, unknown> {
@@ -60,6 +83,7 @@ export interface DiagnosticNodeData extends Record<string, unknown> {
   readonly candidateCount: number;
   readonly reasonCount: number;
   readonly ariaLabel: string;
+  readonly visualVariant: GraphVisualVariant;
 }
 
 export interface GraphEdgeData extends Record<string, unknown> {
@@ -68,6 +92,7 @@ export interface GraphEdgeData extends Record<string, unknown> {
   readonly status: ReferenceResolutionStatus | null;
   readonly referenceCount: number;
   readonly ariaLabel: string;
+  readonly visualVariant: GraphVisualVariant;
 }
 
 export type EntityFlowNode = Node<EntityNodeData, 'entity'>;
@@ -122,6 +147,11 @@ export interface GraphCanvasProps {
   readonly projection: ViewProjection;
   readonly layoutService: GraphLayoutService;
   readonly layoutMode: GraphLayoutMode;
+  readonly layoutRequestKey?: number;
+  readonly visualVariant?: GraphVisualVariant;
+  /** Required by Local Structured for root normalization and emphasis. */
+  readonly rootEntityId?: string;
+  readonly layoutCache?: LocalStructuredLayoutCache;
   readonly focusAppearance: FocusAppearance;
   readonly selection: GraphSelection | null;
   /** Disabled by default and never persisted by the renderer. */
@@ -130,13 +160,35 @@ export interface GraphCanvasProps {
   readonly performanceUpdateKey?: string;
   readonly fitRequestKey: number;
   readonly centerRequest?: GraphCenterRequest;
+  readonly initialTransitionAnchor?: GraphTransitionAnchor;
   readonly maximized?: boolean;
   readonly trackpadZoomMode: TrackpadZoomMode;
   readonly onMaximizedChange?: (maximized: boolean) => void;
   readonly onViewportObservation?: (
     observation: GraphViewportObservation,
   ) => void;
+  readonly onTransitionAnchorApiChange?: (
+    api: GraphTransitionAnchorApi | undefined,
+  ) => void;
+  readonly onTransitionAnchorConsumed?: (key: number) => void;
+  readonly onFitRequestConsumed?: (key: number) => void;
   readonly onSelectionChange: (selection: GraphSelection | null) => void;
-  readonly onFocusEntity: (entityId: string) => void;
+  readonly onFocusEntity?: (entityId: string) => void;
   readonly onToggleEntity: (entityId: string, currentlyOpen: boolean) => void;
+}
+
+export interface LocalStructuredLayoutPosition {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface LocalStructuredLayoutCache {
+  readonly get: (
+    fingerprint: string,
+  ) => readonly LocalStructuredLayoutPosition[] | undefined;
+  readonly set: (
+    fingerprint: string,
+    positions: readonly LocalStructuredLayoutPosition[],
+  ) => void;
 }

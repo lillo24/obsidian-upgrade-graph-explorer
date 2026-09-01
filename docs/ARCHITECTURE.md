@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, and KG11 implements Tauri-selected, coalesced live vault acquisition with transactional KG10 application, full resync, and in-place view preservation. KG12 supplies the performance baseline and implements separate stateful W1 workspace and stateless W3 Dagre workers without changing KG11 transaction semantics or renderer-independent contracts. KG13A selected direct Sigma/Graphology for a complementary Global renderer. KG13B1 promotes it into the product as a lazy documents-first Global/Regional mode with off-main layout and soft folder geometry. KG13B2A adds bounded Local Free as an explicit third presentation with KG6 Focus/disclosure authority, deterministic immediate geometry, separate off-main layout, schema-v3 persistence/history, and Global transition anchoring. Structure remains the hierarchy/detail authority; Local Structured is KG13B2B.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, and KG11 implements Tauri-selected, coalesced live vault acquisition with transactional KG10 application, full resync, and in-place view preservation. KG12 supplies the performance baseline and implements separate stateful W1 workspace and stateless W3 Dagre workers without changing KG11 transaction semantics or renderer-independent contracts. KG13A selected direct Sigma/Graphology for a complementary Global renderer. KG13B1 promotes it into the product as a lazy documents-first Global/Regional mode with off-main layout and soft folder geometry. KG13B2A adds bounded Local Free as an explicit third presentation with KG6 Focus/disclosure authority, deterministic immediate geometry, separate off-main layout, schema-v3 persistence/history, and Global transition anchoring. KG13B2B completes that Local presentation with a compact React Flow/W3 Structured schematic over the same bounded projection. General Structure remains the separate hierarchy/detail authority.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -605,12 +605,15 @@ entered explicitly from a selected Global file. It reuses KG6 Focus and
 disclosure, normalizes the root to a stable document, and projects only that
 bounded document neighborhood plus disclosed headings/blocks and exact
 diagnostics. The root's top headings appear while neighboring files remain
-collapsed. A deterministic Local seed renders immediately; a separate
-latest-only ForceAtlas2 Worker refines hierarchy/reference geometry without a
-folder prior. Captured Global screen context anchors the root transiently and a
-semantic center is the safe fallback. Local headings never enter Global
-topology, mutate its cache, or trigger whole-vault relayout. Local Free is
-implemented; KG13B2B may present the same tested projection as Local Structured.
+collapsed. That one memoized projection feeds either Local Free (Sigma plus a
+latest-only ForceAtlas2 Worker) or Local Structured (compact React Flow plus
+the existing latest-only W3 Dagre Worker). Both show deterministic immediate
+seed geometry, normalize the root to origin, share Search/Inspector/disclosure,
+and keep only an exact bounded memory cache. Captured renderer screen context
+anchors the selected node or root transiently and semantic centering is the
+safe fallback. The Free/Structured choice is an existing user preference, not
+canonical or history state. Local headings never enter Global topology, mutate
+its cache, or trigger whole-vault relayout.
 QUERY1 and GROUP1 remain independent future systems. The separate LAYOUT1 idea
 is paused/absorbed into this Global → Regional → Local spatial architecture;
 manual cluster offsets remain future derived presentation state.
@@ -625,7 +628,8 @@ React Flow is installed only in the KG7 renderer package. Dagre is installed
 only in the plain W3 compute package and bundled into its dedicated worker,
 not the main application chunk. Sigma 3.0.3, Graphology 0.26.0, and ForceAtlas2
 0.10.1 are exact production renderer-sigma dependencies emitted only in lazy
-Sigma presentation and dedicated Global/Local worker chunks. Structure startup
+Sigma presentation and dedicated Global/Local Free worker chunks. Local
+Structured reuses React Flow and W3 and adds no runtime dependency. Structure startup
 does not execute them.
 Tauri dependencies are isolated to the desktop shell and
 `source-provider-tauri`.
@@ -698,6 +702,15 @@ Medium deterministic seed readiness remains inside Class B while the measured
 ForceAtlas2 refinement stays off-main. This evidence rejects speculative
 per-file Local precomputation and retains only a bounded memory-only exact
 layout cache. See `docs/PERFORMANCE.md` and ADR 0014.
+
+KG13B2B measures a compact Local Structured mapping and O(nodes + edges) seed
+against those same bounded projections. At 381 nodes/430 edges, mapping and
+seed medians are 0.748 ms and 0.410 ms; worker-equivalent Dagre is 93.297 ms
+and remains off-main, apply/root normalization is 0.231 ms, and an exact cache
+hit is 0.077 ms. Layout-only switching issues zero KG6/Global/workspace work.
+The React Flow variant exposes only a projected-node screen-point query,
+retains schema v3 with optional `structuredZoom`, and keeps standard Structure
+mapping/layout unchanged. See ADR 0015.
 
 Rust, WASM, universal graph abstractions, and million-node optimization are not foundation requirements.
 
@@ -780,6 +793,15 @@ navigation, and minimum hidden-heading reveal. Browser and release Tauri QA
 cover the real WebGL/Worker transition, touchpad precision, shared
 Search/Inspector, live update/root-loss recovery, and Structure/Global
 regressions without committing private screenshots or vault topology.
+
+KG13B2B adds pure tests for opt-in compact mapping, unchanged standard mapping,
+explicit Dagre mode/worker equality, complete finite root-normalized seed,
+private-safe exact fingerprints, bounded cache eviction, Structured viewport
+round trips, preference restore, and Local/Global operation isolation. Browser
+and release validation cover the renderer toggle, selection policy, anchored
+transition/refinement, disclosure, Search/Inspector, live updates, history,
+precision input, and explicit Free/Structure recovery without committing
+screenshots or private topology.
 
 ## Changing these decisions
 

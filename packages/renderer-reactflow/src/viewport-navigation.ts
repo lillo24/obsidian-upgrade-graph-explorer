@@ -18,7 +18,7 @@ export interface WheelZoomInput {
 
 export interface DisclosureAnchor {
   readonly projectionNodeId: string;
-  readonly entityId: string;
+  readonly entityId: string | null;
   readonly screenPoint: {
     readonly x: number;
     readonly y: number;
@@ -40,13 +40,11 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
-function entityNodeCenter(
+function nodeCenter(
   graph: RendererGraph,
   predicate: (node: RendererGraph['nodes'][number]) => boolean,
 ): { readonly x: number; readonly y: number } | null {
-  const node = graph.nodes.find(
-    (candidate) => candidate.type === 'entity' && predicate(candidate),
-  );
+  const node = graph.nodes.find(predicate);
   if (node === undefined) return null;
   const width = node.width ?? node.measured?.width;
   const height = node.height ?? node.measured?.height;
@@ -120,14 +118,35 @@ export function captureDisclosureAnchor(
       candidate.type === 'entity' && candidate.data.entityId === entityId,
   );
   if (node === undefined) return null;
-  const center = entityNodeCenter(
-    graph,
-    (candidate) => candidate.id === node.id,
-  );
+  const center = nodeCenter(graph, (candidate) => candidate.id === node.id);
   if (center === null) return null;
   return {
     projectionNodeId: node.data.projectionNodeId,
     entityId,
+    screenPoint: {
+      x: center.x * viewport.zoom + viewport.x,
+      y: center.y * viewport.zoom + viewport.y,
+    },
+    zoom: viewport.zoom,
+  };
+}
+
+/** Capture any projected node for Local Structured topology reconciliation. */
+export function captureNodeAnchor(
+  graph: RendererGraph,
+  projectionNodeId: string,
+  viewport: RendererViewport,
+): DisclosureAnchor | null {
+  if (!Number.isFinite(viewport.zoom) || viewport.zoom <= 0) return null;
+  const node = graph.nodes.find(
+    (candidate) => candidate.data.projectionNodeId === projectionNodeId,
+  );
+  if (node === undefined) return null;
+  const center = nodeCenter(graph, (candidate) => candidate.id === node.id);
+  if (center === null) return null;
+  return {
+    projectionNodeId,
+    entityId: node.type === 'entity' ? node.data.entityId : null,
     screenPoint: {
       x: center.x * viewport.zoom + viewport.x,
       y: center.y * viewport.zoom + viewport.y,
@@ -141,12 +160,12 @@ export function viewportForDisclosureAnchor(
   graph: RendererGraph,
   anchor: DisclosureAnchor,
 ): RendererViewport | null {
-  const center = entityNodeCenter(
+  const center = nodeCenter(
     graph,
     (candidate) =>
+      candidate.data.projectionNodeId === anchor.projectionNodeId ||
       (candidate.type === 'entity' &&
-        candidate.data.projectionNodeId === anchor.projectionNodeId) ||
-      (candidate.type === 'entity' &&
+        anchor.entityId !== null &&
         candidate.data.entityId === anchor.entityId),
   );
   if (center === null || !Number.isFinite(anchor.zoom) || anchor.zoom <= 0) {

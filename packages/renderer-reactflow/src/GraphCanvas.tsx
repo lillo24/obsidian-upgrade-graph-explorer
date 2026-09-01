@@ -41,6 +41,12 @@ import {
   commitRendererLayout,
   INITIAL_RENDERER_LAYOUT_STATE,
 } from './layout-state';
+import {
+  applyLocalStructuredPositions,
+  localStructuredGraphPositions,
+  localStructuredLayoutFingerprint,
+  seedLocalStructuredGraph,
+} from './local-structured-layout';
 import { mapProjectionToReactFlow } from './mapping';
 import { observeSemanticViewport } from './semantic-viewport';
 import type {
@@ -48,9 +54,12 @@ import type {
   GraphFlowEdge,
   GraphFlowNode,
   GraphSelection,
+  GraphTransitionAnchor,
+  RendererGraph,
 } from './types';
 import {
   captureDisclosureAnchor,
+  captureNodeAnchor,
   GRAPH_MAX_ZOOM,
   GRAPH_MIN_ZOOM,
   GRAPH_VIEWPORT_OBSERVATION_DELAY_MS,
@@ -68,6 +77,28 @@ const GRAPH_FIT_VIEW_OPTIONS = {
 
 const GRAPH_WHEEL_IGNORE_SELECTOR =
   '.react-flow__controls, .nowheel, [data-graph-wheel-ignore], [data-graph-scroll-container]';
+
+function transitionViewport(
+  graph: RendererGraph,
+  anchor: GraphTransitionAnchor,
+  fallbackZoom: number,
+) {
+  const node = graph.nodes.find(
+    (candidate) => candidate.data.projectionNodeId === anchor.nodeId,
+  );
+  if (node === undefined) return null;
+  const width = node.width ?? node.measured?.width ?? 0;
+  const height = node.height ?? node.measured?.height ?? 0;
+  const zoom = Math.min(
+    GRAPH_MAX_ZOOM,
+    Math.max(GRAPH_MIN_ZOOM, anchor.zoom ?? fallbackZoom),
+  );
+  return {
+    x: anchor.point.x - (node.position.x + width / 2) * zoom,
+    y: anchor.point.y - (node.position.y + height / 2) * zoom,
+    zoom,
+  };
+}
 
 function FitGraphIcon() {
   return (
@@ -115,18 +146,26 @@ function GraphCanvasInner({
   centerRequest,
   fitRequestKey,
   focusAppearance,
+  initialTransitionAnchor,
+  layoutCache,
   layoutMode,
+  layoutRequestKey = 0,
   layoutService,
   maximized,
+  onFitRequestConsumed,
   onMaximizedChange,
   onFocusEntity,
   onSelectionChange,
+  onTransitionAnchorApiChange,
+  onTransitionAnchorConsumed,
   onToggleEntity,
   onViewportObservation,
   performance,
   projection,
+  rootEntityId,
   selection,
   trackpadZoomMode,
+  visualVariant = 'standard',
 }: GraphCanvasProps) {
   const [hovered, setHovered] = useState<GraphSelection | null>(null);
   const { fitView, getViewport, setCenter, setViewport } = useReactFlow<
@@ -135,11 +174,17 @@ function GraphCanvasInner({
   >();
   const previousFitRequest = useRef(fitRequestKey);
   const previousCenterRequest = useRef<number | null>(null);
+  const handledTransitionRequest = useRef<number | null>(null);
+  const initialTransitionRef = useRef(initialTransitionAnchor);
+  const initialTransitionRefinementApplied = useRef(false);
   const viewportInitialized = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const nextDisclosureAnchor = useRef<DisclosureAnchor | null>(null);
+  const pendingStructuredAnchor = useRef<DisclosureAnchor | null>(null);
   const layoutGeneration = useRef(0);
   const appliedDisclosureGeneration = useRef<number | null>(null);
+  const handledLayoutRequest = useRef(layoutRequestKey);
+  const preparedRef = useRef<RendererGraph | null>(null);
   const viewportObservationTimer = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -147,19 +192,94 @@ function GraphCanvasInner({
     INITIAL_RENDERER_LAYOUT_STATE,
   );
   const mapped = useMemo(() => {
-    const map = () => mapProjectionToReactFlow(projection, layoutMode);
+    const map = () =>
+      mapProjectionToReactFlow(projection, layoutMode, {
+        visualVariant,
+        ...(rootEntityId === undefined ? {} : { rootEntityId }),
+      });
     return performance === undefined
       ? map()
       : performance.measure('renderer-mapping', 'renderer-mappings', map);
-  }, [layoutMode, performance, projection]);
+  }, [layoutMode, performance, projection, rootEntityId, visualVariant]);
   const layoutInput = useMemo(
     () => createRendererLayoutInput(mapped.nodes, mapped.edges, layoutMode),
     [layoutMode, mapped.edges, mapped.nodes],
   );
-  const prepared = rendererLayout.committed?.graph ?? null;
+  const structuredBaseline = useMemo(() => {
+    if (visualVariant !== 'local-structured') return undefined;
+    const rootNode = mapped.nodes.find(
+      (node) => node.type === 'entity' && node.data.root,
+    );
+    if (rootNode === undefined) {
+      throw new Error(
+        `Local Structured requires its root entity ${rootEntityId ?? '(missing)'}.`,
+      );
+    }
+    const fingerprint = localStructuredLayoutFingerprint(
+      mapped.nodes,
+      mapped.edges,
+    );
+    const cached = layoutCache?.get(fingerprint);
+    return {
+      cached: cached !== undefined,
+      fingerprint,
+      graph:
+        cached === undefined
+          ? seedLocalStructuredGraph(mapped.nodes, mapped.edges, rootNode.id)
+          : applyLocalStructuredPositions(
+              mapped.nodes,
+              mapped.edges,
+              cached,
+              rootNode.id,
+            ),
+      rootNodeId: rootNode.id,
+    };
+  }, [layoutCache, mapped.edges, mapped.nodes, rootEntityId, visualVariant]);
+  const committedMatchesInput = rendererLayout.committed?.input === layoutInput;
+  const prepared = committedMatchesInput
+    ? (rendererLayout.committed?.graph ?? null)
+    : (structuredBaseline?.graph ?? rendererLayout.committed?.graph ?? null);
   const layoutPending =
     projection.nodes.length > 0 &&
-    rendererLayout.committed?.input !== layoutInput;
+    !committedMatchesInput &&
+    structuredBaseline?.cached !== true;
+
+  useLayoutEffect(() => {
+    if (structuredBaseline === undefined || committedMatchesInput) {
+      return;
+    }
+    const oldGraph = rendererLayout.committed?.graph;
+    const preferredNodeId =
+      selection?.kind === 'node' &&
+      structuredBaseline.graph.nodes.some(
+        (node) => node.data.projectionNodeId === selection.id,
+      )
+        ? selection.id
+        : structuredBaseline.graph.nodes.find(
+            (node) => node.type === 'entity' && node.data.root,
+          )?.data.projectionNodeId;
+    const anchor =
+      nextDisclosureAnchor.current ??
+      (oldGraph === undefined || preferredNodeId === undefined
+        ? null
+        : captureNodeAnchor(oldGraph, preferredNodeId, getViewport()));
+    nextDisclosureAnchor.current = null;
+    pendingStructuredAnchor.current = anchor;
+    if (anchor === null) return;
+    const nextViewport = viewportForDisclosureAnchor(
+      structuredBaseline.graph,
+      anchor,
+    );
+    if (nextViewport === null) return;
+    void setViewport(nextViewport, { duration: 0 });
+  }, [
+    committedMatchesInput,
+    getViewport,
+    rendererLayout.committed?.graph,
+    selection,
+    setViewport,
+    structuredBaseline,
+  ]);
 
   useEffect(() => {
     if (projection.nodes.length === 0) {
@@ -167,8 +287,25 @@ function GraphCanvasInner({
       return;
     }
     const generation = ++layoutGeneration.current;
-    const disclosureAnchor = nextDisclosureAnchor.current;
+    const explicitRelayout = layoutRequestKey > handledLayoutRequest.current;
+    handledLayoutRequest.current = layoutRequestKey;
+    const disclosureAnchor =
+      pendingStructuredAnchor.current ?? nextDisclosureAnchor.current;
+    pendingStructuredAnchor.current = null;
     nextDisclosureAnchor.current = null;
+    if (structuredBaseline?.cached === true && !explicitRelayout) {
+      layoutService.cancelPending();
+      setRendererLayout({
+        pendingGeneration: null,
+        committed: {
+          generation,
+          input: layoutInput,
+          graph: structuredBaseline.graph,
+          disclosureAnchor,
+        },
+      });
+      return;
+    }
     const requestStartedAt =
       performance === undefined ? 0 : globalThis.performance.now();
     let current = true;
@@ -197,20 +334,39 @@ function GraphCanvasInner({
             result.metrics.mainThreadHighGapMs,
           );
         }
-        const apply = () =>
-          result.status === 'success'
-            ? applyRendererLayoutPositions(
-                mapped.nodes,
-                mapped.edges,
-                layoutMode,
-                result.output,
-              )
-            : fallbackRendererGraph(
+        const apply = () => {
+          if (result.status === 'success') {
+            const laidOut = applyRendererLayoutPositions(
+              mapped.nodes,
+              mapped.edges,
+              layoutMode,
+              result.output,
+            );
+            if (structuredBaseline === undefined) return laidOut;
+            const normalized = applyLocalStructuredPositions(
+              laidOut.nodes,
+              laidOut.edges,
+              localStructuredGraphPositions(laidOut),
+              structuredBaseline.rootNodeId,
+            );
+            layoutCache?.set(
+              structuredBaseline.fingerprint,
+              localStructuredGraphPositions(normalized),
+            );
+            return normalized;
+          }
+          return structuredBaseline === undefined
+            ? fallbackRendererGraph(
                 mapped.nodes,
                 mapped.edges,
                 layoutMode,
                 result.message,
-              );
+              )
+            : {
+                ...structuredBaseline.graph,
+                layoutWarning: `Automatic Local Structured layout failed: ${result.message} The deterministic seed remains visible.`,
+              };
+        };
         const graph =
           performance === undefined
             ? apply()
@@ -232,12 +388,19 @@ function GraphCanvasInner({
       })
       .catch((error: unknown) => {
         if (!current) return;
-        const graph = fallbackRendererGraph(
-          mapped.nodes,
-          mapped.edges,
-          layoutMode,
-          error instanceof Error ? error.message : String(error),
-        );
+        const message = error instanceof Error ? error.message : String(error);
+        const graph =
+          structuredBaseline === undefined
+            ? fallbackRendererGraph(
+                mapped.nodes,
+                mapped.edges,
+                layoutMode,
+                message,
+              )
+            : {
+                ...structuredBaseline.graph,
+                layoutWarning: `Automatic Local Structured layout failed: ${message} The deterministic seed remains visible.`,
+              };
         setRendererLayout((state) =>
           commitRendererLayout(state, {
             generation,
@@ -253,11 +416,14 @@ function GraphCanvasInner({
   }, [
     layoutInput,
     layoutMode,
+    layoutRequestKey,
     layoutService,
     mapped.edges,
     mapped.nodes,
     performance,
     projection.nodes.length,
+    layoutCache,
+    structuredBaseline,
   ]);
   const interactive = useMemo(() => {
     if (prepared === null) return null;
@@ -302,12 +468,68 @@ function GraphCanvasInner({
     },
     [layoutPending, prepared, setCenter],
   );
+  const nodeViewportPoint = useCallback(
+    (nodeId: GraphTransitionAnchor['nodeId']) => {
+      const graph = preparedRef.current;
+      if (graph === null) return undefined;
+      const node = graph.nodes.find(
+        (candidate) => candidate.data.projectionNodeId === nodeId,
+      );
+      if (node === undefined) return undefined;
+      const viewport = getViewport();
+      const width = node.width ?? node.measured?.width ?? 0;
+      const height = node.height ?? node.measured?.height ?? 0;
+      return {
+        x: (node.position.x + width / 2) * viewport.zoom + viewport.x,
+        y: (node.position.y + height / 2) * viewport.zoom + viewport.y,
+      };
+    },
+    [getViewport],
+  );
+
+  useLayoutEffect(() => {
+    preparedRef.current = prepared;
+  }, [prepared]);
+
+  useEffect(() => {
+    if (onTransitionAnchorApiChange === undefined) return;
+    const api = { nodeViewportPoint };
+    onTransitionAnchorApiChange(api);
+    return () => onTransitionAnchorApiChange(undefined);
+  }, [nodeViewportPoint, onTransitionAnchorApiChange]);
+
   const initializeViewport = useCallback(
     (instance: ReactFlowInstance<GraphFlowNode, GraphFlowEdge>) => {
       viewportInitialized.current = true;
+      if (
+        initialTransitionAnchor !== undefined &&
+        handledTransitionRequest.current !== initialTransitionAnchor.key &&
+        prepared !== null
+      ) {
+        handledTransitionRequest.current = initialTransitionAnchor.key;
+        const viewport = transitionViewport(
+          prepared,
+          initialTransitionAnchor,
+          instance.getViewport().zoom,
+        );
+        if (viewport !== null) {
+          if (centerRequest !== undefined) {
+            previousCenterRequest.current = centerRequest.key;
+          }
+          void instance.setViewport(viewport, { duration: 0 });
+          onTransitionAnchorConsumed?.(initialTransitionAnchor.key);
+          return;
+        }
+      }
       applyCenterRequest(centerRequest, instance.setCenter);
     },
-    [applyCenterRequest, centerRequest],
+    [
+      applyCenterRequest,
+      centerRequest,
+      initialTransitionAnchor,
+      onTransitionAnchorConsumed,
+      prepared,
+    ],
   );
 
   useEffect(() => {
@@ -322,7 +544,7 @@ function GraphCanvasInner({
   );
   const focusNode = useCallback<NodeMouseHandler<GraphFlowNode>>(
     (_event, node) => {
-      if (node.type !== 'entity') return;
+      if (node.type !== 'entity' || onFocusEntity === undefined) return;
       onSelectionChange({ kind: 'node', id: node.data.projectionNodeId });
       onFocusEntity(node.data.entityId);
     },
@@ -445,8 +667,15 @@ function GraphCanvasInner({
       return;
     }
     previousFitRequest.current = fitRequestKey;
-    void fitGraph();
-  }, [centerRequest, fitGraph, fitRequestKey, layoutPending, prepared]);
+    void fitGraph().then(() => onFitRequestConsumed?.(fitRequestKey));
+  }, [
+    centerRequest,
+    fitGraph,
+    fitRequestKey,
+    layoutPending,
+    onFitRequestConsumed,
+    prepared,
+  ]);
 
   useEffect(
     () => () => {
@@ -524,6 +753,27 @@ function GraphCanvasInner({
   }, [prepared, rendererLayout.committed, reportViewport, setViewport]);
 
   useLayoutEffect(() => {
+    const committed = rendererLayout.committed;
+    const anchor = initialTransitionRef.current;
+    if (
+      committed === null ||
+      anchor === undefined ||
+      initialTransitionRefinementApplied.current
+    ) {
+      return;
+    }
+    initialTransitionRefinementApplied.current = true;
+    const viewport = transitionViewport(
+      committed.graph,
+      anchor,
+      getViewport().zoom,
+    );
+    if (viewport === null) return;
+    void setViewport(viewport, { duration: 0 });
+    reportViewport(viewport);
+  }, [getViewport, rendererLayout.committed, reportViewport, setViewport]);
+
+  useLayoutEffect(() => {
     if (performance === undefined) return;
     performance.markCommit('graph-canvas-commit');
     performance.markNextPaint();
@@ -539,6 +789,7 @@ function GraphCanvasInner({
 
   const activateFocusedNode = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (onFocusEntity === undefined) return;
       const target = event.target;
       if (!(target instanceof Element)) return;
       const originatesInControl =
@@ -588,6 +839,7 @@ function GraphCanvasInner({
         className="graph-layout-pending graph-empty"
         data-focus-appearance={focusAppearance}
         data-trackpad-zoom-mode={trackpadZoomMode}
+        data-visual-variant={visualVariant}
       >
         <div role="status" aria-live="polite">
           <strong>Laying out graph…</strong>
@@ -618,6 +870,7 @@ function GraphCanvasInner({
       aria-busy={layoutPending}
       data-focus-appearance={focusAppearance}
       data-trackpad-zoom-mode={trackpadZoomMode}
+      data-visual-variant={visualVariant}
       onKeyDownCapture={activateFocusedNode}
       ref={containerRef}
       role="region"
@@ -645,7 +898,9 @@ function GraphCanvasInner({
           edgesFocusable
           edgesReconnectable={false}
           elementsSelectable
-          fitView={centerRequest === undefined}
+          fitView={
+            centerRequest === undefined && initialTransitionAnchor === undefined
+          }
           fitViewOptions={GRAPH_FIT_VIEW_OPTIONS}
           maxZoom={GRAPH_MAX_ZOOM}
           minZoom={GRAPH_MIN_ZOOM}

@@ -28,6 +28,7 @@ import type {
   LocalSelection,
   LocalTrackpadZoomMode,
   LocalTransitionAnchor,
+  LocalTransitionAnchorApi,
   SemanticLocalViewport,
 } from './local-types';
 import { shouldApplyGlobalViewportRequest } from './viewport-request';
@@ -45,6 +46,9 @@ export interface LocalGraphCanvasProps {
   readonly onFitRequestConsumed?: (key: number) => void;
   readonly onSelectionChange: (selection: LocalSelection | null) => void;
   readonly onTransitionAnchorConsumed?: (key: number) => void;
+  readonly onTransitionAnchorApiChange?: (
+    api: LocalTransitionAnchorApi | undefined,
+  ) => void;
   readonly onViewportObservation: (
     viewport: SemanticLocalViewport | undefined,
   ) => void;
@@ -74,6 +78,7 @@ export function LocalGraphCanvas({
   onFailure,
   onFitRequestConsumed,
   onSelectionChange,
+  onTransitionAnchorApiChange,
   onTransitionAnchorConsumed,
   onViewportObservation,
   projection,
@@ -92,6 +97,7 @@ export function LocalGraphCanvas({
     onFailure,
     onFitRequestConsumed,
     onSelectionChange,
+    onTransitionAnchorApiChange,
     onTransitionAnchorConsumed,
     onViewportObservation,
   });
@@ -100,6 +106,7 @@ export function LocalGraphCanvas({
       onFailure,
       onFitRequestConsumed,
       onSelectionChange,
+      onTransitionAnchorApiChange,
       onTransitionAnchorConsumed,
       onViewportObservation,
     };
@@ -107,6 +114,7 @@ export function LocalGraphCanvas({
     onFailure,
     onFitRequestConsumed,
     onSelectionChange,
+    onTransitionAnchorApiChange,
     onTransitionAnchorConsumed,
     onViewportObservation,
   ]);
@@ -164,6 +172,7 @@ export function LocalGraphCanvas({
             ? {}
             : {
                 initialViewportPoint: initial.initialTransitionAnchor.point,
+                initialViewportNodeKey: initial.initialTransitionAnchor.nodeId,
               }),
           ...(initial.initialViewport === undefined
             ? {}
@@ -182,6 +191,9 @@ export function LocalGraphCanvas({
       return;
     }
     sessionRef.current = mounted.session;
+    callbacks.current.onTransitionAnchorApiChange?.({
+      nodeViewportPoint: (nodeId) => mounted.session.nodeViewportPoint(nodeId),
+    });
     if (initial.initialTransitionAnchor !== undefined) {
       callbacks.current.onTransitionAnchorConsumed?.(
         initial.initialTransitionAnchor.key,
@@ -197,6 +209,7 @@ export function LocalGraphCanvas({
     return () => {
       cancelled = true;
       mounted.dispose();
+      callbacks.current.onTransitionAnchorApiChange?.(undefined);
       if (sessionRef.current === mounted.session)
         sessionRef.current = undefined;
     };

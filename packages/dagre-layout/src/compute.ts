@@ -12,6 +12,16 @@ import {
 } from './validation';
 
 export function dagreGraphSettings(mode: DagreLayoutMode) {
+  if (mode === 'local-structured') {
+    return {
+      rankdir: 'LR' as const,
+      ranker: 'network-simplex' as const,
+      nodesep: 22,
+      ranksep: 58,
+      marginx: 20,
+      marginy: 20,
+    };
+  }
   return {
     rankdir: mode === 'structure' ? ('TB' as const) : ('LR' as const),
     ranker: 'network-simplex' as const,

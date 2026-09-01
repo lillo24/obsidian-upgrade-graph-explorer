@@ -178,5 +178,13 @@ export type LocalTrackpadZoomMode = 'scroll-zoom' | 'pinch-zoom';
 
 export interface LocalTransitionAnchor {
   readonly key: number;
+  readonly nodeId: ProjectionNodeId;
   readonly point: LocalViewportPoint;
+  readonly zoom?: number;
+}
+
+export interface LocalTransitionAnchorApi {
+  readonly nodeViewportPoint: (
+    nodeId: ProjectionNodeId,
+  ) => LocalViewportPoint | undefined;
 }

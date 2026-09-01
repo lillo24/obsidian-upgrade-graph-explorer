@@ -173,16 +173,23 @@ interaction, and worker responsiveness stay in the dedicated visual harness
 because Node has no WebGL surface. Add `--include-25k` only to the large profile
 for the optional 25k-node/50k-edge mapping ceiling.
 
-`benchmark:local-renderer` is the KG13B2A bounded-neighborhood contract. Its
+`benchmark:local-renderer` is the KG13B2A/B2B bounded-neighborhood contract. Its
 synthetic profiles describe the Local scene itself rather than scaling with a
 whole vault: small has one root plus ten neighbor files; medium has 51 files
 and several hundred disclosed headings/blocks; stress safely targets roughly
-one thousand projected entities. It separately measures KG6 Local projection,
-topology mapping, deterministic seed placement, Graphology construction,
-worker-equivalent ForceAtlas2, result apply, one disclosure reconciliation,
-and exact memory-cache reuse. It verifies root-origin normalization and zero
-Global layout work. WebGL first paint, transition anchoring, interaction RAF
-gaps, and precision input remain production browser/Tauri evidence. Output is
+one thousand projected entities. The Free evidence separately measures KG6
+Local projection, topology mapping, deterministic seed placement, Graphology
+construction, worker-equivalent ForceAtlas2, result apply, one disclosure
+reconciliation, and exact memory-cache reuse. The Structured evidence reuses
+that same projection and measures compact React Flow mapping, deterministic
+schematic seed placement, current-focus versus explicit-local Dagre settings,
+worker-equivalent W3 compute, root-normalized apply, exact cache reuse,
+Free/Structured seed preparation, and disclosure preparation. Its operation
+oracle requires a layout-only toggle to perform zero Local projections, zero
+Global projections/layouts, and zero workspace transactions. Both modes verify
+root-origin normalization and Global-layout isolation. DOM/WebGL first paint,
+worker round trip, refined paint, interaction RAF gaps, transition anchoring,
+and precision input remain production browser/Tauri evidence. Output is
 aggregate-only and never a CI wall-clock threshold.
 
 An opt-in private check can validate one real workspace using an existing

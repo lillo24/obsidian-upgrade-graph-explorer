@@ -144,10 +144,14 @@ anchors and explicit Fit requests are one-shot intents: the canvas reports
 them consumed after mount so a later Local remount or graph-history traversal
 cannot replay stale camera work.
 
-`LocalLayoutMode` reserves `free | structured`, but only Free is rendered here.
-KG13B2B may add Structured as another presentation of the same KG6 Local
-projection. Future manual cluster offsets, Saved Views, QUERY1, and GROUP1
-remain separate product layers.
+KG13B2B keeps this package as the Free owner while React Flow owns Structured.
+The Local canvas now exposes a narrow runtime `nodeViewportPoint` query and can
+mount an arbitrary projected node at a supplied screen point. That is the only
+cross-renderer seam: no Sigma instance, normalized graph coordinate, camera,
+or position cache crosses into application or persisted state. Free viewport
+observations continue to update `freeRatio` while the application preserves
+the sibling `structuredZoom` bookmark. Future manual cluster offsets, Saved
+Views, QUERY1 evolution, and GROUP1 remain separate product layers.
 
 ## Dependency boundary and validation
 

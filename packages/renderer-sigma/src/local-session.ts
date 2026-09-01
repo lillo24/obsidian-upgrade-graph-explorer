@@ -38,6 +38,7 @@ export interface LocalRendererSessionOptions {
   readonly trackpadZoomMode: LocalTrackpadZoomMode;
   readonly initialViewport?: SemanticLocalViewport;
   readonly initialViewportPoint?: LocalViewportPoint;
+  readonly initialViewportNodeKey?: string;
   readonly instrumentation?: LocalRendererInstrumentation;
   readonly onNodeSelected?: (
     key: string | undefined,
@@ -160,7 +161,8 @@ export class LocalRendererSession {
     });
     this.visualLod = resolveLocalVisualLod(this.renderer.getCamera().ratio);
     if (options.initialViewportPoint !== undefined) {
-      this.anchorRootAtViewport(
+      this.anchorNodeAtViewport(
+        options.initialViewportNodeKey ?? this.rootNodeKey,
         options.initialViewportPoint,
         options.initialViewport?.freeRatio,
       );

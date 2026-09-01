@@ -1,6 +1,6 @@
 # Web Multi-scale Graph Explorer
 
-Status: **STABLE — KG13B2A adds bounded Local Free without replacing Structure or Global.**
+Status: **STABLE — KG13B2B completes bounded Local Free/Structured without replacing Structure or Global.**
 
 This package owns the browser SPA, validated KG5 report selection, Tauri-only
 live vault orchestration, KG6 graph interaction state, guarded browser persistence, graph selection, canonical
@@ -14,7 +14,8 @@ selected report JSON → runtime validation → canonical inspection/search
                                    └───────→ KG9B saved view → KG6 projection
                                                           → Structure mapping → W3 Dagre worker
                                                           → Global mapping → Global layout worker
-                                                          → Local mapping/seed → Local layout worker
+                                                          → Local Free mapping/seed → Local ForceAtlas2 worker
+                                                          → Local Structured mapping/seed → W3 Dagre worker
                                                      ↘ KG8 inspector/navigation
                                    ↘ secondary KG5 evidence UI
 
@@ -56,7 +57,9 @@ The `components/README.md` maps the presentation components. The graph workspace
 creates projection/inspection workspaces for each committed snapshot and passes
 only a `ViewProjection` plus semantic viewport requests to the active renderer.
 Structure uses React Flow/W3; Global and Local Free are literal lazy imports of
-direct Sigma/Graphology with separate layout protocols and caches. Each lazy
+direct Sigma/Graphology with separate layout protocols and caches. Local
+Structured is a separate lazy boundary over the same Local projection and the
+existing React Flow/W3 state machine. Only the chosen Local renderer mounts. Each lazy
 presentation imports the shared Sigma stylesheet at its own module boundary. A
 persisted v3 session may restore directly into Local, so Local must not depend
 on a prior Global visit to establish its canvas height or controls. A real
@@ -176,7 +179,9 @@ the optional literal heading ceiling, focus, user-facing path/entity/status
 filters, explicit presentation mode, and canonical Structure/Global/Local
 semantic viewport bookmarks. Schema v1 migrates to Structure; schema v2
 preserves its explicit Structure/Global mode and does not infer Local from an
-active focus. Local stores anchor plus Free ratio only. Raw x/y, transition
+active focus. Local stores anchor plus Free ratio and optional Structured zoom.
+The Free/Structured preference remains in the existing graph-preference key and
+does not enter graph history. Raw x/y, transition
 screen points, Graphology objects, and worker positions are forbidden.
 
 Hydration and source-evolution reconciliation happen synchronously before the
@@ -257,14 +262,21 @@ Focus remains a reduced projection rather than a visual opacity treatment.
 Global **Open Local** is the single scale-down action. It captures only the
 selected file's runtime viewport point, normalizes the KG6 Focus root to that
 document, reveals its direct headings, and keeps neighboring files collapsed.
-Local renders a deterministic seed immediately and refines it in a separate
-latest-only Worker. Expand/Collapse is available in the shared Inspector;
+Local projects once, then the user may choose **Free** or **Structured** from an
+accessible Local-only preference control. Free renders a deterministic Sigma
+seed and refines it in its latest-only ForceAtlas2 Worker. Structured renders a
+compact File/Heading/Block/diagnostic React Flow seed and refines it through the
+existing latest-only W3 Dagre Worker. Exact memory-cache hits skip the active
+worker. Expand/Collapse is available in both the Structured node and the shared Inspector;
 Focus hops/direction and the existing Blocks/filter controls remain shared.
 Ordinary Local zoom, pan, hover, selection, and Inspector activity perform no
 projection, Graphology reconciliation, or layout. Search targets already in the
 scene stay Local, cross-file targets reroot Local, and hidden headings reveal
 only the required ancestor chain. **Open in Structure** and **Back to Global**
-are explicit recovery/scale-up paths. Local Structured is not exposed yet.
+are explicit recovery/scale-up paths. Switching Local layout preserves the
+selected visible node (or root) at a runtime-only screen point and performs no
+KG6/Global/workspace work. Node selection survives; a Structured edge
+selection is cleared with an announcement before Free mounts.
 
 **Heading limit** lives in the toolbar's floating **Filters** panel and remains
 separate from Structure. `#` through `######` are literal canonical Markdown

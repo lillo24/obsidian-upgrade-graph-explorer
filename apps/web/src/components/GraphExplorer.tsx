@@ -21,6 +21,8 @@ import {
   type GraphCenterRequest,
   type FocusAppearance,
   type GraphSelection,
+  type GraphTransitionAnchor,
+  type GraphTransitionAnchorApi,
   type GraphViewportObservation,
   type TrackpadZoomMode,
 } from '@icarus-graph-explorer/renderer-reactflow';
@@ -33,6 +35,7 @@ import {
   type PersistedLocalViewport,
   type PersistedRendererViewports,
   type GraphPresentationMode,
+  type LocalLayoutMode,
 } from '@icarus-graph-explorer/view-state';
 import {
   createProjectionWorkspace,
@@ -48,7 +51,7 @@ import type {
   GlobalTransitionAnchorApi,
   LocalCenterRequest,
   LocalSelection,
-  LocalTransitionAnchor,
+  LocalTransitionAnchorApi as LocalFreeTransitionAnchorApi,
   SemanticGlobalViewport,
   SemanticLocalViewport,
 } from '@icarus-graph-explorer/renderer-sigma/types';
@@ -119,6 +122,10 @@ import { ProvenanceInspector } from './ProvenanceInspector';
 import { StructureDepthControl } from './StructureDepthControl';
 import type { GlobalGraphViewProps } from './GlobalGraphView';
 import type { LocalGraphViewProps } from './LocalGraphView';
+import type {
+  LocalStructuredGraphViewProps,
+  SemanticLocalStructuredViewport,
+} from './LocalStructuredGraphView';
 import { useWorkerServiceDisposal } from './use-worker-service-disposal';
 
 interface ProjectionSuccess {
@@ -149,6 +156,7 @@ interface SavedFilterSession {
 const ENTITY_NAVIGATION_ZOOM = 1.1;
 const GLOBAL_NAVIGATION_RATIO = 0.32;
 const LOCAL_NAVIGATION_RATIO = 0.48;
+const LOCAL_STRUCTURED_NAVIGATION_ZOOM = 0.92;
 
 const GRAPH_HISTORY_SHORTCUT_EXCLUSION_SELECTOR =
   'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [data-graph-history-shortcuts="off"]';
@@ -323,7 +331,10 @@ export function GraphExplorer({
     useState<GlobalLayoutSettings>(
       preferenceLoad.preferences.globalLayoutSettings,
     );
-  const localLayoutMode = preferenceLoad.preferences.localLayoutMode;
+  const [localLayoutMode, setLocalLayoutMode] = useState<LocalLayoutMode>(
+    preferenceLoad.preferences.localLayoutMode,
+  );
+  const localLayoutModeRef = useRef(localLayoutMode);
   const [preferenceWarning, setPreferenceWarning] = useState<
     string | undefined
   >(preferenceLoad.warning ?? undefined);
@@ -388,9 +399,17 @@ export function GraphExplorer({
   const [globalUnavailable, setGlobalUnavailable] = useState<string>();
   const [GlobalGraphView, setGlobalGraphView] =
     useState<ComponentType<GlobalGraphViewProps>>();
-  const [localUnavailable, setLocalUnavailable] = useState<string>();
+  const [localFreeUnavailable, setLocalFreeUnavailable] = useState<string>();
+  const [localStructuredUnavailable, setLocalStructuredUnavailable] =
+    useState<string>();
   const [LocalGraphView, setLocalGraphView] =
     useState<ComponentType<LocalGraphViewProps>>();
+  const [LocalStructuredGraphView, setLocalStructuredGraphView] =
+    useState<ComponentType<LocalStructuredGraphViewProps>>();
+  const localUnavailable =
+    localLayoutMode === 'free'
+      ? localFreeUnavailable
+      : localStructuredUnavailable;
   const legacyBlockFilterNormalized = initialViewState !== hydration.state;
   const [viewState, dispatch] = useReducer(graphStateReducer, initialViewState);
   const currentReconciliation = useMemo(
@@ -545,7 +564,9 @@ export function GraphExplorer({
   const [localCenterRequest, setLocalCenterRequest] = useState<
     LocalCenterRequest | undefined
   >(() =>
-    restoredLocalAnchor === undefined || restoredLocalViewport === undefined
+    localLayoutMode !== 'free' ||
+    restoredLocalAnchor === undefined ||
+    restoredLocalViewport === undefined
       ? undefined
       : {
           key: 1,
@@ -553,7 +574,26 @@ export function GraphExplorer({
           freeRatio: restoredLocalViewport.freeRatio,
         },
   );
-  const localCenterRequestGeneration = useRef(localCenterRequest?.key ?? 0);
+  const [localStructuredCenterRequest, setLocalStructuredCenterRequest] =
+    useState<GraphCenterRequest | undefined>(() =>
+      localLayoutMode !== 'structured' ||
+      restoredLocalAnchor === undefined ||
+      restoredLocalViewport === undefined
+        ? undefined
+        : {
+            key: 1,
+            nodeId: restoredLocalAnchor.id,
+            zoom:
+              restoredLocalViewport.structuredZoom ??
+              LOCAL_STRUCTURED_NAVIGATION_ZOOM,
+          },
+    );
+  const localCenterRequestGeneration = useRef(
+    Math.max(
+      localCenterRequest?.key ?? 0,
+      localStructuredCenterRequest?.key ?? 0,
+    ),
+  );
   const [globalFitRequestKey, setGlobalFitRequestKey] = useState(
     rendererMode === 'global' &&
       restoredGlobalViewport !== undefined &&
@@ -574,11 +614,17 @@ export function GraphExplorer({
   >(initialLocalFitRequestKey);
   const localFitRequestGeneration = useRef(initialLocalFitRequestKey ?? 0);
   const [localTransitionAnchor, setLocalTransitionAnchor] = useState<
-    LocalTransitionAnchor | undefined
+    GraphTransitionAnchor | undefined
   >();
   const localTransitionGeneration = useRef(0);
   const globalTransitionAnchorApiRef = useRef<
     GlobalTransitionAnchorApi | undefined
+  >(undefined);
+  const localFreeTransitionAnchorApiRef = useRef<
+    LocalFreeTransitionAnchorApi | undefined
+  >(undefined);
+  const localStructuredTransitionAnchorApiRef = useRef<
+    GraphTransitionAnchorApi | undefined
   >(undefined);
   const [viewportBookmark, setViewportBookmark] = useState<
     PersistedViewportAnchor | undefined
@@ -715,12 +761,30 @@ export function GraphExplorer({
     [],
   );
   const requestLocalSemanticCenter = useCallback(
-    (request: Omit<LocalCenterRequest, 'key'>) => {
+    (request: {
+      readonly nodeId: LocalCenterRequest['nodeId'];
+      readonly freeRatio: number;
+      readonly structuredZoom?: number;
+    }) => {
       const key = nextGraphViewportRequestKey(
         localCenterRequestGeneration.current,
       );
       localCenterRequestGeneration.current = key;
-      setLocalCenterRequest({ key, ...request });
+      if (localLayoutModeRef.current === 'structured') {
+        setLocalCenterRequest(undefined);
+        setLocalStructuredCenterRequest({
+          key,
+          nodeId: request.nodeId,
+          zoom: request.structuredZoom ?? LOCAL_STRUCTURED_NAVIGATION_ZOOM,
+        });
+      } else {
+        setLocalStructuredCenterRequest(undefined);
+        setLocalCenterRequest({
+          key,
+          nodeId: request.nodeId,
+          freeRatio: request.freeRatio,
+        });
+      }
     },
     [],
   );
@@ -836,6 +900,7 @@ export function GraphExplorer({
           }
         } else if (rendererModeRef.current === 'local') {
           setLocalCenterRequest(undefined);
+          setLocalStructuredCenterRequest(undefined);
           if (options.fitDestination) {
             setLocalSemanticViewportBookmark(undefined);
             requestLocalFit();
@@ -897,6 +962,7 @@ export function GraphExplorer({
       setCenterRequest(undefined);
       setGlobalCenterRequest(undefined);
       setLocalCenterRequest(undefined);
+      setLocalStructuredCenterRequest(undefined);
       requestHistoryViewportRestore(restoredSessionMode, reconciled.viewports);
       setNavigationError(undefined);
       setNavigationAnnouncement(
@@ -1121,8 +1187,9 @@ export function GraphExplorer({
   useEffect(() => {
     if (
       rendererMode !== 'local' ||
+      localLayoutMode !== 'free' ||
       LocalGraphView !== undefined ||
-      localUnavailable !== undefined
+      localFreeUnavailable !== undefined
     ) {
       return;
     }
@@ -1134,14 +1201,45 @@ export function GraphExplorer({
       .catch((error: unknown) => {
         if (cancelled) return;
         const message = error instanceof Error ? error.message : String(error);
-        setLocalUnavailable(
+        setLocalFreeUnavailable(
           `Local Free could not be loaded: ${message} Open in Structure remains available.`,
         );
       });
     return () => {
       cancelled = true;
     };
-  }, [LocalGraphView, localUnavailable, rendererMode]);
+  }, [LocalGraphView, localFreeUnavailable, localLayoutMode, rendererMode]);
+
+  useEffect(() => {
+    if (
+      rendererMode !== 'local' ||
+      localLayoutMode !== 'structured' ||
+      LocalStructuredGraphView !== undefined ||
+      localStructuredUnavailable !== undefined
+    ) {
+      return;
+    }
+    let cancelled = false;
+    void import('./LocalStructuredGraphView')
+      .then((module) => {
+        if (!cancelled) setLocalStructuredGraphView(() => module.default);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : String(error);
+        setLocalStructuredUnavailable(
+          `Local Structured could not be loaded: ${message} Local Free and Structure remain available.`,
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    LocalStructuredGraphView,
+    localLayoutMode,
+    localStructuredUnavailable,
+    rendererMode,
+  ]);
 
   useLayoutEffect(() => {
     if (performance === undefined) return;
@@ -1151,6 +1249,7 @@ export function GraphExplorer({
   useLayoutEffect(() => {
     activeViewStateRef.current = activeViewState;
     rendererModeRef.current = effectiveRendererMode;
+    localLayoutModeRef.current = localLayoutMode;
     viewportBookmarkRef.current = viewportBookmark;
     globalViewportBookmarkRef.current = globalViewportBookmark;
     localViewportBookmarkRef.current = localViewportBookmark;
@@ -1158,6 +1257,7 @@ export function GraphExplorer({
     activeViewState,
     effectiveRendererMode,
     globalViewportBookmark,
+    localLayoutMode,
     localViewportBookmark,
     viewportBookmark,
   ]);
@@ -1225,11 +1325,15 @@ export function GraphExplorer({
           requestLocalSemanticCenter({
             nodeId: anchor.id,
             freeRatio: viewport.freeRatio,
+            ...(viewport.structuredZoom === undefined
+              ? {}
+              : { structuredZoom: viewport.structuredZoom }),
           });
           return;
         }
         setLocalSemanticViewportBookmark(undefined);
         setLocalCenterRequest(undefined);
+        setLocalStructuredCenterRequest(undefined);
         requestLocalFit();
         return;
       }
@@ -1304,6 +1408,7 @@ export function GraphExplorer({
         setRendererMode(recoveryMode);
         setSelection(null);
         setLocalCenterRequest(undefined);
+        setLocalStructuredCenterRequest(undefined);
         setLocalSemanticViewportBookmark(undefined);
         setNavigationAnnouncement(
           `The Local root was removed by a live update. Local closed safely and ${
@@ -1654,10 +1759,46 @@ export function GraphExplorer({
     },
     [],
   );
-  const observeLocalViewport = useCallback(
-    (observation: SemanticLocalViewport | undefined) =>
-      setLocalSemanticViewportBookmark(observation),
+  const observeLocalFreeViewport = useCallback(
+    (observation: SemanticLocalViewport | undefined) => {
+      if (observation === undefined) {
+        setLocalSemanticViewportBookmark(undefined);
+        return;
+      }
+      const structuredZoom = localViewportBookmarkRef.current?.structuredZoom;
+      setLocalSemanticViewportBookmark({
+        ...observation,
+        ...(structuredZoom === undefined ? {} : { structuredZoom }),
+      });
+    },
     [setLocalSemanticViewportBookmark],
+  );
+  const observeLocalStructuredViewport = useCallback(
+    (observation: SemanticLocalStructuredViewport | undefined) => {
+      if (observation === undefined) {
+        setLocalSemanticViewportBookmark(undefined);
+        return;
+      }
+      setLocalSemanticViewportBookmark({
+        anchorEntityId: observation.anchorEntityId,
+        freeRatio:
+          localViewportBookmarkRef.current?.freeRatio ?? LOCAL_NAVIGATION_RATIO,
+        structuredZoom: observation.structuredZoom,
+      });
+    },
+    [setLocalSemanticViewportBookmark],
+  );
+  const changeLocalFreeTransitionAnchorApi = useCallback(
+    (api: LocalFreeTransitionAnchorApi | undefined) => {
+      localFreeTransitionAnchorApiRef.current = api;
+    },
+    [],
+  );
+  const changeLocalStructuredTransitionAnchorApi = useCallback(
+    (api: GraphTransitionAnchorApi | undefined) => {
+      localStructuredTransitionAnchorApiRef.current = api;
+    },
+    [],
   );
   const changeMaximized = useCallback(
     (nextMaximized: boolean) => {
@@ -1715,6 +1856,95 @@ export function GraphExplorer({
       setPreferenceWarning(saved.ok ? undefined : saved.message);
     },
     [focusAppearance, localLayoutMode, persistenceStorage, trackpadZoomMode],
+  );
+  const changeLocalLayoutMode = useCallback(
+    (mode: LocalLayoutMode) => {
+      if (
+        rendererModeRef.current !== 'local' ||
+        mode === localLayoutModeRef.current
+      ) {
+        return;
+      }
+      const rootEntityId = activeViewStateRef.current.focus?.rootEntityId;
+      const rootNode =
+        rootEntityId === undefined
+          ? undefined
+          : projection?.nodes.find(
+              (node) =>
+                node.kind === 'entity' && node.entityId === rootEntityId,
+            );
+      const selectedNode =
+        selection?.kind === 'node'
+          ? projection?.nodes.find((node) => node.id === selection.id)
+          : undefined;
+      const anchorNode = selectedNode ?? rootNode;
+      const sourceApi =
+        localLayoutModeRef.current === 'free'
+          ? localFreeTransitionAnchorApiRef.current
+          : localStructuredTransitionAnchorApiRef.current;
+      const point =
+        anchorNode === undefined
+          ? undefined
+          : sourceApi?.nodeViewportPoint(anchorNode.id);
+      const bookmark = localViewportBookmarkRef.current;
+      const targetZoom =
+        mode === 'structured'
+          ? (bookmark?.structuredZoom ?? LOCAL_STRUCTURED_NAVIGATION_ZOOM)
+          : (bookmark?.freeRatio ?? LOCAL_NAVIGATION_RATIO);
+
+      localLayoutModeRef.current = mode;
+      setLocalLayoutMode(mode);
+      setLocalCenterRequest(undefined);
+      setLocalStructuredCenterRequest(undefined);
+      if (point !== undefined && anchorNode !== undefined) {
+        const key = nextGraphViewportRequestKey(
+          localTransitionGeneration.current,
+        );
+        localTransitionGeneration.current = key;
+        setLocalTransitionAnchor({
+          key,
+          nodeId: anchorNode.id,
+          point,
+          zoom: targetZoom,
+        });
+      } else if (anchorNode !== undefined) {
+        setLocalTransitionAnchor(undefined);
+        requestLocalSemanticCenter({
+          nodeId: anchorNode.id,
+          freeRatio: bookmark?.freeRatio ?? LOCAL_NAVIGATION_RATIO,
+          structuredZoom:
+            bookmark?.structuredZoom ?? LOCAL_STRUCTURED_NAVIGATION_ZOOM,
+        });
+      }
+      if (mode === 'free' && selection?.kind === 'edge') {
+        setSelection(null);
+      }
+      const saved = saveGraphPreferences(persistenceStorage, {
+        focusAppearance,
+        globalLayoutSettings,
+        localLayoutMode: mode,
+        trackpadZoomMode,
+      });
+      setPreferenceWarning(saved.ok ? undefined : saved.message);
+      setNavigationAnnouncement(
+        mode === 'structured'
+          ? 'Local Structured opened with the same bounded Local graph.'
+          : `Local Free opened with the same bounded Local graph.${
+              selection?.kind === 'edge'
+                ? ' The Structured edge selection was cleared.'
+                : ''
+            }`,
+      );
+    },
+    [
+      focusAppearance,
+      globalLayoutSettings,
+      persistenceStorage,
+      projection,
+      requestLocalSemanticCenter,
+      selection,
+      trackpadZoomMode,
+    ],
   );
   const changeSettingsOpen = useCallback((open: boolean) => {
     dispatchWorkspaceOverlay({ type: 'change-settings', open });
@@ -1988,6 +2218,11 @@ export function GraphExplorer({
             localViewportBookmarkRef.current?.anchorEntityId === entityId
               ? localViewportBookmarkRef.current.freeRatio
               : LOCAL_NAVIGATION_RATIO,
+          structuredZoom:
+            localViewportBookmarkRef.current?.anchorEntityId === entityId
+              ? (localViewportBookmarkRef.current.structuredZoom ??
+                LOCAL_STRUCTURED_NAVIGATION_ZOOM)
+              : LOCAL_STRUCTURED_NAVIGATION_ZOOM,
         } satisfies PersistedLocalViewport;
         const destination = createGraphHistoryCheckpoint(
           plan.state,
@@ -2018,17 +2253,27 @@ export function GraphExplorer({
         setSelection({ kind: 'node', id: plan.projectionNodeId });
         setLocalSemanticViewportBookmark(viewport);
         setLocalCenterRequest(undefined);
+        setLocalStructuredCenterRequest(undefined);
         if (point === undefined) {
           requestLocalSemanticCenter({
             nodeId: plan.projectionNodeId,
             freeRatio: viewport.freeRatio,
+            structuredZoom: viewport.structuredZoom,
           });
         } else {
           const key = nextGraphViewportRequestKey(
             localTransitionGeneration.current,
           );
           localTransitionGeneration.current = key;
-          setLocalTransitionAnchor({ key, point });
+          setLocalTransitionAnchor({
+            key,
+            nodeId: plan.projectionNodeId,
+            point,
+            zoom:
+              localLayoutModeRef.current === 'structured'
+                ? viewport.structuredZoom
+                : viewport.freeRatio,
+          });
         }
         setNavigationError(undefined);
         setNavigationAnnouncement(plan.announcement);
@@ -2063,7 +2308,12 @@ export function GraphExplorer({
           );
           const viewport = {
             anchorEntityId: entityId,
-            freeRatio: LOCAL_NAVIGATION_RATIO,
+            freeRatio:
+              localViewportBookmarkRef.current?.freeRatio ??
+              LOCAL_NAVIGATION_RATIO,
+            structuredZoom:
+              localViewportBookmarkRef.current?.structuredZoom ??
+              LOCAL_STRUCTURED_NAVIGATION_ZOOM,
           } satisfies PersistedLocalViewport;
           const destination = createGraphHistoryCheckpoint(
             plan.state,
@@ -2094,6 +2344,7 @@ export function GraphExplorer({
           requestLocalSemanticCenter({
             nodeId: plan.projectionNodeId,
             freeRatio: viewport.freeRatio,
+            structuredZoom: viewport.structuredZoom,
           });
           setNavigationError(undefined);
           setNavigationAnnouncement(`${origin}: ${plan.announcement}`);
@@ -2175,6 +2426,10 @@ export function GraphExplorer({
       setLocalSemanticViewportBookmark,
       setSemanticViewportBookmark,
     ],
+  );
+  const focusLocalEntity = useCallback(
+    (entityId: EntityId) => navigateToEntity(entityId, 'Local focus'),
+    [navigateToEntity],
   );
 
   const enterFocus = useCallback(
@@ -2280,6 +2535,7 @@ export function GraphExplorer({
     setCenterRequest(undefined);
     setGlobalCenterRequest(undefined);
     setLocalCenterRequest(undefined);
+    setLocalStructuredCenterRequest(undefined);
     setSemanticViewportBookmark(undefined);
     setGlobalSemanticViewportBookmark(undefined);
     setLocalSemanticViewportBookmark(undefined);
@@ -2440,30 +2696,52 @@ export function GraphExplorer({
                 </button>
               </div>
             ) : (
-              <div
-                aria-label="Local navigation controls"
-                className="control-group"
-                role="group"
-              >
-                <span>Local Free</span>
-                <button
-                  onClick={() =>
-                    setLocalLayoutRequestKey((current) => current + 1)
-                  }
-                  type="button"
+              <>
+                <div
+                  aria-label="Local layout"
+                  className="control-group"
+                  role="group"
                 >
-                  Re-layout
-                </button>
-                <button onClick={exitLocalToGlobal} type="button">
-                  Back to Global
-                </button>
-                <button
-                  onClick={() => changeRendererMode('structure')}
-                  type="button"
+                  <span>Local layout</span>
+                  <button
+                    aria-pressed={localLayoutMode === 'free'}
+                    onClick={() => changeLocalLayoutMode('free')}
+                    type="button"
+                  >
+                    Free
+                  </button>
+                  <button
+                    aria-pressed={localLayoutMode === 'structured'}
+                    onClick={() => changeLocalLayoutMode('structured')}
+                    type="button"
+                  >
+                    Structured
+                  </button>
+                </div>
+                <div
+                  aria-label="Local navigation controls"
+                  className="control-group"
+                  role="group"
                 >
-                  Open in Structure
-                </button>
-              </div>
+                  <button
+                    onClick={() =>
+                      setLocalLayoutRequestKey((current) => current + 1)
+                    }
+                    type="button"
+                  >
+                    Re-layout
+                  </button>
+                  <button onClick={exitLocalToGlobal} type="button">
+                    Back to Global
+                  </button>
+                  <button
+                    onClick={() => changeRendererMode('structure')}
+                    type="button"
+                  >
+                    Open in Structure
+                  </button>
+                </div>
+              </>
             )}
             <GraphFilters
               contained={maximized}
@@ -2651,8 +2929,17 @@ export function GraphExplorer({
               <div className="graph-failure" role="alert">
                 <p>
                   {localUnavailable ??
-                    'Local Free has no stable document root. Open Structure to recover.'}
+                    `Local ${localLayoutMode === 'free' ? 'Free' : 'Structured'} has no stable document root. Open Structure to recover.`}
                 </p>
+                {localLayoutMode === 'structured' &&
+                localStructuredUnavailable !== undefined ? (
+                  <button
+                    onClick={() => changeLocalLayoutMode('free')}
+                    type="button"
+                  >
+                    Open Local Free
+                  </button>
+                ) : null}
                 <button
                   onClick={() => changeRendererMode('structure')}
                   type="button"
@@ -2660,11 +2947,16 @@ export function GraphExplorer({
                   Open in Structure
                 </button>
               </div>
-            ) : LocalGraphView === undefined ? (
+            ) : localLayoutMode === 'free' && LocalGraphView === undefined ? (
               <p className="graph-loading" role="status">
                 Loading Local Free…
               </p>
-            ) : (
+            ) : localLayoutMode === 'structured' &&
+              LocalStructuredGraphView === undefined ? (
+              <p className="graph-loading" role="status">
+                Loading Local Structured…
+              </p>
+            ) : localLayoutMode === 'free' && LocalGraphView !== undefined ? (
               <LocalGraphView
                 {...(localCenterRequest === undefined
                   ? {}
@@ -2683,20 +2975,54 @@ export function GraphExplorer({
                   ? {}
                   : { instrumentation: performance })}
                 onFailure={(message) =>
-                  setLocalUnavailable(
+                  setLocalFreeUnavailable(
                     `Local Free renderer failed: ${message} Open in Structure remains available.`,
                   )
                 }
                 onFitRequestConsumed={consumeLocalFitRequest}
                 onSelectionChange={changeLocalSelection}
+                onTransitionAnchorApiChange={changeLocalFreeTransitionAnchorApi}
                 onTransitionAnchorConsumed={consumeLocalTransitionAnchor}
-                onViewportObservation={observeLocalViewport}
+                onViewportObservation={observeLocalFreeViewport}
                 projection={result.projection}
                 rootEntityId={localRootEntityId}
                 selection={activeSelection}
                 trackpadZoomMode={trackpadZoomMode}
               />
-            )
+            ) : LocalStructuredGraphView !== undefined ? (
+              <LocalStructuredGraphView
+                {...(localStructuredCenterRequest === undefined
+                  ? {}
+                  : { centerRequest: localStructuredCenterRequest })}
+                fitRequestKey={localFitRequestKey ?? 0}
+                focusAppearance={focusAppearance}
+                {...(localTransitionAnchor === undefined
+                  ? {}
+                  : { initialTransitionAnchor: localTransitionAnchor })}
+                {...(performance === undefined
+                  ? {}
+                  : { instrumentation: performance })}
+                layoutRequestKey={localLayoutRequestKey}
+                onFailure={(message) =>
+                  setLocalStructuredUnavailable(
+                    `Local Structured renderer failed: ${message} Local Free and Structure remain available.`,
+                  )
+                }
+                onFitRequestConsumed={consumeLocalFitRequest}
+                onFocusEntity={focusLocalEntity}
+                onSelectionChange={changeSelection}
+                onToggleEntity={toggleEntity}
+                onTransitionAnchorApiChange={
+                  changeLocalStructuredTransitionAnchorApi
+                }
+                onTransitionAnchorConsumed={consumeLocalTransitionAnchor}
+                onViewportObservation={observeLocalStructuredViewport}
+                projection={result.projection}
+                rootEntityId={localRootEntityId}
+                selection={activeSelection}
+                trackpadZoomMode={trackpadZoomMode}
+              />
+            ) : null
           ) : (
             <GraphCanvas
               {...(centerRequest === undefined ? {} : { centerRequest })}

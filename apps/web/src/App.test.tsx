@@ -6,6 +6,7 @@ import {
   summarizeDiagnosticReport,
   validateObsidianDiagnosticReport,
 } from '@icarus-graph-explorer/diagnostics-obsidian';
+import { createRuntimePerformanceRecorder } from '@icarus-graph-explorer/performance';
 import {
   createPersistedWorkspaceView,
   serializePersistedWorkspaceView,
@@ -459,9 +460,76 @@ describe('graph-first explorer shell', () => {
       '<button aria-pressed="true" type="button">Local</button>',
     );
     expect(markup).toContain('Loading Local Free…');
+    expect(markup).toContain('aria-label="Local layout"');
+    expect(markup).toContain(
+      '<button aria-pressed="true" type="button">Free</button>',
+    );
+    expect(markup).toContain(
+      '<button aria-pressed="false" type="button">Structured</button>',
+    );
     expect(markup).toContain('>Back to Global</button>');
     expect(markup).toContain('>Open in Structure</button>');
     expect(markup).not.toContain('aria-label="Structural depth"');
+  });
+
+  it('restores Local Structured from the existing preference and keeps projection work isolated', () => {
+    const workspace = createProjectionWorkspace(report.snapshot);
+    const root = report.snapshot.entities.find(
+      ({ kind }) => kind === 'document',
+    )!;
+    const persisted = serializePersistedWorkspaceView(
+      createPersistedWorkspaceView({
+        workspace,
+        state: {
+          ...documentOnlyProjectionState(),
+          focus: {
+            rootEntityId: root.id,
+            hops: 1,
+            direction: 'both',
+            hierarchyContext: 'ancestors-and-children',
+          },
+        },
+        presentationMode: 'local',
+        viewports: {
+          local: {
+            anchorEntityId: root.id,
+            freeRatio: 0.48,
+            structuredZoom: 0.92,
+          },
+        },
+      }),
+    );
+    let clock = 0;
+    const performance = createRuntimePerformanceRecorder({
+      now: () => ++clock,
+      markNextPaint: () => undefined,
+    });
+    const markup = renderToStaticMarkup(
+      <GraphExplorer
+        identityStability="stable"
+        maximized={false}
+        onMaximizedChange={() => undefined}
+        performance={performance}
+        snapshot={report.snapshot}
+        storage={{
+          ...storage,
+          getItem: (key) =>
+            key === GRAPH_PREFERENCES_STORAGE_KEY
+              ? '{"localLayoutMode":"structured"}'
+              : persisted,
+        }}
+      />,
+    );
+    const operations = performance.snapshot().operations;
+
+    expect(markup).toContain('Loading Local Structured…');
+    expect(markup).toContain(
+      '<button aria-pressed="true" type="button">Structured</button>',
+    );
+    expect(operations['local-projections']).toBe(1);
+    expect(operations['global-projections']).toBe(0);
+    expect(operations['global-layouts']).toBe(0);
+    expect(operations['local-layouts']).toBe(0);
   });
 
   it('renders diagnostic evidence in a labeled, internally scrollable dialog', () => {
