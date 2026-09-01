@@ -39,7 +39,7 @@ src/
   layout.ts                Worker-safe ForceAtlas2, folder-prior candidates, metrics, fingerprint.
   layout-cache.ts          Four-entry memory-only LRU of derived positions.
   lifecycle.ts             WebGL construction result and idempotent session lease.
-  style.ts                 Far/Regional/Near LOD and built-in GROUP1-compatible style layer.
+  style.ts                 Far/Regional/Near LOD and GROUP1A base-accent layer.
   precision-wheel-zoom.ts  Accepted 0.0017 gain, 0.5 px floor, and 90 ms reversal guard.
   session.ts               Imperative Sigma lifecycle and high-frequency interaction ownership.
   viewport-request.ts      Layout-commit gate for semantic center and Fit requests.
@@ -47,7 +47,7 @@ src/
   local-types.ts           Local mapper, viewport, interaction, and worker contracts.
   local-mapping.ts         Separate Local topology and deterministic root-relative seed.
   local-graph.ts           Local Graphology construction, reconciliation, and neighborhoods.
-  local-style.ts           Far/normal/near Local styling without topology changes.
+  local-style.ts           Far/normal/near Local and GROUP1A styling without topology changes.
   local-layout.ts          DOM-free Local ForceAtlas2 request/result and fingerprint.
   local-layout-cache.ts    Bounded memory-only exact Local position cache.
   local-lifecycle.ts       Idempotent lease and pre-draw anchored refresh boundary.
@@ -97,7 +97,13 @@ changes reducer styling and may schedule a Sigma render; it never asks KG6 to
 project, rebuilds Graphology topology, or requests layout. Hover and selection
 use the same reducer boundary. Style resolution is centralized so a future
 GROUP1 layer can contribute color, marker, or label treatment before the final
-interaction pass.
+interaction pass. GROUP1A now supplies that layer as an optional resolved
+`EntityId` presentation map: document base color may use the group accent,
+then LOD label policy, hover, selection, and deemphasis remain final. Diagnostic
+status colors are excluded. `setVisualGroupStyles()` retains the map and
+schedules one partial node reducer refresh without Graphology reconciliation,
+index rebuilding, coordinate or size changes, folder/degree changes,
+fingerprint changes, or a Global worker request.
 
 Stable projected IDs are Graphology keys. Live/filter changes reconcile nodes
 and edges in place, preserve surviving positions and selection, seed additions
@@ -137,6 +143,13 @@ settings while excluding seed coordinates, labels, hover, selection, camera,
 and source text. Ordinary zoom/pan/hover/selection changes reducer or camera
 state only; it never maps, reconciles, or lays out topology.
 
+The same GROUP1A map feeds Local Free. File, Heading, and Block base fills may
+use the accent; diagnostic colors and all edges remain unchanged. Root/LOD,
+hover, selection, and deemphasis stay authoritative. A style-map update uses
+the Local session's style-only setter and cannot reproject, reconcile topology,
+change positions, request Local ForceAtlas2, or touch Global layout. GROUP1B
+user-facing configuration is pending.
+
 Local hop and direction changes preserve the current camera rather than
 requesting Fit. Their topology may naturally change around the anchored node,
 but the application does not move away and then recenter. Cross-mode entry
@@ -155,8 +168,9 @@ Views, QUERY1 evolution, and GROUP1 remain separate product layers.
 
 ## Dependency boundary and validation
 
-Production depends only on view-projection, React/React DOM, Sigma, Graphology,
-and Graphology ForceAtlas2. ESLint rejects canonical, source, platform,
+Production depends only on view-projection, the resolved GROUP1A presentation
+type, React/React DOM, Sigma, Graphology, and Graphology ForceAtlas2. ESLint
+rejects canonical, source, platform,
 application, analytics/performance, React Flow, Dagre, and Node imports. React
 Sigma is not used.
 

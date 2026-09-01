@@ -10,6 +10,7 @@
     "benchmark:dagre-worker": "tsx src/dagre-layout-worker-responsiveness.ts",
     "benchmark:global-renderer": "tsx src/global-renderer-benchmark.ts",
     "benchmark:local-renderer": "tsx src/local-renderer-benchmark.ts",
+    "benchmark:visual-groups": "tsx src/visual-groups-benchmark.ts",
     "diagnose": "tsx src/cli.ts",
     "generate:sample": "tsx src/generate-sample.ts",
     "validate:incremental-real": "tsx src/validate-incremental-real.ts",
@@ -30,6 +31,7 @@
     "@icarus-graph-explorer/stable-identity": "workspace:*",
     "@icarus-graph-explorer/vault-discovery-policy": "workspace:*",
     "@icarus-graph-explorer/view-projection": "workspace:*",
+    "@icarus-graph-explorer/visual-groups": "workspace:*",
     "@icarus-graph-explorer/workspace-engine-obsidian": "workspace:*",
     "@icarus-graph-explorer/workspace-worker": "workspace:*"
   },

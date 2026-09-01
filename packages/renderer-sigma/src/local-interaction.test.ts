@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { LOCAL_INTERACTION_OPERATION_CONTRACTS } from './local-interaction-contract';
 
 describe('Local operation oracle', () => {
-  it.each(['zoom', 'pan', 'hover', 'selection'] as const)(
+  it.each([
+    'zoom',
+    'pan',
+    'hover',
+    'selection',
+    'visual-group-style-change',
+  ] as const)(
     '%s never projects, reconciles topology, or requests layout',
     (interaction) => {
       expect(LOCAL_INTERACTION_OPERATION_CONTRACTS[interaction]).toMatchObject({

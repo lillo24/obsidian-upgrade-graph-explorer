@@ -28,6 +28,7 @@ src/
   layout-state.ts        Pure latest-generation commit/anchor state machine.
   local-structured-layout.ts  Exact fingerprint/cache, immediate seed, and root normalization.
   local-structured.ts    DOM-free Local Structured benchmark/test exports.
+  visual-group-presentation.tsx  EntityId style context and zero-work operation contract.
   highlight.ts           Direct incident-node/edge visual emphasis.
   focus-interaction.ts   Graph-scoped Enter-to-Focus activation policy.
   center-request.ts      Keyed projected-node viewport-center resolution.
@@ -78,6 +79,16 @@ and diagnostic `148 × 42`. Marker-plus-label nodes use `▰`, `◇`, `●`, and
 the root File is emphasized, hierarchy is visually stronger, and references
 remain secondary smooth-step cross-links. Standard Structure mapping, markup,
 dimensions, CSS classes, and Structure/Focus Dagre settings remain unchanged.
+
+GROUP1A adds an optional `visualGroupStyles` presentation map to `GraphCanvas`.
+It is delivered through a renderer-local context, so changing only the map does
+not rerun KG6, React Flow mapping, W3/Dagre, Local Structured fingerprints, or
+node geometry. Matched entity cards receive a fixed overlay on the right edge;
+File top-edge, Heading left-edge, Block dashed grammar, Local markers, Focus,
+hover attenuation, context styling, and the selection ring remain independent.
+Diagnostics do not read the map. With the prop omitted, the node markup has no
+group data/style and the current appearance is unchanged. GROUP1B UI wiring is
+pending.
 
 On a Local Structured cache miss, deterministic O(nodes + edges) seed geometry
 is complete, finite, root-normalized, and usable on the first React Flow paint;
@@ -199,8 +210,9 @@ explicit workload budget.
 
 ## Dependency boundary
 
-Production code depends only on KG6 view projection, React, React Flow, and the
-plain root contract of `@icarus-graph-explorer/dagre-layout`. ESLint rejects
+Production code depends only on KG6 view projection, the resolved GROUP1A
+presentation type, React, React Flow, and the plain root contract of
+`@icarus-graph-explorer/dagre-layout`. ESLint rejects
 direct Dagre, canonical/core, source adapters, diagnostics, application,
 filesystem, platform, Sigma, and Graphology imports. The `./prepare` subpath
 retains direct compute only for tests and diagnostic benchmarks; it is not

@@ -192,6 +192,12 @@ worker round trip, refined paint, interaction RAF gaps, transition anchoring,
 and precision input remain production browser/Tauri evidence. Output is
 aggregate-only and never a CI wall-clock threshold.
 
+`benchmark:visual-groups` records aggregate synthetic GROUP1A compile,
+visible-entity assignment, and renderer style-lookup distributions for 300 and
+3,000 visible entities with 4 and 8 enabled groups. Projection is explicitly
+outside the measured path, operation counts report zero topology/layout work,
+and the timings are evidence rather than CI gates.
+
 An opt-in private check can validate one real workspace using an existing
 identity catalog:
 

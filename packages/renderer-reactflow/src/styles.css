@@ -111,6 +111,21 @@
   box-shadow: none;
 }
 
+.entity-card[data-visual-group-color]::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 0.32rem;
+  background: var(--visual-group-accent);
+  content: '';
+  pointer-events: none;
+}
+
+.entity-card--local-structured[data-visual-group-color]::after {
+  width: 0.22rem;
+}
+
 .entity-card__title-row {
   display: flex;
   min-width: 0;

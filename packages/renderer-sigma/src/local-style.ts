@@ -3,6 +3,7 @@ import type {
   LocalNodeAttributes,
   LocalVisualLod,
 } from './local-types';
+import type { VisualGroupNodePresentation } from '@icarus-graph-explorer/visual-groups';
 
 export function resolveLocalVisualLod(cameraRatio: number): LocalVisualLod {
   if (!Number.isFinite(cameraRatio) || cameraRatio <= 0) {
@@ -20,9 +21,14 @@ export function resolveLocalNodeStyle(
     readonly relatedToHover: boolean;
     readonly selected: boolean;
     readonly lod: LocalVisualLod;
+    readonly visualGroup?: VisualGroupNodePresentation;
   },
 ) {
   const emphasized = context.selected || context.hovered;
+  const baseColor =
+    attributes.nodeKind !== 'diagnostic' && attributes.entityId !== null
+      ? (context.visualGroup?.accent ?? attributes.color)
+      : attributes.color;
   const labelVisible =
     emphasized ||
     attributes.root ||
@@ -36,7 +42,7 @@ export function resolveLocalNodeStyle(
       : context.hovered
         ? '#38a5c2'
         : context.relatedToHover
-          ? attributes.color
+          ? baseColor
           : '#dce4e6',
     forceLabel: emphasized || attributes.root,
     highlighted: emphasized,

@@ -51,6 +51,11 @@ export {
   viewportForDisclosureAnchor,
 } from './viewport-navigation';
 export type { DisclosureAnchor, WheelZoomInput } from './viewport-navigation';
+export {
+  REACT_FLOW_VISUAL_GROUP_STYLE_UPDATE_CONTRACT,
+  visualGroupAccentStyle,
+  VisualGroupPresentationProvider,
+} from './visual-group-presentation';
 export type {
   DiagnosticFlowNode,
   DiagnosticNodeData,

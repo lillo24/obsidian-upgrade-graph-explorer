@@ -43,6 +43,7 @@ apps/web/
     graph-state.ts    Pure disclosure/focus/filter interaction reducer.
     navigation.ts     Shared reveal/filter-widening/navigation planner.
     local-view.ts     Local entry/reroot/minimum-reveal planner over KG6 state.
+    visual-groups/    Visible-entity GROUP1A presentation-map derivation; no projection calls.
     navigation-history.ts Bounded session history over semantic graph checkpoints.
     graph-history-shortcuts.ts Exact graph-context Back/Forward shortcut policy.
     persistence/      Stable-report eligibility, hydration, and localStorage adapter.
@@ -71,6 +72,20 @@ explorer. New projections supersede active layout jobs by replacing that
 worker; an idle worker is reused. A later layout keeps the last committed graph
 interactive until the matching geometry arrives, while an initial layout shows
 an explicit progress surface.
+
+GROUP1A adds a source-neutral Visual Group package plus app-owned seams, without
+adding product controls. `src/visual-groups/presentation.ts` takes an already
+available projection/entity subset and canonical lookup, skips diagnostic
+targets, evaluates only those canonical `EntityId`s, and returns one resolved
+presentation map. It never calls `projectView()`. The renderer props are
+optional, so the current product supplies no map and looks unchanged until
+GROUP1B adds user-facing configuration.
+
+The separate schema-v1 registry adapter is keyed by encoded stable workspace
+ID. It strictly retains ordered priority and stores only name, canonical QUERY1
+string, fixed palette token, and enabled boolean. It is not graph-view state,
+does not bump schema v3, and is not wired into GraphExplorer, NAV1 history,
+DISC1 counts, active QUERY1 filtering, or Saved Filters.
 
 Graph history remains a web-layer session concern above KG9 view state.
 Each checkpoint contains one immutable KG6 `ViewProjectionState` reference and

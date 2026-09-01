@@ -20,6 +20,7 @@
     "@icarus-graph-explorer/source-provider-tauri": "workspace:*",
     "@icarus-graph-explorer/view-state": "workspace:*",
     "@icarus-graph-explorer/view-projection": "workspace:*",
+    "@icarus-graph-explorer/visual-groups": "workspace:*",
     "@icarus-graph-explorer/workspace-worker": "workspace:*",
     "@icarus-graph-explorer/workspace-engine-obsidian": "workspace:*",
     "react": "19.2.8",
