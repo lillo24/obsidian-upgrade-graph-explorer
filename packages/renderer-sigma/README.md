@@ -1,12 +1,13 @@
-# Sigma Global/Regional Renderer
+# Sigma Global/Regional and Local Free Renderer
 
-Status: **STABLE — KG13B1 production contracts are test-backed; Local is not implemented.**
+Status: **STABLE — KG13B1 Global and KG13B2A Local Free contracts are test-backed.**
 
-This package owns the lazy, direct Sigma 3 renderer for file-level Global and
-Regional exploration. It consumes a completed KG6 `ViewProjection`, derives a
-replaceable Graphology graph, runs plain-data ForceAtlas2 plus a soft folder
-prior, and keeps camera/hover/selection state inside one imperative renderer
-session. It never owns canonical entities, KG6 projection policy, search,
+This package owns the lazy, direct Sigma 3 renderers for file-level
+Global/Regional exploration and bounded Local Free exploration. Both consume a
+completed KG6 `ViewProjection` and derive replaceable Graphology state, but
+their mapping and layout contracts remain explicit: Global owns the soft folder
+prior; Local owns hierarchy/reference force semantics and has no folder
+clustering. Neither owns canonical entities, KG6 projection policy, search,
 inspection, source acquisition, Tauri, React Flow, Dagre, analytics, or saved
 coordinates.
 
@@ -17,6 +18,13 @@ documents-only KG6 projection
   → session.ts       direct Sigma lifecycle, reducers, camera, precision input
   → layout.ts        serializable request → ForceAtlas2 + optional soft prior
   → application Worker → latest result → memory-only position cache
+
+bounded Local KG6 projection
+  → local-mapping.ts   File/Heading/Block/diagnostic topology + stable seed
+  → local-graph.ts     Local Graphology construction + survivor reconciliation
+  → local-session.ts   Local Sigma lifecycle, LOD, selection, semantic viewport
+  → local-layout.ts    separate hierarchy/reference ForceAtlas2 protocol
+  → Local Worker → latest result → bounded memory-only position cache
 ```
 
 ## File map
@@ -36,6 +44,17 @@ src/
   session.ts               Imperative Sigma lifecycle and high-frequency interaction ownership.
   viewport-request.ts      Layout-commit gate for semantic center and Fit requests.
   GlobalGraphCanvas.tsx    Thin React mount/update boundary and background-layout adoption.
+  local-types.ts           Local mapper, viewport, interaction, and worker contracts.
+  local-mapping.ts         Separate Local topology and deterministic root-relative seed.
+  local-graph.ts           Local Graphology construction, reconciliation, and neighborhoods.
+  local-style.ts           Far/normal/near Local styling without topology changes.
+  local-layout.ts          DOM-free Local ForceAtlas2 request/result and fingerprint.
+  local-layout-cache.ts    Bounded memory-only exact Local position cache.
+  local-lifecycle.ts       Idempotent lease and pre-draw anchored refresh boundary.
+  local-session.ts         Local Sigma ownership, precision input, anchors, and viewport.
+  local-interaction-contract.ts  Local operation-count oracle and Global-isolation proof.
+  LocalGraphCanvas.tsx     Immediate seed mount and latest worker refinement boundary.
+  deterministic.ts        Shared stable hash/unit primitives; no random geometry.
   styles.css               Canvas controls, progress/error surface, and reduced-motion rules.
   core.ts                  DOM-free mapping/layout/settings exports for tests and benchmarks.
   index.ts                 Browser-capable public API.
@@ -98,13 +117,37 @@ lazy-module failure must be reported to the application, which keeps Structure
 usable for the session. Layout failure keeps the last valid positions visible
 and reports an explicit error.
 
-## Future Local seam
+## Local Free contract
 
-KG13B2 may use stable Global file coordinates as anchors for a bounded induced
-subgraph and add Local Free/Structured presentation. It must not add headings to
-Global topology or relayout the whole vault when local detail opens. Future
-manual cluster offsets, Saved Views, QUERY1, and GROUP1 remain separate derived
-or product layers; none are implemented here.
+Local maps files, headings, blocks, and diagnostic targets without weakening
+Global's documents-only invariant. The root seed and every refined result are
+normalized to graph origin. A transient Global viewport point may place that
+root on entry; refinement captures and restores the root's screen position.
+Missing capture falls back to semantic centering. Exact cached positions and
+the saved semantic viewport are installed during the imperative mount, before
+the first visible draw. A topology or position reconciliation restores the
+selected node, or otherwise the Local root, during Sigma's `afterProcess`
+phase so the renderer cannot expose one frame with new normalization and an
+old camera.
+
+Hierarchy edges are stronger than references and remain visually distinct.
+Local has no folder prior or fake edges. Exact cache fingerprints include the
+root, stable topology, semantic node/edge roles, weights, iterations, and Local
+settings while excluding seed coordinates, labels, hover, selection, camera,
+and source text. Ordinary zoom/pan/hover/selection changes reducer or camera
+state only; it never maps, reconciles, or lays out topology.
+
+Local hop and direction changes preserve the current camera rather than
+requesting Fit. Their topology may naturally change around the anchored node,
+but the application does not move away and then recenter. Cross-mode entry
+anchors and explicit Fit requests are one-shot intents: the canvas reports
+them consumed after mount so a later Local remount or graph-history traversal
+cannot replay stale camera work.
+
+`LocalLayoutMode` reserves `free | structured`, but only Free is rendered here.
+KG13B2B may add Structured as another presentation of the same KG6 Local
+projection. Future manual cluster offsets, Saved Views, QUERY1, and GROUP1
+remain separate product layers.
 
 ## Dependency boundary and validation
 

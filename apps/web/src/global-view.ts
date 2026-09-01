@@ -1,5 +1,5 @@
-import type { EntityId } from '@icarus-graph-explorer/core';
 import {
+  containingDocumentEntityId,
   documentOnlyProjectionState,
   type ProjectionWorkspace,
   type ReferenceResolutionStatus,
@@ -10,16 +10,7 @@ export const DEFAULT_GLOBAL_REFERENCE_STATUSES = [
   'resolved',
 ] as const satisfies readonly ReferenceResolutionStatus[];
 
-export function containingDocumentEntityId(
-  workspace: ProjectionWorkspace,
-  entityId: EntityId,
-): EntityId | undefined {
-  let entity = workspace.entity(entityId);
-  while (entity !== undefined && entity.kind !== 'document') {
-    entity = workspace.parent(entity.id);
-  }
-  return entity?.id;
-}
+export { containingDocumentEntityId };
 
 /**
  * Global consumes the same KG6 filter/focus intent but never mutates Structure

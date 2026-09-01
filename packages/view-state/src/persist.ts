@@ -9,7 +9,7 @@ import {
   PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION,
   type PersistedViewportAnchor,
   type PersistedRendererViewports,
-  type RendererEntryMode,
+  type GraphPresentationMode,
   type PersistedWorkspaceView,
 } from './types';
 import { validatePersistedWorkspaceView } from './validation';
@@ -17,7 +17,9 @@ import { validatePersistedWorkspaceView } from './validation';
 export interface CreatePersistedWorkspaceViewInput {
   readonly workspace: ProjectionWorkspace;
   readonly state: ViewProjectionState;
-  readonly rendererMode?: RendererEntryMode;
+  readonly presentationMode?: GraphPresentationMode;
+  /** Schema-v2 caller alias. New callers should use presentationMode. */
+  readonly rendererMode?: GraphPresentationMode;
   readonly viewports?: PersistedRendererViewports;
   /** Legacy caller alias; used only when viewports.structure is absent. */
   readonly viewport?: PersistedViewportAnchor;
@@ -34,10 +36,13 @@ function sortedUnique<T extends string>(values: readonly T[]): readonly T[] {
 export function createPersistedWorkspaceView({
   workspace,
   state,
-  rendererMode = 'structure',
+  presentationMode,
+  rendererMode,
   viewports,
   viewport,
 }: CreatePersistedWorkspaceViewInput): PersistedWorkspaceView {
+  const resolvedPresentationMode =
+    presentationMode ?? rendererMode ?? 'structure';
   const parsedQuery =
     state.filters?.query === undefined
       ? undefined
@@ -57,7 +62,7 @@ export function createPersistedWorkspaceView({
   const candidate: PersistedWorkspaceView = {
     schemaVersion: PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION,
     workspaceId: workspace.snapshot().workspace.id,
-    rendererMode,
+    presentationMode: resolvedPresentationMode,
     projection: {
       disclosure: {
         defaultDepth: state.disclosure.defaultDepth,
@@ -95,7 +100,8 @@ export function createPersistedWorkspaceView({
           }),
     },
     ...((viewports?.structure ?? viewport) === undefined &&
-    viewports?.global === undefined
+    viewports?.global === undefined &&
+    viewports?.local === undefined
       ? {}
       : {
           viewports: {
@@ -105,6 +111,9 @@ export function createPersistedWorkspaceView({
             ...(viewports?.global === undefined
               ? {}
               : { global: viewports.global }),
+            ...(viewports?.local === undefined
+              ? {}
+              : { local: viewports.local }),
           },
         }),
   };
@@ -119,7 +128,7 @@ export function createPersistedWorkspaceView({
   const normalized: PersistedWorkspaceView = {
     schemaVersion: PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION,
     workspaceId: candidate.workspaceId,
-    rendererMode: restored.rendererMode,
+    presentationMode: restored.presentationMode,
     projection: {
       disclosure: restored.state.disclosure,
       ...(restored.state.focus === undefined
@@ -130,7 +139,8 @@ export function createPersistedWorkspaceView({
         : { filters: restored.state.filters }),
     },
     ...(restored.viewports.structure === undefined &&
-    restored.viewports.global === undefined
+    restored.viewports.global === undefined &&
+    restored.viewports.local === undefined
       ? {}
       : { viewports: restored.viewports }),
   };

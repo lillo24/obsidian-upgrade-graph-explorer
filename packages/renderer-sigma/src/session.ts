@@ -33,11 +33,13 @@ import type {
   GlobalTrackpadZoomMode,
   GlobalVisualLod,
   SemanticGlobalViewport,
+  GlobalViewportPoint,
 } from './types';
 
 export interface GlobalRendererSessionOptions {
   readonly settings: GlobalLayoutSettings;
   readonly trackpadZoomMode: GlobalTrackpadZoomMode;
+  readonly initialViewport?: SemanticGlobalViewport;
   /** Development harness override; production leaves adaptive labels enabled. */
   readonly labels?: boolean;
   /** Development harness override; production keeps expensive edge events off. */
@@ -159,6 +161,15 @@ export class GlobalRendererSession {
       edgeReducer: (key, attributes) => this.reduceEdge(key, attributes),
     });
     this.visualLod = resolveGlobalVisualLod(this.renderer.getCamera().ratio);
+    if (options.initialViewport !== undefined) {
+      const initialNode = input.nodes.find(
+        ({ attributes }) =>
+          attributes.entityId === options.initialViewport?.anchorEntityId,
+      );
+      if (initialNode !== undefined) {
+        this.centerImmediately(initialNode.key, options.initialViewport.ratio);
+      }
+    }
     const mountMs = Number((performance.now() - mountStart).toFixed(3));
     this.renderer.getMouseCaptor().on('wheel', this.precisionWheelHandler);
     this.renderer.getCamera().on('updated', this.cameraUpdatedHandler);
@@ -500,6 +511,16 @@ export class GlobalRendererSession {
     );
   }
 
+  private centerImmediately(key: string, ratio: number): void {
+    const display = this.renderer.getNodeDisplayData(key);
+    if (display === undefined) return;
+    this.renderer.getCamera().setState({
+      x: display.x,
+      y: display.y,
+      ratio,
+    });
+  }
+
   zoomBy(factor: number): void {
     const camera = this.renderer.getCamera();
     camera.animate(
@@ -537,6 +558,13 @@ export class GlobalRendererSession {
           anchorEntityId: nearest.entityId,
           ratio: this.renderer.getCamera().ratio,
         };
+  }
+
+  nodeViewportPoint(key: string): GlobalViewportPoint | undefined {
+    const display = this.renderer.getNodeDisplayData(key);
+    return display === undefined
+      ? undefined
+      : this.renderer.framedGraphToViewport({ x: display.x, y: display.y });
   }
 
   destroy(): void {

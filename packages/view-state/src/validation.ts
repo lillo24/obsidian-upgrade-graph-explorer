@@ -327,6 +327,44 @@ function validateGlobalViewport(
   }
 }
 
+function validateLocalViewport(
+  value: unknown,
+  path: string,
+  issues: PersistedViewValidationIssue[],
+): void {
+  if (!isRecord(value)) {
+    issue(issues, path, 'Expected a semantic Local viewport object.');
+    return;
+  }
+  fields(
+    value,
+    ['anchorEntityId', 'freeRatio'],
+    ['structuredZoom'],
+    path,
+    issues,
+  );
+  nonEmptyString(value.anchorEntityId, `${path}.anchorEntityId`, issues);
+  if (
+    typeof value.freeRatio !== 'number' ||
+    !Number.isFinite(value.freeRatio) ||
+    value.freeRatio <= 0
+  ) {
+    issue(issues, `${path}.freeRatio`, 'Expected a positive finite number.');
+  }
+  if (
+    Object.hasOwn(value, 'structuredZoom') &&
+    (typeof value.structuredZoom !== 'number' ||
+      !Number.isFinite(value.structuredZoom) ||
+      value.structuredZoom <= 0)
+  ) {
+    issue(
+      issues,
+      `${path}.structuredZoom`,
+      'Expected a positive finite number.',
+    );
+  }
+}
+
 function validateViewports(
   value: unknown,
   issues: PersistedViewValidationIssue[],
@@ -336,12 +374,15 @@ function validateViewports(
     issue(issues, path, 'Expected renderer semantic viewports.');
     return;
   }
-  fields(value, [], ['structure', 'global'], path, issues);
+  fields(value, [], ['structure', 'global', 'local'], path, issues);
   if (Object.hasOwn(value, 'structure')) {
     validateStructureViewport(value.structure, `${path}.structure`, issues);
   }
   if (Object.hasOwn(value, 'global')) {
     validateGlobalViewport(value.global, `${path}.global`, issues);
+  }
+  if (Object.hasOwn(value, 'local')) {
+    validateLocalViewport(value.local, `${path}.local`, issues);
   }
 }
 
@@ -372,7 +413,7 @@ export function validatePersistedWorkspaceView(
     const migrated: PersistedWorkspaceView = {
       schemaVersion: PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION,
       workspaceId: value.workspaceId as string,
-      rendererMode: 'structure',
+      presentationMode: 'structure',
       projection: value.projection as PersistedWorkspaceView['projection'],
       ...(Object.hasOwn(value, 'viewport')
         ? {
@@ -386,9 +427,70 @@ export function validatePersistedWorkspaceView(
     };
     return { valid: true, value: migrated, issues: [] };
   }
+  if (value.schemaVersion === 2) {
+    fields(
+      value,
+      ['schemaVersion', 'workspaceId', 'rendererMode', 'projection'],
+      ['viewports'],
+      '$',
+      issues,
+    );
+    nonEmptyString(value.workspaceId, '$.workspaceId', issues);
+    if (value.rendererMode !== 'structure' && value.rendererMode !== 'global') {
+      issue(issues, '$.rendererMode', 'Expected "structure" or "global".');
+    }
+    validateProjection(value.projection, issues);
+    if (Object.hasOwn(value, 'viewports')) {
+      const legacyViewports = value.viewports;
+      if (!isRecord(legacyViewports)) {
+        issue(issues, '$.viewports', 'Expected renderer semantic viewports.');
+      } else {
+        fields(
+          legacyViewports,
+          [],
+          ['structure', 'global'],
+          '$.viewports',
+          issues,
+        );
+        if (Object.hasOwn(legacyViewports, 'structure')) {
+          validateStructureViewport(
+            legacyViewports.structure,
+            '$.viewports.structure',
+            issues,
+          );
+        }
+        if (Object.hasOwn(legacyViewports, 'global')) {
+          validateGlobalViewport(
+            legacyViewports.global,
+            '$.viewports.global',
+            issues,
+          );
+        }
+      }
+    }
+    if (issues.length > 0) return { valid: false, issues };
+    // Conservative migration: a schema-v2 Global checkpoint stays Global even
+    // when it contains Focus. Only an explicit KG13B2A action enters Local.
+    return {
+      valid: true,
+      value: {
+        schemaVersion: PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION,
+        workspaceId: value.workspaceId as string,
+        presentationMode: value.rendererMode as 'structure' | 'global',
+        projection: value.projection as PersistedWorkspaceView['projection'],
+        ...(Object.hasOwn(value, 'viewports')
+          ? {
+              viewports:
+                value.viewports as unknown as PersistedRendererViewports,
+            }
+          : {}),
+      },
+      issues: [],
+    };
+  }
   fields(
     value,
-    ['schemaVersion', 'workspaceId', 'rendererMode', 'projection'],
+    ['schemaVersion', 'workspaceId', 'presentationMode', 'projection'],
     ['viewports'],
     '$',
     issues,
@@ -401,10 +503,28 @@ export function validatePersistedWorkspaceView(
     );
   }
   nonEmptyString(value.workspaceId, '$.workspaceId', issues);
-  if (value.rendererMode !== 'structure' && value.rendererMode !== 'global') {
-    issue(issues, '$.rendererMode', 'Expected "structure" or "global".');
+  if (
+    value.presentationMode !== 'structure' &&
+    value.presentationMode !== 'global' &&
+    value.presentationMode !== 'local'
+  ) {
+    issue(
+      issues,
+      '$.presentationMode',
+      'Expected "structure", "global", or "local".',
+    );
   }
   validateProjection(value.projection, issues);
+  if (
+    value.presentationMode === 'local' &&
+    (!isRecord(value.projection) || !Object.hasOwn(value.projection, 'focus'))
+  ) {
+    issue(
+      issues,
+      '$.projection.focus',
+      'Local presentation requires a KG6 Focus root.',
+    );
+  }
   if (Object.hasOwn(value, 'viewports'))
     validateViewports(value.viewports, issues);
 

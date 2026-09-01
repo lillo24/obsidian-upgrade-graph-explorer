@@ -116,6 +116,9 @@ pnpm benchmark:dagre-worker -- --profile medium
 pnpm benchmark:global-renderer -- --profile small
 pnpm benchmark:global-renderer -- --profile medium
 pnpm benchmark:global-renderer -- --profile large
+pnpm benchmark:local-renderer -- --profile small
+pnpm benchmark:local-renderer -- --profile medium
+pnpm benchmark:local-renderer -- --profile stress
 ```
 
 Profiles are deterministic and measure parse/adapt, resolution, report
@@ -169,6 +172,18 @@ and reads aggregate production bundle sizes. Browser/Tauri mount, render,
 interaction, and worker responsiveness stay in the dedicated visual harness
 because Node has no WebGL surface. Add `--include-25k` only to the large profile
 for the optional 25k-node/50k-edge mapping ceiling.
+
+`benchmark:local-renderer` is the KG13B2A bounded-neighborhood contract. Its
+synthetic profiles describe the Local scene itself rather than scaling with a
+whole vault: small has one root plus ten neighbor files; medium has 51 files
+and several hundred disclosed headings/blocks; stress safely targets roughly
+one thousand projected entities. It separately measures KG6 Local projection,
+topology mapping, deterministic seed placement, Graphology construction,
+worker-equivalent ForceAtlas2, result apply, one disclosure reconciliation,
+and exact memory-cache reuse. It verifies root-origin normalization and zero
+Global layout work. WebGL first paint, transition anchoring, interaction RAF
+gaps, and precision input remain production browser/Tauri evidence. Output is
+aggregate-only and never a CI wall-clock threshold.
 
 An opt-in private check can validate one real workspace using an existing
 identity catalog:

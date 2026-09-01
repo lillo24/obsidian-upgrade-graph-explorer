@@ -439,3 +439,77 @@ rendered, allowing the graph to move out of view at commit. Center/Fit requests
 now wait for Sigma's matching `afterRender`; both first-worker and exact-cache
 Structure→Global transitions passed the repeated release check without manual
 Fit.
+
+## KG13B2A bounded Local Free evidence
+
+Local profiles describe the projected neighborhood itself rather than a large
+vault whose focus happens to be small. The small fixture contains one root,
+ten neighbor files, root headings, modest resolved references, and diagnostic
+targets. Medium contains 51 files plus disclosed hierarchy and blocks for 381
+nodes/430 edges. Stress targets roughly one thousand projected entities and is
+an explicit safety profile, not the default product target.
+
+Values below are local Windows/Node evidence recorded on 2026-09-01. They are
+median/p95 milliseconds and never CI thresholds. ForceAtlas2 is measured with
+the same plain request/compute path used inside the dedicated Worker; browser
+paint and RAF behavior remain runtime evidence.
+
+| Work                         | Small (25 nodes / 34 edges) | Medium (381 nodes / 430 edges) | Stress (1,101 nodes / 1,175 edges) |
+| ---------------------------- | --------------------------: | -----------------------------: | ---------------------------------: |
+| Bounded KG6 Local projection |               0.919 / 1.517 |                 3.195 / 10.401 |                      6.745 / 6.745 |
+| Local topology mapping       |               0.016 / 0.187 |                  0.632 / 0.747 |                      0.687 / 0.687 |
+| Deterministic seed placement |               0.089 / 0.165 |                  0.709 / 1.508 |                      2.295 / 2.295 |
+| Graphology construction      |               0.145 / 0.315 |                  0.295 / 0.471 |                      1.067 / 1.067 |
+| ForceAtlas2 compute          |               1.085 / 1.278 |                46.801 / 48.619 |                  107.859 / 107.859 |
+| Refined-position apply       |               0.012 / 0.023 |                  0.172 / 0.716 |                      0.208 / 0.208 |
+| Disclosure reconciliation    |               0.165 / 0.369 |                  0.621 / 1.351 |                      1.208 / 1.208 |
+| Exact layout-cache hit       |               0.001 / 0.003 |                  0.034 / 0.163 |                      0.028 / 0.028 |
+
+The seed path—projection, mapping, seed, and graph construction—is comfortably
+inside Class B in these bounded profiles and does not wait for ForceAtlas2.
+Medium and stress refinement are material enough to remain off-main but not a
+reason to precompute. KG13B2A therefore rejects speculative per-file projection/layout
+warming: it would add background CPU and invalidation without evidence that the
+immediate deterministic scene is late. The only Local cache is the six-entry,
+page-memory exact-layout LRU; changed topology warm-seeds surviving coordinates.
+
+Production instrumentation adds `local-projection`, `local-map`, `local-seed`,
+`local-sigma-mount`, `local-layout-worker`, `local-layout-apply`,
+`local-visual-lod`, `local-hover`, `local-selection`, `local-center`,
+`global-to-local-transition`, and `local-to-global-transition`, with matching
+aggregate operation counts. It records no entity ID, path, query, source text,
+layout coordinate, or transition point.
+
+The Local operation oracle requires zoom, pan, hover, selection, and Inspector
+activity to perform zero KG6 projections, zero Graphology topology
+reconciliations, and zero layout requests. A disclosure or focus change may run
+one Local semantic update/layout while producing zero Global topology/layout
+work and leaving the Global exact-layout cache valid. Semantic LOD changes only
+Sigma reducers. Both Sigma presentations retain the accepted precision-wheel
+gain of `0.0017`.
+
+Production browser QA covered fresh Structure startup, direct persisted-Local
+restore, Global → Local entry, exact-cache re-entry, explicit worker
+refinement, disclosure, hop/direction changes, same-document navigation,
+cross-document rerooting, semantic history, Structure recovery, and both
+trackpad modes. It found two ordering/ownership defects before release QA:
+Sigma display coordinates had been converted as raw graph coordinates during
+the transition, and Local styling depended on a prior Global import. Framed
+coordinate conversion now preserves the root viewport point through worker
+adoption, and Local imports the shared stylesheet at its own lazy boundary.
+Follow-up QA found another one-frame ordering defect: hop changes and
+Global↔Local history could expose Sigma's new graph normalization with the old
+camera before a post-render anchor or Fit returned it. Exact cached positions
+and semantic viewports now warm the first draw, reconciliation restores its
+anchor in `afterProcess`, Local hop/direction changes do not auto-fit, and
+one-shot transition/Fit intents are cleared after consumption. The repeated
+production run kept the graph visible without Fit and emitted no console
+warning or error.
+
+Run the aggregate profiles with:
+
+```bash
+pnpm benchmark:local-renderer -- --profile small
+pnpm benchmark:local-renderer -- --profile medium
+pnpm benchmark:local-renderer -- --profile stress
+```

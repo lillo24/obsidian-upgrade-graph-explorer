@@ -5,6 +5,7 @@ import type {
   ViewProjectionFilters,
   ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
+import { containingDocumentEntityId } from '@icarus-graph-explorer/view-projection';
 
 import type {
   PersistedWorkspaceView,
@@ -215,7 +216,7 @@ function reconcileWorkspaceView(
     Viewport extends { readonly anchorEntityId: string },
   >(
     viewport: Viewport | undefined,
-    renderer: 'Structure' | 'Global',
+    renderer: 'Structure' | 'Global' | 'Local',
   ): Viewport | undefined => {
     if (
       viewport === undefined ||
@@ -232,9 +233,11 @@ function reconcileWorkspaceView(
   };
   const structure = reconcileViewport(viewports.structure, 'Structure');
   const global = reconcileViewport(viewports.global, 'Global');
+  const local = reconcileViewport(viewports.local, 'Local');
   const restoredViewports: PersistedRendererViewports = {
     ...(structure === undefined ? {} : { structure }),
     ...(global === undefined ? {} : { global }),
+    ...(local === undefined ? {} : { local }),
   };
 
   return {
@@ -292,21 +295,47 @@ export function restorePersistedWorkspaceView(
             ? {}
             : { query: parsedQuery.canonical }),
         };
+  const persistedFocus = persisted.projection.focus;
+  const localRootEntityId =
+    persisted.presentationMode === 'local' && persistedFocus !== undefined
+      ? containingDocumentEntityId(workspace, persistedFocus.rootEntityId)
+      : undefined;
+  const normalizedFocus =
+    persisted.presentationMode === 'local' && persistedFocus !== undefined
+      ? localRootEntityId === undefined
+        ? persistedFocus
+        : { ...persistedFocus, rootEntityId: localRootEntityId }
+      : persistedFocus;
+  const persistedDisclosure = persisted.projection.disclosure;
+  const localExpanded =
+    localRootEntityId === undefined
+      ? persistedDisclosure.expandedEntityIds
+      : [
+          ...new Set([
+            ...persistedDisclosure.expandedEntityIds,
+            localRootEntityId,
+          ]),
+        ].sort(compareText);
+  const localCollapsed =
+    localRootEntityId === undefined
+      ? persistedDisclosure.collapsedEntityIds
+      : persistedDisclosure.collapsedEntityIds.filter(
+          (entityId) => entityId !== localRootEntityId,
+        );
   const state: ViewProjectionState = {
     disclosure: {
-      defaultDepth: persisted.projection.disclosure.defaultDepth,
-      ...(persisted.projection.disclosure.maxSectionLevel === undefined
+      defaultDepth:
+        localRootEntityId === undefined ? persistedDisclosure.defaultDepth : 0,
+      ...(persistedDisclosure.maxSectionLevel === undefined
         ? {}
         : {
-            maxSectionLevel: persisted.projection.disclosure.maxSectionLevel,
+            maxSectionLevel: persistedDisclosure.maxSectionLevel,
           }),
-      expandedEntityIds: persisted.projection.disclosure.expandedEntityIds,
-      collapsedEntityIds: persisted.projection.disclosure.collapsedEntityIds,
-      includeBlocks: persisted.projection.disclosure.includeBlocks,
+      expandedEntityIds: localExpanded,
+      collapsedEntityIds: localCollapsed,
+      includeBlocks: persistedDisclosure.includeBlocks,
     },
-    ...(persisted.projection.focus === undefined
-      ? {}
-      : { focus: persisted.projection.focus }),
+    ...(normalizedFocus === undefined ? {} : { focus: normalizedFocus }),
     ...(normalizedFilters === undefined ? {} : { filters: normalizedFilters }),
   };
   const reconciled = reconcileWorkspaceView(
@@ -318,6 +347,10 @@ export function restorePersistedWorkspaceView(
   );
   return {
     ...reconciled,
-    rendererMode: persisted.rendererMode,
+    presentationMode:
+      persisted.presentationMode === 'local' &&
+      reconciled.state.focus === undefined
+        ? 'global'
+        : persisted.presentationMode,
   };
 }

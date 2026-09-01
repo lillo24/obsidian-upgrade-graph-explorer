@@ -12,8 +12,11 @@ import type {
   ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
 
-export const PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION = 2 as const;
-export type RendererEntryMode = 'structure' | 'global';
+export const PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION = 3 as const;
+export type GraphPresentationMode = 'structure' | 'global' | 'local';
+/** Compatibility name for callers compiled against the schema-v2 API. */
+export type RendererEntryMode = GraphPresentationMode;
+export type LocalLayoutMode = 'free' | 'structured';
 
 export interface PersistedViewportAnchor {
   readonly anchorEntityId: EntityId;
@@ -27,9 +30,18 @@ export interface PersistedGlobalViewport {
   readonly ratio: number;
 }
 
+export interface PersistedLocalViewport {
+  readonly anchorEntityId: EntityId;
+  /** Sigma camera ratio for Local Free. Raw camera coordinates are excluded. */
+  readonly freeRatio: number;
+  /** Reserved semantic zoom for KG13B2B's Structured presentation. */
+  readonly structuredZoom?: number;
+}
+
 export interface PersistedRendererViewports {
   readonly structure?: PersistedStructureViewport;
   readonly global?: PersistedGlobalViewport;
+  readonly local?: PersistedLocalViewport;
 }
 
 export interface PersistedProjectionState {
@@ -52,7 +64,7 @@ export interface PersistedProjectionState {
 export interface PersistedWorkspaceView {
   readonly schemaVersion: typeof PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION;
   readonly workspaceId: WorkspaceId;
-  readonly rendererMode: RendererEntryMode;
+  readonly presentationMode: GraphPresentationMode;
   readonly projection: PersistedProjectionState;
   readonly viewports?: PersistedRendererViewports;
 }
@@ -89,7 +101,7 @@ export interface ViewRestoreIssue {
 
 export interface RestoredWorkspaceView {
   readonly state: ViewProjectionState;
-  readonly rendererMode: RendererEntryMode;
+  readonly presentationMode: GraphPresentationMode;
   readonly viewports: PersistedRendererViewports;
   /** Compatibility alias for the Structure viewport during schema-v2 rollout. */
   readonly viewport?: PersistedViewportAnchor;

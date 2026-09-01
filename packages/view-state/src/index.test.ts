@@ -102,7 +102,7 @@ describe('persisted workspace view', () => {
   });
 
   it.each([0, 1, 2, 3] as const)(
-    'round-trips structural depth %i under schema v2',
+    'round-trips structural depth %i under schema v3',
     (defaultDepth) => {
       const workspace = createProjectionWorkspace(snapshot());
       const value = createPersistedWorkspaceView({
@@ -116,7 +116,7 @@ describe('persisted workspace view', () => {
         JSON.parse(serializePersistedWorkspaceView(value)),
       );
 
-      expect(value.schemaVersion).toBe(2);
+      expect(value.schemaVersion).toBe(3);
       expect(validation.valid).toBe(true);
       if (!validation.valid) return;
       expect(
@@ -168,7 +168,7 @@ describe('persisted workspace view', () => {
     ).toBeUndefined();
   });
 
-  it('migrates a schema-v1 Structure viewport losslessly into schema v2', () => {
+  it('migrates a schema-v1 Structure viewport losslessly into schema v3', () => {
     const value = persisted();
     const validation = validatePersistedWorkspaceView({
       schemaVersion: 1,
@@ -180,11 +180,30 @@ describe('persisted workspace view', () => {
     expect(validation.valid).toBe(true);
     if (!validation.valid) return;
     expect(validation.value).toMatchObject({
-      schemaVersion: 2,
-      rendererMode: 'structure',
+      schemaVersion: 3,
+      presentationMode: 'structure',
       viewports: {
         structure: { anchorEntityId: 'section-one', zoom: 1.25 },
       },
+    });
+  });
+
+  it('migrates schema-v2 Global conservatively without inferring Local from Focus', () => {
+    const value = persisted();
+    const validation = validatePersistedWorkspaceView({
+      schemaVersion: 2,
+      workspaceId: value.workspaceId,
+      rendererMode: 'global',
+      projection: value.projection,
+      viewports: { global: { anchorEntityId: 'doc-a', ratio: 0.4 } },
+    });
+
+    expect(validation.valid).toBe(true);
+    if (!validation.valid) return;
+    expect(validation.value).toMatchObject({
+      schemaVersion: 3,
+      presentationMode: 'global',
+      projection: { focus: { rootEntityId: 'section-one' } },
     });
   });
 
@@ -193,7 +212,7 @@ describe('persisted workspace view', () => {
     const value = createPersistedWorkspaceView({
       workspace,
       state: fullState(),
-      rendererMode: 'global',
+      presentationMode: 'global',
       viewports: {
         structure: { anchorEntityId: 'section-one', zoom: 1.25 },
         global: { anchorEntityId: 'doc-a', ratio: 0.32 },
@@ -201,12 +220,84 @@ describe('persisted workspace view', () => {
     });
     const restored = restorePersistedWorkspaceView(workspace, value);
 
-    expect(restored.rendererMode).toBe('global');
+    expect(restored.presentationMode).toBe('global');
     expect(restored.viewports).toEqual({
       structure: { anchorEntityId: 'section-one', zoom: 1.25 },
       global: { anchorEntityId: 'doc-a', ratio: 0.32 },
     });
     expect(JSON.stringify(value)).not.toContain('coordinates');
+  });
+
+  it('round-trips Local presentation and semantic viewport without raw coordinates', () => {
+    const workspace = createProjectionWorkspace(snapshot());
+    const value = createPersistedWorkspaceView({
+      workspace,
+      state: {
+        ...fullState(),
+        focus: { ...fullState().focus!, rootEntityId: 'doc-a' },
+      },
+      presentationMode: 'local',
+      viewports: {
+        local: { anchorEntityId: 'section-one', freeRatio: 0.48 },
+      },
+    });
+    const restored = restorePersistedWorkspaceView(workspace, value);
+
+    expect(restored.presentationMode).toBe('local');
+    expect(restored.state.focus?.rootEntityId).toBe('doc-a');
+    expect(restored.viewports.local).toEqual({
+      anchorEntityId: 'section-one',
+      freeRatio: 0.48,
+    });
+    expect(JSON.stringify(value)).not.toMatch(/"[xy]":/u);
+  });
+
+  it('normalizes a Local section root to its document and exits without fuzzy reassignment when it is deleted', () => {
+    const workspace = createProjectionWorkspace(snapshot());
+    const saved = createPersistedWorkspaceView({
+      workspace,
+      state: fullState(),
+      presentationMode: 'local',
+      viewports: {
+        local: { anchorEntityId: 'section-one', freeRatio: 0.48 },
+      },
+    });
+    const restored = restorePersistedWorkspaceView(workspace, saved);
+    const afterDeletion = restorePersistedWorkspaceView(
+      createProjectionWorkspace(
+        snapshot(ENTITIES.filter(({ id }) => id === 'doc-b')),
+      ),
+      saved,
+    );
+
+    expect(restored.presentationMode).toBe('local');
+    expect(restored.state.focus?.rootEntityId).toBe('doc-a');
+    expect(afterDeletion.presentationMode).toBe('global');
+    expect(afterDeletion.state.focus).toBeUndefined();
+    expect(afterDeletion.issues.map(({ code }) => code)).toContain(
+      'focus-root-missing',
+    );
+  });
+
+  it('rejects Local presentation without KG6 Focus and future schema versions', () => {
+    const value = persisted();
+    const withoutFocus = { ...value.projection };
+    delete withoutFocus.focus;
+    const local = validatePersistedWorkspaceView({
+      ...value,
+      presentationMode: 'local',
+      projection: withoutFocus,
+    });
+    const future = validatePersistedWorkspaceView({
+      ...value,
+      schemaVersion: 4,
+    });
+
+    expect(local.valid).toBe(false);
+    expect(local.valid ? [] : local.issues.map(({ path }) => path)).toContain(
+      '$.projection.focus',
+    );
+    expect(future.valid).toBe(false);
   });
 
   it.each([0, 7, '1'])('rejects invalid heading ceiling %s', (level) => {
@@ -245,7 +336,7 @@ describe('persisted workspace view', () => {
           referenceStatuses: ['ambiguous', 'resolved'],
         },
       },
-      rendererMode: 'structure',
+      presentationMode: 'structure',
       viewport: { anchorEntityId: 'section-one', zoom: 1.25 },
       viewports: {
         structure: { anchorEntityId: 'section-one', zoom: 1.25 },
@@ -385,7 +476,7 @@ describe('persisted workspace view', () => {
     };
     const saved = createPersistedWorkspaceView({ workspace, state });
 
-    expect(saved.schemaVersion).toBe(2);
+    expect(saved.schemaVersion).toBe(3);
     expect(saved.projection.filters?.query).toBe(
       'kind:section OR path:"folder"',
     );
@@ -461,7 +552,7 @@ describe('persisted workspace view', () => {
     const value = persisted();
     const result = validatePersistedWorkspaceView({
       ...value,
-      schemaVersion: 3,
+      schemaVersion: 4,
       projection: {
         ...value.projection,
         filters: {

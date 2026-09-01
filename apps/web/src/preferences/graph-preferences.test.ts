@@ -54,6 +54,7 @@ describe('graph preferences', () => {
     expect(loadGraphPreferences(storage).preferences).toEqual({
       focusAppearance: 'inverted',
       globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
+      localLayoutMode: 'free',
       trackpadZoomMode: 'pinch-zoom',
     });
 
@@ -61,11 +62,12 @@ describe('graph preferences', () => {
       saveGraphPreferences(storage, {
         focusAppearance: 'minimal',
         globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
+        localLayoutMode: 'free',
         trackpadZoomMode: 'scroll-zoom',
       }),
     ).toEqual({ ok: true });
     expect(storage.value).toBe(
-      '{"focusAppearance":"minimal","globalLayoutSettings":{"folderClustering":true,"spacingPreset":"normal"},"trackpadZoomMode":"scroll-zoom"}',
+      '{"focusAppearance":"minimal","globalLayoutSettings":{"folderClustering":true,"spacingPreset":"normal"},"localLayoutMode":"free","trackpadZoomMode":"scroll-zoom"}',
     );
   });
 
@@ -79,6 +81,7 @@ describe('graph preferences', () => {
     ).toEqual({
       focusAppearance: 'inverted',
       globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
+      localLayoutMode: 'free',
       trackpadZoomMode: 'pinch-zoom',
     });
     expect(
@@ -90,6 +93,7 @@ describe('graph preferences', () => {
     ).toEqual({
       focusAppearance: 'inverted',
       globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
+      localLayoutMode: 'free',
       trackpadZoomMode: 'scroll-zoom',
     });
   });
@@ -144,6 +148,7 @@ describe('graph preferences', () => {
       saveGraphPreferences(storage, {
         focusAppearance: 'inverted',
         globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
+        localLayoutMode: 'free',
         trackpadZoomMode: 'pinch-zoom',
       }),
     ).toEqual({

@@ -99,6 +99,18 @@ export interface GlobalCenterRequest {
   readonly ratio: number;
 }
 
+export interface GlobalViewportPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+/** Narrow runtime bridge used only for the Global → Local screen anchor. */
+export interface GlobalTransitionAnchorApi {
+  readonly nodeViewportPoint: (
+    nodeId: ProjectionNodeId,
+  ) => GlobalViewportPoint | undefined;
+}
+
 export interface GlobalSelection {
   readonly kind: 'node' | 'edge';
   readonly id: string;
@@ -218,3 +230,5 @@ export interface GlobalRendererInstrumentation {
   ) => Value;
   readonly record: (phase: GlobalPerformancePhase, durationMs: number) => void;
 }
+
+export type * from './local-types';

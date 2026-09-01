@@ -9,6 +9,7 @@
     "benchmark:workspace-worker": "tsx src/workspace-worker-responsiveness.ts",
     "benchmark:dagre-worker": "tsx src/dagre-layout-worker-responsiveness.ts",
     "benchmark:global-renderer": "tsx src/global-renderer-benchmark.ts",
+    "benchmark:local-renderer": "tsx src/local-renderer-benchmark.ts",
     "diagnose": "tsx src/cli.ts",
     "generate:sample": "tsx src/generate-sample.ts",
     "validate:incremental-real": "tsx src/validate-incremental-real.ts",

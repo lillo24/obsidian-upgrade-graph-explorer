@@ -416,6 +416,56 @@ describe('graph-first explorer shell', () => {
     expect(markup).not.toContain('aria-label="Structural depth"');
   });
 
+  it('restores an explicit Local presentation lazily with scale-up recovery controls', () => {
+    const workspace = createProjectionWorkspace(report.snapshot);
+    const root = report.snapshot.entities.find(
+      ({ kind }) => kind === 'document',
+    )!;
+    const persisted = serializePersistedWorkspaceView(
+      createPersistedWorkspaceView({
+        workspace,
+        state: {
+          ...documentOnlyProjectionState(),
+          disclosure: {
+            ...documentOnlyProjectionState().disclosure,
+            expandedEntityIds: [root.id],
+          },
+          focus: {
+            rootEntityId: root.id,
+            hops: 1,
+            direction: 'both',
+            hierarchyContext: 'ancestors-and-children',
+          },
+        },
+        presentationMode: 'local',
+        viewports: {
+          local: { anchorEntityId: root.id, freeRatio: 0.48 },
+        },
+      }),
+    );
+    const markup = renderToStaticMarkup(
+      <GraphExplorer
+        identityStability="stable"
+        maximized={false}
+        onMaximizedChange={() => undefined}
+        snapshot={report.snapshot}
+        storage={{
+          ...storage,
+          getItem: (key) =>
+            key === GRAPH_PREFERENCES_STORAGE_KEY ? null : persisted,
+        }}
+      />,
+    );
+
+    expect(markup).toContain(
+      '<button aria-pressed="true" type="button">Local</button>',
+    );
+    expect(markup).toContain('Loading Local Free…');
+    expect(markup).toContain('>Back to Global</button>');
+    expect(markup).toContain('>Open in Structure</button>');
+    expect(markup).not.toContain('aria-label="Structural depth"');
+  });
+
   it('renders diagnostic evidence in a labeled, internally scrollable dialog', () => {
     const markup = renderToStaticMarkup(
       <DiagnosticEvidenceDialog onClose={() => undefined}>

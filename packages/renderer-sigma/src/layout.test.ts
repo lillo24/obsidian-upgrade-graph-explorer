@@ -5,6 +5,7 @@ import {
   computeGlobalLayout,
   createGlobalLayoutRequest,
   globalLayoutFingerprint,
+  warmGlobalRendererInput,
 } from './layout';
 import { mapProjectionToGlobal } from './mapping';
 import {
@@ -114,5 +115,26 @@ describe('Global folder-aware layout', () => {
     expect(cache.get('two')).toBeUndefined();
     expect(cache.get('one')).toEqual(positions);
     expect(cache.size).toBe(2);
+  });
+
+  it('warms a remounted renderer from an exact cached position set', () => {
+    const input = mapProjectionToGlobal(
+      globalTestProjection(),
+      DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+    );
+    const positions = input.nodes.map((node, index) => ({
+      key: node.key,
+      x: index + 20,
+      y: index - 20,
+    }));
+
+    const warmed = warmGlobalRendererInput(input, positions);
+
+    expect(
+      warmed.nodes.map(({ attributes }) => [attributes.x, attributes.y]),
+    ).toEqual(positions.map(({ x, y }) => [x, y]));
+    expect(() => warmGlobalRendererInput(input, positions.slice(1))).toThrow(
+      'does not match the projected nodes',
+    );
   });
 });

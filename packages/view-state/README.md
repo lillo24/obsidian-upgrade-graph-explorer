@@ -3,15 +3,15 @@
 Status: **STABLE — persisted and live-snapshot reconciliation are pure-test-backed.**
 
 This package owns the renderer-independent, versioned saved-view contract and
-its reconciliation against a current KG6 `ProjectionWorkspace`. Schema v2
+its reconciliation against a current KG6 `ProjectionWorkspace`. Schema v3
 persists structural disclosure, focus, visible graph filters, the current
-renderer entry mode, and separate semantic Structure/Global viewport bookmarks.
+presentation mode, and separate semantic Structure/Global/Local viewport bookmarks.
 It does not access storage, files, reports, React, renderer libraries,
 diagnostics, or the KG9A identity catalog.
 
 ```text
-current KG6 state + renderer bookmarks → deterministic schema-v2 record
-schema-v1/v2 record + current workspace → reconciled KG6 state + restore issues
+current KG6 state + presentation bookmarks → deterministic schema-v3 record
+schema-v1/v2/v3 record + current workspace → reconciled KG6 state + restore issues
 current KG6 state + newer workspace    → reconciled live state + update issues
 ```
 
@@ -28,7 +28,7 @@ src/
 ```
 
 Unknown entity IDs, removed focus roots, obsolete path scopes, and missing
-Structure or Global anchors are dropped without inventing replacements. A workspace-ID
+Structure, Global, or Local anchors are dropped without inventing replacements. A workspace-ID
 mismatch is rejected. `filters.text`, search, selection, renderer IDs, raw
 viewport coordinates, renderer node IDs, layouts, ForceAtlas2 positions,
 layout settings, source text, and timestamps are never stored.
@@ -41,14 +41,17 @@ current transient text filter and every still-valid disclosure, focus, path,
 entity-kind, reference-status, graph-query, and semantic viewport choice. Missing canonical
 IDs and stale paths are removed deterministically before projection.
 
-Schema v2 accepts structural `defaultDepth` values 0–3 plus an optional literal
-Markdown heading ceiling, `rendererMode: structure | global`, a Structure
-canonical anchor plus React Flow zoom, and a Global canonical anchor plus Sigma
-ratio. Existing schema-v1 records migrate losslessly to Structure with their
-semantic viewport. The renderer/viewports object is deliberately separable so
-KG13B2 can add Local Free/Structured state without treating raw coordinates as
-canonical viewport semantics. New records persist the heading ceiling only when
-active, and reset/default state omits it.
+Schema v3 accepts structural `defaultDepth` values 0–3 plus an optional literal
+Markdown heading ceiling, `presentationMode: structure | global | local`, a
+Structure canonical anchor plus React Flow zoom, a Global canonical anchor plus
+Sigma ratio, and a Local canonical anchor plus Free ratio. Existing schema-v1
+records migrate losslessly to Structure. Schema-v2 records preserve their
+explicit Structure/Global renderer mode; an active focus does not guess Local.
+Local restoration normalizes focus to a surviving containing document and exits
+to Global if that root is lost. Raw coordinates, transition points, renderer
+objects, and ForceAtlas2 positions are never accepted. Future schema versions
+fail loudly. New records persist the heading ceiling only when active, and
+reset/default state omits it.
 
 The production dependency boundary is core, graph-query, and view-projection only. Browser
 `localStorage` is one outer adapter in `apps/web`, not part of this contract.

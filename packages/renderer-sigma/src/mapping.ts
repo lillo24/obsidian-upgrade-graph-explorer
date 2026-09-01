@@ -17,6 +17,7 @@ import type {
   GlobalRendererInput,
   GlobalSpatialMetadata,
 } from './types';
+import { stableUnit } from './deterministic';
 
 const STATUS_COLORS = {
   resolved: '#7b8d96',
@@ -25,26 +26,13 @@ const STATUS_COLORS = {
   invalid: '#c34f5d',
 } as const satisfies Record<GlobalReferenceStatus, string>;
 
-function hash32(value: string, seed: number): number {
-  let hash = seed >>> 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16_777_619);
-  }
-  return hash >>> 0;
-}
-
-function unitFromHash(value: string, seed: number): number {
-  return hash32(value, seed) / 0xffff_ffff;
-}
-
 /** Deterministic warm seed only; never persisted as knowledge or view truth. */
 export function deterministicGlobalPosition(key: string): {
   readonly x: number;
   readonly y: number;
 } {
-  const angle = unitFromHash(key, 2_166_136_261) * Math.PI * 2;
-  const radius = 0.12 + Math.sqrt(unitFromHash(key, 1_013_904_223)) * 0.88;
+  const angle = stableUnit(key, 2_166_136_261) * Math.PI * 2;
+  const radius = 0.12 + Math.sqrt(stableUnit(key, 1_013_904_223)) * 0.88;
   return {
     x: Number((Math.cos(angle) * radius).toFixed(6)),
     y: Number((Math.sin(angle) * radius).toFixed(6)),

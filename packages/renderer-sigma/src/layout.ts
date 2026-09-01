@@ -10,11 +10,13 @@ import type {
   GlobalFolderPriorMetrics,
   GlobalLayoutEdge,
   GlobalLayoutNode,
+  GlobalLayoutPosition,
   GlobalLayoutRequest,
   GlobalLayoutResult,
   GlobalLayoutWorkerResponse,
   GlobalRendererInput,
 } from './types';
+import { stableHash32 } from './deterministic';
 
 type LayoutGraph = MultiDirectedGraph<
   { x: number; y: number; size: number; folderKey?: string },
@@ -24,17 +26,8 @@ type LayoutGraph = MultiDirectedGraph<
 const MAX_LAYOUT_ITERATIONS = 1_000;
 const LAYOUT_SCHEMA_VERSION = 1 as const;
 
-function hash32(value: string): number {
-  let hash = 2_166_136_261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16_777_619);
-  }
-  return hash >>> 0;
-}
-
 function folderDirection(folderKey: string): { x: number; y: number } {
-  const angle = (hash32(folderKey) / 0xffff_ffff) * Math.PI * 2;
+  const angle = (stableHash32(folderKey) / 0xffff_ffff) * Math.PI * 2;
   return { x: Math.cos(angle), y: Math.sin(angle) };
 }
 
@@ -486,6 +479,42 @@ export function createGlobalLayoutRequest(
   };
 }
 
+/** Applies an exact memory-cache hit before a remounted Sigma session draws. */
+export function warmGlobalRendererInput(
+  input: GlobalRendererInput,
+  positions: readonly GlobalLayoutPosition[],
+): GlobalRendererInput {
+  const byKey = new Map(
+    positions.map((position) => [position.key, position] as const),
+  );
+  if (byKey.size !== input.nodes.length) {
+    throw new Error('Cached Global layout does not match the projected nodes.');
+  }
+  return {
+    ...input,
+    nodes: input.nodes.map((node) => {
+      const position = byKey.get(node.key);
+      if (
+        position === undefined ||
+        !Number.isFinite(position.x) ||
+        !Number.isFinite(position.y)
+      ) {
+        throw new Error(
+          `Cached Global layout omitted or invalidated node ${node.key}.`,
+        );
+      }
+      return {
+        ...node,
+        attributes: {
+          ...node.attributes,
+          x: position.x,
+          y: position.y,
+        },
+      };
+    }),
+  };
+}
+
 function stableNode(node: GlobalLayoutNode): readonly (string | number)[] {
   return [node.key, node.size, node.folderKey ?? ''];
 }
@@ -509,5 +538,5 @@ export function globalLayoutFingerprint(
       .sort((left, right) => left.key.localeCompare(right.key))
       .map(stableEdge),
   });
-  return `global-layout-v1-${hash32(value).toString(16).padStart(8, '0')}`;
+  return `global-layout-v1-${stableHash32(value).toString(16).padStart(8, '0')}`;
 }

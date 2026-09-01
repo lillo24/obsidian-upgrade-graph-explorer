@@ -25,6 +25,7 @@ import {
   nextGraphViewportRequestKey,
   planSemanticViewportRestore,
   recordGraphNavigation,
+  returnToPresentationInGraphHistory,
   sameGraphHistoryCheckpoint,
   sameGraphViewState,
 } from './navigation-history';
@@ -179,6 +180,53 @@ describe('renderer-independent graph navigation history', () => {
     expect(forward?.target).toEqual(global);
   });
 
+  it('jumps from Local disclosure history to the actual prior Global checkpoint', () => {
+    const global = createGraphHistoryCheckpoint(
+      initialGraphState(),
+      undefined,
+      'global',
+      { global: { anchorEntityId: 'doc-a', ratio: 0.32 } },
+    );
+    const localState: ViewProjectionState = {
+      ...initialGraphState(),
+      focus: {
+        rootEntityId: 'doc-a',
+        hops: 1,
+        direction: 'both',
+        hierarchyContext: 'ancestors-and-children',
+      },
+    };
+    const local = createGraphHistoryCheckpoint(localState, undefined, 'local', {
+      local: { anchorEntityId: 'doc-a', freeRatio: 0.48 },
+    });
+    const expanded = createGraphHistoryCheckpoint(
+      {
+        ...localState,
+        disclosure: {
+          ...localState.disclosure,
+          expandedEntityIds: ['doc-a'],
+        },
+      },
+      undefined,
+      'local',
+      { local: { anchorEntityId: 'doc-a', freeRatio: 0.4 } },
+    );
+    const entered = recordGraphNavigation(
+      createGraphNavigationHistory(),
+      global,
+      local,
+    );
+    const changed = recordGraphNavigation(entered, local, expanded);
+    const returned = returnToPresentationInGraphHistory(
+      changed,
+      expanded,
+      'global',
+    );
+
+    expect(returned?.target).toEqual(global);
+    expect(returned?.history.future).toEqual([expanded, local]);
+  });
+
   it('bounds retained checkpoints at 100 and drops the oldest', () => {
     let history = createGraphNavigationHistory();
     for (let index = 0; index <= GRAPH_NAVIGATION_HISTORY_LIMIT; index += 1) {
@@ -276,7 +324,7 @@ describe('renderer-independent graph navigation history', () => {
     });
 
     expect(Object.keys(checkpoint).sort()).toEqual([
-      'rendererMode',
+      'presentationMode',
       'state',
       'viewports',
     ]);

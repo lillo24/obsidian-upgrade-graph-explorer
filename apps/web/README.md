@@ -1,6 +1,6 @@
-# Web Structural Graph Explorer
+# Web Multi-scale Graph Explorer
 
-Status: **STABLE — NAV1 adds semantic session history above KG9 and KG12B workers.**
+Status: **STABLE — KG13B2A adds bounded Local Free without replacing Structure or Global.**
 
 This package owns the browser SPA, validated KG5 report selection, Tauri-only
 live vault orchestration, KG6 graph interaction state, guarded browser persistence, graph selection, canonical
@@ -12,8 +12,9 @@ renderer layouts/raw transforms, or derive renderer semantics.
 ```text
 selected report JSON → runtime validation → canonical inspection/search
                                    └───────→ KG9B saved view → KG6 projection
-                                                          → renderer mapping
-                                                          → W3 Dagre worker → KG7 canvas
+                                                          → Structure mapping → W3 Dagre worker
+                                                          → Global mapping → Global layout worker
+                                                          → Local mapping/seed → Local layout worker
                                                      ↘ KG8 inspector/navigation
                                    ↘ secondary KG5 evidence UI
 
@@ -36,10 +37,11 @@ apps/web/
     desktop-runtime.ts Lazy official Tauri detection and provider creation.
     desktop-vault.ts Lazy worker initialization and truthful identity/worker commit orchestration.
     desktop-live-vault.ts Serialized watch, worker candidate, pause, replacement, and resync lifecycle.
-    workers/          Separate Vite W1/W3 entries and their lifecycle clients.
+    workers/          Separate Vite W1, W3, Global, and Local entries/clients.
     performance.ts    Query-gated browser recorder and local inspection API.
     graph-state.ts    Pure disclosure/focus/filter interaction reducer.
     navigation.ts     Shared reveal/filter-widening/navigation planner.
+    local-view.ts     Local entry/reroot/minimum-reveal planner over KG6 state.
     navigation-history.ts Bounded session history over semantic graph checkpoints.
     graph-history-shortcuts.ts Exact graph-context Back/Forward shortcut policy.
     persistence/      Stable-report eligibility, hydration, and localStorage adapter.
@@ -52,9 +54,14 @@ apps/web/
 
 The `components/README.md` maps the presentation components. The graph workspace
 creates projection/inspection workspaces for each committed snapshot and passes
-only a `ViewProjection` plus semantic viewport requests to
-`@icarus-graph-explorer/renderer-reactflow`. A real source-session switch keys
-a complete transient selection/search reset and workspace-specific hydration;
+only a `ViewProjection` plus semantic viewport requests to the active renderer.
+Structure uses React Flow/W3; Global and Local Free are literal lazy imports of
+direct Sigma/Graphology with separate layout protocols and caches. Each lazy
+presentation imports the shared Sigma stylesheet at its own module boundary. A
+persisted v3 session may restore directly into Local, so Local must not depend
+on a prior Global visit to establish its canvas height or controls. A real
+source-session switch keys a complete transient selection/search reset and
+workspace-specific hydration;
 live revisions reconcile current state and update the mounted explorer in place.
 The graph workspace owns one lazily started W3 layout service for the mounted
 explorer. New projections supersede active layout jobs by replacing that
@@ -62,10 +69,11 @@ worker; an idle worker is reused. A later layout keeps the last committed graph
 interactive until the matching geometry arrives, while an initial layout shows
 an explicit progress surface.
 
-NAV1 graph history remains a web-layer session concern above KG9 view state.
+Graph history remains a web-layer session concern above KG9 view state.
 Each checkpoint contains one immutable KG6 `ViewProjectionState` reference and
-an optional canonical entity/zoom bookmark; it never contains selection, React
-Flow IDs, transforms, projections, layouts, preferences, or shell state. The
+separate Structure/Global/Local canonical entity/zoom-ratio bookmarks; it never
+contains selection, renderer IDs, transforms, projections, layouts, transition
+points, preferences, or shell state. The
 current view remains App-owned, while bounded past/future stacks retain at most
 100 checkpoints and reconcile an entry only when traversed after a live update.
 
@@ -162,11 +170,14 @@ resize or remount the graph workspace.
 
 Cross-session persistence activates only when a report explicitly declares
 `identity.stability: "stable"`. Transient and legacy schema-v1 reports remain
-usable in memory and never read or write saved state. The schema-v1 saved record
+usable in memory and never read or write saved state. The schema-v3 saved record
 is keyed by encoded stable workspace ID and contains only structural disclosure,
 the optional literal heading ceiling, focus, user-facing path/entity/status
-filters, and an optional canonical entity plus positive zoom bookmark. Older
-schema-v1 records without the optional ceiling restore with no heading limit.
+filters, explicit presentation mode, and canonical Structure/Global/Local
+semantic viewport bookmarks. Schema v1 migrates to Structure; schema v2
+preserves its explicit Structure/Global mode and does not infer Local from an
+active focus. Local stores anchor plus Free ratio only. Raw x/y, transition
+screen points, Graphology objects, and worker positions are forbidden.
 
 Hydration and source-evolution reconciliation happen synchronously before the
 autosave effect. Stale disclosure IDs, focus roots, path scopes, and viewport
@@ -181,14 +192,16 @@ only that workspace's view, restores **Files only**, clears transient
 search/selection and both navigation-history stacks, and fits the graph. It
 never resets the KG9A catalog.
 
-Back/Forward history is never persisted. Meaningful Structure, disclosure,
+Back/Forward history is never persisted. Meaningful presentation, disclosure,
 Focus, filter, and Search/Inspector navigation actions record the current
 semantic checkpoint; selection, hover, pan/zoom/Fit frames, Search typing,
 overlays, maximize, preferences, and live adoption do not. Entity navigation
 updates the canonical bookmark immediately at zoom `1.1`. Traversal converts a
 visible canonical anchor to a keyed projection-node center request after the
 new projection exists, or Fits when the anchor is missing/hidden. The currently
-traversed view continues through normal KG9 autosave.
+traversed view continues through normal KG9 autosave. **Back to Global** jumps
+to the actual prior Global checkpoint while retaining skipped Local disclosure
+checkpoints for Forward traversal.
 
 Live snapshot reconciliation is not localStorage hydration. It keeps surviving
 disclosure, focus, heading/block choices, filters, and semantic viewport by
@@ -197,7 +210,7 @@ autosave persist that current state under the same workspace ID. Search,
 Inspector visibility, maximize mode, and surviving selection stay in memory;
 selection clears with an announcement only when its projected element vanishes.
 
-QUERY1 adds one optional canonical advanced-query string to that schema-v1
+QUERY1 adds one optional canonical advanced-query string to that saved
 active view. Draft text never projects, enters history, or persists. Saved
 Filters are a separate stable-workspace registry containing only `{name,
 query}` definitions; applying one changes only the active query, deleting one
@@ -240,6 +253,18 @@ Hover temporarily emphasizes a node or edge's direct neighborhood and fades
 unrelated rendered content only until pointer leave. Click or keyboard selection
 keeps the chosen element visibly selected without persistent graph-wide fading.
 Focus remains a reduced projection rather than a visual opacity treatment.
+
+Global **Open Local** is the single scale-down action. It captures only the
+selected file's runtime viewport point, normalizes the KG6 Focus root to that
+document, reveals its direct headings, and keeps neighboring files collapsed.
+Local renders a deterministic seed immediately and refines it in a separate
+latest-only Worker. Expand/Collapse is available in the shared Inspector;
+Focus hops/direction and the existing Blocks/filter controls remain shared.
+Ordinary Local zoom, pan, hover, selection, and Inspector activity perform no
+projection, Graphology reconciliation, or layout. Search targets already in the
+scene stay Local, cross-file targets reroot Local, and hidden headings reveal
+only the required ancestor chain. **Open in Structure** and **Back to Global**
+are explicit recovery/scale-up paths. Local Structured is not exposed yet.
 
 **Heading limit** lives in the toolbar's floating **Filters** panel and remains
 separate from Structure. `#` through `######` are literal canonical Markdown

@@ -211,4 +211,31 @@ describe('user-facing provenance inspector', () => {
     expect(markup).toContain('<summary>Technical details</summary>');
     expect(markup).not.toContain('<details class="technical-details" open="">');
   });
+
+  it('exposes explicit presentation and Local disclosure actions for an entity', () => {
+    const source = entityNode('Source.md');
+    if (source.kind !== 'entity') throw new Error('Expected an entity node.');
+    const markup = renderToStaticMarkup(
+      <ProvenanceInspector
+        disclosureControl={{
+          currentlyOpen: false,
+          entityId: source.entityId,
+          label: 'Expand',
+        }}
+        onClear={() => undefined}
+        onClose={() => undefined}
+        onNavigate={() => undefined}
+        onOpenInStructure={() => undefined}
+        onOpenLocal={() => undefined}
+        onToggleDisclosure={() => undefined}
+        projection={documentProjection}
+        selection={{ kind: 'node', id: source.id }}
+        workspace={inspectionWorkspace}
+      />,
+    );
+
+    expect(markup).toContain('>Open Local</button>');
+    expect(markup).toContain('>Open in Structure</button>');
+    expect(markup).toContain('>Expand</button>');
+  });
 });
