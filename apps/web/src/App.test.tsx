@@ -87,10 +87,12 @@ describe('graph-first explorer shell', () => {
     expect(markup).toContain(
       'aria-label="Forward in graph history" disabled=""',
     );
-    expect(markup).toContain('>Files only</button>');
-    expect(markup).toContain('>1 level</button>');
-    expect(markup).toContain('>2 levels</button>');
-    expect(markup).toContain('>3 levels</button>');
+    expect(markup).toContain('aria-label="Structural depth"');
+    expect(markup).toContain('>Structure depth<select');
+    expect(markup).toContain('>Files only</option>');
+    expect(markup).toContain('>1 level</option>');
+    expect(markup).toContain('>2 levels</option>');
+    expect(markup).toContain('>3 levels</option>');
     expect(markup).not.toContain('>Documents</button>');
     expect(markup).not.toContain('>Top-Level</button>');
     expect(markup).not.toContain('Focus Selected');
@@ -287,12 +289,8 @@ describe('graph-first explorer shell', () => {
       />,
     );
 
-    expect(markup).toContain(
-      '<button aria-pressed="true" type="button">3 levels</button>',
-    );
-    expect(markup).toContain(
-      '<button aria-pressed="false" type="button">Files only</button>',
-    );
+    expect(markup).toContain('<option value="3" selected="">3 levels</option>');
+    expect(markup).not.toContain('aria-pressed="true">3 levels</button>');
   });
 
   it('uses one shared settings UI and hydrates the global trackpad choice', () => {
