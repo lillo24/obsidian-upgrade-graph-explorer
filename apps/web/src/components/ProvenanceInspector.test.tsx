@@ -5,6 +5,11 @@ import { validateObsidianDiagnosticReport } from '@icarus-graph-explorer/diagnos
 import { createInspectionWorkspace } from '@icarus-graph-explorer/explorer-inspection';
 import type { GraphSelection } from '@icarus-graph-explorer/renderer-reactflow';
 import {
+  compileVisualGroups,
+  matchingVisualGroupsForEntity,
+  type VisualGroupMatch,
+} from '@icarus-graph-explorer/visual-groups';
+import {
   createProjectionWorkspace,
   documentOnlyProjectionState,
   projectView,
@@ -33,6 +38,7 @@ const sectionProjection = projectView(
 function renderInspector(
   projection: ViewProjection,
   selection: GraphSelection | null,
+  visualGroupMatches?: readonly VisualGroupMatch[],
 ): string {
   return renderToStaticMarkup(
     <ProvenanceInspector
@@ -41,6 +47,7 @@ function renderInspector(
       onNavigate={() => undefined}
       projection={projection}
       selection={selection}
+      {...(visualGroupMatches === undefined ? {} : { visualGroupMatches })}
       workspace={inspectionWorkspace}
     />,
   );
@@ -237,5 +244,51 @@ describe('user-facing provenance inspector', () => {
     expect(markup).toContain('>Open Local</button>');
     expect(markup).toContain('>Open in Structure</button>');
     expect(markup).toContain('>Expand</button>');
+  });
+
+  it('shows ordered primary and additional Visual Group matches only for entities', () => {
+    const source = entityNode('Source.md');
+    if (source.kind !== 'entity') throw new Error('Expected an entity node.');
+    const entity = snapshot.entities.find(
+      (candidate) => candidate.id === source.entityId,
+    );
+    if (entity === undefined)
+      throw new Error('Missing canonical source entity.');
+    const compiled = compileVisualGroups([
+      {
+        name: 'Language',
+        query: 'kind:document',
+        color: 'violet',
+        enabled: true,
+      },
+      {
+        name: 'Draft',
+        query: 'path:"Source"',
+        color: 'orange',
+        enabled: true,
+      },
+    ]);
+    if (!compiled.ok) throw new Error('Expected valid Visual Groups.');
+    const matches = matchingVisualGroupsForEntity(entity, compiled.value);
+    const entityMarkup = renderInspector(
+      documentProjection,
+      { kind: 'node', id: source.id },
+      matches,
+    );
+    const diagnosticMarkup = renderInspector(
+      documentProjection,
+      { kind: 'node', id: diagnosticNode('unresolved').id },
+      matches,
+    );
+
+    expect(entityMarkup).toContain('<h4>Visual Groups</h4>');
+    expect(entityMarkup).toContain('>Primary</p>');
+    expect(entityMarkup).toContain('>Language</span>');
+    expect(entityMarkup).toContain('>Also matches</p>');
+    expect(entityMarkup).toContain('>Draft</span>');
+    expect(entityMarkup.indexOf('Language')).toBeLessThan(
+      entityMarkup.indexOf('Draft'),
+    );
+    expect(diagnosticMarkup).not.toContain('<h4>Visual Groups</h4>');
   });
 });

@@ -76,6 +76,14 @@ canonical truth, or own a platform storage implementation.
   the panel first ownership of Escape and restores trigger focus.
   `graph-workspace-overlays.ts` owns the pure Settings/Filters/Tools exclusivity
   policy without coupling transient chrome to KG6 projection state.
+- `VisualGroups.tsx` owns the controlled Groups trigger, enabled-count badge,
+  bounded normal/maximized panel, local create/edit drafts, fixed-palette
+  selector, immediate enable/priority mutations, confirmed delete, active-query
+  copy, and two-step corrupt-registry recovery UI. `GraphExplorer.tsx` retains
+  the single write-before-adopt session commit and memoized compile/lookup/map
+  boundaries; `visual-group-editor.ts` owns submit-time trim, name bounds, and
+  positioned QUERY1 canonicalization. Filters and Groups share one active
+  tool-panel owner; Inspector remains independent.
 - `maximized-graph-mode.ts` owns the reversible body scroll lock and Escape-key
   exit listener for the transient application maximize mode. The graph shell
   closes a nearer Tools, Settings, or Filters surface before leaving maximized
@@ -103,6 +111,9 @@ canonical truth, or own a platform storage implementation.
   Global document receives **Open Local** and the exact **Open in Structure**
   handoff. In Local, the selected expandable entity receives one accessible
   Expand/Collapse action while Inspector remains shared rather than duplicated.
+  Selected canonical entities also show their ordered enabled Visual Group
+  matches as Primary and optional Also matches; diagnostic nodes and edges omit
+  the section.
 - `SummaryPanel.tsx` renders derived canonical/evidence counts.
 - `HierarchyPanel.tsx` lazily expands document, section, and block ownership.
 - `ReferencesPanel.tsx` pages filtered references and exposes provenance details.

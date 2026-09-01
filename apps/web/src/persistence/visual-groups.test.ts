@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import type { StorageLike } from './storage';
 import {
   addVisualGroup,
+  clearVisualGroupRegistry,
   createEmptyVisualGroupRegistry,
   deleteVisualGroup,
   loadVisualGroupRegistry,
@@ -202,5 +203,33 @@ describe('Visual Group registry persistence', () => {
     expect(saveVisualGroupRegistry(failing, registry())).toMatchObject({
       ok: false,
     });
+    expect(clearVisualGroupRegistry(failing, 'workspace')).toEqual({
+      ok: true,
+    });
+  });
+
+  it('clears only the current workspace Visual Group key', () => {
+    const storage = memoryStorage();
+    const current = visualGroupStorageKey('workspace');
+    const other = visualGroupStorageKey('other');
+    storage.values.set(current, serializeVisualGroupRegistry(registry()));
+    storage.values.set(other, 'other-groups');
+    storage.values.set('icarus-graph-explorer:view-state:workspace', 'view');
+    storage.values.set(
+      'icarus-graph-explorer:saved-filters:workspace',
+      'filters',
+    );
+
+    expect(clearVisualGroupRegistry(storage, 'workspace')).toEqual({
+      ok: true,
+    });
+    expect(storage.values.has(current)).toBe(false);
+    expect(storage.values.get(other)).toBe('other-groups');
+    expect(
+      storage.values.get('icarus-graph-explorer:view-state:workspace'),
+    ).toBe('view');
+    expect(
+      storage.values.get('icarus-graph-explorer:saved-filters:workspace'),
+    ).toBe('filters');
   });
 });

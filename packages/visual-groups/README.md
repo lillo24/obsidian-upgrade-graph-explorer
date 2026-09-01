@@ -6,7 +6,9 @@ This package turns ordered QUERY1 rules into renderer-safe node presentation.
 It exists so Structure, Global, Local Free, and Local Structured can classify
 the same canonical entity once by `EntityId` without putting visual concerns in
 KG6 projection or reproducing query semantics in a renderer. GROUP1A supplies
-the backbone and style seams only; GROUP1B user-facing configuration is pending.
+the backbone and style seams; GROUP1B now supplies workspace-scoped product
+configuration through the web application without changing this package's
+source-neutral contract.
 
 ## File map
 

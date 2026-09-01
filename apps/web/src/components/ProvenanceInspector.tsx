@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from 'react';
 
@@ -21,6 +22,7 @@ import {
 } from '@icarus-graph-explorer/explorer-inspection';
 import type { GraphSelection } from '@icarus-graph-explorer/renderer-reactflow';
 import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
+import type { VisualGroupMatch } from '@icarus-graph-explorer/visual-groups';
 
 interface ProvenanceInspectorProps {
   readonly workspace: InspectionWorkspace;
@@ -41,6 +43,7 @@ interface ProvenanceInspectorProps {
     currentlyOpen: boolean,
   ) => void;
   readonly performance?: PerformanceInstrumentation;
+  readonly visualGroupMatches?: readonly VisualGroupMatch[];
 }
 
 interface BoundedSectionProps<Item> {
@@ -396,9 +399,11 @@ function uniqueOccurrences(
 function EntityInspector({
   inspection,
   onNavigate,
+  visualGroupMatches = [],
 }: {
   readonly inspection: Extract<ProjectedNodeInspection, { kind: 'entity' }>;
   readonly onNavigate: (entityId: EntityId, origin: string) => void;
+  readonly visualGroupMatches?: readonly VisualGroupMatch[];
 }) {
   const scoped = inspection.entity;
   const outgoing = scoped.outgoingReferences;
@@ -422,6 +427,7 @@ function EntityInspector({
       <p className="relationship-summary" aria-label="Relationship summary">
         {outgoing.length} outgoing · {backlinks.length} backlinks
       </p>
+      <VisualGroupMemberships matches={visualGroupMatches} />
       <BoundedSection
         emptyMessage="No outgoing links."
         itemKey={({ occurrence }) => occurrence.referenceId}
@@ -525,6 +531,43 @@ function EntityInspector({
         />
       </TechnicalDetails>
     </>
+  );
+}
+
+function VisualGroupMemberships({
+  matches,
+}: {
+  readonly matches: readonly VisualGroupMatch[];
+}) {
+  if (matches.length === 0) return null;
+  const primary = matches[0]!;
+  const also = matches.slice(1);
+  const item = (match: VisualGroupMatch) => (
+    <li key={match.definition.name}>
+      <span
+        aria-hidden="true"
+        className="visual-group-swatch"
+        style={
+          {
+            '--visual-group-accent': match.presentation.accent,
+          } as CSSProperties
+        }
+      />
+      <span>{match.definition.name}</span>
+    </li>
+  );
+  return (
+    <section className="inspector-section inspector-visual-groups">
+      <h4>Visual Groups</h4>
+      <p>Primary</p>
+      <ul>{item(primary)}</ul>
+      {also.length === 0 ? null : (
+        <>
+          <p>Also matches</p>
+          <ul>{also.map(item)}</ul>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -852,6 +895,7 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
   performance,
   projection,
   selection,
+  visualGroupMatches,
   workspace,
 }: ProvenanceInspectorProps) {
   const collapseButtonRef = useRef<HTMLButtonElement>(null);
@@ -959,6 +1003,9 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
           <EntityInspector
             inspection={inspected.value}
             onNavigate={onNavigate}
+            {...(visualGroupMatches === undefined
+              ? {}
+              : { visualGroupMatches })}
           />
         ) : inspected.value.kind === 'diagnostic' ? (
           <DiagnosticInspector

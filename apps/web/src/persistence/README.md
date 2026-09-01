@@ -12,7 +12,8 @@ view contract.
   50-filter limit, and explicit read/write failures.
 - `visual-groups.ts` owns the separate schema-v1 ordered Visual Group registry,
   strict canonical QUERY1/palette validation, a 24-group limit, pure priority
-  mutations, and explicit read/write failures. GROUP1B UI wiring is pending.
+  mutations, explicit read/write failures, and a narrow current-workspace clear
+  operation used only by the confirmed corrupt-registry recovery flow.
 - `*.test.ts` uses injected storage doubles; tests never rely on global browser
   storage.
 
@@ -43,4 +44,8 @@ exact array order is priority, so serialization preserves it rather than
 sorting. Records contain only name, canonical QUERY1 string, fixed palette
 token, and enabled state. Corrupt values remain untouched, and no group is
 stored in graph-view state, navigation history, projection state, or renderer
-layout caches.
+layout caches. GROUP1B keeps transient/storage-unavailable sessions editable in
+memory. Durable mutations write before adoption; a failed write retains the
+last confirmed registry and blocks later writes until the workspace is
+reopened. Corrupt data is deleted only after the Groups panel's explicit
+two-step reset and no other localStorage key is affected.

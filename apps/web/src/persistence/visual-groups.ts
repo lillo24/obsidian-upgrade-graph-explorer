@@ -16,7 +16,11 @@ export interface VisualGroupRegistry {
 export type VisualGroupRegistryLoadResult =
   | { readonly status: 'empty'; readonly value: VisualGroupRegistry }
   | { readonly status: 'loaded'; readonly value: VisualGroupRegistry }
-  | { readonly status: 'error'; readonly message: string };
+  | {
+      readonly status: 'error';
+      readonly kind: 'storage' | 'corrupt';
+      readonly message: string;
+    };
 
 export type VisualGroupRegistryMutationResult =
   | { readonly ok: true; readonly value: VisualGroupRegistry }
@@ -162,6 +166,7 @@ export function loadVisualGroupRegistry(
   } catch (error: unknown) {
     return {
       status: 'error',
+      kind: 'storage',
       message: `Could not read Visual Groups for workspace ${JSON.stringify(workspaceId)}: ${errorMessage(error)}`,
     };
   }
@@ -177,6 +182,7 @@ export function loadVisualGroupRegistry(
   } catch (error: unknown) {
     return {
       status: 'error',
+      kind: 'corrupt',
       message: `Visual Groups for workspace ${JSON.stringify(workspaceId)} are not valid JSON: ${errorMessage(error)}`,
     };
   }
@@ -185,6 +191,7 @@ export function loadVisualGroupRegistry(
     ? { status: 'loaded', value: validation.value }
     : {
         status: 'error',
+        kind: 'corrupt',
         message: `Visual Groups for workspace ${JSON.stringify(workspaceId)} are incompatible: ${validation.message}`,
       };
 }
@@ -221,6 +228,21 @@ export function saveVisualGroupRegistry(
     return {
       ok: false,
       message: `Could not save Visual Groups for workspace ${JSON.stringify(value.workspaceId)}: ${errorMessage(error)}`,
+    };
+  }
+}
+
+export function clearVisualGroupRegistry(
+  storage: StorageLike,
+  workspaceId: string,
+): { readonly ok: true } | { readonly ok: false; readonly message: string } {
+  try {
+    storage.removeItem(visualGroupStorageKey(workspaceId));
+    return { ok: true };
+  } catch (error: unknown) {
+    return {
+      ok: false,
+      message: `Could not reset Visual Groups for workspace ${JSON.stringify(workspaceId)}: ${errorMessage(error)}`,
     };
   }
 }

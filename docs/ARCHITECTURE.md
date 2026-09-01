@@ -633,8 +633,18 @@ safe fallback. The Free/Structured choice is an existing user preference, not
 canonical or history state. Local headings never enter Global topology, mutate
 its cache, or trigger whole-vault relayout.
 QUERY1 filtering and GROUP1 visual classification remain independent systems.
-GROUP1A's source-neutral backbone and renderer seams are complete; GROUP1B
-user-facing creation, editing, ordering, and palette configuration is pending.
+GROUP1A's source-neutral backbone and renderer seams remain unchanged. GROUP1B
+adds a web-owned workspace session with durable, session-only, corrupt, and
+failed-write states; local create/edit drafts; one write-before-adopt commit;
+and explicit two-step corrupt-registry recovery. Definitions compile only when
+the registry array changes. A snapshot-scoped canonical lookup and the current
+already-completed projection derive one `EntityId` presentation map shared by
+Structure, Global, Local Free, and Local Structured. Group changes therefore
+restyle nodes without entering KG6, navigation history, renderer topology,
+layout inputs/caches, or semantic viewport state. Selected canonical entities
+use the compiled all-match evaluator in Inspector; diagnostics and edges opt
+out. Filters and Groups have one transient tool-panel owner while Inspector is
+independent.
 The separate LAYOUT1 idea is paused/absorbed into this Global → Regional → Local spatial architecture;
 manual cluster offsets remain future derived presentation state.
 
@@ -832,6 +842,14 @@ Local Free, and Local Structured. Renderer-local operation oracles require a
 style-map update to perform zero projection, topology mapping/reconciliation,
 layout requests, or geometry changes while scheduling exactly one style
 refresh.
+
+GROUP1B adds injected-storage session tests for stable A → B → A isolation,
+transient and storage-unavailable editing, write-before-adopt rollback,
+blocked retries, corrupt-value preservation, and key-scoped confirmed reset.
+Static product tests cover the enabled badge, ordered rows, editor labels,
+multiline QUERY1 feedback, fixed palette, contained Tools presentation, and
+Inspector Primary/Also matches. Existing GROUP1A renderer operation oracles
+remain the style-only regression gate.
 
 ## Changing these decisions
 
