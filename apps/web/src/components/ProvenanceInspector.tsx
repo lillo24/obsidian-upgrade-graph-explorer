@@ -30,6 +30,16 @@ interface ProvenanceInspectorProps {
   readonly onClose: () => void;
   readonly onNavigate: (entityId: EntityId, origin: string) => void;
   readonly onOpenInStructure?: (entityId: EntityId) => void;
+  readonly onOpenLocal?: (entityId: EntityId) => void;
+  readonly disclosureControl?: {
+    readonly entityId: EntityId;
+    readonly label: 'Expand' | 'Collapse';
+    readonly currentlyOpen: boolean;
+  };
+  readonly onToggleDisclosure?: (
+    entityId: EntityId,
+    currentlyOpen: boolean,
+  ) => void;
   readonly performance?: PerformanceInstrumentation;
 }
 
@@ -834,8 +844,11 @@ function EdgeInspector({
 export const ProvenanceInspector = memo(function ProvenanceInspector({
   onClear,
   onClose,
+  disclosureControl,
   onNavigate,
   onOpenInStructure,
+  onOpenLocal,
+  onToggleDisclosure,
   performance,
   projection,
   selection,
@@ -870,10 +883,8 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
   }, [performance, projection, selection, workspace]);
   const contentKey =
     selection === null ? 'empty' : `${selection.kind}:${selection.id}`;
-  const structureDocumentId =
-    inspected?.ok === true &&
-    inspected.value.kind === 'entity' &&
-    inspected.value.entity.entity.kind === 'document'
+  const inspectedEntityId =
+    inspected?.ok === true && inspected.value.kind === 'entity'
       ? inspected.value.entity.entity.entityId
       : undefined;
 
@@ -897,14 +908,36 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
         <h3>Inspector</h3>
         <div className="selection-panel__actions">
           {onOpenInStructure !== undefined &&
-          structureDocumentId !== undefined ? (
+          inspectedEntityId !== undefined ? (
             <button
-              onClick={() => onOpenInStructure(structureDocumentId)}
+              onClick={() => onOpenInStructure(inspectedEntityId)}
               type="button"
             >
               Open in Structure
             </button>
           ) : null}
+          {onOpenLocal !== undefined && inspectedEntityId !== undefined ? (
+            <button
+              onClick={() => onOpenLocal(inspectedEntityId)}
+              type="button"
+            >
+              Open Local
+            </button>
+          ) : null}
+          {disclosureControl === undefined ||
+          onToggleDisclosure === undefined ? null : (
+            <button
+              onClick={() =>
+                onToggleDisclosure(
+                  disclosureControl.entityId,
+                  disclosureControl.currentlyOpen,
+                )
+              }
+              type="button"
+            >
+              {disclosureControl.label}
+            </button>
+          )}
           {selection === null ? null : (
             <button onClick={onClear} type="button">
               Clear selection

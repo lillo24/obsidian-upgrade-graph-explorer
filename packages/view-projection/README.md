@@ -1,6 +1,6 @@
 # View Projection
 
-Status: **STABLE — DISC1 actionable disclosure semantics are pure-test-backed.**
+Status: **STABLE — disclosure, Focus, and bounded Local semantics are pure-test-backed.**
 
 This source-neutral package turns canonical `KnowledgeSnapshot` truth plus
 temporary renderer-independent view state into the visible graph consumed by
@@ -32,6 +32,7 @@ src/
   validation.ts        Deserialized-output and cross-record invariant checks.
   presets.ts           Generic structural-depth and compatibility state helpers.
   reveal.ts            Canonical-target disclosure helper for navigation.
+  local.ts             Document-root normalization and bounded two-pass Local projection.
   project.ts           Public orchestration and one-call snapshot wrapper.
   index.ts             Intentional public surface.
   test-fixture.ts      Neutral canonical fixture shared only by package tests.
@@ -148,6 +149,21 @@ with their shortest distance.
 Synthetic diagnostic targets may appear at distance one through their edge but
 are traversal terminals. Context nodes carry no distance or internal reference
 provenance and do not pull unrelated reference edges into the neighborhood.
+
+## Local projection semantics
+
+`deriveLocalProjectionState` normalizes a document, section, or block target to
+its stable containing document. It reuses KG6 `focus.rootEntityId`, hop count,
+direction, disclosure IDs, and filters. Automatic depth becomes zero; the root
+is explicitly expanded so its top-level headings appear while every neighbor
+document stays collapsed until explicitly expanded.
+
+`projectLocalView` performs a documents-only Focus pass to establish the
+bounded reference neighborhood, then a normal disclosure/filter/provenance pass
+and retains only entities whose containing documents belong to that
+neighborhood. This prevents revealing a heading from admitting an unrelated
+vault region. It emits ordinary validated `ViewProjection` data—no Local
+canonical model, renderer traversal, folder relation, or copied source truth.
 
 ## Filter semantics
 

@@ -7,6 +7,7 @@ import {
   validateGlobalLayoutSettings,
   type GlobalLayoutSettings,
 } from '@icarus-graph-explorer/renderer-sigma/settings';
+import type { LocalLayoutMode } from '@icarus-graph-explorer/view-state';
 
 import type { StorageLike } from '../persistence/storage';
 
@@ -16,12 +17,14 @@ export const GRAPH_PREFERENCES_STORAGE_KEY =
 export interface GraphPreferences {
   readonly focusAppearance: FocusAppearance;
   readonly globalLayoutSettings: GlobalLayoutSettings;
+  readonly localLayoutMode: LocalLayoutMode;
   readonly trackpadZoomMode: TrackpadZoomMode;
 }
 
 export const DEFAULT_GRAPH_PREFERENCES: GraphPreferences = {
   focusAppearance: 'inverted',
   globalLayoutSettings: DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+  localLayoutMode: 'free',
   trackpadZoomMode: 'scroll-zoom',
 };
 
@@ -42,6 +45,10 @@ function isTrackpadZoomMode(value: unknown): value is TrackpadZoomMode {
 
 function isFocusAppearance(value: unknown): value is FocusAppearance {
   return value === 'outline' || value === 'inverted' || value === 'minimal';
+}
+
+function isLocalLayoutMode(value: unknown): value is LocalLayoutMode {
+  return value === 'free' || value === 'structured';
 }
 
 function defaultLoadResult(
@@ -71,6 +78,7 @@ export function loadGraphPreferences(
       const stored = parsed as {
         readonly focusAppearance?: unknown;
         readonly globalLayoutSettings?: unknown;
+        readonly localLayoutMode?: unknown;
         readonly trackpadZoomMode?: unknown;
       };
       let globalLayoutSettings = DEFAULT_GLOBAL_LAYOUT_SETTINGS;
@@ -89,6 +97,13 @@ export function loadGraphPreferences(
             ? stored.focusAppearance
             : DEFAULT_GRAPH_PREFERENCES.focusAppearance,
           globalLayoutSettings,
+          // KG13B2A implements Free only. A persisted future Structured value
+          // remains a valid preference seam but falls back until B2B ships.
+          localLayoutMode:
+            isLocalLayoutMode(stored.localLayoutMode) &&
+            stored.localLayoutMode === 'free'
+              ? stored.localLayoutMode
+              : DEFAULT_GRAPH_PREFERENCES.localLayoutMode,
           trackpadZoomMode: isTrackpadZoomMode(stored.trackpadZoomMode)
             ? stored.trackpadZoomMode
             : DEFAULT_GRAPH_PREFERENCES.trackpadZoomMode,

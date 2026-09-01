@@ -1,7 +1,7 @@
 import type {
   PersistedRendererViewports,
   PersistedViewportAnchor,
-  RendererEntryMode,
+  GraphPresentationMode,
 } from '@icarus-graph-explorer/view-state';
 import type {
   ProjectionNodeId,
@@ -16,7 +16,7 @@ export const GRAPH_NAVIGATION_HISTORY_LIMIT = 100;
 const VIEWPORT_ZOOM_EPSILON = 0.0001;
 
 export interface GraphHistoryCheckpoint {
-  readonly rendererMode: RendererEntryMode;
+  readonly presentationMode: GraphPresentationMode;
   readonly state: ViewProjectionState;
   readonly viewports: PersistedRendererViewports;
 }
@@ -115,25 +115,41 @@ function sameRendererViewports(
   left: PersistedRendererViewports,
   right: PersistedRendererViewports,
 ): boolean {
+  const sameGlobal =
+    (left.global === undefined && right.global === undefined) ||
+    (left.global !== undefined &&
+      right.global !== undefined &&
+      left.global.anchorEntityId === right.global.anchorEntityId &&
+      Math.abs(left.global.ratio - right.global.ratio) <=
+        VIEWPORT_ZOOM_EPSILON);
+  const sameStructuredZoom =
+    (left.local?.structuredZoom === undefined &&
+      right.local?.structuredZoom === undefined) ||
+    (left.local?.structuredZoom !== undefined &&
+      right.local?.structuredZoom !== undefined &&
+      Math.abs(left.local.structuredZoom - right.local.structuredZoom) <=
+        VIEWPORT_ZOOM_EPSILON);
+  const sameLocal =
+    (left.local === undefined && right.local === undefined) ||
+    (left.local !== undefined &&
+      right.local !== undefined &&
+      left.local.anchorEntityId === right.local.anchorEntityId &&
+      Math.abs(left.local.freeRatio - right.local.freeRatio) <=
+        VIEWPORT_ZOOM_EPSILON &&
+      sameStructuredZoom);
   return (
-    sameViewport(left.structure, right.structure) &&
-    ((left.global === undefined && right.global === undefined) ||
-      (left.global !== undefined &&
-        right.global !== undefined &&
-        left.global.anchorEntityId === right.global.anchorEntityId &&
-        Math.abs(left.global.ratio - right.global.ratio) <=
-          VIEWPORT_ZOOM_EPSILON))
+    sameViewport(left.structure, right.structure) && sameGlobal && sameLocal
   );
 }
 
 export function createGraphHistoryCheckpoint(
   state: ViewProjectionState,
   viewport?: PersistedViewportAnchor,
-  rendererMode: RendererEntryMode = 'structure',
+  presentationMode: GraphPresentationMode = 'structure',
   viewports: PersistedRendererViewports = {},
 ): GraphHistoryCheckpoint {
   return {
-    rendererMode,
+    presentationMode,
     state,
     viewports: {
       ...(viewports.structure !== undefined
@@ -142,6 +158,7 @@ export function createGraphHistoryCheckpoint(
           ? { structure: viewport }
           : {}),
       ...(viewports.global === undefined ? {} : { global: viewports.global }),
+      ...(viewports.local === undefined ? {} : { local: viewports.local }),
     },
   };
 }
@@ -151,7 +168,7 @@ export function sameGraphHistoryCheckpoint(
   right: GraphHistoryCheckpoint,
 ): boolean {
   return (
-    left.rendererMode === right.rendererMode &&
+    left.presentationMode === right.presentationMode &&
     sameGraphViewState(left.state, right.state) &&
     sameRendererViewports(left.viewports, right.viewports)
   );
@@ -213,6 +230,33 @@ export function goForwardInGraphHistory(
       past: appendBounded(history.past, current),
       future: history.future.slice(0, -1),
     },
+  };
+}
+
+/** Jumps to the most recent checkpoint for a presentation, preserving history. */
+export function returnToPresentationInGraphHistory(
+  history: GraphNavigationHistory,
+  current: GraphHistoryCheckpoint,
+  presentationMode: GraphPresentationMode,
+): GraphHistoryTraversal | null {
+  let targetIndex = -1;
+  for (let index = history.past.length - 1; index >= 0; index -= 1) {
+    if (history.past[index]?.presentationMode === presentationMode) {
+      targetIndex = index;
+      break;
+    }
+  }
+  if (targetIndex < 0) return null;
+  const target = history.past[targetIndex];
+  if (target === undefined) return null;
+  const skipped = history.past.slice(targetIndex + 1);
+  let future = appendBounded(history.future, current);
+  for (const checkpoint of [...skipped].reverse()) {
+    future = appendBounded(future, checkpoint);
+  }
+  return {
+    target,
+    history: { past: history.past.slice(0, targetIndex), future },
   };
 }
 

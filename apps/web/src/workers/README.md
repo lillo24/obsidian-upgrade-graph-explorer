@@ -1,6 +1,6 @@
 # Desktop Workers
 
-Status: **STABLE — stateful W1 and stateless Structure/Global layout workers remain separate.**
+Status: **STABLE — stateful W1 and stateless Structure/Global/Local layout workers remain separate.**
 
 This folder owns browser Worker transport code. Domain state, geometry, and
 protocol behavior live in platform-independent packages; the web application
@@ -16,6 +16,9 @@ dagre-layout-worker-client.test.ts  Supersession, stale-result, failure, and reu
 global-layout.worker.ts       Stateless production Global ForceAtlas2/folder-prior entry.
 global-layout-worker-client.ts  Latest-result-wins replacement-worker client.
 global-layout-worker-client.test.ts  Supersession, malformed output, and adoption tests.
+local-layout.worker.ts        Stateless Local hierarchy/reference ForceAtlas2 entry.
+local-layout-worker-client.ts  Latest-result-wins Local replacement-worker client.
+local-layout-worker-client.test.ts  Supersession, malformed output, and failure tests.
 ```
 
 The worker is instantiated only after a local-vault open starts. Sample and
@@ -40,3 +43,11 @@ soft folder prior never run on the UI thread. A worker error remains explicit
 while the last valid deterministic or committed positions stay visible. The
 worker dependency graph is DOM-free and is checked by the same Vite production
 boundary that protects W1.
+
+The Local worker is a fourth independent protocol; it does not overload Global
+folder-prior settings. It receives stable node/edge roles, hierarchy/reference
+weights, root key, seed positions, iterations, and bounded settings only. A new
+request terminates obsolete work, strict request IDs reject stale adoption, and
+errors leave the immediate deterministic scene visible. The Local worker is
+created only after Local Free is mounted; Structure startup and ordinary Global
+use do not load it.

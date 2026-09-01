@@ -1,9 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
 
 import { GlobalLayoutCache } from './layout-cache';
-import { createGlobalLayoutRequest, globalLayoutFingerprint } from './layout';
+import {
+  createGlobalLayoutRequest,
+  globalLayoutFingerprint,
+  warmGlobalRendererInput,
+} from './layout';
 import { mountGlobalRendererSession } from './lifecycle';
 import { mapProjectionToGlobal } from './mapping';
 import { GlobalRendererSession } from './session';
@@ -15,12 +26,14 @@ import type {
   GlobalRendererInstrumentation,
   GlobalSelection,
   GlobalTrackpadZoomMode,
+  GlobalTransitionAnchorApi,
   SemanticGlobalViewport,
 } from './types';
 
 export interface GlobalGraphCanvasProps {
   readonly centerRequest?: GlobalCenterRequest;
   readonly fitRequestKey: number;
+  readonly initialViewport?: SemanticGlobalViewport;
   readonly instrumentation?: GlobalRendererInstrumentation;
   readonly layoutRequestKey: number;
   /** Optional session cache owner; the lazy web module keeps this across mode switches. */
@@ -28,6 +41,9 @@ export interface GlobalGraphCanvasProps {
   readonly layoutService: GlobalLayoutService;
   readonly onFailure: (message: string) => void;
   readonly onSelectionChange: (selection: GlobalSelection | null) => void;
+  readonly onTransitionAnchorApiChange?: (
+    api: GlobalTransitionAnchorApi | undefined,
+  ) => void;
   readonly onViewportObservation: (
     viewport: SemanticGlobalViewport | undefined,
   ) => void;
@@ -48,12 +64,14 @@ function layoutIterations(nodeCount: number): number {
 export function GlobalGraphCanvas({
   centerRequest,
   fitRequestKey,
+  initialViewport,
   instrumentation,
   layoutRequestKey,
   layoutCache,
   layoutService,
   onFailure,
   onSelectionChange,
+  onTransitionAnchorApiChange,
   onViewportObservation,
   projection,
   selection,
@@ -62,7 +80,7 @@ export function GlobalGraphCanvas({
 }: GlobalGraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<GlobalRendererSession | undefined>(undefined);
-  const cacheRef = useRef(layoutCache ?? new GlobalLayoutCache());
+  const [cache] = useState(() => layoutCache ?? new GlobalLayoutCache());
   const handledCenterRequest = useRef(0);
   const handledFitRequest = useRef(0);
   const handledLayoutRequest = useRef(layoutRequestKey);
@@ -85,21 +103,51 @@ export function GlobalGraphCanvas({
       ? map()
       : instrumentation.measure('global-map', 'global-mappings', map);
   }, [instrumentation, projection, settings]);
-  const initial = useRef({ input, settings, trackpadZoomMode });
+  const requestTemplate = useMemo(
+    () =>
+      createGlobalLayoutRequest(
+        input,
+        settings,
+        layoutIterations(input.nodes.length),
+      ),
+    [input, settings],
+  );
+  const fingerprint = useMemo(
+    () => globalLayoutFingerprint(requestTemplate),
+    [requestTemplate],
+  );
+  const [initial] = useState(() => {
+    const cached = cache.get(fingerprint);
+    return {
+      cached: cached !== undefined,
+      initialViewport,
+      input:
+        cached === undefined ? input : warmGlobalRendererInput(input, cached),
+      settings,
+      trackpadZoomMode,
+    };
+  });
   const [ready, setReady] = useState(false);
   const [layoutCommitKey, setLayoutCommitKey] = useState(0);
-  const [layoutStatus, setLayoutStatus] = useState('Preparing Global layout…');
+  const [layoutStatus, setLayoutStatus] = useState(
+    initial.cached
+      ? 'Global layout restored from the in-memory cache.'
+      : 'Preparing Global layout…',
+  );
   const [layoutError, setLayoutError] = useState<string>();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const container = containerRef.current;
     if (container === null) return;
     let cancelled = false;
     const mounted = mountGlobalRendererSession(
       () =>
-        new GlobalRendererSession(container, initial.current.input, {
-          settings: initial.current.settings,
-          trackpadZoomMode: initial.current.trackpadZoomMode,
+        new GlobalRendererSession(container, initial.input, {
+          settings: initial.settings,
+          trackpadZoomMode: initial.trackpadZoomMode,
+          ...(initial.initialViewport === undefined
+            ? {}
+            : { initialViewport: initial.initialViewport }),
           ...(instrumentation === undefined ? {} : { instrumentation }),
           onNodeSelected: (key) =>
             callbacks.current.onSelectionChange(
@@ -116,6 +164,9 @@ export function GlobalGraphCanvas({
     const { lease } = mounted;
     const { session } = lease;
     sessionRef.current = session;
+    onTransitionAnchorApiChange?.({
+      nodeViewportPoint: (nodeId) => session.nodeViewportPoint(nodeId),
+    });
     void session.ready
       .then(() => {
         if (!cancelled) setReady(true);
@@ -126,19 +177,20 @@ export function GlobalGraphCanvas({
     return () => {
       cancelled = true;
       lease.dispose();
+      onTransitionAnchorApiChange?.(undefined);
       if (sessionRef.current === session) sessionRef.current = undefined;
     };
-  }, [instrumentation]);
+  }, [initial, instrumentation, onTransitionAnchorApiChange]);
 
   useEffect(() => {
     const session = sessionRef.current;
-    if (session === undefined || input === initial.current.input) return;
+    if (session === undefined || input === initial.input) return;
     try {
       session.update(input);
     } catch (error: unknown) {
       callbacks.current.onFailure(errorMessage(error));
     }
-  }, [input]);
+  }, [initial.input, input]);
 
   useEffect(() => {
     const session = sessionRef.current;
@@ -156,20 +208,6 @@ export function GlobalGraphCanvas({
     );
   }, [selection]);
 
-  const requestTemplate = useMemo(
-    () =>
-      createGlobalLayoutRequest(
-        input,
-        settings,
-        layoutIterations(input.nodes.length),
-      ),
-    [input, settings],
-  );
-  const fingerprint = useMemo(
-    () => globalLayoutFingerprint(requestTemplate),
-    [requestTemplate],
-  );
-
   useEffect(() => {
     if (!ready) return;
     const session = sessionRef.current;
@@ -177,8 +215,8 @@ export function GlobalGraphCanvas({
     layoutPending.current = true;
     const explicitRelayout = layoutRequestKey !== handledLayoutRequest.current;
     handledLayoutRequest.current = layoutRequestKey;
-    if (explicitRelayout) cacheRef.current.delete(fingerprint);
-    const cached = cacheRef.current.get(fingerprint);
+    if (explicitRelayout) cache.delete(fingerprint);
+    const cached = cache.get(fingerprint);
     let cancelled = false;
     if (cached !== undefined) {
       void session
@@ -222,7 +260,7 @@ export function GlobalGraphCanvas({
         if (cancelled) return;
         instrumentation?.record('global-layout-worker', result.computeMs);
         instrumentation?.record('folder-prior', result.folderPriorMs);
-        cacheRef.current.set(fingerprint, result.positions);
+        cache.set(fingerprint, result.positions);
         layoutPending.current = false;
         setLayoutStatus(
           result.algorithm === 'reference-only'
@@ -243,6 +281,7 @@ export function GlobalGraphCanvas({
       cancelled = true;
     };
   }, [
+    cache,
     fingerprint,
     input,
     instrumentation,

@@ -17,11 +17,16 @@ canonical truth, or own a platform storage implementation.
   changes and does not re-derive graph edges or persist renderer coordinates or
   shell visibility. Maximize/restore is passed to the renderer as a narrow
   callback so the canvas control stack remains the mode trigger. KG13B1 adds
-  the initial lazy Structure/Global renderer entry point, separate semantic
-  viewports, cross-mode history/context, Global-effective KG6 state, and
-  explicit per-session fallback without persisting Graphology or coordinates.
-  This is an initial presentation entry point, not a permanent two-scale product
-  model; Local Free/Structured remains a future extension. Inactive Focus
+  lazy Structure/Global and KG13B2A adds explicit Local Free, each with separate
+  semantic viewports and cross-mode history/context. Local uses the KG6 Focus
+  root, captures a transient Global screen anchor, keeps Global topology/cache
+  isolated from Local disclosure, and exits explicitly if its stable root is
+  lost. Exact in-memory layout coordinates and the saved semantic viewport are
+  applied before the first visible mode-switch draw; Local hop/direction changes
+  preserve that camera. Transition anchors and Local Fit requests are consumed
+  once, preventing remount or Back/Forward from replaying stale camera work.
+  Graphology, worker positions, and transition points are never persisted.
+  Local Structured remains the next extension. Inactive Focus
   has no toolbar chrome; canonical nodes enter or retarget Focus through the
   renderer's direct pointer/keyboard callback while selection remains intact.
 - `GraphHistoryControls.tsx` owns the compact, accessible Back/Forward arrow
@@ -67,6 +72,10 @@ canonical truth, or own a platform storage implementation.
 - `GlobalGraphView.tsx` is the only lazy production import of the direct Sigma
   canvas. It owns the Worker service and a bounded module-lifetime layout cache
   so Structure startup stays Sigma-free and exact results survive mode switches.
+- `LocalGraphView.tsx` owns the separate Local Free worker client and bounded
+  page-lifetime layout cache. An exact hit warms the first canvas draw; otherwise
+  it mounts deterministic seed geometry immediately, then adopts only the latest
+  refinement.
 - `use-worker-service-disposal.ts` owns Strict Mode-safe Worker service leases:
   same-tick development probes keep the service, while a real unmount disposes it.
 - `ProvenanceInspector.tsx` presents user-facing identity, breadcrumbs,
@@ -76,7 +85,9 @@ canonical truth, or own a platform storage implementation.
   internal occurrences stay in a closed-by-default technical disclosure. It is
   always an overlay drawer, keeps clear-selection separate from collapse, and
   resets bounded content only when the inspected selection changes. A selected
-  Global document also receives the exact **Open in Structure** handoff.
+  Global document receives **Open Local** and the exact **Open in Structure**
+  handoff. In Local, the selected expandable entity receives one accessible
+  Expand/Collapse action while Inspector remains shared rather than duplicated.
 - `SummaryPanel.tsx` renders derived canonical/evidence counts.
 - `HierarchyPanel.tsx` lazily expands document, section, and block ownership.
 - `ReferencesPanel.tsx` pages filtered references and exposes provenance details.
@@ -92,12 +103,15 @@ normalization that keeps legacy entity-kind filters internally eligible for
 blocks while `disclosure.includeBlocks` remains the sole visible opt-in.
 `global-view.ts` owns the effective documents-only/resolved-only Global KG6
 state and exact containing-document mapping without mutating Structure state.
+`local-view.ts` owns entry and navigation plans that normalize a document root,
+keep visible results Local, reroot cross-document results, and reveal the
+minimum hidden ancestor chain.
 `navigation-history.ts` owns the bounded, immutable session history over KG6
-state plus renderer entry mode and separate canonical viewport bookmarks, while `graph-history-shortcuts.ts`
+state plus presentation mode and separate canonical viewport bookmarks, while `graph-history-shortcuts.ts`
 owns exact graph-context keyboard classification. `navigation.ts` owns the
 verified target-reveal plan, and `report-view.ts` owns secondary evidence
 transformations.
 `../persistence/` owns the localStorage adapter and pre-autosave hydration; the
 source-neutral schema/reconciliation lives in `packages/view-state`.
-`../preferences/` separately owns global focus-root/trackpad preferences and
-their versioned localStorage key.
+`../preferences/` separately owns global focus-root/trackpad preferences, the
+Free/Structured future seam (Free only today), and their versioned localStorage key.

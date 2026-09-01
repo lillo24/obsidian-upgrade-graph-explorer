@@ -3,7 +3,7 @@ import {
   restorePersistedWorkspaceView,
   type PersistedViewportAnchor,
   type PersistedRendererViewports,
-  type RendererEntryMode,
+  type GraphPresentationMode,
   type ViewRestoreIssue,
 } from '@icarus-graph-explorer/view-state';
 import {
@@ -18,7 +18,7 @@ export type ViewPersistenceEligibility = 'stable' | 'transient' | 'legacy';
 
 export interface HydratedGraphView {
   readonly state: ViewProjectionState;
-  readonly rendererMode: RendererEntryMode;
+  readonly presentationMode: GraphPresentationMode;
   readonly viewports: PersistedRendererViewports;
   /** Compatibility alias for the Structure viewport. */
   readonly viewport?: PersistedViewportAnchor;
@@ -55,7 +55,7 @@ export function hydrateGraphView({
   if (eligibility !== 'stable') {
     return {
       state: documentOnlyProjectionState(),
-      rendererMode: 'structure',
+      presentationMode: 'structure',
       viewports: {},
       issues: [],
       writable: false,
@@ -68,7 +68,7 @@ export function hydrateGraphView({
   if (storage === undefined) {
     return {
       state: documentOnlyProjectionState(),
-      rendererMode: 'structure',
+      presentationMode: 'structure',
       viewports: {},
       issues: [],
       writable: false,
@@ -81,7 +81,7 @@ export function hydrateGraphView({
   if (loaded.status === 'empty') {
     return {
       state: documentOnlyProjectionState(),
-      rendererMode: 'structure',
+      presentationMode: 'structure',
       viewports: {},
       issues: [],
       writable: true,
@@ -91,7 +91,7 @@ export function hydrateGraphView({
   if (loaded.status === 'error') {
     return {
       state: documentOnlyProjectionState(),
-      rendererMode: 'structure',
+      presentationMode: 'structure',
       viewports: {},
       issues: [],
       writable: false,
@@ -102,7 +102,7 @@ export function hydrateGraphView({
     const restored = restorePersistedWorkspaceView(workspace, loaded.value);
     return {
       state: restored.state,
-      rendererMode: restored.rendererMode,
+      presentationMode: restored.presentationMode,
       viewports: restored.viewports,
       ...(restored.viewport === undefined
         ? {}
@@ -115,7 +115,7 @@ export function hydrateGraphView({
     const message = error instanceof Error ? error.message : String(error);
     return {
       state: documentOnlyProjectionState(),
-      rendererMode: 'structure',
+      presentationMode: 'structure',
       viewports: {},
       issues: [],
       writable: false,

@@ -1,10 +1,11 @@
 # Global renderer decision
 
-Status: **ADOPTED — KG13B1 production Global/Regional is complete; Structure
-remains authoritative and Local Free/Structured is next.**
+Status: **ADOPTED — Global/Regional and bounded Local Free are production;
+Structure remains authoritative and Local Structured is next.**
 
 Sections 2–18 retain the KG13A decision evidence. KG13B1's production
-follow-through is recorded in Section 20 and ADR 0013.
+follow-through is recorded in Section 20/ADR 0013; KG13B2A Local isolation is
+recorded in Section 21/ADR 0014.
 
 ## 1. Decision
 
@@ -296,7 +297,7 @@ used.
 ## 19. Roadmap
 
 `KG13 — In progress`, `KG13A — Complete`, `KG13B1 — Complete`,
-`KG13B2 — Next`.
+`KG13B2A — Complete`, `KG13B2B — Next`.
 KG14 does not become next under the evidence-backed ADOPT result.
 
 ## 20. KG13B1 production follow-through
@@ -325,3 +326,30 @@ KG13B2 may use stable Global file positions as anchors for Local
 Free/Structured induced subgraphs. It must keep headings outside Global
 topology and avoid whole-vault relayout. QUERY1/GROUP1 remain independent;
 separate LAYOUT1 is paused/absorbed. Do not implement KG13B2 in KG13B1.
+
+## 21. KG13B2A Local Free isolation
+
+KG13B2A implements the Free half of that handoff while preserving the Global
+decision:
+
+- Global Graphology remains documents-only and keeps its folder-prior cache;
+- **Open Local** normalizes the selected entity to a stable document and uses
+  existing KG6 Focus/disclosure for a bounded neighborhood;
+- Local maps File/Heading/Block/diagnostic roles and distinct hierarchy versus
+  reference edges through separate Graphology state;
+- a transient stable-node screen-point query anchors the Local root without
+  copying or mutating the Global position map;
+- deterministic root-relative seed geometry renders before the separate Local
+  ForceAtlas2 Worker returns;
+- Local disclosure/focus issues zero Global layout requests and does not
+  invalidate Global exact fingerprints;
+- schema v3 persists only presentation mode and canonical semantic viewport
+  anchors/ratios, never either renderer's coordinates;
+- shared Search, Inspector, history, live reconciliation, precision input, and
+  Structure recovery continue across all three presentations.
+
+Synthetic Local-medium evidence uses 381 nodes/430 edges: projection median is
+10.1 ms, mapping/seed together remain below 2 ms median, and roughly 94 ms
+ForceAtlas2 refinement remains off-main. This supports immediate seed plus
+worker refinement and rejects speculative background precomputation. Local
+Structured remains KG13B2B and must consume the same Local KG6 projection.

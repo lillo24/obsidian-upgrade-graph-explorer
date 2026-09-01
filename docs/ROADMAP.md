@@ -17,7 +17,7 @@ The roadmap is a sequencing map, not a claim that future features exist. Each mi
 | **KG10 — Incremental workspace engine**                      | File-granular reparsing and exact stable snapshot deltas while preserving whole-workspace semantics.                                           | **Complete** — cache, delta, global invalidation, identity, oracle, and real-vault gates passed.                                    |
 | **KG11 — Tauri local-vault workflow**                        | Desktop folder access and watching through a narrow source-provider adapter.                                                                   | **Complete** — secure selection, coalesced plans, transactional live application, resync, and view preservation pass.               |
 | **KG12 — Performance + worker hardening**                    | Explicit workload budgets, measurement-led worker split, and projection/focus/collapse optimization.                                           | **Complete** — budgets plus separate stateful W1 and stateless latest-result-wins W3 workers passed automated and release QA gates. |
-| **KG13 — Global → Regional → Local multi-scale exploration** | Add a complementary high-density Global renderer, visual Regional LOD, then bounded Local Free/Structured detail without replacing Structure.  | **In progress** — KG13A and KG13B1 are complete; KG13B2 Local Free/Structured is next.                                              |
+| **KG13 — Global → Regional → Local multi-scale exploration** | Add a complementary high-density Global renderer, visual Regional LOD, then bounded Local Free/Structured detail without replacing Structure.  | **In progress** — KG13A, KG13B1, and KG13B2A Local Free are complete; KG13B2B Local Structured is next.                             |
 | **KG14 — Product-quality exploration**                       | Accessibility, resilience, onboarding, polished exploration workflows, and release-quality hardening.                                          | Core workflows and renderer choices are evidence-backed and stable.                                                                 |
 
 Future package names, state libraries, and implementation details are intentionally unspecified until their milestone supplies concrete requirements.
@@ -77,12 +77,17 @@ Flow remains Structure. KG13B1 now provides the lazy production documents-only
 Global renderer, Regional visual LOD, off-main reference/folder layout,
 serializable settings, memory-only derived positions, shared Search/Inspector,
 and separate semantic viewport/history persistence. Headings remain outside
-Global topology. KG13B2 is next: Local Free/Structured should derive a bounded
-induced subgraph around stable Global file coordinates without whole-vault
-relayout.
+Global topology. KG13B2A now adds explicit Local presentation state, a bounded
+document-root KG6 projection, immediate deterministic Sigma geometry, separate
+latest-only hierarchy/reference ForceAtlas2, shared Search/Inspector/history,
+Global screen-context anchoring, and schema-v3 semantic Local viewport
+persistence. Local disclosure never mutates Global topology or layout cache.
+KG13B2B is next: add React Flow/W3 Local Structured as an alternate
+presentation of this same tested projection, without redesigning Local
+semantics or replacing the existing Structure renderer.
 
 QUERY1 saved queries/filters and GROUP1 visual rule groups remain independent
-future product systems and are not implemented by KG13B1. The separate LAYOUT1
+future product systems and are not implemented by KG13B2A. The separate LAYOUT1
 idea is paused/absorbed into KG13's Global → Regional → Local spatial
 architecture. Manual folder-cluster offsets and named Saved Views also remain
 future derived presentation work.

@@ -7,6 +7,7 @@ import type {
   SectionHeadingLevel,
   ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
+import type { GraphPresentationMode } from '@icarus-graph-explorer/view-state';
 
 import {
   ALL_REFERENCE_STATUSES,
@@ -21,7 +22,7 @@ interface GraphFiltersProps {
   readonly contained: boolean;
   readonly open: boolean;
   readonly pathScopes: readonly string[];
-  readonly rendererMode?: 'structure' | 'global';
+  readonly rendererMode?: GraphPresentationMode;
   readonly state: ViewProjectionState;
   readonly savedFilters: readonly SavedGraphFilter[];
   readonly savedFiltersStatus: string;

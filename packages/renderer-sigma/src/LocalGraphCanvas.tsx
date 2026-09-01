@@ -1,0 +1,372 @@
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+
+import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
+
+import { LocalLayoutCache } from './local-layout-cache';
+import {
+  createLocalLayoutRequest,
+  localLayoutFingerprint,
+  warmLocalRendererInput,
+} from './local-layout';
+import { mountLocalRendererSession } from './local-lifecycle';
+import {
+  mapProjectionToLocalTopology,
+  seedLocalRendererInput,
+} from './local-mapping';
+import { LocalRendererSession } from './local-session';
+import type {
+  LocalCenterRequest,
+  LocalLayoutService,
+  LocalRendererInstrumentation,
+  LocalSelection,
+  LocalTrackpadZoomMode,
+  LocalTransitionAnchor,
+  SemanticLocalViewport,
+} from './local-types';
+import { shouldApplyGlobalViewportRequest } from './viewport-request';
+
+export interface LocalGraphCanvasProps {
+  readonly centerRequest?: LocalCenterRequest;
+  readonly fitRequestKey?: number;
+  readonly initialTransitionAnchor?: LocalTransitionAnchor;
+  readonly initialViewport?: SemanticLocalViewport;
+  readonly instrumentation?: LocalRendererInstrumentation;
+  readonly layoutCache?: LocalLayoutCache;
+  readonly layoutRequestKey: number;
+  readonly layoutService: LocalLayoutService;
+  readonly onFailure: (message: string) => void;
+  readonly onFitRequestConsumed?: (key: number) => void;
+  readonly onSelectionChange: (selection: LocalSelection | null) => void;
+  readonly onTransitionAnchorConsumed?: (key: number) => void;
+  readonly onViewportObservation: (
+    viewport: SemanticLocalViewport | undefined,
+  ) => void;
+  readonly projection: ViewProjection;
+  readonly rootEntityId: string;
+  readonly selection: LocalSelection | null;
+  readonly trackpadZoomMode: LocalTrackpadZoomMode;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function layoutIterations(nodeCount: number): number {
+  return nodeCount <= 100 ? 160 : nodeCount <= 500 ? 100 : 60;
+}
+
+export function LocalGraphCanvas({
+  centerRequest,
+  fitRequestKey,
+  initialTransitionAnchor,
+  initialViewport,
+  instrumentation,
+  layoutCache,
+  layoutRequestKey,
+  layoutService,
+  onFailure,
+  onFitRequestConsumed,
+  onSelectionChange,
+  onTransitionAnchorConsumed,
+  onViewportObservation,
+  projection,
+  rootEntityId,
+  selection,
+  trackpadZoomMode,
+}: LocalGraphCanvasProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const sessionRef = useRef<LocalRendererSession | undefined>(undefined);
+  const [cache] = useState(() => layoutCache ?? new LocalLayoutCache());
+  const handledCenterRequest = useRef(0);
+  const handledFitRequest = useRef(0);
+  const handledLayoutRequest = useRef(layoutRequestKey);
+  const layoutPending = useRef(true);
+  const callbacks = useRef({
+    onFailure,
+    onFitRequestConsumed,
+    onSelectionChange,
+    onTransitionAnchorConsumed,
+    onViewportObservation,
+  });
+  useEffect(() => {
+    callbacks.current = {
+      onFailure,
+      onFitRequestConsumed,
+      onSelectionChange,
+      onTransitionAnchorConsumed,
+      onViewportObservation,
+    };
+  }, [
+    onFailure,
+    onFitRequestConsumed,
+    onSelectionChange,
+    onTransitionAnchorConsumed,
+    onViewportObservation,
+  ]);
+
+  const topology = useMemo(() => {
+    const map = () => mapProjectionToLocalTopology(projection, rootEntityId);
+    return instrumentation === undefined
+      ? map()
+      : instrumentation.measure('local-map', 'local-mappings', map);
+  }, [instrumentation, projection, rootEntityId]);
+  const input = useMemo(() => {
+    const seed = () => seedLocalRendererInput(topology);
+    return instrumentation === undefined
+      ? seed()
+      : instrumentation.measure('local-seed', 'local-seeds', seed);
+  }, [instrumentation, topology]);
+  const requestTemplate = useMemo(
+    () => createLocalLayoutRequest(input, layoutIterations(input.nodes.length)),
+    [input],
+  );
+  const fingerprint = useMemo(
+    () => localLayoutFingerprint(requestTemplate),
+    [requestTemplate],
+  );
+  const [initial] = useState(() => {
+    const cached = cache.get(fingerprint);
+    return {
+      cached: cached !== undefined,
+      input:
+        cached === undefined ? input : warmLocalRendererInput(input, cached),
+      initialTransitionAnchor,
+      initialViewport,
+      trackpadZoomMode,
+    };
+  });
+  const [ready, setReady] = useState(false);
+  const [layoutCommitKey, setLayoutCommitKey] = useState(0);
+  const [layoutStatus, setLayoutStatus] = useState(
+    initial.cached
+      ? 'Local layout restored from memory.'
+      : 'Local context is ready; refining layout…',
+  );
+  const [layoutError, setLayoutError] = useState<string>();
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (container === null) return;
+    let cancelled = false;
+    const mounted = mountLocalRendererSession(
+      () =>
+        new LocalRendererSession(container, initial.input, {
+          rootNodeKey: initial.input.rootNodeKey,
+          trackpadZoomMode: initial.trackpadZoomMode,
+          ...(initial.initialTransitionAnchor === undefined
+            ? {}
+            : {
+                initialViewportPoint: initial.initialTransitionAnchor.point,
+              }),
+          ...(initial.initialViewport === undefined
+            ? {}
+            : { initialViewport: initial.initialViewport }),
+          ...(instrumentation === undefined ? {} : { instrumentation }),
+          onNodeSelected: (key) =>
+            callbacks.current.onSelectionChange(
+              key === undefined ? null : { kind: 'node', id: key },
+            ),
+          onViewportObservation: (viewport) =>
+            callbacks.current.onViewportObservation(viewport),
+        }),
+    );
+    if (!mounted.ok) {
+      callbacks.current.onFailure(mounted.message);
+      return;
+    }
+    sessionRef.current = mounted.session;
+    if (initial.initialTransitionAnchor !== undefined) {
+      callbacks.current.onTransitionAnchorConsumed?.(
+        initial.initialTransitionAnchor.key,
+      );
+    }
+    void mounted.session.ready
+      .then(() => {
+        if (!cancelled) setReady(true);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) callbacks.current.onFailure(errorMessage(error));
+      });
+    return () => {
+      cancelled = true;
+      mounted.dispose();
+      if (sessionRef.current === mounted.session)
+        sessionRef.current = undefined;
+    };
+  }, [initial, instrumentation]);
+
+  useEffect(() => {
+    const session = sessionRef.current;
+    if (session === undefined || input === initial.input) return;
+    try {
+      session.update(input);
+    } catch (error: unknown) {
+      callbacks.current.onFailure(errorMessage(error));
+    }
+  }, [initial.input, input]);
+
+  useEffect(() => {
+    sessionRef.current?.updateTrackpadZoomMode(trackpadZoomMode);
+  }, [trackpadZoomMode]);
+
+  useEffect(() => {
+    sessionRef.current?.setControlledSelection(
+      selection?.kind === 'node' ? selection.id : undefined,
+    );
+  }, [selection]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const session = sessionRef.current;
+    if (session === undefined) return;
+    layoutPending.current = true;
+    const explicitRelayout = layoutRequestKey > handledLayoutRequest.current;
+    handledLayoutRequest.current = layoutRequestKey;
+    const cached = explicitRelayout ? undefined : cache.get(fingerprint);
+    let cancelled = false;
+    if (cached !== undefined) {
+      void session
+        .applyPositions(cached)
+        .then(() => {
+          if (cancelled) return;
+          layoutPending.current = false;
+          setLayoutError(undefined);
+          setLayoutStatus('Local layout restored from memory.');
+          setLayoutCommitKey((current) => current + 1);
+        })
+        .catch((error: unknown) => {
+          if (!cancelled) callbacks.current.onFailure(errorMessage(error));
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setLayoutError(undefined);
+        setLayoutStatus('Local context is ready; refining layout…');
+      }
+    });
+    const request = session.createLayoutRequest(
+      input,
+      requestTemplate.iterations,
+    );
+    instrumentation?.count('local-layouts');
+    void layoutService
+      .layout(request)
+      .then(async (result) => {
+        if (cancelled) return;
+        const applyStarted = performance.now();
+        await session.applyPositions(result.positions);
+        instrumentation?.record(
+          'local-layout-apply',
+          performance.now() - applyStarted,
+        );
+        if (cancelled) return;
+        instrumentation?.record('local-layout-worker', result.computeMs);
+        cache.set(fingerprint, result.positions);
+        layoutPending.current = false;
+        setLayoutStatus('Local Free layout ready.');
+        setLayoutCommitKey((current) => current + 1);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        const message = `Local layout failed: ${errorMessage(error)}`;
+        layoutPending.current = false;
+        setLayoutError(message);
+        setLayoutStatus('The last valid Local positions remain visible.');
+        setLayoutCommitKey((current) => current + 1);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    cache,
+    fingerprint,
+    input,
+    instrumentation,
+    layoutService,
+    layoutRequestKey,
+    ready,
+    requestTemplate.iterations,
+  ]);
+
+  useEffect(() => {
+    if (
+      centerRequest === undefined ||
+      !shouldApplyGlobalViewportRequest({
+        handledKey: handledCenterRequest.current,
+        layoutPending: layoutPending.current,
+        ready,
+        requestKey: centerRequest.key,
+      })
+    ) {
+      return;
+    }
+    handledCenterRequest.current = centerRequest.key;
+    void sessionRef.current?.center(centerRequest).catch((error: unknown) => {
+      setLayoutError(`Could not center Local: ${errorMessage(error)}`);
+    });
+  }, [centerRequest, layoutCommitKey, ready]);
+
+  useEffect(() => {
+    if (
+      fitRequestKey === undefined ||
+      !shouldApplyGlobalViewportRequest({
+        handledKey: handledFitRequest.current,
+        layoutPending: layoutPending.current,
+        ready,
+        requestKey: fitRequestKey,
+      })
+    ) {
+      return;
+    }
+    handledFitRequest.current = fitRequestKey;
+    sessionRef.current?.fit();
+    callbacks.current.onFitRequestConsumed?.(fitRequestKey);
+  }, [fitRequestKey, layoutCommitKey, ready]);
+
+  const zoomIn = useCallback(() => sessionRef.current?.zoomBy(0.82), []);
+  const zoomOut = useCallback(() => sessionRef.current?.zoomBy(1.22), []);
+  const fit = useCallback(() => sessionRef.current?.fit(), []);
+
+  return (
+    <div className="local-graph-canvas">
+      <div className="local-graph-canvas__surface" ref={containerRef} />
+      <div
+        aria-label="Local canvas controls"
+        className="local-graph-canvas__controls"
+        role="group"
+      >
+        <button aria-label="Zoom in" onClick={zoomIn} type="button">
+          +
+        </button>
+        <button aria-label="Zoom out" onClick={zoomOut} type="button">
+          −
+        </button>
+        <button onClick={fit} type="button">
+          Fit
+        </button>
+      </div>
+      <p
+        aria-atomic="true"
+        aria-live="polite"
+        className="local-graph-canvas__status"
+      >
+        {layoutStatus}
+      </p>
+      {layoutError === undefined ? null : (
+        <p className="local-graph-canvas__error" role="alert">
+          {layoutError}
+        </p>
+      )}
+    </div>
+  );
+}
