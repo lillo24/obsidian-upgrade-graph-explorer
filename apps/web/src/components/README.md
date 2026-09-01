@@ -33,6 +33,9 @@ canonical truth, or own a platform storage implementation.
   group shared by the normal toolbar and maximized floating controls. It receives
   only availability and callbacks; graph state, semantic viewport, keyboard
   policy, and storage remain outside the component.
+- `StructureDepthControl.tsx` owns the labeled Structure-only depth select and
+  `structure-depth-selection.ts` maps its four options onto the existing
+  structural-depth action without redefining KG6 values or behavior.
 - `controlled-selection.ts` prevents equivalent controlled renderer selection
   echoes from creating a React Flow update loop during programmatic handoff.
 - `GraphSettings.tsx` presents the shared normal/maximized Settings popover and
@@ -58,7 +61,7 @@ canonical truth, or own a platform storage implementation.
 - `GraphFilters.tsx` owns the controlled toolbar trigger and responsive nonmodal
   panel for path, entity content, literal Markdown Heading limit, reference
   status, the local Advanced query draft/apply boundary, and workspace-scoped
-  Saved Filters. Structure remains a separate Files only / 1 / 2 / 3 levels control.
+  Saved Filters. Structure depth remains a separate four-option select.
   Blocks is
   represented once through disclosure state; `graph-filter-count.ts` derives
   its user-visible active-group badge, while `graph-filters-overlay.ts` gives

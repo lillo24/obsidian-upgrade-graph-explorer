@@ -38,7 +38,6 @@ import {
   createProjectionWorkspace,
   projectLocalView,
   projectView,
-  type StructuralDepth,
   type ViewProjection,
   type ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
@@ -117,6 +116,7 @@ import {
 } from './graph-workspace-overlays';
 import { activateMaximizedGraphMode } from './maximized-graph-mode';
 import { ProvenanceInspector } from './ProvenanceInspector';
+import { StructureDepthControl } from './StructureDepthControl';
 import type { GlobalGraphViewProps } from './GlobalGraphView';
 import type { LocalGraphViewProps } from './LocalGraphView';
 import { useWorkerServiceDisposal } from './use-worker-service-disposal';
@@ -149,16 +149,6 @@ interface SavedFilterSession {
 const ENTITY_NAVIGATION_ZOOM = 1.1;
 const GLOBAL_NAVIGATION_RATIO = 0.32;
 const LOCAL_NAVIGATION_RATIO = 0.48;
-
-const STRUCTURAL_DEPTH_OPTIONS = [
-  { depth: 0, label: 'Files only' },
-  { depth: 1, label: '1 level' },
-  { depth: 2, label: '2 levels' },
-  { depth: 3, label: '3 levels' },
-] as const satisfies readonly {
-  readonly depth: StructuralDepth;
-  readonly label: string;
-}[];
 
 const GRAPH_HISTORY_SHORTCUT_EXCLUSION_SELECTOR =
   'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [data-graph-history-shortcuts="off"]';
@@ -2428,27 +2418,12 @@ export function GraphExplorer({
               onChange={changeRendererMode}
             />
             {effectiveRendererMode === 'structure' ? (
-              <div
-                className="control-group"
-                aria-label="Structural depth"
-                role="group"
-              >
-                <span>Structure</span>
-                {STRUCTURAL_DEPTH_OPTIONS.map(({ depth, label }) => (
-                  <button
-                    aria-pressed={
-                      activeViewState.disclosure.defaultDepth === depth
-                    }
-                    key={depth}
-                    onClick={() =>
-                      commitHistoryGraphAction({ type: 'set-depth', depth })
-                    }
-                    type="button"
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <StructureDepthControl
+                depth={activeViewState.disclosure.defaultDepth}
+                onChange={(depth) =>
+                  void commitHistoryGraphAction({ type: 'set-depth', depth })
+                }
+              />
             ) : effectiveRendererMode === 'global' ? (
               <div
                 aria-label="Global layout controls"
