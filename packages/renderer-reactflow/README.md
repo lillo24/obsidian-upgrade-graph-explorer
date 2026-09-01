@@ -1,6 +1,6 @@
 # React Flow Structural Renderer
 
-Status: **STABLE — DISC1 disclosure UI and KG12B2 worker layout are test-backed.**
+Status: **STABLE — Structure and KG13B2B Local Structured contracts are test-backed.**
 
 This renderer package turns one KG6 `ViewProjection` into a deterministic,
 read-only React Flow scene. It owns renderer IDs, fixed node geometry, Dagre
@@ -22,10 +22,12 @@ ViewProjection + renderer interaction state
 src/
   types.ts               Renderer data, selection, layout, and component contracts.
   ids.ts                 Collision-safe projection-to-renderer tuple IDs.
-  mapping.ts             One-to-one semantic React Flow node/edge mapping.
+  mapping.ts             Standard and compact Local Structured one-to-one mapping.
   layout.ts              Plain layout input/result adaptation and grid fallback.
   layout-sync.ts         Direct compute entry used only by tests and benchmarks.
   layout-state.ts        Pure latest-generation commit/anchor state machine.
+  local-structured-layout.ts  Exact fingerprint/cache, immediate seed, and root normalization.
+  local-structured.ts    DOM-free Local Structured benchmark/test exports.
   highlight.ts           Direct incident-node/edge visual emphasis.
   focus-interaction.ts   Graph-scoped Enter-to-Focus activation policy.
   center-request.ts      Keyed projected-node viewport-center resolution.
@@ -51,11 +53,12 @@ selectable terminals, and aggregated reference counts come directly from KG6
 never as self-loop edges.
 
 Structure mode uses a top-to-bottom Dagre layout. Focus mode uses left-to-right
-layout. Entity nodes participate in Dagre topology; diagnostic targets are
+layout. Local Structured uses an independently tunable compact left-to-right
+mode with `nodesep: 22` and `ranksep: 58`. Entity nodes participate in Dagre topology; diagnostic targets are
 placed deterministically beside their projected source so they do not distort
-structural ranks. Every node type has a fixed measured size. A layout exception
-becomes an explicit warning plus deterministic grid—not a success-shaped empty
-graph.
+structural ranks. Every node type has a fixed measured size. In standard
+Structure/Focus, a layout exception becomes an explicit warning plus
+deterministic grid—not a success-shaped empty graph.
 
 Production `GraphCanvas` maps the projection on the UI thread and sends only
 plain entity geometry/topology to a caller-owned asynchronous layout service.
@@ -67,6 +70,28 @@ generation may adopt a result. Center, initial fit, saved viewport restoration,
 and disclosure anchors run only against that matching commit. A worker failure
 adopts the deterministic renderer-side grid and exposes a warning; production
 never falls back to synchronous Dagre.
+
+KG13B2B adds `visualVariant: local-structured` without duplicating this state
+machine. It consumes the same bounded KG6 Local projection as Local Free and
+uses fixed compact boxes: File `156 × 46`, Heading `148 × 42`, Block `132 × 38`,
+and diagnostic `148 × 42`. Marker-plus-label nodes use `▰`, `◇`, `●`, and `○`;
+the root File is emphasized, hierarchy is visually stronger, and references
+remain secondary smooth-step cross-links. Standard Structure mapping, markup,
+dimensions, CSS classes, and Structure/Focus Dagre settings remain unchanged.
+
+On a Local Structured cache miss, deterministic O(nodes + edges) seed geometry
+is complete, finite, root-normalized, and usable on the first React Flow paint;
+W3 refines it asynchronously. An exact bounded memory-cache fingerprint covers
+mode/version, node IDs/dimensions, and edge IDs/endpoints/kinds while excluding
+labels, paths, source/query text, camera, selection, and hover. Exact hits skip
+W3. A worker failure keeps seed/cached geometry and shows a warning instead of
+using the standard grid fallback or switching presentation.
+
+The optional runtime transition API exposes only one projected node's viewport
+point. It preserves the selected node, or Local root, across Free/Structured
+mounts and during Structured topology/refinement adoption. Renderer instances,
+graph coordinates, and screen points never enter persisted state. Structured
+semantic observation reports only canonical entity anchor plus React Flow zoom.
 
 The graph is deliberately not an authoring surface: nodes cannot be dragged or
 connected, edges cannot be reconnected, and Delete is disabled. First render

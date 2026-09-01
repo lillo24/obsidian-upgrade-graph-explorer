@@ -61,7 +61,9 @@ function assertUniqueIds(
 export function validateDagreLayoutInput(value: unknown): DagreLayoutInput {
   if (
     !isRecord(value) ||
-    (value.mode !== 'structure' && value.mode !== 'focus') ||
+    (value.mode !== 'structure' &&
+      value.mode !== 'focus' &&
+      value.mode !== 'local-structured') ||
     !Array.isArray(value.nodes) ||
     !value.nodes.every(validNode) ||
     !Array.isArray(value.edges) ||

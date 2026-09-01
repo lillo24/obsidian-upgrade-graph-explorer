@@ -22,6 +22,11 @@
       "import": "./src/layout.ts",
       "default": "./src/layout.ts"
     },
+    "./local-structured": {
+      "types": "./src/local-structured.ts",
+      "import": "./src/local-structured.ts",
+      "default": "./src/local-structured.ts"
+    },
     "./types": {
       "types": "./src/types.ts",
       "import": "./src/types.ts",

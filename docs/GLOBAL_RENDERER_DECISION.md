@@ -1,7 +1,7 @@
 # Global renderer decision
 
-Status: **ADOPTED — Global/Regional and bounded Local Free are production;
-Structure remains authoritative and Local Structured is next.**
+Status: **ADOPTED — Global/Regional and bounded Local Free/Structured are
+production-validated; KG13 is complete.**
 
 Sections 2–18 retain the KG13A decision evidence. KG13B1's production
 follow-through is recorded in Section 20/ADR 0013; KG13B2A Local isolation is
@@ -296,9 +296,9 @@ used.
 
 ## 19. Roadmap
 
-`KG13 — In progress`, `KG13A — Complete`, `KG13B1 — Complete`,
-`KG13B2A — Complete`, `KG13B2B — Next`.
-KG14 does not become next under the evidence-backed ADOPT result.
+`KG13 — Complete`, `KG13A — Complete`, `KG13B1 — Complete`,
+`KG13B2A — Complete`, `KG13B2B — Complete`, `KG14 — Next`.
+This decision does not begin KG14.
 
 ## 20. KG13B1 production follow-through
 
@@ -351,5 +351,42 @@ decision:
 Synthetic Local-medium evidence uses 381 nodes/430 edges: projection median is
 10.1 ms, mapping/seed together remain below 2 ms median, and roughly 94 ms
 ForceAtlas2 refinement remains off-main. This supports immediate seed plus
-worker refinement and rejects speculative background precomputation. Local
-Structured remains KG13B2B and must consume the same Local KG6 projection.
+worker refinement and rejects speculative background precomputation.
+
+## 22. KG13B2B Local Structured completion
+
+KG13B2B implements the Structured half over the exact same memoized Local KG6
+projection:
+
+- the Local-only accessible `Free | Structured` control persists a presentation
+  preference without adding navigation-history entries or changing schema v3;
+- React Flow's existing GraphCanvas owns an opt-in compact schematic visual
+  variant rather than a duplicated Local canvas;
+- File, Heading, Block, and diagnostic nodes use distinct compact DOM-backed
+  markers while hierarchy edges dominate secondary reference edges;
+- the existing W3 Worker accepts an explicit `local-structured` Dagre mode,
+  leaving general Structure/Focus settings unchanged;
+- a complete root-normalized deterministic seed renders before W3, while an
+  exact bounded page-memory cache skips W3 for unchanged topology;
+- narrow runtime-only node viewport-point APIs preserve the selected node or
+  Local root across Free/Structured mounts without persisting coordinates or
+  exposing renderer instances;
+- Structured writes `structuredZoom` while preserving `freeRatio`; Free does
+  the inverse, and both share one canonical semantic viewport anchor;
+- node selection survives when representable; Structured edge selection is
+  cleared with an announcement when entering Free, where edges are not
+  interactive;
+- disclosure, Focus/reroot, Search, Inspector, Back/Forward, QUERY1 filters,
+  and live adoption retain the KG13B2A semantic owners.
+
+The medium synthetic scene maps and seeds Structured in about 1.1 ms combined;
+the independently tuned Dagre mode takes about 91 ms and remains off-main.
+Exact cache reuse is about 0.08 ms. The deterministic operation oracle proves
+that Free/Structured switching performs zero Local or Global reprojections,
+zero Global layouts, and zero workspace transactions. Production browser QA
+passes the layout, navigation, Search/Inspector, QUERY1, persistence, history,
+disclosure, and console-error matrix after correcting a missing Structured
+double-click reroot callback. The final release artifact then passed physical
+desktop vault opening, Free/Structured navigation, live heading and root-file
+changes, Rescan, restart restoration, and precision-touchpad validation without
+worker/module/CSP errors. ADR 0015 records the closed architecture.

@@ -513,3 +513,62 @@ pnpm benchmark:local-renderer -- --profile small
 pnpm benchmark:local-renderer -- --profile medium
 pnpm benchmark:local-renderer -- --profile stress
 ```
+
+## KG13B2B Local Structured evidence
+
+Local Structured consumes the exact KG13B2A bounded projection. The benchmark
+therefore measures a second presentation of the same 25/34 small, 381/430
+medium, and 1,101/1,175 stress scenes rather than creating a separate semantic
+workload. Values below are local Windows/Node evidence recorded on 2026-09-01.
+They are median/p95 milliseconds and never CI thresholds; stress has one
+sample. Browser first/refined paint, W3 round trip, and main-thread gaps remain
+runtime evidence rather than invented Node proxies.
+
+| Work                               | Small (25 / 34) | Medium (381 / 430) | Stress (1,101 / 1,175) |
+| ---------------------------------- | --------------: | -----------------: | ---------------------: |
+| Compact React Flow mapping         |   0.090 / 0.166 |      0.702 / 1.067 |          2.474 / 2.474 |
+| Deterministic schematic seed       |   0.020 / 0.050 |      0.397 / 1.381 |          0.997 / 0.997 |
+| Existing focus-mode Dagre baseline |   6.871 / 8.203 |    81.574 / 83.399 |      344.228 / 344.228 |
+| Explicit Local Structured Dagre    |   7.836 / 9.760 |    90.792 / 91.427 |      372.285 / 372.285 |
+| Refined apply + root normalization |   0.026 / 0.060 |      0.225 / 0.418 |          0.985 / 0.985 |
+| Exact Structured cache hit         |   0.008 / 0.016 |      0.077 / 0.086 |          0.253 / 0.253 |
+| Free → Structured mapping + seed   |   0.103 / 0.131 |      1.289 / 1.327 |          3.374 / 3.374 |
+| Structured → Free mapping + seed   |   0.040 / 0.054 |      0.473 / 0.497 |          1.124 / 1.124 |
+| Disclosure compact mapping         |   0.080 / 0.086 |      0.730 / 0.749 |          1.844 / 1.844 |
+| Disclosure schematic seed          |   0.019 / 0.041 |      0.184 / 0.190 |          0.593 / 0.593 |
+
+The explicit `local-structured` W3 mode is intentionally independent from
+general focus layout: left-to-right `network-simplex`, 22-unit node separation,
+58-unit rank separation, and 20-unit margins suit the compact schematic nodes.
+It costs roughly 11% more than the focus baseline at medium scale and 8% at
+stress, which is acceptable because the deterministic seed is immediate and
+the full Dagre calculation remains in the existing W3 Worker. The explicit
+mode can now be tuned without changing general Structure/Focus geometry.
+
+An exact Structured fingerprint includes mode/version, renderer node IDs and
+dimensions, and edge IDs/endpoints/kinds. It excludes selection, hover,
+Inspector, camera, source body, and query text. The bounded page-memory cache
+skips W3 on an exact hit; otherwise the complete finite O(nodes + edges) seed
+is usable while only the latest W3 request refines it. A worker failure retains
+the seed/cache instead of invoking synchronous Dagre.
+
+The layout-toggle oracle records zero Local projection calls, zero Global
+projection calls, zero Global layout calls, and zero workspace transactions;
+a cache miss permits at most one active W3 layout. Disclosure may create one
+latest Local Structured layout and continues to require zero Global layout.
+The same operation boundary applies to Local heading live updates, preserving
+the documents-only Global topology.
+
+Production browser validation covered lazy Free → Structured → Free switching,
+compact node and edge grammar, exact edge inspection and its announced
+Free-switch clearing policy, node-selection retention, pointer and keyboard
+disclosure, Focus and Search rerooting, QUERY1 filter retention, Structure
+handoff/history return, Back to Global, reload into saved Local Structured,
+zoom/Fit, and Inspector. It found and corrected one integration omission:
+Structured double-click Focus initially selected a node without invoking the
+existing Local navigation planner. The final build routes that gesture through
+the shared planner and reroots while retaining Structured. The repeated matrix
+reported no console warnings or errors. Final release desktop QA passed vault
+opening, Free/Structured switching, disclosure, Search/Inspector, Back/Forward,
+live heading and root-file changes, Rescan, restart restoration, and physical
+precision-touchpad input in both layouts without worker/module/CSP errors.

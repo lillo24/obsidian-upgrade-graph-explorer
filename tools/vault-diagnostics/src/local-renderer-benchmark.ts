@@ -7,6 +7,17 @@ import type {
   SourceLocation,
   SourceSpan,
 } from '@icarus-graph-explorer/core';
+import { computeDagreLayout } from '@icarus-graph-explorer/dagre-layout/compute';
+import {
+  applyLocalStructuredPositions,
+  applyRendererLayoutPositions,
+  createRendererLayoutInput,
+  LocalStructuredLayoutCache,
+  localStructuredGraphPositions,
+  localStructuredLayoutFingerprint,
+  mapProjectionToReactFlow,
+  seedLocalStructuredGraph,
+} from '@icarus-graph-explorer/renderer-reactflow/local-structured';
 import {
   buildLocalGraph,
   computeLocalLayout,
@@ -359,13 +370,122 @@ function main(): void {
       throw new Error('Exact Local layout cache hit was lost.');
     return hit.length;
   }, repeats);
+  const structuredMapping = measureRepeated(
+    () =>
+      mapProjectionToReactFlow(projection, 'local-structured', {
+        visualVariant: 'local-structured',
+        rootEntityId,
+      }),
+    repeats,
+  );
+  const structuredRootNodeId = structuredMapping.value.nodes.find(
+    (node) => node.type === 'entity' && node.data.root,
+  )?.id;
+  if (structuredRootNodeId === undefined) {
+    throw new Error('Local Structured mapping omitted the root document.');
+  }
+  const structuredSeed = measureRepeated(
+    () =>
+      seedLocalStructuredGraph(
+        structuredMapping.value.nodes,
+        structuredMapping.value.edges,
+        structuredRootNodeId,
+      ),
+    repeats,
+  );
+  const structuredLayoutInput = createRendererLayoutInput(
+    structuredMapping.value.nodes,
+    structuredMapping.value.edges,
+    'local-structured',
+  );
+  const structuredLayout = measureRepeated(
+    () => computeDagreLayout(structuredLayoutInput),
+    repeats,
+  );
+  const focusBaselineLayout = measureRepeated(
+    () => computeDagreLayout({ ...structuredLayoutInput, mode: 'focus' }),
+    repeats,
+  );
+  const structuredApply = measureRepeated(() => {
+    const dagreGraph = applyRendererLayoutPositions(
+      structuredMapping.value.nodes,
+      structuredMapping.value.edges,
+      'local-structured',
+      structuredLayout.value,
+    );
+    return applyLocalStructuredPositions(
+      dagreGraph.nodes,
+      dagreGraph.edges,
+      localStructuredGraphPositions(dagreGraph),
+      structuredRootNodeId,
+    );
+  }, repeats);
+  const structuredFingerprint = localStructuredLayoutFingerprint(
+    structuredMapping.value.nodes,
+    structuredMapping.value.edges,
+  );
+  const structuredCache = new LocalStructuredLayoutCache();
+  structuredCache.set(
+    structuredFingerprint,
+    localStructuredGraphPositions(structuredApply.value),
+  );
+  const structuredCacheHit = measureRepeated(() => {
+    const positions = structuredCache.get(structuredFingerprint);
+    if (positions === undefined) {
+      throw new Error('Exact Local Structured cache hit was lost.');
+    }
+    return applyLocalStructuredPositions(
+      structuredMapping.value.nodes,
+      structuredMapping.value.edges,
+      positions,
+      structuredRootNodeId,
+    );
+  }, repeats);
+  const freeToStructured = measureRepeated(() => {
+    const mapped = mapProjectionToReactFlow(projection, 'local-structured', {
+      visualVariant: 'local-structured',
+      rootEntityId,
+    });
+    const rootNodeId = mapped.nodes.find(
+      (node) => node.type === 'entity' && node.data.root,
+    )?.id;
+    if (rootNodeId === undefined) throw new Error('Missing Structured root.');
+    return seedLocalStructuredGraph(mapped.nodes, mapped.edges, rootNodeId);
+  }, repeats);
+  const structuredToFree = measureRepeated(() => {
+    const mapped = mapProjectionToLocalTopology(projection, rootEntityId);
+    return seedLocalRendererInput(mapped);
+  }, repeats);
+  const expandedStructuredMapping = measureRepeated(
+    () =>
+      mapProjectionToReactFlow(expandedProjection, 'local-structured', {
+        visualVariant: 'local-structured',
+        rootEntityId,
+      }),
+    repeats,
+  );
+  const expandedStructuredRoot = expandedStructuredMapping.value.nodes.find(
+    (node) => node.type === 'entity' && node.data.root,
+  )?.id;
+  if (expandedStructuredRoot === undefined) {
+    throw new Error('Expanded Local Structured mapping omitted the root.');
+  }
+  const expandedStructuredSeed = measureRepeated(
+    () =>
+      seedLocalStructuredGraph(
+        expandedStructuredMapping.value.nodes,
+        expandedStructuredMapping.value.edges,
+        expandedStructuredRoot,
+      ),
+    repeats,
+  );
 
   console.log(
     JSON.stringify(
       {
         schemaVersion: 1,
         profile,
-        mode: 'Local Free',
+        modes: ['Local Free', 'Local Structured'],
         canonicalWorkspace: {
           entities: fixture.snapshot.entities.length,
           references: fixture.snapshot.references.length,
@@ -393,8 +513,47 @@ function main(): void {
           globalLayouts: 0,
         },
         exactLayoutCacheHit: exactCacheHit.distribution,
+        localStructured: {
+          nodes: structuredMapping.value.nodes.length,
+          edges: structuredMapping.value.edges.length,
+          compactMapping: structuredMapping.distribution,
+          deterministicSeed: structuredSeed.distribution,
+          firstUsableScenePreparation: {
+            mapping: structuredMapping.distribution,
+            seed: structuredSeed.distribution,
+          },
+          dagreWorkerEquivalent: structuredLayout.distribution,
+          focusModeDagreBaseline: focusBaselineLayout.distribution,
+          applyAndRootNormalize: structuredApply.distribution,
+          rootNormalizedToOrigin:
+            structuredApply.value.nodes.find(
+              ({ id }) => id === structuredRootNodeId,
+            )?.position.x === 0 &&
+            structuredApply.value.nodes.find(
+              ({ id }) => id === structuredRootNodeId,
+            )?.position.y === 0,
+          exactCacheHit: structuredCacheHit.distribution,
+          exactCacheHitW3Layouts: 0,
+          freeToStructuredSeedPreparation: freeToStructured.distribution,
+          structuredToFreeSeedPreparation: structuredToFree.distribution,
+          disclosureUpdate: {
+            nodes: expandedStructuredMapping.value.nodes.length,
+            edges: expandedStructuredMapping.value.edges.length,
+            mapping: expandedStructuredMapping.distribution,
+            seed: expandedStructuredSeed.distribution,
+            latestW3LayoutsOnChangedTopology: 1,
+            globalLayouts: 0,
+          },
+        },
+        layoutToggleOperationOracle: {
+          localProjectionCalls: 0,
+          globalProjectionCalls: 0,
+          globalLayoutCalls: 0,
+          workspaceTransactions: 0,
+          cacheMissW3LayoutsAtMost: 1,
+        },
         runtimeEvidence:
-          'Transition-to-first-visual-paint, Sigma mount, LOD, hover, selection, pan/zoom, and search-center remain production browser/Tauri measurements.',
+          'DOM first/refined paint, W3 round trip and main-thread gaps, Sigma/WebGL mount, viewport-point anchoring, hover, selection, pan/zoom, and search-center remain production browser/Tauri measurements.',
         privacy:
           'Deterministic synthetic aggregate-only evidence; no paths, names, source text, queries, workspace IDs, or private output files.',
         note: 'Wall-clock values are local evidence and never CI thresholds.',

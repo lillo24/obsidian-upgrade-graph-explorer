@@ -26,7 +26,10 @@ canonical truth, or own a platform storage implementation.
   preserve that camera. Transition anchors and Local Fit requests are consumed
   once, preventing remount or Back/Forward from replaying stale camera work.
   Graphology, worker positions, and transition points are never persisted.
-  Local Structured remains the next extension. Inactive Focus
+  KG13B2B adds a Local-only Free/Structured preference below that same
+  memoized projection. The selected visible node, or root fallback, crosses the
+  renderer boundary only as a transient viewport point. Layout switching is not
+  history and never starts hidden workers or Global/projection work. Inactive Focus
   has no toolbar chrome; canonical nodes enter or retarget Focus through the
   renderer's direct pointer/keyboard callback while selection remains intact.
 - `GraphHistoryControls.tsx` owns the compact, accessible Back/Forward arrow
@@ -79,6 +82,10 @@ canonical truth, or own a platform storage implementation.
   page-lifetime layout cache. An exact hit warms the first canvas draw; otherwise
   it mounts deterministic seed geometry immediately, then adopts only the latest
   refinement.
+- `LocalStructuredGraphView.tsx` owns the lazy React Flow Local schematic,
+  caller-owned W3 service, bounded exact memory cache, semantic Structured zoom
+  adapter, and explicit mount-failure boundary. It reuses `GraphCanvas` rather
+  than duplicating its latest-layout lifecycle.
 - `use-worker-service-disposal.ts` owns Strict Mode-safe Worker service leases:
   same-tick development probes keep the service, while a real unmount disposes it.
 - `ProvenanceInspector.tsx` presents user-facing identity, breadcrumbs,
@@ -116,5 +123,6 @@ verified target-reveal plan, and `report-view.ts` owns secondary evidence
 transformations.
 `../persistence/` owns the localStorage adapter and pre-autosave hydration; the
 source-neutral schema/reconciliation lives in `packages/view-state`.
-`../preferences/` separately owns global focus-root/trackpad preferences, the
-Free/Structured future seam (Free only today), and their versioned localStorage key.
+`../preferences/` separately owns global focus-root/trackpad preferences and
+the persisted Local Free/Structured presentation preference in its existing
+versioned localStorage key.

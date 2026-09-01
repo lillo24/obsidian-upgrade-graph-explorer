@@ -5,6 +5,7 @@ import { rendererTestProjection } from './test-fixture';
 import type { RendererGraph } from './types';
 import {
   captureDisclosureAnchor,
+  captureNodeAnchor,
   GRAPH_MAX_ZOOM,
   GRAPH_MIN_ZOOM,
   GRAPH_ZOOM_SENSITIVITY,
@@ -125,5 +126,30 @@ describe('viewport navigation', () => {
         },
       ),
     ).toBeNull();
+  });
+
+  it('anchors a diagnostic projection node without inventing an entity ID', () => {
+    const graph = graphAt(0, 0);
+    const diagnostic = graph.nodes.find(
+      (node) => node.data.projectionNodeId === 'projection-diagnostic',
+    );
+    expect(diagnostic).toBeDefined();
+
+    const anchor = captureNodeAnchor(graph, 'projection-diagnostic', {
+      x: 12,
+      y: -8,
+      zoom: 0.75,
+    });
+
+    expect(anchor).toMatchObject({
+      projectionNodeId: 'projection-diagnostic',
+      entityId: null,
+      zoom: 0.75,
+    });
+    expect(viewportForDisclosureAnchor(graph, anchor!)).toEqual({
+      x: 12,
+      y: -8,
+      zoom: 0.75,
+    });
   });
 });

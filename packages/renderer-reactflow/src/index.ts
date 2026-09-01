@@ -18,11 +18,21 @@ export {
   fallbackRendererGraph,
 } from './layout';
 export {
+  applyLocalStructuredPositions,
+  LocalStructuredLayoutCache,
+  localStructuredGraphPositions,
+  localStructuredLayoutFingerprint,
+  seedLocalStructuredGraph,
+} from './local-structured-layout';
+export {
   DIAGNOSTIC_NODE_DIMENSIONS,
   ENTITY_NODE_DIMENSIONS,
   ENTITY_TYPE_LABELS,
+  LOCAL_STRUCTURED_DIAGNOSTIC_NODE_DIMENSIONS,
+  LOCAL_STRUCTURED_ENTITY_NODE_DIMENSIONS,
   mapProjectionToReactFlow,
 } from './mapping';
+export type { MapProjectionOptions } from './mapping';
 export { observeSemanticViewport } from './semantic-viewport';
 export type {
   RendererViewport,
@@ -30,6 +40,7 @@ export type {
 } from './semantic-viewport';
 export {
   captureDisclosureAnchor,
+  captureNodeAnchor,
   GRAPH_MAX_ZOOM,
   GRAPH_MIN_ZOOM,
   GRAPH_VIEWPORT_OBSERVATION_DELAY_MS,
@@ -56,7 +67,12 @@ export type {
   GraphLayoutResult,
   GraphLayoutService,
   GraphSelection,
+  GraphTransitionAnchor,
+  GraphTransitionAnchorApi,
+  GraphViewportPoint,
   GraphViewportObservation,
+  GraphVisualVariant,
+  LocalStructuredLayoutPosition,
   RendererGraph,
   TrackpadZoomMode,
 } from './types';

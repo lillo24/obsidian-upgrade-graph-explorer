@@ -1,4 +1,4 @@
-export type DagreLayoutMode = 'structure' | 'focus';
+export type DagreLayoutMode = 'structure' | 'focus' | 'local-structured';
 
 export interface DagreLayoutNode {
   readonly id: string;

@@ -4,7 +4,6 @@ import {
   type DagreLayoutOutput,
 } from '@icarus-graph-explorer/dagre-layout';
 
-import { DIAGNOSTIC_NODE_DIMENSIONS } from './mapping';
 import type {
   GraphFlowEdge,
   GraphFlowNode,
@@ -69,20 +68,21 @@ function positionDiagnostics(
     if (incoming !== undefined)
       sourceCounts.set(incoming.source, sourceIndex + 1);
     if (source === undefined || sourcePosition === undefined) {
+      const diagnosticWidth = diagnostic.width ?? 208;
+      const diagnosticHeight = diagnostic.height ?? 94;
       positions.set(diagnostic.id, {
-        x: sourceIndex * (DIAGNOSTIC_NODE_DIMENSIONS.width + 36),
-        y: sourceIndex * (DIAGNOSTIC_NODE_DIMENSIONS.height + 24),
+        x: sourceIndex * (diagnosticWidth + 36),
+        y: sourceIndex * (diagnosticHeight + 24),
       });
       continue;
     }
+    const diagnosticHeight = diagnostic.height ?? 94;
     positions.set(diagnostic.id, {
       x:
         sourcePosition.x +
         (source.width ?? 224) +
         (mode === 'structure' ? 72 : 92),
-      y:
-        sourcePosition.y +
-        sourceIndex * (DIAGNOSTIC_NODE_DIMENSIONS.height + 20),
+      y: sourcePosition.y + sourceIndex * (diagnosticHeight + 20),
     });
   }
 }

@@ -238,7 +238,11 @@ describe('persisted workspace view', () => {
       },
       presentationMode: 'local',
       viewports: {
-        local: { anchorEntityId: 'section-one', freeRatio: 0.48 },
+        local: {
+          anchorEntityId: 'section-one',
+          freeRatio: 0.48,
+          structuredZoom: 0.92,
+        },
       },
     });
     const restored = restorePersistedWorkspaceView(workspace, value);
@@ -248,6 +252,7 @@ describe('persisted workspace view', () => {
     expect(restored.viewports.local).toEqual({
       anchorEntityId: 'section-one',
       freeRatio: 0.48,
+      structuredZoom: 0.92,
     });
     expect(JSON.stringify(value)).not.toMatch(/"[xy]":/u);
   });

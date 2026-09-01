@@ -97,13 +97,9 @@ export function loadGraphPreferences(
             ? stored.focusAppearance
             : DEFAULT_GRAPH_PREFERENCES.focusAppearance,
           globalLayoutSettings,
-          // KG13B2A implements Free only. A persisted future Structured value
-          // remains a valid preference seam but falls back until B2B ships.
-          localLayoutMode:
-            isLocalLayoutMode(stored.localLayoutMode) &&
-            stored.localLayoutMode === 'free'
-              ? stored.localLayoutMode
-              : DEFAULT_GRAPH_PREFERENCES.localLayoutMode,
+          localLayoutMode: isLocalLayoutMode(stored.localLayoutMode)
+            ? stored.localLayoutMode
+            : DEFAULT_GRAPH_PREFERENCES.localLayoutMode,
           trackpadZoomMode: isTrackpadZoomMode(stored.trackpadZoomMode)
             ? stored.trackpadZoomMode
             : DEFAULT_GRAPH_PREFERENCES.trackpadZoomMode,
