@@ -96,8 +96,11 @@ QUERY1 saved queries/filters and GROUP1 visual rule groups remain independent
 product systems. GROUP1A's source-neutral rule compiler, fixed palette,
 workspace registry logic, visible-entity presentation derivation, and
 style-only seams across Structure, Global, Local Free, and Local Structured are
-complete. GROUP1B user-facing creation, editing, ordering, enabling, and palette
-configuration is pending; no default groups or product controls exist yet. The
+complete. GROUP1B now adds workspace-scoped durable/session-only product
+sessions, creation, editing, ordering, enabling, fixed-palette configuration,
+corrupt-storage recovery, and selected-entity Inspector matches. It adds no
+default groups and leaves projection, topology, navigation, viewport, and
+layout semantics unchanged. The
 separate LAYOUT1 idea remains paused/absorbed into KG13's Global → Regional →
 Local spatial architecture. Manual folder-cluster offsets and named Saved Views
 also remain future derived presentation work.

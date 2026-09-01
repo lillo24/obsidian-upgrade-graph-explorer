@@ -602,3 +602,14 @@ same boundary directly: React Flow group context is absent from mapping, W3
 input, Local Structured fingerprints, and dimensions; Global and Local Sigma
 session setters schedule one partial, skip-indexation reducer refresh without
 reconciling Graphology or touching a layout service.
+
+GROUP1B preserves that boundary in the product session. The registry array is
+the sole compile dependency, the canonical lookup is snapshot-scoped, and the
+presentation map depends only on the current completed projection, lookup, and
+compiled definitions. Draft typing remains local to the Groups component and
+does not compile, persist, project, map, reconcile, center, Fit, or request
+layout. A committed mutation changes only the registry/compiled evaluator/map;
+all four renderer seams consume the resulting style-map identity using the
+existing GROUP1A partial-style paths. The existing `benchmark:visual-groups`
+profiles remain the reproducible evidence; GROUP1B adds no new timing threshold
+or external dependency.

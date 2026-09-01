@@ -12,7 +12,11 @@ import {
   type ReactNode,
 } from 'react';
 
-import type { EntityId, KnowledgeSnapshot } from '@icarus-graph-explorer/core';
+import type {
+  AddressableEntity,
+  EntityId,
+  KnowledgeSnapshot,
+} from '@icarus-graph-explorer/core';
 import type { DiagnosticIdentityStability } from '@icarus-graph-explorer/diagnostics-obsidian';
 import { createInspectionWorkspace } from '@icarus-graph-explorer/explorer-inspection';
 import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performance';
@@ -55,6 +59,13 @@ import type {
   SemanticGlobalViewport,
   SemanticLocalViewport,
 } from '@icarus-graph-explorer/renderer-sigma/types';
+import {
+  compileVisualGroups,
+  matchingVisualGroupsForEntity,
+  type CompiledVisualGroups,
+  type VisualGroupMatch,
+  type VisualGroupPresentationMap,
+} from '@icarus-graph-explorer/visual-groups';
 
 import { graphHistoryShortcut } from '../graph-history-shortcuts';
 import {
@@ -93,6 +104,7 @@ import {
   saveSavedGraphFilterRegistry,
   type SavedGraphFilterRegistry,
 } from '../persistence/saved-filters';
+import type { VisualGroupRegistry } from '../persistence/visual-groups';
 import {
   hydrateGraphView,
   persistenceEligibility,
@@ -107,6 +119,12 @@ import {
   loadGraphPreferences,
   saveGraphPreferences,
 } from '../preferences/graph-preferences';
+import { deriveProjectionVisualGroupPresentationMap } from '../visual-groups/presentation';
+import {
+  commitVisualGroupSessionMutation,
+  createVisualGroupSession,
+  resetCorruptVisualGroupSession,
+} from '../visual-groups/session';
 import { createDagreLayoutWorkerService } from '../workers/dagre-layout-worker-client';
 import { EntitySearch } from './EntitySearch';
 import { retainGraphSelection } from './controlled-selection';
@@ -120,6 +138,7 @@ import {
 import { activateMaximizedGraphMode } from './maximized-graph-mode';
 import { ProvenanceInspector } from './ProvenanceInspector';
 import { StructureDepthControl } from './StructureDepthControl';
+import { VisualGroups } from './VisualGroups';
 import type { GlobalGraphViewProps } from './GlobalGraphView';
 import type { LocalGraphViewProps } from './LocalGraphView';
 import type {
@@ -153,6 +172,16 @@ interface SavedFilterSession {
   readonly error?: string;
 }
 
+interface VisualGroupCompilation {
+  readonly compiled: CompiledVisualGroups;
+  readonly error?: string;
+}
+
+interface VisualGroupPresentation {
+  readonly styles: VisualGroupPresentationMap;
+  readonly error?: string;
+}
+
 const ENTITY_NAVIGATION_ZOOM = 1.1;
 const GLOBAL_NAVIGATION_RATIO = 0.32;
 const LOCAL_NAVIGATION_RATIO = 0.48;
@@ -160,6 +189,13 @@ const LOCAL_STRUCTURED_NAVIGATION_ZOOM = 0.92;
 
 const GRAPH_HISTORY_SHORTCUT_EXCLUSION_SELECTOR =
   'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [data-graph-history-shortcuts="off"]';
+
+const emptyVisualGroupCompilation = compileVisualGroups([]);
+if (!emptyVisualGroupCompilation.ok) {
+  throw new Error('The empty Visual Group registry must compile.');
+}
+const EMPTY_COMPILED_VISUAL_GROUPS = emptyVisualGroupCompilation.value;
+const EMPTY_VISUAL_GROUP_PRESENTATIONS: VisualGroupPresentationMap = new Map();
 
 function historyShortcutTargetIsExcluded(target: EventTarget | null): boolean {
   return (
@@ -338,14 +374,41 @@ export function GraphExplorer({
   const [preferenceWarning, setPreferenceWarning] = useState<
     string | undefined
   >(preferenceLoad.warning ?? undefined);
-  const [{ activeOverlay, filtersOpen }, dispatchWorkspaceOverlay] = useReducer(
-    graphWorkspaceOverlayReducer,
-    CLOSED_GRAPH_WORKSPACE_OVERLAYS,
-  );
+  const [{ activeOverlay, activeToolPanel }, dispatchWorkspaceOverlay] =
+    useReducer(graphWorkspaceOverlayReducer, CLOSED_GRAPH_WORKSPACE_OVERLAYS);
+  const filtersOpen = activeToolPanel === 'filters';
+  const groupsOpen = activeToolPanel === 'groups';
   const eligibility = persistenceEligibility(identityStability);
+  const workspaceId = projectionWorkspace.snapshot().workspace.id;
+  const loadedVisualGroupSession = useMemo(
+    () =>
+      createVisualGroupSession({
+        eligibility,
+        storage: persistenceStorage,
+        workspaceId,
+      }),
+    [eligibility, persistenceStorage, workspaceId],
+  );
+  const visualGroupSessionKey = `${eligibility}\0${workspaceId}`;
+  const [visualGroupSessions, setVisualGroupSessions] = useState(
+    () => new Map([[visualGroupSessionKey, loadedVisualGroupSession]]),
+  );
+  // The keyed map preserves same-page session-only edits while ensuring a
+  // prop-level workspace switch can never render another workspace's groups.
+  const activeVisualGroupSession =
+    visualGroupSessions.get(visualGroupSessionKey) ?? loadedVisualGroupSession;
+  const adoptVisualGroupSession = useCallback(
+    (nextSession: typeof activeVisualGroupSession) => {
+      setVisualGroupSessions((current) => {
+        const next = new Map(current);
+        next.set(visualGroupSessionKey, nextSession);
+        return next;
+      });
+    },
+    [visualGroupSessionKey],
+  );
   const [savedFilterSession, setSavedFilterSession] =
     useState<SavedFilterSession>(() => {
-      const workspaceId = projectionWorkspace.snapshot().workspace.id;
       const registry = createEmptySavedGraphFilterRegistry(workspaceId);
       if (eligibility !== 'stable') {
         return {
@@ -412,6 +475,36 @@ export function GraphExplorer({
       : localStructuredUnavailable;
   const legacyBlockFilterNormalized = initialViewState !== hydration.state;
   const [viewState, dispatch] = useReducer(graphStateReducer, initialViewState);
+  const visualGroupCompilation = useMemo<VisualGroupCompilation>(() => {
+    try {
+      const result = compileVisualGroups(
+        activeVisualGroupSession.registry.groups,
+      );
+      if (!result.ok) {
+        return {
+          compiled: EMPTY_COMPILED_VISUAL_GROUPS,
+          error:
+            result.issues[0]?.message ??
+            'Visual Groups could not be compiled. Node colors were left unchanged.',
+        };
+      }
+      return { compiled: result.value };
+    } catch (error: unknown) {
+      return {
+        compiled: EMPTY_COMPILED_VISUAL_GROUPS,
+        error: `Visual Groups could not be compiled: ${
+          error instanceof Error ? error.message : String(error)
+        } Node colors were left unchanged.`,
+      };
+    }
+  }, [activeVisualGroupSession.registry.groups]);
+  const visualGroupEntityById = useMemo(
+    () =>
+      new Map<EntityId, AddressableEntity>(
+        snapshot.entities.map((entity) => [entity.id, entity]),
+      ),
+    [snapshot],
+  );
   const currentReconciliation = useMemo(
     () => reconcileCurrentWorkspaceView(projectionWorkspace, viewState),
     [projectionWorkspace, viewState],
@@ -705,14 +798,67 @@ export function GraphExplorer({
     [projectionWorkspace],
   );
   const projection = result.ok ? result.projection : undefined;
+  const visualGroupPresentation = useMemo<VisualGroupPresentation>(() => {
+    if (projection === undefined) {
+      return { styles: EMPTY_VISUAL_GROUP_PRESENTATIONS };
+    }
+    try {
+      return {
+        styles: deriveProjectionVisualGroupPresentationMap(
+          projection,
+          visualGroupEntityById,
+          visualGroupCompilation.compiled,
+        ),
+      };
+    } catch (error: unknown) {
+      return {
+        styles: EMPTY_VISUAL_GROUP_PRESENTATIONS,
+        error: `Visual Group colors could not be derived: ${
+          error instanceof Error ? error.message : String(error)
+        } Node colors were left unchanged.`,
+      };
+    }
+  }, [projection, visualGroupCompilation.compiled, visualGroupEntityById]);
   const activeSelection =
     projection !== undefined && selectionExists(projection, selection)
       ? selection
       : null;
+  const selectedVisualGroups = useMemo<{
+    readonly matches: readonly VisualGroupMatch[];
+    readonly error?: string;
+  }>(() => {
+    const entityId = selectedEntityId(projection, activeSelection);
+    if (entityId === undefined) return { matches: [] };
+    const entity = visualGroupEntityById.get(entityId);
+    if (entity === undefined) return { matches: [] };
+    try {
+      return {
+        matches: matchingVisualGroupsForEntity(
+          entity,
+          visualGroupCompilation.compiled,
+        ),
+      };
+    } catch (error: unknown) {
+      return {
+        matches: [],
+        error: `Visual Group matches could not be inspected: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      };
+    }
+  }, [
+    activeSelection,
+    projection,
+    visualGroupCompilation.compiled,
+    visualGroupEntityById,
+  ]);
+  const visualGroupError =
+    activeVisualGroupSession.error ??
+    visualGroupCompilation.error ??
+    visualGroupPresentation.error ??
+    selectedVisualGroups.error;
   const previousProjectionWorkspace = useRef(projectionWorkspace);
-  const previousWorkspaceId = useRef(
-    projectionWorkspace.snapshot().workspace.id,
-  );
+  const previousWorkspaceId = useRef(workspaceId);
 
   const replaceNavigationHistory = useCallback(
     (next: GraphNavigationHistory) => {
@@ -1523,17 +1669,20 @@ export function GraphExplorer({
           window.removeEventListener('keydown', listener),
       },
       () => {
-        if (activeOverlay !== null || filtersOpen) {
+        if (activeOverlay !== null || activeToolPanel !== null) {
           dispatchWorkspaceOverlay({ type: 'close-all' });
           return;
         }
         onMaximizedChange(false);
       },
     );
-  }, [activeOverlay, filtersOpen, maximized, onMaximizedChange]);
+  }, [activeOverlay, activeToolPanel, maximized, onMaximizedChange]);
 
   useEffect(() => {
-    if (!applicationOverlayOpen || (activeOverlay === null && !filtersOpen)) {
+    if (
+      !applicationOverlayOpen ||
+      (activeOverlay === null && activeToolPanel === null)
+    ) {
       return;
     }
     let cancelled = false;
@@ -1545,7 +1694,7 @@ export function GraphExplorer({
     return () => {
       cancelled = true;
     };
-  }, [activeOverlay, applicationOverlayOpen, filtersOpen]);
+  }, [activeOverlay, activeToolPanel, applicationOverlayOpen]);
 
   useEffect(() => {
     if (
@@ -1725,6 +1874,33 @@ export function GraphExplorer({
     },
     [persistenceStorage, savedFilterSession],
   );
+  const commitVisualGroupMutation = useCallback(
+    (
+      candidate: VisualGroupRegistry,
+      announcement: string,
+    ): string | undefined => {
+      const committed = commitVisualGroupSessionMutation(
+        activeVisualGroupSession,
+        candidate,
+        persistenceStorage,
+      );
+      adoptVisualGroupSession(committed.value);
+      if (!committed.ok) return committed.message;
+      setPersistenceAnnouncement(announcement);
+      return undefined;
+    },
+    [activeVisualGroupSession, adoptVisualGroupSession, persistenceStorage],
+  );
+  const resetSavedVisualGroups = useCallback((): string | undefined => {
+    const reset = resetCorruptVisualGroupSession(
+      activeVisualGroupSession,
+      persistenceStorage,
+    );
+    adoptVisualGroupSession(reset.value);
+    if (!reset.ok) return reset.message;
+    setPersistenceAnnouncement('Saved Visual Groups reset.');
+    return undefined;
+  }, [activeVisualGroupSession, adoptVisualGroupSession, persistenceStorage]);
   const clearSelection = useCallback(() => setSelection(null), []);
   const changeGlobalSelection = useCallback(
     (nextSelection: GlobalSelection | null) =>
@@ -1951,7 +2127,23 @@ export function GraphExplorer({
   }, []);
   const changeFiltersOpen = useCallback(
     (open: boolean) => {
-      dispatchWorkspaceOverlay({ type: 'change-filters', maximized, open });
+      dispatchWorkspaceOverlay({
+        type: 'change-tool-panel',
+        panel: 'filters',
+        maximized,
+        open,
+      });
+    },
+    [maximized],
+  );
+  const changeGroupsOpen = useCallback(
+    (open: boolean) => {
+      dispatchWorkspaceOverlay({
+        type: 'change-tool-panel',
+        panel: 'groups',
+        maximized,
+        open,
+      });
     },
     [maximized],
   );
@@ -2758,6 +2950,21 @@ export function GraphExplorer({
               savedFiltersWritable={savedFilterSession.writable}
               state={activeViewState}
             />
+            <VisualGroups
+              {...(activeViewState.filters?.query === undefined
+                ? {}
+                : { activeQuery: activeViewState.filters.query })}
+              contained={maximized}
+              {...(visualGroupError === undefined
+                ? {}
+                : { error: visualGroupError })}
+              onCommit={commitVisualGroupMutation}
+              key={visualGroupSessionKey}
+              onOpenChange={changeGroupsOpen}
+              onResetSaved={resetSavedVisualGroups}
+              open={groupsOpen}
+              session={activeVisualGroupSession}
+            />
             {activeViewState.focus === undefined ? null : (
               <div
                 className="control-group control-group--focus"
@@ -2873,6 +3080,11 @@ export function GraphExplorer({
             {savedFilterError}
           </p>
         )}
+        {visualGroupError === undefined ? null : (
+          <p className="graph-alert" role="alert">
+            {visualGroupError}
+          </p>
+        )}
         {globalFailure === undefined ? null : (
           <p className="graph-alert" role="alert">
             {globalFailure}
@@ -2921,6 +3133,7 @@ export function GraphExplorer({
                 selection={activeSelection}
                 settings={globalLayoutSettings}
                 trackpadZoomMode={trackpadZoomMode}
+                visualGroupStyles={visualGroupPresentation.styles}
               />
             )
           ) : effectiveRendererMode === 'local' ? (
@@ -2988,6 +3201,7 @@ export function GraphExplorer({
                 rootEntityId={localRootEntityId}
                 selection={activeSelection}
                 trackpadZoomMode={trackpadZoomMode}
+                visualGroupStyles={visualGroupPresentation.styles}
               />
             ) : LocalStructuredGraphView !== undefined ? (
               <LocalStructuredGraphView
@@ -3021,6 +3235,7 @@ export function GraphExplorer({
                 rootEntityId={localRootEntityId}
                 selection={activeSelection}
                 trackpadZoomMode={trackpadZoomMode}
+                visualGroupStyles={visualGroupPresentation.styles}
               />
             ) : null
           ) : (
@@ -3045,6 +3260,7 @@ export function GraphExplorer({
               projection={result.projection}
               selection={activeSelection}
               trackpadZoomMode={trackpadZoomMode}
+              visualGroupStyles={visualGroupPresentation.styles}
             />
           )}
           {!inspectorOpen ? (
@@ -3089,6 +3305,7 @@ export function GraphExplorer({
               {...(performance === undefined ? {} : { performance })}
               projection={result.projection}
               selection={activeSelection}
+              visualGroupMatches={selectedVisualGroups.matches}
               workspace={inspectionWorkspace}
             />
           ) : null}
