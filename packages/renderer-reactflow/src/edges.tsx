@@ -30,7 +30,7 @@ function GraphEdgeComponent({
     targetX,
     targetY,
     targetPosition,
-    borderRadius: data.visualVariant === 'local-structured' ? 3 : 10,
+    borderRadius: data.visualVariant === 'compact-schematic' ? 3 : 10,
   });
   const diagnosticMarker =
     data.status === 'unresolved'
@@ -47,7 +47,7 @@ function GraphEdgeComponent({
       <BaseEdge
         className={`graph-edge-path graph-edge-path--${data.kind}${
           data.status === null ? '' : ` graph-edge-path--${data.status}`
-        }${data.visualVariant === 'local-structured' ? ' graph-edge-path--local-structured' : ''}`}
+        }${data.visualVariant === 'compact-schematic' ? ' graph-edge-path--compact-schematic' : ''}`}
         id={id}
         markerEnd={markerEnd ?? ''}
         path={path}

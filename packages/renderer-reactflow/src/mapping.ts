@@ -28,14 +28,14 @@ export const ENTITY_TYPE_LABELS = {
 
 export const DIAGNOSTIC_NODE_DIMENSIONS = { width: 208, height: 94 } as const;
 
-/** Measured fixed boxes for the compact Local schematic presentation. */
-export const LOCAL_STRUCTURED_ENTITY_NODE_DIMENSIONS = {
+/** Measured fixed boxes for the reusable compact hierarchy presentation. */
+export const COMPACT_HIERARCHY_ENTITY_NODE_DIMENSIONS = {
   document: { width: 156, height: 46 },
   section: { width: 148, height: 42 },
   block: { width: 132, height: 38 },
 } as const;
 
-export const LOCAL_STRUCTURED_DIAGNOSTIC_NODE_DIMENSIONS = {
+export const COMPACT_HIERARCHY_DIAGNOSTIC_NODE_DIMENSIONS = {
   width: 148,
   height: 42,
 } as const;
@@ -197,8 +197,8 @@ function mapEntityNode(
   rootEntityId: string | undefined,
 ): EntityFlowNode {
   const dimensions =
-    visualVariant === 'local-structured'
-      ? LOCAL_STRUCTURED_ENTITY_NODE_DIMENSIONS[node.entityKind]
+    visualVariant === 'compact-schematic'
+      ? COMPACT_HIERARCHY_ENTITY_NODE_DIMENSIONS[node.entityKind]
       : ENTITY_NODE_DIMENSIONS[node.entityKind];
   const typeLabel = ENTITY_TYPE_LABELS[node.entityKind];
   const { detail, title } = presentation;
@@ -218,7 +218,9 @@ function mapEntityNode(
       : ` graph-node--focus-distance-${node.focusDistance}`;
   const root = rootEntityId === node.entityId;
   const variantClass =
-    visualVariant === 'local-structured' ? ' graph-node--local-structured' : '';
+    visualVariant === 'compact-schematic'
+      ? ' graph-node--compact-schematic'
+      : '';
   const rootClass = root ? ' graph-node--local-root' : '';
   return {
     id: rendererNodeId(node.id),
@@ -266,8 +268,8 @@ function mapDiagnosticNode(
       : '';
   const ariaLabel = `${node.status} reference target ${node.rawTarget}, ${node.referenceIds.length} occurrence${node.referenceIds.length === 1 ? '' : 's'}${candidateText}`;
   const dimensions =
-    visualVariant === 'local-structured'
-      ? LOCAL_STRUCTURED_DIAGNOSTIC_NODE_DIMENSIONS
+    visualVariant === 'compact-schematic'
+      ? COMPACT_HIERARCHY_DIAGNOSTIC_NODE_DIMENSIONS
       : DIAGNOSTIC_NODE_DIMENSIONS;
   return {
     id: rendererNodeId(node.id),
@@ -282,7 +284,7 @@ function mapDiagnosticNode(
     selectable: true,
     focusable: true,
     ariaLabel,
-    className: `graph-node graph-node--diagnostic graph-node--${node.status}${visualVariant === 'local-structured' ? ' graph-node--local-structured' : ''}`,
+    className: `graph-node graph-node--diagnostic graph-node--${node.status}${visualVariant === 'compact-schematic' ? ' graph-node--compact-schematic' : ''}`,
     data: {
       projectionNodeId: node.id,
       status: node.status,
@@ -307,7 +309,7 @@ export function mapProjectionToReactFlow(
   mode: GraphLayoutMode,
   options: MapProjectionOptions = {},
 ): { readonly nodes: GraphFlowNode[]; readonly edges: GraphFlowEdge[] } {
-  const visualVariant = options.visualVariant ?? 'standard';
+  const visualVariant = options.visualVariant ?? 'extended';
   const entityNodes = projection.nodes.filter(
     (node): node is ProjectedEntityNode => node.kind === 'entity',
   );
@@ -366,7 +368,7 @@ export function mapProjectionToReactFlow(
         focusable: true,
         deletable: false,
         ariaLabel,
-        className: `graph-edge graph-edge--${edge.kind}${status === null ? '' : ` graph-edge--${status}`}${visualVariant === 'local-structured' ? ' graph-edge--local-structured' : ''}`,
+        className: `graph-edge graph-edge--${edge.kind}${status === null ? '' : ` graph-edge--${status}`}${visualVariant === 'compact-schematic' ? ' graph-edge--compact-schematic' : ''}`,
         data: {
           projectionEdgeId: edge.id,
           kind: edge.kind,

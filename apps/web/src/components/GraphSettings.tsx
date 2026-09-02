@@ -6,10 +6,13 @@ import type {
 } from '@icarus-graph-explorer/renderer-reactflow';
 import {
   customGlobalLayoutSettings,
+  folderClusteringStrength,
   GLOBAL_LAYOUT_CUSTOM_RANGES,
   type GlobalLayoutCustomSettings,
   type GlobalLayoutSettings,
   type GlobalSpacingPreset,
+  withFolderClusteringStrength,
+  withGlobalSpacingPreset,
 } from '@icarus-graph-explorer/renderer-sigma/settings';
 
 import {
@@ -59,16 +62,14 @@ export const GraphSettings = memo(function GraphSettings({
   warning,
 }: GraphSettingsProps) {
   const [activeTab, setActiveTab] = useState<GraphSettingsTab>('graph');
+  const [advancedLayoutOpen, setAdvancedLayoutOpen] = useState(false);
+  const folderStrength = folderClusteringStrength(globalLayoutSettings);
   const graphTabRef = useRef<HTMLButtonElement>(null);
   const sourceTabRef = useRef<HTMLButtonElement>(null);
   const changePreset = (spacingPreset: GlobalSpacingPreset) => {
-    onGlobalLayoutSettingsChange({
-      ...globalLayoutSettings,
-      spacingPreset,
-      ...(globalLayoutSettings.custom === undefined
-        ? {}
-        : { custom: customGlobalLayoutSettings(spacingPreset) }),
-    });
+    onGlobalLayoutSettingsChange(
+      withGlobalSpacingPreset(globalLayoutSettings, spacingPreset),
+    );
   };
   const changeCustom = (
     key: keyof GlobalLayoutCustomSettings,
@@ -217,6 +218,10 @@ export const GraphSettings = memo(function GraphSettings({
                 className="graph-settings__section"
               >
                 <h3 id="global-layout-settings-heading">All Network Layout</h3>
+                <p className="global-layout-scope-note">
+                  Applies to Scope = All, Layout = Network. Changes appear when
+                  you return to All + Network.
+                </p>
                 <label className="graph-settings__check">
                   <input
                     checked={globalLayoutSettings.folderClustering}
@@ -236,6 +241,37 @@ export const GraphSettings = memo(function GraphSettings({
                       links.
                     </small>
                   </span>
+                </label>
+                <label
+                  className="global-layout-strength"
+                  htmlFor="global-folder-clustering-strength"
+                >
+                  <span>
+                    <strong>Folder clustering strength</strong>
+                    <output>{folderStrength}%</output>
+                  </span>
+                  <input
+                    aria-valuetext={`${folderStrength} percent`}
+                    disabled={!globalLayoutSettings.folderClustering}
+                    id="global-folder-clustering-strength"
+                    max="100"
+                    min="0"
+                    onChange={(event) =>
+                      onGlobalLayoutSettingsChange(
+                        withFolderClusteringStrength(
+                          globalLayoutSettings,
+                          Number(event.currentTarget.value),
+                        ),
+                      )
+                    }
+                    step="1"
+                    type="range"
+                    value={folderStrength}
+                  />
+                  <small>
+                    <span>Weak</span>
+                    <span>Strong</span>
+                  </small>
                 </label>
                 <fieldset>
                   <legend>Spacing</legend>
@@ -258,36 +294,29 @@ export const GraphSettings = memo(function GraphSettings({
                     ),
                   )}
                 </fieldset>
-                <label className="graph-settings__check">
-                  <input
-                    checked={globalLayoutSettings.custom !== undefined}
-                    name="global-custom-layout"
-                    onChange={(event) =>
-                      onGlobalLayoutSettingsChange({
-                        folderClustering: globalLayoutSettings.folderClustering,
-                        spacingPreset: globalLayoutSettings.spacingPreset,
-                        ...(event.currentTarget.checked
-                          ? {
-                              custom: customGlobalLayoutSettings(
-                                globalLayoutSettings.spacingPreset,
-                              ),
-                            }
-                          : {}),
-                      })
-                    }
-                    type="checkbox"
-                  />
-                  <span>
-                    <strong>Custom controls</strong>
-                    <small>Expose a bounded product-level subset.</small>
-                  </span>
-                </label>
-                {globalLayoutSettings.custom === undefined ? null : (
+                <button
+                  aria-controls="global-layout-advanced-controls"
+                  aria-expanded={advancedLayoutOpen}
+                  className="graph-settings__disclosure"
+                  onClick={() => setAdvancedLayoutOpen((current) => !current)}
+                  type="button"
+                >
+                  <span aria-hidden="true">
+                    {advancedLayoutOpen ? '▾' : '▸'}
+                  </span>{' '}
+                  Advanced controls
+                </button>
+                {advancedLayoutOpen ? (
                   <GlobalCustomLayoutControls
                     onChange={changeCustom}
-                    settings={globalLayoutSettings.custom}
+                    settings={
+                      globalLayoutSettings.custom ??
+                      customGlobalLayoutSettings(
+                        globalLayoutSettings.spacingPreset,
+                      )
+                    }
                   />
-                )}
+                ) : null}
               </section>
               <section
                 aria-labelledby="graph-interaction-settings-heading"
@@ -360,11 +389,13 @@ function GlobalCustomLayoutControls({
   readonly settings: GlobalLayoutCustomSettings;
 }) {
   return (
-    <div className="global-layout-custom-controls">
+    <div
+      className="global-layout-custom-controls"
+      id="global-layout-advanced-controls"
+    >
       {(
         [
           ['linkForce', 'Reference pull', 0.05],
-          ['folderCohesion', 'Folder tendency', 0.005],
           ['betweenFolderSpacing', 'Folder separation', 0.1],
           ['nodeSize', 'Node size', 0.25],
           ['linkThickness', 'Link thickness', 0.05],

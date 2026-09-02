@@ -373,7 +373,7 @@ function main(): void {
   const structuredMapping = measureRepeated(
     () =>
       mapProjectionToReactFlow(projection, 'local-structured', {
-        visualVariant: 'local-structured',
+        visualVariant: 'extended',
         rootEntityId,
       }),
     repeats,
@@ -443,7 +443,7 @@ function main(): void {
   }, repeats);
   const freeToStructured = measureRepeated(() => {
     const mapped = mapProjectionToReactFlow(projection, 'local-structured', {
-      visualVariant: 'local-structured',
+      visualVariant: 'extended',
       rootEntityId,
     });
     const rootNodeId = mapped.nodes.find(
@@ -459,7 +459,7 @@ function main(): void {
   const expandedStructuredMapping = measureRepeated(
     () =>
       mapProjectionToReactFlow(expandedProjection, 'local-structured', {
-        visualVariant: 'local-structured',
+        visualVariant: 'extended',
         rootEntityId,
       }),
     repeats,
@@ -516,7 +516,7 @@ function main(): void {
         localStructured: {
           nodes: structuredMapping.value.nodes.length,
           edges: structuredMapping.value.edges.length,
-          compactMapping: structuredMapping.distribution,
+          extendedMapping: structuredMapping.distribution,
           deterministicSeed: structuredSeed.distribution,
           firstUsableScenePreparation: {
             mapping: structuredMapping.distribution,

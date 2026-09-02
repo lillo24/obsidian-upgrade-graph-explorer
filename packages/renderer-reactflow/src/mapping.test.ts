@@ -7,6 +7,8 @@ import type {
 
 import { rendererEdgeId, rendererNodeId } from './ids';
 import {
+  COMPACT_HIERARCHY_DIAGNOSTIC_NODE_DIMENSIONS,
+  COMPACT_HIERARCHY_ENTITY_NODE_DIMENSIONS,
   ENTITY_NODE_DIMENSIONS,
   ENTITY_TYPE_LABELS,
   mapProjectionToReactFlow,
@@ -75,7 +77,7 @@ describe('React Flow projection mapping', () => {
     });
   });
 
-  it('keeps entity-kind metadata and compact silhouettes explicit', () => {
+  it('keeps entity-kind metadata and both density silhouettes explicit', () => {
     expect(ENTITY_TYPE_LABELS).toEqual({
       document: 'File',
       section: 'Heading',
@@ -86,6 +88,23 @@ describe('React Flow projection mapping', () => {
       section: { width: 184, height: 72 },
       block: { width: 152, height: 64 },
     });
+    expect(COMPACT_HIERARCHY_ENTITY_NODE_DIMENSIONS).toEqual({
+      document: { width: 156, height: 46 },
+      section: { width: 148, height: 42 },
+      block: { width: 132, height: 38 },
+    });
+    expect(COMPACT_HIERARCHY_DIAGNOSTIC_NODE_DIMENSIONS).toEqual({
+      width: 148,
+      height: 42,
+    });
+
+    const compact = mapProjectionToReactFlow(
+      rendererTestProjection(),
+      'structure',
+      { visualVariant: 'compact-schematic' },
+    );
+    expect(compact.nodes[0]?.data.visualVariant).toBe('compact-schematic');
+    expect(compact.nodes[0]?.className).toContain('compact-schematic');
   });
 
   it('adds deterministic collision-only context without exposing full paths by default', () => {

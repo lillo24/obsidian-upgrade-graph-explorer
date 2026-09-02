@@ -1,7 +1,10 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_GLOBAL_LAYOUT_SETTINGS } from '@icarus-graph-explorer/renderer-sigma/settings';
+import {
+  DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+  withFolderClusteringStrength,
+} from '@icarus-graph-explorer/renderer-sigma/settings';
 
 import { GraphSettings } from './GraphSettings';
 
@@ -39,5 +42,33 @@ describe('Graph Settings presentation', () => {
     expect(markup).toContain('>All Network Layout<');
     expect(markup).toContain('>Graph Interaction<');
     expect(markup).toContain('>Current Source<');
+    expect(markup).toContain('Applies to Scope = All, Layout = Network.');
+    expect(markup).toContain('>Folder clustering strength<');
+    expect(markup).toContain('aria-valuetext="44 percent"');
+    expect(markup).toContain('aria-expanded="false"');
+    expect(markup).toContain('Advanced controls</button>');
+    expect(markup).not.toContain('Folder tendency');
+  });
+
+  it('disables the normalized strength slider without discarding its value', () => {
+    const settings = {
+      ...withFolderClusteringStrength(DEFAULT_GLOBAL_LAYOUT_SETTINGS, 75),
+      folderClustering: false,
+    };
+    const markup = renderToStaticMarkup(
+      <GraphSettings
+        focusAppearance="outline"
+        globalLayoutSettings={settings}
+        onFocusAppearanceChange={() => undefined}
+        onGlobalLayoutSettingsChange={() => undefined}
+        onOpenChange={() => undefined}
+        onTrackpadZoomModeChange={() => undefined}
+        open
+        trackpadZoomMode="pinch-zoom"
+      />,
+    );
+
+    expect(markup).toContain('aria-valuetext="75 percent" disabled=""');
+    expect(markup).toContain('value="75"');
   });
 });

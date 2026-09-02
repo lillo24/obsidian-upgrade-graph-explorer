@@ -122,7 +122,7 @@
   pointer-events: none;
 }
 
-.entity-card--local-structured[data-visual-group-color]::after {
+.entity-card--compact-schematic[data-visual-group-color]::after {
   width: 0.22rem;
 }
 
@@ -133,17 +133,17 @@
   align-items: center;
 }
 
-.graph-canvas[data-visual-variant='local-structured'] {
+.graph-canvas[data-visual-variant='compact-schematic'] {
   background:
     linear-gradient(rgb(255 255 255 / 42%), rgb(255 255 255 / 42%)), #e9eff1;
 }
 
-.graph-canvas .react-flow__node.graph-node--local-structured {
+.graph-canvas .react-flow__node.graph-node--compact-schematic {
   border-radius: 0.28rem;
 }
 
-.entity-card--local-structured,
-.diagnostic-card--local-structured {
+.entity-card--compact-schematic,
+.diagnostic-card--compact-schematic {
   justify-content: center;
   padding: 0.34rem 0.48rem;
   border-width: 1px;
@@ -152,19 +152,19 @@
   box-shadow: 0 0.22rem 0.55rem rgb(22 46 58 / 12%);
 }
 
-.entity-card--local-structured.entity-card--document {
+.entity-card--compact-schematic.entity-card--document {
   border: 1px solid #4f7584;
   border-left: 4px solid #245e74;
   background: #eef7f8;
 }
 
-.entity-card--local-structured.entity-card--section {
+.entity-card--compact-schematic.entity-card--section {
   border: 1px solid #756b9b;
   border-left: 3px solid #756b9b;
   background: #f3f1fa;
 }
 
-.entity-card--local-structured.entity-card--block {
+.entity-card--compact-schematic.entity-card--block {
   border: 1px dashed #85703f;
   background: #fffdf5;
 }
@@ -175,8 +175,8 @@
   box-shadow: 0 0.38rem 0.9rem rgb(28 78 97 / 24%);
 }
 
-.entity-card--local-structured .entity-title,
-.diagnostic-card--local-structured strong {
+.entity-card--compact-schematic .entity-title,
+.diagnostic-card--compact-schematic strong {
   overflow: hidden;
   font-size: 0.76rem;
   line-height: 1.15;
@@ -184,11 +184,11 @@
   white-space: nowrap;
 }
 
-.entity-card--local-structured .entity-detail {
+.entity-card--compact-schematic .entity-detail {
   display: none;
 }
 
-.local-structured-marker {
+.compact-hierarchy-marker {
   display: inline-grid;
   width: 1.05rem;
   height: 1.05rem;
@@ -200,26 +200,26 @@
   line-height: 1;
 }
 
-.local-structured-marker--section {
+.compact-hierarchy-marker--section {
   color: #695d91;
   font-size: 1rem;
 }
 
-.local-structured-marker--block {
+.compact-hierarchy-marker--block {
   color: #80672f;
   font-size: 0.62rem;
 }
 
-.local-structured-marker--diagnostic {
+.compact-hierarchy-marker--diagnostic {
   color: #9a5d24;
   font-size: 1rem;
 }
 
-.entity-card--local-structured.entity-card--has-footer {
+.entity-card--compact-schematic.entity-card--has-footer {
   padding-right: 2.6rem;
 }
 
-.entity-card--local-structured .entity-card__footer {
+.entity-card--compact-schematic .entity-card__footer {
   top: 50%;
   right: 0.1rem;
   bottom: auto;
@@ -228,17 +228,17 @@
   transform: translateY(-50%);
 }
 
-.entity-card--local-structured .internal-reference-badge {
+.entity-card--compact-schematic .internal-reference-badge {
   display: none;
 }
 
-.entity-card--local-structured .entity-disclosure {
+.entity-card--compact-schematic .entity-disclosure {
   min-width: 2.35rem;
   min-height: 2.35rem;
   font-size: 0.66rem;
 }
 
-.diagnostic-card--local-structured .diagnostic-card__topline {
+.diagnostic-card--compact-schematic .diagnostic-card__topline {
   min-width: 0;
   gap: 0.35rem;
   letter-spacing: 0;
@@ -465,12 +465,12 @@
   stroke-width: 1.2;
 }
 
-.graph-edge-path--local-structured.graph-edge-path--hierarchy {
+.graph-edge-path--compact-schematic.graph-edge-path--hierarchy {
   stroke: #71838b;
   stroke-width: 2.2;
 }
 
-.graph-edge-path--local-structured.graph-edge-path--reference {
+.graph-edge-path--compact-schematic.graph-edge-path--reference {
   opacity: 0.68;
   stroke-width: 1.35;
 }

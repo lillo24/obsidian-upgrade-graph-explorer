@@ -10,6 +10,7 @@ import {
   type GraphTransitionAnchor,
   type GraphTransitionAnchorApi,
   type GraphViewportObservation,
+  type GraphVisualVariant,
   type TrackpadZoomMode,
 } from '@icarus-graph-explorer/renderer-reactflow';
 import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
@@ -47,6 +48,7 @@ export interface LocalStructuredGraphViewProps {
   readonly selection: GraphSelection | null;
   readonly trackpadZoomMode: TrackpadZoomMode;
   readonly visualGroupStyles?: VisualGroupPresentationMap;
+  readonly visualVariant: GraphVisualVariant;
 }
 
 // Bounded page-lifetime coordinates only. They never enter saved view state or
@@ -115,7 +117,6 @@ export default function LocalStructuredGraphView({
         {...(instrumentation === undefined
           ? {}
           : { performance: instrumentation })}
-        visualVariant="local-structured"
       />
     </LocalStructuredErrorBoundary>
   );

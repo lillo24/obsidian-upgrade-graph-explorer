@@ -103,7 +103,7 @@ function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
     data.entityKind === 'document'
       ? data.sourcePath
       : `${data.sourcePath}, line ${data.sourceStartLine}`;
-  const structured = data.visualVariant === 'local-structured';
+  const compact = data.visualVariant === 'compact-schematic';
   const marker =
     data.entityKind === 'document'
       ? '▰'
@@ -112,7 +112,7 @@ function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
         : '●';
   return (
     <article
-      className={`entity-card entity-card--${data.entityKind} entity-card--${data.role}${hasFooter ? ' entity-card--has-footer' : ''}${hasDisclosure ? ' entity-card--has-disclosure' : ''}${structured ? ' entity-card--local-structured' : ''}${data.root ? ' entity-card--local-root' : ''}`}
+      className={`entity-card entity-card--${data.entityKind} entity-card--${data.role}${hasFooter ? ' entity-card--has-footer' : ''}${hasDisclosure ? ' entity-card--has-disclosure' : ''}${compact ? ' entity-card--compact-schematic' : ''}${data.root ? ' entity-card--local-root' : ''}`}
       data-entity-id={data.entityId}
       data-entity-kind={data.entityKind}
       data-focus-distance={data.focusDistance ?? undefined}
@@ -123,10 +123,10 @@ function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
     >
       <NodeHandles />
       <div className="entity-card__title-row">
-        {structured ? (
+        {compact ? (
           <span
             aria-hidden="true"
-            className={`local-structured-marker local-structured-marker--${data.entityKind}`}
+            className={`compact-hierarchy-marker compact-hierarchy-marker--${data.entityKind}`}
           >
             {marker}
           </span>
@@ -183,27 +183,27 @@ function DiagnosticNodeComponent({ data }: NodeProps<DiagnosticFlowNode>) {
       : data.reasonCount > 0
         ? `${data.reasonCount} reason${data.reasonCount === 1 ? '' : 's'}`
         : 'No target match';
-  const structured = data.visualVariant === 'local-structured';
+  const compact = data.visualVariant === 'compact-schematic';
   return (
     <article
-      className={`diagnostic-card diagnostic-card--${data.status}${structured ? ' diagnostic-card--local-structured' : ''}`}
+      className={`diagnostic-card diagnostic-card--${data.status}${compact ? ' diagnostic-card--compact-schematic' : ''}`}
       data-projection-node-id={data.projectionNodeId}
     >
       <NodeHandles />
       <div className="diagnostic-card__topline">
         <span
           className={
-            structured
-              ? 'local-structured-marker local-structured-marker--diagnostic'
+            compact
+              ? 'compact-hierarchy-marker compact-hierarchy-marker--diagnostic'
               : 'diagnostic-symbol'
           }
           aria-hidden="true"
         >
-          {structured ? '○' : statusSymbol}
+          {compact ? '○' : statusSymbol}
         </span>
-        <strong>{structured ? data.rawTarget : data.status}</strong>
+        <strong>{compact ? data.rawTarget : data.status}</strong>
       </div>
-      {structured ? null : (
+      {compact ? null : (
         <>
           <span
             className="diagnostic-target"

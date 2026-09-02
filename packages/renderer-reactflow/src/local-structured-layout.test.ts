@@ -9,8 +9,10 @@ import {
   seedLocalStructuredGraph,
 } from './local-structured-layout';
 import {
-  LOCAL_STRUCTURED_DIAGNOSTIC_NODE_DIMENSIONS,
-  LOCAL_STRUCTURED_ENTITY_NODE_DIMENSIONS,
+  COMPACT_HIERARCHY_DIAGNOSTIC_NODE_DIMENSIONS,
+  COMPACT_HIERARCHY_ENTITY_NODE_DIMENSIONS,
+  DIAGNOSTIC_NODE_DIMENSIONS,
+  ENTITY_NODE_DIMENSIONS,
   mapProjectionToReactFlow,
 } from './mapping';
 import { rendererTestProjection } from './test-fixture';
@@ -19,15 +21,17 @@ function localMapping() {
   return mapProjectionToReactFlow(
     rendererTestProjection(),
     'local-structured',
-    { visualVariant: 'local-structured', rootEntityId: 'document-a' },
+    { visualVariant: 'extended', rootEntityId: 'document-a' },
   );
 }
 
 describe('Local Structured schematic preparation', () => {
-  it('maps the same projection once with compact, opt-in dimensions and root emphasis', () => {
+  it('keeps Local Structured geometry independent from extended card density', () => {
     const projection = rendererTestProjection();
     const mapped = localMapping();
-    const standard = mapProjectionToReactFlow(projection, 'focus');
+    const compact = mapProjectionToReactFlow(projection, 'structure', {
+      visualVariant: 'compact-schematic',
+    });
     const root = mapped.nodes.find(
       (node) => node.data.projectionNodeId === 'projection-document',
     );
@@ -41,29 +45,37 @@ describe('Local Structured schematic preparation', () => {
     expect(mapped.nodes).toHaveLength(projection.nodes.length);
     expect(mapped.edges).toHaveLength(projection.edges.length);
     expect(root).toMatchObject({
-      width: LOCAL_STRUCTURED_ENTITY_NODE_DIMENSIONS.document.width,
-      height: LOCAL_STRUCTURED_ENTITY_NODE_DIMENSIONS.document.height,
-      data: { root: true, visualVariant: 'local-structured' },
+      width: ENTITY_NODE_DIMENSIONS.document.width,
+      height: ENTITY_NODE_DIMENSIONS.document.height,
+      data: { root: true, visualVariant: 'extended' },
     });
     expect(root?.className).toContain('graph-node--local-root');
     expect(section).toMatchObject({
-      width: LOCAL_STRUCTURED_ENTITY_NODE_DIMENSIONS.section.width,
-      height: LOCAL_STRUCTURED_ENTITY_NODE_DIMENSIONS.section.height,
+      width: ENTITY_NODE_DIMENSIONS.section.width,
+      height: ENTITY_NODE_DIMENSIONS.section.height,
     });
     expect(diagnostic).toMatchObject({
-      width: LOCAL_STRUCTURED_DIAGNOSTIC_NODE_DIMENSIONS.width,
-      height: LOCAL_STRUCTURED_DIAGNOSTIC_NODE_DIMENSIONS.height,
+      width: DIAGNOSTIC_NODE_DIMENSIONS.width,
+      height: DIAGNOSTIC_NODE_DIMENSIONS.height,
     });
     expect(mapped.edges[0]).toMatchObject({
       sourceHandle: 'source-right',
       targetHandle: 'target-left',
-      data: { visualVariant: 'local-structured' },
+      data: { visualVariant: 'extended' },
     });
-    const standardRoot = standard.nodes.find(
+    const compactRoot = compact.nodes.find(
       (node) => node.data.projectionNodeId === 'projection-document',
     );
-    expect(standardRoot).toMatchObject({ width: 200, height: 80 });
-    expect(standardRoot?.className).not.toContain('local-structured');
+    expect(compactRoot).toMatchObject({
+      width: COMPACT_HIERARCHY_ENTITY_NODE_DIMENSIONS.document.width,
+      height: COMPACT_HIERARCHY_ENTITY_NODE_DIMENSIONS.document.height,
+    });
+    expect(
+      compact.nodes.find(
+        (node) => node.data.projectionNodeId === 'projection-diagnostic',
+      ),
+    ).toMatchObject(COMPACT_HIERARCHY_DIAGNOSTIC_NODE_DIMENSIONS);
+    expect(compactRoot?.className).toContain('compact-schematic');
   });
 
   it('creates a deterministic, complete, finite, root-normalized immediate seed', () => {
@@ -116,6 +128,14 @@ describe('Local Structured schematic preparation', () => {
     );
     expect(
       localStructuredLayoutFingerprint(mapped.nodes, changedEdges),
+    ).not.toBe(fingerprint);
+    const compact = mapProjectionToReactFlow(
+      rendererTestProjection(),
+      'local-structured',
+      { visualVariant: 'compact-schematic', rootEntityId: 'document-a' },
+    );
+    expect(
+      localStructuredLayoutFingerprint(compact.nodes, compact.edges),
     ).not.toBe(fingerprint);
     expect(
       applyLocalStructuredPositions(

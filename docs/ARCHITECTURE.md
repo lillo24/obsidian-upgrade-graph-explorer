@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, and KG11 implements Tauri-selected, coalesced live vault acquisition with transactional KG10 application, full resync, and in-place view preservation. KG12 supplies the performance baseline and implements separate stateful W1 workspace and stateless W3 Dagre workers without changing KG11 transaction semantics or renderer-independent contracts. KG13A selected direct Sigma/Graphology for a complementary Global renderer. KG13B1 promotes it into the product as a lazy documents-first Global/Regional mode with off-main layout and soft folder geometry. KG13B2A adds bounded Local Free as an explicit third presentation with KG6 Focus/disclosure authority, deterministic immediate geometry, separate off-main layout, schema-v3 persistence/history, and Global transition anchoring. KG13B2B completes that Local presentation with a compact React Flow/W3 Structured schematic over the same bounded projection. General Structure remains the separate hierarchy/detail authority.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, and KG11 implements Tauri-selected, coalesced live vault acquisition with transactional KG10 application, full resync, and in-place view preservation. KG12 supplies the performance baseline and implements separate stateful W1 workspace and stateless W3 Dagre workers without changing KG11 transaction semantics or renderer-independent contracts. KG13A selected direct Sigma/Graphology for a complementary Global renderer. KG13B1 promotes it into the product as a lazy documents-first Global/Regional mode with off-main layout and soft folder geometry. KG13B2A adds bounded Local Free as an explicit third presentation with KG6 Focus/disclosure authority, deterministic immediate geometry, separate off-main layout, schema-v3 persistence/history, and Global transition anchoring. KG13B2B completes that Local presentation with a reusable React Flow/W3 schematic variant over the same bounded projection. PRE-KG14A4 assigns compact hierarchy cards to All and extended cards to Focus while preserving their separate Structure and Local Structured layout modes.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -646,14 +646,23 @@ projection, so changing layout does not rerun KG6. Neighbor files remain
 collapsed unless manually expanded.
 
 The Focus projection feeds Sigma plus the latest-only ForceAtlas2 Worker for
-Network, or compact React Flow plus the existing latest-only W3 Dagre Worker
-for Hierarchy. Captured screen-space root context anchors entry, layout changes,
+Network, or extended React Flow cards plus the existing latest-only W3 Dagre
+Worker for Hierarchy. All Hierarchy uses the compact schematic card grammar over
+its unchanged Structure projection and Dagre mode. Visual density is selected
+by one scope-to-variant seam and remains independent from layout mode; measured
+dimensions participate in layout/cache fingerprints. Captured screen-space root context anchors entry, layout changes,
 and Focus depth changes transiently; semantic centering is the safe fallback.
 No screen point is persisted. Scope All returns to the most recent true All
 history checkpoint, including its semantic viewport; a no-history fallback
 clears Focus and preserves the current layout. Focus headings never enter All
 Network topology, mutate its cache, or trigger whole-vault relayout.
 QUERY1 filtering and GROUP1 visual classification remain independent systems.
+Folder clustering remains an All Network-only spatial prior. Its product
+Strength control normalizes the existing persisted `folderCohesion` range to
+0–100%; spacing changes preserve that value, and hiding Advanced controls does
+not mutate preferences. Hierarchy renderers never observe the setting. The
+Global worker terminates superseded requests, so rapid slider input adopts only
+the latest valid result without adding a serial queue.
 GROUP1A's source-neutral backbone and renderer seams remain unchanged. GROUP1B
 adds a web-owned workspace session with durable, session-only, corrupt, and
 failed-write states; local create/edit drafts; one write-before-adopt commit;
@@ -761,9 +770,11 @@ against those same bounded projections. At 381 nodes/430 edges, mapping and
 seed medians are 0.748 ms and 0.410 ms; worker-equivalent Dagre is 93.297 ms
 and remains off-main, apply/root normalization is 0.231 ms, and an exact cache
 hit is 0.077 ms. Layout-only switching issues zero KG6/Global/workspace work.
-The React Flow variant exposes only a projected-node screen-point query,
-retains schema v3 with optional `structuredZoom`, and keeps standard Structure
-mapping/layout unchanged. See ADR 0015.
+The React Flow variant exposes only a projected-node screen-point query and
+retains schema v3 with optional `structuredZoom`. Those figures record the
+original compact-Focus assignment; PRE-KG14A4 reuses the same density grammar
+for All and gives Focus extended cards without changing either Dagre mode. See
+ADR 0015 and the current renderer contract.
 
 Rust, WASM, universal graph abstractions, and million-node optimization are not foundation requirements.
 

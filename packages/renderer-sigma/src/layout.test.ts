@@ -11,6 +11,7 @@ import { mapProjectionToGlobal } from './mapping';
 import {
   customGlobalLayoutSettings,
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+  withFolderClusteringStrength,
   resolveGlobalLayoutSettings,
   validateGlobalLayoutSettings,
 } from './settings';
@@ -55,6 +56,41 @@ describe('Global folder-aware layout', () => {
     expect(offset.positions).not.toEqual(chunked.positions);
     expect(chunked.metrics.meanCrossFolderReferenceLength).toBeGreaterThan(0);
     expect(offset.metrics.meanCrossFolderReferenceLength).toBeGreaterThan(0);
+  });
+
+  it.each([0, 100])(
+    'keeps folder strength %i finite, deterministic, and topology-neutral',
+    (strength) => {
+      const base = request('chunked-prior');
+      const settings = withFolderClusteringStrength(base.settings, strength);
+      const configured = { ...base, settings };
+      const first = computeGlobalLayout(configured);
+      const repeated = computeGlobalLayout(configured);
+
+      expect(repeated.positions).toEqual(first.positions);
+      expect(
+        first.positions.every(
+          ({ x, y }) => Number.isFinite(x) && Number.isFinite(y),
+        ),
+      ).toBe(true);
+      expect(configured.edges).toEqual(base.edges);
+    },
+  );
+
+  it('keeps strong cross-folder reference edges influential at maximum strength', () => {
+    const base = request('chunked-prior');
+    const settings = withFolderClusteringStrength(base.settings, 100);
+    const ordinary = computeGlobalLayout({ ...base, settings });
+    const strong = computeGlobalLayout({
+      ...base,
+      settings,
+      edges: base.edges.map((edge) =>
+        edge.key === 'edge-ac' ? { ...edge, weight: 40 } : edge,
+      ),
+    });
+
+    expect(strong.positions).not.toEqual(ordinary.positions);
+    expect(strong.metrics.meanCrossFolderReferenceLength).toBeGreaterThan(0);
   });
 
   it('validates presets and every custom bound', () => {

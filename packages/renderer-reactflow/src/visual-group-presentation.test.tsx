@@ -104,12 +104,12 @@ describe('React Flow Visual Group presentation seam', () => {
     );
   });
 
-  it('reuses the same style seam in Local Structured without changing W3 geometry', () => {
+  it('reuses the same style seam in Local Structured with extended cards', () => {
     const projection = rendererTestProjection();
     const structured = mapProjectionToReactFlow(
       projection,
       'local-structured',
-      { visualVariant: 'local-structured', rootEntityId: 'document-a' },
+      { visualVariant: 'extended', rootEntityId: 'document-a' },
     );
     const before = localStructuredLayoutFingerprint(
       structured.nodes,
@@ -132,9 +132,9 @@ describe('React Flow Visual Group presentation seam', () => {
       ),
     ).toEqual(
       new Map([
-        ['projection-document', { width: 156, height: 46 }],
-        ['projection-section', { width: 148, height: 42 }],
-        ['projection-diagnostic', { width: 148, height: 42 }],
+        ['projection-document', { width: 200, height: 80 }],
+        ['projection-section', { width: 184, height: 72 }],
+        ['projection-diagnostic', { width: 208, height: 94 }],
       ]),
     );
   });

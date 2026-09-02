@@ -40,7 +40,8 @@ canonical truth, or own a platform storage implementation.
   policy, and storage remain outside the component.
 - `ExplorationControls.tsx` owns the accessible Scope and Layout button groups,
   focused-root text, and explained disabled Focus state. `../exploration-model.ts`
-  owns the pure four-way mapping to existing internal modes.
+  owns the pure four-way mapping to existing internal modes plus the hierarchy
+  density decision: All uses `compact-schematic`, Focus uses `extended`.
 - `StructureDepthControl.tsx` owns the labeled Hierarchy depth select and
   compact Custom override indicator, and
   `structure-depth-selection.ts` maps its four options onto the existing
@@ -54,7 +55,9 @@ canonical truth, or own a platform storage implementation.
   Appearance/Layout/Interaction separately from the App-owned Source and
   Diagnostic controls while keeping both panels mounted. `graph-settings-tabs.ts`
   owns the two-tab keyboard transition. Global layout controls edit one validated
-  serializable preference rather than scattering component-local physics values;
+  serializable preference rather than scattering component-local physics values.
+  Folder Strength is a normalized view of the existing `folderCohesion` field;
+  its Advanced disclosure is transient and applies only to All Network;
   global focus-root and gesture preference storage remains in `../preferences/`.
 - `SourceSettingsSection.tsx` presents safe current-source metadata, browser
   report/sample switching, desktop vault/rescan actions, and exceptional local
