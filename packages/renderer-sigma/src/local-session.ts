@@ -129,7 +129,7 @@ export class LocalRendererSession {
     camera.setState(
       this.renderer.getViewportZoomedState(
         { x: coordinates.x, y: coordinates.y },
-        ratioAfterWheelDelta(camera.ratio, delta),
+        ratioAfterWheelDelta(camera.ratio, delta, original.ctrlKey),
       ),
     );
     const captor = this.renderer.getMouseCaptor();

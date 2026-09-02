@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { GLOBAL_INTERACTION_OPERATION_CONTRACTS } from './interaction-contract';
 import { LOCAL_INTERACTION_OPERATION_CONTRACTS } from './local-interaction-contract';
 import {
-  FINE_ZOOM_SENSITIVITY,
+  FINE_PINCH_ZOOM_SENSITIVITY,
+  FINE_SCROLL_ZOOM_SENSITIVITY,
   GLOBAL_ZOOM_SENSITIVITY,
   isCoarseWheelDelta,
   normalizeWheelDeltaPixels,
@@ -43,6 +44,7 @@ const edge: GlobalEdgeAttributes = {
 
 interface TimedWheelDelta {
   readonly at: number;
+  readonly ctrlKey?: boolean;
   readonly deltaMode?: number;
   readonly deltaY: number;
 }
@@ -65,7 +67,7 @@ function applyWheelSequence(events: readonly TimedWheelDelta[]): {
       event.at,
       isCoarseWheelDelta(deltaPixels),
     );
-    ratio = ratioAfterWheelDelta(ratio, applied);
+    ratio = ratioAfterWheelDelta(ratio, applied, event.ctrlKey);
     appliedDeltas.push(applied);
     ratios.push(ratio);
   }
@@ -135,7 +137,8 @@ describe('Global visual interactions', () => {
 
   it('preserves many tiny same-direction deltas proportionally and monotonically', () => {
     expect(GLOBAL_ZOOM_SENSITIVITY).toBe(0.0017);
-    expect(FINE_ZOOM_SENSITIVITY).toBe(0.00255);
+    expect(FINE_SCROLL_ZOOM_SENSITIVITY).toBe(0.0019);
+    expect(FINE_PINCH_ZOOM_SENSITIVITY).toBe(0.0051);
     const events = Array.from({ length: 40 }, (_, index) => ({
       at: index * 16.7,
       deltaY: 0.01 + index * 0.001,
@@ -154,12 +157,16 @@ describe('Global visual interactions', () => {
     );
   });
 
-  it('increases fine-input travel without changing the coarse-event gain', () => {
+  it('gives pinch stronger fine travel without changing the coarse-event gain', () => {
     expect(ratioAfterWheelDelta(1, 1)).toBeCloseTo(
-      Math.exp(FINE_ZOOM_SENSITIVITY),
+      Math.exp(FINE_SCROLL_ZOOM_SENSITIVITY),
       12,
     );
-    expect(ratioAfterWheelDelta(1, 8.01)).toBeCloseTo(
+    expect(ratioAfterWheelDelta(1, 1, true)).toBeCloseTo(
+      Math.exp(FINE_PINCH_ZOOM_SENSITIVITY),
+      12,
+    );
+    expect(ratioAfterWheelDelta(1, 8.01, true)).toBeCloseTo(
       Math.exp(8.01 * GLOBAL_ZOOM_SENSITIVITY),
       12,
     );

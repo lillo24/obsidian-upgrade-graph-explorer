@@ -139,7 +139,12 @@ export class GlobalRendererSession {
       isCoarseWheelDelta(deltaPixels),
     );
     if (stabilizedDeltaPixels === 0) return;
-    this.applyWheelZoom(coordinates.x, coordinates.y, stabilizedDeltaPixels);
+    this.applyWheelZoom(
+      coordinates.x,
+      coordinates.y,
+      stabilizedDeltaPixels,
+      original.ctrlKey,
+    );
     const mouseCaptor = this.renderer.getMouseCaptor();
     mouseCaptor.currentWheelDirection = stabilizedDeltaPixels > 0 ? -1 : 1;
     if (this.precisionWheelIdleTimer !== undefined) {
@@ -213,9 +218,14 @@ export class GlobalRendererSession {
     });
   }
 
-  private applyWheelZoom(x: number, y: number, deltaPixels: number): void {
+  private applyWheelZoom(
+    x: number,
+    y: number,
+    deltaPixels: number,
+    ctrlKey: boolean,
+  ): void {
     const camera = this.renderer.getCamera();
-    const ratio = ratioAfterWheelDelta(camera.ratio, deltaPixels);
+    const ratio = ratioAfterWheelDelta(camera.ratio, deltaPixels, ctrlKey);
     camera.setState(this.renderer.getViewportZoomedState({ x, y }, ratio));
   }
 

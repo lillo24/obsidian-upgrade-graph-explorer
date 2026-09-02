@@ -4,7 +4,8 @@ const PRECISE_LINEAR_DELTA_PIXELS = 8;
 const MAX_EFFECTIVE_DELTA_PIXELS = 34;
 const REVERSAL_GAP_MS = 90;
 export const GLOBAL_ZOOM_SENSITIVITY = 0.0017;
-export const FINE_ZOOM_SENSITIVITY = 0.00255;
+export const FINE_SCROLL_ZOOM_SENSITIVITY = 0.0019;
+export const FINE_PINCH_ZOOM_SENSITIVITY = 0.0051;
 
 export interface WheelDeltaInput {
   readonly deltaMode: number;
@@ -94,9 +95,12 @@ export function isCoarseWheelDelta(deltaPixels: number): boolean {
 export function ratioAfterWheelDelta(
   currentRatio: number,
   deltaPixels: number,
+  ctrlKey = false,
 ): number {
   const sensitivity = isCoarseWheelDelta(deltaPixels)
     ? GLOBAL_ZOOM_SENSITIVITY
-    : FINE_ZOOM_SENSITIVITY;
+    : ctrlKey
+      ? FINE_PINCH_ZOOM_SENSITIVITY
+      : FINE_SCROLL_ZOOM_SENSITIVITY;
   return currentRatio * Math.exp(deltaPixels * sensitivity);
 }
