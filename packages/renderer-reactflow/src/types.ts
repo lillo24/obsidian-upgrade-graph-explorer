@@ -47,6 +47,8 @@ export interface GraphTransitionAnchorApi {
   readonly nodeViewportPoint: (
     nodeId: ProjectionNodeId,
   ) => GraphViewportPoint | undefined;
+  /** Stage one semantic node for the next same-renderer topology/layout pass. */
+  readonly stageNodeAnchor: (nodeId: ProjectionNodeId) => boolean;
 }
 
 export interface GraphTransitionAnchor {

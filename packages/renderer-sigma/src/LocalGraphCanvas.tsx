@@ -160,8 +160,8 @@ export function LocalGraphCanvas({
   const [layoutCommitKey, setLayoutCommitKey] = useState(0);
   const [layoutStatus, setLayoutStatus] = useState(
     initial.cached
-      ? 'Local layout restored from memory.'
-      : 'Local context is ready; refining layout…',
+      ? 'Focus Network layout restored from memory.'
+      : 'Focus Network is ready; refining layout…',
   );
   const [layoutError, setLayoutError] = useState<string>();
 
@@ -202,6 +202,7 @@ export function LocalGraphCanvas({
     sessionRef.current = mounted.session;
     callbacks.current.onTransitionAnchorApiChange?.({
       nodeViewportPoint: (nodeId) => mounted.session.nodeViewportPoint(nodeId),
+      stageNodeAnchor: (nodeId) => mounted.session.stageNodeAnchor(nodeId),
     });
     if (initial.initialTransitionAnchor !== undefined) {
       callbacks.current.onTransitionAnchorConsumed?.(
@@ -266,7 +267,7 @@ export function LocalGraphCanvas({
           if (cancelled) return;
           layoutPending.current = false;
           setLayoutError(undefined);
-          setLayoutStatus('Local layout restored from memory.');
+          setLayoutStatus('Focus Network layout restored from memory.');
           setLayoutCommitKey((current) => current + 1);
         })
         .catch((error: unknown) => {
@@ -279,7 +280,7 @@ export function LocalGraphCanvas({
     queueMicrotask(() => {
       if (!cancelled) {
         setLayoutError(undefined);
-        setLayoutStatus('Local context is ready; refining layout…');
+        setLayoutStatus('Focus Network is ready; refining layout…');
       }
     });
     const request = session.createLayoutRequest(
@@ -301,15 +302,17 @@ export function LocalGraphCanvas({
         instrumentation?.record('local-layout-worker', result.computeMs);
         cache.set(fingerprint, result.positions);
         layoutPending.current = false;
-        setLayoutStatus('Local Free layout ready.');
+        setLayoutStatus('Focus Network layout ready.');
         setLayoutCommitKey((current) => current + 1);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        const message = `Local layout failed: ${errorMessage(error)}`;
+        const message = `Focus Network layout failed: ${errorMessage(error)}`;
         layoutPending.current = false;
         setLayoutError(message);
-        setLayoutStatus('The last valid Local positions remain visible.');
+        setLayoutStatus(
+          'The last valid Focus Network positions remain visible.',
+        );
         setLayoutCommitKey((current) => current + 1);
       });
     return () => {
@@ -369,7 +372,7 @@ export function LocalGraphCanvas({
     <div className="local-graph-canvas">
       <div className="local-graph-canvas__surface" ref={containerRef} />
       <div
-        aria-label="Local canvas controls"
+        aria-label="Focus Network canvas controls"
         className="local-graph-canvas__controls"
         role="group"
       >

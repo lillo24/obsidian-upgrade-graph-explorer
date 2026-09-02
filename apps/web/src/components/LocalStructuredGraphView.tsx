@@ -77,7 +77,7 @@ class LocalStructuredErrorBoundary extends Component<
       this.props.children
     ) : (
       <div className="graph-failure" role="alert">
-        Local Structured could not mount: {this.state.message}
+        Focus Hierarchy could not mount: {this.state.message}
       </div>
     );
   }

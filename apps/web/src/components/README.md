@@ -17,7 +17,8 @@ canonical truth, or own a platform storage implementation.
   changes and does not re-derive graph edges or persist renderer coordinates or
   shell visibility. Maximize/restore is passed to the renderer as a narrow
   callback so the canvas control stack remains the mode trigger. KG13B1 adds
-  lazy Structure/Global and KG13B2A adds explicit Local Free, each with separate
+  internal Structure/Global/Local renderers through the user-facing Scope ×
+  Layout model, each with separate
   semantic viewports and cross-mode history/context. Local uses the KG6 Focus
   root, captures a transient Global screen anchor, keeps Global topology/cache
   isolated from Local disclosure, and exits explicitly if its stable root is
@@ -26,7 +27,8 @@ canonical truth, or own a platform storage implementation.
   preserve that camera. Transition anchors and Local Fit requests are consumed
   once, preventing remount or Back/Forward from replaying stale camera work.
   Graphology, worker positions, and transition points are never persisted.
-  KG13B2B adds a Local-only Free/Structured preference below that same
+  `ExplorationControls.tsx` presents accessible All/Focus and Network/Hierarchy
+  choices derived from schema-v3 state. Both Focus layouts share the same
   memoized projection. The selected visible node, or root fallback, crosses the
   renderer boundary only as a transient viewport point. Layout switching is not
   history and never starts hidden workers or Global/projection work. Inactive Focus
@@ -36,7 +38,11 @@ canonical truth, or own a platform storage implementation.
   group shared by the normal toolbar and maximized floating controls. It receives
   only availability and callbacks; graph state, semantic viewport, keyboard
   policy, and storage remain outside the component.
-- `StructureDepthControl.tsx` owns the labeled Structure-only depth select and
+- `ExplorationControls.tsx` owns the accessible Scope and Layout button groups,
+  focused-root text, and explained disabled Focus state. `../exploration-model.ts`
+  owns the pure four-way mapping to existing internal modes.
+- `StructureDepthControl.tsx` owns the labeled Hierarchy depth select and
+  compact Custom override indicator, and
   `structure-depth-selection.ts` maps its four options onto the existing
   structural-depth action. Choosing a depth is a fresh preset: it clears
   per-entity expand/collapse exceptions while preserving the independent
@@ -69,7 +75,7 @@ canonical truth, or own a platform storage implementation.
 - `GraphFilters.tsx` owns the controlled toolbar trigger and responsive nonmodal
   panel for path, entity content, literal Markdown Heading limit, reference
   status, the local Advanced query draft/apply boundary, and workspace-scoped
-  Saved Filters. Structure depth remains a separate four-option select.
+  Saved Filters. Hierarchy depth remains a separate four-option select.
   Blocks is
   represented once through disclosure state; `graph-filter-count.ts` derives
   its user-visible active-group badge, while `graph-filters-overlay.ts` gives
@@ -92,7 +98,7 @@ canonical truth, or own a platform storage implementation.
   canvas. It owns the Worker service and a bounded module-lifetime layout cache
   so Structure startup stays Sigma-free and exact results survive mode switches.
   Its narrow document-activation callback sends Global double-click through the
-  same `GraphExplorer` Open Local/history/transition-anchor path as Inspector;
+  same `GraphExplorer` Focus/history/transition-anchor path as Inspector;
   Sigma default double-click zoom is already consumed inside the renderer.
 - `LocalGraphView.tsx` owns the separate Local Free worker client and bounded
   page-lifetime layout cache. An exact hit warms the first canvas draw; otherwise
@@ -111,7 +117,7 @@ canonical truth, or own a platform storage implementation.
   internal occurrences stay in a closed-by-default technical disclosure. It is
   always an overlay drawer, keeps clear-selection separate from collapse, and
   resets bounded content only when the inspected selection changes. A selected
-  Global document receives **Open Local** and the exact **Open in Structure**
+  an All-scope entity receives **Focus** and the exact **Open full hierarchy**
   handoff. In Local, the selected expandable entity receives one accessible
   Expand/Collapse action while Inspector remains shared rather than duplicated.
   Selected canonical entities also show their ordered enabled Visual Group

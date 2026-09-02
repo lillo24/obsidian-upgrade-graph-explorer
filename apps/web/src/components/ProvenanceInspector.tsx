@@ -31,8 +31,8 @@ interface ProvenanceInspectorProps {
   readonly onClear: () => void;
   readonly onClose: () => void;
   readonly onNavigate: (entityId: EntityId, origin: string) => void;
-  readonly onOpenInStructure?: (entityId: EntityId) => void;
-  readonly onOpenLocal?: (entityId: EntityId) => void;
+  readonly onOpenFullHierarchy?: (entityId: EntityId) => void;
+  readonly onFocus?: (entityId: EntityId) => void;
   readonly disclosureControl?: {
     readonly entityId: EntityId;
     readonly label: 'Expand' | 'Collapse';
@@ -889,8 +889,8 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
   onClose,
   disclosureControl,
   onNavigate,
-  onOpenInStructure,
-  onOpenLocal,
+  onOpenFullHierarchy,
+  onFocus,
   onToggleDisclosure,
   performance,
   projection,
@@ -951,21 +951,18 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
         </button>
         <h3>Inspector</h3>
         <div className="selection-panel__actions">
-          {onOpenInStructure !== undefined &&
+          {onOpenFullHierarchy !== undefined &&
           inspectedEntityId !== undefined ? (
             <button
-              onClick={() => onOpenInStructure(inspectedEntityId)}
+              onClick={() => onOpenFullHierarchy(inspectedEntityId)}
               type="button"
             >
-              Open in Structure
+              Open full hierarchy
             </button>
           ) : null}
-          {onOpenLocal !== undefined && inspectedEntityId !== undefined ? (
-            <button
-              onClick={() => onOpenLocal(inspectedEntityId)}
-              type="button"
-            >
-              Open Local
+          {onFocus !== undefined && inspectedEntityId !== undefined ? (
+            <button onClick={() => onFocus(inspectedEntityId)} type="button">
+              Focus
             </button>
           ) : null}
           {disclosureControl === undefined ||

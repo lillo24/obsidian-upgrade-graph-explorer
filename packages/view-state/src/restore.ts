@@ -307,32 +307,28 @@ export function restorePersistedWorkspaceView(
         : { ...persistedFocus, rootEntityId: localRootEntityId }
       : persistedFocus;
   const persistedDisclosure = persisted.projection.disclosure;
-  const localExpanded =
-    localRootEntityId === undefined
-      ? persistedDisclosure.expandedEntityIds
-      : [
-          ...new Set([
-            ...persistedDisclosure.expandedEntityIds,
-            localRootEntityId,
-          ]),
-        ].sort(compareText);
-  const localCollapsed =
-    localRootEntityId === undefined
-      ? persistedDisclosure.collapsedEntityIds
-      : persistedDisclosure.collapsedEntityIds.filter(
-          (entityId) => entityId !== localRootEntityId,
-        );
+  // Earlier schema-v3 Local entry encoded its automatic top-level detail as
+  // depth 0 plus an expanded document root. That root-only signature is
+  // normalized on read while every other manual override remains untouched.
+  const legacyLocalRootExpansion =
+    localRootEntityId !== undefined &&
+    persistedDisclosure.defaultDepth === 0 &&
+    persistedDisclosure.expandedEntityIds.includes(localRootEntityId);
+  const localExpanded = legacyLocalRootExpansion
+    ? persistedDisclosure.expandedEntityIds.filter(
+        (entityId) => entityId !== localRootEntityId,
+      )
+    : persistedDisclosure.expandedEntityIds;
   const state: ViewProjectionState = {
     disclosure: {
-      defaultDepth:
-        localRootEntityId === undefined ? persistedDisclosure.defaultDepth : 0,
+      defaultDepth: persistedDisclosure.defaultDepth,
       ...(persistedDisclosure.maxSectionLevel === undefined
         ? {}
         : {
             maxSectionLevel: persistedDisclosure.maxSectionLevel,
           }),
       expandedEntityIds: localExpanded,
-      collapsedEntityIds: localCollapsed,
+      collapsedEntityIds: persistedDisclosure.collapsedEntityIds,
       includeBlocks: persistedDisclosure.includeBlocks,
     },
     ...(normalizedFocus === undefined ? {} : { focus: normalizedFocus }),
@@ -345,8 +341,22 @@ export function restorePersistedWorkspaceView(
     'Saved',
     false,
   );
+  const legacyIssue: ViewRestoreIssue | undefined =
+    legacyLocalRootExpansion && localRootEntityId !== undefined
+      ? {
+          code: 'legacy-local-root-expansion-removed',
+          subject: localRootEntityId,
+          message:
+            `Saved Focus root "${localRootEntityId}" used the earlier automatic ` +
+            'expansion marker; that marker was removed while other disclosure choices were preserved.',
+        }
+      : undefined;
   return {
     ...reconciled,
+    issues:
+      legacyIssue === undefined
+        ? reconciled.issues
+        : [legacyIssue, ...reconciled.issues],
     presentationMode:
       persisted.presentationMode === 'local' &&
       reconciled.state.focus === undefined

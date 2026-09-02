@@ -606,45 +606,53 @@ selected source tree.
 ## UI, renderer, and platform roles
 
 React and Vite implement the SPA shell; they are outer-layer delivery choices,
-not domain dependencies. React Flow remains the Structure renderer because the
-product needs interactive hierarchical detail, exact provenance, and
-disclosure. It receives only KG6 projections and uses deterministic Dagre
-layout. Literal lazy imports load direct Sigma/Graphology only on first Global
-or Local activation. Global is documents-first and effectively resolved-only unless the
-user explicitly chose reference statuses. It shares KG6 filters/focus, KG8
-Search/Inspector, and exact canonical context with Structure, but owns only a
-visual overview and Regional style LOD. Search documents stay Global; section
-or block results and **Open in Structure** return to exact hierarchical detail.
-WebGL/startup failure is explicit and leaves Structure available without
-deleting the persisted presentation preference.
+not domain dependencies. React Flow remains the internal Structure renderer
+because the product needs interactive hierarchical detail, exact provenance,
+and disclosure. It receives only KG6 projections and uses deterministic Dagre
+layout. Literal lazy imports load direct Sigma/Graphology only on first All
+Network or Focus Network activation (the internal Global and Local modules).
+All Network is documents-first and effectively resolved-only unless the user
+explicitly chose reference statuses. It shares KG6 filters/focus, KG8
+Search/Inspector, and exact canonical context with Hierarchy, but owns only a
+visual overview and Regional style LOD. Search documents stay All Network;
+section or block results and **Open full hierarchy** return to exact
+hierarchical detail. WebGL/startup failure is explicit and leaves All Hierarchy
+available without deleting the persisted presentation preference.
 
-Structure Focus is a source-neutral two-pass projection. A documents-only,
+Focus is a source-neutral two-pass projection. A documents-only,
 prefiltered hop traversal first fixes file membership from the containing
 document of the exact Focus root. A second pass applies full filters and precise
 endpoint routing while automatic structural depth is scoped only to that root
 document. Neighbor files remain manually expandable, and precise heading
 endpoints cannot add or remove files from the established neighborhood. Ordinary
-non-Focus Structure depth remains global.
+All Hierarchy depth remains global.
 
-The production presentation model is `Structure | Global | Local`. Local is
-entered explicitly from a selected Global file. It reuses KG6 Focus and
-disclosure, normalizes the root to a stable document, and projects only that
-bounded document neighborhood plus disclosed headings/blocks and exact
-diagnostics. The root's top headings appear while neighboring files remain
-collapsed. That one memoized projection feeds either Local Free (Sigma plus a
-latest-only ForceAtlas2 Worker) or Local Structured (compact React Flow plus
-the existing latest-only W3 Dagre Worker). Both show deterministic immediate
-seed geometry, normalize the root to origin, share Search/Inspector/disclosure,
-and keep only an exact bounded memory cache. Captured renderer screen context
-anchors the selected node or root transiently and semantic centering is the
-safe fallback. The Free/Structured choice is an existing user preference, not
-canonical or history state. Local headings never enter Global topology, mutate
-its cache, or trigger whole-vault relayout.
-Global document double-click is a shortcut to that exact existing Local-entry
-orchestration. The Sigma 3.0.3 node event prevents its default camera zoom,
-diagnostic nodes do not activate, and the application still owns history,
-selection, transition anchoring, root normalization, and the Free/Structured
-preference.
+The user-facing exploration model is the product of two independent choices:
+`Scope = All | Focus` and `Layout = Network | Hierarchy`. The existing internal
+schema-v3 modes remain implementation details: All Network maps to `global`,
+All Hierarchy to `structure`, Focus Network to `local/free`, and Focus Hierarchy
+to `local/structured`. This is a UI normalization, not a persisted-contract
+rename. Regional remains ordinary visual LOD inside Network rather than a fifth
+mode.
+
+Both All layouts enter Focus through one application planner and NAV1 history
+path. Focus normalizes the root to a stable document and projects only that
+bounded document neighborhood plus root-scoped hierarchy detail and exact
+diagnostics. Hierarchy Depth is hidden in All Network, global in All Hierarchy,
+and root-scoped in both Focus layouts. A fresh All Network entry starts at depth
+0; All Hierarchy entry inherits its current preset. Both clear unrelated manual
+disclosure overrides. Network and Hierarchy consume the same memoized Focus
+projection, so changing layout does not rerun KG6. Neighbor files remain
+collapsed unless manually expanded.
+
+The Focus projection feeds Sigma plus the latest-only ForceAtlas2 Worker for
+Network, or compact React Flow plus the existing latest-only W3 Dagre Worker
+for Hierarchy. Captured screen-space root context anchors entry, layout changes,
+and Focus depth changes transiently; semantic centering is the safe fallback.
+No screen point is persisted. Scope All returns to the most recent true All
+history checkpoint, including its semantic viewport; a no-history fallback
+clears Focus and preserves the current layout. Focus headings never enter All
+Network topology, mutate its cache, or trigger whole-vault relayout.
 QUERY1 filtering and GROUP1 visual classification remain independent systems.
 GROUP1A's source-neutral backbone and renderer seams remain unchanged. GROUP1B
 adds a web-owned workspace session with durable, session-only, corrupt, and
@@ -652,7 +660,7 @@ failed-write states; local create/edit drafts; one write-before-adopt commit;
 and explicit two-step corrupt-registry recovery. Definitions compile only when
 the registry array changes. A snapshot-scoped canonical lookup and the current
 already-completed projection derive one `EntityId` presentation map shared by
-Structure, Global, Local Free, and Local Structured. Group changes therefore
+All Hierarchy, All Network, Focus Network, and Focus Hierarchy. Group changes therefore
 restyle nodes without entering KG6, navigation history, renderer topology,
 layout inputs/caches, or semantic viewport state. Selected canonical entities
 use the compiled all-match evaluator in Inspector; diagnostics and edges opt

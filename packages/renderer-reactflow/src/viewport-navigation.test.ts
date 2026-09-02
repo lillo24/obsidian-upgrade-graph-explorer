@@ -13,6 +13,7 @@ import {
   wheelActionForMode,
   viewportAfterWheelZoom,
   viewportForDisclosureAnchor,
+  viewportPointForNode,
 } from './viewport-navigation';
 
 function graphAt(documentX: number, documentY: number): RendererGraph {
@@ -151,5 +152,17 @@ describe('viewport navigation', () => {
       y: -8,
       zoom: 0.75,
     });
+  });
+
+  it('prefers measured runtime bounds when capturing a transition point', () => {
+    const graph = graphAt(10, 20);
+    const point = viewportPointForNode(
+      graph,
+      'projection-document',
+      { x: 40, y: -30, zoom: 1.25 },
+      { x: 10, y: 20, width: 240, height: 100 },
+    );
+
+    expect(point).toEqual({ x: 202.5, y: 57.5 });
   });
 });

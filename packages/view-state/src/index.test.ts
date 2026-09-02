@@ -257,6 +257,80 @@ describe('persisted workspace view', () => {
     expect(JSON.stringify(value)).not.toMatch(/"[xy]":/u);
   });
 
+  it('normalizes only the legacy schema-v3 Local root expansion signature', () => {
+    const workspace = createProjectionWorkspace(snapshot());
+    const current = createPersistedWorkspaceView({
+      workspace,
+      state: {
+        disclosure: {
+          defaultDepth: 0,
+          expandedEntityIds: ['doc-a', 'section-one'],
+          collapsedEntityIds: ['doc-b'],
+          includeBlocks: false,
+        },
+        focus: {
+          rootEntityId: 'doc-a',
+          hops: 1,
+          direction: 'both',
+          hierarchyContext: 'ancestors-and-children',
+        },
+      },
+      presentationMode: 'local',
+    });
+    const saved = {
+      ...current,
+      projection: {
+        ...current.projection,
+        disclosure: {
+          ...current.projection.disclosure,
+          expandedEntityIds: ['doc-a', 'section-one'],
+        },
+      },
+    };
+
+    const restored = restorePersistedWorkspaceView(workspace, saved);
+
+    expect(restored.state.disclosure).toMatchObject({
+      defaultDepth: 0,
+      expandedEntityIds: ['section-one'],
+      collapsedEntityIds: ['doc-b'],
+    });
+    expect(restored.issues).toEqual([
+      expect.objectContaining({
+        code: 'legacy-local-root-expansion-removed',
+        subject: 'doc-a',
+      }),
+    ]);
+  });
+
+  it('preserves depth and manual root expansion outside the legacy signature', () => {
+    const workspace = createProjectionWorkspace(snapshot());
+    const saved = createPersistedWorkspaceView({
+      workspace,
+      state: {
+        disclosure: {
+          defaultDepth: 2,
+          expandedEntityIds: ['doc-a'],
+          collapsedEntityIds: [],
+          includeBlocks: false,
+        },
+        focus: {
+          rootEntityId: 'doc-a',
+          hops: 1,
+          direction: 'both',
+          hierarchyContext: 'ancestors-and-children',
+        },
+      },
+      presentationMode: 'local',
+    });
+
+    const restored = restorePersistedWorkspaceView(workspace, saved);
+
+    expect(restored.state.disclosure.defaultDepth).toBe(2);
+    expect(restored.state.disclosure.expandedEntityIds).toEqual(['doc-a']);
+    expect(restored.issues).toEqual([]);
+  });
+
   it('normalizes a Local section root to its document and exits without fuzzy reassignment when it is deleted', () => {
     const workspace = createProjectionWorkspace(snapshot());
     const saved = createPersistedWorkspaceView({

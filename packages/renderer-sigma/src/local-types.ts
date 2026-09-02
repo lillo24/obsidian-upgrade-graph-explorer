@@ -187,4 +187,6 @@ export interface LocalTransitionAnchorApi {
   readonly nodeViewportPoint: (
     nodeId: ProjectionNodeId,
   ) => LocalViewportPoint | undefined;
+  /** Stage one semantic node for the next same-renderer topology/layout pass. */
+  readonly stageNodeAnchor: (nodeId: ProjectionNodeId) => boolean;
 }

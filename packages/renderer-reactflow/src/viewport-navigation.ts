@@ -26,6 +26,13 @@ export interface DisclosureAnchor {
   readonly zoom: number;
 }
 
+export interface RuntimeNodeBounds {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 export type WheelNavigationAction = 'pan' | 'zoom';
 
 /** Decide gesture ownership before React Flow handles an ordinary wheel event. */
@@ -59,6 +66,38 @@ function nodeCenter(
   return {
     x: node.position.x + width / 2,
     y: node.position.y + height / 2,
+  };
+}
+
+/** Resolve a projected node's visible point, preferring renderer measurements. */
+export function viewportPointForNode(
+  graph: RendererGraph,
+  projectionNodeId: string,
+  viewport: RendererViewport,
+  runtimeBounds?: RuntimeNodeBounds,
+): { readonly x: number; readonly y: number } | null {
+  if (!Number.isFinite(viewport.zoom) || viewport.zoom <= 0) return null;
+  const node = graph.nodes.find(
+    (candidate) => candidate.data.projectionNodeId === projectionNodeId,
+  );
+  if (node === undefined) return null;
+  const runtimeCenter =
+    runtimeBounds !== undefined &&
+    Number.isFinite(runtimeBounds.x) &&
+    Number.isFinite(runtimeBounds.y) &&
+    Number.isFinite(runtimeBounds.width) &&
+    Number.isFinite(runtimeBounds.height)
+      ? {
+          x: runtimeBounds.x + runtimeBounds.width / 2,
+          y: runtimeBounds.y + runtimeBounds.height / 2,
+        }
+      : null;
+  const center =
+    runtimeCenter ?? nodeCenter(graph, (candidate) => candidate.id === node.id);
+  if (center === null) return null;
+  return {
+    x: center.x * viewport.zoom + viewport.x,
+    y: center.y * viewport.zoom + viewport.y,
   };
 }
 

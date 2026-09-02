@@ -50,7 +50,7 @@ export function mountLocalRendererSession<T extends DisposableLocalRenderer>(
   } catch (error: unknown) {
     return {
       ok: false,
-      message: `Local Free WebGL initialization failed: ${
+      message: `Focus Network WebGL initialization failed: ${
         error instanceof Error ? error.message : String(error)
       }`,
     };

@@ -15,7 +15,7 @@ function structuralDepthFromValue(value: string): StructuralDepth {
     ({ depth }) => String(depth) === value,
   );
   if (option === undefined) {
-    throw new Error(`Unknown Structure depth value "${value}".`);
+    throw new Error(`Unknown Hierarchy depth value "${value}".`);
   }
   return option.depth;
 }

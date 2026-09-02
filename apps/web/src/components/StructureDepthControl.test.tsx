@@ -7,7 +7,7 @@ import { graphStateReducer, initialGraphState } from '../graph-state';
 import { applyStructureDepthSelection } from './structure-depth-selection';
 import { StructureDepthControl } from './StructureDepthControl';
 
-describe('Structure depth control', () => {
+describe('Hierarchy depth control', () => {
   it.each([
     ['0', 0],
     ['1', 1],
@@ -33,14 +33,27 @@ describe('Structure depth control', () => {
     'renders structural depth %i as the selected option',
     (depth: StructuralDepth) => {
       const markup = renderToStaticMarkup(
-        <StructureDepthControl depth={depth} onChange={() => undefined} />,
+        <StructureDepthControl
+          custom={false}
+          depth={depth}
+          onChange={() => undefined}
+        />,
       );
 
-      expect(markup).toContain('aria-label="Structural depth"');
-      expect(markup).toContain('>Structure depth<select');
+      expect(markup).toContain('aria-label="Hierarchy depth"');
+      expect(markup).toContain('>Hierarchy depth<select');
       expect(markup).toContain(`<option value="${depth}" selected="">`);
       expect(markup.match(/<option /gu)).toHaveLength(4);
       expect(markup).not.toContain('<button');
     },
   );
+
+  it('indicates manual disclosure overrides without changing the preset', () => {
+    const markup = renderToStaticMarkup(
+      <StructureDepthControl custom depth={2} onChange={() => undefined} />,
+    );
+
+    expect(markup).toContain('>Custom</span>');
+    expect(markup).toContain('<option value="2" selected="">2 levels</option>');
+  });
 });

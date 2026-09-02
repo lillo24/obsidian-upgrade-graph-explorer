@@ -17,7 +17,7 @@ describe('Local KG6 projection', () => {
     expect(containingDocumentEntityId(workspace, 'missing')).toBeUndefined();
   });
 
-  it('reveals root top-level headings while keeping neighbor documents collapsed', () => {
+  it('uses root-scoped automatic depth while keeping neighbor documents collapsed', () => {
     const state = deriveLocalProjectionState(
       workspace,
       {
@@ -36,9 +36,11 @@ describe('Local KG6 projection', () => {
     );
 
     expect(state.focus?.rootEntityId).toBe('doc-a');
-    expect(state.disclosure.defaultDepth).toBe(0);
+    expect(state.disclosure.defaultDepth).toBe(3);
     expect(entities).toContain('doc-a');
     expect(entities).toContain('a-overview');
+    expect(entities).toContain('a-detail');
+    expect(entities).toContain('a-deep');
     expect(entities).toContain('doc-b');
     expect(entities).toContain('doc-c');
     expect(entities).not.toContain('b-target');
@@ -48,6 +50,32 @@ describe('Local KG6 projection', () => {
         node.kind === 'reference-target' ? node.referenceIds : [],
       ),
     ).not.toContain('r-b-missing');
+  });
+
+  it('matches the shared focused hierarchy projection exactly', async () => {
+    const { projectStructureView } = await import('./structure');
+    const state = deriveLocalProjectionState(
+      workspace,
+      {
+        disclosure: {
+          defaultDepth: 2,
+          expandedEntityIds: ['doc-b'],
+          collapsedEntityIds: [],
+          includeBlocks: false,
+        },
+        focus: {
+          rootEntityId: 'doc-a',
+          hops: 2,
+          direction: 'outgoing',
+          hierarchyContext: 'ancestors',
+        },
+      },
+      'doc-a',
+    );
+
+    expect(projectLocalView(workspace, state)).toEqual(
+      projectStructureView(workspace, state),
+    );
   });
 
   it('preserves explicit neighbor disclosure without admitting unrelated documents', () => {

@@ -89,7 +89,7 @@ import {
   nextGraphViewportRequestKey,
   planSemanticViewportRestore,
   recordGraphNavigation,
-  returnToPresentationInGraphHistory,
+  returnToAllInGraphHistory,
   sameGraphViewState,
   type GraphHistoryCheckpoint,
   type GraphHistoryTraversal,
@@ -97,6 +97,14 @@ import {
 } from '../navigation-history';
 import { planEntityNavigation, topLevelPathScopes } from '../navigation';
 import { planLocalEntityNavigation, planLocalEntry } from '../local-view';
+import {
+  allPresentationMode,
+  explorationLayout,
+  explorationScope,
+  focusLayoutMode,
+  type ExplorationLayout,
+  type ExplorationScope,
+} from '../exploration-model';
 import {
   addSavedGraphFilter,
   createEmptySavedGraphFilterRegistry,
@@ -128,6 +136,7 @@ import {
 } from '../visual-groups/session';
 import { createDagreLayoutWorkerService } from '../workers/dagre-layout-worker-client';
 import { EntitySearch } from './EntitySearch';
+import { ExplorationControls } from './ExplorationControls';
 import { retainGraphSelection } from './controlled-selection';
 import { GraphFilters } from './GraphFilters';
 import { GraphHistoryControls } from './GraphHistoryControls';
@@ -227,51 +236,6 @@ function selectedEntityId(
   return node?.kind === 'entity' ? node.entityId : undefined;
 }
 
-function RendererModeControl({
-  mode,
-  onChange,
-  globalUnavailable,
-}: {
-  readonly mode: GraphPresentationMode;
-  readonly onChange: (mode: GraphPresentationMode) => void;
-  readonly globalUnavailable?: string;
-}) {
-  return (
-    <div
-      aria-label="Graph presentation"
-      className="control-group control-group--renderer"
-      role="group"
-    >
-      <span>View</span>
-      <button
-        aria-pressed={mode === 'structure'}
-        onClick={() => onChange('structure')}
-        type="button"
-      >
-        Structure
-      </button>
-      <button
-        aria-pressed={mode === 'global'}
-        disabled={globalUnavailable !== undefined}
-        onClick={() => onChange('global')}
-        title={globalUnavailable}
-        type="button"
-      >
-        Global
-      </button>
-      {mode !== 'local' ? null : (
-        <button
-          aria-pressed="true"
-          onClick={() => onChange('local')}
-          type="button"
-        >
-          Local
-        </button>
-      )}
-    </div>
-  );
-}
-
 function ToolsIcon() {
   return (
     <svg
@@ -368,10 +332,6 @@ export function GraphExplorer({
     useState<GlobalLayoutSettings>(
       preferenceLoad.preferences.globalLayoutSettings,
     );
-  const [localLayoutMode, setLocalLayoutMode] = useState<LocalLayoutMode>(
-    preferenceLoad.preferences.localLayoutMode,
-  );
-  const localLayoutModeRef = useRef(localLayoutMode);
   const [preferenceWarning, setPreferenceWarning] = useState<
     string | undefined
   >(preferenceLoad.warning ?? undefined);
@@ -456,8 +416,17 @@ export function GraphExplorer({
   const [initialViewState] = useState(() =>
     normalizeGraphState(hydration.state),
   );
+  const legacyFocusedStructure =
+    hydration.presentationMode === 'structure' &&
+    initialViewState.focus !== undefined;
+  const [localLayoutMode, setLocalLayoutMode] = useState<LocalLayoutMode>(
+    legacyFocusedStructure
+      ? 'structured'
+      : preferenceLoad.preferences.localLayoutMode,
+  );
+  const localLayoutModeRef = useRef(localLayoutMode);
   const [rendererMode, setRendererMode] = useState<GraphPresentationMode>(
-    hydration.presentationMode,
+    legacyFocusedStructure ? 'local' : hydration.presentationMode,
   );
   const rendererModeRef = useRef(rendererMode);
   const [globalUnavailable, setGlobalUnavailable] = useState<string>();
@@ -551,7 +520,10 @@ export function GraphExplorer({
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      return { ok: false, message: `Global projection failed: ${message}` };
+      return {
+        ok: false,
+        message: `All Network projection failed: ${message}`,
+      };
     }
   }, [globalViewState, performance, projectionWorkspace, rendererMode]);
   const localResult = useMemo<ProjectionResult | undefined>(() => {
@@ -572,12 +544,12 @@ export function GraphExplorer({
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      return { ok: false, message: `Local projection failed: ${message}` };
+      return { ok: false, message: `Focus projection failed: ${message}` };
     }
   }, [activeViewState, performance, projectionWorkspace, rendererMode]);
   const globalProjectionFailure =
     rendererMode === 'global' && globalResult?.ok === false
-      ? `${globalResult.message} Structure remains available for this session.`
+      ? `${globalResult.message} All Hierarchy remains available for this session.`
       : undefined;
   const globalFailure = globalUnavailable ?? globalProjectionFailure;
   const effectiveRendererMode: GraphPresentationMode =
@@ -586,6 +558,11 @@ export function GraphExplorer({
       : rendererMode === 'local'
         ? 'local'
         : 'structure';
+  const activeScope = explorationScope(effectiveRendererMode);
+  const activeLayout = explorationLayout(
+    effectiveRendererMode,
+    localLayoutMode,
+  );
   const unavailableProjection: ProjectionResult = {
     ok: false,
     message: 'The active graph presentation could not be prepared.',
@@ -714,6 +691,9 @@ export function GraphExplorer({
   const globalTransitionAnchorApiRef = useRef<
     GlobalTransitionAnchorApi | undefined
   >(undefined);
+  const structureTransitionAnchorApiRef = useRef<
+    GraphTransitionAnchorApi | undefined
+  >(undefined);
   const localFreeTransitionAnchorApiRef = useRef<
     LocalFreeTransitionAnchorApi | undefined
   >(undefined);
@@ -752,6 +732,10 @@ export function GraphExplorer({
       legacyBlockFilterNormalized
         ? ' Legacy Blocks filtering was normalized to the current view controls.'
         : ''
+    }${
+      legacyFocusedStructure
+        ? ' The saved focused hierarchy was restored as Focus with Hierarchy layout.'
+        : ''
     }`,
   );
   const [persistenceError, setPersistenceError] = useState<string | undefined>(
@@ -777,7 +761,7 @@ export function GraphExplorer({
           createPersistedWorkspaceView({
             workspace: projectionWorkspace,
             state: initialViewState,
-            presentationMode: hydration.presentationMode,
+            presentationMode: rendererMode,
             viewports: hydration.viewports,
           }),
         )
@@ -824,6 +808,18 @@ export function GraphExplorer({
     projection !== undefined && selectionExists(projection, selection)
       ? selection
       : null;
+  const selectedFocusableEntityId = selectedEntityId(
+    projection,
+    activeSelection,
+  );
+  const focusedRootLabel = useMemo(() => {
+    const rootEntityId = activeViewState.focus?.rootEntityId;
+    if (rootEntityId === undefined) return undefined;
+    const root = projectionWorkspace.entity(rootEntityId);
+    const path = root?.source.path;
+    if (path === undefined) return undefined;
+    return (path.split('/').at(-1) ?? path).replace(/\.md$/iu, '');
+  }, [activeViewState.focus?.rootEntityId, projectionWorkspace]);
   const selectedVisualGroups = useMemo<{
     readonly matches: readonly VisualGroupMatch[];
     readonly error?: string;
@@ -1120,8 +1116,8 @@ export function GraphExplorer({
           (restoredSessionMode === traversal.target.presentationMode
             ? ''
             : traversal.target.presentationMode === 'local'
-              ? ' The Local root no longer exists, so the checkpoint recovered to Global.'
-              : ' Global is unavailable, so this checkpoint is shown in Structure for this session.'),
+              ? ' The Focus root no longer exists, so the checkpoint recovered to All Network.'
+              : ' All Network is unavailable, so this checkpoint is shown in All Hierarchy for this session.'),
       );
       return true;
     },
@@ -1158,18 +1154,14 @@ export function GraphExplorer({
     },
     [applyHistoryTraversal, currentHistoryCheckpoint],
   );
-  const returnToPriorGlobal = useCallback((): boolean => {
-    const traversal = returnToPresentationInGraphHistory(
+  const returnToPriorAll = useCallback((): boolean => {
+    const traversal = returnToAllInGraphHistory(
       navigationHistoryRef.current,
       currentHistoryCheckpoint(),
-      'global',
     );
     if (traversal === null) return false;
     const apply = () =>
-      applyHistoryTraversal(
-        traversal,
-        'Returned to the previous Global context.',
-      );
+      applyHistoryTraversal(traversal, 'Returned to the previous All context.');
     return performance === undefined
       ? apply()
       : performance.measure(
@@ -1178,28 +1170,38 @@ export function GraphExplorer({
           apply,
         );
   }, [applyHistoryTraversal, currentHistoryCheckpoint, performance]);
-  const exitLocalToGlobal = useCallback((): void => {
-    if (returnToPriorGlobal()) return;
+  const exitFocusToAll = useCallback((): void => {
+    if (returnToPriorAll()) return;
     const applyFallback = () => {
-      const localState = activeViewStateRef.current;
-      const rootEntityId = localState.focus?.rootEntityId;
-      const globalState: ViewProjectionState = {
-        disclosure: localState.disclosure,
-        ...(localState.filters === undefined
+      const focusState = activeViewStateRef.current;
+      const rootEntityId = focusState.focus?.rootEntityId;
+      const allState: ViewProjectionState = {
+        disclosure: focusState.disclosure,
+        ...(focusState.filters === undefined
           ? {}
-          : { filters: localState.filters }),
+          : { filters: focusState.filters }),
       };
-      const globalProjection = projectView(
-        projectionWorkspace,
-        effectiveGlobalProjectionState(projectionWorkspace, globalState),
+      const targetMode = allPresentationMode(
+        localLayoutModeRef.current === 'free' ? 'network' : 'hierarchy',
       );
-      const preferredAnchor =
-        globalViewportBookmarkRef.current?.anchorEntityId ?? rootEntityId;
-      const anchor = globalProjection.nodes.find(
-        (node) => node.kind === 'entity' && node.entityId === preferredAnchor,
+      const candidateProjection =
+        targetMode === 'global'
+          ? projectView(
+              projectionWorkspace,
+              effectiveGlobalProjectionState(projectionWorkspace, allState),
+            )
+          : projectStructureView(projectionWorkspace, allState);
+      const savedAnchorEntityId =
+        targetMode === 'global'
+          ? globalViewportBookmarkRef.current?.anchorEntityId
+          : viewportBookmarkRef.current?.anchorEntityId;
+      const anchor = candidateProjection.nodes.find(
+        (node) =>
+          node.kind === 'entity' &&
+          node.entityId === (savedAnchorEntityId ?? rootEntityId),
       );
-      const viewport =
-        anchor?.kind === 'entity'
+      const globalViewport: PersistedGlobalViewport | undefined =
+        targetMode === 'global' && anchor?.kind === 'entity'
           ? {
               anchorEntityId: anchor.entityId,
               ratio:
@@ -1209,15 +1211,31 @@ export function GraphExplorer({
                   : GLOBAL_NAVIGATION_RATIO,
             }
           : undefined;
+      const structureViewport: PersistedViewportAnchor | undefined =
+        targetMode === 'structure' && anchor?.kind === 'entity'
+          ? {
+              anchorEntityId: anchor.entityId,
+              zoom:
+                viewportBookmarkRef.current?.anchorEntityId === anchor.entityId
+                  ? viewportBookmarkRef.current.zoom
+                  : ENTITY_NAVIGATION_ZOOM,
+            }
+          : undefined;
       const destination = createGraphHistoryCheckpoint(
-        globalState,
+        allState,
         undefined,
-        'global',
+        targetMode,
         {
-          ...(viewportBookmarkRef.current === undefined
-            ? {}
-            : { structure: viewportBookmarkRef.current }),
-          ...(viewport === undefined ? {} : { global: viewport }),
+          ...(structureViewport === undefined
+            ? viewportBookmarkRef.current === undefined
+              ? {}
+              : { structure: viewportBookmarkRef.current }
+            : { structure: structureViewport }),
+          ...(globalViewport === undefined
+            ? globalViewportBookmarkRef.current === undefined
+              ? {}
+              : { global: globalViewportBookmarkRef.current }
+            : { global: globalViewport }),
           ...(localViewportBookmarkRef.current === undefined
             ? {}
             : { local: localViewportBookmarkRef.current }),
@@ -1230,25 +1248,45 @@ export function GraphExplorer({
           destination,
         ),
       );
-      activeViewStateRef.current = globalState;
-      dispatch({ type: 'replace-state', state: globalState });
-      rendererModeRef.current = 'global';
-      setRendererMode('global');
-      setGlobalSemanticViewportBookmark(viewport);
-      if (anchor?.kind === 'entity' && viewport !== undefined) {
+      activeViewStateRef.current = allState;
+      dispatch({ type: 'replace-state', state: allState });
+      rendererModeRef.current = targetMode;
+      setRendererMode(targetMode);
+      if (
+        targetMode === 'global' &&
+        anchor?.kind === 'entity' &&
+        globalViewport !== undefined
+      ) {
+        setGlobalSemanticViewportBookmark(globalViewport);
         setSelection({ kind: 'node', id: anchor.id });
         requestGlobalSemanticCenter({
           nodeId: anchor.id,
-          ratio: viewport.ratio,
+          ratio: globalViewport.ratio,
+        });
+      } else if (
+        targetMode === 'structure' &&
+        anchor?.kind === 'entity' &&
+        structureViewport !== undefined
+      ) {
+        setSemanticViewportBookmark(structureViewport);
+        setSelection({ kind: 'node', id: anchor.id });
+        requestSemanticCenter({
+          nodeId: anchor.id,
+          zoom: structureViewport.zoom,
         });
       } else {
         setSelection(null);
-        setGlobalCenterRequest(undefined);
-        setGlobalFitRequestKey((value) => value + 1);
+        if (targetMode === 'global') {
+          setGlobalCenterRequest(undefined);
+          setGlobalFitRequestKey((value) => value + 1);
+        } else {
+          setCenterRequest(undefined);
+          setFitRequestKey((value) => value + 1);
+        }
       }
       setNavigationError(undefined);
       setNavigationAnnouncement(
-        'Returned to Global using the Local root context because no prior Global history checkpoint was available.',
+        `Returned to All ${targetMode === 'global' ? 'Network' : 'Hierarchy'} using the focused root because no prior All checkpoint was available.`,
       );
     };
     try {
@@ -1262,7 +1300,7 @@ export function GraphExplorer({
       }
     } catch (error: unknown) {
       setNavigationError(
-        `Could not return to Global: ${
+        `Could not return to All: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
@@ -1273,8 +1311,10 @@ export function GraphExplorer({
     projectionWorkspace,
     replaceNavigationHistory,
     requestGlobalSemanticCenter,
-    returnToPriorGlobal,
+    requestSemanticCenter,
+    returnToPriorAll,
     setGlobalSemanticViewportBookmark,
+    setSemanticViewportBookmark,
   ]);
   const goBack = useCallback(
     () => void traverseGraphHistory('back'),
@@ -1323,7 +1363,7 @@ export function GraphExplorer({
         if (cancelled) return;
         const message = error instanceof Error ? error.message : String(error);
         setGlobalUnavailable(
-          `Global could not be loaded: ${message} Structure remains available for this session.`,
+          `All Network could not be loaded: ${message} All Hierarchy remains available for this session.`,
         );
       });
     return () => {
@@ -1349,7 +1389,7 @@ export function GraphExplorer({
         if (cancelled) return;
         const message = error instanceof Error ? error.message : String(error);
         setLocalFreeUnavailable(
-          `Local Free could not be loaded: ${message} Open in Structure remains available.`,
+          `Focus Network could not be loaded: ${message} Open full hierarchy remains available.`,
         );
       });
     return () => {
@@ -1375,7 +1415,7 @@ export function GraphExplorer({
         if (cancelled) return;
         const message = error instanceof Error ? error.message : String(error);
         setLocalStructuredUnavailable(
-          `Local Structured could not be loaded: ${message} Local Free and Structure remain available.`,
+          `Focus Hierarchy could not be loaded: ${message} Focus Network and All Hierarchy remain available.`,
         );
       });
     return () => {
@@ -1558,10 +1598,10 @@ export function GraphExplorer({
         setLocalStructuredCenterRequest(undefined);
         setLocalSemanticViewportBookmark(undefined);
         setNavigationAnnouncement(
-          `The Local root was removed by a live update. Local closed safely and ${
+          `The Focus root was removed by a live update. Focus closed safely and ${
             recoveryMode === 'global'
-              ? 'Global was restored.'
-              : 'Structure remains available.'
+              ? 'All Network was restored.'
+              : 'All Hierarchy remains available.'
           }`,
         );
         return;
@@ -1572,7 +1612,7 @@ export function GraphExplorer({
           reconciled.viewports.global === undefined
         ) {
           setNavigationAnnouncement(
-            'The previous Global viewport anchor was removed by a live update; the current camera was preserved.',
+            'The previous All Network viewport anchor was removed by a live update; the current camera was preserved.',
           );
         }
         return;
@@ -1583,7 +1623,7 @@ export function GraphExplorer({
           reconciled.viewports.local === undefined
         ) {
           setNavigationAnnouncement(
-            'The previous Local viewport anchor was removed by a live update; surviving positions and camera were preserved.',
+            'The previous Focus viewport anchor was removed by a live update; surviving positions and camera were preserved.',
           );
         }
         return;
@@ -1936,6 +1976,12 @@ export function GraphExplorer({
     },
     [],
   );
+  const changeStructureTransitionAnchorApi = useCallback(
+    (api: GraphTransitionAnchorApi | undefined) => {
+      structureTransitionAnchorApiRef.current = api;
+    },
+    [],
+  );
   const observeLocalFreeViewport = useCallback(
     (observation: SemanticLocalViewport | undefined) => {
       if (observation === undefined) {
@@ -2105,10 +2151,10 @@ export function GraphExplorer({
       setPreferenceWarning(saved.ok ? undefined : saved.message);
       setNavigationAnnouncement(
         mode === 'structured'
-          ? 'Local Structured opened with the same bounded Local graph.'
-          : `Local Free opened with the same bounded Local graph.${
+          ? 'Focus Hierarchy opened with the same bounded graph.'
+          : `Focus Network opened with the same bounded graph.${
               selection?.kind === 'edge'
-                ? ' The Structured edge selection was cleared.'
+                ? ' The Hierarchy edge selection was cleared.'
                 : ''
             }`,
       );
@@ -2178,7 +2224,7 @@ export function GraphExplorer({
     (nextMode: GraphPresentationMode) => {
       if (nextMode === 'local') return;
       if (rendererModeRef.current === 'local' && nextMode === 'global') {
-        exitLocalToGlobal();
+        exitFocusToAll();
         return;
       }
       if (
@@ -2187,6 +2233,13 @@ export function GraphExplorer({
       ) {
         return;
       }
+      const currentState = activeViewStateRef.current;
+      const nextAllState: ViewProjectionState = {
+        disclosure: currentState.disclosure,
+        ...(currentState.filters === undefined
+          ? {}
+          : { filters: currentState.filters }),
+      };
       const current = currentHistoryCheckpoint();
       const recordModeDestination = (
         structure: PersistedViewportAnchor | undefined,
@@ -2194,7 +2247,7 @@ export function GraphExplorer({
         local: PersistedLocalViewport | undefined,
       ) => {
         const destination = createGraphHistoryCheckpoint(
-          activeViewStateRef.current,
+          nextAllState,
           undefined,
           nextMode,
           {
@@ -2233,10 +2286,7 @@ export function GraphExplorer({
         const projectGlobalDestination = () =>
           projectView(
             projectionWorkspace,
-            effectiveGlobalProjectionState(
-              projectionWorkspace,
-              activeViewStateRef.current,
-            ),
+            effectiveGlobalProjectionState(projectionWorkspace, nextAllState),
           );
         const nextProjection =
           performance === undefined
@@ -2253,6 +2303,10 @@ export function GraphExplorer({
         );
         rendererModeRef.current = 'global';
         setRendererMode('global');
+        if (!sameGraphViewState(currentState, nextAllState)) {
+          activeViewStateRef.current = nextAllState;
+          dispatch({ type: 'replace-state', state: nextAllState });
+        }
         if (candidate === undefined || candidate.kind !== 'entity') {
           recordModeDestination(
             viewportBookmarkRef.current,
@@ -2285,7 +2339,7 @@ export function GraphExplorer({
           });
         }
         setNavigationAnnouncement(
-          'Opened Global overview. Zoom changes visual detail without changing graph topology or layout.',
+          'Opened All Network. Zoom changes visual detail without changing graph topology or layout.',
         );
         return;
       }
@@ -2304,13 +2358,13 @@ export function GraphExplorer({
         try {
           structureProjection = projectStructureView(
             projectionWorkspace,
-            activeViewStateRef.current,
+            nextAllState,
           );
         } catch (error: unknown) {
           const message =
             error instanceof Error ? error.message : String(error);
           setNavigationError(
-            `Could not open Structure: graph projection failed: ${message}`,
+            `Could not open All Hierarchy: graph projection failed: ${message}`,
           );
           return;
         }
@@ -2324,6 +2378,10 @@ export function GraphExplorer({
         : undefined;
       rendererModeRef.current = 'structure';
       setRendererMode('structure');
+      if (!sameGraphViewState(currentState, nextAllState)) {
+        activeViewStateRef.current = nextAllState;
+        dispatch({ type: 'replace-state', state: nextAllState });
+      }
       if (candidate === undefined || candidate.kind !== 'entity') {
         recordModeDestination(
           undefined,
@@ -2353,7 +2411,7 @@ export function GraphExplorer({
         requestSemanticCenter({ nodeId: node.id, zoom: viewport.zoom });
       }
       setNavigationAnnouncement(
-        'Opened Structure at the current file context.',
+        'Opened All Hierarchy at the current file context.',
       );
     },
     [
@@ -2366,22 +2424,30 @@ export function GraphExplorer({
       replaceNavigationHistory,
       requestGlobalSemanticCenter,
       requestSemanticCenter,
-      exitLocalToGlobal,
+      exitFocusToAll,
       selection,
       setGlobalSemanticViewportBookmark,
       setSemanticViewportBookmark,
       structureResult,
     ],
   );
-  const enterLocal = useCallback(
+  const enterFocusScope = useCallback(
     (entityId: EntityId): void => {
-      if (rendererModeRef.current !== 'global') return;
+      const sourceMode = rendererModeRef.current;
+      if (sourceMode !== 'global' && sourceMode !== 'structure') return;
       try {
+        const targetLayoutMode: LocalLayoutMode =
+          sourceMode === 'global' ? 'free' : 'structured';
+        const targetDepth =
+          sourceMode === 'global'
+            ? 0
+            : activeViewStateRef.current.disclosure.defaultDepth;
         const prepare = () =>
           planLocalEntry(
             projectionWorkspace,
             activeViewStateRef.current,
             entityId,
+            targetDepth,
           );
         const plan =
           performance === undefined
@@ -2391,28 +2457,36 @@ export function GraphExplorer({
                 'global-to-local-transitions',
                 prepare,
               );
-        const globalRootNode =
-          globalResult?.ok === true
-            ? globalResult.projection.nodes.find(
-                (candidate) =>
-                  candidate.kind === 'entity' &&
-                  candidate.entityId === plan.rootEntityId,
-              )
-            : undefined;
+        const sourceRootNode = projection?.nodes.find(
+          (candidate) =>
+            candidate.kind === 'entity' &&
+            candidate.entityId === plan.rootEntityId,
+        );
         const point =
-          globalRootNode === undefined
+          sourceRootNode === undefined
             ? undefined
-            : globalTransitionAnchorApiRef.current?.nodeViewportPoint(
-                globalRootNode.id,
-              );
+            : sourceMode === 'global'
+              ? globalTransitionAnchorApiRef.current?.nodeViewportPoint(
+                  sourceRootNode.id,
+                )
+              : structureTransitionAnchorApiRef.current?.nodeViewportPoint(
+                  sourceRootNode.id,
+                );
+        const destinationRootNode = plan.projection.nodes.find(
+          (candidate) =>
+            candidate.kind === 'entity' &&
+            candidate.entityId === plan.rootEntityId,
+        );
         const viewport = {
-          anchorEntityId: entityId,
+          anchorEntityId: plan.rootEntityId,
           freeRatio:
-            localViewportBookmarkRef.current?.anchorEntityId === entityId
+            localViewportBookmarkRef.current?.anchorEntityId ===
+            plan.rootEntityId
               ? localViewportBookmarkRef.current.freeRatio
               : LOCAL_NAVIGATION_RATIO,
           structuredZoom:
-            localViewportBookmarkRef.current?.anchorEntityId === entityId
+            localViewportBookmarkRef.current?.anchorEntityId ===
+            plan.rootEntityId
               ? (localViewportBookmarkRef.current.structuredZoom ??
                 LOCAL_STRUCTURED_NAVIGATION_ZOOM)
               : LOCAL_STRUCTURED_NAVIGATION_ZOOM,
@@ -2441,6 +2515,17 @@ export function GraphExplorer({
         cancelPendingHistoryViewportRestore();
         activeViewStateRef.current = plan.state;
         dispatch({ type: 'replace-state', state: plan.state });
+        if (localLayoutModeRef.current !== targetLayoutMode) {
+          localLayoutModeRef.current = targetLayoutMode;
+          setLocalLayoutMode(targetLayoutMode);
+          const saved = saveGraphPreferences(persistenceStorage, {
+            focusAppearance,
+            globalLayoutSettings,
+            localLayoutMode: targetLayoutMode,
+            trackpadZoomMode,
+          });
+          setPreferenceWarning(saved.ok ? undefined : saved.message);
+        }
         rendererModeRef.current = 'local';
         setRendererMode('local');
         setSelection({ kind: 'node', id: plan.projectionNodeId });
@@ -2449,7 +2534,7 @@ export function GraphExplorer({
         setLocalStructuredCenterRequest(undefined);
         if (point === undefined) {
           requestLocalSemanticCenter({
-            nodeId: plan.projectionNodeId,
+            nodeId: destinationRootNode?.id ?? plan.projectionNodeId,
             freeRatio: viewport.freeRatio,
             structuredZoom: viewport.structuredZoom,
           });
@@ -2460,10 +2545,10 @@ export function GraphExplorer({
           localTransitionGeneration.current = key;
           setLocalTransitionAnchor({
             key,
-            nodeId: plan.projectionNodeId,
+            nodeId: destinationRootNode?.id ?? plan.projectionNodeId,
             point,
             zoom:
-              localLayoutModeRef.current === 'structured'
+              targetLayoutMode === 'structured'
                 ? viewport.structuredZoom
                 : viewport.freeRatio,
           });
@@ -2472,7 +2557,7 @@ export function GraphExplorer({
         setNavigationAnnouncement(plan.announcement);
       } catch (error: unknown) {
         setNavigationError(
-          `Open Local failed: ${
+          `Open Focus failed: ${
             error instanceof Error ? error.message : String(error)
           }`,
         );
@@ -2481,12 +2566,16 @@ export function GraphExplorer({
     [
       cancelPendingHistoryViewportRestore,
       currentHistoryCheckpoint,
-      globalResult,
+      focusAppearance,
+      globalLayoutSettings,
       performance,
+      persistenceStorage,
+      projection,
       projectionWorkspace,
       replaceNavigationHistory,
       requestLocalSemanticCenter,
       setLocalSemanticViewportBookmark,
+      trackpadZoomMode,
     ],
   );
   const navigateToEntity = useCallback(
@@ -2559,7 +2648,7 @@ export function GraphExplorer({
           : undefined;
         if (node === undefined) {
           setNavigationError(
-            `${origin}: the document is hidden by the current Global filters.`,
+            `${origin}: the document is hidden by the current All Network filters.`,
           );
           return;
         }
@@ -2574,7 +2663,9 @@ export function GraphExplorer({
           ratio: viewport.ratio,
         });
         setNavigationError(undefined);
-        setNavigationAnnouncement(`${origin}: centered the file in Global.`);
+        setNavigationAnnouncement(
+          `${origin}: centered the file in All Network.`,
+        );
         return;
       }
       if (rendererModeRef.current === 'global') {
@@ -2621,44 +2712,40 @@ export function GraphExplorer({
     ],
   );
   const focusLocalEntity = useCallback(
-    (entityId: EntityId) => navigateToEntity(entityId, 'Local focus'),
+    (entityId: EntityId) => navigateToEntity(entityId, 'Focus'),
     [navigateToEntity],
   );
 
-  const enterFocus = useCallback(
-    (entityId: string): void => {
-      const focusEntity = projection?.nodes.find(
-        (candidate) =>
-          candidate.kind === 'entity' && candidate.entityId === entityId,
-      );
-      if (focusEntity === undefined || focusEntity.kind !== 'entity') return;
-      setSelection({ kind: 'node', id: focusEntity.id });
-      const committed = commitHistoryGraphAction(
-        { type: 'enter-focus', entityId: focusEntity.entityId },
-        { fitDestination: true },
-      );
-      if (!committed) return;
-      setFitRequestKey((current) => current + 1);
-      setNavigationError(undefined);
-      setNavigationAnnouncement(
-        `Focused ${focusEntity.entityKind} in ${focusEntity.sourcePath}.`,
-      );
-    },
-    [commitHistoryGraphAction, projection],
-  );
-
-  function exitFocus(): void {
-    const committed = commitHistoryGraphAction(
-      { type: 'exit-focus' },
-      { fitDestination: true },
+  function changeHierarchyDepth(depth: 0 | 1 | 2 | 3): void {
+    if (rendererModeRef.current !== 'local') {
+      void commitHistoryGraphAction({ type: 'set-depth', depth });
+      return;
+    }
+    const rootEntityId = activeViewStateRef.current.focus?.rootEntityId;
+    const rootNode = projection?.nodes.find(
+      (node) => node.kind === 'entity' && node.entityId === rootEntityId,
     );
-    if (!committed) return;
-    setSelection(null);
-    setFitRequestKey((current) => current + 1);
-    setNavigationError(undefined);
-    setNavigationAnnouncement(
-      'Exited focus and restored structural disclosure.',
-    );
+    const sourceApi =
+      localLayoutModeRef.current === 'free'
+        ? localFreeTransitionAnchorApiRef.current
+        : localStructuredTransitionAnchorApiRef.current;
+    const rootAnchorStaged =
+      rootNode === undefined
+        ? false
+        : (sourceApi?.stageNodeAnchor(rootNode.id) ?? false);
+    if (!commitHistoryGraphAction({ type: 'set-depth', depth })) return;
+    const bookmark = localViewportBookmarkRef.current;
+    // Each active Focus renderer stages the root before the semantic update,
+    // then preserves it through its seed/reconciliation and worker refinement.
+    // KG6 runs once and no sibling renderer or workspace work is started.
+    if (!rootAnchorStaged && rootNode !== undefined) {
+      requestLocalSemanticCenter({
+        nodeId: rootNode.id,
+        freeRatio: bookmark?.freeRatio ?? LOCAL_NAVIGATION_RATIO,
+        structuredZoom:
+          bookmark?.structuredZoom ?? LOCAL_STRUCTURED_NAVIGATION_ZOOM,
+      });
+    }
   }
 
   function changeHops(hops: 1 | 2 | 3): void {
@@ -2691,6 +2778,32 @@ export function GraphExplorer({
     )
       setFitRequestKey((current) => current + 1);
   }
+
+  const changeExplorationScope = useCallback(
+    (scope: ExplorationScope): void => {
+      if (scope === activeScope) return;
+      if (scope === 'all') {
+        exitFocusToAll();
+        return;
+      }
+      if (selectedFocusableEntityId !== undefined) {
+        enterFocusScope(selectedFocusableEntityId);
+      }
+    },
+    [activeScope, enterFocusScope, exitFocusToAll, selectedFocusableEntityId],
+  );
+
+  const changeExplorationLayout = useCallback(
+    (layout: ExplorationLayout): void => {
+      if (layout === activeLayout) return;
+      if (activeScope === 'focus') {
+        changeLocalLayoutMode(focusLayoutMode(layout));
+      } else {
+        changeRendererMode(allPresentationMode(layout));
+      }
+    },
+    [activeLayout, activeScope, changeLocalLayoutMode, changeRendererMode],
+  );
 
   function resetSavedView(): void {
     if (persistenceStorage === undefined) {
@@ -2859,83 +2972,50 @@ export function GraphExplorer({
                 onForward={goForward}
               />
             )}
-            <RendererModeControl
+            <ExplorationControls
+              {...(activeScope === 'all' &&
+              selectedFocusableEntityId === undefined
+                ? { focusDisabledReason: 'Select a file first.' }
+                : {})}
+              {...(focusedRootLabel === undefined ? {} : { focusedRootLabel })}
+              layout={activeLayout}
               {...(globalFailure === undefined
                 ? {}
-                : { globalUnavailable: globalFailure })}
-              mode={effectiveRendererMode}
-              onChange={changeRendererMode}
+                : { networkDisabledReason: globalFailure })}
+              onLayoutChange={changeExplorationLayout}
+              onScopeChange={changeExplorationScope}
+              scope={activeScope}
             />
-            {effectiveRendererMode === 'structure' ? (
+            {activeScope === 'focus' || activeLayout === 'hierarchy' ? (
               <StructureDepthControl
-                depth={activeViewState.disclosure.defaultDepth}
-                onChange={(depth) =>
-                  void commitHistoryGraphAction({ type: 'set-depth', depth })
+                custom={
+                  activeViewState.disclosure.expandedEntityIds.length > 0 ||
+                  activeViewState.disclosure.collapsedEntityIds.length > 0
                 }
+                depth={activeViewState.disclosure.defaultDepth}
+                onChange={changeHierarchyDepth}
               />
-            ) : effectiveRendererMode === 'global' ? (
+            ) : null}
+            {activeLayout === 'network' || activeScope === 'focus' ? (
               <div
-                aria-label="Global layout controls"
+                aria-label="Layout actions"
                 className="control-group"
                 role="group"
               >
                 <button
-                  onClick={() =>
-                    setGlobalLayoutRequestKey((current) => current + 1)
-                  }
+                  onClick={() => {
+                    if (activeScope === 'focus') {
+                      setLocalLayoutRequestKey((current) => current + 1);
+                    } else {
+                      setGlobalLayoutRequestKey((current) => current + 1);
+                    }
+                  }}
                   type="button"
                 >
                   Re-layout
                 </button>
               </div>
-            ) : (
-              <>
-                <div
-                  aria-label="Local layout"
-                  className="control-group"
-                  role="group"
-                >
-                  <span>Local layout</span>
-                  <button
-                    aria-pressed={localLayoutMode === 'free'}
-                    onClick={() => changeLocalLayoutMode('free')}
-                    type="button"
-                  >
-                    Free
-                  </button>
-                  <button
-                    aria-pressed={localLayoutMode === 'structured'}
-                    onClick={() => changeLocalLayoutMode('structured')}
-                    type="button"
-                  >
-                    Structured
-                  </button>
-                </div>
-                <div
-                  aria-label="Local navigation controls"
-                  className="control-group"
-                  role="group"
-                >
-                  <button
-                    onClick={() =>
-                      setLocalLayoutRequestKey((current) => current + 1)
-                    }
-                    type="button"
-                  >
-                    Re-layout
-                  </button>
-                  <button onClick={exitLocalToGlobal} type="button">
-                    Back to Global
-                  </button>
-                  <button
-                    onClick={() => changeRendererMode('structure')}
-                    type="button"
-                  >
-                    Open in Structure
-                  </button>
-                </div>
-              </>
-            )}
+            ) : null}
             <GraphFilters
               contained={maximized}
               onAction={applyGraphAction}
@@ -2966,17 +3046,13 @@ export function GraphExplorer({
               open={groupsOpen}
               session={activeVisualGroupSession}
             />
-            {activeViewState.focus === undefined ? null : (
+            {activeScope !== 'focus' ||
+            activeViewState.focus === undefined ? null : (
               <div
                 className="control-group control-group--focus"
                 aria-label="Focus controls"
                 role="group"
               >
-                {effectiveRendererMode === 'local' ? null : (
-                  <button onClick={exitFocus} type="button">
-                    Exit Focus
-                  </button>
-                )}
                 <label>
                   Hops
                   <select
@@ -3107,7 +3183,7 @@ export function GraphExplorer({
           {effectiveRendererMode === 'global' ? (
             GlobalGraphView === undefined ? (
               <p className="graph-loading" role="status">
-                Loading Global overview…
+                Loading All Network…
               </p>
             ) : (
               <GlobalGraphView
@@ -3124,10 +3200,10 @@ export function GraphExplorer({
                 layoutRequestKey={globalLayoutRequestKey}
                 onFailure={(message) =>
                   setGlobalUnavailable(
-                    `Global renderer failed: ${message} Structure remains available for this session.`,
+                    `All Network renderer failed: ${message} All Hierarchy remains available for this session.`,
                   )
                 }
-                onNodeActivate={enterLocal}
+                onNodeActivate={enterFocusScope}
                 onSelectionChange={changeGlobalSelection}
                 onTransitionAnchorApiChange={changeGlobalTransitionAnchorApi}
                 onViewportObservation={observeGlobalViewport}
@@ -3144,7 +3220,7 @@ export function GraphExplorer({
               <div className="graph-failure" role="alert">
                 <p>
                   {localUnavailable ??
-                    `Local ${localLayoutMode === 'free' ? 'Free' : 'Structured'} has no stable document root. Open Structure to recover.`}
+                    `Focus ${localLayoutMode === 'free' ? 'Network' : 'Hierarchy'} has no stable document root. Open full hierarchy to recover.`}
                 </p>
                 {localLayoutMode === 'structured' &&
                 localStructuredUnavailable !== undefined ? (
@@ -3152,24 +3228,24 @@ export function GraphExplorer({
                     onClick={() => changeLocalLayoutMode('free')}
                     type="button"
                   >
-                    Open Local Free
+                    Open Focus Network
                   </button>
                 ) : null}
                 <button
                   onClick={() => changeRendererMode('structure')}
                   type="button"
                 >
-                  Open in Structure
+                  Open full hierarchy
                 </button>
               </div>
             ) : localLayoutMode === 'free' && LocalGraphView === undefined ? (
               <p className="graph-loading" role="status">
-                Loading Local Free…
+                Loading Focus Network…
               </p>
             ) : localLayoutMode === 'structured' &&
               LocalStructuredGraphView === undefined ? (
               <p className="graph-loading" role="status">
-                Loading Local Structured…
+                Loading Focus Hierarchy…
               </p>
             ) : localLayoutMode === 'free' && LocalGraphView !== undefined ? (
               <LocalGraphView
@@ -3191,7 +3267,7 @@ export function GraphExplorer({
                   : { instrumentation: performance })}
                 onFailure={(message) =>
                   setLocalFreeUnavailable(
-                    `Local Free renderer failed: ${message} Open in Structure remains available.`,
+                    `Focus Network renderer failed: ${message} Open full hierarchy remains available.`,
                   )
                 }
                 onFitRequestConsumed={consumeLocalFitRequest}
@@ -3221,7 +3297,7 @@ export function GraphExplorer({
                 layoutRequestKey={localLayoutRequestKey}
                 onFailure={(message) =>
                   setLocalStructuredUnavailable(
-                    `Local Structured renderer failed: ${message} Local Free and Structure remain available.`,
+                    `Focus Hierarchy renderer failed: ${message} Focus Network and All Hierarchy remain available.`,
                   )
                 }
                 onFitRequestConsumed={consumeLocalFitRequest}
@@ -3251,9 +3327,10 @@ export function GraphExplorer({
               layoutService={layoutService}
               maximized={maximized}
               onMaximizedChange={changeMaximized}
-              onFocusEntity={enterFocus}
+              onFocusEntity={enterFocusScope}
               onSelectionChange={changeSelection}
               onToggleEntity={toggleEntity}
+              onTransitionAnchorApiChange={changeStructureTransitionAnchorApi}
               onViewportObservation={observeViewport}
               {...(performance === undefined ? {} : { performance })}
               {...(performanceUpdateKey === undefined
@@ -3286,17 +3363,16 @@ export function GraphExplorer({
                 effectiveRendererMode === 'local') &&
               activeSelection?.kind === 'node'
                 ? {
-                    onOpenInStructure: (entityId: EntityId) => {
+                    onOpenFullHierarchy: (entityId: EntityId) => {
                       changeRendererMode('structure');
                       queueMicrotask(() =>
-                        navigateToEntity(entityId, 'Open in Structure'),
+                        navigateToEntity(entityId, 'Open full hierarchy'),
                       );
                     },
                   }
                 : {})}
-              {...(effectiveRendererMode === 'global' &&
-              activeSelection?.kind === 'node'
-                ? { onOpenLocal: enterLocal }
+              {...(activeScope === 'all' && activeSelection?.kind === 'node'
+                ? { onFocus: enterFocusScope }
                 : {})}
               {...(localDisclosureControl === undefined
                 ? {}

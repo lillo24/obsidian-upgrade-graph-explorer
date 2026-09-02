@@ -33,8 +33,9 @@ src/
   presets.ts           Generic structural-depth and compatibility state helpers.
   reveal.ts            Canonical-target disclosure helper for navigation.
   focused-documents.ts Shared containing-document, filtered neighborhood, and detail-retention helpers.
-  local.ts             Document-root normalization and bounded two-pass Local projection.
-  structure.ts         Product Structure projection with stable, root-scoped Focus depth.
+  focused-detail.ts    Shared bounded Focus detail with root-scoped automatic depth.
+  local.ts             Document-root normalization and the Focus projection entry point.
+  structure.ts         Full Hierarchy projection plus compatibility Focus routing.
   project.ts           Public orchestration and one-call snapshot wrapper.
   index.ts             Intentional public surface.
   test-fixture.ts      Neutral canonical fixture shared only by package tests.
@@ -155,14 +156,15 @@ Synthetic diagnostic targets may appear at distance one through their edge but
 are traversal terminals. Context nodes carry no distance or internal reference
 provenance and do not pull unrelated reference edges into the neighborhood.
 
-## Structure Focus projection semantics
+## Focus projection semantics
 
-Outside Focus, Structure depth remains global across every eligible visible
-document. Inside Structure Focus, `projectStructureView` first normalizes the
-exact file/heading/block Focus root to its containing document and establishes a
-documents-only reference neighborhood. Path and reference-status constraints
-are applied before that bounded hop traversal; text, entity-kind, and QUERY1
-filters remain part of the later detailed pass.
+Outside Focus, Hierarchy depth remains global across every eligible visible
+document. Inside Focus, Network and Hierarchy consume the same projection.
+`projectFocusedDetailView` first normalizes the exact file/heading/block Focus
+root to its containing document and establishes a documents-only reference
+neighborhood. Path and reference-status constraints are applied before that
+bounded hop traversal; text, entity-kind, and QUERY1 filters remain part of the
+later detailed pass.
 
 The detailed pass sets ordinary automatic depth to zero and applies the stored
 depth only to a projection-only set of detail document IDs—today the one Focus
@@ -174,20 +176,18 @@ parent expansion, so root-scoped automatic depth cannot reveal them by itself.
 Visible headings may take over precise reference endpoints without changing the
 precomputed document neighborhood.
 
-## Local projection semantics
+## Focus state normalization
 
 `deriveLocalProjectionState` normalizes a document, section, or block target to
 its stable containing document. It reuses KG6 `focus.rootEntityId`, hop count,
-direction, disclosure IDs, and filters. Automatic depth becomes zero; the root
-is explicitly expanded so its top-level headings appear while every neighbor
-document stays collapsed until explicitly expanded.
+direction, disclosure depth/IDs, and filters. Fresh Focus entry is an
+application concern: All Network enters at depth 0 and All Hierarchy inherits
+its current depth, while both clear previous manual disclosure overrides.
 
-`projectLocalView` shares the documents-only Focus helper with Structure. It
-applies path/reference-status constraints before traversal, then runs a normal
-disclosure/filter/provenance pass and retains only entities whose containing
-documents belong to that neighborhood. This prevents revealing a heading from
-admitting an unrelated vault region. It emits ordinary validated
-`ViewProjection` data—no Local canonical model, renderer traversal, folder
+`projectLocalView` delegates to that shared Focus detail contract. This prevents
+revealing a heading from admitting an unrelated vault region and ensures both
+renderers show identical nodes and edges. It emits ordinary validated
+`ViewProjection` data—no Focus canonical model, renderer traversal, folder
 relation, or copied source truth.
 
 ## Filter semantics

@@ -26,6 +26,7 @@ import {
   planSemanticViewportRestore,
   recordGraphNavigation,
   returnToPresentationInGraphHistory,
+  returnToAllInGraphHistory,
   sameGraphHistoryCheckpoint,
   sameGraphViewState,
 } from './navigation-history';
@@ -225,6 +226,43 @@ describe('renderer-independent graph navigation history', () => {
 
     expect(returned?.target).toEqual(global);
     expect(returned?.history.future).toEqual([expanded, local]);
+  });
+
+  it('returns Focus to the most recent actual All checkpoint regardless of layout', () => {
+    const allNetwork = createGraphHistoryCheckpoint(
+      initialGraphState(),
+      undefined,
+      'global',
+    );
+    const allHierarchy = createGraphHistoryCheckpoint(
+      stateWithText('hierarchy'),
+      undefined,
+      'structure',
+    );
+    const focusState: ViewProjectionState = {
+      ...stateWithText('focus'),
+      focus: {
+        rootEntityId: 'doc-a',
+        hops: 1,
+        direction: 'both',
+        hierarchyContext: 'ancestors-and-children',
+      },
+    };
+    const focus = createGraphHistoryCheckpoint(focusState, undefined, 'local');
+    const history = recordGraphNavigation(
+      recordGraphNavigation(
+        createGraphNavigationHistory(),
+        allNetwork,
+        allHierarchy,
+      ),
+      allHierarchy,
+      focus,
+    );
+
+    const returned = returnToAllInGraphHistory(history, focus);
+
+    expect(returned?.target).toEqual(allHierarchy);
+    expect(returned?.history.future).toEqual([focus]);
   });
 
   it('bounds retained checkpoints at 100 and drops the oldest', () => {

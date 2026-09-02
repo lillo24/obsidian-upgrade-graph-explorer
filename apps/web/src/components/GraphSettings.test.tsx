@@ -36,7 +36,7 @@ describe('Graph Settings presentation', () => {
       'hidden="" id="graph-settings-source-panel" role="tabpanel"',
     );
     expect(markup).toContain('>Graph Appearance<');
-    expect(markup).toContain('>Global Layout<');
+    expect(markup).toContain('>All Network Layout<');
     expect(markup).toContain('>Graph Interaction<');
     expect(markup).toContain('>Current Source<');
   });

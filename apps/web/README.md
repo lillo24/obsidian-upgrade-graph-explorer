@@ -1,6 +1,6 @@
 # Web Multi-scale Graph Explorer
 
-Status: **STABLE — KG13B2B completes bounded Local Free/Structured without replacing Structure or Global.**
+Status: **STABLE — Scope × Layout unifies multi-scale exploration over the existing renderers.**
 
 This package owns the browser SPA, validated KG5 report selection, Tauri-only
 live vault orchestration, KG6 graph interaction state, guarded browser persistence, graph selection, canonical
@@ -41,6 +41,7 @@ apps/web/
     workers/          Separate Vite W1, W3, Global, and Local entries/clients.
     performance.ts    Query-gated browser recorder and local inspection API.
     graph-state.ts    Pure disclosure/focus/filter interaction reducer.
+    exploration-model.ts Pure Scope/Layout mapping onto schema-v3 internal modes.
     navigation.ts     Shared reveal/filter-widening/navigation planner.
     local-view.ts     Local entry/reroot/minimum-reveal planner over KG6 state.
     visual-groups/    Visible-entity GROUP1A presentation-map derivation; no projection calls.
@@ -191,11 +192,12 @@ Cross-session persistence activates only when a report explicitly declares
 usable in memory and never read or write saved state. The schema-v3 saved record
 is keyed by encoded stable workspace ID and contains only structural disclosure,
 the optional literal heading ceiling, focus, user-facing path/entity/status
-filters, explicit presentation mode, and canonical Structure/Global/Local
-semantic viewport bookmarks. Schema v1 migrates to Structure; schema v2
-preserves its explicit Structure/Global mode and does not infer Local from an
-active focus. Local stores anchor plus Free ratio and optional Structured zoom.
-The Free/Structured preference remains in the existing graph-preference key and
+filters, explicit presentation mode, and canonical renderer viewport bookmarks.
+Internally those bookmarks remain named Structure/Global/Local for schema-v3
+compatibility. Schema v1 migrates to Structure; schema v2 preserves its explicit
+Structure/Global mode and does not infer Local from an active focus. The Local
+bookmark stores an anchor plus Free ratio and optional Structured zoom. The
+Free/Structured preference remains in the existing graph-preference key and
 does not enter graph history. Raw x/y, transition
 screen points, Graphology objects, and worker positions are forbidden.
 
@@ -219,9 +221,11 @@ overlays, maximize, preferences, and live adoption do not. Entity navigation
 updates the canonical bookmark immediately at zoom `1.1`. Traversal converts a
 visible canonical anchor to a keyed projection-node center request after the
 new projection exists, or Fits when the anchor is missing/hidden. The currently
-traversed view continues through normal KG9 autosave. **Back to Global** jumps
-to the actual prior Global checkpoint while retaining skipped Local disclosure
-checkpoints for Forward traversal.
+traversed view continues through normal KG9 autosave. Choosing **All** from
+Focus jumps to the latest unfocused All checkpoint—whether Network or
+Hierarchy—while retaining skipped Focus disclosure checkpoints for Forward
+traversal. If no such checkpoint exists, the fallback keeps the current Layout
+and clears Focus conservatively.
 
 Live snapshot reconciliation is not localStorage hydration. It keeps surviving
 disclosure, focus, heading/block choices, filters, and semantic viewport by
@@ -258,14 +262,14 @@ never enter reports or persistence.
 
 ## Graph interaction boundary
 
-The default Structure view is **Files only**. Outside Focus, **1 level**, **2
+The default All Hierarchy view is **Files only**. Outside Focus, **1 level**, **2
 levels**, and **3 levels** automatically expose that many canonical section-tree
 generations for every eligible file; explicit per-entity disclosure may continue
 beyond that baseline. Inside Focus, the file-level reference neighborhood is
 established first and remains stable across depth changes. Automatic depth then
 unfolds only the focused file; neighbor files remain collapsed unless the user
 explicitly expands them. A new depth preset still clears prior manual disclosure,
-and manual collapse retains precedence afterward. Structure changes remain
+and manual collapse retains precedence afterward. All Hierarchy changes remain
 ordinary NAV1 semantic actions. Selecting an entity enables one-to-three-hop
 focus with incoming/outgoing/both direction. Selection and hover affect
 presentation only. Diagnostic targets can be selected but never focused or
@@ -280,29 +284,43 @@ unrelated rendered content only until pointer leave. Click or keyboard selection
 keeps the chosen element visibly selected without persistent graph-wide fading.
 Focus remains a reduced projection rather than a visual opacity treatment.
 
-Global **Open Local** is the single scale-down action. The Inspector button and
-document double-click use the same application callback; single-click remains
-selection-only and diagnostic double-click is inert. Entry captures only the
-selected file's runtime viewport point, normalizes the KG6 Focus root to that
-document, reveals its direct headings, and keeps neighboring files collapsed.
-Local projects once, then the user may choose **Free** or **Structured** from an
-accessible Local-only preference control. Free renders a deterministic Sigma
-seed and refines it in its latest-only ForceAtlas2 Worker. Structured renders a
-compact File/Heading/Block/diagnostic React Flow seed and refines it through the
-existing latest-only W3 Dagre Worker. Exact memory-cache hits skip the active
-worker. Expand/Collapse is available in both the Structured node and the shared Inspector;
+The primary controls are **Scope: All / Focus** and **Layout: Network /
+Hierarchy**. All Network is the files-only whole-vault Sigma overview; All
+Hierarchy is the general React Flow structure. Focus Network and Focus
+Hierarchy share one bounded KG6 projection. Double-click and Inspector
+**Focus** use the same entry callback from either All layout; single-click
+remains selection-only and diagnostic double-click is inert. Entry captures the
+focused document's runtime viewport point, normalizes the KG6 root to that
+document, and keeps neighboring files collapsed. Network renders a
+deterministic Sigma seed and refines it in its latest-only ForceAtlas2 Worker.
+Hierarchy renders a compact File/Heading/Block/diagnostic React Flow seed and
+refines it through the existing latest-only W3 Dagre Worker. Exact memory-cache
+hits skip the active worker. Expand/Collapse is available in both the Hierarchy node and the shared Inspector;
 Focus hops/direction and the existing Blocks/filter controls remain shared.
-Ordinary Local zoom, pan, hover, selection, and Inspector activity perform no
+Ordinary Focus Network zoom, pan, hover, selection, and Inspector activity perform no
 projection, Graphology reconciliation, or layout. Search targets already in the
-scene stay Local, cross-file targets reroot Local, and hidden headings reveal
-only the required ancestor chain. **Open in Structure** and **Back to Global**
-are explicit recovery/scale-up paths. Switching Local layout preserves the
-selected visible node (or root) at a runtime-only screen point and performs no
-KG6/Global/workspace work. Node selection survives; a Structured edge
-selection is cleared with an announcement before Free mounts.
+scene stay Focus, cross-file targets reroot Focus, and hidden headings reveal
+only the required ancestor chain. **Open full hierarchy** explicitly returns to
+All Hierarchy; the **All** scope action returns to the actual prior All history
+checkpoint. Switching Focus layout preserves the selected visible node (or
+root) at a runtime-only screen point and performs no KG6/All Network/workspace
+work. Node selection survives; a Hierarchy edge selection is cleared with an
+announcement before Network mounts.
+
+**Hierarchy Depth** is hidden in All Network and visible in the other three
+combinations. In Focus it applies automatic depth only beneath the root file;
+depth 0 has no automatic headings, while depths 1–3 reveal the corresponding
+structural generations. Choosing a preset clears manual disclosure overrides.
+A compact **Custom** marker reports surviving explicit expand/collapse choices.
+Focus depth changes preserve the root's screen point in either renderer without
+persisting raw coordinates. Old schema-v3 Local state that encoded automatic
+detail as depth 0 plus an expanded root is normalized on restore; other manual
+IDs are preserved. Schema v3 did not record whether that root marker was added
+automatically or manually, so the compatibility rule deliberately removes only
+the depth-0 focused root to keep **Files only** truthful.
 
 **Heading limit** lives in the toolbar's floating **Filters** panel and remains
-separate from Structure. `#` through `######` are literal canonical Markdown
+separate from Hierarchy Depth. `#` through `######` are literal canonical Markdown
 heading ceilings; **No limit** preserves prior
 disclosure. Explicit expansion cannot bypass the ceiling, and references from
 hidden headings retain normal endpoint roll-up and aggregation. Navigation to a
