@@ -5,6 +5,11 @@ export {
 } from './presets';
 export { STRUCTURAL_DEPTHS } from './types';
 export { projectSnapshot, projectView } from './project';
+export type {
+  ProjectionInstrumentation,
+  ProjectionOperation,
+  ProjectionPhase,
+} from './instrumentation';
 export { projectStructureView } from './structure';
 export {
   containingDocumentEntityId,

@@ -60,6 +60,69 @@ Recorded environment on 2026-08-29: Windows `10.0.26200` x64, Intel Core Ultra
 Environment metadata excludes hostnames, usernames, workspace IDs/names,
 paths, queries, source text, and live correlation tokens.
 
+## PERFQ1A query-projection evidence
+
+PERFQ1A isolates QUERY1 evaluation from the larger query-driven projection
+path. On the medium synthetic snapshot (8,500 canonical entities and 16,000
+references), the broad QUERY1 evaluator itself measured 1.844 ms median before
+the change. That is below the 10 ms evaluator gate, so its parser/evaluator was
+left unchanged. The expensive path was derived graph work: the pre-change
+instrumented broad query built and filtered a second candidate projection,
+scanned 32,000 canonical references, and sorted filtered nodes/edges twice.
+
+The canonical path/kind/QUERY1 candidate route now prepares filters once and
+computes DISC1 eligibility directly from visible plus one-action candidate
+entities. Its deterministic operation result is one base projection, 16,000
+reference scans, one direct candidate plan, zero candidate base builds, zero
+hierarchy rebuilds, and zero filter node/edge sorts. Projected-text filtering
+retains one explicitly measured legacy candidate fallback because raw
+diagnostic targets are projection-only. Reference-status filtering remains
+parallel and does not alter candidate entity eligibility.
+
+Exactness is not inferred from timing. A wide direct-versus-legacy candidate
+oracle covers structural depths, manual expansion/collapse, Blocks, heading
+limits, valid/invalid paths and queries, Boolean QUERY1, kinds, and status
+combinations. A separate byte oracle fixes eleven complete projection outputs
+from pre-PERFQ1A main, including Focus, projected text, diagnostic provenance,
+and invalid inputs. Local and Structure Focus suites remain part of the normal
+projection regression run.
+
+Validation also exceeded its evidence gate. Replacing validation-only copied
+array sorts/JSON comparisons with equivalent adjacent/element scans reduced the
+first sequential medium no-filter validation median from 203.011 to 163.018 ms
+and broad-query validation from 180.529 to 155.029 ms. All shape, ordering,
+canonical membership, endpoint, provenance, diagnostic, and Focus invariants
+still run on every final projection. The reductions are 39.993 and 25.500 ms,
+respectively, satisfying the absolute 15 ms gate without changing accepted
+output.
+
+Wall-clock values remain noisy local evidence. The untouched general medium
+depth-three advanced-query baseline was 878.700 / 1,057.116 ms median/p95. In
+the focused instrumented harness, the comparable pre-change run was 497.695 /
+503.987 ms; the first sequential post-change run was 413.648 / 429.836 ms. A
+later loaded-machine rerun was 612.592 / 701.878 ms while its no-filter control
+also moved from 322.279 to 562.103 ms, so deterministic operation deltas—not
+that cross-load timing pair—are the regression gate. Small broad-query evidence
+remained within Class B at 37.534 / 43.824 ms.
+
+The first post-change repeated sequence remained above the stronger 50 ms
+target:
+
+| Transition | Project median / p95 | Base median | Filter median | Direct DISC1 median | Validation median |
+| ---------- | -------------------: | ----------: | ------------: | ------------------: | ----------------: |
+| A          | 302.564 / 346.728 ms |  125.038 ms |     42.983 ms |            6.693 ms |        120.271 ms |
+| B          | 200.787 / 235.804 ms |  162.225 ms |     28.444 ms |            2.283 ms |          0.018 ms |
+| C          | 263.846 / 273.987 ms |  123.592 ms |     33.994 ms |            4.256 ms |        105.428 ms |
+| Clear      | 269.661 / 316.178 ms |  133.792 ms |      0.016 ms |            0.000 ms |        137.942 ms |
+| A          | 415.954 / 550.916 ms |  158.264 ms |     65.827 ms |           10.515 ms |        181.467 ms |
+
+Medium QUERY1 therefore still misses Class B and repeated query changes miss
+50 ms. The first structural base accounts for roughly 40–50% of representative
+repeated transitions, so the evidence recommends a separate PERFQ1B evaluation
+of a prepared structural projection cache. PERFQ1A adds no cache and no W2
+worker; W2 remains on the main thread until that algorithmic/cache decision is
+tested against merged code. Timing is never a CI gate.
+
 ## KG12B1 W1 responsiveness evidence
 
 `pnpm benchmark:workspace-worker -- --profile medium` and `--profile large`

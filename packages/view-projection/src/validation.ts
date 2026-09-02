@@ -49,10 +49,6 @@ function isStringArray(value: unknown): value is readonly string[] {
   );
 }
 
-function hasDuplicates(values: readonly string[]): boolean {
-  return new Set(values).size !== values.length;
-}
-
 function sortedUniqueStrings(
   value: unknown,
   path: string,
@@ -62,7 +58,18 @@ function sortedUniqueStrings(
     addIssue(issues, 'invalid-shape', path, 'Expected an array of strings.');
     return undefined;
   }
-  if (hasDuplicates(value)) {
+  const seen = new Set<string>();
+  let hasDuplicate = false;
+  let sorted = true;
+  for (let index = 0; index < value.length; index += 1) {
+    const item = value[index];
+    if (item === undefined) continue;
+    if (seen.has(item)) hasDuplicate = true;
+    seen.add(item);
+    const previous = value[index - 1];
+    if (previous !== undefined && previous > item) sorted = false;
+  }
+  if (hasDuplicate) {
     addIssue(
       issues,
       'duplicate-provenance',
@@ -70,8 +77,7 @@ function sortedUniqueStrings(
       'Array entries must be unique.',
     );
   }
-  const sorted = [...value].sort();
-  if (JSON.stringify(sorted) !== JSON.stringify(value)) {
+  if (!sorted) {
     addIssue(issues, 'invalid-shape', path, 'Array entries must be sorted.');
   }
   return value;
@@ -211,7 +217,26 @@ function sameStrings(
   left: readonly string[],
   right: readonly string[],
 ): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
+}
+
+function sortedById(values: readonly { readonly id: string }[]): boolean {
+  for (let index = 1; index < values.length; index += 1) {
+    const previous = values[index - 1];
+    const current = values[index];
+    if (
+      previous !== undefined &&
+      current !== undefined &&
+      previous.id > current.id
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function parseDiagnosticNode(
@@ -337,12 +362,7 @@ function parseNodes(
     ids.add(parsed.id);
     nodes.push(parsed);
   }
-  if (
-    !sameStrings(
-      nodes.map(({ id }) => id),
-      nodes.map(({ id }) => id).sort(),
-    )
-  ) {
+  if (!sortedById(nodes)) {
     addIssue(issues, 'invalid-shape', '$.nodes', 'Nodes must be sorted by ID.');
   }
   return nodes;
@@ -505,12 +525,7 @@ function parseEdges(
     }
     edges.push(candidate as unknown as ProjectedReferenceEdge);
   }
-  if (
-    !sameStrings(
-      edges.map(({ id }) => id),
-      edges.map(({ id }) => id).sort(),
-    )
-  ) {
+  if (!sortedById(edges)) {
     addIssue(issues, 'invalid-shape', '$.edges', 'Edges must be sorted by ID.');
   }
 

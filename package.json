@@ -16,6 +16,7 @@
     "diagnose:vault": "pnpm --filter @icarus-graph-explorer/vault-diagnostics diagnose",
     "benchmark:pipeline": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark",
     "benchmark:performance": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:performance",
+    "benchmark:query-projection": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:query-projection",
     "benchmark:workspace-worker": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:workspace-worker",
     "benchmark:dagre-worker": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:dagre-worker",
     "benchmark:global-renderer": "pnpm --filter @icarus-graph-explorer/global-renderer-spike build && pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:global-renderer",

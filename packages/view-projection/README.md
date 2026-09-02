@@ -28,7 +28,10 @@ src/
   ids.ts               Deterministic collision-safe projected tuple IDs.
   disclosure.ts        Structural visibility and stale-state diagnostics.
   base-projection.ts   Endpoint routing, hierarchy, aggregation, and provenance.
-  slicing.ts           Reference-hop focus and post-focus projected filters.
+  filter-plan.ts       Once-per-call canonical/query/status filter preparation.
+  candidate-eligibility.ts Direct DISC1 canonical candidate retention and ancestor closure.
+  slicing.ts           Reference-hop focus and stable-scan post-focus filters.
+  instrumentation.ts   Optional aggregate-only phase and operation evidence.
   validation.ts        Deserialized-output and cross-record invariant checks.
   presets.ts           Generic structural-depth and compatibility state helpers.
   reveal.ts            Canonical-target disclosure helper for navigation.
@@ -100,11 +103,14 @@ canonical subtree size. Preserved expanded descendant IDs can therefore make a
 reopened branch reveal more than its immediate children.
 
 Candidate IDs stay projection-internal. The ordinary unfiltered path counts a
-single indexed structural traversal. When path, text, entity-kind, or QUERY1
-filters are active, one shared hypothetical disclosure/filter pass finalizes every
-visible owner's candidates together; the package never runs one full
-projection per node. Reference-status filtering does not change entity
-revealability. Because expansion can non-locally change reference endpoint
+single indexed structural traversal. Path, entity-kind, and QUERY1 filters use
+one prepared canonical predicate and derive candidate eligibility directly
+from the union of visible and one-action candidate entities, followed by
+ancestor closure inside that same universe. They do not build or filter a
+second hypothetical graph. Projected-text filters retain the conservative
+hypothetical projection fallback because raw diagnostic targets and projected
+labels are not canonical entity fields. Reference-status filtering does not
+change entity revealability. Because expansion can non-locally change reference endpoint
 roll-up and Focus reachability in the generic one-pass `projectView`, that
 low-level Focus path still suppresses speculative Expand metadata. Product
 Structure uses `projectStructureView`: it establishes document reachability
@@ -192,8 +198,11 @@ relation, or copied source truth.
 
 ## Filter semantics
 
-Filters run after structural projection and focus, combine across configured
-dimensions, and never mutate or reroute canonical relationships:
+Filters are prepared once, then run after structural projection and focus.
+They combine across configured dimensions and never mutate or reroute
+canonical relationships. Normal filtering scans the already sorted nodes and
+edges in input order, filters existing hierarchy edges, and reuses unchanged
+node/edge objects; it does not reconstruct or resort graph topology:
 
 - `pathPrefixes` accepts normalized workspace-relative exact paths/folder
   prefixes; invalid prefixes produce issues and never broaden a match.
@@ -220,6 +229,9 @@ deterministic ordering, unique node/edge IDs, canonical entity/reference
 membership, non-negative actionable reveal counts, endpoints, entity-only
 hierarchy edges, non-self reference edges,
 diagnostic candidates/provenance, focus metadata, and source-scoped tuple IDs.
+Sorted-array and sorted-ID invariants are checked with linear adjacent scans;
+this avoids validation-only array copies and sorts without relaxing any
+accepted or rejected shape.
 
 For every relationship that survives disclosure/focus/filter policy, its
 canonical reference appears exactly once in a projected reference edge or an
@@ -228,8 +240,14 @@ so a renderer can inspect the target without accessing canonical data; that
 mirror is metadata for the same diagnostic path, not a second relationship.
 
 The implementation uses ordinary maps/sets, memoized ancestor routing, one-pass
-aggregation, and bounded BFS. The KG5 synthetic harness measures small/medium
-index, disclosure, focus, and filter scenarios without enforcing timing budgets.
+aggregation, and bounded BFS. `projectView` accepts an optional runtime-only,
+aggregate instrumentation seam; ordinary product callers omit it and no path,
+query, ID, or source content is retained. The KG5 synthetic harness measures
+small/medium index, disclosure, focus, and filter scenarios without enforcing
+timing budgets. `pnpm benchmark:query-projection` adds phase distributions,
+deterministic operation counts, and the repeated A → B → C → Clear → A query
+sequence. Its output is investigative and belongs under ignored
+`output/performance/`.
 
 ## KG7 handoff
 

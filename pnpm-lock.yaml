@@ -417,6 +417,9 @@ importers:
       '@icarus-graph-explorer/global-renderer-spike':
         specifier: workspace:*
         version: link:../global-renderer-spike
+      '@icarus-graph-explorer/graph-query':
+        specifier: workspace:*
+        version: link:../../packages/graph-query
       '@icarus-graph-explorer/performance':
         specifier: workspace:*
         version: link:../../packages/performance

@@ -6,6 +6,7 @@
   "scripts": {
     "benchmark": "tsx src/benchmark.ts",
     "benchmark:performance": "tsx src/performance-benchmark.ts",
+    "benchmark:query-projection": "tsx src/query-projection-benchmark.ts",
     "benchmark:workspace-worker": "tsx src/workspace-worker-responsiveness.ts",
     "benchmark:dagre-worker": "tsx src/dagre-layout-worker-responsiveness.ts",
     "benchmark:global-renderer": "tsx src/global-renderer-benchmark.ts",
@@ -22,6 +23,7 @@
     "@icarus-graph-explorer/dagre-layout": "workspace:*",
     "@icarus-graph-explorer/diagnostics-obsidian": "workspace:*",
     "@icarus-graph-explorer/explorer-inspection": "workspace:*",
+    "@icarus-graph-explorer/graph-query": "workspace:*",
     "@icarus-graph-explorer/global-renderer-spike": "workspace:*",
     "@icarus-graph-explorer/performance": "workspace:*",
     "@icarus-graph-explorer/renderer-reactflow": "workspace:*",

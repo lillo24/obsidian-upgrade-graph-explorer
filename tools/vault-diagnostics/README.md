@@ -30,6 +30,7 @@ src/
   benchmark.ts        Opt-in full-pipeline plus incremental timing entry point.
   incremental-benchmark.ts Edit/add/delete/move timings with exact rebuild oracles.
   performance-benchmark.ts Repeated versioned pipeline/projection/renderer/inspection results.
+  query-projection-benchmark.ts PERFQ1A projection phases, operations, and repeated-query evidence.
   performance-policy.ts Class budgets plus measured KG12B worker/cache decisions.
   workspace-worker-thread.ts Node host for the production W1 protocol/runtime.
   workspace-worker-responsiveness.ts Direct-versus-worker event-loop evidence.
@@ -109,6 +110,10 @@ pnpm benchmark:pipeline -- --profile medium
 pnpm benchmark:pipeline -- --profile large
 pnpm benchmark:performance -- --profile small \
   --output output/performance/small.json
+pnpm benchmark:query-projection -- --profile small \
+  --output output/performance/query-small.json
+pnpm benchmark:query-projection -- --profile medium \
+  --output output/performance/query-medium.json
 pnpm benchmark:workspace-worker -- --profile medium
 pnpm benchmark:workspace-worker -- --profile large
 pnpm benchmark:dagre-worker -- --profile small
@@ -147,6 +152,15 @@ root command resolve from the caller's directory even though pnpm executes in
 this package. Use only the ignored `output/performance/` destination. Repeated
 Dagre is explicitly omitted above 2,500 projected nodes after the measured
 structural cliff; the JSON records the reason instead of a zero-time success.
+
+`benchmark:query-projection` is the PERFQ1A focused contract. It measures
+depth-three no-filter, broad/selective QUERY1, path+kind, projected-text
+fallback, and invalid-query scenarios. It reports aggregate phase
+median/p95/maximum distributions plus deterministic build, preparation,
+candidate-path, scan, sort, hierarchy, and validation operation counts. The
+same snapshot/disclosure is then exercised through A → B → C → Clear → A.
+Scenario IDs deliberately replace query/path text in output, and wall-clock
+results remain investigative rather than CI gates.
 
 `benchmark:workspace-worker` runs the same deterministic W1 initialization
 directly and through a warm worker thread while a 16 ms event-loop probe stays
