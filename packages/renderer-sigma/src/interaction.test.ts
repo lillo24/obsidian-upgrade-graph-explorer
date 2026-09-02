@@ -4,7 +4,9 @@ import { GLOBAL_INTERACTION_OPERATION_CONTRACTS } from './interaction-contract';
 import { LOCAL_INTERACTION_OPERATION_CONTRACTS } from './local-interaction-contract';
 import {
   GLOBAL_ZOOM_SENSITIVITY,
+  isCoarseWheelDelta,
   normalizeWheelDeltaPixels,
+  preventSigmaWheelDefault,
   ratioAfterWheelDelta,
   WheelDirectionStabilizer,
 } from './precision-wheel-zoom';
@@ -37,6 +39,37 @@ const edge: GlobalEdgeAttributes = {
   status: 'resolved',
   referenceCount: 1,
 };
+
+interface TimedWheelDelta {
+  readonly at: number;
+  readonly deltaMode?: number;
+  readonly deltaY: number;
+}
+
+function applyWheelSequence(events: readonly TimedWheelDelta[]): {
+  readonly appliedDeltas: readonly number[];
+  readonly ratios: readonly number[];
+} {
+  const stabilizer = new WheelDirectionStabilizer();
+  let ratio = 1;
+  const appliedDeltas: number[] = [];
+  const ratios: number[] = [];
+  for (const event of events) {
+    const deltaPixels = normalizeWheelDeltaPixels(
+      { deltaMode: event.deltaMode ?? 0, deltaY: event.deltaY },
+      800,
+    );
+    const applied = stabilizer.stabilize(
+      deltaPixels,
+      event.at,
+      isCoarseWheelDelta(deltaPixels),
+    );
+    ratio = ratioAfterWheelDelta(ratio, applied);
+    appliedDeltas.push(applied);
+    ratios.push(ratio);
+  }
+  return { appliedDeltas, ratios };
+}
 
 describe('Global visual interactions', () => {
   it.each([
@@ -99,29 +132,66 @@ describe('Global visual interactions', () => {
     ).toBe(true);
   });
 
-  it('preserves precise tiny movement and smooth repeated fine deltas', () => {
+  it('preserves many tiny same-direction deltas proportionally and monotonically', () => {
     expect(GLOBAL_ZOOM_SENSITIVITY).toBe(0.0017);
-    const tinyDelta = normalizeWheelDeltaPixels(
-      { deltaMode: 0, deltaY: 0.01 },
-      800,
-    );
-    expect(tinyDelta).toBe(0.5);
-    expect(ratioAfterWheelDelta(1, tinyDelta)).toBeGreaterThan(1);
-    const repeatedFineRatio = Array.from({ length: 4 }).reduce<number>(
-      (ratio) =>
-        ratioAfterWheelDelta(
-          ratio,
-          normalizeWheelDeltaPixels({ deltaMode: 0, deltaY: 0.5 }, 800),
-        ),
-      1,
-    );
-    expect(repeatedFineRatio).toBeCloseTo(
+    const events = Array.from({ length: 40 }, (_, index) => ({
+      at: index * 16.7,
+      deltaY: 0.01 + index * 0.001,
+    }));
+    const { appliedDeltas, ratios } = applyWheelSequence(events);
+    expect(appliedDeltas).toEqual(events.map(({ deltaY }) => deltaY));
+    for (let index = 1; index < ratios.length; index += 1) {
+      expect(ratios[index]).toBeGreaterThan(ratios[index - 1] ?? 0);
+    }
+    expect(ratios.at(-1)).toBeCloseTo(
       ratioAfterWheelDelta(
         1,
-        normalizeWheelDeltaPixels({ deltaMode: 0, deltaY: 2 }, 800),
+        events.reduce((sum, event) => sum + event.deltaY, 0),
       ),
       12,
     );
+  });
+
+  it('keeps short opposite-sign fine noise proportional instead of flooring or suppressing it', () => {
+    const { appliedDeltas, ratios } = applyWheelSequence([
+      { at: 0, deltaY: 0.25 },
+      { at: 17, deltaY: 0.25 },
+      { at: 34, deltaY: -0.01 },
+      { at: 51, deltaY: 0.25 },
+    ]);
+    expect(appliedDeltas).toEqual([0.25, 0.25, -0.01, 0.25]);
+    expect(ratios[2]).toBeCloseTo(
+      ratioAfterWheelDelta(ratios[1] ?? 1, -0.01),
+      12,
+    );
+    expect(ratios.at(-1)).toBeGreaterThan(ratios[1] ?? 1);
+  });
+
+  it('keeps very slow same-direction fine input proportional across long gaps', () => {
+    const { appliedDeltas, ratios } = applyWheelSequence([
+      { at: 0, deltaY: 0.000_012 },
+      { at: 150, deltaY: 0.062_875 },
+      { at: 700, deltaY: 0.253_731 },
+      { at: 1_000, deltaY: 0.01 },
+    ]);
+    expect(appliedDeltas).toEqual([0.000_012, 0.062_875, 0.253_731, 0.01]);
+    for (let index = 1; index < ratios.length; index += 1) {
+      expect(ratios[index]).toBeGreaterThan(ratios[index - 1] ?? 0);
+    }
+    expect(ratios.at(-1)).toBeCloseTo(ratioAfterWheelDelta(1, 0.326_618), 12);
+  });
+
+  it('accepts an intentional fine-input direction reversal immediately', () => {
+    const { appliedDeltas, ratios } = applyWheelSequence([
+      { at: 0, deltaY: 0.25 },
+      { at: 17, deltaY: 0.25 },
+      { at: 34, deltaY: -0.25 },
+      { at: 51, deltaY: -0.25 },
+    ]);
+    expect(appliedDeltas).toEqual([0.25, 0.25, -0.25, -0.25]);
+    expect(ratios[2]).toBeLessThan(ratios[1] ?? 1);
+    expect(ratios[3]).toBeLessThan(ratios[2] ?? 1);
+    expect(ratios.at(-1)).toBeCloseTo(1, 12);
   });
 
   it('keeps fine pixel input linear through the precision range', () => {
@@ -196,11 +266,28 @@ describe('Global visual interactions', () => {
     expect(ratioAfterWheelDelta(1, 0)).toBe(1);
   });
 
-  it('keeps short reversal-tail stabilization unchanged', () => {
-    const stabilizer = new WheelDirectionStabilizer();
-    expect(stabilizer.stabilize(-2, 0)).toBe(-2);
-    expect(stabilizer.stabilize(1, 50)).toBe(0);
-    expect(stabilizer.stabilize(1, 141)).toBe(1);
+  it('retains reversal-tail stabilization only for a coarse mouse-notch sequence', () => {
+    const { appliedDeltas, ratios } = applyWheelSequence([
+      { at: 0, deltaY: -100 },
+      { at: 50, deltaY: 100 },
+      { at: 141, deltaY: 100 },
+    ]);
+    expect(appliedDeltas[0]).toBeLessThan(-8);
+    expect(appliedDeltas[1]).toBe(0);
+    expect(appliedDeltas[2]).toBeGreaterThan(8);
+    expect(ratios[1]).toBe(ratios[0]);
+    expect(ratios[2]).toBeGreaterThan(ratios[1] ?? 0);
+  });
+
+  it('explicitly prevents Sigma 3.0.3 default wheel animation', () => {
+    const coordinates = {
+      sigmaDefaultPrevented: false,
+      preventSigmaDefault() {
+        // Reproduce Sigma 3.0.3's ineffective pre-spread closure.
+      },
+    };
+    preventSigmaWheelDefault(coordinates);
+    expect(coordinates.sigmaDefaultPrevented).toBe(true);
   });
 
   it('leaves the existing min/max ratio constraints to the Sigma camera', () => {

@@ -41,7 +41,7 @@ src/
   lifecycle.ts             WebGL construction result and idempotent session lease.
   style.ts                 Far/Regional/Near LOD and GROUP1A base-accent layer.
   global-label.ts          Viewport-aware Global label/hover placement after adaptive culling.
-  precision-wheel-zoom.ts  Fine-linear/coarse-compressed wheel curve and reversal guard.
+  precision-wheel-zoom.ts  Fine-linear/coarse-compressed wheel curve and Sigma default guard.
   session.ts               Imperative Sigma lifecycle and high-frequency interaction ownership.
   viewport-request.ts      Layout-commit gate for semantic center and Fit requests.
   GlobalGraphEmptyState.tsx  Explicit zero-match state shared by Global mount decisions.
@@ -127,16 +127,22 @@ WebGL. Exact memory-cache restoration is silent; persistent canvas status is
 reserved for pending layout work and failures.
 
 All and Focus Network share one precision-wheel contract. Browser line units
-still normalize to 16 px and tiny nonzero events retain the 0.5 px visibility
-floor. Effective deltas remain exactly linear through 8 px, then follow a smooth
-exponential compression toward 34 px; with the unchanged `0.0017` gain, a
-single coarse event cannot exceed roughly a 6% ratio change. This handles both
-line-mode mouse notches and large pixel-mode Windows/browser/Tauri events
-without device detection. The 90 ms reversal-tail guard, Ctrl/pinch ownership,
-pointer-anchored Sigma camera transform, `0.02`–`6` camera bounds, and 120 ms
-semantic viewport observation remain unchanged. Wheel handling stays inside
-the imperative sessions and performs no React state, projection, Graphology,
-layout, or workspace work.
+still normalize to 16 px. Pixel-mode input remains exact—including magnitudes
+below 0.5 px—through the 8 px precision range, then follows a smooth exponential
+compression toward 34 px; with the unchanged `0.0017` gain, a single coarse
+event cannot exceed roughly a 6% ratio change. The 90 ms reversal-tail guard is
+restricted to those coarse events, while fine high-frequency events and
+intentional fine reversals are applied immediately. This classification uses
+only normalized event magnitude, not device or OS detection.
+
+Both sessions explicitly set Sigma's wheel prevention flag after calling its
+public prevention function. Sigma 3.0.3 constructs that function before
+spreading the wheel coordinates, so the function alone updates a different
+object and otherwise leaves Sigma's animated 1.7x default zoom competing with
+the direct camera update. Ctrl/pinch ownership, pointer-anchored Sigma camera
+transform, `0.02`–`6` camera bounds, and 120 ms semantic viewport observation
+remain unchanged. Wheel handling stays inside the imperative sessions and
+performs no React state, projection, Graphology, layout, or workspace work.
 
 Sigma 3.0.3's default label and highlight drawing always extends to the right.
 Global replaces only that canvas drawing boundary: adaptive culling still

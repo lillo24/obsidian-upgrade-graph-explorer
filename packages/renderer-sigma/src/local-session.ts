@@ -10,7 +10,9 @@ import {
 } from './local-graph';
 import { createLocalLayoutRequest } from './local-layout';
 import {
+  isCoarseWheelDelta,
   normalizeWheelDeltaPixels,
+  preventSigmaWheelDefault,
   ratioAfterWheelDelta,
   WheelDirectionStabilizer,
 } from './precision-wheel-zoom';
@@ -108,15 +110,19 @@ export class LocalRendererSession {
 
   private readonly precisionWheelHandler = (coordinates: WheelCoords): void => {
     const original = coordinates.original as WheelEvent;
+    preventSigmaWheelDefault(coordinates);
+    const deltaPixels = normalizeWheelDeltaPixels(
+      original,
+      this.renderer.getDimensions().height,
+    );
     if (this.trackpadZoomMode === 'pinch-zoom' && !original.ctrlKey) {
-      coordinates.preventSigmaDefault();
       this.applyWheelPan(original);
       return;
     }
-    coordinates.preventSigmaDefault();
     const delta = this.wheelDirection.stabilize(
-      normalizeWheelDeltaPixels(original, this.renderer.getDimensions().height),
+      deltaPixels,
       performance.now(),
+      isCoarseWheelDelta(deltaPixels),
     );
     if (delta === 0) return;
     const camera = this.renderer.getCamera();
