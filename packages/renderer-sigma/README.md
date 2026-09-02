@@ -119,8 +119,11 @@ fingerprint changes, or a Global worker request.
 Networks with 1–12 visible nodes force their document labels through Sigma's
 ordinary density culling so filtered and synthetic results remain legible at
 the default camera ratio. Larger graphs retain the existing semantic-zoom label
-policy. A zero-node projection does not mount WebGL and instead reports the
-same explicit `No nodes match this view.` outcome used by Hierarchy.
+policy. A zero-node projection overlays the same explicit
+`No nodes match this view.` outcome used by Hierarchy. The existing Global
+session remains mounted across nonempty/empty query changes so desktop WebView
+transitions reconcile topology in place instead of tearing down and recreating
+WebGL.
 
 Sigma 3.0.3's default label and highlight drawing always extends to the right.
 Global replaces only that canvas drawing boundary: adaptive culling still

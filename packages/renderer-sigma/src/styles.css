@@ -25,17 +25,18 @@
   inset: 0;
 }
 
-.global-graph-canvas--empty {
+.global-graph-empty {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
   display: grid;
   place-items: center;
-}
-
-.global-graph-empty {
-  display: grid;
+  align-content: center;
   gap: 0.35rem;
-  max-width: min(28rem, calc(100% - 2rem));
+  padding: 1rem;
   color: #43565b;
   text-align: center;
+  pointer-events: none;
 }
 
 .global-graph-empty strong {

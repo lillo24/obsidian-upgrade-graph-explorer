@@ -66,15 +66,7 @@ function layoutIterations(nodeCount: number): number {
   return nodeCount <= 1_000 ? 100 : nodeCount <= 5_000 ? 30 : 20;
 }
 
-export function GlobalGraphCanvas(props: GlobalGraphCanvasProps) {
-  return props.projection.nodes.length === 0 ? (
-    <GlobalGraphEmptyState />
-  ) : (
-    <MountedGlobalGraphCanvas {...props} />
-  );
-}
-
-function MountedGlobalGraphCanvas({
+export function GlobalGraphCanvas({
   centerRequest,
   fitRequestKey,
   initialViewport,
@@ -367,28 +359,34 @@ function MountedGlobalGraphCanvas({
   return (
     <div className="global-graph-canvas">
       <div className="global-graph-canvas__surface" ref={containerRef} />
-      <div
-        aria-label="All Network canvas controls"
-        className="global-graph-canvas__controls"
-        role="group"
-      >
-        <button aria-label="Zoom in" onClick={zoomIn} type="button">
-          +
-        </button>
-        <button aria-label="Zoom out" onClick={zoomOut} type="button">
-          −
-        </button>
-        <button onClick={fit} type="button">
-          Fit
-        </button>
-      </div>
-      <p
-        className="global-graph-canvas__status"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        {layoutStatus}
-      </p>
+      {projection.nodes.length === 0 ? (
+        <GlobalGraphEmptyState />
+      ) : (
+        <>
+          <div
+            aria-label="All Network canvas controls"
+            className="global-graph-canvas__controls"
+            role="group"
+          >
+            <button aria-label="Zoom in" onClick={zoomIn} type="button">
+              +
+            </button>
+            <button aria-label="Zoom out" onClick={zoomOut} type="button">
+              −
+            </button>
+            <button onClick={fit} type="button">
+              Fit
+            </button>
+          </div>
+          <p
+            className="global-graph-canvas__status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {layoutStatus}
+          </p>
+        </>
+      )}
       {layoutError === undefined ? null : (
         <p className="global-graph-canvas__error" role="alert">
           {layoutError}

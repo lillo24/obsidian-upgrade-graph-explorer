@@ -34,6 +34,7 @@ describe('GlobalGraphCanvas empty state', () => {
 
     expect(markup).toContain('No nodes match this view.');
     expect(markup).toContain('Adjust Filters to restore files.');
+    expect(markup).toContain('global-graph-canvas__surface');
     expect(markup).not.toContain('All Network canvas controls');
   });
 });
