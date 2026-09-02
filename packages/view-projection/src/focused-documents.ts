@@ -1,6 +1,7 @@
 import type { EntityId } from '@icarus-graph-explorer/core';
 
 import { buildBaseProjection } from './base-projection';
+import { prepareViewProjectionFilters } from './filter-plan';
 import { documentOnlyProjectionState } from './presets';
 import { applyFilters, applyFocus } from './slicing';
 import type {
@@ -71,18 +72,19 @@ export function projectFocusedDocumentNeighborhood(
   const constrainedDocuments = applyFilters(
     workspace,
     documentBase,
-    state.filters?.pathPrefixes === undefined &&
-      state.filters?.referenceStatuses === undefined
-      ? undefined
-      : {
-          ...(state.filters.pathPrefixes === undefined
-            ? {}
-            : { pathPrefixes: state.filters.pathPrefixes }),
-          ...(state.filters.referenceStatuses === undefined
-            ? {}
-            : { referenceStatuses: state.filters.referenceStatuses }),
-        },
-    undefined,
+    prepareViewProjectionFilters(
+      state.filters?.pathPrefixes === undefined &&
+        state.filters?.referenceStatuses === undefined
+        ? undefined
+        : {
+            ...(state.filters.pathPrefixes === undefined
+              ? {}
+              : { pathPrefixes: state.filters.pathPrefixes }),
+            ...(state.filters.referenceStatuses === undefined
+              ? {}
+              : { referenceStatuses: state.filters.referenceStatuses }),
+          },
+    ),
   );
   const neighborhood = applyFocus(workspace, constrainedDocuments, {
     ...focus,

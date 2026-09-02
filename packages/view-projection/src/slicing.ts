@@ -1,10 +1,16 @@
 import type { EntityId } from '@icarus-graph-explorer/core';
-import {
-  matchesGraphQuery,
-  type GraphQueryParseResult,
-} from '@icarus-graph-explorer/graph-query';
 
 import { entityNodeId, hierarchyEdgeId } from './ids';
+import {
+  matchesCanonicalEntityFilters,
+  matchesProjectedText,
+  referenceStatusAllowed,
+  type PreparedViewProjectionFilters,
+} from './filter-plan';
+import {
+  countProjectionOperation,
+  type ProjectionInstrumentation,
+} from './instrumentation';
 import type {
   FocusProjectionState,
   ProjectedEdge,
@@ -13,10 +19,10 @@ import type {
   ProjectedNode,
   ProjectedReferenceEdge,
   ProjectedReferenceTargetNode,
+  ProjectionEdgeId,
   ProjectionIssue,
   ProjectionNodeId,
   ViewProjection,
-  ViewProjectionFilters,
 } from './types';
 import type { ProjectionWorkspace } from './workspace';
 
@@ -45,19 +51,25 @@ function addVisibleAncestors(
   entityId: EntityId,
   available: ReadonlyMap<EntityId, ProjectedEntityNode>,
   retainedNodeIds: Set<ProjectionNodeId>,
+  instrumentation?: ProjectionInstrumentation,
 ): void {
+  let steps = 0;
   let parent = workspace.parent(entityId);
   while (parent !== undefined) {
+    steps += 1;
     const node = available.get(parent.id);
     if (node !== undefined) retainedNodeIds.add(node.id);
     parent = workspace.parent(parent.id);
   }
+  countProjectionOperation(instrumentation, 'ancestorWalkSteps', steps);
 }
 
 function hierarchyFor(
   workspace: ProjectionWorkspace,
   retainedEntityNodes: readonly ProjectedEntityNode[],
+  instrumentation?: ProjectionInstrumentation,
 ): readonly ProjectedHierarchyEdge[] {
+  countProjectionOperation(instrumentation, 'hierarchyEdgesRebuilt');
   const retainedByEntityId = new Map(
     retainedEntityNodes.map((node) => [node.entityId, node]),
   );
@@ -87,7 +99,10 @@ function sortedProjection(
   nodes: readonly ProjectedNode[],
   edges: readonly ProjectedEdge[],
   issues: readonly ProjectionIssue[],
+  instrumentation?: ProjectionInstrumentation,
 ): ViewProjection {
+  countProjectionOperation(instrumentation, 'nodeSorts');
+  countProjectionOperation(instrumentation, 'edgeSorts');
   return {
     nodes: [...nodes].sort((left, right) => compareText(left.id, right.id)),
     edges: [...edges].sort((left, right) => compareText(left.id, right.id)),
@@ -249,90 +264,61 @@ export function applyFocus(
   );
 }
 
-function normalizedPathPrefix(prefix: string): boolean {
-  return (
-    prefix.length > 0 &&
-    !prefix.startsWith('/') &&
-    !prefix.includes('\\') &&
-    !/^[A-Za-z]:\//u.test(prefix) &&
-    prefix
-      .split('/')
-      .every(
-        (segment) => segment.length > 0 && segment !== '.' && segment !== '..',
-      )
+function issuesWithFilterDiagnostics(
+  projection: ViewProjection,
+  plan: PreparedViewProjectionFilters,
+): readonly ProjectionIssue[] {
+  if (plan.issues.length === 0) return projection.issues;
+  return [...projection.issues, ...plan.issues].sort(
+    (left, right) =>
+      compareText(left.code, right.code) ||
+      compareText(left.subject, right.subject),
   );
 }
 
-function pathMatches(path: string, prefixes: ReadonlySet<string>): boolean {
-  for (const prefix of prefixes) {
-    if (path === prefix || path.startsWith(`${prefix}/`)) return true;
-  }
-  return false;
-}
-
-function textMatchesEntity(node: ProjectedEntityNode, text: string): boolean {
+function allReferenceStatusesAllowed(
+  plan: PreparedViewProjectionFilters,
+): boolean {
+  const statuses = plan.referenceStatuses;
   return (
-    node.sourcePath.toLowerCase().includes(text) ||
-    (node.title?.toLowerCase().includes(text) ?? false)
+    statuses === undefined ||
+    (statuses.has('resolved') &&
+      statuses.has('unresolved') &&
+      statuses.has('ambiguous') &&
+      statuses.has('invalid'))
   );
 }
 
 export function applyFilters(
   workspace: ProjectionWorkspace,
   projection: ViewProjection,
-  filters: ViewProjectionFilters | undefined,
-  preparedQuery: GraphQueryParseResult | undefined,
+  plan: PreparedViewProjectionFilters,
+  instrumentation?: ProjectionInstrumentation,
 ): ViewProjection {
-  if (filters === undefined) return projection;
-
-  const issues: ProjectionIssue[] = [...projection.issues];
-  if (preparedQuery !== undefined && !preparedQuery.valid) {
-    const first = preparedQuery.issues[0];
-    issues.push({
-      code: 'invalid-query',
-      subject: filters.query ?? '',
-      message: `Graph query is invalid${
-        first === undefined
-          ? '.'
-          : ` at character ${first.position + 1}: ${first.message}`
-      }`,
-    });
-    return sortedProjection([], [], issues);
+  const issues = issuesWithFilterDiagnostics(projection, plan);
+  if (plan.invalid) {
+    return { nodes: [], edges: [], issues };
   }
-  const validPathPrefixes = new Set<string>();
-  if (filters.pathPrefixes !== undefined) {
-    for (const prefix of [...new Set(filters.pathPrefixes)].sort(compareText)) {
-      if (normalizedPathPrefix(prefix)) {
-        validPathPrefixes.add(prefix);
-      } else {
-        issues.push({
-          code: 'invalid-path-prefix',
-          subject: prefix,
-          message: `Path prefix "${prefix}" is not a normalized workspace-relative path prefix.`,
-        });
+
+  if (!plan.hasEntityVisibilityFilter) {
+    if (allReferenceStatusesAllowed(plan) && issues === projection.issues) {
+      return projection;
+    }
+    const keptReferenceEdgeIds = new Set<ProjectionEdgeId>();
+    for (const edge of projection.edges) {
+      if (
+        edge.kind === 'reference' &&
+        referenceStatusAllowed(edge.status, plan)
+      ) {
+        keptReferenceEdgeIds.add(edge.id);
       }
     }
-  }
-
-  const statuses =
-    filters.referenceStatuses === undefined
-      ? undefined
-      : new Set(filters.referenceStatuses);
-  const statusAllowed = (status: ProjectedReferenceEdge['status']): boolean =>
-    statuses === undefined || statuses.has(status);
-  const hasEntityFilter =
-    filters.pathPrefixes !== undefined ||
-    filters.entityKinds !== undefined ||
-    (filters.text?.trim().length ?? 0) > 0 ||
-    preparedQuery !== undefined;
-
-  if (!hasEntityFilter) {
-    const referenceEdges = projection.edges.filter(
-      (edge): edge is ProjectedReferenceEdge =>
-        edge.kind === 'reference' && statusAllowed(edge.status),
-    );
     const diagnosticIds = new Set(
-      referenceEdges.flatMap((edge) => [edge.sourceNodeId, edge.targetNodeId]),
+      projection.edges.flatMap((edge) =>
+        edge.kind === 'reference' && keptReferenceEdgeIds.has(edge.id)
+          ? [edge.sourceNodeId, edge.targetNodeId]
+          : [],
+      ),
     );
     const nodes: ProjectedNode[] = [];
     for (const node of projection.nodes) {
@@ -341,73 +327,67 @@ export function applyFilters(
         continue;
       }
       nodes.push(
-        statuses !== undefined && !statuses.has('resolved')
+        !referenceStatusAllowed('resolved', plan) &&
+          node.internalReferenceIds.length > 0
           ? { ...node, internalReferenceIds: [] }
           : node,
       );
     }
-    return sortedProjection(
+    return {
       nodes,
-      [
-        ...projection.edges.filter((edge) => edge.kind === 'hierarchy'),
-        ...referenceEdges,
-      ],
+      edges: projection.edges.filter(
+        (edge) =>
+          edge.kind === 'hierarchy' || keptReferenceEdgeIds.has(edge.id),
+      ),
       issues,
-    );
+    };
   }
 
   const availableEntities = entityNodeMap(projection);
-  const entityKinds =
-    filters.entityKinds === undefined
-      ? undefined
-      : new Set(filters.entityKinds);
-  const normalizedText = filters.text?.trim().toLowerCase() ?? '';
   const eligibleEntityNodeIds = new Set<ProjectionNodeId>();
   const contentEntityNodeIds = new Set<ProjectionNodeId>();
+  let entityFilterEvaluations = 0;
   for (const node of availableEntities.values()) {
     if (node.role !== 'content') continue;
-    const pathAllowed =
-      filters.pathPrefixes === undefined ||
-      pathMatches(node.sourcePath, validPathPrefixes);
-    const kindAllowed =
-      entityKinds === undefined || entityKinds.has(node.entityKind);
+    entityFilterEvaluations += 1;
     const entity = workspace.entity(node.entityId);
-    const queryAllowed =
-      preparedQuery === undefined ||
-      (preparedQuery.valid &&
-        entity !== undefined &&
-        matchesGraphQuery(entity, preparedQuery.expression));
-    if (!pathAllowed || !kindAllowed || !queryAllowed) continue;
+    if (entity === undefined || !matchesCanonicalEntityFilters(entity, plan)) {
+      continue;
+    }
     eligibleEntityNodeIds.add(node.id);
-    if (
-      normalizedText.length === 0 ||
-      textMatchesEntity(node, normalizedText)
-    ) {
+    if (matchesProjectedText(node, plan)) {
       contentEntityNodeIds.add(node.id);
     }
   }
+  countProjectionOperation(
+    instrumentation,
+    'entityFilterEvaluations',
+    entityFilterEvaluations,
+  );
 
   const nodesById = nodeMap(projection);
-  const referenceEdges = projection.edges.filter(
-    (edge): edge is ProjectedReferenceEdge => edge.kind === 'reference',
-  );
   const supportingSourceNodeIds = new Set<ProjectionNodeId>();
-  const keptReferenceEdges: ProjectedReferenceEdge[] = [];
-  for (const edge of referenceEdges) {
-    if (!statusAllowed(edge.status)) continue;
+  const keptReferenceEdgeIds = new Set<ProjectionEdgeId>();
+  for (const edge of projection.edges) {
+    if (
+      edge.kind !== 'reference' ||
+      !referenceStatusAllowed(edge.status, plan)
+    ) {
+      continue;
+    }
     const target = nodesById.get(edge.targetNodeId);
     if (target?.kind === 'reference-target') {
       const rawTargetMatch =
-        normalizedText.length > 0 &&
-        target.rawTarget.toLowerCase().includes(normalizedText);
+        plan.hasProjectedTextFilter &&
+        target.rawTarget.toLowerCase().includes(plan.projectedText);
       if (contentEntityNodeIds.has(edge.sourceNodeId)) {
-        keptReferenceEdges.push(edge);
+        keptReferenceEdgeIds.add(edge.id);
       } else if (
         rawTargetMatch &&
         eligibleEntityNodeIds.has(edge.sourceNodeId)
       ) {
         supportingSourceNodeIds.add(edge.sourceNodeId);
-        keptReferenceEdges.push(edge);
+        keptReferenceEdgeIds.add(edge.id);
       }
       continue;
     }
@@ -415,7 +395,7 @@ export function applyFilters(
       contentEntityNodeIds.has(edge.sourceNodeId) &&
       contentEntityNodeIds.has(edge.targetNodeId)
     ) {
-      keptReferenceEdges.push(edge);
+      keptReferenceEdgeIds.add(edge.id);
     }
   }
 
@@ -430,37 +410,49 @@ export function applyFilters(
       node.entityId,
       availableEntities,
       retainedEntityNodeIds,
+      instrumentation,
     );
   }
 
-  const entityNodes = [...availableEntities.values()].flatMap((node) => {
-    if (!retainedEntityNodeIds.has(node.id)) return [];
-    const isContent = contentEntityNodeIds.has(node.id);
-    const keepInternal =
-      isContent && (statuses === undefined || statuses.has('resolved'));
-    return [
-      {
-        ...node,
-        internalReferenceIds: keepInternal ? node.internalReferenceIds : [],
-        role: isContent ? ('content' as const) : ('context' as const),
-        focusDistance: isContent ? node.focusDistance : null,
-      },
-    ];
-  });
-  const diagnosticIds = new Set(
-    keptReferenceEdges.flatMap((edge) => [
-      edge.sourceNodeId,
-      edge.targetNodeId,
-    ]),
-  );
-  const diagnosticNodes = projection.nodes.filter(
-    (node): node is ProjectedReferenceTargetNode =>
-      node.kind === 'reference-target' && diagnosticIds.has(node.id),
-  );
+  const retainedDiagnosticNodeIds = new Set<ProjectionNodeId>();
+  for (const edge of projection.edges) {
+    if (edge.kind === 'reference' && keptReferenceEdgeIds.has(edge.id)) {
+      retainedDiagnosticNodeIds.add(edge.sourceNodeId);
+      retainedDiagnosticNodeIds.add(edge.targetNodeId);
+    }
+  }
 
-  return sortedProjection(
-    [...entityNodes, ...diagnosticNodes],
-    [...hierarchyFor(workspace, entityNodes), ...keptReferenceEdges],
+  const nodes: ProjectedNode[] = [];
+  for (const node of projection.nodes) {
+    if (node.kind === 'reference-target') {
+      if (retainedDiagnosticNodeIds.has(node.id)) nodes.push(node);
+      continue;
+    }
+    if (!retainedEntityNodeIds.has(node.id)) continue;
+    const isContent = contentEntityNodeIds.has(node.id);
+    const keepInternal = isContent && referenceStatusAllowed('resolved', plan);
+    const internalReferenceIds = keepInternal ? node.internalReferenceIds : [];
+    const role = isContent ? ('content' as const) : ('context' as const);
+    const focusDistance = isContent ? node.focusDistance : null;
+    if (
+      internalReferenceIds === node.internalReferenceIds &&
+      role === node.role &&
+      focusDistance === node.focusDistance
+    ) {
+      nodes.push(node);
+    } else {
+      nodes.push({ ...node, internalReferenceIds, role, focusDistance });
+    }
+  }
+
+  return {
+    nodes,
+    edges: projection.edges.filter((edge) =>
+      edge.kind === 'hierarchy'
+        ? retainedEntityNodeIds.has(edge.sourceNodeId) &&
+          retainedEntityNodeIds.has(edge.targetNodeId)
+        : keptReferenceEdgeIds.has(edge.id),
+    ),
     issues,
-  );
+  };
 }

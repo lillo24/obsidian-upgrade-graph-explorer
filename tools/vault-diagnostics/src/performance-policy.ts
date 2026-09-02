@@ -50,7 +50,7 @@ export const PERFORMANCE_WORKER_DECISIONS = [
     workload: 'W2-projection',
     decision: 'main-thread',
     evidence:
-      'Bounded documents, top-level, filter, and focus projections remain below layout cost; React memoization already prevents projection on hover, selection, pan, and zoom.',
+      'PERFQ1A removed duplicate candidate projection/filter work for canonical QUERY1/path/kind filters and retained exact main-thread semantics. Medium depth-three query timing still misses Class B, but repeated evidence points to the remaining structural base as the next cache candidate rather than a W2 worker.',
   },
   {
     workload: 'W3-dagre-layout',
@@ -83,7 +83,13 @@ export const PERFORMANCE_CACHE_DECISIONS = [
     candidate: 'projectView result cache',
     decision: 'do-not-add',
     evidence:
-      'Current state-identity memoization prevents unrelated interaction recomputation; a broader cache adds invalidation cost without measured need.',
+      'Current state-identity memoization prevents unrelated interaction recomputation; PERFQ1A does not add a query-result cache or broaden invalidation state.',
+  },
+  {
+    candidate: 'prepared structural projection cache (PERFQ1B candidate)',
+    decision: 'do-not-add',
+    evidence:
+      'Not implemented in PERFQ1A. Repeated unchanged-disclosure query medians remain above 50 ms and the first structural base is about 40–50% of representative transitions, so a separate PERFQ1B should evaluate this evidence-backed candidate against the merged code.',
   },
   {
     candidate: 'renderer mapping and layout memoization',
