@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { GLOBAL_INTERACTION_OPERATION_CONTRACTS } from './interaction-contract';
+import { LOCAL_INTERACTION_OPERATION_CONTRACTS } from './local-interaction-contract';
 import {
   GLOBAL_ZOOM_SENSITIVITY,
   normalizeWheelDeltaPixels,
@@ -98,16 +99,127 @@ describe('Global visual interactions', () => {
     ).toBe(true);
   });
 
-  it('preserves precise tiny movement and suppresses short reversal tails', () => {
+  it('preserves precise tiny movement and smooth repeated fine deltas', () => {
     expect(GLOBAL_ZOOM_SENSITIVITY).toBe(0.0017);
-    expect(normalizeWheelDeltaPixels({ deltaMode: 0, deltaY: 0.01 }, 800)).toBe(
-      0.5,
+    const tinyDelta = normalizeWheelDeltaPixels(
+      { deltaMode: 0, deltaY: 0.01 },
+      800,
     );
-    expect(ratioAfterWheelDelta(1, 0.5)).toBeGreaterThan(1);
+    expect(tinyDelta).toBe(0.5);
+    expect(ratioAfterWheelDelta(1, tinyDelta)).toBeGreaterThan(1);
+    const repeatedFineRatio = Array.from({ length: 4 }).reduce<number>(
+      (ratio) =>
+        ratioAfterWheelDelta(
+          ratio,
+          normalizeWheelDeltaPixels({ deltaMode: 0, deltaY: 0.5 }, 800),
+        ),
+      1,
+    );
+    expect(repeatedFineRatio).toBeCloseTo(
+      ratioAfterWheelDelta(
+        1,
+        normalizeWheelDeltaPixels({ deltaMode: 0, deltaY: 2 }, 800),
+      ),
+      12,
+    );
+  });
+
+  it('keeps fine pixel input linear through the precision range', () => {
+    expect(normalizeWheelDeltaPixels({ deltaMode: 0, deltaY: 2 }, 800)).toBe(2);
+    expect(normalizeWheelDeltaPixels({ deltaMode: 0, deltaY: 8 }, 800)).toBe(8);
+    expect(normalizeWheelDeltaPixels({ deltaMode: 0, deltaY: -8 }, 800)).toBe(
+      -8,
+    );
+  });
+
+  it('compresses a coarse line-mode wheel notch to a modest step', () => {
+    const normalized = normalizeWheelDeltaPixels(
+      { deltaMode: 1, deltaY: 3 },
+      800,
+    );
+    const nextRatio = ratioAfterWheelDelta(1, normalized);
+    expect(normalized).toBeGreaterThan(8);
+    expect(normalized).toBeLessThan(48);
+    expect(nextRatio).toBeGreaterThan(1.03);
+    expect(nextRatio).toBeLessThan(1.06);
+  });
+
+  it('compresses a coarse pixel-mode wheel event to a modest step', () => {
+    const normalized = normalizeWheelDeltaPixels(
+      { deltaMode: 0, deltaY: 100 },
+      800,
+    );
+    const nextRatio = ratioAfterWheelDelta(1, normalized);
+    expect(normalized).toBeLessThan(34);
+    expect(nextRatio).toBeGreaterThan(1.03);
+    expect(nextRatio).toBeLessThan(1.06);
+  });
+
+  it('keeps equivalent positive and negative events multiplicatively symmetric', () => {
+    const positive = normalizeWheelDeltaPixels(
+      { deltaMode: 0, deltaY: 100 },
+      800,
+    );
+    const negative = normalizeWheelDeltaPixels(
+      { deltaMode: 0, deltaY: -100 },
+      800,
+    );
+    expect(negative).toBeCloseTo(-positive, 12);
+    expect(
+      ratioAfterWheelDelta(1, positive) * ratioAfterWheelDelta(1, negative),
+    ).toBeCloseTo(1, 12);
+  });
+
+  it('bounds pathological events and rejects zero or non-finite input', () => {
+    const positive = normalizeWheelDeltaPixels(
+      { deltaMode: 0, deltaY: 10_000 },
+      800,
+    );
+    const negative = normalizeWheelDeltaPixels(
+      { deltaMode: 2, deltaY: -10_000 },
+      800,
+    );
+    expect(positive).toBeLessThan(34);
+    expect(negative).toBeGreaterThan(-34);
+    expect(ratioAfterWheelDelta(1, positive)).toBeLessThan(1.061);
+    expect(ratioAfterWheelDelta(1, negative)).toBeGreaterThan(1 / 1.061);
+    expect(normalizeWheelDeltaPixels({ deltaMode: 0, deltaY: 0 }, 800)).toBe(0);
+    expect(
+      normalizeWheelDeltaPixels({ deltaMode: 0, deltaY: Number.NaN }, 800),
+    ).toBe(0);
+    expect(
+      normalizeWheelDeltaPixels(
+        { deltaMode: 0, deltaY: Number.POSITIVE_INFINITY },
+        800,
+      ),
+    ).toBe(0);
+    expect(ratioAfterWheelDelta(1, 0)).toBe(1);
+  });
+
+  it('keeps short reversal-tail stabilization unchanged', () => {
     const stabilizer = new WheelDirectionStabilizer();
     expect(stabilizer.stabilize(-2, 0)).toBe(-2);
     expect(stabilizer.stabilize(1, 50)).toBe(0);
     expect(stabilizer.stabilize(1, 141)).toBe(1);
+  });
+
+  it('leaves the existing min/max ratio constraints to the Sigma camera', () => {
+    expect(ratioAfterWheelDelta(6, 34)).toBeGreaterThan(6);
+    expect(ratioAfterWheelDelta(0.02, -34)).toBeLessThan(0.02);
+  });
+
+  it('keeps All and Focus Network zoom camera-only', () => {
+    expect(GLOBAL_INTERACTION_OPERATION_CONTRACTS.zoom).toMatchObject({
+      projection: 0,
+      graphReconciliation: 0,
+      layoutRequest: 0,
+    });
+    expect(LOCAL_INTERACTION_OPERATION_CONTRACTS.zoom).toMatchObject({
+      projection: 0,
+      topologyReconciliation: 0,
+      layoutRequest: 0,
+      globalLayoutRequest: 0,
+    });
   });
 
   it('applies hover and selection only through styling', () => {
