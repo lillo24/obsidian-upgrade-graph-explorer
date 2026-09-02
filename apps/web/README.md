@@ -293,8 +293,10 @@ remains selection-only and diagnostic double-click is inert. Entry captures the
 focused document's runtime viewport point, normalizes the KG6 root to that
 document, and keeps neighboring files collapsed. Network renders a
 deterministic Sigma seed and refines it in its latest-only ForceAtlas2 Worker.
-Hierarchy renders a compact File/Heading/Block/diagnostic React Flow seed and
-refines it through the existing latest-only W3 Dagre Worker. Exact memory-cache
+All Hierarchy uses compact schematic File/Heading/Block/diagnostic cards over
+the existing Structure projection and Dagre mode; Focus Hierarchy uses extended
+detailed cards over the same bounded Focus projection and keeps its
+`local-structured` seed, root normalization, and W3 Dagre mode. Exact memory-cache
 hits skip the active worker. Expand/Collapse is available in both the Hierarchy node and the shared Inspector;
 Focus hops/direction and the existing Blocks/filter controls remain shared.
 Ordinary Focus Network zoom, pan, hover, selection, and Inspector activity perform no
@@ -306,6 +308,12 @@ checkpoint. Switching Focus layout preserves the selected visible node (or
 root) at a runtime-only screen point and performs no KG6/All Network/workspace
 work. Node selection survives; a Hierarchy edge selection is cleared with an
 announcement before Network mounts.
+
+Settings expose Folder clustering and a normalized 0–100% Strength directly for
+All Network. The slider reuses persisted `folderCohesion`; spacing changes keep
+the selected strength, Off retains it, and Advanced is a transient disclosure
+rather than a persistence toggle. These controls can be configured from any
+view, but Hierarchy projection and W3 layout do not observe them.
 
 **Hierarchy Depth** is hidden in All Network and visible in the other three
 combinations. In Focus it applies automatic depth only beneath the root file;

@@ -5,6 +5,8 @@ import {
   explorationLayout,
   explorationScope,
   focusLayoutMode,
+  globalLayoutSettingsApplyImmediately,
+  hierarchyVisualVariantForScope,
 } from './exploration-model';
 
 describe('Scope and Layout mapping', () => {
@@ -27,4 +29,23 @@ describe('Scope and Layout mapping', () => {
     expect(focusLayoutMode('network')).toBe('free');
     expect(focusLayoutMode('hierarchy')).toBe('structured');
   });
+
+  it('assigns compact hierarchy cards to All and extended cards to Focus', () => {
+    expect(hierarchyVisualVariantForScope('all')).toBe('compact-schematic');
+    expect(hierarchyVisualVariantForScope('focus')).toBe('extended');
+  });
+
+  it.each([
+    ['all', 'network', true],
+    ['all', 'hierarchy', false],
+    ['focus', 'network', false],
+    ['focus', 'hierarchy', false],
+  ] as const)(
+    'applies Global settings immediately for %s/%s: %s',
+    (scope, layout, expected) => {
+      expect(globalLayoutSettingsApplyImmediately(scope, layout)).toBe(
+        expected,
+      );
+    },
+  );
 });

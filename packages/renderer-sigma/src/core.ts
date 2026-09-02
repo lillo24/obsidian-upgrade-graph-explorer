@@ -51,9 +51,12 @@ export {
 export {
   customGlobalLayoutSettings,
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+  folderClusteringStrength,
   GLOBAL_LAYOUT_CUSTOM_RANGES,
   resolveGlobalLayoutSettings,
   validateGlobalLayoutSettings,
+  withFolderClusteringStrength,
+  withGlobalSpacingPreset,
 } from './settings';
 export {
   resolveGlobalEdgeStyle,

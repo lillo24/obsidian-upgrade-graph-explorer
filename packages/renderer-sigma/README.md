@@ -79,9 +79,18 @@ reference length materially closer to the reference-only result. The prior is
 soft: strong cross-folder references still affect geometry and no rigid boxes
 or cluster topology exist.
 
+PRE-KG14A4 keeps this prior exclusive to All Network and exposes its existing
+`folderCohesion` value as **Folder clustering strength** on a normalized 0–100%
+scale. No second persisted strength field exists. The compact/normal/spacious
+cohesion baselines are now `0.09` / `0.08` / `0.07` (previously `0.055` /
+`0.045` / `0.035`) so default grouping is noticeable while reference edges
+remain part of every ForceAtlas2 pass. Strength survives spacing changes and
+Folder clustering Off; Advanced visibility is transient UI state.
+
 `GlobalLayoutSettings` is plain JSON-compatible presentation state. Presets
-cover ordinary use; Custom exposes only bounded link force, folder cohesion and
-spacing, node size, link thickness, and label threshold. Settings are user
+cover ordinary use; the direct Strength slider owns folder cohesion, while
+Advanced exposes bounded link force, folder separation, node size, link
+thickness, and label threshold. Settings are user
 preferences, not canonical truth. Manual folder dragging and persistent node,
 folder, or ForceAtlas2 coordinates are intentionally absent.
 

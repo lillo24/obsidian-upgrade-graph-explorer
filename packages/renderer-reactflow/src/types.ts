@@ -16,7 +16,8 @@ import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-g
 
 export type GraphLayoutMode = DagreLayoutMode;
 
-export type GraphVisualVariant = 'standard' | 'local-structured';
+/** Card-density grammar; intentionally independent from Dagre layout mode. */
+export type GraphVisualVariant = 'extended' | 'compact-schematic';
 
 export type TrackpadZoomMode = 'scroll-zoom' | 'pinch-zoom';
 

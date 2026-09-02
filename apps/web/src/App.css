@@ -647,6 +647,65 @@ h2 {
   line-height: 1.4;
 }
 
+.global-layout-scope-note {
+  margin: 0 0 0.65rem;
+  color: #647983;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.global-layout-strength {
+  display: grid;
+  gap: 0.42rem;
+  margin: 0.7rem 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #d7e1e5;
+  border-radius: 0.6rem;
+  background: #f9fbfc;
+}
+
+.global-layout-strength > span,
+.global-layout-strength > small {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.global-layout-strength strong {
+  color: #294957;
+  font-size: 0.78rem;
+}
+
+.global-layout-strength output,
+.global-layout-strength small {
+  color: #647983;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.global-layout-strength input[type='range'] {
+  width: 100%;
+  accent-color: #1c5267;
+}
+
+.global-layout-strength input[type='range']:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.graph-settings__disclosure {
+  min-height: 2.75rem;
+  margin-top: 0.7rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid #99acb6;
+  border-radius: 0.55rem;
+  color: #294957;
+  background: #f8fafb;
+  font-size: 0.74rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .global-layout-custom-controls {
   display: grid;
   gap: 0.65rem;

@@ -102,6 +102,8 @@ import {
   explorationLayout,
   explorationScope,
   focusLayoutMode,
+  globalLayoutSettingsApplyImmediately,
+  hierarchyVisualVariantForScope,
   type ExplorationLayout,
   type ExplorationScope,
 } from '../exploration-model';
@@ -2066,10 +2068,14 @@ export function GraphExplorer({
       trackpadZoomMode,
     ],
   );
+  // Settings are inert while another renderer is mounted. All Network observes
+  // the new settings directly and its worker keeps only the latest request.
   const changeGlobalLayoutSettings = useCallback(
     (settings: GlobalLayoutSettings) => {
       setGlobalLayoutSettings(settings);
-      setGlobalLayoutRequestKey((current) => current + 1);
+      if (globalLayoutSettingsApplyImmediately(activeScope, activeLayout)) {
+        setGlobalLayoutRequestKey((current) => current + 1);
+      }
       const saved = saveGraphPreferences(persistenceStorage, {
         focusAppearance,
         globalLayoutSettings: settings,
@@ -2078,7 +2084,14 @@ export function GraphExplorer({
       });
       setPreferenceWarning(saved.ok ? undefined : saved.message);
     },
-    [focusAppearance, localLayoutMode, persistenceStorage, trackpadZoomMode],
+    [
+      activeLayout,
+      activeScope,
+      focusAppearance,
+      localLayoutMode,
+      persistenceStorage,
+      trackpadZoomMode,
+    ],
   );
   const changeLocalLayoutMode = useCallback(
     (mode: LocalLayoutMode) => {
@@ -3314,6 +3327,7 @@ export function GraphExplorer({
                 selection={activeSelection}
                 trackpadZoomMode={trackpadZoomMode}
                 visualGroupStyles={visualGroupPresentation.styles}
+                visualVariant={hierarchyVisualVariantForScope(activeScope)}
               />
             ) : null
           ) : (
@@ -3340,6 +3354,7 @@ export function GraphExplorer({
               selection={activeSelection}
               trackpadZoomMode={trackpadZoomMode}
               visualGroupStyles={visualGroupPresentation.styles}
+              visualVariant={hierarchyVisualVariantForScope(activeScope)}
             />
           )}
           {!inspectorOpen ? (

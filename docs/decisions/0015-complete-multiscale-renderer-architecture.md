@@ -2,6 +2,12 @@
 
 **Status:** Accepted — KG13 complete.
 
+**PRE-KG14A4 amendment:** the compact schematic is a reusable visual variant,
+not a Local layout identity. All Hierarchy now uses compact cards with
+`structure` Dagre; Focus Hierarchy uses extended cards while retaining the
+`local-structured` Dagre mode, seed, root normalization, and cache. The density
+assignment changed; the projection and layout architecture decided here did not.
+
 ## Context
 
 KG13B1 established a documents-only Global/Regional network in Sigma, and

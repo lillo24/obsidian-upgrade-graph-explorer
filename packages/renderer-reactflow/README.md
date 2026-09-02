@@ -1,6 +1,6 @@
 # React Flow Structural Renderer
 
-Status: **STABLE — Structure and KG13B2B Local Structured contracts are test-backed.**
+Status: **STABLE — Structure, Local Structured, and scope-neutral density contracts are test-backed.**
 
 This renderer package turns one KG6 `ViewProjection` into a deterministic,
 read-only React Flow scene. It owns renderer IDs, fixed node geometry, Dagre
@@ -22,7 +22,7 @@ ViewProjection + renderer interaction state
 src/
   types.ts               Renderer data, selection, layout, and component contracts.
   ids.ts                 Collision-safe projection-to-renderer tuple IDs.
-  mapping.ts             Standard and compact Local Structured one-to-one mapping.
+  mapping.ts             Extended and compact-schematic one-to-one mapping.
   layout.ts              Plain layout input/result adaptation and grid fallback.
   layout-sync.ts         Direct compute entry used only by tests and benchmarks.
   layout-state.ts        Pure latest-generation commit/anchor state machine.
@@ -54,10 +54,10 @@ selectable terminals, and aggregated reference counts come directly from KG6
 never as self-loop edges.
 
 Structure mode uses a top-to-bottom Dagre layout. Focus mode uses left-to-right
-layout. Local Structured uses an independently tunable compact left-to-right
+layout. Local Structured uses an independently tunable left-to-right
 mode with `nodesep: 22` and `ranksep: 58`. Entity nodes participate in Dagre topology; diagnostic targets are
 placed deterministically beside their projected source so they do not distort
-structural ranks. Every node type has a fixed measured size. In standard
+structural ranks. Every node type has a fixed measured size. In extended
 Structure/Focus, a layout exception becomes an explicit warning plus
 deterministic grid—not a success-shaped empty graph.
 
@@ -72,19 +72,21 @@ and disclosure anchors run only against that matching commit. A worker failure
 adopts the deterministic renderer-side grid and exposes a warning; production
 never falls back to synchronous Dagre.
 
-KG13B2B adds `visualVariant: local-structured` without duplicating this state
-machine. It consumes the same bounded KG6 Local projection as Local Free and
-uses fixed compact boxes: File `156 × 46`, Heading `148 × 42`, Block `132 × 38`,
-and diagnostic `148 × 42`. Marker-plus-label nodes use `▰`, `◇`, `●`, and `○`;
-the root File is emphasized, hierarchy is visually stronger, and references
-remain secondary smooth-step cross-links. Standard Structure mapping, markup,
-dimensions, CSS classes, and Structure/Focus Dagre settings remain unchanged.
+`GraphVisualVariant` is scope-neutral: `extended` owns the detailed File
+`200 × 80`, Heading `184 × 72`, Block `152 × 64`, and diagnostic `208 × 94`
+cards; `compact-schematic` owns File `156 × 46`, Heading `148 × 42`, Block
+`132 × 38`, and diagnostic `148 × 42` boxes plus the `▰`, `◇`, `●`, and `○`
+marker grammar. PRE-KG14A4 assigns compact cards to All Hierarchy and extended
+cards to Focus Hierarchy. This visual-density choice is independent from Dagre:
+All keeps `structure`, while Focus keeps `local-structured`, its root emphasis,
+seed, and exact cache. Fingerprints include measured dimensions, so coordinates
+from the former density assignment cannot become stale cache hits.
 
 GROUP1A adds an optional `visualGroupStyles` presentation map to `GraphCanvas`.
 It is delivered through a renderer-local context, so changing only the map does
 not rerun KG6, React Flow mapping, W3/Dagre, Local Structured fingerprints, or
 node geometry. Matched entity cards receive a fixed overlay on the right edge;
-File top-edge, Heading left-edge, Block dashed grammar, Local markers, Focus,
+File top-edge, Heading left-edge, Block dashed grammar, compact markers, Focus,
 hover attenuation, context styling, and the selection ring remain independent.
 Diagnostics do not read the map. With the prop omitted, the node markup has no
 group data/style and the current appearance is unchanged. GROUP1B UI wiring is

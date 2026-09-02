@@ -167,7 +167,7 @@ function GraphCanvasInner({
   rootEntityId,
   selection,
   trackpadZoomMode,
-  visualVariant = 'standard',
+  visualVariant = 'extended',
 }: GraphCanvasProps) {
   const [hovered, setHovered] = useState<GraphSelection | null>(null);
   const { fitView, getInternalNode, getViewport, setCenter, setViewport } =
@@ -206,7 +206,7 @@ function GraphCanvasInner({
     [layoutMode, mapped.edges, mapped.nodes],
   );
   const structuredBaseline = useMemo(() => {
-    if (visualVariant !== 'local-structured') return undefined;
+    if (layoutMode !== 'local-structured') return undefined;
     const rootNode = mapped.nodes.find(
       (node) => node.type === 'entity' && node.data.root,
     );
@@ -234,7 +234,7 @@ function GraphCanvasInner({
             ),
       rootNodeId: rootNode.id,
     };
-  }, [layoutCache, mapped.edges, mapped.nodes, rootEntityId, visualVariant]);
+  }, [layoutCache, layoutMode, mapped.edges, mapped.nodes, rootEntityId]);
   const committedMatchesInput = rendererLayout.committed?.input === layoutInput;
   const prepared = committedMatchesInput
     ? (rendererLayout.committed?.graph ?? null)

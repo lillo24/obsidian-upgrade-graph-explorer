@@ -637,3 +637,42 @@ membership consumes no disclosure controls. The detailed pass still produces
 truthful actionable counts inside the fixed neighborhood. Both medium
 projections remain inside the existing Class B 250 ms p95 budget, so no new
 projection cache or Worker boundary is justified.
+
+## PRE-KG14A4 hierarchy density and folder strength evidence
+
+PRE-KG14A4 changes card density without changing either hierarchy projection or
+Dagre mode. The performance harness now measures All Structure with the compact
+schematic dimensions, while the Local Structured harness measures Focus with
+extended dimensions. Local Windows/Node medians/p95 values recorded on
+2026-09-02 are investigative evidence, not CI thresholds.
+
+| Work                                     |             Small |             Medium |
+| ---------------------------------------- | ----------------: | -----------------: |
+| All documents-only compact mapping       |     0.992 / 1.067 |    11.509 / 12.938 |
+| All documents-only Structure Dagre       |   35.724 / 40.821 | omitted (5k nodes) |
+| All fully expanded compact mapping       |     2.269 / 2.876 |    57.529 / 60.997 |
+| All fully expanded Structure Dagre       | 523.447 / 566.050 |    omitted (16.5k) |
+| Focus extended mapping                   |     0.048 / 0.086 |      0.226 / 0.276 |
+| Focus deterministic structured seed      |     0.020 / 0.051 |      0.056 / 0.076 |
+| Focus Local Structured worker-equivalent |     5.113 / 7.693 |    23.440 / 27.054 |
+
+Compact All dimensions do not add mapping or layout work; they reduce the
+geometry supplied to the existing W3 request. Extended Focus remains comfortably
+inside Class B on the current bounded small (13 nodes/22 edges) and medium (61
+nodes/110 edges) profiles. The exact Local Structured fingerprint includes the
+new dimensions, so old compact-Focus coordinates miss rather than being reused.
+
+The stronger compact/normal/spacious folder-cohesion presets are `0.09` /
+`0.08` / `0.07`. With normal `0.08`, the selected chunked prior reduced mean
+within-folder distance from 28.421 to 26.137 at small and 117.770 to 108.527 at
+medium. Mean cross-folder reference length remained finite and moved from
+29.883 to 33.124 and 115.933 to 128.837 respectively: grouping is more visible,
+but reference attraction still participates rather than being replaced by
+rigid clusters. Tests separately cover finite deterministic 0%/100%, unchanged
+semantic edges, custom round-trip, Off retention, and spacing-preserved strength.
+
+The application operation oracle permits one immediate layout request only for
+All + Network. All + Hierarchy, Focus + Network, and Focus + Hierarchy defer the
+preference with zero KG6 projection and zero active hierarchy W3 work. Rapid
+input uses the existing Global worker client, which terminates superseded work
+and adopts only the latest response; no timer, backlog, or dependency was added.

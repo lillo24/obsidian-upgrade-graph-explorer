@@ -27,7 +27,7 @@ export const GLOBAL_LAYOUT_CUSTOM_RANGES = {
 const PRESETS = {
   compact: {
     linkForce: 1.15,
-    folderCohesion: 0.055,
+    folderCohesion: 0.09,
     withinFolderSpacing: 0.8,
     betweenFolderSpacing: 2.2,
     nodeSize: 4,
@@ -36,7 +36,7 @@ const PRESETS = {
   },
   normal: {
     linkForce: 1,
-    folderCohesion: 0.045,
+    folderCohesion: 0.08,
     withinFolderSpacing: 1.15,
     betweenFolderSpacing: 3.2,
     nodeSize: 4.5,
@@ -45,7 +45,7 @@ const PRESETS = {
   },
   spacious: {
     linkForce: 0.85,
-    folderCohesion: 0.035,
+    folderCohesion: 0.07,
     withinFolderSpacing: 1.65,
     betweenFolderSpacing: 4.6,
     nodeSize: 5,
@@ -175,4 +175,67 @@ export function customGlobalLayoutSettings(
   preset: GlobalSpacingPreset,
 ): GlobalLayoutCustomSettings {
   return { ...PRESETS[preset] };
+}
+
+const FOLDER_COHESION_MAX = GLOBAL_LAYOUT_CUSTOM_RANGES.folderCohesion.max;
+
+function customFromResolved(
+  settings: ResolvedGlobalLayoutSettings,
+): GlobalLayoutCustomSettings {
+  return {
+    linkForce: settings.linkForce,
+    folderCohesion: settings.folderCohesion,
+    withinFolderSpacing: settings.withinFolderSpacing,
+    betweenFolderSpacing: settings.betweenFolderSpacing,
+    nodeSize: settings.nodeSize,
+    linkThickness: settings.linkThickness,
+    labelThreshold: settings.labelThreshold,
+  };
+}
+
+/** Product-facing 0–100 scale backed only by persisted folderCohesion. */
+export function folderClusteringStrength(
+  settings: GlobalLayoutSettings,
+): number {
+  return Math.round(
+    (resolveGlobalLayoutSettings(settings).folderCohesion /
+      FOLDER_COHESION_MAX) *
+      100,
+  );
+}
+
+export function withFolderClusteringStrength(
+  settings: GlobalLayoutSettings,
+  percent: number,
+): GlobalLayoutSettings {
+  if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+    throw new Error(
+      'Folder clustering strength must be a finite percentage from 0 to 100.',
+    );
+  }
+  const resolved = resolveGlobalLayoutSettings(settings);
+  const folderCohesion = Number(
+    ((FOLDER_COHESION_MAX * Math.round(percent)) / 100).toFixed(6),
+  );
+  return {
+    folderClustering: resolved.folderClustering,
+    spacingPreset: resolved.spacingPreset,
+    custom: { ...customFromResolved(resolved), folderCohesion },
+  };
+}
+
+/** Applies a spacing baseline while keeping folder strength independent. */
+export function withGlobalSpacingPreset(
+  settings: GlobalLayoutSettings,
+  spacingPreset: GlobalSpacingPreset,
+): GlobalLayoutSettings {
+  const folderCohesion = resolveGlobalLayoutSettings(settings).folderCohesion;
+  return {
+    folderClustering: settings.folderClustering,
+    spacingPreset,
+    custom: {
+      ...customGlobalLayoutSettings(spacingPreset),
+      folderCohesion,
+    },
+  };
 }
