@@ -130,10 +130,12 @@ All and Focus Network share one precision-wheel contract. Browser line units
 still normalize to 16 px. Pixel-mode input remains exact—including magnitudes
 below 0.5 px—through the 8 px precision range, then follows a smooth exponential
 compression toward 34 px; with the unchanged `0.0017` gain, a single coarse
-event cannot exceed roughly a 6% ratio change. The 90 ms reversal-tail guard is
-restricted to those coarse events, while fine high-frequency events and
-intentional fine reversals are applied immediately. This classification uses
-only normalized event magnitude, not device or OS detection.
+event cannot exceed roughly a 6% ratio change. Fine events use a modestly faster
+`0.00255` gain so continuous precision-touchpad travel is 50% stronger without
+changing mouse-notch magnitude. The 90 ms reversal-tail guard is restricted to
+coarse events, while fine high-frequency events and intentional fine reversals
+are applied immediately. This classification uses only normalized event
+magnitude, not device or OS detection.
 
 Both sessions explicitly set Sigma's wheel prevention flag after calling its
 public prevention function. Sigma 3.0.3 constructs that function before

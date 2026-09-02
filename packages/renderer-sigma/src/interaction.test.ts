@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { GLOBAL_INTERACTION_OPERATION_CONTRACTS } from './interaction-contract';
 import { LOCAL_INTERACTION_OPERATION_CONTRACTS } from './local-interaction-contract';
 import {
+  FINE_ZOOM_SENSITIVITY,
   GLOBAL_ZOOM_SENSITIVITY,
   isCoarseWheelDelta,
   normalizeWheelDeltaPixels,
@@ -134,6 +135,7 @@ describe('Global visual interactions', () => {
 
   it('preserves many tiny same-direction deltas proportionally and monotonically', () => {
     expect(GLOBAL_ZOOM_SENSITIVITY).toBe(0.0017);
+    expect(FINE_ZOOM_SENSITIVITY).toBe(0.00255);
     const events = Array.from({ length: 40 }, (_, index) => ({
       at: index * 16.7,
       deltaY: 0.01 + index * 0.001,
@@ -148,6 +150,17 @@ describe('Global visual interactions', () => {
         1,
         events.reduce((sum, event) => sum + event.deltaY, 0),
       ),
+      12,
+    );
+  });
+
+  it('increases fine-input travel without changing the coarse-event gain', () => {
+    expect(ratioAfterWheelDelta(1, 1)).toBeCloseTo(
+      Math.exp(FINE_ZOOM_SENSITIVITY),
+      12,
+    );
+    expect(ratioAfterWheelDelta(1, 8.01)).toBeCloseTo(
+      Math.exp(8.01 * GLOBAL_ZOOM_SENSITIVITY),
       12,
     );
   });

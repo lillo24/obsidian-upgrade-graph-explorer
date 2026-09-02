@@ -43,6 +43,7 @@ export {
   seedLocalRendererInput,
 } from './local-mapping';
 export {
+  FINE_ZOOM_SENSITIVITY,
   GLOBAL_ZOOM_SENSITIVITY,
   normalizeWheelDeltaPixels,
   ratioAfterWheelDelta,
