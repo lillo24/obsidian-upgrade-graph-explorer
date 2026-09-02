@@ -554,7 +554,8 @@ export function VisualGroupEditor({
       </label>
       <p id="visual-group-rule-help">
         Uses the same QUERY1 syntax as Advanced query: AND, OR, NOT, path,
-        title, text, kind, and level.
+        title, text, kind, and level. path:&quot;notes&quot; contains text;
+        path=&quot;Notes/Foo.md&quot; is exact and case-sensitive.
       </p>
       {activeQuery === undefined || activeQuery.length === 0 ? null : (
         <button

@@ -22,6 +22,7 @@ export type {
   SourceSpan,
   WorkspacePath,
 } from './model/source';
+export { isNormalizedWorkspacePath } from './model/source';
 export {
   validateKnowledgeSnapshot,
   type SnapshotValidationIssue,

@@ -15,7 +15,12 @@ import {
   type KnowledgeSnapshot,
   type WorkspaceDescriptor,
 } from './snapshot';
-import type { SourceLocation, SourcePoint, SourceSpan } from './source';
+import {
+  isNormalizedWorkspacePath,
+  type SourceLocation,
+  type SourcePoint,
+  type SourceSpan,
+} from './source';
 
 export type SnapshotValidationIssueCode =
   | 'invalid-type'
@@ -299,23 +304,6 @@ function parseSourceSpan(
   }
 
   return { start, end };
-}
-
-function isNormalizedWorkspacePath(path: string): boolean {
-  if (
-    path.length === 0 ||
-    path.startsWith('/') ||
-    path.includes('\\') ||
-    /^[A-Za-z]:\//u.test(path)
-  ) {
-    return false;
-  }
-
-  return path
-    .split('/')
-    .every(
-      (segment) => segment.length > 0 && segment !== '.' && segment !== '..',
-    );
 }
 
 function parseSourceLocation(

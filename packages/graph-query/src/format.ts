@@ -5,6 +5,9 @@ function quoted(value: string): string {
 }
 
 function formatPredicate(predicate: GraphQueryPredicate): string {
+  if (predicate.kind === 'exact-path-predicate') {
+    return `path=${quoted(predicate.value)}`;
+  }
   if (predicate.kind === 'string-predicate') {
     return `${predicate.field}:${quoted(predicate.value)}`;
   }

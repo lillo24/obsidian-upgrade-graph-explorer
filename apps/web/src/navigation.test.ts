@@ -198,6 +198,36 @@ describe('shared canonical navigation planning', () => {
     }
   });
 
+  it('uses exact-path identity when retaining a query during navigation', () => {
+    const workspace = createProjectionWorkspace(snapshot);
+    const matching = planEntityNavigation(
+      workspace,
+      {
+        ...documentOnlyProjectionState(),
+        filters: { query: 'path="alpha/A.md"' },
+      },
+      'section-a',
+    );
+    const wrongCase = planEntityNavigation(
+      workspace,
+      {
+        ...documentOnlyProjectionState(),
+        filters: { query: 'path="Alpha/A.md"' },
+      },
+      'section-a',
+    );
+
+    expect(matching.ok).toBe(true);
+    if (matching.ok) {
+      expect(matching.state.filters?.query).toBe('path="alpha/A.md"');
+    }
+    expect(wrongCase.ok).toBe(true);
+    if (wrongCase.ok) {
+      expect(wrongCase.state.filters).toBeUndefined();
+      expect(wrongCase.filterChanges).toContain('advanced-query-cleared');
+    }
+  });
+
   it('clears an invalid externally supplied query instead of failing navigation', () => {
     const plan = planEntityNavigation(
       createProjectionWorkspace(snapshot),
