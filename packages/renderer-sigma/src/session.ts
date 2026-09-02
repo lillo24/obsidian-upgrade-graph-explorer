@@ -23,6 +23,7 @@ import {
   resolveGlobalEdgeStyle,
   resolveGlobalNodeStyle,
   resolveGlobalVisualLod,
+  shouldAlwaysShowGlobalLabels,
 } from './style';
 import type {
   GlobalCenterRequest,
@@ -238,6 +239,7 @@ export class GlobalRendererSession {
       hovered ||
       this.neighborhoods.get(this.hoveredNode)?.has(key) === true;
     return resolveGlobalNodeStyle(attributes, {
+      alwaysShowLabel: shouldAlwaysShowGlobalLabels(this.graph.order),
       hovered,
       relatedToHover,
       selected: key === this.selectedNode,

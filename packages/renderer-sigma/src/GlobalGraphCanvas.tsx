@@ -16,6 +16,7 @@ import {
   globalLayoutFingerprint,
   warmGlobalRendererInput,
 } from './layout';
+import { GlobalGraphEmptyState } from './GlobalGraphEmptyState';
 import { mountGlobalRendererSession } from './lifecycle';
 import { mapProjectionToGlobal } from './mapping';
 import { GlobalRendererSession } from './session';
@@ -65,7 +66,15 @@ function layoutIterations(nodeCount: number): number {
   return nodeCount <= 1_000 ? 100 : nodeCount <= 5_000 ? 30 : 20;
 }
 
-export function GlobalGraphCanvas({
+export function GlobalGraphCanvas(props: GlobalGraphCanvasProps) {
+  return props.projection.nodes.length === 0 ? (
+    <GlobalGraphEmptyState />
+  ) : (
+    <MountedGlobalGraphCanvas {...props} />
+  );
+}
+
+function MountedGlobalGraphCanvas({
   centerRequest,
   fitRequestKey,
   initialViewport,
