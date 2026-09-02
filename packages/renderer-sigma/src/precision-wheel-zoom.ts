@@ -4,8 +4,8 @@ const PRECISE_LINEAR_DELTA_PIXELS = 8;
 const MAX_EFFECTIVE_DELTA_PIXELS = 34;
 const REVERSAL_GAP_MS = 90;
 export const GLOBAL_ZOOM_SENSITIVITY = 0.0017;
-export const FINE_SCROLL_ZOOM_SENSITIVITY = 0.0019;
-export const FINE_PINCH_ZOOM_SENSITIVITY = 0.0051;
+export const FINE_SCROLL_ZOOM_SENSITIVITY = 0.0021;
+export const FINE_PINCH_ZOOM_SENSITIVITY = 0.0075;
 
 export interface WheelDeltaInput {
   readonly deltaMode: number;

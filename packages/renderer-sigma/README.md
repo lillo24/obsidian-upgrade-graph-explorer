@@ -131,8 +131,8 @@ still normalize to 16 px. Pixel-mode input remains exact—including magnitudes
 below 0.5 px—through the 8 px precision range, then follows a smooth exponential
 compression toward 34 px; with the unchanged `0.0017` gain, a single coarse
 event cannot exceed roughly a 6% ratio change. Fine ordinary-wheel input uses a
-slightly faster `0.0019` gain, while fine Ctrl+wheel input—the browser contract
-for precision-touchpad pinch—uses `0.0051`. Pinch therefore travels farther
+slightly faster `0.0021` gain, while fine Ctrl+wheel input—the browser contract
+for precision-touchpad pinch—uses `0.0075`. Pinch therefore travels farther
 without changing mouse-notch magnitude or relying on device/OS detection. The
 90 ms reversal-tail guard is restricted to coarse events, while fine
 high-frequency events and intentional fine reversals are applied immediately.
