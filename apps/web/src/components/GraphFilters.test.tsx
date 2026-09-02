@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import type { ViewProjectionState } from '@icarus-graph-explorer/view-projection';
+import type { GraphPresentationMode } from '@icarus-graph-explorer/view-state';
 
 import { initialGraphState, normalizeGraphState } from '../graph-state';
 import type { SavedGraphFilter } from '../persistence/saved-filters';
@@ -13,6 +14,7 @@ function renderFilters(
   options: {
     readonly contained?: boolean;
     readonly open?: boolean;
+    readonly rendererMode?: GraphPresentationMode;
     readonly savedFilters?: readonly SavedGraphFilter[];
     readonly savedFiltersWritable?: boolean;
   } = {},
@@ -27,6 +29,7 @@ function renderFilters(
       onSaveCurrentQuery={() => undefined}
       open={options.open ?? false}
       pathScopes={['folder-a', 'folder-b']}
+      rendererMode={options.rendererMode ?? 'structure'}
       savedFilters={options.savedFilters ?? []}
       savedFiltersStatus="Saved Filters are stored for this stable workspace."
       savedFiltersWritable={options.savedFiltersWritable ?? true}
@@ -82,6 +85,21 @@ describe('graph Filters controls', () => {
     expect(markup).toContain(
       'graph-filters__panel graph-filters__panel--contained',
     );
+  });
+
+  it('keeps Advanced query available in the files-only All Network view', () => {
+    const markup = renderFilters(normalizeGraphState(initialGraphState()), {
+      open: true,
+      rendererMode: 'global',
+    });
+
+    expect(markup).toContain(
+      'All Network displays files only. Entity and heading controls remain saved for Hierarchy; Advanced query still applies to files.',
+    );
+    expect(markup).toContain('>Advanced query<');
+    expect(markup).toContain('id="advanced-graph-query"');
+    expect(markup).not.toContain('<legend>Entity Content</legend>');
+    expect(markup).not.toContain('>Heading limit<');
   });
 
   it('keeps confirmed presets applicable when registry writes are disabled', () => {

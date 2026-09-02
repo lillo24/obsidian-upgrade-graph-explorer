@@ -93,6 +93,8 @@ export class GlobalRendererSession {
   private visualGroupStyles: VisualGroupPresentationMap | undefined;
   private precisionWheelIdleTimer: number | undefined;
   private viewportObservationTimer: number | undefined;
+  private topologyRefreshPending: Promise<void> | undefined;
+  private visualStyleRefreshPending = false;
   private destroyed = false;
   private readonly wheelDirection = new WheelDirectionStabilizer();
 
@@ -312,6 +314,16 @@ export class GlobalRendererSession {
   setVisualGroupStyles(styles?: VisualGroupPresentationMap): void {
     this.visualGroupStyles = styles;
     this.options.instrumentation?.count('global-style-updates');
+    if (this.topologyRefreshPending !== undefined) {
+      // Query changes can alter All Network membership in the same React
+      // commit as a style-map update. Wait until Sigma indexes that topology.
+      this.visualStyleRefreshPending = true;
+      return;
+    }
+    this.refreshVisualGroupStyles();
+  }
+
+  private refreshVisualGroupStyles(): void {
     // Sigma 3 applies node reducers during refresh, not a render-only pass.
     // Repaint existing nodes without rebuilding its node/edge indices.
     this.renderer.refresh({
@@ -339,7 +351,23 @@ export class GlobalRendererSession {
       this.selectedNode = undefined;
       this.options.onNodeSelected?.(undefined, undefined);
     }
-    this.renderer.scheduleRefresh();
+    const changed = Object.values(reconciliation).some((count) => count > 0);
+    if (changed) {
+      const refresh = new Promise<void>((resolve) => {
+        this.renderer.once('afterRender', resolve);
+        this.renderer.scheduleRefresh();
+      });
+      this.topologyRefreshPending = refresh;
+      void refresh.then(() => {
+        if (this.topologyRefreshPending !== refresh) return;
+        this.topologyRefreshPending = undefined;
+        if (!this.visualStyleRefreshPending || this.destroyed) return;
+        this.visualStyleRefreshPending = false;
+        this.refreshVisualGroupStyles();
+      });
+    } else {
+      this.renderer.scheduleRefresh();
+    }
     return reconciliation;
   }
 

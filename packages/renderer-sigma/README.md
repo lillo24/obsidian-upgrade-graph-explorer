@@ -176,7 +176,8 @@ change positions, request Local ForceAtlas2, or touch Global layout. GROUP1B
 user-facing configuration is pending. When projection and style-map updates
 arrive in the same commit, the style-only repaint is queued behind Sigma's
 topology process/render boundary so it cannot target node indices that do not
-exist yet.
+exist yet. The Global session uses the same boundary when an All Network query
+changes files-only membership alongside a style-map update.
 
 Local hop and direction changes preserve the current camera rather than
 requesting Fit. Their topology may naturally change around the anchored node,
