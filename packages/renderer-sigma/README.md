@@ -44,6 +44,7 @@ src/
   precision-wheel-zoom.ts  Accepted 0.0017 gain, 0.5 px floor, and 90 ms reversal guard.
   session.ts               Imperative Sigma lifecycle and high-frequency interaction ownership.
   viewport-request.ts      Layout-commit gate for semantic center and Fit requests.
+  GlobalGraphEmptyState.tsx  Explicit zero-match state shared by Global mount decisions.
   GlobalGraphCanvas.tsx    Thin React mount/update boundary and background-layout adoption.
   local-types.ts           Local mapper, viewport, interaction, and worker contracts.
   local-mapping.ts         Separate Local topology and deterministic root-relative seed.
@@ -115,6 +116,15 @@ schedules one partial node reducer refresh without Graphology reconciliation,
 index rebuilding, coordinate or size changes, folder/degree changes,
 fingerprint changes, or a Global worker request.
 
+Networks with 1–12 visible nodes force their document labels through Sigma's
+ordinary density culling so filtered and synthetic results remain legible at
+the default camera ratio. Larger graphs retain the existing semantic-zoom label
+policy. A zero-node projection overlays the same explicit
+`No nodes match this view.` outcome used by Hierarchy. The existing Global
+session remains mounted across nonempty/empty query changes so desktop WebView
+transitions reconcile topology in place instead of tearing down and recreating
+WebGL.
+
 Sigma 3.0.3's default label and highlight drawing always extends to the right.
 Global replaces only that canvas drawing boundary: adaptive culling still
 chooses ordinary labels, while forced hover/selection labels can flip or clamp
@@ -176,7 +186,8 @@ change positions, request Local ForceAtlas2, or touch Global layout. GROUP1B
 user-facing configuration is pending. When projection and style-map updates
 arrive in the same commit, the style-only repaint is queued behind Sigma's
 topology process/render boundary so it cannot target node indices that do not
-exist yet.
+exist yet. The Global session uses the same boundary when an All Network query
+changes files-only membership alongside a style-map update.
 
 Local hop and direction changes preserve the current camera rather than
 requesting Fit. Their topology may naturally change around the anchored node,

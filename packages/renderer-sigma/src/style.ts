@@ -6,6 +6,12 @@ import type {
 } from './types';
 import type { VisualGroupNodePresentation } from '@icarus-graph-explorer/visual-groups';
 
+export const GLOBAL_ALWAYS_LABELED_NODE_LIMIT = 12;
+
+export function shouldAlwaysShowGlobalLabels(nodeCount: number): boolean {
+  return nodeCount > 0 && nodeCount <= GLOBAL_ALWAYS_LABELED_NODE_LIMIT;
+}
+
 export function resolveGlobalVisualLod(cameraRatio: number): GlobalVisualLod {
   if (!Number.isFinite(cameraRatio) || cameraRatio <= 0) {
     throw new Error('Global camera ratio must be a positive finite number.');
@@ -16,6 +22,7 @@ export function resolveGlobalVisualLod(cameraRatio: number): GlobalVisualLod {
 }
 
 export interface GlobalNodeStyleContext {
+  readonly alwaysShowLabel?: boolean;
   readonly hovered: boolean;
   readonly relatedToHover: boolean;
   readonly selected: boolean;
@@ -36,6 +43,7 @@ export function resolveGlobalNodeStyle(
   context: GlobalNodeStyleContext,
 ) {
   const emphasized = context.selected || context.hovered;
+  const forceLabel = emphasized || context.alwaysShowLabel === true;
   const baseColor =
     attributes.nodeKind === 'document' && attributes.entityId !== null
       ? (context.visualGroup?.accent ?? attributes.color)
@@ -55,9 +63,9 @@ export function resolveGlobalNodeStyle(
   return {
     ...attributes,
     color,
-    forceLabel: emphasized,
+    forceLabel,
     highlighted: emphasized,
-    label: visibleByScale || emphasized ? attributes.label : '',
+    label: visibleByScale || forceLabel ? attributes.label : '',
     zIndex: emphasized ? 2 : 0,
   };
 }

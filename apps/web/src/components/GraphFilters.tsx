@@ -208,8 +208,9 @@ export const GraphFilters = memo(function GraphFilters({
             </label>
             {rendererMode === 'global' ? (
               <p className="graph-filter-note">
-                All Network always displays files only. Entity and heading
-                controls remain saved for Hierarchy.
+                All Network displays files only. Entity and heading controls
+                remain saved for Hierarchy; Advanced query still applies to
+                files.
               </p>
             ) : (
               <>

@@ -13,9 +13,10 @@ export const DEFAULT_GLOBAL_REFERENCE_STATUSES = [
 export { containingDocumentEntityId };
 
 /**
- * Global consumes the same KG6 filter/focus intent but never mutates Structure
- * disclosure. A missing status filter means the conservative Global-only
- * resolved default; an explicit status list remains authoritative.
+ * Global consumes the same KG6 filter/focus intent, including canonical
+ * QUERY1, but never mutates Structure disclosure. A missing status filter
+ * means the conservative Global-only resolved default; an explicit status
+ * list remains authoritative.
  */
 export function effectiveGlobalProjectionState(
   workspace: ProjectionWorkspace,
@@ -47,6 +48,7 @@ export function effectiveGlobalProjectionState(
         ? {}
         : { pathPrefixes: filters.pathPrefixes }),
       ...(filters?.text === undefined ? {} : { text: filters.text }),
+      ...(filters?.query === undefined ? {} : { query: filters.query }),
       ...(filters?.entityKinds === undefined
         ? {}
         : {

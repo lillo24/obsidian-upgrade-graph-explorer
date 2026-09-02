@@ -236,6 +236,24 @@ describe('cross-Sigma Visual Group style contract', () => {
     });
   });
 
+  it('queues a Global style refresh while changed topology is being indexed', () => {
+    const refresh = vi.fn();
+    const count = vi.fn();
+    const session = Object.create(
+      GlobalRendererSession.prototype,
+    ) as GlobalRendererSession;
+    Reflect.set(session, 'graph', { nodes: () => ['document'] });
+    Reflect.set(session, 'renderer', { refresh });
+    Reflect.set(session, 'options', { instrumentation: { count } });
+    Reflect.set(session, 'topologyRefreshPending', Promise.resolve());
+
+    session.setVisualGroupStyles(new Map([['document', presentation]]));
+
+    expect(refresh).not.toHaveBeenCalled();
+    expect(count).toHaveBeenCalledWith('global-style-updates');
+    expect(Reflect.get(session, 'visualStyleRefreshPending')).toBe(true);
+  });
+
   it('updates the actual Local session through one style refresh only', () => {
     const refresh = vi.fn();
     const count = vi.fn();

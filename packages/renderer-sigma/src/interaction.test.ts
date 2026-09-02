@@ -12,6 +12,7 @@ import {
   resolveGlobalEdgeStyle,
   resolveGlobalNodeStyle,
   resolveGlobalVisualLod,
+  shouldAlwaysShowGlobalLabels,
 } from './style';
 import type { GlobalEdgeAttributes, GlobalNodeAttributes } from './types';
 
@@ -124,5 +125,25 @@ describe('Global visual interactions', () => {
     expect(selected.forceLabel).toBe(true);
     expect(selected.x).toBe(node.x);
     expect(selected.y).toBe(node.y);
+  });
+
+  it('keeps labels legible for small Network results at regional zoom', () => {
+    expect(shouldAlwaysShowGlobalLabels(1)).toBe(true);
+    expect(shouldAlwaysShowGlobalLabels(12)).toBe(true);
+    expect(shouldAlwaysShowGlobalLabels(13)).toBe(false);
+    const styled = resolveGlobalNodeStyle(node, {
+      alwaysShowLabel: true,
+      hovered: false,
+      relatedToHover: true,
+      selected: false,
+      lod: 'regional',
+      settings: resolveGlobalLayoutSettings({
+        folderClustering: true,
+        spacingPreset: 'normal',
+      }),
+    });
+
+    expect(styled.label).toBe('Alpha');
+    expect(styled.forceLabel).toBe(true);
   });
 });

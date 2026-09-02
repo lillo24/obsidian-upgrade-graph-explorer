@@ -239,6 +239,9 @@ active view. Draft text never projects, enters history, or persists. Saved
 Filters are a separate stable-workspace registry containing only `{name,
 query}` definitions; applying one changes only the active query, deleting one
 does not change graph history, and Reset saved view leaves definitions intact.
+All Network applies that same canonical query to its files-only topology, so
+document-compatible clauses filter files while Section-only clauses correctly
+produce no matches instead of promoting parent files.
 Unstable identities still support session-only Advanced query use but disable
 cross-session saving with an explanation.
 

@@ -140,7 +140,8 @@ serialized live transactions, pause/recovery, and watcher lifecycle.
 normalization that keeps legacy entity-kind filters internally eligible for
 blocks while `disclosure.includeBlocks` remains the sole visible opt-in.
 `global-view.ts` owns the effective documents-only/resolved-only Global KG6
-state and exact containing-document mapping without mutating Structure state.
+state, passes canonical QUERY1 intent into that files-only topology, and maps
+containing documents exactly without mutating Structure state.
 `local-view.ts` owns entry and navigation plans that normalize a document root,
 keep visible results Local, reroot cross-document results, and reveal the
 minimum hidden ancestor chain.
