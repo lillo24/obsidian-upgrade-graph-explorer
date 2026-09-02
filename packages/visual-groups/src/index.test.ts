@@ -210,6 +210,27 @@ describe('compiled Visual Group matching', () => {
     ).toEqual(['Research', 'Drafts']);
   });
 
+  it('uses exact case-sensitive source paths without changing group schema', () => {
+    const groups = compiled([
+      {
+        name: 'Exact release file',
+        query: 'path="Research/Release.md"',
+        color: 'blue',
+        enabled: true,
+      },
+      {
+        name: 'Wrong case',
+        query: 'path="research/release.md"',
+        color: 'red',
+        enabled: true,
+      },
+    ]);
+    expect(matchingVisualGroupsForEntity(section, groups)).toHaveLength(1);
+    expect(resolvePrimaryVisualGroup(section, groups)?.definition.name).toBe(
+      'Exact release file',
+    );
+  });
+
   it.each([document, section, block])(
     'reuses QUERY1 semantics for $kind entities',
     (entity) => {

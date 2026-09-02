@@ -1,3 +1,5 @@
+import { isNormalizedWorkspacePath } from '@icarus-graph-explorer/core';
+
 import { formatGraphQuery } from './format';
 import {
   MAX_GRAPH_QUERY_AST_NODES,
@@ -363,6 +365,38 @@ class Parser {
     const shorthandKind = shorthand[name];
     if (shorthandKind !== undefined)
       return this.addNode({ kind: 'kind-predicate', value: shorthandKind });
+
+    if (name === 'path' && this.current().kind === 'equals') {
+      this.advance();
+      const valueToken = this.current();
+      if (valueToken.kind !== 'word' && valueToken.kind !== 'string') {
+        this.issues.push(
+          issue(
+            'invalid-predicate-value',
+            valueToken.start,
+            Math.max(1, valueToken.end - valueToken.start),
+            'path= requires a normalized workspace-relative path.',
+          ),
+        );
+        return undefined;
+      }
+      this.advance();
+      if (!isNormalizedWorkspacePath(valueToken.value)) {
+        this.issues.push(
+          issue(
+            'invalid-predicate-value',
+            valueToken.start,
+            Math.max(1, valueToken.end - valueToken.start),
+            'path= requires a normalized workspace-relative path using forward slashes.',
+          ),
+        );
+        return undefined;
+      }
+      return this.addNode({
+        kind: 'exact-path-predicate',
+        value: valueToken.value,
+      });
+    }
 
     if (
       name === 'path' ||

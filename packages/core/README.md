@@ -40,7 +40,8 @@ packages/core/
 The source export is intentional for this private workspace package: Vite
 consumes it through `@icarus-graph-explorer/core`, while both packages remain
 independently typechecked. Test-only builders stay private; consumers receive
-only canonical types, the schema version, structured validation results, and
+only canonical types, the schema version, structured validation results, the
+shared lexical `isNormalizedWorkspacePath` predicate, and
 `validateKnowledgeSnapshot`.
 
 ## Runtime boundary

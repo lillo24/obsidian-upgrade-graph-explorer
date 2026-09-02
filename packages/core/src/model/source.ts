@@ -6,6 +6,24 @@
  */
 export type WorkspacePath = string;
 
+/** Returns whether a string satisfies the canonical WorkspacePath contract. */
+export function isNormalizedWorkspacePath(path: string): path is WorkspacePath {
+  if (
+    path.length === 0 ||
+    path.startsWith('/') ||
+    path.includes('\\') ||
+    /^[A-Za-z]:/u.test(path)
+  ) {
+    return false;
+  }
+
+  return path
+    .split('/')
+    .every(
+      (segment) => segment.length > 0 && segment !== '.' && segment !== '..',
+    );
+}
+
 /**
  * A source point compatible with unist-style positions.
  *

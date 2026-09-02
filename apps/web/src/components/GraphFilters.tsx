@@ -360,8 +360,10 @@ export const GraphFilters = memo(function GraphFilters({
               </label>
               <p id="advanced-graph-query-help">
                 Use path, title, text, kind, or level with explicit AND, OR,
-                NOT, and parentheses. Text searches paths and section titles,
-                not Markdown body content.
+                NOT, and parentheses. path:&quot;notes&quot; contains text;
+                path=&quot;Notes/Foo.md&quot; matches one exact, case-sensitive
+                source path. Text searches paths and section titles, not
+                Markdown body content.
               </p>
               {queryIssue === undefined ? null : (
                 <p

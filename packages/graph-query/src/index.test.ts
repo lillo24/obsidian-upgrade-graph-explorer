@@ -2,12 +2,15 @@ import type { AddressableEntity } from '@icarus-graph-explorer/core';
 import { describe, expect, it } from 'vitest';
 
 import {
+  addExactPathExclusion,
   formatGraphQuery,
+  listExactPathExclusions,
   matchesGraphQuery,
   MAX_GRAPH_QUERY_AST_NODES,
   MAX_GRAPH_QUERY_LENGTH,
   MAX_GRAPH_QUERY_NESTING,
   parseGraphQuery,
+  removeExactPathExclusion,
 } from './index';
 
 const source = (path: string) => ({
@@ -67,6 +70,29 @@ describe('graph query parsing and formatting', () => {
     expect(parsed('text:"a\\\\b\\"c"').canonical).toBe('text:"a\\\\b\\"c"');
   });
 
+  it('parses exact paths as a distinct predicate and always quotes them', () => {
+    expect(parsed('path=Notes/Foo.md')).toMatchObject({
+      canonical: 'path="Notes/Foo.md"',
+      expression: {
+        kind: 'exact-path-predicate',
+        value: 'Notes/Foo.md',
+      },
+    });
+    expect(parsed('PATH="folder with spaces/Foo.md"').canonical).toBe(
+      'path="folder with spaces/Foo.md"',
+    );
+    expect(parsed(String.raw`path="Notes/Foo\"Quote.md"`).canonical).toBe(
+      String.raw`path="Notes/Foo\"Quote.md"`,
+    );
+  });
+
+  it('formats exact paths with existing Boolean precedence', () => {
+    expect(
+      parsed('(path:"notes" OR title:"Foo") AND NOT path=Notes/Foo.md')
+        .canonical,
+    ).toBe('(path:"notes" OR title:"Foo") AND NOT path="Notes/Foo.md"');
+  });
+
   it('is parse-format-parse idempotent', () => {
     const first = parsed('NOT sections OR path:Notes AND title:"Plan"');
     const second = parsed(first.canonical);
@@ -82,12 +108,31 @@ describe('graph query parsing and formatting', () => {
     ['kind:folder', 'invalid-predicate-value'],
     ['level<3', 'unexpected-token'],
     ['owner:"team"', 'unknown-predicate'],
+    ['title="Exact"', 'unexpected-token'],
+    ['text="Exact"', 'unexpected-token'],
   ])('rejects %s with a positioned %s issue', (query, code) => {
     const result = parseGraphQuery(query);
     expect(result.valid).toBe(false);
     if (result.valid) return;
     expect(result.issues[0]).toMatchObject({ code });
     expect(result.issues[0]?.position).toBeGreaterThanOrEqual(0);
+  });
+
+  it.each([
+    'path=""',
+    'path="/C:/Foo.md"',
+    'path="C:/Foo.md"',
+    'path="C:Foo.md"',
+    'path="/Foo.md"',
+    'path="foo\\\\bar.md"',
+    'path="foo//bar.md"',
+    'path="foo/./bar.md"',
+    'path="foo/../bar.md"',
+  ])('rejects non-canonical exact path in %s', (query) => {
+    expect(parseGraphQuery(query)).toMatchObject({
+      valid: false,
+      issues: [{ code: 'invalid-predicate-value' }],
+    });
   });
 
   it('enforces query length, AST size, and nesting limits', () => {
@@ -132,6 +177,38 @@ describe('graph query evaluation', () => {
     ).toBe(true);
   });
 
+  it('distinguishes exact path identity from path substring search', () => {
+    expect(
+      matchesGraphQuery(document, parsed('path:"Overview"').expression),
+    ).toBe(true);
+    expect(
+      matchesGraphQuery(
+        document,
+        parsed('path="Notes/Overview.md"').expression,
+      ),
+    ).toBe(true);
+    expect(
+      matchesGraphQuery(
+        document,
+        parsed('path="Archive/Notes/Overview.md"').expression,
+      ),
+    ).toBe(false);
+    expect(
+      matchesGraphQuery(
+        document,
+        parsed('path="notes/overview.md"').expression,
+      ),
+    ).toBe(false);
+    for (const entity of [section, block]) {
+      expect(
+        matchesGraphQuery(
+          entity,
+          parsed('path="Notes/Overview.md"').expression,
+        ),
+      ).toBe(true);
+    }
+  });
+
   it('evaluates kind, level, Boolean grouping, and section-only levels', () => {
     const expression = parsed(
       '(sections AND level<=3) OR (documents AND NOT path:"archive")',
@@ -142,5 +219,147 @@ describe('graph query evaluation', () => {
     expect(matchesGraphQuery(document, parsed('NOT level>=1').expression)).toBe(
       true,
     );
+  });
+});
+
+function successfulQuery(
+  result: ReturnType<typeof addExactPathExclusion>,
+): string | undefined {
+  expect(result.ok, JSON.stringify(result)).toBe(true);
+  if (!result.ok) throw new Error(result.issues[0]?.message);
+  return result.query;
+}
+
+describe('global exact-path exclusion operations', () => {
+  it('adds exclusions to no query, an AND query, and an OR query', () => {
+    expect(successfulQuery(addExactPathExclusion(undefined, 'A.md'))).toBe(
+      'NOT path="A.md"',
+    );
+    expect(
+      successfulQuery(addExactPathExclusion('kind:document', 'A.md')),
+    ).toBe('kind:document AND NOT path="A.md"');
+    expect(
+      successfulQuery(
+        addExactPathExclusion('kind:document OR title:"Memory"', 'A.md'),
+      ),
+    ).toBe('(kind:document OR title:"Memory") AND NOT path="A.md"');
+  });
+
+  it('preserves term order and makes repeated adds idempotent', () => {
+    const first = successfulQuery(
+      addExactPathExclusion('kind:document', 'A.md'),
+    );
+    const second = successfulQuery(addExactPathExclusion(first, 'B.md'));
+    expect(second).toBe(
+      'kind:document AND NOT path="A.md" AND NOT path="B.md"',
+    );
+    expect(successfulQuery(addExactPathExclusion(second, 'A.md'))).toBe(second);
+  });
+
+  it('lists unique global exclusions in query-term order', () => {
+    expect(
+      listExactPathExclusions(
+        '(title:"X" OR sections) AND NOT path="B.md" AND NOT path="A.md" AND NOT path="B.md"',
+      ),
+    ).toEqual({ ok: true, paths: ['B.md', 'A.md'] });
+    expect(listExactPathExclusions(undefined)).toEqual({
+      ok: true,
+      paths: [],
+    });
+  });
+
+  it('does not manage exclusions inside OR or nested NOT expressions', () => {
+    for (const query of [
+      'path="A.md" OR kind:document',
+      'NOT (path="A.md" OR path="B.md")',
+      'kind:document OR NOT path="A.md"',
+    ]) {
+      expect(listExactPathExclusions(query)).toEqual({ ok: true, paths: [] });
+      expect(removeExactPathExclusion(query, 'A.md')).toEqual({
+        ok: true,
+        query: parsed(query).canonical,
+      });
+    }
+  });
+
+  it('removes first, middle, last, sole, and duplicate global terms', () => {
+    const query =
+      'NOT path="A.md" AND kind:document AND NOT path="B.md" AND NOT path="C.md"';
+    expect(removeExactPathExclusion(query, 'A.md')).toEqual({
+      ok: true,
+      query: 'kind:document AND NOT path="B.md" AND NOT path="C.md"',
+    });
+    expect(removeExactPathExclusion(query, 'B.md')).toEqual({
+      ok: true,
+      query: 'NOT path="A.md" AND kind:document AND NOT path="C.md"',
+    });
+    expect(removeExactPathExclusion(query, 'C.md')).toEqual({
+      ok: true,
+      query: 'NOT path="A.md" AND kind:document AND NOT path="B.md"',
+    });
+    expect(removeExactPathExclusion('NOT path="A.md"', 'A.md')).toEqual({
+      ok: true,
+      query: undefined,
+    });
+    expect(
+      removeExactPathExclusion(
+        'NOT path="A.md" AND kind:document AND NOT path="A.md"',
+        'A.md',
+      ),
+    ).toEqual({ ok: true, query: 'kind:document' });
+  });
+
+  it('returns explicit failures for invalid paths and current queries', () => {
+    expect(addExactPathExclusion(undefined, '../A.md')).toMatchObject({
+      ok: false,
+      issues: [{ code: 'invalid-predicate-value' }],
+    });
+    expect(
+      removeExactPathExclusion('sections documents', 'A.md'),
+    ).toMatchObject({
+      ok: false,
+      issues: [{ code: 'missing-operator' }],
+    });
+    expect(listExactPathExclusions('')).toMatchObject({
+      ok: false,
+      issues: [{ code: 'empty-query' }],
+    });
+  });
+
+  it('fails instead of emitting queries beyond length, AST, or nesting limits', () => {
+    const maximumLengthQuery = `path:"${'x'.repeat(MAX_GRAPH_QUERY_LENGTH - 7)}"`;
+    expect(addExactPathExclusion(maximumLengthQuery, 'A.md')).toMatchObject({
+      ok: false,
+      issues: [{ code: 'query-too-long' }],
+    });
+
+    const maximumNodeQuery = Array.from(
+      { length: 128 },
+      () => 'documents',
+    ).join(' AND ');
+    expect(addExactPathExclusion(maximumNodeQuery, 'A.md')).toMatchObject({
+      ok: false,
+      issues: [{ code: 'query-too-complex' }],
+    });
+
+    const maximumDepthOr = `documents OR ${'NOT '.repeat(
+      MAX_GRAPH_QUERY_NESTING - 1,
+    )}(documents OR sections)`;
+    expect(parsed(maximumDepthOr).canonical).toContain(' OR ');
+    expect(addExactPathExclusion(maximumDepthOr, 'A.md')).toMatchObject({
+      ok: false,
+      issues: [{ code: 'query-too-deep' }],
+    });
+  });
+
+  it('does not mutate parsed expression inputs while deriving operations', () => {
+    const original = parsed(
+      '(kind:document OR kind:section) AND NOT path="A.md"',
+    );
+    const before = JSON.stringify(original.expression);
+    addExactPathExclusion(original.canonical, 'B.md');
+    listExactPathExclusions(original.canonical);
+    removeExactPathExclusion(original.canonical, 'A.md');
+    expect(JSON.stringify(original.expression)).toBe(before);
   });
 });

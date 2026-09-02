@@ -139,6 +139,37 @@ describe('DISC1 canonical candidate fast path', () => {
     expect(operations.counts.candidateBaseProjectionBuilds).toBe(1);
     expect(operations.counts.legacyCandidateFilterApplications).toBe(1);
   });
+
+  it('keeps exact paths distinct from path substring matching', () => {
+    const fixture = projectionFixture();
+    const exactWorkspace = createProjectionWorkspace({
+      ...fixture,
+      entities: [
+        ...fixture.entities,
+        {
+          id: 'doc-archive-a',
+          kind: 'document',
+          source: {
+            path: 'Archive/A.md',
+            span: {
+              start: { line: 1, column: 1, offset: 0 },
+              end: { line: 1, column: 2, offset: 1 },
+            },
+          },
+        },
+      ],
+    });
+    const entityIds = (query: string) =>
+      projectView(exactWorkspace, {
+        ...documentOnlyProjectionState(),
+        filters: { query },
+      }).nodes.flatMap((node) =>
+        node.kind === 'entity' ? [node.entityId] : [],
+      );
+
+    expect(entityIds('path="A.md"')).toEqual(['doc-a']);
+    expect(entityIds('path:"A.md"')).toEqual(['doc-a', 'doc-archive-a']);
+  });
 });
 
 function operationRecorder(): {

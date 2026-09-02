@@ -1,4 +1,4 @@
-import type { EntityKind } from '@icarus-graph-explorer/core';
+import type { EntityKind, WorkspacePath } from '@icarus-graph-explorer/core';
 
 export const MAX_GRAPH_QUERY_LENGTH = 4_096;
 export const MAX_GRAPH_QUERY_AST_NODES = 256;
@@ -17,6 +17,10 @@ export type GraphQueryPredicate =
   | {
       readonly kind: 'kind-predicate';
       readonly value: EntityKind;
+    }
+  | {
+      readonly kind: 'exact-path-predicate';
+      readonly value: WorkspacePath;
     }
   | {
       readonly kind: 'level-predicate';
@@ -71,5 +75,25 @@ export type GraphQueryParseResult =
     }
   | {
       readonly valid: false;
+      readonly issues: readonly GraphQueryIssue[];
+    };
+
+export type ExactPathExclusionMutationResult =
+  | {
+      readonly ok: true;
+      readonly query: string | undefined;
+    }
+  | {
+      readonly ok: false;
+      readonly issues: readonly GraphQueryIssue[];
+    };
+
+export type ExactPathExclusionListResult =
+  | {
+      readonly ok: true;
+      readonly paths: readonly WorkspacePath[];
+    }
+  | {
+      readonly ok: false;
       readonly issues: readonly GraphQueryIssue[];
     };

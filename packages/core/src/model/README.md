@@ -26,7 +26,8 @@ only when every issue is resolved.
 ## Canonical conventions
 
 - IDs are opaque, non-empty strings. Titles and paths are never identity.
-- Workspace paths are normalized, root-relative, forward-slash paths.
+- Workspace paths are normalized, root-relative, forward-slash paths;
+  `isNormalizedWorkspacePath` is the shared lexical check for that contract.
 - Lines/columns are 1-based; offsets are 0-based UTF-16 code-unit indexes.
 - Spans are start-inclusive/end-exclusive; both points carry offsets or neither
   does.
