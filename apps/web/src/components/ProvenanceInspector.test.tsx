@@ -169,7 +169,7 @@ describe('user-facing provenance inspector', () => {
     });
     const normal = normalView(markup);
 
-    expect(normal).toContain('>Structure<');
+    expect(normal).toContain('>Hierarchy<');
     expect(normal).toContain('>contains<');
     expect(normal).not.toContain('canonical');
     expect(normal).not.toContain('fabricated');

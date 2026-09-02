@@ -6,6 +6,7 @@ import { documentOnlyProjectionState } from './presets';
 import { applyFilters, applyFocus } from './slicing';
 import type {
   ProjectedEdge,
+  ProjectedEntityNode,
   ProjectedNode,
   ProjectedReferenceTargetNode,
   ProjectionIssue,
@@ -33,6 +34,7 @@ export function containingDocumentEntityId(
 
 export interface FocusedDocumentNeighborhood {
   readonly rootDocumentId: EntityId;
+  readonly rootDocumentNode: ProjectedEntityNode;
   readonly documentDistance: ReadonlyMap<EntityId, number>;
   readonly allowedDiagnosticReferenceIds: ReadonlySet<string>;
   readonly issues: readonly ProjectionIssue[];
@@ -92,11 +94,13 @@ export function projectFocusedDocumentNeighborhood(
     hierarchyContext: 'ancestors',
   });
   const documentDistance = new Map<EntityId, number>();
+  let rootDocumentNode: ProjectedEntityNode | undefined;
   for (const node of neighborhood.nodes) {
     if (node.kind !== 'entity' || node.entityKind !== 'document') continue;
     documentDistance.set(node.entityId, node.focusDistance ?? 0);
+    if (node.entityId === rootDocumentId) rootDocumentNode = node;
   }
-  if (!documentDistance.has(rootDocumentId)) {
+  if (rootDocumentNode === undefined) {
     throw new Error(
       `Cannot project ${owner}: root document "${rootDocumentId}" is outside the active KG6 neighborhood.`,
     );
@@ -104,6 +108,7 @@ export function projectFocusedDocumentNeighborhood(
 
   return {
     rootDocumentId,
+    rootDocumentNode,
     documentDistance,
     allowedDiagnosticReferenceIds: new Set(
       neighborhood.nodes.flatMap((node) =>
@@ -155,6 +160,23 @@ export function retainProjectionInsideFocusedDocuments(
       },
     ];
   });
+  if (
+    !entityNodes.some(
+      (node) =>
+        node.kind === 'entity' && node.entityId === neighborhood.rootDocumentId,
+    )
+  ) {
+    // Focus renderers and navigation require one stable file anchor. Content
+    // filters may hide the root as a match, but they must not invalidate the
+    // active Focus scope when no matching descendant is structurally visible.
+    entityNodes.push({
+      ...neighborhood.rootDocumentNode,
+      internalReferenceIds: [],
+      revealableDescendantCount: 0,
+      role: 'context',
+      focusDistance: null,
+    });
+  }
   const retainedNodeIds = new Set(entityNodes.map(({ id }) => id));
   const diagnosticReferences = new Map<string, Set<string>>();
   const candidateEdges = detailed.edges.flatMap((edge): ProjectedEdge[] => {

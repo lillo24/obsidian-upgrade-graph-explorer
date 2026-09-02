@@ -5,10 +5,13 @@ vi.mock('sigma', () => ({ default: class {} }));
 import { GLOBAL_INTERACTION_OPERATION_CONTRACTS } from './interaction-contract';
 import { LOCAL_INTERACTION_OPERATION_CONTRACTS } from './local-interaction-contract';
 import { LocalRendererSession } from './local-session';
+import { buildGlobalGraph } from './graph';
+import { mapProjectionToGlobal } from './mapping';
 import { resolveLocalEdgeStyle, resolveLocalNodeStyle } from './local-style';
 import { resolveGlobalLayoutSettings } from './settings';
 import { GlobalRendererSession } from './session';
 import { resolveGlobalNodeStyle } from './style';
+import { globalTestProjection } from './test-fixture';
 import type {
   GlobalNodeAttributes,
   LocalEdgeAttributes,
@@ -236,22 +239,45 @@ describe('cross-Sigma Visual Group style contract', () => {
     });
   });
 
-  it('queues a Global style refresh while changed topology is being indexed', () => {
+  it('defers a Global style repaint until changed topology is indexed', async () => {
     const refresh = vi.fn();
-    const count = vi.fn();
+    const scheduleRefresh = vi.fn();
+    let afterRender: (() => void) | undefined;
+    const initial = mapProjectionToGlobal(globalTestProjection(), {
+      folderClustering: true,
+      spacingPreset: 'normal',
+    });
     const session = Object.create(
       GlobalRendererSession.prototype,
     ) as GlobalRendererSession;
-    Reflect.set(session, 'graph', { nodes: () => ['document'] });
-    Reflect.set(session, 'renderer', { refresh });
-    Reflect.set(session, 'options', { instrumentation: { count } });
-    Reflect.set(session, 'topologyRefreshPending', Promise.resolve());
+    Reflect.set(session, 'graph', buildGlobalGraph(initial));
+    Reflect.set(session, 'neighborhoods', new Map());
+    Reflect.set(session, 'renderer', {
+      once: (event: string, callback: () => void) => {
+        expect(event).toBe('afterRender');
+        afterRender = callback;
+      },
+      refresh,
+      scheduleRefresh,
+    });
+    Reflect.set(session, 'options', {});
 
+    session.update({ ...initial, nodes: initial.nodes.slice(0, 1), edges: [] });
     session.setVisualGroupStyles(new Map([['document', presentation]]));
 
+    expect(scheduleRefresh).toHaveBeenCalledOnce();
     expect(refresh).not.toHaveBeenCalled();
-    expect(count).toHaveBeenCalledWith('global-style-updates');
-    expect(Reflect.get(session, 'visualStyleRefreshPending')).toBe(true);
+    expect(afterRender).toBeTypeOf('function');
+
+    afterRender?.();
+    await Promise.resolve();
+
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(refresh).toHaveBeenCalledWith({
+      partialGraph: { nodes: [initial.nodes[0]!.key] },
+      skipIndexation: true,
+      schedule: true,
+    });
   });
 
   it('updates the actual Local session through one style refresh only', () => {

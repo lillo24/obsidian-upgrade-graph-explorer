@@ -826,7 +826,7 @@ function HierarchyEdgeInspector({
   return (
     <>
       <div className="inspector-identity">
-        <span className="inspector-type">Structure</span>
+        <span className="inspector-type">Hierarchy</span>
         <h4>{inspection.parent.displayName}</h4>
       </div>
       <div className="structure-relationship">

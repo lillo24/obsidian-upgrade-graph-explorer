@@ -16,7 +16,7 @@ import {
 } from '../graph-state';
 import type { SavedGraphFilter } from '../persistence/saved-filters';
 import { activeGraphFilterCount } from './graph-filter-count';
-import { activateGraphFiltersEscape } from './graph-filters-overlay';
+import { activateGraphFiltersOverlay } from './graph-filters-overlay';
 
 interface GraphFiltersProps {
   readonly contained: boolean;
@@ -66,6 +66,7 @@ export const GraphFilters = memo(function GraphFilters({
   state,
 }: GraphFiltersProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
   const filters = state.filters;
   const activeQuery = filters?.query ?? '';
   const previousActiveQuery = useRef(activeQuery);
@@ -85,16 +86,31 @@ export const GraphFilters = memo(function GraphFilters({
   }, [onOpenChange]);
 
   useEffect(() => {
-    if (!open || triggerRef.current === null || typeof window === 'undefined') {
+    const panel = panelRef.current;
+    const trigger = triggerRef.current;
+    if (
+      !open ||
+      panel === null ||
+      trigger === null ||
+      typeof window === 'undefined'
+    ) {
       return;
     }
-    return activateGraphFiltersEscape(
+    return activateGraphFiltersOverlay(
       {
-        trigger: triggerRef.current,
+        trigger,
+        panelContains: (target) =>
+          target instanceof Node && panel.contains(target),
+        triggerContains: (target) =>
+          target instanceof Node && trigger.contains(target),
         addKeydownListener: (listener) =>
           window.addEventListener('keydown', listener, true),
         removeKeydownListener: (listener) =>
           window.removeEventListener('keydown', listener, true),
+        addPointerdownListener: (listener) =>
+          window.addEventListener('pointerdown', listener, true),
+        removePointerdownListener: (listener) =>
+          window.removeEventListener('pointerdown', listener, true),
         queueFocus: (callback) => queueMicrotask(callback),
       },
       () => onOpenChange(false),
@@ -173,6 +189,7 @@ export const GraphFilters = memo(function GraphFilters({
           }`}
           data-graph-scroll-container
           id="graph-filters-panel"
+          ref={panelRef}
         >
           <div className="graph-filters__heading">
             <h3 id="graph-filters-heading">Filters</h3>

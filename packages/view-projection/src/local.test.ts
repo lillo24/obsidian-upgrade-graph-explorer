@@ -137,6 +137,35 @@ describe('Local KG6 projection', () => {
     ).toEqual(['doc-a']);
   });
 
+  it('keeps the Focus root as context when filters hide every visible file', () => {
+    const state = deriveLocalProjectionState(
+      workspace,
+      {
+        disclosure: {
+          defaultDepth: 0,
+          expandedEntityIds: [],
+          collapsedEntityIds: [],
+          includeBlocks: false,
+        },
+        filters: { entityKinds: ['section'] },
+      },
+      'doc-a',
+    );
+    const projection = projectLocalView(workspace, state);
+
+    expect(projection.nodes).toEqual([
+      expect.objectContaining({
+        kind: 'entity',
+        entityId: 'doc-a',
+        entityKind: 'document',
+        role: 'context',
+        focusDistance: null,
+        internalReferenceIds: [],
+      }),
+    ]);
+    expect(projection.edges).toEqual([]);
+  });
+
   it('does not mutate the source state or canonical workspace', () => {
     const source = {
       disclosure: {
