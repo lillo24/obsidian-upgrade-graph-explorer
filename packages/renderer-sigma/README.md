@@ -123,7 +123,8 @@ policy. A zero-node projection overlays the same explicit
 `No nodes match this view.` outcome used by Hierarchy. The existing Global
 session remains mounted across nonempty/empty query changes so desktop WebView
 transitions reconcile topology in place instead of tearing down and recreating
-WebGL.
+WebGL. Exact memory-cache restoration is silent; persistent canvas status is
+reserved for pending layout work and failures.
 
 Sigma 3.0.3's default label and highlight drawing always extends to the right.
 Global replaces only that canvas drawing boundary: adaptive culling still

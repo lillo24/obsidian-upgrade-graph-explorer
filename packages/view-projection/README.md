@@ -172,6 +172,11 @@ neighborhood. Path and reference-status constraints are applied before that
 bounded hop traversal; text, entity-kind, and QUERY1 filters remain part of the
 later detailed pass.
 
+The stable Focus root file is always retained as structural context even when
+those later content filters exclude documents or match no currently disclosed
+descendant. Filters still decide visible content and relationships; they cannot
+erase the anchor required by both Focus renderers and Focus navigation.
+
 The detailed pass sets ordinary automatic depth to zero and applies the stored
 depth only to a projection-only set of detail document IDs—today the one Focus
 root document. Depths 0/1/2/3 therefore retain the same file IDs while revealing

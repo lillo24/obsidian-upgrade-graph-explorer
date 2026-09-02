@@ -82,7 +82,10 @@ canonical truth, or own a platform storage implementation.
   Blocks is
   represented once through disclosure state; `graph-filter-count.ts` derives
   its user-visible active-group badge, while `graph-filters-overlay.ts` gives
-  the panel first ownership of Escape and restores trigger focus.
+  the panel first ownership of Escape, restores trigger focus for keyboard
+  dismissal, and closes on an outside pointer action without stealing the new
+  target's focus. All Network preserves the same applied Advanced query while
+  deriving its documents-only projection.
   `graph-workspace-overlays.ts` owns the pure Settings/Filters/Tools exclusivity
   policy without coupling transient chrome to KG6 projection state.
 - `VisualGroups.tsx` owns the controlled Groups trigger, enabled-count badge,
@@ -100,13 +103,18 @@ canonical truth, or own a platform storage implementation.
 - `GlobalGraphView.tsx` is the only lazy production import of the direct Sigma
   canvas. It owns the Worker service and a bounded module-lifetime layout cache
   so Structure startup stays Sigma-free and exact results survive mode switches.
+  The canvas keeps its renderer session mounted when filters produce zero nodes
+  and overlays an explicit graph-empty recovery state, avoiding WebGL context
+  churn when results return. Exact in-memory cache restoration is intentionally
+  silent; only pending layout work and failures need persistent canvas feedback.
   Its narrow document-activation callback sends Global double-click through the
   same `GraphExplorer` Focus/history/transition-anchor path as Inspector;
   Sigma default double-click zoom is already consumed inside the renderer.
 - `LocalGraphView.tsx` owns the separate Local Free worker client and bounded
   page-lifetime layout cache. An exact hit warms the first canvas draw; otherwise
   it mounts deterministic seed geometry immediately, then adopts only the latest
-  refinement.
+  refinement. Its mount boundary reports an invalid renderer input without
+  unmounting the application shell.
 - `LocalStructuredGraphView.tsx` owns the lazy React Flow Local schematic,
   caller-owned W3 service, bounded exact memory cache, semantic Structured zoom
   adapter, and explicit mount-failure boundary. It reuses `GraphCanvas` rather

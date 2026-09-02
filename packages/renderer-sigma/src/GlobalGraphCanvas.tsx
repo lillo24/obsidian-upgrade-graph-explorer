@@ -140,10 +140,8 @@ export function GlobalGraphCanvas({
   const appliedVisualGroupStyles = useRef(initial.visualGroupStyles);
   const [ready, setReady] = useState(false);
   const [layoutCommitKey, setLayoutCommitKey] = useState(0);
-  const [layoutStatus, setLayoutStatus] = useState(
-    initial.cached
-      ? 'All Network layout restored from the in-memory cache.'
-      : 'Preparing All Network layout…',
+  const [layoutStatus, setLayoutStatus] = useState<string | undefined>(
+    initial.cached ? undefined : 'Preparing All Network layout…',
   );
   const [layoutError, setLayoutError] = useState<string>();
 
@@ -250,9 +248,7 @@ export function GlobalGraphCanvas({
           if (cancelled) return;
           layoutPending.current = false;
           setLayoutError(undefined);
-          setLayoutStatus(
-            'All Network layout restored from the in-memory cache.',
-          );
+          setLayoutStatus(undefined);
           setLayoutCommitKey((current) => current + 1);
         })
         .catch((error: unknown) => {
@@ -378,13 +374,15 @@ export function GlobalGraphCanvas({
               Fit
             </button>
           </div>
-          <p
-            className="global-graph-canvas__status"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            {layoutStatus}
-          </p>
+          {layoutStatus === undefined ? null : (
+            <p
+              className="global-graph-canvas__status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {layoutStatus}
+            </p>
+          )}
         </>
       )}
       {layoutError === undefined ? null : (

@@ -202,6 +202,27 @@ describe('Local navigation planning', () => {
     ).toBe(false);
   });
 
+  it('opens Files-only Focus when a saved content filter excludes documents', () => {
+    const plan = planLocalEntry(
+      workspace,
+      {
+        ...documentOnlyProjectionState(),
+        filters: { entityKinds: ['section'] },
+      },
+      'doc-a',
+      0,
+    );
+
+    expect(plan.state.filters?.entityKinds).toEqual(['section']);
+    expect(
+      plan.projection.nodes.find((node) => node.id === plan.projectionNodeId),
+    ).toMatchObject({
+      kind: 'entity',
+      entityId: 'doc-a',
+      role: 'context',
+    });
+  });
+
   it('fails loudly when a live update removed the requested canonical target', () => {
     expect(() =>
       planLocalEntityNavigation(

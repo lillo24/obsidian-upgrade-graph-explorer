@@ -18,7 +18,7 @@ The roadmap is a sequencing map, not a claim that future features exist. Each mi
 | **KG11 — Tauri local-vault workflow**                        | Desktop folder access and watching through a narrow source-provider adapter.                                                                   | **Complete** — secure selection, coalesced plans, transactional live application, resync, and view preservation pass.                              |
 | **KG12 — Performance + worker hardening**                    | Explicit workload budgets, measurement-led worker split, and projection/focus/collapse optimization.                                           | **Complete** — budgets plus separate stateful W1 and stateless latest-result-wins W3 workers passed automated and release QA gates.                |
 | **KG13 — Global → Regional → Local multi-scale exploration** | Add a complementary high-density Global renderer, visual Regional LOD, then bounded Local Free/Structured detail without replacing Structure.  | **Complete** — Global/Regional plus one bounded Local projection with Free and Structured presentations passed automated, browser, and release QA. |
-| **KG14 — Product-quality exploration**                       | Accessibility, resilience, onboarding, polished exploration workflows, and release-quality hardening.                                          | **Next** — core workflows and renderer choices are evidence-backed and stable.                                                                     |
+| **KG14 — Product-quality exploration**                       | Accessibility, resilience, onboarding, polished exploration workflows, and release-quality hardening.                                          | **In progress** — KG14A audit complete; KG14B accessible Network exploration and critical feedback is Next.                                        |
 
 Future package names, state libraries, and implementation details are intentionally unspecified until their milestone supplies concrete requirements.
 
@@ -90,7 +90,13 @@ history and viewport state, and does not reproject Local or relayout Global.
 Immediate deterministic schematic geometry, latest-only W3 refinement, and a
 bounded exact memory cache passed automated, production-browser, release-vault,
 live-update, accessibility, and physical precision-touchpad gates. KG13 is
-complete and KG14 is next; no KG14 work begins in this milestone.
+complete. KG14A now records the current workflow map, release-readiness audit,
+resilience matrix, decision points, ranked implementation queue, and KG14
+completion gate in `PRODUCT_QUALITY_AUDIT.md`. The audit found strong runtime
+and data resilience but a release-blocking lack of an equivalent DOM exploration
+path for both Network layouts. KG14B is therefore Next: accessible Network
+exploration plus critical query/feedback accessibility. Desktop CSP,
+versioning, and packaging follow as a separate evidence-backed hardening slice.
 
 QUERY1 saved queries/filters and GROUP1 visual rule groups remain independent
 product systems. GROUP1A's source-neutral rule compiler, fixed palette,

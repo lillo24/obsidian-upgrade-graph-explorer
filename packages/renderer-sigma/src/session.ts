@@ -317,8 +317,9 @@ export class GlobalRendererSession {
     this.visualGroupStyles = styles;
     this.options.instrumentation?.count('global-style-updates');
     if (this.topologyRefreshPending !== undefined) {
-      // Query changes can alter All Network membership in the same React
-      // commit as a style-map update. Wait until Sigma indexes that topology.
+      // Reconciliation has already changed Graphology, but Sigma still owns
+      // indices for the previous graph until its next process/render pass.
+      // A partial repaint during that gap can target an added or removed node.
       this.visualStyleRefreshPending = true;
       return;
     }
