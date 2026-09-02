@@ -63,8 +63,8 @@ const expanded: ViewProjectionState = {
   },
 };
 
-describe('effective Global KG6 state', () => {
-  it('maps section focus to its file without mutating Structure disclosure', () => {
+describe('effective All Network KG6 state', () => {
+  it('enforces documents-only topology without mutating Hierarchy disclosure', () => {
     const workspace = createProjectionWorkspace(snapshot);
     const before = JSON.stringify(expanded);
     const global = effectiveGlobalProjectionState(workspace, expanded);
@@ -77,6 +77,11 @@ describe('effective Global KG6 state', () => {
         (node) => node.kind !== 'entity' || node.entityKind === 'document',
       ),
     ).toBe(true);
+    expect(
+      projection.nodes.some(
+        (node) => node.kind === 'entity' && node.entityId === 'section',
+      ),
+    ).toBe(false);
     expect(projection.edges.every((edge) => edge.kind === 'reference')).toBe(
       true,
     );

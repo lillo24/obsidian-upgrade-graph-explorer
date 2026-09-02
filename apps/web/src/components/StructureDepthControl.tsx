@@ -6,16 +6,18 @@ import {
 } from './structure-depth-selection';
 
 export function StructureDepthControl({
+  custom,
   depth,
   onChange,
 }: {
+  readonly custom: boolean;
   readonly depth: StructuralDepth;
   readonly onChange: (depth: StructuralDepth) => void;
 }) {
   return (
-    <div aria-label="Structural depth" className="control-group" role="group">
+    <div aria-label="Hierarchy depth" className="control-group" role="group">
       <label>
-        Structure depth
+        Hierarchy depth
         <select
           onChange={(event) =>
             applyStructureDepthSelection(event.currentTarget.value, onChange)
@@ -29,6 +31,7 @@ export function StructureDepthControl({
           ))}
         </select>
       </label>
+      {custom ? <span className="depth-custom-indicator">Custom</span> : null}
     </div>
   );
 }

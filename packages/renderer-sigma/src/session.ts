@@ -626,7 +626,15 @@ export class GlobalRendererSession {
     const display = this.renderer.getNodeDisplayData(key);
     return display === undefined
       ? undefined
-      : this.renderer.framedGraphToViewport({ x: display.x, y: display.y });
+      : this.renderer.framedGraphToViewport(
+          { x: display.x, y: display.y },
+          {
+            // Recompute from the live camera instead of handing a stale
+            // post-layout matrix to the destination renderer.
+            cameraState: this.renderer.getCamera().getState(),
+            graphDimensions: this.renderer.getGraphDimensions(),
+          },
+        );
   }
 
   destroy(): void {

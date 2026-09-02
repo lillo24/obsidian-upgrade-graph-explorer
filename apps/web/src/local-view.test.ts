@@ -100,6 +100,7 @@ describe('Local navigation planning', () => {
       workspace,
       documentOnlyProjectionState(),
       'section-a',
+      0,
     );
 
     expect(plan.rootEntityId).toBe('doc-a');
@@ -109,7 +110,10 @@ describe('Local navigation planning', () => {
       plan.projection.nodes.some(
         (node) => node.kind === 'entity' && node.entityId === 'section-a',
       ),
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      plan.projection.nodes.find((node) => node.id === plan.projectionNodeId),
+    ).toMatchObject({ kind: 'entity', entityId: 'doc-a' });
     expect(
       plan.projection.nodes.some(
         (node) => node.kind === 'entity' && node.entityId === 'section-b',
@@ -122,6 +126,7 @@ describe('Local navigation planning', () => {
       workspace,
       documentOnlyProjectionState(),
       'doc-a',
+      0,
     );
     const visible = planLocalEntityNavigation(
       workspace,
@@ -147,7 +152,8 @@ describe('Local navigation planning', () => {
   it('widens only the minimum ancestor disclosure needed for a hidden heading', () => {
     const plan = planLocalEntityNavigation(
       workspace,
-      planLocalEntry(workspace, documentOnlyProjectionState(), 'doc-a').state,
+      planLocalEntry(workspace, documentOnlyProjectionState(), 'doc-a', 0)
+        .state,
       'deep-a',
     );
 
@@ -162,6 +168,38 @@ describe('Local navigation planning', () => {
         (node) => node.kind === 'entity' && node.entityId === 'deep-a',
       ),
     ).toBe(true);
+  });
+
+  it('starts Focus with the requested depth and no prior manual overrides', () => {
+    const plan = planLocalEntry(
+      workspace,
+      {
+        disclosure: {
+          defaultDepth: 1,
+          expandedEntityIds: ['doc-b'],
+          collapsedEntityIds: ['doc-a'],
+          includeBlocks: false,
+        },
+      },
+      'doc-a',
+      2,
+    );
+
+    expect(plan.state.disclosure).toMatchObject({
+      defaultDepth: 2,
+      expandedEntityIds: [],
+      collapsedEntityIds: [],
+    });
+    expect(
+      plan.projection.nodes.some(
+        (node) => node.kind === 'entity' && node.entityId === 'deep-a',
+      ),
+    ).toBe(true);
+    expect(
+      plan.projection.nodes.some(
+        (node) => node.kind === 'entity' && node.entityId === 'section-b',
+      ),
+    ).toBe(false);
   });
 
   it('fails loudly when a live update removed the requested canonical target', () => {

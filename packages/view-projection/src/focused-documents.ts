@@ -45,7 +45,7 @@ export interface FocusedDocumentNeighborhood {
 export function projectFocusedDocumentNeighborhood(
   workspace: ProjectionWorkspace,
   state: ViewProjectionState,
-  owner: 'Local' | 'Structure Focus',
+  owner: string,
 ): FocusedDocumentNeighborhood {
   const focus = state.focus;
   if (focus === undefined) {
@@ -131,7 +131,7 @@ export function retainProjectionInsideFocusedDocuments(
   workspace: ProjectionWorkspace,
   detailed: ViewProjection,
   neighborhood: FocusedDocumentNeighborhood,
-  owner: 'Local' | 'Structure Focus',
+  owner: string,
 ): ViewProjection {
   const entityNodes = detailed.nodes.flatMap((node): ProjectedNode[] => {
     if (node.kind !== 'entity') return [];
@@ -142,8 +142,7 @@ export function retainProjectionInsideFocusedDocuments(
     ) {
       return [];
     }
-    const preserveFilterContext =
-      owner === 'Structure Focus' && node.role === 'context';
+    const preserveFilterContext = node.role === 'context';
     return [
       {
         ...node,

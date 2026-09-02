@@ -66,6 +66,7 @@ import {
   GRAPH_VIEWPORT_OBSERVATION_DELAY_MS,
   viewportAfterWheelZoom,
   viewportForDisclosureAnchor,
+  viewportPointForNode,
   wheelActionForMode,
   type DisclosureAnchor,
 } from './viewport-navigation';
@@ -169,10 +170,8 @@ function GraphCanvasInner({
   visualVariant = 'standard',
 }: GraphCanvasProps) {
   const [hovered, setHovered] = useState<GraphSelection | null>(null);
-  const { fitView, getViewport, setCenter, setViewport } = useReactFlow<
-    GraphFlowNode,
-    GraphFlowEdge
-  >();
+  const { fitView, getInternalNode, getViewport, setCenter, setViewport } =
+    useReactFlow<GraphFlowNode, GraphFlowEdge>();
   const previousFitRequest = useRef(fitRequestKey);
   const previousCenterRequest = useRef<number | null>(null);
   const handledTransitionRequest = useRef<number | null>(null);
@@ -213,7 +212,7 @@ function GraphCanvasInner({
     );
     if (rootNode === undefined) {
       throw new Error(
-        `Local Structured requires its root entity ${rootEntityId ?? '(missing)'}.`,
+        `Focus Hierarchy requires its root entity ${rootEntityId ?? '(missing)'}.`,
       );
     }
     const fingerprint = localStructuredLayoutFingerprint(
@@ -365,7 +364,7 @@ function GraphCanvasInner({
               )
             : {
                 ...structuredBaseline.graph,
-                layoutWarning: `Automatic Local Structured layout failed: ${result.message} The deterministic seed remains visible.`,
+                layoutWarning: `Automatic Focus Hierarchy layout failed: ${result.message} The deterministic seed remains visible.`,
               };
         };
         const graph =
@@ -400,7 +399,7 @@ function GraphCanvasInner({
               )
             : {
                 ...structuredBaseline.graph,
-                layoutWarning: `Automatic Local Structured layout failed: ${message} The deterministic seed remains visible.`,
+                layoutWarning: `Automatic Focus Hierarchy layout failed: ${message} The deterministic seed remains visible.`,
               };
         setRendererLayout((state) =>
           commitRendererLayout(state, {
@@ -477,15 +476,83 @@ function GraphCanvasInner({
         (candidate) => candidate.data.projectionNodeId === nodeId,
       );
       if (node === undefined) return undefined;
+      // React Flow may hold zero/unfinished measured dimensions in its runtime
+      // node while the visible fixed-size card is already painted. Capture the
+      // actual card center first so a cross-mount transition cannot anchor the
+      // card's top-left corner by accident.
+      const nodeElement = [
+        ...(containerRef.current?.querySelectorAll<HTMLElement>(
+          '.react-flow__node',
+        ) ?? []),
+      ].find((candidate) => candidate.dataset.id === node.id);
+      const flowElement = nodeElement?.closest<HTMLElement>('.react-flow');
+      if (
+        nodeElement !== undefined &&
+        flowElement !== null &&
+        flowElement !== undefined
+      ) {
+        const nodeRect = nodeElement.getBoundingClientRect();
+        const flowRect = flowElement.getBoundingClientRect();
+        if (
+          Number.isFinite(nodeRect.left) &&
+          Number.isFinite(nodeRect.top) &&
+          Number.isFinite(nodeRect.width) &&
+          Number.isFinite(nodeRect.height)
+        ) {
+          return {
+            x: nodeRect.left - flowRect.left + nodeRect.width / 2,
+            y: nodeRect.top - flowRect.top + nodeRect.height / 2,
+          };
+        }
+      }
       const viewport = getViewport();
-      const width = node.width ?? node.measured?.width ?? 0;
-      const height = node.height ?? node.measured?.height ?? 0;
-      return {
-        x: (node.position.x + width / 2) * viewport.zoom + viewport.x,
-        y: (node.position.y + height / 2) * viewport.zoom + viewport.y,
-      };
+      const internalNode = getInternalNode(node.id);
+      const measuredWidth = internalNode?.measured.width;
+      const measuredHeight = internalNode?.measured.height;
+      const runtimeBounds =
+        internalNode === undefined ||
+        measuredWidth === undefined ||
+        measuredHeight === undefined
+          ? undefined
+          : {
+              x: internalNode.internals.positionAbsolute.x,
+              y: internalNode.internals.positionAbsolute.y,
+              width: measuredWidth,
+              height: measuredHeight,
+            };
+      return (
+        viewportPointForNode(graph, nodeId, viewport, runtimeBounds) ??
+        undefined
+      );
     },
-    [getViewport],
+    [getInternalNode, getViewport],
+  );
+  const stageNodeAnchor = useCallback(
+    (nodeId: GraphTransitionAnchor['nodeId']) => {
+      const graph = preparedRef.current;
+      const point = nodeViewportPoint(nodeId);
+      const viewport = getViewport();
+      const node = graph?.nodes.find(
+        (candidate) => candidate.data.projectionNodeId === nodeId,
+      );
+      if (
+        graph === null ||
+        node === undefined ||
+        point === undefined ||
+        !Number.isFinite(viewport.zoom) ||
+        viewport.zoom <= 0
+      ) {
+        return false;
+      }
+      nextDisclosureAnchor.current = {
+        projectionNodeId: nodeId,
+        entityId: node.type === 'entity' ? node.data.entityId : null,
+        screenPoint: point,
+        zoom: viewport.zoom,
+      };
+      return true;
+    },
+    [getViewport, nodeViewportPoint],
   );
 
   useLayoutEffect(() => {
@@ -494,10 +561,10 @@ function GraphCanvasInner({
 
   useEffect(() => {
     if (onTransitionAnchorApiChange === undefined) return;
-    const api = { nodeViewportPoint };
+    const api = { nodeViewportPoint, stageNodeAnchor };
     onTransitionAnchorApiChange(api);
     return () => onTransitionAnchorApiChange(undefined);
-  }, [nodeViewportPoint, onTransitionAnchorApiChange]);
+  }, [nodeViewportPoint, onTransitionAnchorApiChange, stageNodeAnchor]);
 
   const initializeViewport = useCallback(
     (instance: ReactFlowInstance<GraphFlowNode, GraphFlowEdge>) => {

@@ -216,7 +216,7 @@ export const GraphSettings = memo(function GraphSettings({
                 aria-labelledby="global-layout-settings-heading"
                 className="graph-settings__section"
               >
-                <h3 id="global-layout-settings-heading">Global Layout</h3>
+                <h3 id="global-layout-settings-heading">All Network Layout</h3>
                 <label className="graph-settings__check">
                   <input
                     checked={globalLayoutSettings.folderClustering}

@@ -41,6 +41,11 @@ current transient text filter and every still-valid disclosure, focus, path,
 entity-kind, reference-status, graph-query, and semantic viewport choice. Missing canonical
 IDs and stale paths are removed deterministically before projection.
 
+Schema v3 remains the internal compatibility contract beneath the user-facing
+`Scope = All | Focus` and `Layout = Network | Hierarchy` controls. Their mapping
+is `global`, `structure`, `local/free`, and `local/structured` respectively; no
+schema v4 or renderer-coordinate state is required.
+
 Schema v3 accepts structural `defaultDepth` values 0–3 plus an optional literal
 Markdown heading ceiling, `presentationMode: structure | global | local`, a
 Structure canonical anchor plus React Flow zoom, a Global canonical anchor plus
@@ -50,7 +55,13 @@ preserving the other. Existing schema-v1
 records migrate losslessly to Structure. Schema-v2 records preserve their
 explicit Structure/Global renderer mode; an active focus does not guess Local.
 Local restoration normalizes focus to a surviving containing document and exits
-to Global if that root is lost. `LocalLayoutMode` remains a separate user
+to Global if that root is lost. Earlier schema-v3 Local records represented
+automatic top-level detail as depth 0 plus an expanded root document. Restore
+removes only that root marker and reports the normalization; all other expansion
+and collapse IDs remain intact. An ordinary later save writes the normalized
+shape. Schema v3 has no provenance bit that can distinguish the old automatic
+marker from a manual expansion of the same depth-0 root, so this intentionally
+small normalization favors a truthful Files-only restore. `LocalLayoutMode` remains a separate user
 preference rather than saved semantic history. Raw coordinates, transition
 points, renderer objects, Dagre/ForceAtlas2 positions are never accepted. Future schema versions
 fail loudly. New records persist the heading ceiling only when active, and

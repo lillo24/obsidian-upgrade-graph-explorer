@@ -232,8 +232,8 @@ describe('user-facing provenance inspector', () => {
         onClear={() => undefined}
         onClose={() => undefined}
         onNavigate={() => undefined}
-        onOpenInStructure={() => undefined}
-        onOpenLocal={() => undefined}
+        onOpenFullHierarchy={() => undefined}
+        onFocus={() => undefined}
         onToggleDisclosure={() => undefined}
         projection={documentProjection}
         selection={{ kind: 'node', id: source.id }}
@@ -241,8 +241,8 @@ describe('user-facing provenance inspector', () => {
       />,
     );
 
-    expect(markup).toContain('>Open Local</button>');
-    expect(markup).toContain('>Open in Structure</button>');
+    expect(markup).toContain('>Focus</button>');
+    expect(markup).toContain('>Open full hierarchy</button>');
     expect(markup).toContain('>Expand</button>');
   });
 

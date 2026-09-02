@@ -208,8 +208,8 @@ export const GraphFilters = memo(function GraphFilters({
             </label>
             {rendererMode === 'global' ? (
               <p className="graph-filter-note">
-                Global always displays files only. Entity and heading controls
-                remain saved for Structure.
+                All Network always displays files only. Entity and heading
+                controls remain saved for Hierarchy.
               </p>
             ) : (
               <>
@@ -283,8 +283,8 @@ export const GraphFilters = memo(function GraphFilters({
                     className="visually-hidden"
                     id="heading-depth-description"
                   >
-                    Limits sections by literal Markdown heading level. Structure
-                    separately controls how many section-tree levels are
+                    Limits sections by literal Markdown heading level. Hierarchy
+                    depth separately controls how many section-tree levels are
                     automatically visible.
                   </span>
                 </label>

@@ -61,7 +61,7 @@ describe('graph Filters controls', () => {
     expect(markup).toContain('<option value="" selected="">No limit</option>');
     expect(markup).toContain('<option value="6">######</option>');
     expect(markup).toContain(
-      'Limits sections by literal Markdown heading level. Structure separately controls how many section-tree levels are automatically visible.',
+      'Limits sections by literal Markdown heading level. Hierarchy depth separately controls how many section-tree levels are automatically visible.',
     );
     expect(markup).toContain('<legend>Reference Status</legend>');
     expect(markup).toContain('>Advanced query<');

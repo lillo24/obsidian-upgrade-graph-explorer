@@ -13,7 +13,8 @@ describe('Local renderer lifecycle', () => {
 
     expect(result).toEqual({
       ok: false,
-      message: 'Local Free WebGL initialization failed: WebGL is unavailable',
+      message:
+        'Focus Network WebGL initialization failed: WebGL is unavailable',
     });
   });
 

@@ -260,6 +260,37 @@ export function returnToPresentationInGraphHistory(
   };
 }
 
+/** Jumps to the most recent unfocused All checkpoint, preserving history. */
+export function returnToAllInGraphHistory(
+  history: GraphNavigationHistory,
+  current: GraphHistoryCheckpoint,
+): GraphHistoryTraversal | null {
+  let targetIndex = -1;
+  for (let index = history.past.length - 1; index >= 0; index -= 1) {
+    const checkpoint = history.past[index];
+    if (
+      checkpoint !== undefined &&
+      checkpoint.presentationMode !== 'local' &&
+      checkpoint.state.focus === undefined
+    ) {
+      targetIndex = index;
+      break;
+    }
+  }
+  if (targetIndex < 0) return null;
+  const target = history.past[targetIndex];
+  if (target === undefined) return null;
+  const skipped = history.past.slice(targetIndex + 1);
+  let future = appendBounded(history.future, current);
+  for (const checkpoint of [...skipped].reverse()) {
+    future = appendBounded(future, checkpoint);
+  }
+  return {
+    target,
+    history: { past: history.past.slice(0, targetIndex), future },
+  };
+}
+
 export function graphHistoryActionPolicy(
   action: GraphStateAction,
 ): GraphHistoryActionPolicy {

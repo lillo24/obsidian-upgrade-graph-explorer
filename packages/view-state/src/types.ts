@@ -89,6 +89,7 @@ export type ViewRestoreIssueCode =
   | 'unknown-expanded-entity'
   | 'unknown-collapsed-entity'
   | 'conflicting-disclosure-state'
+  | 'legacy-local-root-expansion-removed'
   | 'focus-root-missing'
   | 'path-filter-no-longer-matches'
   | 'viewport-anchor-missing';

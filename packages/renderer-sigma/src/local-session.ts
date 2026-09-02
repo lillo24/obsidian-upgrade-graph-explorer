@@ -73,12 +73,15 @@ export class LocalRendererSession {
   private neighborhoods: ReadonlyMap<string, ReadonlySet<string>>;
   private hoveredNode: string | undefined;
   private selectedNode: string | undefined;
+  private pendingViewportAnchorNodeKey: string | undefined;
   private visualLod: LocalVisualLod;
   private visualGroupStyles: VisualGroupPresentationMap | undefined;
   private trackpadZoomMode: LocalTrackpadZoomMode;
   private readonly options: LocalRendererSessionOptions;
   private precisionWheelIdleTimer: number | undefined;
   private viewportObservationTimer: number | undefined;
+  private topologyRefreshPending: Promise<void> | undefined;
+  private visualStyleRefreshPending = false;
   private destroyed = false;
   private readonly wheelDirection = new WheelDirectionStabilizer();
 
@@ -277,6 +280,17 @@ export class LocalRendererSession {
   setVisualGroupStyles(styles?: VisualGroupPresentationMap): void {
     this.visualGroupStyles = styles;
     this.options.instrumentation?.count('local-style-updates');
+    if (this.topologyRefreshPending !== undefined) {
+      // A projection update has already changed Graphology, but Sigma has not
+      // indexed the new nodes yet. Coalesce the style repaint behind that
+      // process/render boundary so partial repaint never targets stale indices.
+      this.visualStyleRefreshPending = true;
+      return;
+    }
+    this.refreshVisualGroupStyles();
+  }
+
+  private refreshVisualGroupStyles(): void {
     // Sigma 3 applies node reducers during refresh, not a render-only pass.
     // Repaint existing nodes without rebuilding its node/edge indices.
     this.renderer.refresh({
@@ -287,7 +301,9 @@ export class LocalRendererSession {
   }
 
   update(input: LocalRendererInput): LocalGraphReconciliation {
-    const anchorKey = this.viewportAnchorNodeKey();
+    const anchorKey =
+      this.pendingViewportAnchorNodeKey ?? this.viewportAnchorNodeKey();
+    this.pendingViewportAnchorNodeKey = undefined;
     const anchor = this.nodeViewportPoint(anchorKey);
     const ratio = this.renderer.getCamera().ratio;
     const run = () => reconcileLocalGraph(this.graph, input);
@@ -310,7 +326,7 @@ export class LocalRendererSession {
     }
     const changed = Object.values(result).some((count) => count > 0);
     if (changed) {
-      void refreshLocalRendererWithAnchor(
+      const refresh = refreshLocalRendererWithAnchor(
         {
           afterProcess: (callback) =>
             this.renderer.once('afterProcess', callback),
@@ -324,6 +340,14 @@ export class LocalRendererSession {
           }
         },
       );
+      this.topologyRefreshPending = refresh;
+      void refresh.then(() => {
+        if (this.topologyRefreshPending !== refresh) return;
+        this.topologyRefreshPending = undefined;
+        if (!this.visualStyleRefreshPending || this.destroyed) return;
+        this.visualStyleRefreshPending = false;
+        this.refreshVisualGroupStyles();
+      });
     }
     return result;
   }
@@ -427,7 +451,22 @@ export class LocalRendererSession {
     const display = this.renderer.getNodeDisplayData(key);
     return display === undefined
       ? undefined
-      : this.renderer.framedGraphToViewport({ x: display.x, y: display.y });
+      : this.renderer.framedGraphToViewport(
+          { x: display.x, y: display.y },
+          {
+            // A topology refresh can anchor the camera during afterProcess.
+            // Recompute instead of trusting Sigma's cached matrix so a
+            // cross-renderer handoff observes the frame that was drawn.
+            cameraState: this.renderer.getCamera().getState(),
+            graphDimensions: this.renderer.getGraphDimensions(),
+          },
+        );
+  }
+
+  stageNodeAnchor(key: string): boolean {
+    if (!this.graph.hasNode(key)) return false;
+    this.pendingViewportAnchorNodeKey = key;
+    return true;
   }
 
   anchorRootAtViewport(point: LocalViewportPoint, ratio?: number): void {

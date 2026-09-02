@@ -5,6 +5,7 @@ import {
   revealEntityInViewState,
   type ProjectionNodeId,
   type ProjectionWorkspace,
+  type StructuralDepth,
   type ViewProjection,
   type ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
@@ -24,25 +25,32 @@ function localPlan(
   state: ViewProjectionState,
   entityId: EntityId,
   announcement: string,
+  revealHiddenExact: boolean,
 ): LocalNavigationPlan {
   let localState = deriveLocalProjectionState(workspace, state, entityId);
   const target = workspace.requireEntity(entityId);
-  if (target.kind !== 'document') {
+  if (target.kind !== 'document' && revealHiddenExact) {
     localState = revealEntityInViewState(workspace, localState, entityId);
   }
   const projection = projectLocalView(workspace, localState);
-  const node = projection.nodes.find(
+  const exactNode = projection.nodes.find(
     (candidate) =>
       candidate.kind === 'entity' && candidate.entityId === entityId,
   );
-  if (node === undefined) {
+  const rootEntityId = localState.focus?.rootEntityId;
+  const node =
+    exactNode ??
+    projection.nodes.find(
+      (candidate) =>
+        candidate.kind === 'entity' && candidate.entityId === rootEntityId,
+    );
+  if (node === undefined || node.kind !== 'entity') {
     throw new Error(
-      `Local navigation could not project canonical target "${entityId}".`,
+      `Focus navigation could not project canonical target "${entityId}".`,
     );
   }
-  const rootEntityId = localState.focus?.rootEntityId;
   if (rootEntityId === undefined) {
-    throw new Error('Local navigation produced no document root.');
+    throw new Error('Focus navigation produced no document root.');
   }
   return {
     state: localState,
@@ -57,12 +65,23 @@ export function planLocalEntry(
   workspace: ProjectionWorkspace,
   state: ViewProjectionState,
   entityId: EntityId,
+  depth: StructuralDepth,
 ): LocalNavigationPlan {
+  const freshFocusState: ViewProjectionState = {
+    disclosure: {
+      ...state.disclosure,
+      defaultDepth: depth,
+      expandedEntityIds: [],
+      collapsedEntityIds: [],
+    },
+    ...(state.filters === undefined ? {} : { filters: state.filters }),
+  };
   return localPlan(
     workspace,
-    state,
+    freshFocusState,
     entityId,
-    'Opened the bounded Local Free context.',
+    'Opened bounded Focus.',
+    false,
   );
 }
 
@@ -77,6 +96,7 @@ export function planLocalEntityNavigation(
     workspace,
     revealed.state,
     entityId,
-    `Stayed in Local. ${revealed.announcement}`,
+    `Stayed in Focus. ${revealed.announcement}`,
+    true,
   );
 }

@@ -141,8 +141,8 @@ export function GlobalGraphCanvas({
   const [layoutCommitKey, setLayoutCommitKey] = useState(0);
   const [layoutStatus, setLayoutStatus] = useState(
     initial.cached
-      ? 'Global layout restored from the in-memory cache.'
-      : 'Preparing Global layout…',
+      ? 'All Network layout restored from the in-memory cache.'
+      : 'Preparing All Network layout…',
   );
   const [layoutError, setLayoutError] = useState<string>();
 
@@ -249,7 +249,9 @@ export function GlobalGraphCanvas({
           if (cancelled) return;
           layoutPending.current = false;
           setLayoutError(undefined);
-          setLayoutStatus('Global layout restored from the in-memory cache.');
+          setLayoutStatus(
+            'All Network layout restored from the in-memory cache.',
+          );
           setLayoutCommitKey((current) => current + 1);
         })
         .catch((error: unknown) => {
@@ -263,7 +265,7 @@ export function GlobalGraphCanvas({
     queueMicrotask(() => {
       if (cancelled) return;
       setLayoutError(undefined);
-      setLayoutStatus('Refining Global layout in the background…');
+      setLayoutStatus('Refining All Network layout in the background…');
     });
     const request = session.createLayoutRequest(
       input,
@@ -295,10 +297,10 @@ export function GlobalGraphCanvas({
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        const message = `Global layout failed: ${errorMessage(error)}`;
+        const message = `All Network layout failed: ${errorMessage(error)}`;
         layoutPending.current = false;
         setLayoutError(message);
-        setLayoutStatus('The last valid Global positions remain visible.');
+        setLayoutStatus('The last valid All Network positions remain visible.');
         setLayoutCommitKey((current) => current + 1);
       });
     return () => {
@@ -357,7 +359,7 @@ export function GlobalGraphCanvas({
     <div className="global-graph-canvas">
       <div className="global-graph-canvas__surface" ref={containerRef} />
       <div
-        aria-label="Global canvas controls"
+        aria-label="All Network canvas controls"
         className="global-graph-canvas__controls"
         role="group"
       >

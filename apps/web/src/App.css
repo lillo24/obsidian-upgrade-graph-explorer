@@ -299,6 +299,20 @@ h2 {
   text-transform: uppercase;
 }
 
+.control-group > .focus-root-label,
+.control-group > .depth-custom-indicator {
+  color: #3d5b68;
+  font-size: 0.68rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.control-group > .depth-custom-indicator {
+  padding: 0.2rem 0.4rem;
+  border-radius: 999px;
+  background: #dce9ed;
+}
+
 .control-group label {
   display: inline-flex;
   gap: 0.35rem;

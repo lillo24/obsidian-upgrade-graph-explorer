@@ -88,8 +88,16 @@ describe('graph-first explorer shell', () => {
     expect(markup).toContain(
       'aria-label="Forward in graph history" disabled=""',
     );
-    expect(markup).toContain('aria-label="Structural depth"');
-    expect(markup).toContain('>Structure depth<select');
+    expect(markup).toContain('aria-label="Scope"');
+    expect(markup).toContain(
+      '<button aria-pressed="true" type="button">All</button>',
+    );
+    expect(markup).toContain('aria-label="Layout"');
+    expect(markup).toContain(
+      '<button aria-pressed="true" type="button">Hierarchy</button>',
+    );
+    expect(markup).toContain('aria-label="Hierarchy depth"');
+    expect(markup).toContain('>Hierarchy depth<select');
     expect(markup).toContain('>Files only</option>');
     expect(markup).toContain('>1 level</option>');
     expect(markup).toContain('>2 levels</option>');
@@ -327,7 +335,7 @@ describe('graph-first explorer shell', () => {
       </GraphSettings>,
     );
     expect(settingsMarkup).toContain('>Graph Appearance</h3>');
-    expect(settingsMarkup).toContain('>Global Layout</h3>');
+    expect(settingsMarkup).toContain('>All Network Layout</h3>');
     expect(settingsMarkup).toContain('>Folder clustering</strong>');
     expect(settingsMarkup).toContain('<legend>Spacing</legend>');
     expect(settingsMarkup).toContain('data-graph-history-shortcuts="off"');
@@ -379,7 +387,7 @@ describe('graph-first explorer shell', () => {
     expect(persistedMarkup).toContain('data-focus-appearance="inverted"');
   });
 
-  it('restores Global lazily while keeping Structure controls out of its topology', () => {
+  it('restores All Network lazily while keeping hierarchy depth out of its topology', () => {
     const workspace = createProjectionWorkspace(report.snapshot);
     const persisted = serializePersistedWorkspaceView(
       createPersistedWorkspaceView({
@@ -411,10 +419,13 @@ describe('graph-first explorer shell', () => {
     );
 
     expect(markup).toContain(
-      '<button aria-pressed="true" type="button">Global</button>',
+      '<button aria-pressed="true" type="button">All</button>',
     );
-    expect(markup).toContain('Loading Global overview…');
-    expect(markup).not.toContain('aria-label="Structural depth"');
+    expect(markup).toContain(
+      '<button aria-pressed="true" type="button">Network</button>',
+    );
+    expect(markup).toContain('Loading All Network…');
+    expect(markup).not.toContain('aria-label="Hierarchy depth"');
   });
 
   it('restores an explicit Local presentation lazily with scale-up recovery controls', () => {
@@ -459,19 +470,67 @@ describe('graph-first explorer shell', () => {
     );
 
     expect(markup).toContain(
-      '<button aria-pressed="true" type="button">Local</button>',
+      '<button aria-pressed="true" type="button">Focus</button>',
     );
-    expect(markup).toContain('Loading Local Free…');
-    expect(markup).toContain('aria-label="Local layout"');
+    expect(markup).toContain('Loading Focus Network…');
+    expect(markup).toContain('aria-label="Layout"');
     expect(markup).toContain(
-      '<button aria-pressed="true" type="button">Free</button>',
+      '<button aria-pressed="true" type="button">Network</button>',
     );
     expect(markup).toContain(
-      '<button aria-pressed="false" type="button">Structured</button>',
+      '<button aria-pressed="false" type="button">Hierarchy</button>',
     );
-    expect(markup).toContain('>Back to Global</button>');
-    expect(markup).toContain('>Open in Structure</button>');
-    expect(markup).not.toContain('aria-label="Structural depth"');
+    expect(markup).toContain('aria-label="Hierarchy depth"');
+    expect(markup).not.toContain('>Back to Global</button>');
+    expect(markup).not.toContain('>Open in Structure</button>');
+  });
+
+  it('restores a legacy focused Structure checkpoint as Focus Hierarchy', () => {
+    const workspace = createProjectionWorkspace(report.snapshot);
+    const root = report.snapshot.entities.find(
+      ({ kind }) => kind === 'document',
+    )!;
+    const persisted = serializePersistedWorkspaceView(
+      createPersistedWorkspaceView({
+        workspace,
+        state: {
+          ...documentOnlyProjectionState(),
+          focus: {
+            rootEntityId: root.id,
+            hops: 1,
+            direction: 'both',
+            hierarchyContext: 'ancestors-and-children',
+          },
+        },
+        presentationMode: 'structure',
+      }),
+    );
+    const markup = renderToStaticMarkup(
+      <GraphExplorer
+        identityStability="stable"
+        maximized={false}
+        onMaximizedChange={() => undefined}
+        snapshot={report.snapshot}
+        storage={{
+          ...storage,
+          getItem: (key) =>
+            key === GRAPH_PREFERENCES_STORAGE_KEY
+              ? '{"localLayoutMode":"free"}'
+              : persisted,
+        }}
+      />,
+    );
+
+    expect(markup).toContain(
+      '<button aria-pressed="true" type="button">Focus</button>',
+    );
+    expect(markup).toContain(
+      '<button aria-pressed="true" type="button">Hierarchy</button>',
+    );
+    expect(markup).toContain('Loading Focus Hierarchy…');
+    expect(markup).toContain(
+      'The saved focused hierarchy was restored as Focus with Hierarchy layout.',
+    );
   });
 
   it('restores Local Structured from the existing preference and keeps projection work isolated', () => {
@@ -524,9 +583,9 @@ describe('graph-first explorer shell', () => {
     );
     const operations = performance.snapshot().operations;
 
-    expect(markup).toContain('Loading Local Structured…');
+    expect(markup).toContain('Loading Focus Hierarchy…');
     expect(markup).toContain(
-      '<button aria-pressed="true" type="button">Structured</button>',
+      '<button aria-pressed="true" type="button">Hierarchy</button>',
     );
     expect(operations['local-projections']).toBe(1);
     expect(operations['global-projections']).toBe(0);

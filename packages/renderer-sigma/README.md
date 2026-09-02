@@ -117,8 +117,8 @@ Sigma 3.0.3 also applies camera zoom after a node double-click unless the
 renderer event prevents its default. Global consumes every node double-click at
 that event seam, invokes the application-neutral activation callback only for a
 canonical document node, and leaves diagnostic nodes inert. The web boundary
-maps document activation to its existing Open Local/history/transition-anchor
-pipeline; Sigma never learns presentation modes or Local navigation policy.
+maps document activation to the shared Focus/history/transition-anchor
+pipeline; Sigma never learns presentation modes or Focus navigation policy.
 
 Stable projected IDs are Graphology keys. Live/filter changes reconcile nodes
 and edges in place, preserve surviving positions and selection, seed additions
@@ -138,10 +138,11 @@ lazy-module failure must be reported to the application, which keeps Structure
 usable for the session. Layout failure keeps the last valid positions visible
 and reports an explicit error.
 
-## Local Free contract
+## Focus Network contract (internal Local Free)
 
-Local maps files, headings, blocks, and diagnostic targets without weakening
-Global's documents-only invariant. The root seed and every refined result are
+Focus Network maps files, headings, blocks, and diagnostic targets without
+weakening All Network's documents-only invariant. The root seed and every
+refined result are
 normalized to graph origin. A transient Global viewport point may place that
 root on entry; refinement captures and restores the root's screen position.
 Missing capture falls back to semantic centering. Exact cached positions and
@@ -163,7 +164,10 @@ use the accent; diagnostic colors and all edges remain unchanged. Root/LOD,
 hover, selection, and deemphasis stay authoritative. A style-map update uses
 the Local session's style-only setter and cannot reproject, reconcile topology,
 change positions, request Local ForceAtlas2, or touch Global layout. GROUP1B
-user-facing configuration is pending.
+user-facing configuration is pending. When projection and style-map updates
+arrive in the same commit, the style-only repaint is queued behind Sigma's
+topology process/render boundary so it cannot target node indices that do not
+exist yet.
 
 Local hop and direction changes preserve the current camera rather than
 requesting Fit. Their topology may naturally change around the anchored node,
@@ -172,11 +176,16 @@ anchors and explicit Fit requests are one-shot intents: the canvas reports
 them consumed after mount so a later Local remount or graph-history traversal
 cannot replay stale camera work.
 
-KG13B2B keeps this package as the Free owner while React Flow owns Structured.
+KG13B2B keeps this package as the internal Free owner while React Flow owns the
+internal Structured presentation. Product controls call these Focus Network
+and Focus Hierarchy.
 The Local canvas now exposes a narrow runtime `nodeViewportPoint` query and can
 mount an arbitrary projected node at a supplied screen point. That is the only
 cross-renderer seam: no Sigma instance, normalized graph coordinate, camera,
-or position cache crosses into application or persisted state. Free viewport
+or position cache crosses into application or persisted state. The query
+recomputes Sigma's framed-to-viewport transform from the live camera and graph
+dimensions because topology anchoring can make the renderer's cached matrix
+one frame older than the pixels already drawn. Free viewport
 observations continue to update `freeRatio` while the application preserves
 the sibling `structuredZoom` bookmark. Future manual cluster offsets, Saved
 Views, QUERY1 evolution, and GROUP1 remain separate product layers.

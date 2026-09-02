@@ -99,8 +99,12 @@ W3. A worker failure keeps seed/cached geometry and shows a warning instead of
 using the standard grid fallback or switching presentation.
 
 The optional runtime transition API exposes only one projected node's viewport
-point. It preserves the selected node, or Local root, across Free/Structured
-mounts and during Structured topology/refinement adoption. Renderer instances,
+point. It preserves the selected node, or Focus root, across the product's
+Network/Hierarchy switch (the internal Free/Structured mounts) and during
+structured topology/refinement adoption. The point comes from the visible DOM
+card center when available, with measured React Flow bounds as the fallback;
+same-instance depth changes stage that anchor before the new topology arrives.
+Renderer instances,
 graph coordinates, and screen points never enter persisted state. Structured
 semantic observation reports only canonical entity anchor plus React Flow zoom.
 
