@@ -19,6 +19,7 @@ import type {
 } from '@icarus-graph-explorer/core';
 import type { DiagnosticIdentityStability } from '@icarus-graph-explorer/diagnostics-obsidian';
 import { createInspectionWorkspace } from '@icarus-graph-explorer/explorer-inspection';
+import { listExactPathExclusions } from '@icarus-graph-explorer/graph-query';
 import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performance';
 import {
   GraphCanvas,
@@ -165,6 +166,7 @@ import type {
   SemanticLocalStructuredViewport,
 } from './LocalStructuredGraphView';
 import { useWorkerServiceDisposal } from './use-worker-service-disposal';
+import { useGraphQueryDraft } from './use-graph-query-draft';
 
 interface ProjectionSuccess {
   readonly ok: true;
@@ -787,7 +789,8 @@ export function GraphExplorer({
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const inspectorToolbarRef = useRef<HTMLButtonElement>(null);
   const inspectorHandleRef = useRef<HTMLButtonElement>(null);
-  const inspectorRestoreTarget = useRef<HTMLButtonElement | null>(null);
+  const inspectorRestoreTarget = useRef<HTMLElement | null>(null);
+  const [inspectorFocusRequestKey, setInspectorFocusRequestKey] = useState(0);
   const [networkExplorerOpen, setNetworkExplorerOpen] = useState(false);
   const [networkExplorerExpandedNodeIds, setNetworkExplorerExpandedNodeIds] =
     useState<ReadonlySet<ProjectionNodeId>>(() => new Set());
@@ -1930,9 +1933,57 @@ export function GraphExplorer({
     },
     [commitGraphDestination, commitHistoryGraphAction],
   );
+  const commitQuery = useCallback(
+    (query: string | undefined) => {
+      void commitHistoryGraphAction({
+        type: 'set-query',
+        query: query ?? null,
+      });
+    },
+    [commitHistoryGraphAction],
+  );
+  const queryEditor = useGraphQueryDraft(
+    activeViewState.filters?.query,
+    commitQuery,
+  );
+  const { adoptQuery, mutateExactPath } = queryEditor;
+  const hiddenFileResult = useMemo(
+    () => listExactPathExclusions(activeViewState.filters?.query),
+    [activeViewState.filters?.query],
+  );
+  const focusedSourcePath =
+    activeViewState.focus === undefined
+      ? undefined
+      : projectionWorkspace.entity(activeViewState.focus.rootEntityId)?.source
+          .path;
+  const restoreNetworkFile = useCallback(
+    (path: string) => {
+      mutateExactPath(path, 'remove');
+    },
+    [mutateExactPath],
+  );
+  const hideNetworkFile = useCallback(
+    (path: string) => {
+      if (
+        path === focusedSourcePath ||
+        !hiddenFileResult.ok ||
+        hiddenFileResult.paths.includes(path) ||
+        !networkExplorerModel?.nodes.some((node) => node.sourcePath === path)
+      )
+        return;
+      mutateExactPath(path, 'add');
+    },
+    [
+      focusedSourcePath,
+      hiddenFileResult,
+      mutateExactPath,
+      networkExplorerModel,
+    ],
+  );
   const applySavedFilter = useCallback(
     (query: string) => {
       const committed = commitHistoryGraphAction({ type: 'set-query', query });
+      adoptQuery(query);
       setNavigationError(undefined);
       setNavigationAnnouncement(
         committed
@@ -1940,7 +1991,7 @@ export function GraphExplorer({
           : 'That Saved Filter query is already active.',
       );
     },
-    [commitHistoryGraphAction],
+    [adoptQuery, commitHistoryGraphAction],
   );
   const saveCurrentQuery = useCallback(
     (name: string): string | undefined => {
@@ -2388,6 +2439,20 @@ export function GraphExplorer({
       requestGlobalSemanticCenter,
       requestLocalSemanticCenter,
     ],
+  );
+  const inspectNetworkExplorerNode = useCallback(
+    (nodeId: ProjectionNodeId, origin: HTMLElement | null) => {
+      if (networkExplorerModel?.nodeById.has(nodeId) !== true) return;
+      setSelection((current) =>
+        retainGraphSelection(current, { kind: 'node', id: nodeId }),
+      );
+      inspectorRestoreTarget.current = origin;
+      mostRecentlyOpenedDrawer.current = 'inspector';
+      if (narrowGraphWorkspace) setNetworkExplorerOpen(false);
+      setInspectorFocusRequestKey((current) => current + 1);
+      setInspectorOpen(true);
+    },
+    [narrowGraphWorkspace, networkExplorerModel],
   );
   const changeRendererMode = useCallback(
     (nextMode: GraphPresentationMode) => {
@@ -2884,6 +2949,15 @@ export function GraphExplorer({
     (entityId: EntityId) => navigateToEntity(entityId, 'Focus'),
     [navigateToEntity],
   );
+  const focusNetworkExplorerNode = useCallback(
+    (nodeId: ProjectionNodeId) => {
+      const entityId = networkExplorerModel?.nodeById.get(nodeId)?.entityId;
+      if (entityId === undefined) return;
+      if (rendererModeRef.current === 'global') enterFocusScope(entityId);
+      else navigateToEntity(entityId, 'Focus');
+    },
+    [enterFocusScope, navigateToEntity, networkExplorerModel],
+  );
 
   function changeHierarchyDepth(depth: 0 | 1 | 2 | 3): void {
     if (rendererModeRef.current !== 'local') {
@@ -3191,6 +3265,8 @@ export function GraphExplorer({
               </div>
             ) : null}
             <GraphFilters
+              queryEditor={queryEditor}
+              queryInNetworkExplorer={networkLayoutActive}
               contained={maximized}
               onAction={applyGraphAction}
               onApplySavedFilter={applySavedFilter}
@@ -3564,6 +3640,20 @@ export function GraphExplorer({
           networkExplorerModel !== undefined &&
           networkExplorerVisible ? (
             <NetworkExplorer
+              queryEditor={{
+                ...queryEditor,
+                queryIssue:
+                  queryEditor.queryIssue ??
+                  (hiddenFileResult.ok
+                    ? undefined
+                    : 'Hidden files could not be read from the applied QUERY1 expression.'),
+              }}
+              hiddenPaths={hiddenFileResult.ok ? hiddenFileResult.paths : []}
+              focusedSourcePath={focusedSourcePath}
+              onRestoreFile={restoreNetworkFile}
+              onFocusNode={focusNetworkExplorerNode}
+              onInspectNode={inspectNetworkExplorerNode}
+              onHideFile={hideNetworkFile}
               expandedNodeIds={networkExplorerExpandedNodeIds}
               model={networkExplorerModel}
               onClose={closeNetworkExplorer}
@@ -3586,6 +3676,7 @@ export function GraphExplorer({
           ) : null}
           {inspectorOpen ? (
             <ProvenanceInspector
+              focusRequestKey={inspectorFocusRequestKey}
               onClear={clearSelection}
               onClose={closeInspector}
               onNavigate={navigateToEntity}

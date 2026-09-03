@@ -980,8 +980,7 @@ h2 {
   border-bottom: 1px solid #dbe3e7;
 }
 
-.network-explorer__heading h3,
-.network-explorer__heading p {
+.network-explorer__heading h3 {
   margin: 0;
 }
 
@@ -993,16 +992,26 @@ h2 {
   text-transform: uppercase;
 }
 
-.network-explorer__heading p {
-  margin-top: 0.15rem;
-  color: #627985;
-  font-size: 0.7rem;
-  font-weight: 700;
+.network-explorer__close {
+  display: grid;
+  width: 2.25rem;
+  min-height: 2.25rem;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid #b9cbd3;
+  border-radius: 0.6rem;
+  color: #395966;
+  background: #edf4f6;
+  font-size: 1.35rem;
+  cursor: pointer;
+  place-items: center;
+  touch-action: manipulation;
 }
 
-.network-explorer__heading button {
-  min-height: 2.25rem;
-  padding: 0.35rem 0.6rem;
+.network-explorer__close:hover {
+  border-color: #6e929e;
+  color: #103f4b;
+  background: #dceff0;
 }
 
 .network-explorer__empty {
@@ -1021,6 +1030,171 @@ h2 {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+}
+
+.network-explorer__controls {
+  min-height: 0;
+  /* Reserve the drawer heading and at least one 56px virtual row. */
+  max-height: min(50%, max(0px, calc(100% - 8rem)));
+  flex: 0 1 auto;
+  overflow-y: auto;
+  border-bottom: 1px solid #dbe3e7;
+  overscroll-behavior: contain;
+}
+
+.network-explorer__query {
+  padding: 0.55rem 0.75rem;
+}
+
+.network-explorer .advanced-graph-query--compact {
+  gap: 0.4rem;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.network-explorer .advanced-graph-query--compact textarea {
+  min-height: 3.5rem;
+  max-height: 7rem;
+}
+
+.network-explorer .advanced-graph-query__actions {
+  flex-flow: row wrap;
+}
+
+.network-explorer .advanced-graph-query__actions button {
+  min-height: 2.25rem;
+  width: auto;
+}
+
+.network-explorer .advanced-graph-query__actions {
+  justify-content: space-between;
+  color: #526b78;
+  font-size: 0.7rem;
+}
+
+.network-explorer .advanced-graph-query__icon-actions {
+  display: grid;
+  flex: 0 0 2rem;
+  grid-template-rows: repeat(2, 1fr);
+  gap: 0.25rem;
+}
+
+.network-explorer .advanced-graph-query__icon-actions button {
+  display: grid;
+  width: 2rem;
+  min-height: 1.625rem;
+  padding: 0.1rem;
+  background: #edf4f6;
+  place-items: center;
+}
+
+.network-explorer
+  .advanced-graph-query__icon-actions
+  button:hover:not(:disabled) {
+  border-color: #6e929e;
+  background: #dceff0;
+}
+
+.advanced-graph-query__icon-actions svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.network-explorer__hidden {
+  padding: 0 0.75rem 0.55rem;
+}
+
+.network-explorer__hidden-chips {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.network-explorer__hidden-chips button {
+  display: inline-flex;
+  /* A long path still leaves room for the same-row disclosure. */
+  max-width: calc(100% - 3.5rem);
+  min-height: 2rem;
+  flex: 0 0 auto;
+  gap: 0.35rem;
+  align-items: center;
+  padding: 0.25rem 0.45rem;
+  border: 1px solid #99acb6;
+  border-radius: 0.5rem;
+  color: #1c3d4c;
+  background: #fff;
+  font-size: 0.7rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.network-explorer__chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.network-explorer__hidden-chips .network-explorer__chips-disclosure {
+  min-width: 3rem;
+  justify-content: center;
+}
+
+/* Keep intrinsic widths measurable without exposing collapsed chips to focus. */
+.network-explorer__chip--overflow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.network-explorer__hidden-chips button:hover {
+  background: #e5eff4;
+}
+
+.network-explorer-menu {
+  position: fixed;
+  z-index: 150;
+  display: grid;
+  width: min(16rem, calc(100vw - 1rem));
+  max-height: calc(100dvh - 1rem);
+  overflow-y: auto;
+  padding: 0.3rem;
+  border: 1px solid #99acb6;
+  border-radius: 0.5rem;
+  background: #fff;
+  box-shadow: 0 0.5rem 2rem rgb(16 35 45 / 25%);
+}
+
+.network-explorer-menu button {
+  min-height: 2.5rem;
+  padding: 0.5rem;
+  border: 0;
+  border-radius: 0.25rem;
+  color: #203f4d;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.network-explorer-menu button:hover:not(:disabled),
+.network-explorer-menu button:focus-visible {
+  background: #e5eff4;
+}
+
+.network-explorer-menu button:disabled {
+  color: #657781;
+  cursor: not-allowed;
+}
+
+.network-explorer-menu small {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  line-height: 1.4;
 }
 
 .network-explorer__virtual-space {
@@ -1117,8 +1291,7 @@ h2 {
   gap: 0.12rem;
 }
 
-.network-explorer__row-title,
-.network-explorer__row-secondary {
+.network-explorer__row-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1129,21 +1302,8 @@ h2 {
   font-weight: 800;
 }
 
-.network-explorer__row-secondary {
-  color: #647c87;
-  font-size: 0.65rem;
-  font-weight: 650;
-}
-
-.network-explorer__badges {
-  display: flex;
-  max-width: 7rem;
-  flex-wrap: wrap;
-  gap: 0.2rem;
-  justify-content: flex-end;
-}
-
 .network-explorer__badge {
+  flex: 0 0 auto;
   overflow: hidden;
   max-width: 6.5rem;
   padding: 0.1rem 0.3rem;
@@ -1826,6 +1986,14 @@ h2 {
   line-height: 1.45;
 }
 
+.advanced-graph-query__input-row {
+  display: flex;
+  min-width: 0;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
 .advanced-graph-query button,
 .saved-graph-filters button {
   min-height: 2.75rem;
@@ -1854,6 +2022,7 @@ h2 {
 
 .saved-graph-filters {
   display: grid;
+  grid-column: 1 / -1;
   min-width: 0;
   gap: 0.6rem;
   padding: 0.75rem;

@@ -93,7 +93,10 @@ export class LocalRendererSession {
     if (lod !== this.visualLod) {
       this.visualLod = lod;
       this.options.instrumentation?.count('local-style-updates');
-      this.renderer.scheduleRender();
+      // Sigma 3 caches reducer output. Apply zoom-detail visibility now, not
+      // on the next Hide/projection refresh, and restore it when zooming in.
+      // This is renderer-only work at LOD boundaries, never a new layout.
+      this.renderer.scheduleRefresh();
       this.options.instrumentation?.record(
         'local-visual-lod',
         performance.now() - started,
@@ -172,7 +175,6 @@ export class LocalRendererSession {
       nodeReducer: (key, attributes) => this.reduceNode(key, attributes),
       edgeReducer: (key, attributes) => this.reduceEdge(key, attributes),
     });
-    this.visualLod = resolveLocalVisualLod(this.renderer.getCamera().ratio);
     if (options.initialViewportPoint !== undefined) {
       this.anchorNodeAtViewport(
         options.initialViewportNodeKey ?? this.rootNodeKey,
@@ -191,6 +193,7 @@ export class LocalRendererSession {
         );
       }
     }
+    this.visualLod = resolveLocalVisualLod(this.renderer.getCamera().ratio);
     const mountMs = Number((performance.now() - mountStarted).toFixed(3));
     this.renderer.getMouseCaptor().on('wheel', this.precisionWheelHandler);
     this.renderer.getCamera().on('updated', this.cameraUpdatedHandler);

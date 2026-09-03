@@ -146,6 +146,16 @@ schedules one partial node reducer refresh without Graphology reconciliation,
 index rebuilding, coordinate or size changes, folder/degree changes,
 fingerprint changes, or a Global worker request.
 
+Crossing a camera LOD boundary refreshes Sigma's reducer caches (including edge
+visibility and its label/program indices), not merely its draw pass. Otherwise
+zoom styling stays stale until a later Hide or query update and can make
+unrelated edges appear to disappear together. Both Network sessions initialize
+LOD after restoring the initial camera; within-band zoom and pan do not trigger
+this refresh. The existing far-scale edge suppression thresholds are unchanged,
+and zooming back in restores reference lines without needing a query/layout
+change. This renderer-only refresh does not change canonical/projection data,
+Graphology topology, positions, or the worker layout fingerprint.
+
 Networks with 1–12 visible nodes force their document labels through Sigma's
 ordinary density culling so filtered and synthetic results remain legible at
 the default camera ratio. Larger graphs retain the existing semantic-zoom label

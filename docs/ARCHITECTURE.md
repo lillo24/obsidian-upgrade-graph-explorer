@@ -657,6 +657,27 @@ it may coexist with Inspector above 900 px, while the last-opened drawer wins at
 the existing narrow breakpoint. Drawer, expansion, active-row, and scroll state
 are memory-only and absent from schema v3.
 
+KG14B3 adds QUERY1 and contextual actions to that projection companion. The
+single applied formula remains `ViewProjectionState.filters.query`; the shared
+controlled editor appears in Network Explorer for Network and Filters for
+Hierarchy. Its transient controller stays at GraphExplorer level. Clean drafts
+follow external/history updates, dirty drafts survive placement changes, Saved
+Filter Apply intentionally adopts its formula, and Reset draft mutates no graph
+state. There is no new persisted hidden-files array or schema version.
+
+Hidden chips are the KG14B1 global exact-path exclusion list, not source-inventory
+state. A pure planner applies add/remove independently to the active query and a
+valid dirty draft before either is adopted. Parse/limit failures block both;
+each successful semantic mutation uses one normal set-query history checkpoint.
+No chip operation centers or fits the returning graph. One contextual menu
+normalizes both row kinds through the current model, uses canonical entity/path
+metadata, and is invalidated by virtual scrolling or projection replacement.
+Focus calls the existing All entry or Local navigation pipeline. Inspect changes
+controlled selection and opens the existing responsive Inspector without layout
+or history work. Hide file is unavailable for diagnostics, the focused source
+file (including its headings/blocks), and already-excluded paths. Menu open/close
+does not project, inspect canonical workspaces, or call Sigma.
+
 Focus is a source-neutral two-pass projection. A documents-only,
 prefiltered hop traversal first fixes file membership from the containing
 document of the exact Focus root. A second pass applies full filters and precise

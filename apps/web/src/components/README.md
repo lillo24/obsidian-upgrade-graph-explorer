@@ -90,8 +90,9 @@ canonical truth, or own a platform storage implementation.
   a click can reopen them.
 - `GraphFilters.tsx` owns the controlled toolbar trigger and responsive nonmodal
   panel for path, entity content, literal Markdown Heading limit, reference
-  status, the local Advanced query draft/apply boundary, and workspace-scoped
-  Saved Filters. Hierarchy depth remains a separate four-option select.
+  status, the shared Advanced query editor for Hierarchy, and workspace-scoped
+  Saved Filters. In Network it points to the drawer's editor instead of rendering
+  a duplicate. Hierarchy depth remains a separate four-option select.
   Blocks is
   represented once through disclosure state; `graph-filter-count.ts` derives
   its user-visible active-group badge, while `graph-filters-overlay.ts` gives
@@ -149,6 +150,31 @@ canonical truth, or own a platform storage implementation.
   ordering, one-pass projected-edge indexes, flattened rows, stale-expansion
   reconciliation, virtual ranges, and keyboard transition planning. Neither
   file reconstructs hidden canonical topology or deaggregates references.
+  Visible rows show only the title and an optional Focus badge; path/context
+  remains in accessible names and node tooltips, without a secondary text line.
+- `GraphQueryEditor.tsx` is the controlled QUERY1 presentation reused in Network
+  Explorer and Hierarchy Filters. `use-graph-query-draft.ts` lives at GraphExplorer
+  level and preserves transient drafts across placement/unmounts. It commits only
+  through the existing set-query callback; `../network-explorer-query-actions.ts`
+  validates atomic applied/draft exclusion mutations and derives chip labels.
+  The compact Network placement omits explanatory headings/help and uses labelled
+  Apply/Clear icons beside the unchanged-height textarea. Dirty/error feedback
+  and Reset draft remain available; Hierarchy retains its explanatory editor.
+- `NetworkExplorerHiddenFiles.tsx` presents exact-path exclusions directly below
+  the Network query as one row of restore chips. `../network-explorer-chip-layout.ts`
+  fits measured chip widths plus a more disclosure; expansion wraps all chips
+  inside the existing height-bounded controls area. Overflow chips remain
+  measurable but are invisible, untabbable, and excluded from the accessible
+  tree. This disclosure is local presentation state, not another hidden-file list
+  or query source of truth.
+- `NetworkExplorerMenu.tsx` renders one accessible portal for the current logical
+  row target. It owns enabled-item keyboard focus and outside dismissal;
+  NetworkExplorer invalidates it on scroll/projection changes and safely restores
+  virtual row focus. `../network-explorer-context.ts` owns target normalization,
+  Focus/Hide eligibility and keyboard transitions. Application callbacks reuse
+  existing Focus, Inspector and QUERY1 paths, never renderer topology or hiding.
+  Query and Hidden controls share a height-bounded scroll area so short windows
+  retain an independently scrollable virtual list.
 - `ProvenanceInspector.tsx` presents user-facing identity, breadcrumbs,
   outgoing links, backlinks, connection occurrences, structural containment,
   and plain-language link problems in bounded groups. Canonical IDs, exact
