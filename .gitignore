@@ -3,6 +3,7 @@ dist/
 coverage/
 /output/diagnostics/
 /output/performance/
+/output/spacing1a/
 *.tsbuildinfo
 .DS_Store
 *.local

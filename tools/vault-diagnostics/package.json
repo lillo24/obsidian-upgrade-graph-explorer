@@ -12,6 +12,7 @@
     "benchmark:global-renderer": "tsx src/global-renderer-benchmark.ts",
     "benchmark:local-renderer": "tsx src/local-renderer-benchmark.ts",
     "benchmark:visual-groups": "tsx src/visual-groups-benchmark.ts",
+    "analyze:focus-spacing": "tsx src/focus-spacing-analysis.ts",
     "diagnose": "tsx src/cli.ts",
     "generate:sample": "tsx src/generate-sample.ts",
     "validate:incremental-real": "tsx src/validate-incremental-real.ts",
@@ -35,7 +36,8 @@
     "@icarus-graph-explorer/view-projection": "workspace:*",
     "@icarus-graph-explorer/visual-groups": "workspace:*",
     "@icarus-graph-explorer/workspace-engine-obsidian": "workspace:*",
-    "@icarus-graph-explorer/workspace-worker": "workspace:*"
+    "@icarus-graph-explorer/workspace-worker": "workspace:*",
+    "sigma": "3.0.3"
   },
   "devDependencies": {
     "@types/node": "24.13.3",
