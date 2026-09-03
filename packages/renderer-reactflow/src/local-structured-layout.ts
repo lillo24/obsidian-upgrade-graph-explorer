@@ -6,10 +6,11 @@ import type {
   RendererGraph,
 } from './types';
 
-const LOCAL_STRUCTURED_LAYOUT_VERSION = 1;
+const LOCAL_STRUCTURED_LAYOUT_VERSION = 2;
 const DEFAULT_CACHE_LIMIT = 12;
-const RANK_GAP = 210;
-const LANE_GAP = 64;
+// Clear gaps between actual fixed rectangles, including outline clearance.
+const RANK_GAP = 58;
+const LANE_GAP = 24;
 
 function fixedDimensions(node: GraphFlowNode): {
   readonly width: number;
@@ -21,7 +22,9 @@ function fixedDimensions(node: GraphFlowNode): {
     width === undefined ||
     height === undefined ||
     !Number.isFinite(width) ||
-    !Number.isFinite(height)
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0
   ) {
     throw new Error(
       `Local Structured node ${node.id} is missing finite fixed dimensions.`,
@@ -116,7 +119,7 @@ function graphWithPositions(
   };
 }
 
-/** Deterministic O(n+e) complete seed shown before W3 returns. */
+/** Deterministic O(n+e+sorting) dimension-packed seed shown before W3 returns. */
 export function seedLocalStructuredGraph(
   nodes: readonly GraphFlowNode[],
   edges: readonly GraphFlowEdge[],
@@ -186,19 +189,30 @@ export function seedLocalStructuredGraph(
     idsByDepth.set(depth, ids);
   }
   const positions: LocalStructuredLayoutPosition[] = [];
+  let columnX = 0;
   for (let depth = 0; depth <= maximumDepth; depth += 1) {
     const ids = idsByDepth.get(depth) ?? [];
     const ordered =
       depth === 0 && ids.includes(rootNodeId)
         ? [rootNodeId, ...ids.filter((id) => id !== rootNodeId)]
-        : ids;
-    ordered.forEach((id, index) => {
+        : [...ids].sort();
+    let columnWidth = 0;
+    let packedHeight = Math.max(0, ordered.length - 1) * LANE_GAP;
+    for (const id of ordered) {
+      const dimensions = fixedDimensions(nodeById.get(id)!);
+      columnWidth = Math.max(columnWidth, dimensions.width);
+      packedHeight += dimensions.height;
+    }
+    let y = -packedHeight / 2;
+    ordered.forEach((id) => {
       positions.push({
         id,
-        x: depth * RANK_GAP,
-        y: (index - (ordered.length - 1) / 2) * LANE_GAP,
+        x: columnX,
+        y,
       });
+      y += fixedDimensions(nodeById.get(id)!).height + LANE_GAP;
     });
+    columnX += columnWidth + RANK_GAP;
   }
   return graphWithPositions(nodes, edges, positions, rootNodeId, null);
 }

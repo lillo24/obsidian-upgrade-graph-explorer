@@ -18,6 +18,8 @@ export interface GraphPreferences {
   readonly focusAppearance: FocusAppearance;
   readonly globalLayoutSettings: GlobalLayoutSettings;
   readonly localLayoutMode: LocalLayoutMode;
+  /** Product exposure only; absent/malformed v1 fields default to false. */
+  readonly showExperimentalAllHierarchy: boolean;
   readonly trackpadZoomMode: TrackpadZoomMode;
 }
 
@@ -25,6 +27,7 @@ export const DEFAULT_GRAPH_PREFERENCES: GraphPreferences = {
   focusAppearance: 'inverted',
   globalLayoutSettings: DEFAULT_GLOBAL_LAYOUT_SETTINGS,
   localLayoutMode: 'free',
+  showExperimentalAllHierarchy: false,
   trackpadZoomMode: 'scroll-zoom',
 };
 
@@ -79,6 +82,7 @@ export function loadGraphPreferences(
         readonly focusAppearance?: unknown;
         readonly globalLayoutSettings?: unknown;
         readonly localLayoutMode?: unknown;
+        readonly showExperimentalAllHierarchy?: unknown;
         readonly trackpadZoomMode?: unknown;
       };
       let globalLayoutSettings = DEFAULT_GLOBAL_LAYOUT_SETTINGS;
@@ -97,6 +101,8 @@ export function loadGraphPreferences(
             ? stored.focusAppearance
             : DEFAULT_GRAPH_PREFERENCES.focusAppearance,
           globalLayoutSettings,
+          showExperimentalAllHierarchy:
+            stored.showExperimentalAllHierarchy === true,
           localLayoutMode: isLocalLayoutMode(stored.localLayoutMode)
             ? stored.localLayoutMode
             : DEFAULT_GRAPH_PREFERENCES.localLayoutMode,

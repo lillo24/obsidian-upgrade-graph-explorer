@@ -231,3 +231,36 @@ pnpm --filter @icarus-graph-explorer/renderer-reactflow typecheck
 pnpm exec vitest run packages/renderer-reactflow
 pnpm --filter @icarus-graph-explorer/web build
 ```
+
+## HIER0 collision baseline
+
+`geometry.ts` owns validated fixed rectangles, a deterministic overlap sweep, and
+spatial occupancy buckets used during diagnostic adoption. Positive-area
+intersection counts as overlap; touching boundaries do not. The 16px clearance
+reserves two 7px focus/keyboard outlines plus 2px breathing room. Shadows do not
+change the fixed rectangle contract.
+
+The immediate Local Structured seed retains the existing depth assignment and
+packs each sorted column by its actual maximum width and summed node heights,
+with 58px horizontal and 24px vertical clear gaps. The root remains at (0,0).
+Work is O(nodes + edges + deterministic sorting). Layout cache version 2 prevents
+reuse of earlier coordinate semantics; IDs, dimensions and topology remain in
+the fingerprint, and stale worker adoption remains guarded by generation.
+
+Dagre continues to receive entity nodes only, using unchanged options. Final
+entity rectangles reserve occupied space. Diagnostics sort by source/ID, start
+beside their source, and advance below collisions in a deterministic lane.
+Accepted diagnostics reserve space for later ones. After 32 blocked candidates,
+an outer column beyond occupied bounds guarantees termination; missing sources
+use a shared outer fallback lane. Placement runs only during layout adoption.
+The existing 280 x 170 fallback grid already clears all current fixed dimensions
+and is unchanged. `geometry.test.ts` stress-tests many and missing-source
+terminals with an independent exhaustive rectangle oracle.
+
+Compact duplicate Files reuse the mapper's shortest unique parent suffix on a
+second line (`Note` / `folder-a`). Browser measurement showed the inline form
+needed 84-85px while the title had 78px beside the 44px disclosure target; the
+second line fits without changing 156 x 46 geometry. Unique compact Files,
+Heading/Block details, extended Focus cards, full paths and ARIA stay unchanged.
+`compact-file-labels.test.tsx` verifies the rendered contexts and fixed sizes.
+No File-module, folder-band, or rank redesign is part of HIER0.

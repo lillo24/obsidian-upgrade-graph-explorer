@@ -10,6 +10,11 @@ import type {
   GraphLayoutMode,
   RendererGraph,
 } from './types';
+import {
+  HIERARCHY_NODE_CLEARANCE,
+  nodeRectangle,
+  RectangleOccupancy,
+} from './geometry';
 
 function nodeDimensions(node: GraphFlowNode) {
   const width = node.width;
@@ -50,40 +55,58 @@ function positionDiagnostics(
   nodeById: ReadonlyMap<string, GraphFlowNode>,
   mode: GraphLayoutMode,
 ): void {
-  const sourceCounts = new Map<string, number>();
+  const occupied = new RectangleOccupancy();
+  for (const [id, position] of positions) {
+    const node = nodeById.get(id);
+    if (node === undefined)
+      throw new Error('Hierarchy layout returned an unknown node.');
+    occupied.add(nodeRectangle({ ...node, position }));
+  }
+  const fallbackX = occupied.right + 92;
+  const nextSourceY = new Map<string, number>();
   const incomingByTarget = new Map<string, GraphFlowEdge>();
-  for (const edge of edges) {
+  for (const edge of [...edges].sort((a, b) => a.id.localeCompare(b.id))) {
     if (!incomingByTarget.has(edge.target)) {
       incomingByTarget.set(edge.target, edge);
     }
   }
-  for (const diagnostic of diagnostics) {
+  const ordered = [...diagnostics].sort(
+    (a, b) =>
+      (incomingByTarget.get(a.id)?.source ?? '').localeCompare(
+        incomingByTarget.get(b.id)?.source ?? '',
+      ) || a.id.localeCompare(b.id),
+  );
+  for (const diagnostic of ordered) {
     const incoming = incomingByTarget.get(diagnostic.id);
     const source =
       incoming === undefined ? undefined : nodeById.get(incoming.source);
     const sourcePosition =
       source === undefined ? undefined : positions.get(source.id);
-    const sourceIndex =
-      incoming === undefined ? 0 : (sourceCounts.get(incoming.source) ?? 0);
-    if (incoming !== undefined)
-      sourceCounts.set(incoming.source, sourceIndex + 1);
-    if (source === undefined || sourcePosition === undefined) {
-      const diagnosticWidth = diagnostic.width ?? 208;
-      const diagnosticHeight = diagnostic.height ?? 94;
-      positions.set(diagnostic.id, {
-        x: sourceIndex * (diagnosticWidth + 36),
-        y: sourceIndex * (diagnosticHeight + 24),
-      });
-      continue;
-    }
-    const diagnosticHeight = diagnostic.height ?? 94;
-    positions.set(diagnostic.id, {
+    const sourceKey = sourcePosition === undefined ? '' : source!.id;
+    const rectangle = {
+      ...nodeRectangle(diagnostic),
       x:
-        sourcePosition.x +
-        (source.width ?? 224) +
-        (mode === 'structure' ? 72 : 92),
-      y: sourcePosition.y + sourceIndex * (diagnosticHeight + 20),
-    });
+        sourcePosition === undefined
+          ? fallbackX
+          : sourcePosition.x +
+            source!.width! +
+            (mode === 'structure' ? 72 : 92),
+      y: nextSourceY.get(sourceKey) ?? sourcePosition?.y ?? 0,
+    };
+    // Bounded downward lane search skips occupied bottoms. A new outer column
+    // is guaranteed clear after 32 blocked candidates, even on dense vaults.
+    for (let attempt = 0; attempt < 32; attempt++) {
+      const collisions = occupied.collisions(rectangle);
+      if (collisions.length === 0) break;
+      rectangle.y =
+        Math.max(...collisions.map((other) => other.y + other.height)) +
+        HIERARCHY_NODE_CLEARANCE;
+      if (attempt === 31)
+        rectangle.x = occupied.right + HIERARCHY_NODE_CLEARANCE;
+    }
+    occupied.add(rectangle);
+    positions.set(diagnostic.id, { x: rectangle.x, y: rectangle.y });
+    nextSourceY.set(sourceKey, rectangle.y + rectangle.height + 20);
   }
 }
 
@@ -107,10 +130,12 @@ export function applyRendererLayoutPositions(
     mode,
   );
   return {
-    nodes: nodes.map((node) => ({
-      ...node,
-      position: positions.get(node.id) ?? { x: 0, y: 0 },
-    })),
+    nodes: nodes.map((node) => {
+      const position = positions.get(node.id);
+      if (position === undefined)
+        throw new Error('Hierarchy layout omitted a mapped node.');
+      return { ...node, position };
+    }),
     edges: [...edges],
     layoutWarning: null,
   };
