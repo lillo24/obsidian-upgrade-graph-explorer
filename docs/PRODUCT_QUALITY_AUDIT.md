@@ -762,6 +762,28 @@ pointer/keyboard/touchpad and real-vault/live-update smoke remain the user QA
 gate; PR and post-merge CI remain separate gates. No native QA pass or KG14
 completion is claimed here.
 
+### Hide / zoom-styling QA follow-up
+
+The user reported that the other KG14B3 workflows passed but Hide could make all
+Network lines disappear. Production-browser reproduction retained 8 of 9 edges
+after hiding Target, while every remaining line vanished: the projection was
+correct, but Sigma's cached edge styling had not followed a prior zoom-out.
+Hide's topology refresh applied that delayed styling all at once. Both Network
+sessions now refresh reducer caches at zoom-detail boundaries and initialize
+their detail state after restoring the camera. Existing distant-zoom edge
+simplification is unchanged; zooming in restores lines immediately, and ordinary
+within-band zoom/pan does not rebuild those caches or request a new layout.
+
+New All/Focus projection tests prove Hide removes only the excluded file and its
+incident edges. Eight session regressions cover cached visibility, surviving
+edges, zoom restoration, initial camera restoration, and refresh boundaries;
+six failed before the fix. `pnpm check` passed 105 test files / 904 tests plus
+formatting, lint, workspace typechecks, and production build. Desktop check and
+release build passed. Production-browser Hide/zoom/restore retests passed in
+Focus, and All retained its unrelated Source-to-Target connection after Hide;
+console warnings/errors were empty. The rebuilt Windows executable still needs
+the user's targeted Hide/zoom retest before merge; this is not a native QA pass.
+
 ## KG14A QA record and low-risk fixes
 
 Automated/deterministic coverage inspected corrupt report/state/storage,

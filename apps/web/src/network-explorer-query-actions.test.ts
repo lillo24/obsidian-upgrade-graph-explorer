@@ -1,4 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import type { KnowledgeSnapshot } from '@icarus-graph-explorer/core';
+import {
+  createProjectionWorkspace,
+  documentOnlyProjectionState,
+  projectLocalView,
+  projectView,
+} from '@icarus-graph-explorer/view-projection';
 import {
   listExactPathExclusions,
   MAX_GRAPH_QUERY_LENGTH,
@@ -11,6 +18,7 @@ import {
   reconcileGraphQueryDraft,
 } from './network-explorer-query-actions';
 import { graphStateReducer, initialGraphState } from './graph-state';
+import { effectiveGlobalProjectionState } from './global-view';
 import {
   createGraphHistoryCheckpoint,
   createGraphNavigationHistory,
@@ -20,6 +28,77 @@ import {
 } from './navigation-history';
 
 describe('atomic exact-path UI query planning', () => {
+  it.each(['All', 'Focus'] as const)(
+    '%s Hide removes only the excluded file and its incident edges',
+    (scope) => {
+      const span = {
+        start: { line: 1, column: 1, offset: 0 },
+        end: { line: 3, column: 1, offset: 20 },
+      };
+      const snapshot: KnowledgeSnapshot = {
+        schemaVersion: 1,
+        workspace: { id: 'hide-edge-regression' },
+        entities: ['A', 'B', 'C'].map((id) => ({
+          id,
+          kind: 'document',
+          source: { path: `${id}.md`, span },
+        })),
+        references: ['B', 'C'].map((target) => ({
+          id: `A-${target}`,
+          sourceEntityId: 'A',
+          kind: 'link',
+          rawTarget: `${target}.md`,
+          sourceSpan: span,
+          resolution: { status: 'resolved', targetEntityId: target },
+        })),
+      };
+      const workspace = createProjectionWorkspace(snapshot);
+      const initial = {
+        ...documentOnlyProjectionState(),
+        ...(scope === 'Focus'
+          ? {
+              focus: {
+                rootEntityId: 'A',
+                hops: 1,
+                direction: 'both',
+                hierarchyContext: 'ancestors',
+              } as const,
+            }
+          : {}),
+      };
+      const project = (state: typeof initial) =>
+        scope === 'Focus'
+          ? projectLocalView(workspace, state)
+          : projectView(
+              workspace,
+              effectiveGlobalProjectionState(workspace, state),
+            );
+      expect(project(initial).edges).toHaveLength(2);
+      const hidden = planExactPathQueryMutation({
+        activeQuery: undefined,
+        queryDraft: '',
+        path: 'C.md',
+        operation: 'add',
+      });
+      if (!hidden.ok) throw new Error(hidden.issue);
+      const state = graphStateReducer(initial, {
+        type: 'set-query',
+        query: hidden.query ?? null,
+      });
+      const projection = project(state);
+      expect(
+        projection.nodes.map((node) =>
+          node.kind === 'entity' ? node.entityId : node.id,
+        ),
+      ).toEqual(['A', 'B']);
+      expect(projection.edges).toHaveLength(1);
+      expect(projection.edges[0]).toMatchObject({
+        kind: 'reference',
+        referenceIds: ['A-B'],
+      });
+    },
+  );
+
   it('adds to clean empty, AND, and OR queries without replacing their meaning', () => {
     for (const query of [
       undefined,
