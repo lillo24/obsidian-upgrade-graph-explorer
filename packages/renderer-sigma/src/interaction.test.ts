@@ -95,6 +95,25 @@ describe('Global visual interactions', () => {
     },
   );
 
+  it.each([
+    'arrange-enter',
+    'arrange-hover',
+    'arrange-preview',
+    'arrange-commit',
+    'arrange-reset',
+  ] as const)(
+    '%s performs no projection, reconciliation, or layout',
+    (interaction) => {
+      expect(GLOBAL_INTERACTION_OPERATION_CONTRACTS[interaction]).toMatchObject(
+        {
+          projection: 0,
+          graphReconciliation: 0,
+          layoutRequest: 0,
+        },
+      );
+    },
+  );
+
   it('requests layout only for semantic, folder, settings, or explicit layout changes', () => {
     const layoutTriggers = Object.entries(
       GLOBAL_INTERACTION_OPERATION_CONTRACTS,
@@ -344,6 +363,73 @@ describe('Global visual interactions', () => {
     expect(selected.forceLabel).toBe(true);
     expect(selected.x).toBe(node.x);
     expect(selected.y).toBe(node.y);
+  });
+
+  it('layers arrangement emphasis after group color without changing size', () => {
+    const settings = resolveGlobalLayoutSettings({
+      folderClustering: true,
+      spacingPreset: 'normal',
+    });
+    const member = resolveGlobalNodeStyle(node, {
+      arrangementActive: true,
+      arrangementMember: true,
+      hovered: false,
+      relatedToHover: true,
+      selected: false,
+      lod: 'far',
+      settings,
+      sizeScale: 1.8,
+      visualGroup: {
+        groupName: 'Research',
+        color: 'teal',
+        accent: '#0f766e',
+      },
+    });
+    const unrelated = resolveGlobalNodeStyle(node, {
+      arrangementActive: true,
+      arrangementMember: false,
+      hovered: false,
+      relatedToHover: true,
+      selected: false,
+      lod: 'far',
+      settings,
+      sizeScale: 1.8,
+      visualGroup: {
+        groupName: 'Research',
+        color: 'teal',
+        accent: '#0f766e',
+      },
+    });
+    expect(member.color).toBe('#0f766e');
+    expect(member.forceLabel).toBe(true);
+    expect(unrelated.color).toBe('#e1e6e7');
+    expect(member.size).toBe(unrelated.size);
+  });
+
+  it('keeps internal and incident edges visible while fading unrelated edges', () => {
+    const internal = resolveGlobalEdgeStyle(edge, {
+      arrangementRelation: 'internal',
+      hoverActive: false,
+      relatedToHover: true,
+      lod: 'far',
+    });
+    const incident = resolveGlobalEdgeStyle(edge, {
+      arrangementRelation: 'incident',
+      hoverActive: false,
+      relatedToHover: true,
+      lod: 'far',
+    });
+    const unrelated = resolveGlobalEdgeStyle(edge, {
+      arrangementRelation: 'unrelated',
+      hoverActive: false,
+      relatedToHover: true,
+      lod: 'far',
+    });
+    expect(internal.hidden).toBe(false);
+    expect(incident.hidden).toBe(false);
+    expect(unrelated.hidden).toBe(false);
+    expect(internal.size).toBeGreaterThan(incident.size);
+    expect(incident.size).toBeGreaterThan(unrelated.size);
   });
 
   it('keeps labels legible for small Network results at regional zoom', () => {

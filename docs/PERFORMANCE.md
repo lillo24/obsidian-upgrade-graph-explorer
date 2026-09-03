@@ -530,6 +530,34 @@ composition/apply. The automatic frame excludes diagnostics, displayed node
 sizes, viewport state, and earlier translations, preventing cumulative drift.
 Benchmark output contains aggregate counts and generic synthetic data only.
 
+### SPATIAL1B direct-folder preview
+
+SPATIAL1B adds `spatial-preview-apply` and `spatial-preview-applies`. One gesture
+captures immutable exact-folder geometry once. Pointer moves run pure sparse
+translation math and are coalesced to at most one renderer apply per animation
+frame; they never run the full anchor-map composition. The interaction oracle
+requires zero projection, mapping, topology reconciliation, and automatic layout
+for enter, hover, preview, commit, and reset.
+
+The global renderer benchmark now measures generic folders of 1, 10, 100, and
+1,000 visible Files. Local Windows/Node results recorded on 2026-09-03 are
+median/p95 milliseconds and remain investigative rather than CI thresholds:
+
+| Folder Files | Small geometry capture | Small sparse preview | Medium geometry capture | Medium sparse preview |
+| -----------: | ---------------------: | -------------------: | ----------------------: | --------------------: |
+|            1 |         0.032/0.045 ms |       0.001/0.012 ms |          0.029/0.040 ms |        0.001/0.009 ms |
+|           10 |         0.036/0.053 ms |       0.001/0.002 ms |          0.025/0.033 ms |        0.001/0.002 ms |
+|          100 |         0.160/0.193 ms |       0.002/0.007 ms |          0.117/0.156 ms |        0.002/0.002 ms |
+|        1,000 |         0.775/1.897 ms |       0.014/0.023 ms |          0.699/1.562 ms |        0.013/0.084 ms |
+
+The sparse result contains exactly the folder-size position count. Runtime apply
+validates all coordinates, mutates only those renderer-owned x/y fields, and
+requests one scheduled Sigma partial refresh containing moved nodes plus incident
+edges. Sigma 3.0.3 needs `skipIndexation: false` for correct picking, labels, and
+edge geometry, so its internal process may still scan the graph. Production
+browser/Tauri drag evidence—not the pure Node table—is the authority for that
+library cost and RAF responsiveness.
+
 ## KG13B2A bounded Local Free evidence
 
 Local profiles describe the projected neighborhood itself rather than a large

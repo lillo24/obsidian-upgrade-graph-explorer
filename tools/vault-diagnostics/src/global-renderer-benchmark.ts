@@ -23,6 +23,11 @@ import {
 } from '@icarus-graph-explorer/renderer-sigma/core';
 import { createStableIdentityCatalog } from '@icarus-graph-explorer/stable-identity';
 import {
+  createFolderClusterPreviewGeometry,
+  previewFolderClusterAtAnchor,
+  type FolderClusterPreviewGeometry,
+} from '@icarus-graph-explorer/spatial-overrides';
+import {
   createProjectionWorkspace,
   documentOnlyProjectionState,
   projectView,
@@ -151,6 +156,67 @@ function updateEvidence(
   };
 }
 
+function folderDragPreviewEvidence(folderSize: number, repeats: number) {
+  const memberPositions = Array.from({ length: folderSize }, (_, index) => ({
+    key: `synthetic-member-${index}`,
+    x: index % 2 === 0 ? index * 0.01 : -index * 0.01,
+    y: (index % 7) * 0.013,
+  }));
+  const automaticPositions = [
+    ...memberPositions,
+    { key: 'synthetic-frame-left', x: -100, y: -80 },
+    { key: 'synthetic-frame-right', x: 100, y: 80 },
+  ];
+  const folderKeyByNodeKey = new Map([
+    ...memberPositions.map(({ key }) => [key, 'synthetic-folder'] as const),
+    ['synthetic-frame-left', 'other-folder'] as const,
+    ['synthetic-frame-right', 'other-folder'] as const,
+  ]);
+  let geometry: FolderClusterPreviewGeometry | undefined;
+  const geometryCapture = measureRepeated(() => {
+    geometry = createFolderClusterPreviewGeometry({
+      automaticPositions,
+      folderKeyByNodeKey,
+      anchors: new Map(),
+      folderKey: 'synthetic-folder',
+      visualDownGraphYSign: -1,
+    });
+  }, repeats);
+  if (geometry === undefined) {
+    throw new Error('Folder drag preview benchmark produced no geometry.');
+  }
+  const capturedGeometry: FolderClusterPreviewGeometry = geometry;
+  let outputPositionCount = 0;
+  let sample = 0;
+  const sparsePreview = measureRepeated(
+    () => {
+      const preview = previewFolderClusterAtAnchor({
+        geometry: capturedGeometry,
+        anchor: {
+          x: 0.35 + (sample % 5) * 0.01,
+          y: -0.45 + (sample % 7) * 0.01,
+        },
+        visualDownGraphYSign: -1,
+      });
+      sample += 1;
+      outputPositionCount = preview.positions.length;
+    },
+    Math.max(20, repeats * 10),
+  );
+  return {
+    folderSize,
+    outputPositionCount,
+    geometryCapture,
+    sparsePreview,
+    operationCountsPerPreview: {
+      automaticLayouts: 0,
+      projections: 0,
+      topologyReconciliations: 0,
+      fullSpatialCompositions: 0,
+    },
+  };
+}
+
 function stressProfile(options: BenchmarkOptions): GlobalFixtureProfile {
   if (options.include25k) return 'stress-25000';
   switch (options.profile) {
@@ -233,6 +299,9 @@ async function main(): Promise<void> {
     ]),
   );
   const automaticPositions = globalLayoutPositionsFromInput(productInput);
+  const directFolderDragging = [1, 10, 100, 1_000].map((folderSize) =>
+    folderDragPreviewEvidence(folderSize, repeats),
+  );
   let spatialResult:
     ReturnType<typeof composeGlobalSpatialOverrides> | undefined;
   const spatialComposition = measureRepeated(() => {
@@ -438,6 +507,11 @@ async function main(): Promise<void> {
           projectionRequestsPerAnchorEdit: 0,
           topologyReconciliationsPerAnchorEdit: 0,
         },
+        directFolderDragging: {
+          folderSizes: directFolderDragging,
+          previewApplyModel:
+            'One sparse exact-folder coordinate update and one scheduled Sigma partial refresh per animation frame; browser/Tauri harness measures renderer work.',
+        },
         bundle: await bundleEvidence(),
         rendererRuntime: {
           measuredBy: 'production browser/Tauri harness',
@@ -457,6 +531,7 @@ async function main(): Promise<void> {
             'edge-events-on',
             'destroy-recreate',
             'forceatlas2-worker',
+            'spatial-direct-drag',
           ],
         },
         privacy:

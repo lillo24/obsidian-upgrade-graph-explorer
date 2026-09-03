@@ -27,8 +27,10 @@ canonical truth, or own a platform storage implementation.
   preserve that camera. Transition anchors and Local Fit requests are consumed
   once, preventing remount or Back/Forward from replaying stale camera work.
   Graphology, worker positions, and transition points are never persisted.
-  SPATIAL1A also owns the independent workspace spatial-override session and
-  passes its resolved map only to All Network; no production editor is exposed.
+  SPATIAL1 also owns the independent workspace spatial-override session and
+  passes its resolved map only to All Network. SPATIAL1B adds a small web-owned
+  Arrange mode reducer, write-before-adopt callbacks, and exact-folder Network
+  Explorer entry points; per-pointer gesture state remains inside Sigma.
   Network Explorer consumes the same already-completed All/Focus Network
   projection and resolved Visual Group presentation map as the canvas. Its
   selection callback updates the single controlled graph selection and issues a
@@ -37,6 +39,11 @@ canonical truth, or own a platform storage implementation.
   screens both side drawers may coexist; at the existing 900 px breakpoint the
   most recently opened drawer owns the overlay and the other closes without
   stealing focus.
+  In All Network it also exposes `Arrange folder` only for an exact folder with
+  a directly visible File, a root-folder fallback, and one marker per persisted
+  exact folder. These controls select/focus the canvas arrangement panel but do
+  not change graph selection, projection, topology, navigation history, or
+  layout. Parent actions never move nested-folder members.
   `ExplorationControls.tsx` presents accessible All/Focus and Network/Hierarchy
   choices derived from schema-v3 state. Both Focus layouts share the same
   memoized projection. The selected visible node, or root fallback, crosses the

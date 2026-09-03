@@ -487,6 +487,9 @@ importers:
       '@icarus-graph-explorer/snapshot-delta':
         specifier: workspace:*
         version: link:../../packages/snapshot-delta
+      '@icarus-graph-explorer/spatial-overrides':
+        specifier: workspace:*
+        version: link:../../packages/spatial-overrides
       '@icarus-graph-explorer/stable-identity':
         specifier: workspace:*
         version: link:../../packages/stable-identity

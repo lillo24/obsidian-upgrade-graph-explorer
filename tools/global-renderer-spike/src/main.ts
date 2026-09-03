@@ -50,6 +50,7 @@ interface SpikeSnapshot {
     readonly activeFolderCount: number;
     readonly inactiveFolderCount: number;
     readonly layoutRequests: number;
+    readonly arrangementActive: boolean;
   };
 }
 
@@ -81,6 +82,8 @@ const recreateButton = requiredElement<HTMLButtonElement>('recreate');
 const interactionsButton = requiredElement<HTMLButtonElement>('interactions');
 const bookmarkButton = requiredElement<HTMLButtonElement>('bookmark');
 const spatialForm = requiredElement<HTMLFormElement>('spatial-form');
+const arrangeFoldersButton =
+  requiredElement<HTMLButtonElement>('arrange-folders');
 const spatialFolderInput = requiredElement<HTMLInputElement>('spatial-folder');
 const spatialXInput = requiredElement<HTMLInputElement>('spatial-x');
 const spatialYInput = requiredElement<HTMLInputElement>('spatial-y');
@@ -112,6 +115,7 @@ let spatialComposition: SpatialCompositionResult =
     folderClusterAnchorMap(spatialRegistry),
   );
 let layoutRequests = 0;
+let arrangementActive = false;
 let session: GlobalRendererSession | undefined;
 const layoutService: GlobalLayoutService = createHarnessGlobalLayoutService();
 const measurements: GlobalRendererMeasurement[] = [];
@@ -176,6 +180,33 @@ function createSession(): GlobalRendererSession {
           selectionInspector(key, attributes);
         }
       },
+      onArrangementFolderChange: (folderKey) => {
+        spatialFolderInput.value = folderKey;
+        renderSpatialSummary();
+      },
+      onArrangementCommit: (folderKey, anchor) => {
+        try {
+          spatialRegistry = setFolderClusterAnchor(
+            spatialRegistry,
+            folderKey,
+            anchor,
+          );
+          const before = layoutRequests;
+          void applySpatialDisplay('spatial-direct-drag')
+            .then(() => {
+              created.completeFolderArrangementCommit();
+              status.textContent = `Dragged ${folderKey} with ${layoutRequests - before} automatic layout requests.`;
+            })
+            .catch((error: unknown) => {
+              created.cancelFolderArrangementGesture();
+              showFailure(error);
+            });
+        } catch (error: unknown) {
+          created.cancelFolderArrangementGesture();
+          showFailure(error);
+        }
+      },
+      onArrangementError: (message) => showFailure(new Error(message)),
     },
   );
   void created.ready
@@ -231,6 +262,23 @@ function renderSpatialSummary(): void {
   spatialSummary.replaceChildren(fragment);
 }
 
+function refreshArrangementContext(): void {
+  const current = session;
+  if (current === undefined) return;
+  const folderKey = spatialFolderInput.value.trim();
+  current.setFolderArrangementContext({
+    active: arrangementActive,
+    ...(folderKey === '' ? {} : { activeFolderKey: folderKey }),
+    anchors: folderClusterAnchorMap(spatialRegistry),
+    automaticPositions,
+    input,
+  });
+  arrangeFoldersButton.setAttribute('aria-pressed', String(arrangementActive));
+  arrangeFoldersButton.textContent = arrangementActive
+    ? 'Done Arranging'
+    : 'Arrange Folders';
+}
+
 async function applySpatialDisplay(operation: string): Promise<void> {
   const started = performance.now();
   spatialComposition = composeGlobalSpatialOverrides(
@@ -239,6 +287,7 @@ async function applySpatialDisplay(operation: string): Promise<void> {
     folderClusterAnchorMap(spatialRegistry),
   );
   await activeSession().applyPositions(spatialComposition.displayedPositions);
+  refreshArrangementContext();
   record({
     operation,
     durationMs: Number((performance.now() - started).toFixed(3)),
@@ -309,6 +358,7 @@ function activeSession(): GlobalRendererSession {
 function installSession(): void {
   try {
     session = createSession();
+    refreshArrangementContext();
   } catch (error: unknown) {
     session = undefined;
     showFailure(error);
@@ -436,6 +486,7 @@ function snapshot(): SpikeSnapshot {
       activeFolderCount: spatialComposition.activeFolders.length,
       inactiveFolderCount: spatialComposition.inactiveFolderKeys.length,
       layoutRequests,
+      arrangementActive,
     },
   };
 }
@@ -455,6 +506,7 @@ profileSelect.addEventListener('change', () => {
   inspector.textContent = 'Select a file in the graph or search results.';
   searchInput.value = '';
   searchResults.replaceChildren();
+  arrangementActive = false;
   installSession();
   renderMetrics();
 });
@@ -573,6 +625,15 @@ spatialForm.addEventListener('submit', (event) => {
   }
 });
 
+arrangeFoldersButton.addEventListener('click', () => {
+  arrangementActive = !arrangementActive;
+  activeSession().cancelFolderArrangementGesture();
+  refreshArrangementContext();
+  status.textContent = arrangementActive
+    ? 'Arrange folders is active. Drag any File to move its exact folder; drag the stage to pan.'
+    : 'Arrange folders is off.';
+});
+
 spatialResetFolderButton.addEventListener('click', () => {
   try {
     spatialRegistry = removeFolderClusterAnchor(
@@ -598,7 +659,10 @@ spatialResetAllButton.addEventListener('click', () => {
     .catch(showFailure);
 });
 
-spatialFolderInput.addEventListener('input', renderSpatialSummary);
+spatialFolderInput.addEventListener('input', () => {
+  renderSpatialSummary();
+  refreshArrangementContext();
+});
 
 searchInput.addEventListener('input', renderSearchResults);
 

@@ -75,6 +75,16 @@ export {
   SIGMA_VISUAL_DOWN_GRAPH_Y_SIGN,
 } from './spatial';
 export {
+  GLOBAL_FOLDER_DRAG_THRESHOLD_PX,
+  IDLE_GLOBAL_FOLDER_ARRANGEMENT_GESTURE,
+  reduceGlobalFolderArrangementGesture,
+} from './arrangement';
+export type {
+  GlobalFolderArrangementGestureEvent,
+  GlobalFolderArrangementGestureState,
+  GlobalFolderDragBase,
+} from './arrangement';
+export {
   resolveLocalEdgeStyle,
   resolveLocalNodeStyle,
   resolveLocalVisualLod,

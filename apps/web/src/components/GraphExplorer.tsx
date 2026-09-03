@@ -145,6 +145,10 @@ import { deriveProjectionVisualGroupPresentationMap } from '../visual-groups/pre
 import { usePresentationOverrides } from '../presentation-overrides/use-presentation-overrides';
 import { useSpatialOverrides } from '../spatial-overrides/use-spatial-overrides';
 import {
+  folderArrangementModeReducer,
+  INACTIVE_FOLDER_ARRANGEMENT_MODE,
+} from '../spatial-overrides/arrangement';
+import {
   commitVisualGroupSessionMutation,
   createVisualGroupSession,
   resetCorruptVisualGroupSession,
@@ -534,6 +538,35 @@ export function GraphExplorer({
     eligibility,
     storage: persistenceStorage,
   });
+  const [folderArrangementMode, dispatchFolderArrangementMode] = useReducer(
+    folderArrangementModeReducer,
+    INACTIVE_FOLDER_ARRANGEMENT_MODE,
+  );
+  const [
+    folderArrangementFocusRequestKey,
+    setFolderArrangementFocusRequestKey,
+  ] = useState(0);
+  const [folderArrangementAvailability, setFolderArrangementAvailability] =
+    useState<{
+      readonly available: boolean;
+      readonly reason?: string;
+    }>({
+      available: false,
+      reason: 'Wait for the All Network renderer to start',
+    });
+  const changeFolderArrangementAvailability = useCallback(
+    (available: boolean, reason: string | undefined) => {
+      setFolderArrangementAvailability((current) =>
+        current.available === available && current.reason === reason
+          ? current
+          : {
+              available,
+              ...(reason === undefined ? {} : { reason }),
+            },
+      );
+    },
+    [],
+  );
   const currentReconciliation = useMemo(
     () => reconcileCurrentWorkspaceView(projectionWorkspace, viewState),
     [projectionWorkspace, viewState],
@@ -641,6 +674,24 @@ export function GraphExplorer({
   const networkLayoutActive =
     rendererMode === 'global' ||
     (rendererMode === 'local' && localLayoutMode === 'free');
+  useEffect(() => {
+    if (effectiveRendererMode === 'global') return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      dispatchFolderArrangementMode({ type: 'exit' });
+      changeFolderArrangementAvailability(
+        false,
+        'Arrange folders is available only in All Network',
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [changeFolderArrangementAvailability, effectiveRendererMode]);
+  useEffect(() => {
+    dispatchFolderArrangementMode({ type: 'exit' });
+  }, [workspaceId]);
   const unavailableProjection: ProjectionResult = {
     ok: false,
     message: 'The active graph presentation could not be prepared.',
@@ -829,6 +880,95 @@ export function GraphExplorer({
     'Select a graph element to inspect it, or use Search to reveal a hidden entity.',
   );
   const [navigationError, setNavigationError] = useState<string>();
+  const beginFolderArrangement = useCallback((folderKey?: string) => {
+    dispatchFolderArrangementMode({
+      type: 'enter',
+      ...(folderKey === undefined ? {} : { folderKey }),
+    });
+    setFolderArrangementFocusRequestKey((current) => current + 1);
+  }, []);
+  const folderArrangementViewProps = useMemo<
+    NonNullable<GlobalGraphViewProps['folderArrangement']>
+  >(
+    () => ({
+      active: folderArrangementMode.phase === 'active',
+      ...(folderArrangementMode.phase === 'active' &&
+      folderArrangementMode.activeFolderKey !== undefined
+        ? { activeFolderKey: folderArrangementMode.activeFolderKey }
+        : {}),
+      anchorCount: spatialOverrides.anchors.size,
+      editable:
+        spatialOverrides.session.persistenceMode !== 'blocked-corrupt' &&
+        spatialOverrides.session.persistenceMode !== 'blocked-write-failure',
+      ...(spatialOverrides.session.error === undefined
+        ? {}
+        : { blockedReason: spatialOverrides.session.error }),
+      canRecoverCorrupt:
+        spatialOverrides.session.persistenceMode === 'blocked-corrupt',
+      focusRequestKey: folderArrangementFocusRequestKey,
+      persistenceStatus: spatialOverrides.session.status,
+      onActiveChange: (active) => {
+        if (active) beginFolderArrangement();
+        else dispatchFolderArrangementMode({ type: 'exit' });
+      },
+      onActiveFolderChange: (folderKey) =>
+        dispatchFolderArrangementMode({
+          type: 'activate-folder',
+          folderKey,
+        }),
+      onAnnouncement: setNavigationAnnouncement,
+      onAvailabilityChange: changeFolderArrangementAvailability,
+      onCommitAnchor: spatialOverrides.setFolderAnchor,
+      onRecoverCorrupt: spatialOverrides.recoverCorruptRegistry,
+      onResetAll: spatialOverrides.resetAllFolderAnchors,
+      onResetFolder: spatialOverrides.resetFolderAnchor,
+    }),
+    [
+      beginFolderArrangement,
+      changeFolderArrangementAvailability,
+      folderArrangementFocusRequestKey,
+      folderArrangementMode,
+      spatialOverrides.anchors.size,
+      spatialOverrides.recoverCorruptRegistry,
+      spatialOverrides.resetAllFolderAnchors,
+      spatialOverrides.resetFolderAnchor,
+      spatialOverrides.session.error,
+      spatialOverrides.session.persistenceMode,
+      spatialOverrides.session.status,
+      spatialOverrides.setFolderAnchor,
+    ],
+  );
+  const anchoredFolderKeys = useMemo(
+    () => new Set(spatialOverrides.anchors.keys()),
+    [spatialOverrides.anchors],
+  );
+  const networkExplorerArrangement = useMemo(
+    () =>
+      effectiveRendererMode !== 'global'
+        ? undefined
+        : {
+            active: folderArrangementMode.phase === 'active',
+            ...(folderArrangementMode.phase === 'active' &&
+            folderArrangementMode.activeFolderKey !== undefined
+              ? { activeFolderKey: folderArrangementMode.activeFolderKey }
+              : {}),
+            anchoredFolderKeys,
+            available: folderArrangementAvailability.available,
+            ...(folderArrangementAvailability.reason === undefined
+              ? {}
+              : {
+                  unavailableReason: folderArrangementAvailability.reason,
+                }),
+            onArrangeFolder: beginFolderArrangement,
+          },
+    [
+      anchoredFolderKeys,
+      beginFolderArrangement,
+      effectiveRendererMode,
+      folderArrangementAvailability,
+      folderArrangementMode,
+    ],
+  );
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const inspectorToolbarRef = useRef<HTMLButtonElement>(null);
   const inspectorHandleRef = useRef<HTMLButtonElement>(null);
@@ -3341,6 +3481,7 @@ export function GraphExplorer({
               >
                 <button
                   onClick={() => {
+                    dispatchFolderArrangementMode({ type: 'exit' });
                     if (activeScope === 'focus') {
                       setLocalLayoutRequestKey((current) => current + 1);
                     } else {
@@ -3561,6 +3702,7 @@ export function GraphExplorer({
               </p>
             ) : (
               <GlobalGraphView
+                folderArrangement={folderArrangementViewProps}
                 {...(globalCenterRequest === undefined
                   ? {}
                   : { centerRequest: globalCenterRequest })}
@@ -3756,6 +3898,9 @@ export function GraphExplorer({
           networkExplorerModel !== undefined &&
           networkExplorerVisible ? (
             <NetworkExplorer
+              {...(networkExplorerArrangement === undefined
+                ? {}
+                : { arrangement: networkExplorerArrangement })}
               presentationOverrides={nodePresentation.overrides}
               sizePersistenceStatus={nodePresentation.session.status}
               sizeEditingDisabled={

@@ -36,12 +36,12 @@ Future package names, state libraries, and implementation details are intentiona
 This track composes with the active KG14 sequence; it does not replace or
 reorder KG14.
 
-| Milestone                                           | Outcome                                                                                                                                                          | Status                                                             |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| **SPATIAL1**                                        | Durable, normalized workspace spatial intent layered after automatic layout.                                                                                     | **In progress** — the foundation is complete; interaction remains. |
-| **SPATIAL1A — Normalized folder-anchor foundation** | Source-neutral exact-folder registry, automatic/display position separation, stable-workspace persistence, renderer composition, tests, and development harness. | **Complete.**                                                      |
-| **SPATIAL1B — Arrange Folders interaction**         | Spotlight/torch mode, temporary drag preview, commit/cancel, and accessible production controls over the SPATIAL1A seam.                                         | **Next** — not implemented by SPATIAL1A.                           |
-| **SAVED1 — Saved Views**                            | Later composition of query, Scope/Layout, hierarchy detail, settings, viewport, and spatial profile/reference.                                                   | **Later** — no schema is defined.                                  |
+| Milestone                                           | Outcome                                                                                                                                                          | Status                                                                |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| **SPATIAL1**                                        | Durable, normalized workspace spatial intent layered after automatic layout.                                                                                     | **Complete** — foundation and direct exact-folder arrangement passed. |
+| **SPATIAL1A — Normalized folder-anchor foundation** | Source-neutral exact-folder registry, automatic/display position separation, stable-workspace persistence, renderer composition, tests, and development harness. | **Complete.**                                                         |
+| **SPATIAL1B — Arrange Folders interaction**         | Spotlight/torch mode, temporary drag preview, commit/cancel, and accessible production controls over the SPATIAL1A seam.                                         | **Complete.**                                                         |
+| **SAVED1 — Saved Views**                            | Later composition of query, Scope/Layout, hierarchy detail, settings, viewport, and spatial profile/reference.                                                   | **Later** — no schema is defined.                                     |
 
 ## Accepted future interaction guidance
 
@@ -129,9 +129,9 @@ corrupt-storage recovery, and selected-entity Inspector matches. It adds no
 default groups and leaves projection, topology, navigation, viewport, and
 layout semantics unchanged. The
 separate LAYOUT1 idea remains paused/absorbed into KG13's Global → Regional →
-Local spatial architecture. SPATIAL1A's normalized folder-anchor foundation is
-complete; SPATIAL1B's Arrange Folders interaction is next on that parallel
-track. Named Saved Views remain later derived presentation work.
+Local spatial architecture. SPATIAL1's normalized exact-folder foundation and
+Arrange Folders interaction are complete. Named Saved Views remain later
+derived presentation work.
 
 Post-MVP analytics—typed conceptual relations, pathfinding variants,
 centrality, betweenness, communities, connected components, co-citation,

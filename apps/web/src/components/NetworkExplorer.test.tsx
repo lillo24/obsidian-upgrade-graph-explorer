@@ -10,6 +10,7 @@ import type {
   NetworkExplorerNode,
 } from '../network-explorer-model';
 import { NetworkExplorer } from './NetworkExplorer';
+import type { NetworkExplorerArrangementProps } from './NetworkExplorer';
 
 function node(
   id: string,
@@ -41,9 +42,11 @@ function renderExplorer(
   explorerModel: NetworkExplorerModel,
   selection: GraphSelection | null = null,
   presentationOverrides: EntityPresentationOverrideMap = new Map(),
+  arrangement?: NetworkExplorerArrangementProps,
 ): string {
   return renderToStaticMarkup(
     <NetworkExplorer
+      {...(arrangement === undefined ? {} : { arrangement })}
       presentationOverrides={presentationOverrides}
       sizePersistenceStatus="Session only — workspace identity is not stable"
       sizeEditingDisabled={false}
@@ -217,5 +220,45 @@ describe('Network Explorer drawer', () => {
     expect(markup).toContain('title="target.md · L1:C1"');
     expect(markup).not.toContain('3 hop');
     expect(markup).not.toContain('class="network-explorer__badge"');
+  });
+
+  it('offers exact arrangeable folders, disables container-only folders, and marks anchors', () => {
+    const arrangement: NetworkExplorerArrangementProps = {
+      active: true,
+      activeFolderKey: 'Notes/Deep',
+      anchoredFolderKeys: new Set(['Notes/Deep']),
+      available: true,
+      onArrangeFolder: () => undefined,
+    };
+    const markup = renderExplorer(
+      model([node('root'), node('deep', { sourcePath: 'Notes/Deep/Note.md' })]),
+      null,
+      new Map(),
+      arrangement,
+    );
+
+    expect(markup).toContain('>Root folder</span>');
+    expect(markup).toContain('>Arrange folder</button>');
+    expect(markup).toContain('aria-label="Arrange folder Notes"');
+    expect(markup).toContain(
+      'title="This folder has no directly visible File in the current All Network view"',
+    );
+    expect(markup).toContain('aria-label="Arrange folder Deep"');
+    expect(markup).toContain('aria-pressed="true"');
+    expect(markup.match(/aria-label="Custom folder position"/gu)).toHaveLength(
+      1,
+    );
+  });
+
+  it('explains when arrangement is unavailable instead of hiding the action', () => {
+    const markup = renderExplorer(model([node('root')]), null, new Map(), {
+      active: false,
+      anchoredFolderKeys: new Set(),
+      available: false,
+      unavailableReason: 'Wait for layout',
+      onArrangeFolder: () => undefined,
+    });
+    expect(markup).toContain('title="Wait for layout"');
+    expect(markup).toContain('disabled=""');
   });
 });

@@ -6,9 +6,9 @@ This document is the engineering source of truth for the Markdown Structure Grap
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
-SPATIAL1A establishes a parallel source-neutral, workspace-scoped normalized
-folder-anchor layer for All Network while leaving the active KG14 sequence
-unchanged.
+SPATIAL1 establishes a parallel source-neutral, workspace-scoped normalized
+folder-anchor layer plus direct exact-folder arrangement for All Network while
+leaving the active KG14 sequence unchanged.
 
 ## Stable domain shape
 
@@ -208,7 +208,9 @@ stores exact normalized workspace-relative folder keys (`.` for the root) and
 bounded logical visual X/Y target-center anchors under an explicit All-Network
 section. It computes the automatic document-only graph frame, automatic folder
 centers, inverse target normalization, and pure rigid translations from an
-explicit anchor map. It owns no React, Sigma, storage, projection, source
+explicit anchor map. SPATIAL1B adds pure sparse preview geometry that captures
+the automatic base once and emits only one exact folder's coordinates for each
+pointer/keyboard sample. It owns no React, Sigma, storage, projection, source
 adapter, query, viewport, worker, or layout policy. Exact-path folder identity
 does not survive rename in v1; missing folders remain dormant without fuzzy
 reconciliation.
@@ -276,6 +278,27 @@ positions. Anchor changes therefore perform one composition/apply and zero KG6
 projections, topology reconciliations, or ForceAtlas2 requests. Diagnostics,
 node radii, cameras, and prior translations never enter the automatic frame.
 Focus Network and both Hierarchy renderers receive no spatial registry.
+
+Direct arrangement preserves those boundaries. `GraphExplorer` owns only the
+transient inactive/active mode and exact active folder plus the existing
+workspace persistence session. `GlobalGraphCanvas` owns accessible controls and
+the write-before-adopt display transaction. The imperative Global Sigma session
+owns prime/threshold/drag/commit/cancel state, pointer conversion, one
+requestAnimationFrame coalescer, and sparse coordinate application. It validates
+the complete sparse set, changes only renderer-owned x/y attributes, and asks
+Sigma 3.0.3 for one scheduled partial indexed refresh of moved nodes and incident
+edges. Required indexation may scan renderer internals; it is not application
+mapping, topology reconciliation, full anchor composition, or layout.
+
+Arrange applies only to canonical visible document nodes. One click activates
+the exact folder without moving it; a 3 px threshold starts movement. Stage drag
+keeps camera pan, while selection/Focus/double-click/context/wheel actions are
+suppressed on nodes for the duration of the mode. Blur, visibility loss,
+topology/layout/scope change, Escape, and disposal cancel unfinished work.
+Release persists one normalized anchor and keeps the preview until the confirmed
+map is rendered; failure restores the last confirmed composition. Network
+Explorer provides exact folder actions, a root `.` fallback, markers, and
+keyboard nudge/save/reset access without adding canonical folder entities.
 
 `tools/global-renderer-spike` is now a production renderer harness rather than
 an implementation fork. It retains only synthetic KG13A fixtures, browser/Tauri
@@ -782,13 +805,12 @@ use the compiled all-match evaluator in Inspector; diagnostics and edges opt
 out. Filters and Groups have one transient tool-panel owner while Inspector is
 independent.
 The separate LAYOUT1 idea is paused/absorbed into this Global → Regional → Local
-spatial architecture. SPATIAL1A now supplies derived normalized exact-folder
-targets after the automatic prior. SPATIAL1B may combine the persisted map with
-a temporary active-folder preview, with preview winning, then commit a
-normalized release target. The intended Arrange mode dims the graph, spotlights
-the hovered or active folder, moves all member nodes and connected edges live,
-commits on release, and cancels on Escape; none of that UI exists in SPATIAL1A.
-Individual-node dragging is not the first interaction. A later Saved View may
+spatial architecture. SPATIAL1 now supplies derived normalized exact-folder
+targets after the automatic prior and a completed Arrange mode. Its transient
+preview wins visually for one exact folder, moves members and incident edges
+live, then commits one normalized release target or restores confirmed state on
+cancel/failure. Individual-node dragging is not part of this interaction. A
+later Saved View may
 reference, copy, or selectively override an independently serializable spatial
 profile alongside query, scope, layout, hierarchy detail, settings, and
 viewport; no Saved View schema is introduced here.
