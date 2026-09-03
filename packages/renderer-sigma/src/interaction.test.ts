@@ -138,7 +138,7 @@ describe('Global visual interactions', () => {
   it('preserves many tiny same-direction deltas proportionally and monotonically', () => {
     expect(GLOBAL_ZOOM_SENSITIVITY).toBe(0.0017);
     expect(FINE_SCROLL_ZOOM_SENSITIVITY).toBe(0.0021);
-    expect(FINE_PINCH_ZOOM_SENSITIVITY).toBe(0.0075);
+    expect(FINE_PINCH_ZOOM_SENSITIVITY).toBe(0.012);
     const events = Array.from({ length: 40 }, (_, index) => ({
       at: index * 16.7,
       deltaY: 0.01 + index * 0.001,
