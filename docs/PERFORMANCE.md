@@ -519,8 +519,8 @@ investigative, not a CI timing threshold:
 
 | Profile | Positions | Active/inactive anchors | Composition median/p95 | Layout / projection / topology per anchor edit |
 | ------- | --------: | ----------------------: | ---------------------: | ---------------------------------------------: |
-| Small   |       100 |                     3/0 |         0.168/1.018 ms |                                          0/0/0 |
-| Medium  |       500 |                     3/0 |         0.442/0.686 ms |                                          0/0/0 |
+| Small   |       100 |                     3/0 |         0.187/0.213 ms |                                          0/0/0 |
+| Medium  |       500 |                     3/0 |         0.973/1.734 ms |                                          0/0/0 |
 
 Renderer regression tests supply the stronger operation oracle: one anchor edit
 adds exactly one composition and one display apply while preserving the
