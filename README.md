@@ -111,6 +111,9 @@ pnpm test
 pnpm build
 ```
 
+Interactive component regressions use Vitest's `happy-dom` environment with
+React DOM; pure model tests keep the default Node environment.
+
 ## Repository guidance
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) is the engineering source of truth for dependency direction and product boundaries.

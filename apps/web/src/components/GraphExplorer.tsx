@@ -74,6 +74,7 @@ import { graphHistoryShortcut } from '../graph-history-shortcuts';
 import {
   createNetworkExplorerModel,
   type NetworkExplorerFolderState,
+  type NetworkExplorerRevealRequest,
 } from '../network-explorer-model';
 import {
   containingDocumentEntityId,
@@ -789,6 +790,14 @@ export function GraphExplorer({
   // Folder overrides survive query/live membership changes and sidebar remounts.
   const [networkExplorerFolderState, setNetworkExplorerFolderState] =
     useState<NetworkExplorerFolderState>(() => new Map());
+  const [graphClickSelection, setGraphClickSelection] =
+    useState<GraphSelection | null>(null);
+  const [networkExplorerRevealRequest, setNetworkExplorerRevealRequest] =
+    useState<
+      | (NetworkExplorerRevealRequest & { readonly projection: ViewProjection })
+      | undefined
+    >();
+
   const networkExplorerToolbarRef = useRef<HTMLButtonElement>(null);
   const networkExplorerHandleRef = useRef<HTMLButtonElement>(null);
   const networkExplorerRestoreTarget = useRef<HTMLButtonElement | null>(null);
@@ -2099,13 +2108,17 @@ export function GraphExplorer({
   }, [activeVisualGroupSession, adoptVisualGroupSession, persistenceStorage]);
   const clearSelection = useCallback(() => setSelection(null), []);
   const changeGlobalSelection = useCallback(
-    (nextSelection: GlobalSelection | null) =>
-      setSelection((current) => retainGraphSelection(current, nextSelection)),
+    (nextSelection: GlobalSelection | null) => {
+      setGraphClickSelection(nextSelection);
+      setSelection((current) => retainGraphSelection(current, nextSelection));
+    },
     [],
   );
   const changeLocalSelection = useCallback(
-    (nextSelection: LocalSelection | null) =>
-      setSelection((current) => retainGraphSelection(current, nextSelection)),
+    (nextSelection: LocalSelection | null) => {
+      setGraphClickSelection(nextSelection);
+      setSelection((current) => retainGraphSelection(current, nextSelection));
+    },
     [],
   );
   const observeViewport = useCallback(
@@ -2407,6 +2420,7 @@ export function GraphExplorer({
       mostRecentlyOpenedDrawer.current = 'network-explorer';
       if (narrowGraphWorkspace) setInspectorOpen(false);
       setNetworkExplorerOpen(true);
+      setGraphClickSelection(null);
     },
     [closeNetworkExplorer, narrowGraphWorkspace, networkExplorerOpen],
   );
@@ -2440,6 +2454,17 @@ export function GraphExplorer({
       requestGlobalSemanticCenter,
       requestLocalSemanticCenter,
     ],
+  );
+  const revealGraphNode = useCallback(
+    (nodeId: ProjectionNodeId) => {
+      if (!networkExplorerVisible || networkProjection === undefined) return;
+      setNetworkExplorerRevealRequest((current) => ({
+        key: (current?.key ?? 0) + 1,
+        nodeId,
+        projection: networkProjection,
+      }));
+    },
+    [networkExplorerVisible, networkProjection],
   );
   const inspectNetworkExplorerNode = useCallback(
     (nodeId: ProjectionNodeId, origin: HTMLElement | null) => {
@@ -3476,6 +3501,7 @@ export function GraphExplorer({
                   )
                 }
                 onNodeActivate={enterFocusScope}
+                onNodeSingleClick={revealGraphNode}
                 onSelectionChange={changeGlobalSelection}
                 onTransitionAnchorApiChange={changeGlobalTransitionAnchorApi}
                 onViewportObservation={observeGlobalViewport}
@@ -3543,6 +3569,8 @@ export function GraphExplorer({
                   )
                 }
                 onFitRequestConsumed={consumeLocalFitRequest}
+                onNodeActivate={focusLocalEntity}
+                onNodeSingleClick={revealGraphNode}
                 onSelectionChange={changeLocalSelection}
                 onTransitionAnchorApiChange={changeLocalFreeTransitionAnchorApi}
                 onTransitionAnchorConsumed={consumeLocalTransitionAnchor}
@@ -3655,6 +3683,12 @@ export function GraphExplorer({
               onFolderStateChange={setNetworkExplorerFolderState}
               onSelectNode={selectNetworkExplorerNode}
               selection={networkExplorerSelection}
+              deferSelectionReveal={selection === graphClickSelection}
+              revealRequest={
+                networkExplorerRevealRequest?.projection === networkProjection
+                  ? networkExplorerRevealRequest
+                  : undefined
+              }
             />
           ) : null}
           {!inspectorOpen ? (

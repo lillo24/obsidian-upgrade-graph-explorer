@@ -199,6 +199,27 @@ export function shouldRevealNetworkExplorerSelection(
   return selectedNodeId !== undefined && selectedNodeId !== previousNodeId;
 }
 
+/** Transient graph click intent; a new key can reveal the same selected node. */
+export interface NetworkExplorerRevealRequest {
+  readonly key: number;
+  readonly nodeId: ProjectionNodeId;
+}
+
+/** Graph clicks align the row top, clamped to the list's actual scroll range. */
+export function networkExplorerTopAlignedScrollTop(args: {
+  readonly index: number;
+  readonly rowCount: number;
+  readonly viewportHeight: number;
+}): number {
+  return Math.max(
+    0,
+    Math.min(
+      args.index * NETWORK_EXPLORER_ROW_HEIGHT,
+      args.rowCount * NETWORK_EXPLORER_ROW_HEIGHT - args.viewportHeight,
+    ),
+  );
+}
+
 export function networkExplorerVirtualWindow(args: {
   readonly rowCount: number;
   readonly scrollTop: number;

@@ -32,6 +32,7 @@ import {
   NETWORK_EXPLORER_ROW_HEIGHT,
   networkExplorerKeyboardAction,
   networkExplorerScrollTopForIndex,
+  networkExplorerTopAlignedScrollTop,
   networkExplorerVirtualWindow,
   shouldRevealNetworkExplorerSelection,
   revealNetworkExplorerNode,
@@ -39,6 +40,7 @@ import {
   type NetworkExplorerModel,
   type NetworkExplorerNode,
   type NetworkExplorerRow,
+  type NetworkExplorerRevealRequest,
 } from '../network-explorer-model';
 
 interface NetworkExplorerProps {
@@ -59,6 +61,9 @@ interface NetworkExplorerProps {
   readonly onFolderStateChange: (state: NetworkExplorerFolderState) => void;
   readonly onSelectNode: (nodeId: ProjectionNodeId) => void;
   readonly selection: GraphSelection | null;
+  /** Raw graph selection highlights now; its confirmed click reveals later. */
+  readonly deferSelectionReveal?: boolean;
+  readonly revealRequest?: NetworkExplorerRevealRequest | undefined;
 }
 
 const DEFAULT_VIEWPORT_HEIGHT = NETWORK_EXPLORER_ROW_HEIGHT * 8;
@@ -97,6 +102,8 @@ export const NetworkExplorer = memo(function NetworkExplorer({
   onFolderStateChange,
   onSelectNode,
   selection,
+  deferSelectionReveal = false,
+  revealRequest,
 }: NetworkExplorerProps) {
   const rows = useMemo(
     () => flattenNetworkExplorerRows(model, folderState),
@@ -132,6 +139,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
     undefined,
   );
   const rowIndexById = useMemo(() => indexNetworkExplorerRows(rows), [rows]);
+  const handledRevealRequest = useRef(revealRequest?.key);
   const contextTarget =
     context === null ||
     context.model !== model ||
@@ -272,6 +280,10 @@ export const NetworkExplorer = memo(function NetworkExplorer({
       selectedNodeId,
     );
     lastRevealedSelectionNodeId.current = selectedNodeId;
+    if (deferSelectionReveal) {
+      pendingSelectionReveal.current = undefined;
+      return;
+    }
     if (
       selectedNodeId === undefined ||
       (!changed && pendingSelectionReveal.current !== selectedNodeId)
@@ -302,12 +314,56 @@ export const NetworkExplorer = memo(function NetworkExplorer({
     setActiveRowId(selectedRowId);
     revealIndex(index);
   }, [
+    deferSelectionReveal,
     folderState,
     model,
     onFolderStateChange,
     revealIndex,
     rowIndexById,
     selectedNodeId,
+  ]);
+
+  useEffect(() => {
+    if (
+      revealRequest === undefined ||
+      revealRequest.key === handledRevealRequest.current
+    )
+      return;
+    // A confirmed graph click can target a node inside a collapsed folder.
+    // Consume its key only after the controlled ancestor expansion has rendered.
+    const revealed = revealNetworkExplorerNode(
+      folderState,
+      model,
+      revealRequest.nodeId,
+    );
+    if (revealed !== folderState) {
+      onFolderStateChange(revealed);
+      return;
+    }
+    handledRevealRequest.current = revealRequest.key;
+    const rowId = `node:${revealRequest.nodeId}`;
+    const index = rowIndexById.get(rowId);
+    const scroller = scrollerRef.current;
+    if (index === undefined || scroller === null) return;
+    const nextScrollTop = networkExplorerTopAlignedScrollTop({
+      index,
+      rowCount: rows.length,
+      viewportHeight: scroller.clientHeight || viewportHeight,
+    });
+    // Updating both DOM and virtual range mounts an off-screen target without
+    // moving keyboard focus out of the canvas or relying on scroll event timing.
+    focusPending.current = false;
+    setActiveRowId(rowId);
+    scroller.scrollTop = nextScrollTop;
+    setScrollTop(nextScrollTop);
+  }, [
+    folderState,
+    model,
+    onFolderStateChange,
+    revealRequest,
+    rowIndexById,
+    rows.length,
+    viewportHeight,
   ]);
 
   useEffect(() => {

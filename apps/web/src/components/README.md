@@ -154,8 +154,16 @@ canonical truth, or own a platform storage implementation.
   Visual indent is capped at 12 levels to retain usable labels on deep paths;
   logical ARIA depth is exact. Diagnostics trail at root, never grouped by target.
   Neither module reads edges or reconstructs hidden canonical topology.
+  Graph selection highlights immediately but defers that automatic reveal;
+  confirmed canvas single-clicks carry a fresh, projection-scoped transient request
+  through `GraphExplorer.tsx`, even for the same selected node. Those requests align
+  the row top with the viewport, clamped at the list end, and mount virtual rows
+  without taking keyboard focus. Keyboard and other selection reveals retain
+  minimum scrolling. Requests are not persisted or replayed when reopening a drawer.
+
   Visible rows show only the title and an optional Focus badge; path/context
   remains in accessible names and node tooltips, without a secondary text line.
+
 - `GraphQueryEditor.tsx` is the controlled QUERY1 presentation reused in Network
   Explorer and Hierarchy Filters. `use-graph-query-draft.ts` lives at GraphExplorer
   level and preserves transient drafts across placement/unmounts. It commits only
