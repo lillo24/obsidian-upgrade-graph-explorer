@@ -1235,26 +1235,24 @@ h2 {
   font-weight: 700;
 }
 
-.network-node-size label {
+.network-node-size__range {
   display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
   gap: 0.35rem;
   font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.network-node-size select,
 .network-node-size input {
   width: 100%;
   min-width: 0;
 }
 
-.network-node-size select {
-  min-height: 2.25rem;
-  padding: 0.25rem;
-  border: 1px solid #99acb6;
-  border-radius: 0.25rem;
-  color: #203f4d;
-  background: #fff;
-  font: inherit;
+.network-node-size__value {
+  text-align: center;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .network-node-size__status,

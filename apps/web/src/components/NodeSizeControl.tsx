@@ -19,44 +19,42 @@ export function NodeSizeControl({
   const value = sizeScale ?? 1;
   return (
     <fieldset className="network-node-size" disabled={disabled}>
-      <legend>Network size</legend>
+      <legend>Size</legend>
+      <div className="network-node-size__range">
+        <span aria-hidden="true">{NODE_SIZE_SCALE_RANGE.min.toFixed(2)}×</span>
+        <input
+          aria-describedby={`${id}-help ${id}-status`}
+          aria-label="File size"
+          aria-valuetext={`${value.toFixed(2)} times calculated Network size`}
+          id={`${id}-scale`}
+          max={NODE_SIZE_SCALE_RANGE.max}
+          min={NODE_SIZE_SCALE_RANGE.min}
+          onChange={(event) => onChange(event.currentTarget.valueAsNumber)}
+          step="0.05"
+          type="range"
+          value={value}
+        />
+        <span aria-hidden="true">{NODE_SIZE_SCALE_RANGE.max.toFixed(2)}×</span>
+      </div>
+      <output
+        aria-hidden="true"
+        className="network-node-size__value"
+        htmlFor={`${id}-scale`}
+      >
+        {value.toFixed(2)}×
+      </output>
+      <button
+        aria-label="Reset size"
+        onClick={() => onChange(undefined)}
+        type="button"
+      >
+        Reset
+      </button>
+      <span className="visually-hidden" id={`${id}-help`}>
+        Adjust this File relative to its calculated Network size.
+      </span>
       <p id={`${id}-status`} className="network-node-size__status">
         {status}
-      </p>
-      <label>
-        Size
-        <select
-          aria-describedby={`${id}-status`}
-          onChange={(event) =>
-            onChange(event.target.value === 'auto' ? undefined : 1)
-          }
-          value={sizeScale === undefined ? 'auto' : 'custom'}
-        >
-          <option value="auto">Auto</option>
-          <option value="custom">Custom</option>
-        </select>
-      </label>
-      {sizeScale === undefined ? null : (
-        <label htmlFor={`${id}-scale`}>
-          Size multiplier{' '}
-          <output aria-hidden="true" htmlFor={`${id}-scale`}>
-            {value.toFixed(2)}×
-          </output>
-          <input
-            aria-valuetext={`${value.toFixed(2)} times automatic Network size`}
-            id={`${id}-scale`}
-            max={NODE_SIZE_SCALE_RANGE.max}
-            min={NODE_SIZE_SCALE_RANGE.min}
-            onChange={(event) => onChange(event.currentTarget.valueAsNumber)}
-            step="0.05"
-            type="range"
-            value={value}
-          />
-        </label>
-      )}
-      <p className="network-node-size__status">
-        Relative to automatic Network size. Focus roots retain a minimum
-        emphasis. Auto removes this override.
       </p>
     </fieldset>
   );

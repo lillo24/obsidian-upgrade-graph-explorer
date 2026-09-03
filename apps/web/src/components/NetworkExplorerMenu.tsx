@@ -53,10 +53,10 @@ export function NetworkExplorerMenu({
       );
     };
     place();
-    // A slider update must not refocus the select. Only switching screens does.
+    // Focus the editor only on entry, never again for slider value updates.
     if (editing) {
       (
-        menu.querySelector<HTMLElement>('select:not(:disabled)') ??
+        menu.querySelector<HTMLElement>('input[type="range"]:not(:disabled)') ??
         menu.querySelector<HTMLElement>('button')
       )?.focus();
     } else

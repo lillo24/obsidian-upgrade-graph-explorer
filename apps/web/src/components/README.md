@@ -56,8 +56,10 @@ canonical truth, or own a platform storage implementation.
   structural-depth action. Choosing a depth is a fresh preset: it clears
   per-entity expand/collapse exceptions while preserving the independent
   Heading limit, Blocks option, Focus, and graph filters.
-- `NodeSizeControl.tsx` is the controlled Auto/Custom size editor content for
-  Network File actions. It emits one multiplier/reset callback per input event;
+- `NodeSizeControl.tsx` is the controlled multiplier slider for Network File
+  actions. It always displays a value (1.00× without an entry), and Reset removes
+  the entry. There is no sizing-mode selector. It emits one multiplier/reset
+  callback per input event;
   eligibility, validation, storage, and renderer mapping remain outside. It
   occupies the editor screen of the shared Network Explorer action portal.
 - `controlled-selection.ts` prevents equivalent controlled renderer selection
@@ -171,7 +173,7 @@ canonical truth, or own a platform storage implementation.
   tree. This disclosure is local presentation state, not another hidden-file list
   or query source of truth.
 - `NetworkExplorerMenu.tsx` renders one accessible portal for the current logical
-  row target, switching from its action menu to an Auto/Custom Size editor for
+  row target, switching from its action menu to a multiplier/Reset Size editor for
   canonical Files without introducing a second menu. It owns enabled-item
   keyboard focus, viewport bounds, and outside dismissal;
   NetworkExplorer invalidates it on scroll/projection changes and safely restores

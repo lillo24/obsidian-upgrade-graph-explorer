@@ -1,17 +1,44 @@
 # VISUAL1B implementation report
 
-Status: **Implemented and browser-checked; native QA/merge gate remains open.**
+Status: **Draft/unmerged. Native QA is blocked by the separately reported
+Network-layout flicker issue; the Size UI correction does not address it.**
 
 [PR #51](https://github.com/lillo24/icarus-graph-explorer/pull/51) integrates
 `main` at `b81cc2c`, including merged KG14B3 PR #52. No competing action menu or
 Hide mechanism was introduced. The task checkout remains available for QA.
 
+## QA correction — Size UI only
+
+The follow-up correction removes Auto/Custom modes and long visible explanatory
+copy. Size is now one always-visible 0.50–2.50× slider, current value, and Reset.
+No entry displays 1.00×; moving the slider emits the multiplier immediately;
+Reset emits `undefined`, removing the entry and restoring the displayed 1.00×.
+The native range is named File size and describes its value as “times calculated
+Network size.” A short screen-reader explanation and persistence/error status
+remain available. Entry focuses the slider; Escape/focus restoration stays in
+the existing shared menu. Row tooltips/accessibility no longer say Custom.
+
+The UI correction's 30 focused tests and web typecheck passed. Full `pnpm check`
+also passed formatting, lint, workspace typechecks, 979 tests across 113 files,
+and the production web build. Browser checks
+passed for initial 1.00×, keyboard arrows/Home/End, Reset by keyboard and pointer,
+Escape row-focus restoration, unchanged selection, and reading the saved value
+after reload. The compact editor was visually checked; no console errors or
+warnings were logged. Unsupported-kind eligibility remains covered by the
+existing context/row tests. This is **not** a graph movement/flicker QA pass.
+
+No changes or investigation were made to the override package, persistence,
+eligibility, QUERY1, virtualization, Visual Groups, view-state, renderer formula,
+layout inputs/fingerprints, ForceAtlas2, workers, or caches. The new prompt is
+archived alongside the original. All work remains in PR #51.
+
 ## Summary and override architecture
 
 Canonical Files now offer **Size** in Network Explorer's existing action menu,
-with a controlled Auto/Custom editor and a compact custom multiplier indicator.
-Custom scales range from 0.5 to 2.5 in steps of 0.05. Auto removes the entry;
-Custom 1.00 is a stored override, even when it looks identical to Auto.
+with a controlled multiplier slider, Reset, and a compact multiplier indicator
+when an entry exists. Scales range from 0.5 to 2.5 in steps of 0.05. Reset removes
+the entry and displays 1.00×; moving the slider to 1.00× stores that multiplier
+without presenting a different sizing mode.
 
 `packages/presentation-overrides` owns a source-neutral, strictly validated v1
 WorkspaceId/EntityId registry, deterministic serialization, pure mutations, and
@@ -28,7 +55,7 @@ Focus: clamp(existing File/root base × per-file scale, root minimum or 2, 24)
 
 The Focus root retains its existing minimum emphasis of 8.4. Automatic All
 sizing still composes base node size and link-degree influence before applying
-the per-file multiplier. Auto preserves the existing mapper path. Headings,
+the per-file multiplier. No override preserves the existing mapper path. Headings,
 blocks, diagnostic nodes, and Hierarchy sizing remain unchanged.
 
 Final sizes enter the normal mapping/layout fingerprints; no post-mapping
@@ -65,7 +92,7 @@ not clear overrides. QUERY1, Saved Filters, Visual Groups, navigation history,
 global preferences, and view-state schema v3 remain separate and unchanged.
 Visual Group colors compose independently with custom size.
 
-## Validation and performance
+## Original integration validation and performance
 
 - Frozen-lockfile install and full `pnpm check` passed: formatting, lint,
   workspace typechecks, **966 tests across 112 files**, and production web build.
@@ -114,8 +141,8 @@ browser QA group/size edits were removed and global settings restored afterward.
 
 Use the newly built optimized executable, not an older running app:
 
-1. In All + Network, open File Actions → Size. Drag and keyboard-adjust Custom
-   from 0.5 to 2.5, then Auto. Confirm the size/indicator update, editor focus
+1. In All + Network, open File Actions → Size. Drag and keyboard-adjust the
+   multiplier from 0.5 to 2.5, then Reset. Confirm the size/indicator update, editor focus
    stays usable, and opening/editing does not select or center another File.
 2. Open the same editor using right-click and Shift+F10. Check Escape, Tab,
    sidebar close/reopen, short/narrow windows, and scrolling away from the row
@@ -123,7 +150,7 @@ Use the newly built optimized executable, not an older running app:
 3. Check the same File in Focus + Network, including the protected root minimum.
    Headings/blocks/diagnostics must not gain Size; Hierarchy must be unchanged.
 4. Combine a custom size with a Visual Group and global base-size/link-influence
-   controls. Confirm colors and automatic sizing still compose; Auto restores
+   controls. Confirm colors and automatic sizing still compose; Reset restores
    automatic size. Pan, mouse wheel, two-finger scroll, and pinch must still work.
 5. Hide/unhide the File, apply/clear a saved query, and use Back/Forward. Its
    override must survive. Reset saved view must not erase it.
@@ -133,8 +160,10 @@ Use the newly built optimized executable, not an older running app:
    size must follow. Remove it while its editor is open; the editor must close
    safely. An unrelated replacement/new identity must not inherit that size.
 
-**Native interaction/live-update QA has not been run or marked passed. Do not
-merge until the user confirms this gate.** Then check current main/CI again,
+**Native QA is blocked by the separate Network-layout flicker issue. This UI-only
+correction does not investigate or fix that issue, and native interaction/live-update
+QA is not marked passed. Do not merge this correction.** After that separate
+issue and native QA are resolved, check current main/CI again,
 merge through the PR, verify post-merge CI, and remove only this task's checkout
 and branch when no further QA is needed.
 

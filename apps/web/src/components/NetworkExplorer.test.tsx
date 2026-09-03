@@ -136,7 +136,8 @@ describe('Network Explorer drawer', () => {
     expect(markup.match(/class="network-explorer__size-badge"/gu)).toHaveLength(
       1,
     );
-    expect(markup).toContain('Custom Network size: 1.50×');
+    expect(markup).toContain('File size: 1.50×');
+    expect(markup).not.toContain('Custom Network size');
     expect(markup).toContain('aria-label="Actions for file.md"');
     for (const name of ['heading', 'block', 'diagnostic'])
       expect(markup).not.toContain(`aria-label="Actions for ${name}.md"`);

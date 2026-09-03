@@ -112,7 +112,7 @@ function nodeAccessibleName(
     node.secondary,
     sizeScale === undefined
       ? undefined
-      : `Custom Network size ${sizeScale.toFixed(2)} times automatic`,
+      : `File size ${sizeScale.toFixed(2)} times calculated Network size`,
     node.focusRoot ? 'Focus' : undefined,
     node.focusDistance === null || node.focusRoot
       ? undefined
@@ -610,9 +610,9 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                       ) : null}
                       {sizeScale === undefined ? null : (
                         <span
-                          aria-label={`Custom Network size ${sizeScale.toFixed(2)} times automatic`}
+                          aria-label={`File size ${sizeScale.toFixed(2)} times calculated Network size`}
                           className="network-explorer__size-badge"
-                          title={`Custom Network size: ${sizeScale.toFixed(2)}×`}
+                          title={`File size: ${sizeScale.toFixed(2)}×`}
                         >
                           {sizeScale.toFixed(2)}×
                         </span>
