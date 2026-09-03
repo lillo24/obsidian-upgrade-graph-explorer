@@ -1,6 +1,11 @@
 import Sigma from 'sigma';
 import type { WheelCoords } from 'sigma/types';
 import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-groups';
+import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
+import {
+  changedFileSizeNodeKeys,
+  indexFileNodeKeys,
+} from './node-size-presentation';
 
 import {
   buildLocalGraph,
@@ -48,6 +53,7 @@ export interface LocalRendererSessionOptions {
   readonly initialViewportNodeKey?: string;
   readonly instrumentation?: LocalRendererInstrumentation;
   readonly visualGroupStyles?: VisualGroupPresentationMap;
+  readonly presentationOverrides?: EntityPresentationOverrideMap;
   readonly onNodeSingleClick?: (key: string) => void;
   readonly onNodeActivated?: (entityId: string) => void;
   readonly onNodeSelected?: (
@@ -84,6 +90,9 @@ export class LocalRendererSession {
   private pendingViewportAnchorNodeKey: string | undefined;
   private visualLod: LocalVisualLod;
   private visualGroupStyles: VisualGroupPresentationMap | undefined;
+  private presentationOverrides: EntityPresentationOverrideMap | undefined;
+  private fileNodeKeys: ReturnType<typeof indexFileNodeKeys>;
+  private sizeStyleRefreshPending: Set<string> | undefined;
   private trackpadZoomMode: LocalTrackpadZoomMode;
   private readonly options: LocalRendererSessionOptions;
   private precisionWheelIdleTimer: number | undefined;
@@ -163,6 +172,8 @@ export class LocalRendererSession {
     this.rootNodeKey = options.rootNodeKey;
     this.trackpadZoomMode = options.trackpadZoomMode;
     this.visualGroupStyles = options.visualGroupStyles;
+    this.presentationOverrides = options.presentationOverrides;
+    this.fileNodeKeys = indexFileNodeKeys(input.nodes);
     this.graph = buildLocalGraph(input);
     this.neighborhoods = createLocalNeighborhoodIndex(input);
     const mountStarted = performance.now();
@@ -238,6 +249,10 @@ export class LocalRendererSession {
   }
 
   private reduceNode(key: string, attributes: LocalNodeAttributes) {
+    const sizeScale =
+      attributes.entityId === null
+        ? undefined
+        : this.presentationOverrides?.get(attributes.entityId)?.sizeScale;
     const hovered = key === this.hoveredNode;
     const visualGroup =
       attributes.entityId === null
@@ -252,6 +267,7 @@ export class LocalRendererSession {
       selected: key === this.selectedNode,
       lod: this.visualLod,
       ...(visualGroup === undefined ? {} : { visualGroup }),
+      ...(sizeScale === undefined ? {} : { sizeScale }),
     });
   }
 
@@ -313,22 +329,47 @@ export class LocalRendererSession {
   setVisualGroupStyles(styles?: VisualGroupPresentationMap): void {
     this.visualGroupStyles = styles;
     this.options.instrumentation?.count('local-style-updates');
+    this.visualStyleRefreshPending = true;
     if (this.topologyRefreshPending !== undefined) {
       // A projection update has already changed Graphology, but Sigma has not
       // indexed the new nodes yet. Coalesce the style repaint behind that
       // process/render boundary so partial repaint never targets stale indices.
-      this.visualStyleRefreshPending = true;
       return;
     }
-    this.refreshVisualGroupStyles();
+    this.refreshPendingStyles();
   }
 
-  private refreshVisualGroupStyles(): void {
-    // Sigma 3 applies node reducers during refresh, not a render-only pass.
-    // Repaint existing nodes without rebuilding its node/edge indices.
+  setPresentationOverrides(overrides?: EntityPresentationOverrideMap): void {
+    const keys = changedFileSizeNodeKeys(
+      this.presentationOverrides,
+      overrides,
+      this.fileNodeKeys,
+    );
+    this.presentationOverrides = overrides;
+    if (this.destroyed || keys.length === 0) return;
+    this.options.instrumentation?.count('local-style-updates');
+    this.sizeStyleRefreshPending ??= new Set();
+    for (const key of keys) this.sizeStyleRefreshPending.add(key);
+    if (this.topologyRefreshPending === undefined) this.refreshPendingStyles();
+  }
+
+  private refreshPendingStyles(): void {
+    if (this.destroyed) return;
+    const sizeKeys = [...(this.sizeStyleRefreshPending ?? [])].filter((key) =>
+      this.graph.hasNode(key),
+    );
+    const nodes = this.visualStyleRefreshPending
+      ? this.graph.nodes()
+      : sizeKeys;
+    this.visualStyleRefreshPending = false;
+    this.sizeStyleRefreshPending = undefined;
+    if (nodes.length === 0) return;
+    // Sigma 3.0.3 refresh reruns only these reducers. Radius changes must also
+    // process label/program/picking indices (skipIndexation=false), but never
+    // submit a layout or change Graphology coordinates. Color-only stays fast.
     this.renderer.refresh({
-      partialGraph: { nodes: this.graph.nodes() },
-      skipIndexation: true,
+      partialGraph: { nodes },
+      skipIndexation: sizeKeys.length === 0,
       schedule: true,
     });
   }
@@ -351,6 +392,7 @@ export class LocalRendererSession {
           );
     this.rootNodeKey = input.rootNodeKey;
     this.neighborhoods = createLocalNeighborhoodIndex(input);
+    this.fileNodeKeys = indexFileNodeKeys(input.nodes);
     if (
       this.selectedNode !== undefined &&
       !this.graph.hasNode(this.selectedNode)
@@ -378,9 +420,7 @@ export class LocalRendererSession {
       void refresh.then(() => {
         if (this.topologyRefreshPending !== refresh) return;
         this.topologyRefreshPending = undefined;
-        if (!this.visualStyleRefreshPending || this.destroyed) return;
-        this.visualStyleRefreshPending = false;
-        this.refreshVisualGroupStyles();
+        this.refreshPendingStyles();
       });
     }
     return result;

@@ -176,6 +176,22 @@ projection, renderer, UI, layout, navigation, or membership cache. The web app
 owns a separate strict schema-v1 workspace registry and derives maps only for
 entity IDs already visible in a completed projection.
 
+`packages/presentation-overrides` depends only on source-neutral core. Its
+strict v1 workspace registry stores opaque EntityIds and bounded per-File
+Network size multipliers, with Auto represented by absence. It owns validation,
+deterministic serialization, and sparse canonical-Document reconciliation, not
+storage or projection. Missing IDs remain stored but inactive; path/title
+matching and query-driven pruning are forbidden. The app owns stable versus
+session-only persistence and supplies the resolved map to All/Focus Network
+sessions through independent canvas effects. Per-File multipliers affect Sigma
+node display reducers only; automatic sizes remain in mapping/layout inputs and
+fingerprints. Size edits refresh affected node reducers with Sigma indexation
+for labels/picking but never submit layout or change coordinates. Sparse map
+diffs use a topology-owned File-key index, and pending topology processing gates
+style refreshes. Group colors remain independent. Saved-view schema v3,
+preferences, query membership,
+visibility, canonical snapshots, and identity catalogs are unchanged.
+
 `packages/explorer-inspection` depends inward on core and view-projection. It
 builds canonical hierarchy/reference/search indexes once per snapshot and emits
 plain deterministic entity, occurrence, subtree-relationship, projected

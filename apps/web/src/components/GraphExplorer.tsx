@@ -138,6 +138,7 @@ import {
   saveGraphPreferences,
 } from '../preferences/graph-preferences';
 import { deriveProjectionVisualGroupPresentationMap } from '../visual-groups/presentation';
+import { usePresentationOverrides } from '../presentation-overrides/use-presentation-overrides';
 import {
   commitVisualGroupSessionMutation,
   createVisualGroupSession,
@@ -501,6 +502,12 @@ export function GraphExplorer({
       ),
     [snapshot],
   );
+  const nodePresentation = usePresentationOverrides({
+    workspaceId,
+    eligibility,
+    storage: persistenceStorage,
+    entityById: visualGroupEntityById,
+  });
   const currentReconciliation = useMemo(
     () => reconcileCurrentWorkspaceView(projectionWorkspace, viewState),
     [projectionWorkspace, viewState],
@@ -3450,6 +3457,11 @@ export function GraphExplorer({
             {visualGroupError}
           </p>
         )}
+        {nodePresentation.session.error === undefined ? null : (
+          <p className="graph-alert" role="alert">
+            {nodePresentation.session.error}
+          </p>
+        )}
         {globalFailure === undefined ? null : (
           <p className="graph-alert" role="alert">
             {globalFailure}
@@ -3499,6 +3511,7 @@ export function GraphExplorer({
                 projection={result.projection}
                 selection={activeSelection}
                 settings={globalLayoutSettings}
+                presentationOverrides={nodePresentation.overrides}
                 trackpadZoomMode={trackpadZoomMode}
                 visualGroupStyles={visualGroupPresentation.styles}
               />
@@ -3570,6 +3583,7 @@ export function GraphExplorer({
                 rootEntityId={localRootEntityId}
                 selection={activeSelection}
                 trackpadZoomMode={trackpadZoomMode}
+                presentationOverrides={nodePresentation.overrides}
                 visualGroupStyles={visualGroupPresentation.styles}
               />
             ) : LocalStructuredGraphView !== undefined ? (
@@ -3653,6 +3667,15 @@ export function GraphExplorer({
           networkExplorerModel !== undefined &&
           networkExplorerVisible ? (
             <NetworkExplorer
+              presentationOverrides={nodePresentation.overrides}
+              sizePersistenceStatus={nodePresentation.session.status}
+              sizeEditingDisabled={
+                nodePresentation.session.persistenceMode ===
+                  'blocked-corrupt' ||
+                nodePresentation.session.persistenceMode ===
+                  'blocked-write-failure'
+              }
+              onSizeScaleChange={nodePresentation.changeSizeScale}
               queryEditor={{
                 ...queryEditor,
                 queryIssue:

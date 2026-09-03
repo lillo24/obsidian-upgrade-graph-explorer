@@ -1197,6 +1197,100 @@ h2 {
   line-height: 1.4;
 }
 
+.network-explorer-menu--editor {
+  width: min(19rem, calc(100vw - 1rem));
+  padding: 0.65rem;
+}
+
+.network-explorer-menu__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.network-explorer-menu__heading strong {
+  overflow: hidden;
+  font-size: 0.85rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.network-explorer-menu__heading button {
+  flex: 0 0 2.5rem;
+  text-align: center;
+}
+
+.network-node-size {
+  display: grid;
+  min-width: 0;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0.35rem 0;
+  border: 0;
+}
+
+.network-node-size legend {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.network-node-size__range {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.network-node-size input {
+  width: 100%;
+  min-width: 0;
+}
+
+.network-node-size__value {
+  text-align: center;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.network-node-size__status,
+.network-node-size__error {
+  margin: 0;
+  color: #526b77;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.network-node-size__error {
+  color: #a22739;
+}
+
+.network-explorer__actions {
+  flex: 0 0 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid #cbd6db;
+  border-radius: 0.3rem;
+  color: #42616d;
+  background: #f7fbfb;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.network-explorer__actions:hover,
+.network-explorer__actions:focus-visible {
+  background: #dceff0;
+}
+
+.network-explorer__size-badge {
+  flex: 0 0 auto;
+  color: #526b77;
+  font-size: 0.65rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .network-explorer__virtual-space {
   position: relative;
   min-width: 0;

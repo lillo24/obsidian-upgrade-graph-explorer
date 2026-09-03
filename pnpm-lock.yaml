@@ -65,6 +65,9 @@ importers:
       '@icarus-graph-explorer/performance':
         specifier: workspace:*
         version: link:../../packages/performance
+      '@icarus-graph-explorer/presentation-overrides':
+        specifier: workspace:*
+        version: link:../../packages/presentation-overrides
       '@icarus-graph-explorer/renderer-reactflow':
         specifier: workspace:*
         version: link:../../packages/renderer-reactflow
@@ -206,6 +209,12 @@ importers:
 
   packages/performance: {}
 
+  packages/presentation-overrides:
+    dependencies:
+      '@icarus-graph-explorer/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/renderer-reactflow:
     dependencies:
       '@icarus-graph-explorer/dagre-layout':
@@ -239,6 +248,9 @@ importers:
 
   packages/renderer-sigma:
     dependencies:
+      '@icarus-graph-explorer/presentation-overrides':
+        specifier: workspace:*
+        version: link:../presentation-overrides
       '@icarus-graph-explorer/view-projection':
         specifier: workspace:*
         version: link:../view-projection
