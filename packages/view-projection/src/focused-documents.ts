@@ -1,4 +1,4 @@
-import type { EntityId } from '@icarus-graph-explorer/core';
+import type { EntityId, ReferenceId } from '@icarus-graph-explorer/core';
 
 import { buildBaseProjection } from './base-projection';
 import { prepareViewProjectionFilters } from './filter-plan';
@@ -36,7 +36,23 @@ export interface FocusedDocumentNeighborhood {
   readonly rootDocumentId: EntityId;
   readonly rootDocumentNode: ProjectedEntityNode;
   readonly documentDistance: ReadonlyMap<EntityId, number>;
-  readonly allowedDiagnosticReferenceIds: ReadonlySet<string>;
+  readonly allowedDiagnosticReferenceIds: ReadonlySet<ReferenceId>;
+  readonly issues: readonly ProjectionIssue[];
+  readonly documentProjection: ViewProjection;
+}
+
+export interface FocusedDocumentNeighborhoodDescription {
+  readonly rootDocumentEntityId: EntityId;
+  readonly focus: {
+    readonly direction: 'incoming' | 'outgoing' | 'both';
+    readonly hops: 1 | 2 | 3;
+  };
+  readonly documentProjection: ViewProjection;
+  readonly documentDistances: readonly {
+    readonly documentEntityId: EntityId;
+    readonly distance: number;
+  }[];
+  readonly allowedDiagnosticReferenceIds: readonly ReferenceId[];
   readonly issues: readonly ProjectionIssue[];
 }
 
@@ -115,6 +131,39 @@ export function projectFocusedDocumentNeighborhood(
         node.kind === 'reference-target' ? node.referenceIds : [],
       ),
     ),
+    issues: neighborhood.issues,
+    documentProjection: neighborhood,
+  };
+}
+
+/** Returns the existing document Focus pass as deterministic plain data. */
+export function describeFocusedDocumentNeighborhood(
+  workspace: ProjectionWorkspace,
+  state: ViewProjectionState,
+): FocusedDocumentNeighborhoodDescription {
+  const neighborhood = projectFocusedDocumentNeighborhood(
+    workspace,
+    state,
+    'focused document neighborhood',
+  );
+  if (state.focus === undefined) {
+    throw new Error('Cannot describe a focused neighborhood without Focus.');
+  }
+  return {
+    rootDocumentEntityId: neighborhood.rootDocumentId,
+    focus: {
+      direction: state.focus.direction,
+      hops: state.focus.hops,
+    },
+    documentProjection: neighborhood.documentProjection,
+    documentDistances: [...neighborhood.documentDistance]
+      .map(([documentEntityId, distance]) => ({ documentEntityId, distance }))
+      .sort((left, right) =>
+        compareText(left.documentEntityId, right.documentEntityId),
+      ),
+    allowedDiagnosticReferenceIds: [
+      ...neighborhood.allowedDiagnosticReferenceIds,
+    ].sort(compareText),
     issues: neighborhood.issues,
   };
 }

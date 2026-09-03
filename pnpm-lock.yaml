@@ -185,6 +185,25 @@ importers:
         specifier: workspace:*
         version: link:../view-projection
 
+  packages/focus-schematic:
+    dependencies:
+      '@icarus-graph-explorer/core':
+        specifier: workspace:*
+        version: link:../core
+      '@icarus-graph-explorer/view-projection':
+        specifier: workspace:*
+        version: link:../view-projection
+    devDependencies:
+      '@icarus-graph-explorer/adapter-obsidian':
+        specifier: workspace:*
+        version: link:../adapter-obsidian
+      '@icarus-graph-explorer/resolver-obsidian':
+        specifier: workspace:*
+        version: link:../resolver-obsidian
+      '@types/node':
+        specifier: 24.13.3
+        version: 24.13.3
+
   packages/graph-query:
     dependencies:
       '@icarus-graph-explorer/core':
@@ -444,6 +463,9 @@ importers:
       '@icarus-graph-explorer/explorer-inspection':
         specifier: workspace:*
         version: link:../../packages/explorer-inspection
+      '@icarus-graph-explorer/focus-schematic':
+        specifier: workspace:*
+        version: link:../../packages/focus-schematic
       '@icarus-graph-explorer/global-renderer-spike':
         specifier: workspace:*
         version: link:../global-renderer-spike

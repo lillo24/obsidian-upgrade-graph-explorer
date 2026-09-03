@@ -154,6 +154,12 @@ projection-only diagnostic targets. Source adapters, filesystem/platform APIs,
 renderers, layout engines, application code, and graph libraries are
 mechanically excluded from its production source.
 
+`packages/focus-schematic` depends inward on core and view-projection only. It
+owns the deterministic schema-v1 File-module model for a fixed KG6 Focus
+neighborhood, strict construction/validation, aggregate semantic summary, and
+renderer-independent layout-candidate, quality, and stability contracts. It is
+not imported by production rendering in HIER1. See ADR 0017.
+
 `packages/view-state` depends inward on core and view-projection only. It owns a
 versioned plain-data subset of KG6 disclosure, focus, user-facing filters,
 presentation mode, and separate semantic Structure/Global/Local

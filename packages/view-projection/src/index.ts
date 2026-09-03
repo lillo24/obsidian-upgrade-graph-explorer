@@ -12,6 +12,10 @@ export type {
 } from './instrumentation';
 export { projectStructureView } from './structure';
 export {
+  describeFocusedDocumentNeighborhood,
+  type FocusedDocumentNeighborhoodDescription,
+} from './focused-documents';
+export {
   containingDocumentEntityId,
   deriveLocalProjectionState,
   projectLocalView,
