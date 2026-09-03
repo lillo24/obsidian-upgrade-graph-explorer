@@ -483,6 +483,9 @@ importers:
       '@icarus-graph-explorer/workspace-worker':
         specifier: workspace:*
         version: link:../../packages/workspace-worker
+      sigma:
+        specifier: 3.0.3
+        version: 3.0.3(graphology-types@0.24.8)
     devDependencies:
       '@types/node':
         specifier: 24.13.3

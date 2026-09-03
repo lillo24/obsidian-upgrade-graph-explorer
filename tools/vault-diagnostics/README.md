@@ -29,6 +29,10 @@ src/
   benchmark-config.ts Deterministic smoke/small/medium/large workload profiles.
   benchmark.ts        Opt-in full-pipeline plus incremental timing entry point.
   incremental-benchmark.ts Edit/add/delete/move timings with exact rebuild oracles.
+  focus-spacing-fixtures.ts Deterministic sparse, mixed, dense, and disconnected Local scenes.
+  focus-spacing-metrics.ts  Graph, screen-space, Sigma-transform, and candidate-density metrics.
+  focus-spacing-analysis.ts SPACING1A runner and self-contained visual comparison generator.
+  focus-spacing-metrics.test.ts Transform invariance, candidate bounds, and fixture contracts.
   performance-benchmark.ts Repeated versioned pipeline/projection/renderer/inspection results.
   query-projection-benchmark.ts PERFQ1A projection phases, operations, and repeated-query evidence.
   performance-policy.ts Class budgets plus measured KG12B worker/cache decisions.
@@ -124,6 +128,7 @@ pnpm benchmark:global-renderer -- --profile large
 pnpm benchmark:local-renderer -- --profile small
 pnpm benchmark:local-renderer -- --profile medium
 pnpm benchmark:local-renderer -- --profile stress
+pnpm analyze:focus-spacing
 ```
 
 Profiles are deterministic and measure parse/adapt, resolution, report
@@ -212,6 +217,14 @@ visible-entity assignment, and renderer style-lookup distributions for 300 and
 3,000 visible entities with 4 and 8 enabled groups. Projection is explicitly
 outside the measured path, operation counts report zero topology/layout work,
 and the timings are evidence rather than CI gates.
+
+`analyze:focus-spacing` is the SPACING1A diagnostic-only contract. It runs the
+unchanged production Local ForceAtlas2 function over deterministic sparse,
+mixed, disconnected, and dense topologies, then applies Sigma 3.0.3's actual
+normalization and camera transforms in Node. It writes ignored synthetic JSON
+and a self-contained HTML comparison to `output/spacing1a/`. The candidate
+ratios are investigative evidence only: this command does not alter production
+layout settings, camera behavior, renderer state, fingerprints, or node sizes.
 
 An opt-in private check can validate one real workspace using an existing
 identity catalog:
