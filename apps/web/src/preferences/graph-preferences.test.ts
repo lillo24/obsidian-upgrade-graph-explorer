@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import {
+  customGlobalLayoutSettings,
+  DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE,
+} from '@icarus-graph-explorer/renderer-sigma/settings';
+
 import type { StorageLike } from '../persistence/storage';
 import {
   DEFAULT_GRAPH_PREFERENCES,
@@ -151,6 +156,85 @@ describe('graph preferences', () => {
         }),
       ),
     );
+    expect(invalid.preferences.globalLayoutSettings).toBe(
+      DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
+    );
+  });
+
+  it('normalizes a legacy custom v1 payload without discarding its values', () => {
+    const legacyCustom = {
+      linkForce: 1.25,
+      folderCohesion: 0.06,
+      withinFolderSpacing: 1.4,
+      betweenFolderSpacing: 4,
+      nodeSize: 6,
+      linkThickness: 1.2,
+      labelThreshold: 9,
+    };
+    const loaded = loadGraphPreferences(
+      memoryStorage(
+        JSON.stringify({
+          globalLayoutSettings: {
+            folderClustering: false,
+            spacingPreset: 'normal',
+            custom: legacyCustom,
+          },
+        }),
+      ),
+    );
+
+    expect(loaded.warning).toBeNull();
+    expect(loaded.preferences.globalLayoutSettings).toEqual({
+      folderClustering: false,
+      spacingPreset: 'normal',
+      custom: {
+        ...legacyCustom,
+        referenceDegreeSizeInfluence: DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE,
+      },
+    });
+  });
+
+  it('round-trips new custom v1 settings including link influence', () => {
+    const storage = memoryStorage();
+    const globalLayoutSettings = {
+      folderClustering: true,
+      spacingPreset: 'compact' as const,
+      custom: {
+        ...customGlobalLayoutSettings('compact'),
+        referenceDegreeSizeInfluence: 82,
+      },
+    };
+
+    expect(
+      saveGraphPreferences(storage, {
+        ...DEFAULT_GRAPH_PREFERENCES,
+        globalLayoutSettings,
+      }),
+    ).toEqual({ ok: true });
+    expect(
+      loadGraphPreferences(storage).preferences.globalLayoutSettings,
+    ).toEqual(globalLayoutSettings);
+    expect(storage.value).toContain('"referenceDegreeSizeInfluence":82');
+  });
+
+  it('falls back only Global settings when persisted influence is malformed', () => {
+    const invalid = loadGraphPreferences(
+      memoryStorage(
+        JSON.stringify({
+          focusAppearance: 'minimal',
+          globalLayoutSettings: {
+            folderClustering: true,
+            spacingPreset: 'normal',
+            custom: {
+              ...customGlobalLayoutSettings('normal'),
+              referenceDegreeSizeInfluence: 101,
+            },
+          },
+        }),
+      ),
+    );
+
+    expect(invalid.preferences.focusAppearance).toBe('minimal');
     expect(invalid.preferences.globalLayoutSettings).toBe(
       DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
     );

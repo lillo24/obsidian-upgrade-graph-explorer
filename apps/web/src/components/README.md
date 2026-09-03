@@ -57,7 +57,8 @@ canonical truth, or own a platform storage implementation.
   owns the two-tab keyboard transition. Global layout controls edit one validated
   serializable preference rather than scattering component-local physics values.
   Folder Strength is a normalized view of the existing `folderCohesion` field;
-  its Advanced disclosure is transient and applies only to All Network;
+  its Advanced disclosure is transient, groups Layout and Visual controls, and
+  exposes the persisted 0–100 link-influence setting only for All Network;
   global focus-root and gesture preference storage remains in `../preferences/`.
 - `SourceSettingsSection.tsx` presents safe current-source metadata, browser
   report/sample switching, desktop vault/rescan actions, and exceptional local
