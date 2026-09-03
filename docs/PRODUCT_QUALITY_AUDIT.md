@@ -784,6 +784,28 @@ Focus, and All retained its unrelated Source-to-Target connection after Hide;
 console warnings/errors were empty. The rebuilt Windows executable still needs
 the user's targeted Hide/zoom retest before merge; this is not a native QA pass.
 
+### Requested pre-merge Explorer polish
+
+The user accepted the Hide fix and authorized merging the subsequent sidebar
+polish without another manual QA round. Network rows now display only titles
+and the renamed Focus badge; detailed context remains available to assistive
+technology and node tooltips. The redundant visible/hidden/query headings,
+visible-node count, and compact QUERY1 help are removed. Apply/Clear are labelled
+icons stacked beside the query field; dirty/error/Reset feedback is preserved.
+Hidden-file restore chips sit immediately below the field in one measured row;
+more/less wraps or collapses the overflow without changing QUERY1 semantics.
+The Close control now uses the sidebar's rounded icon-button styling. These
+changes do not remove the virtualized file/relationship tree or alter the
+Hierarchy query editor's explanatory content.
+
+Polish validation passed `pnpm check` (106 test files / 909 tests, formatting,
+lint, typechecks, and production build) and desktop check. Production-browser
+smoke covered title-only rows, Focus, the two query icons, invalid/Reset draft,
+Clear, Close, one-row overflow, keyboard more/less, and individual restoration.
+At 320×700 the chips and icons remained contained; at 900×400 the expanded
+controls retained a 64px independent tree viewport. Console warnings/errors were
+empty. No additional native graphical QA is claimed for this requested polish.
+
 ## KG14A QA record and low-risk fixes
 
 Automated/deterministic coverage inspected corrupt report/state/storage,

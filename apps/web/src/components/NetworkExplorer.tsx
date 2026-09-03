@@ -12,7 +12,6 @@ import {
 import type { GraphSelection } from '@icarus-graph-explorer/renderer-reactflow';
 import type { ProjectionNodeId } from '@icarus-graph-explorer/view-projection';
 
-import { hiddenFileLabels } from '../network-explorer-query-actions';
 import {
   networkExplorerContextTarget,
   networkExplorerMenuActions,
@@ -23,6 +22,7 @@ import {
   type GraphQueryEditorState,
 } from './GraphQueryEditor';
 import { NetworkExplorerMenu } from './NetworkExplorerMenu';
+import { NetworkExplorerHiddenFiles } from './NetworkExplorerHiddenFiles';
 
 import {
   flattenNetworkExplorerRows,
@@ -94,7 +94,7 @@ function nodeAccessibleName(node: NetworkExplorerNode): string {
     node.kindLabel,
     node.name,
     node.secondary,
-    node.focusRoot ? 'Focus root' : undefined,
+    node.focusRoot ? 'Focus' : undefined,
     node.focusDistance === null || node.focusRoot
       ? undefined
       : `Focus distance ${node.focusDistance}`,
@@ -175,10 +175,6 @@ export const NetworkExplorer = memo(function NetworkExplorer({
     readonly y: number;
   } | null>(null);
   const hiddenPathSet = useMemo(() => new Set(hiddenPaths), [hiddenPaths]);
-  const hiddenFiles = useMemo(
-    () => hiddenFileLabels(hiddenPaths),
-    [hiddenPaths],
-  );
   const focusPending = useRef(false);
   const focusAfterExpansion = useRef<string | undefined>(undefined);
   const lastRevealedSelectionNodeId = useRef<ProjectionNodeId | undefined>(
@@ -437,42 +433,29 @@ export const NetworkExplorer = memo(function NetworkExplorer({
       data-graph-history-shortcuts="off"
     >
       <header className="network-explorer__heading">
-        <div>
-          <h3>Network Explorer</h3>
-          <p>{model.nodes.length} visible nodes</p>
-        </div>
-        <button onClick={onClose} ref={closeButtonRef} type="button">
-          Close
+        <h3>Network Explorer</h3>
+        <button
+          aria-label="Close Network Explorer"
+          className="network-explorer__close"
+          onClick={onClose}
+          ref={closeButtonRef}
+          title="Close Network Explorer"
+          type="button"
+        >
+          <span aria-hidden="true">×</span>
         </button>
       </header>
       <div className="network-explorer__controls">
         <div className="network-explorer__query">
           <GraphQueryEditor {...queryEditor} compact idPrefix="network-query" />
         </div>
-        {hiddenFiles.length === 0 ? null : (
-          <section
-            aria-label="Hidden files"
-            className="network-explorer__hidden"
-          >
-            <h4>Hidden files</h4>
-            <div className="network-explorer__hidden-chips">
-              {hiddenFiles.map(({ path, label }) => (
-                <button
-                  aria-label={`Show ${path} again`}
-                  key={path}
-                  onClick={() => onRestoreFile(path)}
-                  title={path}
-                  type="button"
-                >
-                  <span aria-hidden="true">× </span>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </section>
+        {hiddenPaths.length === 0 ? null : (
+          <NetworkExplorerHiddenFiles
+            paths={hiddenPaths}
+            onRestoreFile={onRestoreFile}
+          />
         )}
       </div>
-      <h4 className="network-explorer__list-heading">Visible nodes</h4>
       {treeEmpty ? (
         <p className="network-explorer__empty">
           No visible nodes in the current Network view.
@@ -544,6 +527,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                       }}
                       role="treeitem"
                       tabIndex={isActive ? 0 : -1}
+                      title={row.node.secondary}
                     >
                       {row.node.adjacency.length === 0 ? (
                         <span
@@ -574,37 +558,15 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                         <span className="network-explorer__row-title">
                           {row.node.name}
                         </span>
-                        <span className="network-explorer__row-secondary">
-                          {row.node.kindLabel} · {row.node.secondary}
-                        </span>
                       </span>
-                      <span className="network-explorer__badges">
-                        {row.node.focusRoot ? (
-                          <span className="network-explorer__badge">Root</span>
-                        ) : null}
-                        {row.node.focusDistance === null ||
-                        row.node.focusRoot ? null : (
-                          <span className="network-explorer__badge">
-                            {row.node.focusDistance} hop
-                          </span>
-                        )}
-                        {row.node.visualGroupName === undefined ? null : (
-                          <span className="network-explorer__badge">
-                            {row.node.visualGroupName}
-                          </span>
-                        )}
-                        {row.node.internalReferenceCount === 0 ? null : (
-                          <span className="network-explorer__badge">
-                            {row.node.internalReferenceCount} internal
-                          </span>
-                        )}
-                      </span>
+                      {row.node.focusRoot ? (
+                        <span className="network-explorer__badge">Focus</span>
+                      ) : null}
                     </div>
                   </div>
                 );
               }
 
-              const relation = relationshipLabel(row.adjacency);
               return (
                 <div
                   className="network-explorer__virtual-row network-explorer__virtual-row--adjacency"
@@ -655,19 +617,6 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                     <span className="network-explorer__row-copy">
                       <span className="network-explorer__row-title">
                         {row.adjacency.targetName}
-                      </span>
-                      <span className="network-explorer__row-secondary">
-                        {relation} · {row.adjacency.targetKindLabel}
-                        {row.adjacency.status === undefined
-                          ? ''
-                          : ` · ${row.adjacency.status}`}
-                        {row.adjacency.referenceCount === 0
-                          ? ''
-                          : ` · ${row.adjacency.referenceCount} ${
-                              row.adjacency.referenceCount === 1
-                                ? 'link'
-                                : 'links'
-                            }`}
                       </span>
                     </span>
                   </div>
