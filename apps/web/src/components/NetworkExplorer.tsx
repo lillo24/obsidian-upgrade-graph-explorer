@@ -29,6 +29,8 @@ import {
 import { NetworkExplorerMenu } from './NetworkExplorerMenu';
 import { NodeSizeControl } from './NodeSizeControl';
 import { NetworkExplorerHiddenFiles } from './NetworkExplorerHiddenFiles';
+import { SavedQueriesPopover } from './SavedQueriesPopover';
+import type { SavedGraphQueriesState } from './SavedGraphQueries';
 
 import {
   flattenNetworkExplorerRows,
@@ -39,7 +41,8 @@ import {
   networkExplorerTopAlignedScrollTop,
   networkExplorerVirtualWindow,
   shouldRevealNetworkExplorerSelection,
-  type NetworkExplorerAdjacency,
+  revealNetworkExplorerNode,
+  type NetworkExplorerFolderState,
   type NetworkExplorerModel,
   type NetworkExplorerNode,
   type NetworkExplorerRow,
@@ -55,6 +58,7 @@ interface NetworkExplorerProps {
     sizeScale: number | undefined,
   ) => string | undefined;
   readonly queryEditor: GraphQueryEditorState;
+  readonly savedQueries: SavedGraphQueriesState;
   readonly hiddenPaths: readonly string[];
   readonly focusedSourcePath: string | undefined;
   readonly onRestoreFile: (path: string) => void;
@@ -64,12 +68,10 @@ interface NetworkExplorerProps {
     origin: HTMLElement | null,
   ) => void;
   readonly onHideFile: (path: string) => void;
-  readonly expandedNodeIds: ReadonlySet<ProjectionNodeId>;
+  readonly folderState: NetworkExplorerFolderState;
   readonly model: NetworkExplorerModel;
   readonly onClose: () => void;
-  readonly onExpandedNodeIdsChange: (
-    expandedNodeIds: ReadonlySet<ProjectionNodeId>,
-  ) => void;
+  readonly onFolderStateChange: (state: NetworkExplorerFolderState) => void;
   readonly onSelectNode: (nodeId: ProjectionNodeId) => void;
   readonly selection: GraphSelection | null;
   /** Raw graph selection highlights now; its confirmed click reveals later. */
@@ -78,34 +80,6 @@ interface NetworkExplorerProps {
 }
 
 const DEFAULT_VIEWPORT_HEIGHT = NETWORK_EXPLORER_ROW_HEIGHT * 8;
-
-function relationshipLabel(
-  adjacency: NetworkExplorerAdjacency,
-): 'Parent' | 'Child' | 'Outgoing' | 'Incoming' {
-  switch (adjacency.relationship) {
-    case 'parent':
-      return 'Parent';
-    case 'child':
-      return 'Child';
-    case 'outgoing':
-      return 'Outgoing';
-    case 'incoming':
-      return 'Incoming';
-  }
-}
-
-function relationshipGlyph(adjacency: NetworkExplorerAdjacency): string {
-  switch (adjacency.relationship) {
-    case 'parent':
-      return '↑';
-    case 'child':
-      return '↓';
-    case 'outgoing':
-      return '→';
-    case 'incoming':
-      return '←';
-  }
-}
 
 function nodeAccessibleName(
   node: NetworkExplorerNode,
@@ -128,35 +102,8 @@ function nodeAccessibleName(
     node.visualGroupName === undefined
       ? undefined
       : `Visual Group ${node.visualGroupName}`,
-    node.internalReferenceCount === 0
-      ? undefined
-      : `${node.internalReferenceCount} internal ${
-          node.internalReferenceCount === 1 ? 'link' : 'links'
-        }`,
-    `${node.adjacency.length} ${
-      node.adjacency.length === 1 ? 'relationship' : 'relationships'
-    }`,
   ];
   return details.filter((detail) => detail !== undefined).join(', ');
-}
-
-function adjacencyAccessibleName(adjacency: NetworkExplorerAdjacency): string {
-  const relation = relationshipLabel(adjacency);
-  const occurrence =
-    adjacency.referenceCount === 0
-      ? undefined
-      : `${adjacency.referenceCount} ${
-          adjacency.referenceCount === 1 ? 'occurrence' : 'occurrences'
-        }`;
-  return [
-    relation,
-    adjacency.status,
-    adjacency.targetKindLabel,
-    adjacency.targetName,
-    occurrence,
-  ]
-    .filter((detail) => detail !== undefined)
-    .join(', ');
 }
 
 export const NetworkExplorer = memo(function NetworkExplorer({
@@ -165,24 +112,25 @@ export const NetworkExplorer = memo(function NetworkExplorer({
   sizeEditingDisabled,
   onSizeScaleChange,
   queryEditor,
+  savedQueries,
   hiddenPaths,
   focusedSourcePath,
   onRestoreFile,
   onFocusNode,
   onInspectNode,
   onHideFile,
-  expandedNodeIds,
+  folderState,
   model,
   onClose,
-  onExpandedNodeIdsChange,
+  onFolderStateChange,
   onSelectNode,
   selection,
   deferSelectionReveal = false,
   revealRequest,
 }: NetworkExplorerProps) {
   const rows = useMemo(
-    () => flattenNetworkExplorerRows(model, expandedNodeIds),
-    [expandedNodeIds, model],
+    () => flattenNetworkExplorerRows(model, folderState),
+    [folderState, model],
   );
   const selectedNodeId =
     selection?.kind === 'node' && model.nodeById.has(selection.id)
@@ -201,7 +149,9 @@ export const NetworkExplorer = memo(function NetworkExplorer({
   const [sizeError, setSizeError] = useState<string>();
   const hiddenPathSet = useMemo(() => new Set(hiddenPaths), [hiddenPaths]);
   const focusPending = useRef(false);
-  const focusAfterExpansion = useRef<string | undefined>(undefined);
+  const pendingSelectionReveal = useRef<ProjectionNodeId | undefined>(
+    undefined,
+  );
   const lastRevealedSelectionNodeId = useRef<ProjectionNodeId | undefined>(
     undefined,
   );
@@ -231,7 +181,9 @@ export const NetworkExplorer = memo(function NetworkExplorer({
     (restoreFocus: boolean) => {
       setContext(null);
       if (restoreFocus && context !== null) {
-        const origin = rowRefs.current.get(context.rowId);
+        const origin = context.origin?.isConnected
+          ? context.origin
+          : rowRefs.current.get(context.rowId);
         if (origin?.isConnected) origin.focus({ preventScroll: true });
         else closeButtonRef.current?.focus({ preventScroll: true });
       }
@@ -242,7 +194,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
     if (context !== null && contextTarget === undefined) closeContextMenu(true);
   }, [closeContextMenu, context, contextTarget]);
   const openContextMenu = useCallback(
-    (row: NetworkExplorerRow, x: number, y: number) => {
+    (row: NetworkExplorerRow, x: number, y: number, origin?: HTMLElement) => {
       const target = networkExplorerContextTarget(row, model);
       if (target === undefined) return;
       setActiveRowId(row.id);
@@ -254,6 +206,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
         model,
         x,
         y,
+        origin: origin ?? rowRefs.current.get(row.id) ?? null,
         screen: 'actions',
       });
     },
@@ -273,7 +226,9 @@ export const NetworkExplorer = memo(function NetworkExplorer({
         setContext({ ...context, screen: 'size' });
         return;
       }
-      const origin = rowRefs.current.get(context.rowId) ?? null;
+      const origin = context.origin?.isConnected
+        ? context.origin
+        : (rowRefs.current.get(context.rowId) ?? null);
       closeContextMenu(action !== 'inspect');
       if (action === 'focus') onFocusNode(contextTarget.id);
       else if (action === 'inspect') onInspectNode(contextTarget.id, origin);
@@ -348,24 +303,53 @@ export const NetworkExplorer = memo(function NetworkExplorer({
   );
 
   useEffect(() => {
-    const shouldReveal = shouldRevealNetworkExplorerSelection(
+    const changed = shouldRevealNetworkExplorerSelection(
       lastRevealedSelectionNodeId.current,
       selectedNodeId,
     );
     lastRevealedSelectionNodeId.current = selectedNodeId;
-    if (!shouldReveal || deferSelectionReveal) return;
+    if (deferSelectionReveal) {
+      pendingSelectionReveal.current = undefined;
+      return;
+    }
     if (
+      selectedNodeId === undefined ||
+      (!changed && pendingSelectionReveal.current !== selectedNodeId)
+    )
+      return;
+    if (
+      changed &&
       typeof document !== 'undefined' &&
       scrollerRef.current?.contains(document.activeElement)
     ) {
+      pendingSelectionReveal.current = undefined;
       return;
     }
+    const revealed = revealNetworkExplorerNode(
+      folderState,
+      model,
+      selectedNodeId,
+    );
+    if (revealed !== folderState) {
+      pendingSelectionReveal.current = selectedNodeId;
+      onFolderStateChange(revealed);
+      return;
+    }
+    pendingSelectionReveal.current = undefined;
     const selectedRowId = `node:${selectedNodeId}`;
     const index = rowIndexById.get(selectedRowId);
     if (index === undefined) return;
     setActiveRowId(selectedRowId);
     revealIndex(index);
-  }, [deferSelectionReveal, revealIndex, rowIndexById, selectedNodeId]);
+  }, [
+    deferSelectionReveal,
+    folderState,
+    model,
+    onFolderStateChange,
+    revealIndex,
+    rowIndexById,
+    selectedNodeId,
+  ]);
 
   useEffect(() => {
     if (
@@ -373,6 +357,17 @@ export const NetworkExplorer = memo(function NetworkExplorer({
       revealRequest.key === handledRevealRequest.current
     )
       return;
+    // A confirmed graph click can target a node inside a collapsed folder.
+    // Consume its key only after the controlled ancestor expansion has rendered.
+    const revealed = revealNetworkExplorerNode(
+      folderState,
+      model,
+      revealRequest.nodeId,
+    );
+    if (revealed !== folderState) {
+      onFolderStateChange(revealed);
+      return;
+    }
     handledRevealRequest.current = revealRequest.key;
     const rowId = `node:${revealRequest.nodeId}`;
     const index = rowIndexById.get(rowId);
@@ -389,22 +384,24 @@ export const NetworkExplorer = memo(function NetworkExplorer({
     setActiveRowId(rowId);
     scroller.scrollTop = nextScrollTop;
     setScrollTop(nextScrollTop);
-  }, [revealRequest, rowIndexById, rows.length, viewportHeight]);
+  }, [
+    folderState,
+    model,
+    onFolderStateChange,
+    revealRequest,
+    rowIndexById,
+    rows.length,
+    viewportHeight,
+  ]);
 
   useEffect(() => {
-    if (rows.length === 0) return;
-    const pendingRowId = focusAfterExpansion.current;
-    if (pendingRowId !== undefined) {
-      const pendingIndex = rowIndexById.get(pendingRowId);
-      if (pendingIndex !== undefined) {
-        focusAfterExpansion.current = undefined;
-        activateRow(pendingIndex, true);
-        return;
-      }
-    }
-    if (activeRowId !== undefined && rowIndexById.has(activeRowId)) return;
+    if (
+      rows.length === 0 ||
+      (activeRowId !== undefined && rowIndexById.has(activeRowId))
+    )
+      return;
     setActiveRowId(rows[0]?.id);
-  }, [activateRow, activeRowId, rowIndexById, rows]);
+  }, [activeRowId, rowIndexById, rows]);
 
   useEffect(() => {
     if (!focusPending.current || activeRowId === undefined) return;
@@ -414,25 +411,13 @@ export const NetworkExplorer = memo(function NetworkExplorer({
     activeElement.focus();
   }, [activeRowId, virtualWindow.endIndex, virtualWindow.startIndex]);
 
-  const toggleNode = useCallback(
-    (node: NetworkExplorerNode, expand?: boolean) => {
-      if (node.adjacency.length === 0) return;
-      const next = new Set(expandedNodeIds);
-      const shouldExpand = expand ?? !next.has(node.id);
-      if (shouldExpand) next.add(node.id);
-      else next.delete(node.id);
-      onExpandedNodeIdsChange(next);
+  const toggleFolder = useCallback(
+    (path: string, expanded: boolean) => {
+      const next = new Map(folderState);
+      next.set(path, expanded);
+      onFolderStateChange(next);
     },
-    [expandedNodeIds, onExpandedNodeIdsChange],
-  );
-
-  const selectRow = useCallback(
-    (row: NetworkExplorerRow) => {
-      onSelectNode(
-        row.kind === 'node' ? row.node.id : row.adjacency.targetNodeId,
-      );
-    },
-    [onSelectNode],
+    [folderState, onFolderStateChange],
   );
 
   const handleRowKeyDown = useCallback(
@@ -444,6 +429,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
       ) {
         event.preventDefault();
         event.stopPropagation();
+        if (row.kind === 'folder') return;
         const rect = event.currentTarget.getBoundingClientRect();
         openContextMenu(row, rect.left + 24, rect.bottom);
         return;
@@ -454,7 +440,6 @@ export const NetworkExplorer = memo(function NetworkExplorer({
         rows,
         rowIndexById,
         activeIndex: eventRowIndex ?? activeIndex,
-        expandedNodeIds,
         key: event.key,
       });
       if (action.kind === 'none') return;
@@ -463,18 +448,9 @@ export const NetworkExplorer = memo(function NetworkExplorer({
         case 'activate':
           activateRow(action.index, true);
           return;
-        case 'expand': {
-          const node = model.nodeById.get(action.nodeId);
-          if (node === undefined) return;
-          focusAfterExpansion.current = action.focusRowId;
-          toggleNode(node, true);
+        case 'toggle-folder':
+          toggleFolder(action.path, action.expanded);
           return;
-        }
-        case 'collapse': {
-          const node = model.nodeById.get(action.nodeId);
-          if (node !== undefined) toggleNode(node, false);
-          return;
-        }
         case 'select':
           onSelectNode(action.nodeId);
           return;
@@ -483,13 +459,11 @@ export const NetworkExplorer = memo(function NetworkExplorer({
     [
       activateRow,
       activeIndex,
-      expandedNodeIds,
-      model.nodeById,
       onSelectNode,
       openContextMenu,
       rowIndexById,
       rows,
-      toggleNode,
+      toggleFolder,
     ],
   );
 
@@ -515,6 +489,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
       <div className="network-explorer__controls">
         <div className="network-explorer__query">
           <GraphQueryEditor {...queryEditor} compact idPrefix="network-query" />
+          <SavedQueriesPopover {...savedQueries} />
         </div>
         {hiddenPaths.length === 0 ? null : (
           <NetworkExplorerHiddenFiles
@@ -529,7 +504,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
         </p>
       ) : (
         <div
-          aria-label="Visible network nodes and relationships"
+          aria-label="Visible network nodes by source folder"
           className="network-explorer__tree"
           onScroll={(event) => {
             setScrollTop(event.currentTarget.scrollTop);
@@ -554,149 +529,58 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                 height: NETWORK_EXPLORER_ROW_HEIGHT,
                 transform: `translateY(${logicalIndex * NETWORK_EXPLORER_ROW_HEIGHT}px)`,
               } as CSSProperties;
-              const isActive = row.id === activeRowId;
-              if (row.kind === 'node') {
-                const fileEntityId = networkExplorerSizeEntityId(row.node);
-                const sizeScale =
-                  fileEntityId === undefined
-                    ? undefined
-                    : presentationOverrides.get(fileEntityId)?.sizeScale;
-                const expanded = expandedNodeIds.has(row.node.id);
-                const selected = selectedNodeId === row.node.id;
-                return (
-                  <div
-                    className="network-explorer__virtual-row"
-                    key={row.id}
-                    role="presentation"
-                    style={rowStyle}
-                  >
-                    <div
-                      aria-expanded={
-                        row.node.adjacency.length === 0 ? undefined : expanded
-                      }
-                      aria-label={nodeAccessibleName(row.node, sizeScale)}
-                      aria-level={1}
-                      aria-posinset={row.position}
-                      aria-selected={selected}
-                      aria-setsize={row.setSize}
-                      className={`network-explorer__treeitem${
-                        selected ? ' network-explorer__treeitem--selected' : ''
-                      }`}
-                      onClick={() => {
-                        setActiveRowId(row.id);
-                        selectRow(row);
-                      }}
-                      onFocus={() => setActiveRowId(row.id)}
-                      onContextMenu={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        openContextMenu(row, event.clientX, event.clientY);
-                      }}
-                      onKeyDown={(event) => handleRowKeyDown(event, row)}
-                      ref={(element) => {
-                        if (element === null) rowRefs.current.delete(row.id);
-                        else {
-                          rowRefs.current.set(row.id, element);
-                          if (focusPending.current && row.id === activeRowId) {
-                            focusPending.current = false;
-                            element.focus();
-                          }
-                        }
-                      }}
-                      role="treeitem"
-                      tabIndex={isActive ? 0 : -1}
-                      title={row.node.secondary}
-                    >
-                      {row.node.adjacency.length === 0 ? (
-                        <span
-                          aria-hidden="true"
-                          className="network-explorer__disclosure-placeholder"
-                        />
-                      ) : (
-                        <button
-                          aria-label={`${expanded ? 'Collapse' : 'Expand'} ${row.node.name} relationships`}
-                          className="network-explorer__disclosure"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            toggleNode(row.node);
-                          }}
-                          tabIndex={-1}
-                          type="button"
-                        >
-                          <span aria-hidden="true">{expanded ? '▾' : '▸'}</span>
-                        </button>
-                      )}
-                      <span
-                        aria-hidden="true"
-                        className="network-explorer__kind-glyph"
-                      >
-                        {row.node.glyph}
-                      </span>
-                      <span className="network-explorer__row-copy">
-                        <span className="network-explorer__row-title">
-                          {row.node.name}
-                        </span>
-                      </span>
-                      {row.node.focusRoot ? (
-                        <span className="network-explorer__badge">Focus</span>
-                      ) : null}
-                      {sizeScale === undefined ? null : (
-                        <span
-                          aria-label={`File size ${sizeScale.toFixed(2)} times calculated Network size`}
-                          className="network-explorer__size-badge"
-                          title={`File size: ${sizeScale.toFixed(2)}×`}
-                        >
-                          {sizeScale.toFixed(2)}×
-                        </span>
-                      )}
-                      {fileEntityId === undefined ? null : (
-                        <button
-                          aria-haspopup="menu"
-                          aria-label={`Actions for ${row.node.name}`}
-                          className="network-explorer__actions"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            const rect =
-                              event.currentTarget.getBoundingClientRect();
-                            openContextMenu(row, rect.left, rect.bottom);
-                          }}
-                          onKeyDown={(event) => event.stopPropagation()}
-                          tabIndex={isActive ? 0 : -1}
-                          title={`Actions for ${row.node.name}`}
-                          type="button"
-                        >
-                          <span aria-hidden="true">⋯</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              }
-
+              const folder = row.kind === 'folder' ? row : undefined;
+              const node = row.kind === 'node' ? row.node : undefined;
+              const fileEntityId =
+                node === undefined
+                  ? undefined
+                  : networkExplorerSizeEntityId(node);
+              const sizeScale =
+                fileEntityId === undefined
+                  ? undefined
+                  : presentationOverrides.get(fileEntityId)?.sizeScale;
+              const selected = node !== undefined && selectedNodeId === node.id;
               return (
                 <div
-                  className="network-explorer__virtual-row network-explorer__virtual-row--adjacency"
+                  className="network-explorer__virtual-row"
                   key={row.id}
                   role="presentation"
                   style={rowStyle}
                 >
                   <div
-                    aria-label={adjacencyAccessibleName(row.adjacency)}
-                    aria-level={2}
+                    aria-expanded={folder?.expanded}
+                    aria-label={
+                      node === undefined
+                        ? `Folder, ${folder?.folder.path}`
+                        : nodeAccessibleName(node, sizeScale)
+                    }
+                    aria-level={row.level}
                     aria-posinset={row.position}
+                    aria-selected={node === undefined ? undefined : selected}
                     aria-setsize={row.setSize}
-                    className="network-explorer__treeitem network-explorer__treeitem--adjacency"
+                    className={`network-explorer__treeitem${selected ? ' network-explorer__treeitem--selected' : ''}`}
+                    style={
+                      {
+                        '--network-row-indent': `${Math.min(12, row.level - 1 + (row.kind === 'node' && row.nestedInFile ? 1 : 0)) * 0.8}rem`,
+                      } as CSSProperties
+                    }
                     onClick={() => {
                       setActiveRowId(row.id);
-                      selectRow(row);
+                      if (folder !== undefined)
+                        toggleFolder(folder.folder.path, !folder.expanded);
+                      else if (node !== undefined) onSelectNode(node.id);
                     }}
                     onFocus={() => setActiveRowId(row.id)}
                     onContextMenu={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
-                      openContextMenu(row, event.clientX, event.clientY);
+                      if (node !== undefined)
+                        openContextMenu(row, event.clientX, event.clientY);
                     }}
-                    onKeyDown={(event) => handleRowKeyDown(event, row)}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return;
+                      handleRowKeyDown(event, row);
+                    }}
                     ref={(element) => {
                       if (element === null) rowRefs.current.delete(row.id);
                       else {
@@ -708,23 +592,66 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                       }
                     }}
                     role="treeitem"
-                    tabIndex={isActive ? 0 : -1}
+                    tabIndex={row.id === activeRowId ? 0 : -1}
+                    title={node?.secondary ?? folder?.folder.path}
                   >
+                    {folder === undefined ? null : (
+                      <span
+                        aria-hidden="true"
+                        className="network-explorer__folder-disclosure"
+                      >
+                        {folder.expanded ? '▾' : '▸'}
+                      </span>
+                    )}
                     <span
                       aria-hidden="true"
-                      className="network-explorer__disclosure-placeholder"
-                    />
-                    <span
-                      aria-hidden="true"
-                      className="network-explorer__relationship"
+                      className="network-explorer__kind-glyph"
                     >
-                      {relationshipGlyph(row.adjacency)}
+                      {node?.glyph ?? '▱'}
                     </span>
                     <span className="network-explorer__row-copy">
                       <span className="network-explorer__row-title">
-                        {row.adjacency.targetName}
+                        {node?.kindLabel === 'Diagnostic'
+                          ? `Diagnostic: ${node.name}`
+                          : (node?.name ?? folder?.folder.name)}
                       </span>
                     </span>
+                    {node?.focusRoot ? (
+                      <span className="network-explorer__badge">Focus</span>
+                    ) : null}
+                    {sizeScale === undefined ? null : (
+                      <span
+                        aria-label={`File size ${sizeScale.toFixed(2)} times calculated Network size`}
+                        className="network-explorer__size-badge"
+                        title={`File size: ${sizeScale.toFixed(2)}×`}
+                      >
+                        {sizeScale.toFixed(2)}×
+                      </span>
+                    )}
+                    {node === undefined ? null : (
+                      <button
+                        aria-label={`Actions for ${node.name}`}
+                        aria-haspopup="menu"
+                        className="network-explorer__actions"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          const rect =
+                            event.currentTarget.getBoundingClientRect();
+                          openContextMenu(
+                            row,
+                            rect.left,
+                            rect.bottom,
+                            event.currentTarget,
+                          );
+                        }}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        title={`Actions for ${node.name}`}
+                        tabIndex={row.id === activeRowId ? 0 : -1}
+                        type="button"
+                      >
+                        <span aria-hidden="true">⋯</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               );

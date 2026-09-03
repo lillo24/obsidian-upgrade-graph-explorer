@@ -93,8 +93,9 @@ canonical truth, or own a platform storage implementation.
 - `GraphFilters.tsx` owns the controlled toolbar trigger and responsive nonmodal
   panel for path, entity content, literal Markdown Heading limit, reference
   status, the shared Advanced query editor for Hierarchy, and workspace-scoped
-  Saved Filters. In Network it points to the drawer's editor instead of rendering
-  a duplicate. Hierarchy depth remains a separate four-option select.
+  Saved queries. In Network it points to the drawer's query and Saved queries
+  bookmark control instead of rendering duplicates. Hierarchy depth remains a
+  separate four-option select.
   Blocks is
   represented once through disclosure state; `graph-filter-count.ts` derives
   its user-visible active-group badge, while `graph-filters-overlay.ts` gives
@@ -142,35 +143,51 @@ canonical truth, or own a platform storage implementation.
 - `NetworkExplorer.tsx` owns the accessible, projection-scoped `tree` surface
   for both Sigma layouts. Fixed-height row virtualization keeps only the
   viewport plus overscan mounted while roving focus operates over the complete
-  logical node/adjacency list. Top-level File/Heading/Block/Diagnostic rows
-  synchronize controlled canvas selection; projected parent/child and
-  incoming/outgoing rows select and center their existing projected endpoint.
+  logical folder/node list. Only folders disclose; File/Heading/Block/Diagnostic
+  rows synchronize controlled canvas selection and expose the single node-action
+  menu through right-click, Shift+F10, ContextMenu, or the visible Actions button.
+  Arrow keys navigate folders/rows; Enter/Space toggles folders or selects nodes.
   External selection reveal is edge-triggered, so ordinary scrolling and row
   virtualization never pull the drawer back to an unchanged selected root.
+  Newly selected external nodes reveal their source-folder ancestors without
+  moving DOM focus. Folder overrides live at GraphExplorer level, keyed by path,
+  and survive query/live membership changes and drawer remounts until the source
+  session ends. `../network-explorer-model.ts` owns deterministic source ordering,
+  virtual ranges, and keyboard plans; `../network-explorer-folders.ts` builds only
+  current-projection source folders and flattens visible rows iteratively.
+  Depths 1/2 default open, 3+ closed; root is not counted. Projected headings/blocks
+  visually nest below their File without File disclosure; if File is filtered
+  out, they remain under the real folder. Their ARIA parent is always that folder.
+  Visual indent is capped at 12 levels to retain usable labels on deep paths;
+  logical ARIA depth is exact. Diagnostics trail at root, never grouped by target.
+  Neither module reads edges or reconstructs hidden canonical topology.
   Graph selection highlights immediately but defers that automatic reveal;
   confirmed canvas single-clicks carry a fresh, projection-scoped transient request
   through `GraphExplorer.tsx`, even for the same selected node. Those requests align
   the row top with the viewport, clamped at the list end, and mount virtual rows
   without taking keyboard focus. Keyboard and other selection reveals retain
   minimum scrolling. Requests are not persisted or replayed when reopening a drawer.
-  Expansion, active row, scroll position, and drawer visibility are transient
-  presentation state. `../network-explorer-model.ts` owns deterministic source
-  ordering, one-pass projected-edge indexes, flattened rows, stale-expansion
-  reconciliation, virtual ranges, and keyboard transition planning. Neither
-  file reconstructs hidden canonical topology or deaggregates references.
-  Visible rows show the title and an optional Focus badge. Canonical Files also
-  expose a compact Actions button and a custom-size multiplier when set;
-  path/context remains in accessible names and node tooltips, without a secondary
-  text line. Button, right-click, and keyboard invocation share one logical
-  action target. Opening Size or changing its value never selects or centers it.
+  Visible rows show only the title and an optional Focus badge; path/context
+  remains in accessible names and node tooltips, without a secondary text line.
+  Every projected node exposes one shared Actions surface for Focus, Inspect,
+  and supported Hide behavior. Canonical Files add Size and show their custom
+  multiplier when set. Button, right-click, and keyboard invocation share one
+  logical action target. Opening Size or changing its value never selects or
+  centers the node.
 - `GraphQueryEditor.tsx` is the controlled QUERY1 presentation reused in Network
   Explorer and Hierarchy Filters. `use-graph-query-draft.ts` lives at GraphExplorer
   level and preserves transient drafts across placement/unmounts. It commits only
   through the existing set-query callback; `../network-explorer-query-actions.ts`
   validates atomic applied/draft exclusion mutations and derives chip labels.
   The compact Network placement omits explanatory headings/help and uses labelled
-  Apply/Clear icons beside the unchanged-height textarea. Dirty/error feedback
-  and Reset draft remain available; Hierarchy retains its explanatory editor.
+  Apply/Clear icons beside the unchanged-height textarea and keeps validation
+  errors, but omits dirty/reset clutter. Hierarchy retains its explanatory editor
+  and Reset draft. Atomic applied/draft Hide/restore behavior is unchanged.
+- `SavedGraphQueries.tsx` shares the existing registry-backed management UI
+  between Hierarchy Filters and `SavedQueriesPopover.tsx` in Network Explorer.
+  The latter owns only local open/position state: a viewport-bounded nonmodal
+  portal, initial input focus, Escape/Close trigger restoration, and outside
+  dismissal without stealing focus. Opening it never changes graph state.
 - `NetworkExplorerHiddenFiles.tsx` presents exact-path exclusions directly below
   the Network query as one row of restore chips. `../network-explorer-chip-layout.ts`
   fits measured chip widths plus a more disclosure; expansion wraps all chips

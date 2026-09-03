@@ -1,3 +1,4 @@
+import { createNetworkExplorerFolders } from './network-explorer-folders';
 import { describe, expect, it } from 'vitest';
 import {
   networkExplorerContextTarget,
@@ -22,8 +23,6 @@ const entity: NetworkExplorerNode = {
   secondary: 'Notes/A.md',
   focusRoot: false,
   focusDistance: null,
-  internalReferenceCount: 0,
-  adjacency: [],
 };
 const diagnostic: NetworkExplorerNode = {
   id: 'diagnostic',
@@ -33,36 +32,49 @@ const diagnostic: NetworkExplorerNode = {
   secondary: 'unresolved',
   focusRoot: false,
   focusDistance: null,
-  internalReferenceCount: 0,
-  adjacency: [],
 };
 
 describe('Network Explorer context contract', () => {
-  it('normalizes adjacency to the current target rather than its parent or selection', () => {
+  it('targets only current graph nodes; folders and stale rows have no actions', () => {
+    const folders = createNetworkExplorerFolders([entity]);
+    const model = {
+      nodes: [entity],
+      nodeById: new Map([[entity.id, entity]]),
+      ...folders,
+    };
     const row: NetworkExplorerRow = {
-      kind: 'adjacency',
-      id: 'relation',
+      kind: 'node',
+      id: 'node:node',
+      node: entity,
+      nestedInFile: false,
+      level: 2,
+      parentFolderId: 'folder:Notes',
       position: 1,
       setSize: 1,
-      adjacency: {
-        id: 'relation',
-        edgeId: 'edge',
-        parentNodeId: diagnostic.id,
-        targetNodeId: entity.id,
-        relationship: 'outgoing',
-        targetName: entity.name,
-        targetKindLabel: entity.kindLabel,
-        referenceCount: 20,
-      },
     };
+    expect(networkExplorerContextTarget(row, model)).toBe(entity);
     expect(
       networkExplorerContextTarget(row, {
-        nodes: [entity],
-        nodeById: new Map([[entity.id, entity]]),
+        ...model,
+        nodes: [],
+        nodeById: new Map(),
       }),
-    ).toBe(entity);
+    ).toBeUndefined();
+    const folder = folders.folderByPath.get('Notes')!;
     expect(
-      networkExplorerContextTarget(row, { nodes: [], nodeById: new Map() }),
+      networkExplorerContextTarget(
+        {
+          kind: 'folder',
+          id: 'folder:Notes',
+          folder,
+          expanded: true,
+          level: 1,
+          parentFolderId: undefined,
+          position: 1,
+          setSize: 1,
+        },
+        model,
+      ),
     ).toBeUndefined();
   });
   it('enables entity actions, guards the entire focused file, and guards already-hidden paths', () => {
@@ -131,7 +143,11 @@ describe('Network Explorer context contract', () => {
     }
   });
   it('keeps editor targets independent of DOM mounting and closes on changed projection/logical row removal', () => {
-    const model = { nodes: [entity], nodeById: new Map([[entity.id, entity]]) };
+    const model = {
+      nodes: [entity],
+      nodeById: new Map([[entity.id, entity]]),
+      ...createNetworkExplorerFolders([entity]),
+    };
     const context: NetworkExplorerContext = {
       rowId: 'node:node',
       targetId: entity.id,
@@ -150,7 +166,11 @@ describe('Network Explorer context contract', () => {
     expect(
       currentNetworkExplorerContextTarget(
         context,
-        { nodes: [], nodeById: new Map() },
+        {
+          nodes: [],
+          nodeById: new Map(),
+          ...createNetworkExplorerFolders([]),
+        },
         rows,
       ),
     ).toBeUndefined();

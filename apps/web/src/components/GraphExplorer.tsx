@@ -73,7 +73,7 @@ import {
 import { graphHistoryShortcut } from '../graph-history-shortcuts';
 import {
   createNetworkExplorerModel,
-  reconcileNetworkExplorerExpansion,
+  type NetworkExplorerFolderState,
   type NetworkExplorerRevealRequest,
 } from '../network-explorer-model';
 import {
@@ -162,6 +162,7 @@ import {
 import { activateMaximizedGraphMode } from './maximized-graph-mode';
 import { ProvenanceInspector } from './ProvenanceInspector';
 import { NetworkExplorer } from './NetworkExplorer';
+import type { SavedGraphQueriesState } from './SavedGraphQueries';
 import { StructureDepthControl } from './StructureDepthControl';
 import { VisualGroups } from './VisualGroups';
 import type { GlobalGraphViewProps } from './GlobalGraphView';
@@ -828,6 +829,9 @@ export function GraphExplorer({
   const inspectorRestoreTarget = useRef<HTMLElement | null>(null);
   const [inspectorFocusRequestKey, setInspectorFocusRequestKey] = useState(0);
   const [networkExplorerOpen, setNetworkExplorerOpen] = useState(false);
+  // Folder overrides survive query/live membership changes and sidebar remounts.
+  const [networkExplorerFolderState, setNetworkExplorerFolderState] =
+    useState<NetworkExplorerFolderState>(() => new Map());
   const [graphClickSelection, setGraphClickSelection] =
     useState<GraphSelection | null>(null);
   const [networkExplorerRevealRequest, setNetworkExplorerRevealRequest] =
@@ -835,8 +839,7 @@ export function GraphExplorer({
       | (NetworkExplorerRevealRequest & { readonly projection: ViewProjection })
       | undefined
     >();
-  const [networkExplorerExpandedNodeIds, setNetworkExplorerExpandedNodeIds] =
-    useState<ReadonlySet<ProjectionNodeId>>(() => new Set());
+
   const networkExplorerToolbarRef = useRef<HTMLButtonElement>(null);
   const networkExplorerHandleRef = useRef<HTMLButtonElement>(null);
   const networkExplorerRestoreTarget = useRef<HTMLButtonElement | null>(null);
@@ -940,19 +943,6 @@ export function GraphExplorer({
           ),
     [inspectionWorkspace, networkProjection, visualGroupPresentation.styles],
   );
-  useEffect(() => {
-    if (networkExplorerModel === undefined) return;
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (cancelled) return;
-      setNetworkExplorerExpandedNodeIds((current) =>
-        reconcileNetworkExplorerExpansion(current, networkExplorerModel),
-      );
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [networkExplorerModel]);
   const activeSelection =
     projection !== undefined && selectionExists(projection, selection)
       ? selection
@@ -2123,6 +2113,25 @@ export function GraphExplorer({
     },
     [persistenceStorage, savedFilterSession],
   );
+  const savedQueries = useMemo<SavedGraphQueriesState>(
+    () => ({
+      activeQuery: activeViewState.filters?.query ?? '',
+      savedFilters: savedFilterSession.registry.filters,
+      savedFiltersStatus: savedFilterSession.status,
+      savedFiltersWritable: savedFilterSession.writable,
+      onApplySavedFilter: applySavedFilter,
+      onDeleteSavedFilter: removeSavedFilter,
+      onSaveCurrentQuery: saveCurrentQuery,
+    }),
+    [
+      activeViewState.filters?.query,
+      applySavedFilter,
+      removeSavedFilter,
+      saveCurrentQuery,
+      savedFilterSession,
+    ],
+  );
+
   const commitVisualGroupMutation = useCallback(
     (
       candidate: VisualGroupRegistry,
@@ -3758,10 +3767,11 @@ export function GraphExplorer({
               onFocusNode={focusNetworkExplorerNode}
               onInspectNode={inspectNetworkExplorerNode}
               onHideFile={hideNetworkFile}
-              expandedNodeIds={networkExplorerExpandedNodeIds}
+              folderState={networkExplorerFolderState}
+              savedQueries={savedQueries}
               model={networkExplorerModel}
               onClose={closeNetworkExplorer}
-              onExpandedNodeIdsChange={setNetworkExplorerExpandedNodeIds}
+              onFolderStateChange={setNetworkExplorerFolderState}
               onSelectNode={selectNetworkExplorerNode}
               selection={networkExplorerSelection}
               deferSelectionReveal={selection === graphClickSelection}

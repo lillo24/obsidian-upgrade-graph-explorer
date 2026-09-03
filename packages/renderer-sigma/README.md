@@ -187,9 +187,9 @@ visibility and its label/program indices), not merely its draw pass. Otherwise
 zoom styling stays stale until a later Hide or query update and can make
 unrelated edges appear to disappear together. Both Network sessions initialize
 LOD after restoring the initial camera; within-band zoom and pan do not trigger
-this refresh. The existing far-scale edge suppression thresholds are unchanged,
-and zooming back in restores reference lines without needing a query/layout
-change. This renderer-only refresh does not change canonical/projection data,
+this refresh. All Network's far-scale edge suppression remains unchanged;
+Focus keeps references visible at every LOD and changes only detail/width.
+This renderer-only refresh does not change canonical/projection data,
 Graphology topology, positions, or the worker layout fingerprint.
 
 Networks with 1–12 visible nodes force their document labels through Sigma's
@@ -269,6 +269,13 @@ phase so the renderer cannot expose one frame with new normalization and an
 old camera.
 
 Hierarchy edges are stronger than references and remain visually distinct.
+NETWORKPOLISH1 removes Local's far-reference hide rule without changing the
+1.25 LOD threshold or 0.02–6 camera bounds. References remain visible without
+hover through maximum zoom-out, with existing width factors 1 / 0.84 / 0.45
+for near / normal / far. Far hierarchy width stays 0.72; root/label LOD and
+hover emphasis remain intact. Native readability is a release-QA gate.
+Sparse Focus spacing, normalization, camera framing and ForceAtlas2 settings
+are intentionally unchanged.
 Local has no folder prior or fake edges. Exact cache fingerprints include the
 root, stable topology, semantic node/edge roles, weights, iterations, and Local
 settings while excluding seed coordinates, labels, hover, selection, camera,

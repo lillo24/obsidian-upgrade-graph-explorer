@@ -83,7 +83,7 @@ describe('graph Filters controls', () => {
     expect(markup).toContain('>Advanced query<');
     expect(markup).toContain('<textarea');
     expect(markup).toContain('id="filters-query-help"');
-    expect(markup).toContain('>Saved Filters<');
+    expect(markup).toContain('>Saved queries<');
     expect(markup).toContain('>Save current query<');
     expect(markup.match(/Blocks/gu)).toHaveLength(1);
     expect(markup).not.toContain('Structural ancestors may remain');
@@ -100,7 +100,7 @@ describe('graph Filters controls', () => {
     );
   });
 
-  it('keeps Saved Filters but moves the Advanced query editor out of Network Filters', () => {
+  it('moves both query editing and Saved queries out of Network Filters', () => {
     const markup = renderFilters(normalizeGraphState(initialGraphState()), {
       open: true,
       rendererMode: 'global',
@@ -109,9 +109,13 @@ describe('graph Filters controls', () => {
     expect(markup).toContain(
       'All Network displays files only. Entity and heading controls remain saved for Hierarchy; Advanced query still applies to files.',
     );
-    expect(markup).toContain('Advanced query is edited in Network Explorer.');
+    expect(markup).toContain(
+      'Query and Saved queries are available in Network Explorer.',
+    );
     expect(markup).not.toContain('<textarea');
-    expect(markup).toContain('>Saved Filters<');
+    expect(markup).not.toContain('>Saved queries<');
+    expect(markup).not.toContain('>Save current query<');
+    expect(markup).not.toContain('Name</label>');
     expect(markup).not.toContain('<legend>Entity Content</legend>');
     expect(markup).not.toContain('>Heading limit<');
   });
