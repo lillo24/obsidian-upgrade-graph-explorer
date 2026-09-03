@@ -30,6 +30,14 @@ src/index.ts              Production browser API re-export plus fixtures.
 src/styles.css            Diagnostic-harness presentation only.
 ```
 
+SPATIAL1A adds development-only folder-key and normalized X/Y controls with
+Apply, Reset folder, and Reset all actions. The evidence panel reports the
+automatic frame, automatic folder center, normalized target, displayed rigid
+translation, and automatic layout-request count. Anchor edits compose from the
+retained automatic positions and therefore leave that request count unchanged.
+All fixtures and output use generic synthetic folder keys; this is not the
+future production Arrange Folders UI.
+
 The harness is intentionally separate from product orchestration. It may expose
 edge-event toggles, destroy/recreate, and stress profiles for evidence, but it
 must not add alternate graph semantics or duplicate production renderer code.

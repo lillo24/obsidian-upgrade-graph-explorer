@@ -4,6 +4,7 @@ import type {
   ProjectionNodeId,
   ViewProjection,
 } from '@icarus-graph-explorer/view-projection';
+import { workspaceFolderKeyFromPath } from '@icarus-graph-explorer/spatial-overrides';
 
 import {
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
@@ -40,26 +41,7 @@ export function deterministicGlobalPosition(key: string): {
   };
 }
 
-export function folderKeyFromWorkspacePath(sourcePath: string): string {
-  if (
-    sourcePath.length === 0 ||
-    sourcePath.startsWith('/') ||
-    sourcePath.includes('\\') ||
-    /^[A-Za-z]:\//u.test(sourcePath) ||
-    sourcePath
-      .split('/')
-      .some(
-        (segment) =>
-          segment.length === 0 || segment === '.' || segment === '..',
-      )
-  ) {
-    throw new Error(
-      `Cannot derive a Global folder key from invalid workspace path ${JSON.stringify(sourcePath)}.`,
-    );
-  }
-  const separator = sourcePath.lastIndexOf('/');
-  return separator === -1 ? '.' : sourcePath.slice(0, separator);
-}
+export const folderKeyFromWorkspacePath = workspaceFolderKeyFromPath;
 
 export function deriveGlobalSpatialMetadata(
   projection: ViewProjection,

@@ -6,6 +6,10 @@ This document is the engineering source of truth for the Markdown Structure Grap
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
+SPATIAL1A establishes a parallel source-neutral, workspace-scoped normalized
+folder-anchor layer for All Network while leaving the active KG14 sequence
+unchanged.
+
 ## Stable domain shape
 
 The deliberate general abstraction is a hierarchical document:
@@ -192,6 +196,17 @@ style refreshes. Group colors remain independent. Saved-view schema v3,
 preferences, query membership,
 visibility, canonical snapshots, and identity catalogs are unchanged.
 
+`packages/spatial-overrides` also depends only on source-neutral core, but is a
+separate domain from per-File presentation overrides. Its strict v1 registry
+stores exact normalized workspace-relative folder keys (`.` for the root) and
+bounded logical visual X/Y target-center anchors under an explicit All-Network
+section. It computes the automatic document-only graph frame, automatic folder
+centers, inverse target normalization, and pure rigid translations from an
+explicit anchor map. It owns no React, Sigma, storage, projection, source
+adapter, query, viewport, worker, or layout policy. Exact-path folder identity
+does not survive rename in v1; missing folders remain dormant without fuzzy
+reconciliation.
+
 `packages/explorer-inspection` depends inward on core and view-projection. It
 builds canonical hierarchy/reference/search indexes once per snapshot and emits
 plain deterministic entity, occurrence, subtree-relationship, projected
@@ -244,6 +259,17 @@ setters schedule partial, skip-indexation reducer refreshes without topology
 reconciliation or layout.
 ESLint excludes canonical, source, platform,
 application, analytics, React Flow, Dagre, and Node dependencies.
+
+For All Network, renderer-sigma additionally adapts the source-neutral logical
+Y axis to Sigma 3.0.3's graph axis and composes folder translations only after
+automatic positioning. The session retains `latestAutomaticPositions`
+separately from live displayed Graphology coordinates. Seeds, exact cache hits,
+accepted worker results, worker requests, and cache writes use automatic
+positions only; the current registry is applied afterward to produce display
+positions. Anchor changes therefore perform one composition/apply and zero KG6
+projections, topology reconciliations, or ForceAtlas2 requests. Diagnostics,
+node radii, cameras, and prior translations never enter the automatic frame.
+Focus Network and both Hierarchy renderers receive no spatial registry.
 
 `tools/global-renderer-spike` is now a production renderer harness rather than
 an implementation fork. It retains only synthetic KG13A fixtures, browser/Tauri
@@ -731,7 +757,7 @@ history checkpoint, including its semantic viewport; a no-history fallback
 clears Focus and preserves the current layout. Focus headings never enter All
 Network topology, mutate its cache, or trigger whole-vault relayout.
 QUERY1 filtering and GROUP1 visual classification remain independent systems.
-Folder clustering remains an All Network-only spatial prior. Its product
+Folder clustering remains an All Network-only automatic spatial prior. Its product
 Strength control normalizes the existing persisted `folderCohesion` range to
 0–100%; spacing changes preserve that value, and hiding Advanced controls does
 not mutate preferences. Hierarchy renderers never observe the setting. The
@@ -749,8 +775,17 @@ layout inputs/caches, or semantic viewport state. Selected canonical entities
 use the compiled all-match evaluator in Inspector; diagnostics and edges opt
 out. Filters and Groups have one transient tool-panel owner while Inspector is
 independent.
-The separate LAYOUT1 idea is paused/absorbed into this Global → Regional → Local spatial architecture;
-manual cluster offsets remain future derived presentation state.
+The separate LAYOUT1 idea is paused/absorbed into this Global → Regional → Local
+spatial architecture. SPATIAL1A now supplies derived normalized exact-folder
+targets after the automatic prior. SPATIAL1B may combine the persisted map with
+a temporary active-folder preview, with preview winning, then commit a
+normalized release target. The intended Arrange mode dims the graph, spotlights
+the hovered or active folder, moves all member nodes and connected edges live,
+commits on release, and cancels on Escape; none of that UI exists in SPATIAL1A.
+Individual-node dragging is not the first interaction. A later Saved View may
+reference, copy, or selectively override an independently serializable spatial
+profile alongside query, scope, layout, hierarchy detail, settings, and
+viewport; no Saved View schema is introduced here.
 
 Tauri v2 hosts the existing frontend and provides dialog plus filesystem
 read/watch capabilities through a narrow source-provider boundary. Tauri

@@ -13,6 +13,7 @@ export class GlobalLayoutCache {
     this.#capacity = capacity;
   }
 
+  /** Returns automatic pre-spatial-override positions only. */
   get(fingerprint: string): readonly GlobalLayoutPosition[] | undefined {
     const value = this.#entries.get(fingerprint);
     if (value === undefined) return undefined;
@@ -21,6 +22,7 @@ export class GlobalLayoutCache {
     return value;
   }
 
+  /** Stores automatic pre-spatial-override positions only. */
   set(fingerprint: string, positions: readonly GlobalLayoutPosition[]): void {
     const copy = positions.map((position) => ({ ...position }));
     this.#entries.delete(fingerprint);

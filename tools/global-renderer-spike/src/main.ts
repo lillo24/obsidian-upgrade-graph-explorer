@@ -5,14 +5,27 @@ import {
 } from './fixtures';
 import { createHarnessGlobalLayoutService } from './layout-worker';
 import {
+  composeGlobalSpatialOverrides,
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+  globalLayoutPositionsFromInput,
   GlobalRendererSession,
   mapProjectionToGlobal,
+  reconcileGlobalAutomaticPositions,
   resetGlobalSeedPositions,
+  warmGlobalRendererInput,
+  type GlobalLayoutPosition,
   type GlobalNodeAttributes,
   type GlobalRendererInput,
   type GlobalRendererMeasurement,
 } from '@icarus-graph-explorer/renderer-sigma';
+import {
+  clearFolderClusterAnchors,
+  createEmptySpatialOverrideRegistry,
+  folderClusterAnchorMap,
+  removeFolderClusterAnchor,
+  setFolderClusterAnchor,
+  type SpatialCompositionResult,
+} from '@icarus-graph-explorer/spatial-overrides';
 import type { GlobalLayoutService } from '@icarus-graph-explorer/renderer-sigma/types';
 import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
 
@@ -32,6 +45,12 @@ interface SpikeSnapshot {
   readonly edgeEvents: boolean;
   readonly measurements: readonly GlobalRendererMeasurement[];
   readonly viewport: ReturnType<GlobalRendererSession['semanticViewport']>;
+  readonly spatial: {
+    readonly anchorCount: number;
+    readonly activeFolderCount: number;
+    readonly inactiveFolderCount: number;
+    readonly layoutRequests: number;
+  };
 }
 
 declare global {
@@ -61,6 +80,16 @@ const updateTenButton = requiredElement<HTMLButtonElement>('update-ten');
 const recreateButton = requiredElement<HTMLButtonElement>('recreate');
 const interactionsButton = requiredElement<HTMLButtonElement>('interactions');
 const bookmarkButton = requiredElement<HTMLButtonElement>('bookmark');
+const spatialForm = requiredElement<HTMLFormElement>('spatial-form');
+const spatialFolderInput = requiredElement<HTMLInputElement>('spatial-folder');
+const spatialXInput = requiredElement<HTMLInputElement>('spatial-x');
+const spatialYInput = requiredElement<HTMLInputElement>('spatial-y');
+const spatialResetFolderButton = requiredElement<HTMLButtonElement>(
+  'spatial-reset-folder',
+);
+const spatialResetAllButton =
+  requiredElement<HTMLButtonElement>('spatial-reset-all');
+const spatialSummary = requiredElement<HTMLDListElement>('spatial-summary');
 const searchInput = requiredElement<HTMLInputElement>('search');
 const searchResults = requiredElement<HTMLUListElement>('search-results');
 const inspector = requiredElement<HTMLDivElement>('inspector');
@@ -73,6 +102,16 @@ const measurementHistory = requiredElement<HTMLOListElement>(
 let profile: GlobalFixtureProfile = 'product-small';
 let projection: ViewProjection = createGlobalFixtureProjection(profile);
 let input: GlobalRendererInput = mapProjectionToGlobal(projection);
+let automaticPositions: readonly GlobalLayoutPosition[] =
+  globalLayoutPositionsFromInput(input);
+let spatialRegistry = createEmptySpatialOverrideRegistry('synthetic-spike');
+let spatialComposition: SpatialCompositionResult =
+  composeGlobalSpatialOverrides(
+    automaticPositions,
+    input,
+    folderClusterAnchorMap(spatialRegistry),
+  );
+let layoutRequests = 0;
 let session: GlobalRendererSession | undefined;
 const layoutService: GlobalLayoutService = createHarnessGlobalLayoutService();
 const measurements: GlobalRendererMeasurement[] = [];
@@ -119,17 +158,26 @@ function selectionInspector(
 }
 
 function createSession(): GlobalRendererSession {
-  const created = new GlobalRendererSession(container, input, {
-    settings: DEFAULT_GLOBAL_LAYOUT_SETTINGS,
-    trackpadZoomMode: 'scroll-zoom',
-    labels: labelsInput.checked,
-    edgeEvents: edgeEventsInput.checked,
-    onNodeSelected: (key, attributes) => {
-      if (key !== undefined && attributes !== undefined) {
-        selectionInspector(key, attributes);
-      }
+  spatialComposition = composeGlobalSpatialOverrides(
+    automaticPositions,
+    input,
+    folderClusterAnchorMap(spatialRegistry),
+  );
+  const created = new GlobalRendererSession(
+    container,
+    warmGlobalRendererInput(input, spatialComposition.displayedPositions),
+    {
+      settings: DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+      trackpadZoomMode: 'scroll-zoom',
+      labels: labelsInput.checked,
+      edgeEvents: edgeEventsInput.checked,
+      onNodeSelected: (key, attributes) => {
+        if (key !== undefined && attributes !== undefined) {
+          selectionInspector(key, attributes);
+        }
+      },
     },
-  });
+  );
   void created.ready
     .then((ready) => {
       record({ operation: 'sigma-mount', durationMs: ready.mountMs });
@@ -138,9 +186,64 @@ function createSession(): GlobalRendererSession {
         durationMs: ready.firstRenderMs,
       });
       status.textContent = `Rendered ${numberFormatter.format(created.counts().nodes)} nodes and ${numberFormatter.format(created.counts().edges)} edges.`;
+      renderSpatialSummary();
     })
     .catch(showFailure);
   return created;
+}
+
+function pointText(point: { readonly x: number; readonly y: number }): string {
+  return `${point.x.toFixed(2)}, ${point.y.toFixed(2)}`;
+}
+
+function renderSpatialSummary(): void {
+  const folderKey = spatialFolderInput.value.trim();
+  const active = spatialComposition.activeFolders.find(
+    (folder) => folder.folderKey === folderKey,
+  );
+  const rows: readonly (readonly [string, string])[] = [
+    [
+      'Automatic frame',
+      `center ${spatialComposition.automaticFrame.centerX.toFixed(2)}, ${spatialComposition.automaticFrame.centerY.toFixed(2)} · half ${spatialComposition.automaticFrame.halfWidth.toFixed(2)} × ${spatialComposition.automaticFrame.halfHeight.toFixed(2)}`,
+    ],
+    [
+      'Automatic folder center',
+      active === undefined ? 'Inactive' : pointText(active.automaticCenter),
+    ],
+    [
+      'Target anchor',
+      active === undefined ? 'Automatic' : pointText(active.target),
+    ],
+    [
+      'Displayed translation',
+      active === undefined ? '0.00, 0.00' : pointText(active.translation),
+    ],
+    ['Automatic layout requests', String(layoutRequests)],
+  ];
+  const fragment = document.createDocumentFragment();
+  for (const [label, value] of rows) {
+    const term = document.createElement('dt');
+    term.textContent = label;
+    const description = document.createElement('dd');
+    description.textContent = value;
+    fragment.append(term, description);
+  }
+  spatialSummary.replaceChildren(fragment);
+}
+
+async function applySpatialDisplay(operation: string): Promise<void> {
+  const started = performance.now();
+  spatialComposition = composeGlobalSpatialOverrides(
+    automaticPositions,
+    input,
+    folderClusterAnchorMap(spatialRegistry),
+  );
+  await activeSession().applyPositions(spatialComposition.displayedPositions);
+  record({
+    operation,
+    durationMs: Number((performance.now() - started).toFixed(3)),
+  });
+  renderSpatialSummary();
 }
 
 function renderMetrics(): void {
@@ -287,6 +390,11 @@ async function compareUpdate(fraction: 0.01 | 0.1): Promise<SpikeSnapshot> {
   });
   projection = changedProjection;
   input = changedInput;
+  automaticPositions = reconcileGlobalAutomaticPositions(
+    changedInput,
+    automaticPositions,
+  );
+  await applySpatialDisplay(`${fraction * 100}%-spatial-compose`);
   status.textContent = `${fraction * 100}% update: full replacement ${replaceMs.toFixed(1)} ms; incremental mutation ${incrementalMs.toFixed(1)} ms. Stable keys retained.`;
   return snapshot();
 }
@@ -323,6 +431,12 @@ function snapshot(): SpikeSnapshot {
     edgeEvents: edgeEventsInput.checked,
     measurements: [...measurements],
     viewport: currentSession.semanticViewport(),
+    spatial: {
+      anchorCount: spatialRegistry.allNetwork.folderAnchors.length,
+      activeFolderCount: spatialComposition.activeFolders.length,
+      inactiveFolderCount: spatialComposition.inactiveFolderKeys.length,
+      layoutRequests,
+    },
   };
 }
 
@@ -331,6 +445,12 @@ profileSelect.addEventListener('change', () => {
   profile = profileSelect.value as GlobalFixtureProfile;
   projection = createGlobalFixtureProjection(profile);
   input = mapProjectionToGlobal(projection);
+  automaticPositions = globalLayoutPositionsFromInput(input);
+  spatialComposition = composeGlobalSpatialOverrides(
+    automaticPositions,
+    input,
+    folderClusterAnchorMap(spatialRegistry),
+  );
   measurements.length = 0;
   inspector.textContent = 'Select a file in the graph or search results.';
   searchInput.value = '';
@@ -360,9 +480,24 @@ layoutButton.addEventListener('click', () => {
     'ForceAtlas2 is running in a dedicated worker; the canvas should remain interactive.';
   const currentSession = activeSession();
   const iterations = currentSession.counts().nodes >= 5_000 ? 30 : 100;
+  layoutRequests += 1;
+  renderSpatialSummary();
   void currentSession
-    .runLayout(layoutService, input, DEFAULT_GLOBAL_LAYOUT_SETTINGS, iterations)
-    .then((measurement) => {
+    .runLayout(
+      layoutService,
+      input,
+      DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+      iterations,
+      automaticPositions,
+    )
+    .then(async (measurement) => {
+      automaticPositions = currentSession.nodes().map((key) => {
+        const attributes = currentSession.nodeAttributes(key);
+        if (attributes === undefined)
+          throw new Error(`Missing synthetic node ${key}.`);
+        return { key, x: attributes.x, y: attributes.y };
+      });
+      await applySpatialDisplay('spatial-compose-apply');
       record(measurement);
       status.textContent = `Worker layout completed ${iterations} iterations in ${measurement.durationMs.toFixed(1)} ms; high UI RAF gap ${measurement.highRafGapMs?.toFixed(1) ?? 'unknown'} ms.`;
     })
@@ -372,9 +507,14 @@ layoutButton.addEventListener('click', () => {
 
 resetButton.addEventListener('click', () => {
   input = resetGlobalSeedPositions(input);
+  automaticPositions = globalLayoutPositionsFromInput(input);
   activeSession().resetPositions(input);
-  status.textContent =
-    'Restored deterministic stable-ID seed positions. No coordinates were persisted.';
+  void applySpatialDisplay('spatial-reset-seed')
+    .then(() => {
+      status.textContent =
+        'Restored deterministic automatic seeds and reapplied normalized anchors. No coordinates were persisted.';
+    })
+    .catch(showFailure);
 });
 
 updateOneButton.addEventListener('click', () => {
@@ -413,6 +553,52 @@ bookmarkButton.addEventListener('click', () => {
       ? 'No visible canonical entity is available for a semantic bookmark.'
       : `Semantic bookmark captured stable entity ${viewport.anchorEntityId} at Sigma ratio ${viewport.ratio.toFixed(3)}. Raw camera coordinates were not retained.`;
 });
+
+spatialForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  try {
+    spatialRegistry = setFolderClusterAnchor(
+      spatialRegistry,
+      spatialFolderInput.value.trim(),
+      { x: spatialXInput.valueAsNumber, y: spatialYInput.valueAsNumber },
+    );
+    const before = layoutRequests;
+    void applySpatialDisplay('spatial-anchor-edit')
+      .then(() => {
+        status.textContent = `Applied a normalized synthetic folder anchor with ${layoutRequests - before} automatic layout requests.`;
+      })
+      .catch(showFailure);
+  } catch (error: unknown) {
+    showFailure(error);
+  }
+});
+
+spatialResetFolderButton.addEventListener('click', () => {
+  try {
+    spatialRegistry = removeFolderClusterAnchor(
+      spatialRegistry,
+      spatialFolderInput.value.trim(),
+    );
+    void applySpatialDisplay('spatial-reset-folder')
+      .then(() => {
+        status.textContent = 'Reset the selected synthetic folder anchor.';
+      })
+      .catch(showFailure);
+  } catch (error: unknown) {
+    showFailure(error);
+  }
+});
+
+spatialResetAllButton.addEventListener('click', () => {
+  spatialRegistry = clearFolderClusterAnchors(spatialRegistry);
+  void applySpatialDisplay('spatial-reset-all')
+    .then(() => {
+      status.textContent = 'Reset all synthetic folder anchors.';
+    })
+    .catch(showFailure);
+});
+
+spatialFolderInput.addEventListener('input', renderSpatialSummary);
 
 searchInput.addEventListener('input', renderSearchResults);
 

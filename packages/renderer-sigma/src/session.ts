@@ -17,7 +17,7 @@ import {
   drawViewportAwareGlobalNodeHover,
   drawViewportAwareGlobalNodeLabel,
 } from './global-label';
-import { createGlobalLayoutRequest } from './layout';
+import { createGlobalLayoutRequestFromAutomaticPositions } from './layout';
 import {
   NodeClickArbitrator,
   NODE_DOUBLE_CLICK_TIMEOUT_MS,
@@ -40,7 +40,6 @@ import type {
   GlobalCenterRequest,
   GlobalGraphReconciliation,
   GlobalLayoutPosition,
-  GlobalLayoutRequest,
   GlobalLayoutService,
   GlobalLayoutSettings,
   GlobalNodeAttributes,
@@ -555,11 +554,17 @@ export class GlobalRendererSession {
     input: GlobalRendererInput,
     settings: GlobalLayoutSettings,
     iterations: number,
+    automaticPositions: readonly GlobalLayoutPosition[],
   ): Promise<GlobalRendererMeasurement> {
     const started = performance.now();
     const gapProbe = startRafGapProbe();
     const result = await service.layout(
-      this.createLayoutRequest(input, settings, iterations),
+      createGlobalLayoutRequestFromAutomaticPositions(
+        input,
+        settings,
+        iterations,
+        automaticPositions,
+      ),
     );
     await this.applyPositions(result.positions);
     return {
@@ -610,30 +615,6 @@ export class GlobalRendererSession {
       skipIndexation: true,
       schedule: true,
     });
-  }
-
-  createLayoutRequest(
-    input: GlobalRendererInput,
-    settings: GlobalLayoutSettings,
-    iterations: number,
-  ): Omit<GlobalLayoutRequest, 'requestId'> {
-    const positioned: GlobalRendererInput = {
-      ...input,
-      nodes: input.nodes.map((node) => {
-        const current = this.graph.hasNode(node.key)
-          ? this.graph.getNodeAttributes(node.key)
-          : node.attributes;
-        return {
-          ...node,
-          attributes: {
-            ...node.attributes,
-            x: current.x,
-            y: current.y,
-          },
-        };
-      }),
-    };
-    return createGlobalLayoutRequest(positioned, settings, iterations);
   }
 
   applyPositions(positions: readonly GlobalLayoutPosition[]): Promise<void> {

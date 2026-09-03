@@ -27,6 +27,8 @@ canonical truth, or own a platform storage implementation.
   preserve that camera. Transition anchors and Local Fit requests are consumed
   once, preventing remount or Back/Forward from replaying stale camera work.
   Graphology, worker positions, and transition points are never persisted.
+  SPATIAL1A also owns the independent workspace spatial-override session and
+  passes its resolved map only to All Network; no production editor is exposed.
   Network Explorer consumes the same already-completed All/Focus Network
   projection and resolved Visual Group presentation map as the canvas. Its
   selection callback updates the single controlled graph selection and issues a

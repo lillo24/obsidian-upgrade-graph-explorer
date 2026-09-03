@@ -34,12 +34,13 @@ src/
   types.ts                 Serializable settings, worker, renderer, and viewport contracts.
   settings.ts              Compact/Normal/Spacious presets and bounded Custom validation.
   mapping.ts               KG6-to-Sigma mapping, deterministic seeds, and folder keys.
+  spatial.ts               Sigma logical-axis adapter and All Network override composition.
   node-size.ts             Per-File multiplier composition and final display-only bounds.
   node-size-presentation.ts  Sparse override diff and topology-owned File-to-node key index.
   graph.ts                 Graphology construction, neighborhood index, and reconciliation.
   interaction-contract.ts  Operation-count oracle for camera/UI versus layout-triggering work.
   layout.ts                Worker-safe ForceAtlas2, folder-prior candidates, metrics, fingerprint.
-  layout-cache.ts          Four-entry memory-only LRU of derived positions.
+  layout-cache.ts          Four-entry memory-only LRU of automatic derived positions.
   lifecycle.ts             WebGL construction result and idempotent session lease.
   style.ts                 Far/Regional/Near LOD and GROUP1A base-accent layer.
   global-label.ts          Viewport-aware Global label/hover placement after adaptive culling.
@@ -111,9 +112,36 @@ Advanced separates spatial controls (reference pull and folder separation)
 from visual controls (base node size, link influence on node size, link
 thickness, and label threshold). Settings are user preferences, not canonical
 truth. Changing a spacing preset adopts its spatial baseline while preserving
-folder strength and the current advanced visual values. Manual folder dragging
-and persistent node, folder, or ForceAtlas2 coordinates are intentionally
-absent.
+folder strength and the current advanced visual values. SPATIAL1A adds persisted
+normalized folder target centers, but manual dragging remains intentionally
+absent until SPATIAL1B; raw node, folder, and ForceAtlas2 coordinates never
+persist.
+
+SPATIAL1A composes only All Network:
+
+```text
+automatic deterministic/cache/worker positions
+  → normalized exact-folder anchor composition
+  → displayed Sigma positions
+```
+
+`GlobalGraphCanvas` owns `latestAutomaticPositions` separately from the live
+Graphology coordinates. Initial seeds, exact cache hits, and accepted worker
+results update that automatic set. Worker requests use the explicit automatic
+position path; cache writes occur before and independently of display
+composition. An anchor edit recomposes and applies displayed positions with zero
+KG6 projections, topology reconciliations, or ForceAtlas2 requests. A late
+worker result reads the latest anchor map. Explicit Re-layout retains anchors
+and reinterprets them against the new automatic frame.
+
+The source-neutral geometry computes the frame and folder centers from canonical
+document automatic positions only. Diagnostics, node radii (including VISUAL1B
+display multipliers), viewport/camera, and prior translations are excluded.
+Every member receives one rigid translation. Sigma 3.0.3 maps positive graph Y
+upward, so `spatial.ts` centralizes a `-1` visual-down sign: persisted positive
+X/Y therefore renders bottom-right. Inactive exact paths remain dormant and
+reactivate when the same folder becomes visible again. Focus Network and both
+Hierarchy presentations receive no spatial registry.
 
 VISUAL1A applies only to All Network. Ordinary document nodes add a bounded
 reference-degree boost to the configured base size. At the persisted
@@ -161,11 +189,13 @@ the distance between unrelated connected Files. Normal automatic sizes still
 participate in layout fingerprints. Workers, latest-wins handling, and bounded
 position caches are unchanged; no new layout cache or persisted geometry exists.
 
-The layout fingerprint includes schema, algorithm, iterations, stable node
+The automatic layout fingerprint includes schema, algorithm, iterations, stable node
 keys/sizes, reference endpoints/weights, folder assignment, and validated
 settings. It excludes seed coordinates, labels, search, hover, selection, and
 source text. Surviving coordinates warm a changed layout; an exact cache hit
-skips worker computation. The cache is bounded and memory-only.
+skips worker computation. The cache is bounded and memory-only. Normalized
+spatial anchors are excluded, so one automatic cache hit may compose with any
+current anchor map.
 
 ## Regional semantic zoom and lifecycle
 
@@ -317,7 +347,8 @@ Views, QUERY1 evolution, and GROUP1 remain separate product layers.
 ## Dependency boundary and validation
 
 Production depends only on view-projection, the resolved GROUP1A presentation
-type, the source-neutral presentation-overrides contract, React/React DOM,
+type, the source-neutral presentation-overrides and spatial-overrides contracts,
+React/React DOM,
 Sigma, Graphology, and Graphology ForceAtlas2. ESLint
 rejects canonical, source, platform,
 application, analytics/performance, React Flow, Dagre, and Node imports. React

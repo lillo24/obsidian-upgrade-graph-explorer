@@ -77,6 +77,9 @@ importers:
       '@icarus-graph-explorer/source-provider-tauri':
         specifier: workspace:*
         version: link:../../packages/source-provider-tauri
+      '@icarus-graph-explorer/spatial-overrides':
+        specifier: workspace:*
+        version: link:../../packages/spatial-overrides
       '@icarus-graph-explorer/view-projection':
         specifier: workspace:*
         version: link:../../packages/view-projection
@@ -251,6 +254,9 @@ importers:
       '@icarus-graph-explorer/presentation-overrides':
         specifier: workspace:*
         version: link:../presentation-overrides
+      '@icarus-graph-explorer/spatial-overrides':
+        specifier: workspace:*
+        version: link:../spatial-overrides
       '@icarus-graph-explorer/view-projection':
         specifier: workspace:*
         version: link:../view-projection
@@ -319,6 +325,12 @@ importers:
       '@tauri-apps/plugin-fs':
         specifier: 2.5.1
         version: 2.5.1
+
+  packages/spatial-overrides:
+    dependencies:
+      '@icarus-graph-explorer/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/stable-identity:
     dependencies:
@@ -404,6 +416,9 @@ importers:
       '@icarus-graph-explorer/renderer-sigma':
         specifier: workspace:*
         version: link:../../packages/renderer-sigma
+      '@icarus-graph-explorer/spatial-overrides':
+        specifier: workspace:*
+        version: link:../../packages/spatial-overrides
       '@icarus-graph-explorer/view-projection':
         specifier: workspace:*
         version: link:../../packages/view-projection

@@ -15,3 +15,8 @@ canonical Documents receive active overrides. Projection/query membership never
 prunes the registry. The app owns storage and eligibility; Network renderers
 consume the sparse map in their ordinary size/layout mapping. No React, storage,
 source adapter, query, projection, or renderer dependencies belong here.
+
+Normalized folder anchors deliberately live in the separate
+`@icarus-graph-explorer/spatial-overrides` registry. Per-File multipliers affect
+display size only; they neither contribute to the automatic spatial frame nor
+alter folder translations. Neither registry clears or serializes the other.
