@@ -10,10 +10,12 @@ package boundaries remain unchanged.
 
 The strongest parts of the product are transactional live-vault adoption,
 explicit failure behavior, renderer-worker isolation, deterministic recovery,
-and privacy boundaries. The release gate is held by a major keyboard/screen
-reader gap in both Network renderers and by unfinished desktop security and
-distribution configuration. Onboarding, query feedback, repeated-reference
-inspection, and progress communication are important follow-up polish.
+and privacy boundaries. KG14B2 closes the major keyboard/screen-reader Network
+exploration gap with a projection-scoped virtualized DOM companion. External
+release is still held by unfinished desktop security/distribution configuration
+and the remaining accessibility feedback, contrast/scaling, and manual release
+gates. Onboarding, query feedback, repeated-reference inspection, and progress
+communication remain important follow-up polish.
 
 ## 1. Current workflow map
 
@@ -43,7 +45,7 @@ Groups are separate persisted systems.
 | All/Focus and Network/Hierarchy workflows   | Ready with polish work                      | Production-browser traversal of all four combinations, Hops/direction, depth 0–3, Custom disclosure, history, and reload.                                                      |
 | Live-vault safety                           | Ready                                       | Ordered prepare → persist → commit, latest-result rejection, paused recovery, last-valid-graph preservation, and Rescan tests.                                                 |
 | Browser runtime                             | Ready after KG14A fixes                     | Production build exercised without current warnings/errors; the Network refresh crash and missing Focus-root crash found by KG14A are fixed and regression-tested.             |
-| Accessibility                               | Not release-ready                           | Hierarchy has a usable DOM path. Both Sigma canvases are deliberately `aria-hidden` and expose no browsable node equivalent.                                                   |
+| Accessibility                               | Network gate addressed; follow-up remains   | Both Sigma canvases stay visual-only, while KG14B2 supplies a synchronized virtualized DOM tree. QUERY1 announcement, contrast, scaling, and final manual feedback remain.     |
 | Desktop security/distribution               | Not release-ready                           | Narrow filesystem capabilities are good, but CSP is disabled, versions remain `0.0.0`, and bundling is inactive.                                                               |
 | Performance                                 | Ready for bounded use; feedback gap remains | Worker split and small profiles are healthy. A prior aggregate-only real-vault Rescan took about 9.7 seconds, while the UI exposes phase text rather than meaningful progress. |
 
@@ -153,10 +155,10 @@ or adding a general cache in KG14.
 ### KG14A-02 — Network has no equivalent keyboard or screen-reader graph path
 
 - **Category:** Accessibility
-- **Severity / class:** P1 / Must
+- **Severity / class:** P1 / Must — fixed in KG14B2
 - **Confidence:** High
 - **Workflow:** All + Network and Focus + Network without a pointer/visual canvas
-- **Observed behavior:** The Sigma container is `aria-hidden="true"`; its nodes
+- **Observed behavior before KG14B2:** The Sigma container is `aria-hidden="true"`; its nodes
   do not appear in the accessibility tree. Search, Scope/Layout controls, zoom,
   Fit, and Inspector remain accessible, but a user cannot enumerate the visible
   network, discover an unknown node, traverse adjacency, or select a canvas node
@@ -165,14 +167,18 @@ or adding a general cache in KG14.
   knows what to search for. It is not an equivalent way to explore a network.
 - **Reproduction:** Inspect the accessibility tree in either Network layout or
   navigate the page only with the keyboard.
-- **Evidence:** Production DOM snapshots contain only Network controls/status;
-  `GlobalRendererSession` and `LocalRendererSession` hide their canvas roots.
+- **Evidence:** Pure model/keyboard/virtual-range tests, bounded server DOM, and
+  browser/release QA cover the new projection companion;
+  `GlobalRendererSession` and `LocalRendererSession` correctly keep their visual
+  canvas roots hidden.
 - **Likely implementation area:** Shared Network accessibility surface around
   the Sigma views and Inspector/navigation actions.
-- **Suggested direction:** Add a synchronized, virtualized DOM representation
-  of visible nodes and useful adjacency with selection/focus actions. Preserve
-  the visual canvas as presentation and keep Search as a complementary path.
-- **Decision required?:** Yes; see D-01.
+- **Suggested direction:** Completed: the transient Network Explorer enumerates
+  every projected node, expands only projected parent/child and
+  incoming/outgoing adjacency, synchronizes graph selection, and preserves zoom
+  while centering. It uses bounded row virtualization and never reads renderer
+  topology or changes graph history.
+- **Decision required?:** No; D-01 selected Option A.
 
 ### KG14A-03 — desktop configuration is not an external-release configuration
 
@@ -372,23 +378,24 @@ or adding a general cache in KG14.
 
 ## 4. Accessibility
 
-| Surface                       | Result                  | Notes                                                                                                                                             |
-| ----------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Page landmarks and bypass     | Pass                    | Skip link, named main, named workspace/search regions, and one page heading.                                                                      |
-| Scope/Layout/history/settings | Pass                    | Native buttons/selects, pressed/expanded state, disabled Focus explanation, and visible `:focus-visible`.                                         |
-| Search                        | Pass with minor caveat  | Labeled searchbox, result count, semantic buttons, retained query, and Escape closes results while retaining the query.                           |
-| QUERY1/Filters                | Partial                 | Native labeled controls and invalid association; parse result needs live announcement (KG14A-07).                                                 |
-| Visual Groups                 | Pass                    | Native authoring controls, labels, priority buttons, enabled state, inline delete guard, and non-color group names.                               |
-| All/Focus Hierarchy           | Pass                    | Nodes are DOM articles/groups; disclosure is a button with exact reveal/hide count; zoom/Fit/maximize have names.                                 |
-| All/Focus Network             | Fail release gate       | Canvas is visual-only; controls/Search/Inspector do not provide equivalent browseable topology (KG14A-02).                                        |
-| Inspector                     | Pass with density issue | Named complementary region, focus-on-open Close, breadcrumbs/actions, Technical details disclosure; repeated references need differentiation.     |
-| Settings/diagnostics          | Pass                    | Tabs/tabpanels, native controls, short-height internal scrolling, named dialog and Close focus.                                                   |
-| Motion/zoom/scaling           | Partial evidence        | Renderer motion checks `prefers-reduced-motion`; CSS includes reduced-motion overrides; browser zoom and OS scaling remain manual release checks. |
+| Surface                       | Result                        | Notes                                                                                                                                               |
+| ----------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page landmarks and bypass     | Pass                          | Skip link, named main, named workspace/search regions, and one page heading.                                                                        |
+| Scope/Layout/history/settings | Pass                          | Native buttons/selects, pressed/expanded state, disabled Focus explanation, and visible `:focus-visible`.                                           |
+| Search                        | Pass with minor caveat        | Labeled searchbox, result count, semantic buttons, retained query, and Escape closes results while retaining the query.                             |
+| QUERY1/Filters                | Partial                       | Native labeled controls and invalid association; parse result needs live announcement (KG14A-07).                                                   |
+| Visual Groups                 | Pass                          | Native authoring controls, labels, priority buttons, enabled state, inline delete guard, and non-color group names.                                 |
+| All/Focus Hierarchy           | Pass                          | Nodes are DOM articles/groups; disclosure is a button with exact reveal/hide count; zoom/Fit/maximize have names.                                   |
+| All/Focus Network             | Pass; manual feedback remains | Canvas stays visual-only; the virtualized Network Explorer exposes projected nodes/adjacency, roving keyboard navigation, selection, and centering. |
+| Inspector                     | Pass with density issue       | Named complementary region, focus-on-open Close, breadcrumbs/actions, Technical details disclosure; repeated references need differentiation.       |
+| Settings/diagnostics          | Pass                          | Tabs/tabpanels, native controls, short-height internal scrolling, named dialog and Close focus.                                                     |
+| Motion/zoom/scaling           | Partial evidence              | Renderer motion checks `prefers-reduced-motion`; CSS includes reduced-motion overrides; browser zoom and OS scaling remain manual release checks.   |
 
-Contrast is not the only carrier of entity/reference state: cards use labels,
-icons, borders/dashes, and text. Visual Group color is accompanied by its group
-name in the authoring and Inspector surfaces. A formal contrast measurement for
-every palette/state combination remains appropriate in KG14B.
+Contrast is not the only carrier of entity/reference state: cards and Network
+Explorer rows use labels, icons, borders/dashes, and text. Visual Group color is
+accompanied by its group name in the authoring, Inspector, and Network Explorer
+surfaces. A formal contrast measurement for every palette/state combination
+and continued assistive-technology feedback remain appropriate in KG14B.
 
 ## 5. Resilience matrix
 
@@ -403,7 +410,7 @@ fault injected into a production session.
 | Corrupt Saved Filters                  | Graph unaffected                | Visible blocked state                 | Stored bytes untouched; repair outside app                   | saved-filter persistence tests             |
 | Corrupt Visual Groups                  | Graph unchanged                 | Visible blocked state                 | Explicit two-step reset clears only group key                | Visual Group session/component tests       |
 | Storage read/write/remove failure      | Yes                             | Alert/warning                         | Memory stays usable; failed candidate not adopted            | App, storage, preferences, group tests     |
-| WebGL/Sigma mount failure              | Hierarchy path remains          | Named renderer failure                | All Hierarchy/Open full hierarchy fallback                   | Sigma lifecycle and App tests              |
+| WebGL/Sigma mount failure              | Projection companion remains    | Named renderer failure                | Network Explorer remains usable; Hierarchy fallback remains  | Sigma lifecycle, model, and App tests      |
 | All Network layout-worker failure      | Seed/current graph remains      | Renderer status                       | Explicit Re-layout can retry; latest request owns adoption   | Global worker/client tests                 |
 | Focus Network layout-worker failure    | Deterministic seed remains      | Renderer failure/status               | Structured/All Hierarchy fallback; stale result rejected     | Local worker/client/session tests          |
 | W3 Hierarchy failure                   | Deterministic grid/seed remains | Layout warning                        | No synchronous Dagre fallback; newest valid result only      | React Flow layout and W3 client tests      |
@@ -608,7 +615,7 @@ local investigative run, not portable promises or CI thresholds.
 
 ## 16. Decision-required items
 
-### D-01 — equivalent access to Network exploration
+### D-01 — equivalent access to Network exploration — decided in KG14B2
 
 - **Problem:** The visual Sigma canvas has no browsable keyboard/screen-reader
   graph equivalent.
@@ -620,7 +627,7 @@ local investigative run, not portable promises or CI thresholds.
 - **Tradeoff:** A gives the most equivalent exploration but costs more DOM/state
   design. B is smaller but may still underserve discovery. C is not recommended
   because Layout should be a presentation choice, not an accessibility gate.
-- **Recommended default:** A, implemented with virtualization and existing
+- **Decision:** Option A is implemented with virtualization and existing
   projection/inspection indexes; no duplicate canonical graph.
 - **Evidence that could change it:** Moderated assistive-technology testing may
   show that a focused adjacency navigator provides an equivalent task path.
@@ -668,13 +675,14 @@ local investigative run, not portable promises or CI thresholds.
 
 ## 17. Ranked implementation queue
 
-| Priority | Finding IDs                                      | Theme                               | User impact                                                                                             | Confidence  | Suggested implementation slice                             | Needs user decision? |
-| -------- | ------------------------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------- | -------------------- |
-| 1        | KG14A-02, KG14A-07, contrast/manual scaling gate | Accessible exploration              | Removes a release-blocking inability to explore Network and closes query feedback gaps                  | High        | KG14B — accessible Network companion and critical feedback | Yes: D-01            |
-| 2        | KG14A-03                                         | Desktop hardening                   | Produces an identifiable, CSP-hardened, installable release artifact                                    | High        | KG14C — release configuration and packaged smoke           | Yes: D-02            |
-| 3        | KG14A-04, KG14A-05                               | Source confidence and progress      | Users know what is open/live and whether long work is progressing                                       | High        | KG14D — source onboarding/status/progress                  | Yes: D-03 placement  |
-| 4        | KG14A-06, KG14A-09, KG14A-10, KG14A-08           | Workflow comprehension and recovery | Improves small Network readability, provenance scanning, depth mental model, and deletion safety        | Medium–High | KG14E — exploration polish                                 | Yes only for D-04    |
-| Done     | KG14A-01, KG14A-11, KG14A-12, KG14A-13, KG14A-14 | Audit-enabling fixes                | Prevents critical graph failures, restores query/empty-result feedback, and removes terminology leakage | High        | KG14A                                                      | No                   |
+| Priority | Finding IDs                                      | Theme                               | User impact                                                                                             | Confidence  | Suggested implementation slice                          | Needs user decision? |
+| -------- | ------------------------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------- | -------------------- |
+| 1        | KG14A-07, contrast/manual scaling feedback       | Accessible feedback                 | Closes query announcement and remaining verified contrast/scaling gaps                                  | High        | KG14B follow-up — critical feedback and manual evidence | No                   |
+| 2        | KG14A-03                                         | Desktop hardening                   | Produces an identifiable, CSP-hardened, installable release artifact                                    | High        | KG14C — release configuration and packaged smoke        | Yes: D-02            |
+| 3        | KG14A-04, KG14A-05                               | Source confidence and progress      | Users know what is open/live and whether long work is progressing                                       | High        | KG14D — source onboarding/status/progress               | Yes: D-03 placement  |
+| 4        | KG14A-06, KG14A-09, KG14A-10, KG14A-08           | Workflow comprehension and recovery | Improves small Network readability, provenance scanning, depth mental model, and deletion safety        | Medium–High | KG14E — exploration polish                              | Yes only for D-04    |
+| Done     | KG14A-02                                         | Equivalent Network exploration      | Adds a virtualized DOM path for projected discovery, adjacency traversal, selection, and centering      | High        | KG14B2                                                  | No                   |
+| Done     | KG14A-01, KG14A-11, KG14A-12, KG14A-13, KG14A-14 | Audit-enabling fixes                | Prevents critical graph failures, restores query/empty-result feedback, and removes terminology leakage | High        | KG14A                                                   | No                   |
 
 Future Saved Views, manual positions, cluster dragging, multi-focus,
 analytics/community detection, semantic similarity, source editing, cloud sync,
@@ -713,8 +721,9 @@ KG14 is complete when all of the following are true:
    browser QA, release Tauri QA, physical touchpad QA, and post-merge CI pass
    without private vault artifacts.
 
-KG14A establishes this queue and gate. It does not implement KG14B or mark KG14
-complete.
+KG14A established this queue and gate. KG14B2 addresses D-01/KG14A-02 without
+starting later context-menu/query actions; the remaining queue and completion
+gate are still open, so KG14 is not marked complete.
 
 ## KG14A QA record and low-risk fixes
 

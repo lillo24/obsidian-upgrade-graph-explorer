@@ -1,6 +1,6 @@
 # Web Multi-scale Graph Explorer
 
-Status: **STABLE — Scope × Layout unifies multi-scale exploration over the existing renderers.**
+Status: **STABLE — Scope × Layout plus an accessible Network Explorer unify visual and DOM exploration over the existing renderers.**
 
 This package owns the browser SPA, validated KG5 report selection, Tauri-only
 live vault orchestration, KG6 graph interaction state, guarded browser persistence, graph selection, canonical
@@ -17,6 +17,7 @@ selected report JSON → runtime validation → canonical inspection/search
                                                           → Local Free mapping/seed → Local ForceAtlas2 worker
                                                           → Local Structured mapping/seed → W3 Dagre worker
                                                      ↘ KG8 inspector/navigation
+                                                     ↘ virtualized Network Explorer
                                    ↘ secondary KG5 evidence UI
 
 Tauri Open Vault → watcher + buffered one-shot acquisition
@@ -47,6 +48,7 @@ apps/web/
     visual-groups/    Visible-entity GROUP1A presentation-map derivation; no projection calls.
     navigation-history.ts Bounded session history over semantic graph checkpoints.
     graph-history-shortcuts.ts Exact graph-context Back/Forward shortcut policy.
+    network-explorer-model.ts Projection-only node/adjacency indexes, row flattening, keyboard plans, and virtual ranges.
     persistence/      Stable-report eligibility, hydration, and localStorage adapter.
     report-view.ts    Pure reference/hierarchy presentation transformations.
     sample-report.json Deterministic private-safe report generated from fixtures.
@@ -168,6 +170,27 @@ its presentation surface and does not clear or change graph selection. Selecting
 another graph item while it is closed does not reopen it, and reopening resolves
 the current selection. Neither shell preference is part of the persisted-view
 schema.
+
+All + Network and Focus + Network also expose a transient **Network Explorer**
+from the toolbar or left-edge handle. It is a DOM `tree` over the active
+`ViewProjection`, not a second graph: top-level File, Heading, Block, and
+Diagnostic rows plus expanded parent/child and incoming/outgoing rows use only
+the projection's already-aggregated nodes and edges. A fixed-height flattened
+model virtualizes the viewport with overscan, while roving focus and
+Arrow/Home/End/Enter/Space behavior operate over every logical row, including
+offscreen rows. Row selection writes the existing controlled graph selection
+and centers the matching Sigma node at the current semantic zoom ratio without
+creating graph history, projection, topology, or layout work. Canvas selection
+reveals the matching top-level row without moving DOM focus or expanding it.
+
+The drawer starts closed, persists nothing, overlays rather than resizes the
+canvas, and closes when Layout leaves Network. Inspector and Network Explorer
+may coexist on wide screens. At the existing 900 px breakpoint, opening either
+closes the other; a wide-to-narrow resize retains the most recently opened
+drawer. Closing restores the toolbar or edge-handle opener, while a layout
+transition never steals focus from the Layout control. The DOM companion stays
+usable when a valid Network projection exists even if the visual Sigma mount
+reports a failure.
 
 The normal Inspector view is deliberately user-facing: entities show their name,
 kind, location, outgoing links, and backlinks; reference edges show the actual

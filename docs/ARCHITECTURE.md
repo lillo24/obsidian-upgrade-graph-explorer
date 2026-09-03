@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, and KG11 implements Tauri-selected, coalesced live vault acquisition with transactional KG10 application, full resync, and in-place view preservation. KG12 supplies the performance baseline and implements separate stateful W1 workspace and stateless W3 Dagre workers without changing KG11 transaction semantics or renderer-independent contracts. KG13A selected direct Sigma/Graphology for a complementary Global renderer. KG13B1 promotes it into the product as a lazy documents-first Global/Regional mode with off-main layout and soft folder geometry. KG13B2A adds bounded Local Free as an explicit third presentation with KG6 Focus/disclosure authority, deterministic immediate geometry, separate off-main layout, schema-v3 persistence/history, and Global transition anchoring. KG13B2B completes that Local presentation with a reusable React Flow/W3 schematic variant over the same bounded projection. PRE-KG14A4 assigns compact hierarchy cards to All and extended cards to Focus while preserving their separate Structure and Local Structured layout modes.
+This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, and KG11 implements Tauri-selected, coalesced live vault acquisition with transactional KG10 application, full resync, and in-place view preservation. KG12 supplies the performance baseline and implements separate stateful W1 workspace and stateless W3 Dagre workers without changing KG11 transaction semantics or renderer-independent contracts. KG13A selected direct Sigma/Graphology for a complementary Global renderer. KG13B1 promotes it into the product as a lazy documents-first Global/Regional mode with off-main layout and soft folder geometry. KG13B2A adds bounded Local Free as an explicit third presentation with KG6 Focus/disclosure authority, deterministic immediate geometry, separate off-main layout, schema-v3 persistence/history, and Global transition anchoring. KG13B2B completes that Local presentation with a reusable React Flow/W3 schematic variant over the same bounded projection. PRE-KG14A4 assigns compact hierarchy cards to All and extended cards to Focus while preserving their separate Structure and Local Structured layout modes. KG14B2 adds a virtualized, accessible Network Explorer over the completed All or Focus Network projection; it is a DOM companion to the visual Sigma canvas, not a renderer replacement or a new topology authority.
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
@@ -184,6 +184,17 @@ edge explanation resolves the existing KG6 `referenceIds[]` and compares exact
 canonical endpoints with visible projected endpoints. React, renderers, source
 adapters/diagnostics, filesystem/platform APIs, and graph libraries are
 mechanically excluded from production source.
+
+The web-owned `network-explorer-model.ts` is a narrower projection read model.
+It receives one completed Network `ViewProjection`, the snapshot-scoped
+inspection lookup, and the already-resolved Visual Group presentation map. It
+orders the Focus root first, then canonical entities by source position, then
+diagnostics; indexes projected hierarchy and reference edges once into
+parent/child and incoming/outgoing adjacency; and retains aggregated
+`referenceIds.length` rather than reconstructing occurrences. Hidden canonical
+entities, Graphology, Sigma sessions, layout coordinates, and renderer events
+are outside this boundary. Flattening, virtual ranges, stale expansion pruning,
+and keyboard transitions are pure derived presentation operations.
 
 `packages/renderer-reactflow` depends inward on view-projection and adapts one
 completed projection to read-only React Flow nodes/edges. It owns collision-safe
@@ -619,6 +630,20 @@ section or block results and **Open full hierarchy** return to exact
 hierarchical detail. WebGL/startup failure is explicit and leaves All Hierarchy
 available without deleting the persisted presentation preference.
 
+Both Network layouts expose the same transient Network Explorer overlay. Its
+virtualized DOM `tree` is derived from the active projection even if the Sigma
+mount fails, and its rows carry textual kind, source, diagnostic, Focus-distance,
+and winning Visual Group context. One roving tab stop navigates the complete
+logical row list; offscreen activation scrolls before focus is restored. A row
+selection writes the shared `GraphSelection` and sends exactly one Global or
+Local semantic center request at the current bookmark ratio. It creates no KG6
+action or navigation checkpoint and never asks Sigma to report topology. Canvas
+selection scrolls the matching top-level row into the virtual window without
+moving DOM focus or expanding adjacency. The overlay never resizes the graph;
+it may coexist with Inspector above 900 px, while the last-opened drawer wins at
+the existing narrow breakpoint. Drawer, expansion, active-row, and scroll state
+are memory-only and absent from schema v3.
+
 Focus is a source-neutral two-pass projection. A documents-only,
 prefiltered hop traversal first fixes file membership from the containing
 document of the exact Focus root. A second pass applies full filters and precise
@@ -882,6 +907,17 @@ Static product tests cover the enabled badge, ordered rows, editor labels,
 multiline QUERY1 feedback, fixed palette, contained Tools presentation, and
 Inspector Primary/Also matches. Existing GROUP1A renderer operation oracles
 remain the style-only regression gate.
+
+KG14B2 adds projection-model tests for deterministic File/Heading/Block/
+Diagnostic presentation, source/root ordering, symmetric projected adjacency,
+aggregated reference counts, internal-link metadata, stale expansion pruning,
+and every tree key transition. Stress-scale virtual-range and server-rendered
+DOM tests bound mounted rows to viewport plus overscan. App shell tests retain
+lazy Sigma loading while proving that only Network layouts expose the closed
+drawer controls. Browser and release-desktop QA cover responsive coexistence,
+focus restoration, offscreen keyboard traversal, bidirectional selection,
+zoom-preserving centering, renderer failure independence, and unchanged
+touchpad behavior.
 
 ## Changing these decisions
 
