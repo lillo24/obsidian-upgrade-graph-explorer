@@ -14,7 +14,9 @@ import {
 } from './global-label';
 import { createGlobalLayoutRequest } from './layout';
 import {
+  isCoarseWheelDelta,
   normalizeWheelDeltaPixels,
+  preventSigmaWheelDefault,
   ratioAfterWheelDelta,
   WheelDirectionStabilizer,
 } from './precision-wheel-zoom';
@@ -122,20 +124,29 @@ export class GlobalRendererSession {
 
   private readonly precisionWheelHandler = (coordinates: WheelCoords): void => {
     const original = coordinates.original as WheelEvent;
+    preventSigmaWheelDefault(coordinates);
+    const deltaPixels = normalizeWheelDeltaPixels(
+      original,
+      this.renderer.getDimensions().height,
+    );
     if (this.trackpadZoomMode === 'pinch-zoom' && !original.ctrlKey) {
-      coordinates.preventSigmaDefault();
       this.applyWheelPan(original);
       return;
     }
-    coordinates.preventSigmaDefault();
-    const deltaPixels = this.wheelDirection.stabilize(
-      normalizeWheelDeltaPixels(original, this.renderer.getDimensions().height),
+    const stabilizedDeltaPixels = this.wheelDirection.stabilize(
+      deltaPixels,
       performance.now(),
+      isCoarseWheelDelta(deltaPixels),
     );
-    if (deltaPixels === 0) return;
-    this.applyWheelZoom(coordinates.x, coordinates.y, deltaPixels);
+    if (stabilizedDeltaPixels === 0) return;
+    this.applyWheelZoom(
+      coordinates.x,
+      coordinates.y,
+      stabilizedDeltaPixels,
+      original.ctrlKey,
+    );
     const mouseCaptor = this.renderer.getMouseCaptor();
-    mouseCaptor.currentWheelDirection = deltaPixels > 0 ? -1 : 1;
+    mouseCaptor.currentWheelDirection = stabilizedDeltaPixels > 0 ? -1 : 1;
     if (this.precisionWheelIdleTimer !== undefined) {
       window.clearTimeout(this.precisionWheelIdleTimer);
     }
@@ -207,9 +218,14 @@ export class GlobalRendererSession {
     });
   }
 
-  private applyWheelZoom(x: number, y: number, deltaPixels: number): void {
+  private applyWheelZoom(
+    x: number,
+    y: number,
+    deltaPixels: number,
+    ctrlKey: boolean,
+  ): void {
     const camera = this.renderer.getCamera();
-    const ratio = ratioAfterWheelDelta(camera.ratio, deltaPixels);
+    const ratio = ratioAfterWheelDelta(camera.ratio, deltaPixels, ctrlKey);
     camera.setState(this.renderer.getViewportZoomedState({ x, y }, ratio));
   }
 
