@@ -961,3 +961,14 @@ touchpad behavior.
 ## Changing these decisions
 
 Change an expensive decision through a focused ADR that supplies evidence: a product requirement, compatibility constraint, measurement, or demonstrated failure of the current boundary. Roadmap speculation alone is not evidence. Keep documentation clear about what is implemented now, what is an invariant, and what is only planned.
+
+## HIER0 product exposure and geometry
+
+All Hierarchy is retained as an experimental whole-vault presentation, hidden by
+default and available for All Network failure recovery. Focus Hierarchy remains
+supported normally. A web-owned pure availability policy gates all activation
+routes; the boolean is a general v1 preference, not schema-v3 view state.
+Renderer-owned rectangle geometry now packs the immediate Focus seed and reserves
+entities/diagnostics during final diagnostic placement. Dagre topology, canonical
+semantics, Focus document membership and fixed dimensions are unchanged. This is
+a collision baseline, not the future Focus Schematic/File-module model.

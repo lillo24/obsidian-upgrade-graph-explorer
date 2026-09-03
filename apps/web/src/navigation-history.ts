@@ -10,6 +10,10 @@ import type {
 } from '@icarus-graph-explorer/view-projection';
 
 import type { GraphStateAction } from './graph-state';
+import {
+  resolveAvailablePresentationMode,
+  type ExplorationAvailability,
+} from './exploration-model';
 
 export const GRAPH_NAVIGATION_HISTORY_LIMIT = 100;
 
@@ -176,6 +180,68 @@ export function sameGraphHistoryCheckpoint(
 
 export function createGraphNavigationHistory(): GraphNavigationHistory {
   return { past: [], future: [] };
+}
+
+/** Normalize hidden presentations and coalesce only duplicates created by that
+ * normalization. Semantic state and all renderer bookmarks survive the merge. */
+export function normalizeAvailableGraphHistory(
+  history: GraphNavigationHistory,
+  current: GraphHistoryCheckpoint,
+  availability: ExplorationAvailability,
+): {
+  readonly history: GraphNavigationHistory;
+  readonly current: GraphHistoryCheckpoint;
+} {
+  const entries = [...history.past, current, ...[...history.future].reverse()];
+  const compact: {
+    checkpoint: GraphHistoryCheckpoint;
+    changed: boolean;
+    current: boolean;
+  }[] = [];
+  for (const [index, entry] of entries.entries()) {
+    const presentationMode = resolveAvailablePresentationMode(
+      entry.presentationMode,
+      entry.state,
+      availability,
+    );
+    const candidate = {
+      checkpoint:
+        presentationMode === entry.presentationMode
+          ? entry
+          : { ...entry, presentationMode },
+      changed: presentationMode !== entry.presentationMode,
+      current: index === history.past.length,
+    };
+    const previous = compact.at(-1);
+    if (
+      previous !== undefined &&
+      (previous.changed || candidate.changed) &&
+      previous.checkpoint.presentationMode ===
+        candidate.checkpoint.presentationMode &&
+      sameGraphViewState(previous.checkpoint.state, candidate.checkpoint.state)
+    ) {
+      previous.checkpoint = {
+        ...candidate.checkpoint,
+        viewports: {
+          ...previous.checkpoint.viewports,
+          ...candidate.checkpoint.viewports,
+        },
+      };
+      previous.changed ||= candidate.changed;
+      previous.current ||= candidate.current;
+    } else compact.push(candidate);
+  }
+  const index = compact.findIndex((entry) => entry.current);
+  return {
+    current: compact[index]!.checkpoint,
+    history: {
+      past: compact.slice(0, index).map((entry) => entry.checkpoint),
+      future: compact
+        .slice(index + 1)
+        .reverse()
+        .map((entry) => entry.checkpoint),
+    },
+  };
 }
 
 /** Request identity advances independently from whether a request is active. */

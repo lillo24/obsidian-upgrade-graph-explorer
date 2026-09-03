@@ -834,3 +834,16 @@ Low-risk fixes included in KG14A:
    restoration.
 5. Replaced the blank zero-node All Network canvas with explicit filter recovery
    guidance and removed its user-facing in-memory-cache implementation detail.
+
+## HIER0 follow-up
+
+The Synthetic Sample reproduced actual diagnostic/entity collisions: one pair
+in All Hierarchy at Files only, and three pairs in Source Focus Hierarchy at
+three levels. The immediate Focus seed had nine pairs (one entity/entity, one
+entity/diagnostic, seven diagnostic/diagnostic). Entity-only Dagre output and the
+fallback grid had zero. Duplicate compact Note cards also lacked visible parent
+context. HIER0 uses dimension-aware seed packing, collision-aware diagnostic
+placement and compact parent context; no Dagre rank or decorative-state change
+was needed to address these measured failures. All Hierarchy remains available
+behind a default-Off Experimental preference and for Network recovery. See
+[the validation record](HIER0_VALIDATION.md) for completed and outstanding gates.

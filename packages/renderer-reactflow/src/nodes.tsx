@@ -131,7 +131,15 @@ function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
             {marker}
           </span>
         ) : null}
-        <strong className="entity-title">{data.title}</strong>
+        <strong className="entity-title">
+          {data.title}
+          {compact && data.entityKind === 'document' && data.detail !== null ? (
+            <span
+              className="compact-file-context"
+              translate="no"
+            >{` · ${data.detail}`}</span>
+          ) : null}
+        </strong>
       </div>
       {data.detail === null ? null : (
         <span className="entity-detail" title={data.detail} translate="no">

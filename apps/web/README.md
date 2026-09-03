@@ -427,3 +427,28 @@ pnpm --filter @icarus-graph-explorer/web build
 pnpm dev
 pnpm desktop:dev
 ```
+
+## HIER0 availability
+
+All opens in Network by default. All Hierarchy remains intact behind Settings >
+Graph > Experimental > Show All Hierarchy (Off by default), or as emergency
+recovery when All Network is unavailable. Focus always exposes Network and
+Hierarchy. The collapsed Experimental disclosure is transient; its checkbox is a
+general graph preference in the existing v1 record, separate from schema-v3 views.
+Enabling it does not prepare a projection/layout or change the active layout.
+Disabling it while All Hierarchy is active performs the normal anchored Network
+transition and retains renderer viewport bookmarks. Other graph controls patch
+one complete preference record; failed storage writes preserve session behavior.
+
+`exploration-model.ts` owns the pure availability policy. GraphExplorer applies
+it to hydration (after saved metadata is restored), Layout, history, Focus exit,
+live root removal, reset and renderer recovery. `navigation-history.ts` normalizes
+inaccessible checkpoints to available modes and coalesces adjacent equivalent
+semantic states created by normalization, retaining renderer bookmarks. Exact
+Heading/Block Search, breadcrumbs and Inspector navigation reuse the Local
+navigation planner to reveal/select/center the target in Focus Hierarchy when
+All Hierarchy is hidden. Explicit full-hierarchy actions respect the same gate.
+Focus Network failure offers Focus Hierarchy or Return to All; it does not enable
+the experiment. No canonical, QUERY1, Saved Filter, or view schema changes occur.
+
+See [HIER0 validation](../../docs/HIER0_VALIDATION.md) for measurements and gates.

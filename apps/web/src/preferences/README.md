@@ -25,3 +25,11 @@ The storage key and schema version stay at
 `icarus.graph-explorer.preferences.v1`. If storage is unavailable, an in-memory
 change still applies immediately for the current session and the Settings UI
 reports that it will reset when the app closes.
+
+HIER0 adds `showExperimentalAllHierarchy` to the unchanged
+`icarus.graph-explorer.preferences.v1` record. Only boolean `true` enables it;
+missing, false, and malformed values load as Off. It controls product exposure,
+not graph/view truth. GraphExplorer patches one current complete record for all
+controls, so another preference cannot drop the flag; storage failure keeps the
+session value and reports the existing warning. Disclosure open/closed state is
+not stored.
