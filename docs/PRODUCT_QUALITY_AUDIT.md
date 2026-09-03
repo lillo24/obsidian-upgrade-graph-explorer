@@ -834,3 +834,70 @@ Low-risk fixes included in KG14A:
    restoration.
 5. Replaced the blank zero-node All Network canvas with explicit filter recovery
    guidance and removed its user-facing in-memory-cache implementation detail.
+
+## NETWORKPOLISH1 QA record
+
+Status: implementation and automated checks pass; release graphical QA is pending.
+
+Network Explorer now derives a UI-only source-folder tree from current projected
+canonical paths. It neither indexes edges nor enumerates the vault. Depths 1/2
+default open and 3+ closed; memory-only path overrides survive query/live
+membership changes. Files never disclose, projected headings/blocks remain
+reachable, and diagnostic rows trail at root. Inspector remains the relationship
+detail surface. Shared Saved queries management uses the existing registry,
+behind the Network button and in Hierarchy Filters. Compact draft/reset clutter
+is removed without changing atomic Hide/restore safety.
+
+The branch incorporates main's PR #53 click/navigation fix. Confirmed graph
+clicks open collapsed ancestors before consuming the one-shot reveal request;
+unchanged selection never reopens a manually collapsed folder or pulls scroll
+back to the Focus root. Tests cover both confirmed-click and ordinary selection
+reveal with virtual, offscreen targets. Source-folder tests include 5,002 files
+and a 400-level path; fixed-height DOM/window tests retain bounded mounting.
+
+Local far LOD now always returns `hidden: false` for references, including camera
+ratio 6, while retaining 0.45 far width, hierarchy width, labels, and hover-style
+emphasis. Global far-edge rules and all layout/camera formulas are unchanged.
+
+Validation on the integrated branch passed `pnpm check` (111 files / 958 tests,
+formatting, lint, all typechecks and production web build), `pnpm desktop:check`,
+`pnpm desktop:build`, and `git diff --check`. The initial formatting failure was
+in pre-existing AGENTS whitespace; PR #53 supplied its formatting fix. This task
+leaves AGENTS identical to current main and adds no dependencies; the new
+happy-dom test dependency belongs to upstream PR #53. The archived prompt's
+SHA-256 exactly matches the supplied attachment.
+
+Production-browser checks covered folder keys/actions, query removal/return
+preserving collapse, node-only menus, offscreen Home/End, unchanged-selection
+scroll retention, compact validation, invalid-draft Hide blocking, valid
+Hide/restore, Saved Query save/apply/delete and Back/Forward, placement in both
+layouts, Escape/outside focus behavior, and a contained 640×420 Saved panel.
+Local depth/hops/direction and far reference visibility were exercised; console
+warnings/errors were empty. An ignored localhost QA adapter served unchanged
+production bundles and mirrored the existing opt-in aggregate recorder into DOM:
+folder, Saved queries, and drawer toggles produced zero projection, workspace,
+mapping, topology, or layout operation deltas in both Network scopes.
+
+The automation file chooser timed out, so loading the generated nested-folder
+report and actual live filesystem changes are not claimed as browser evidence.
+The ignored synthetic vault under `output/diagnostics/networkpolish1-vault/`
+contains a root file, folder levels 1–3, linked peers, headings, a block and a
+missing target for native QA. In the release executable verify:
+
+1. Open that vault; in All Network inspect folder defaults and node-only actions.
+   Toggle a folder, Apply/Clear a query, and confirm its collapse choice survives.
+2. Focus Root in Network at depth 3. Zoom in/out through the full supported range
+   with the pointer off nodes: reference lines must stay readable. Verify node
+   selection, Inspector, headings/blocks/diagnostics and keyboard scrolling.
+3. Save/apply/delete a temporary query. Make a harmless edit in the synthetic
+   vault and confirm live updates preserve folder choices and the valid graph.
+
+PR #51 (VISUAL1B) remains draft/unmerged and untouched. It must incorporate this
+branch if NETWORKPOLISH1 merges first; Size and its separate flicker are not
+implemented here. A separate browser observation was that a sparse two-file
+All Network query could require extra zoom-out after Fit; its framing was not
+diagnosed or changed in this task.
+
+Sparse Focus graph spacing / normalization / camera framing remains unresolved
+and was intentionally not changed. Native QA, PR CI, merge, post-merge CI, and
+task-checkout cleanup remain the completion gates; no spacing work starts here.
