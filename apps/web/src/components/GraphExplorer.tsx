@@ -1544,7 +1544,7 @@ export function GraphExplorer({
         if (cancelled) return;
         const message = error instanceof Error ? error.message : String(error);
         setLocalFreeUnavailable(
-          `Focus Network could not be loaded: ${message} Open full hierarchy remains available.`,
+          `Focus Network could not be loaded: ${message} Use Focus Hierarchy or return to All.`,
         );
       });
     return () => {
@@ -2920,7 +2920,13 @@ export function GraphExplorer({
             structuredZoom: viewport.structuredZoom,
           });
           setNavigationError(undefined);
-          setNavigationAnnouncement(`${origin}: ${plan.announcement}`);
+          setNavigationAnnouncement(
+            `${origin}: ${
+              enterExactFocus
+                ? 'Opened Focus Hierarchy and revealed the exact target.'
+                : plan.announcement
+            }`,
+          );
         } catch (error: unknown) {
           setNavigationError(
             `${origin}: ${
@@ -3631,7 +3637,7 @@ export function GraphExplorer({
                   : { instrumentation: performance })}
                 onFailure={(message) =>
                   setLocalFreeUnavailable(
-                    `Focus Network renderer failed: ${message} Open full hierarchy remains available.`,
+                    `Focus Network renderer failed: ${message} Use Focus Hierarchy or return to All.`,
                   )
                 }
                 onFitRequestConsumed={consumeLocalFitRequest}
