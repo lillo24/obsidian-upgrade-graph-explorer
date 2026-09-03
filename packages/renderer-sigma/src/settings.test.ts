@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   customGlobalLayoutSettings,
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+  DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE,
   folderClusteringStrength,
   resolveGlobalLayoutSettings,
   validateGlobalLayoutSettings,
@@ -15,6 +16,9 @@ describe('Global folder clustering strength', () => {
     expect(customGlobalLayoutSettings('compact').folderCohesion).toBe(0.09);
     expect(customGlobalLayoutSettings('normal').folderCohesion).toBe(0.08);
     expect(customGlobalLayoutSettings('spacious').folderCohesion).toBe(0.07);
+    expect(
+      customGlobalLayoutSettings('normal').referenceDegreeSizeInfluence,
+    ).toBe(DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE);
   });
 
   it('maps the product percentage to folderCohesion only', () => {
@@ -48,6 +52,58 @@ describe('Global folder clustering strength', () => {
     });
   });
 
+  it('keeps advanced visual choices independent from spacing presets', () => {
+    const custom = {
+      ...customGlobalLayoutSettings('normal'),
+      nodeSize: 7,
+      referenceDegreeSizeInfluence: 85,
+      linkThickness: 1.4,
+      labelThreshold: 11,
+    };
+    const spacious = withGlobalSpacingPreset(
+      {
+        folderClustering: true,
+        spacingPreset: 'normal',
+        custom,
+      },
+      'spacious',
+    );
+
+    expect(resolveGlobalLayoutSettings(spacious)).toMatchObject({
+      linkForce: 0.85,
+      withinFolderSpacing: 1.65,
+      betweenFolderSpacing: 4.6,
+      nodeSize: 7,
+      referenceDegreeSizeInfluence: 85,
+      linkThickness: 1.4,
+      labelThreshold: 11,
+    });
+  });
+
+  it('normalizes legacy custom settings to the old degree-size behavior', () => {
+    const current = customGlobalLayoutSettings('compact');
+    const legacyCustom = {
+      linkForce: current.linkForce,
+      folderCohesion: current.folderCohesion,
+      withinFolderSpacing: current.withinFolderSpacing,
+      betweenFolderSpacing: current.betweenFolderSpacing,
+      nodeSize: current.nodeSize,
+      linkThickness: current.linkThickness,
+      labelThreshold: current.labelThreshold,
+    };
+    const normalized = validateGlobalLayoutSettings({
+      folderClustering: true,
+      spacingPreset: 'compact',
+      custom: { ...legacyCustom, nodeSize: 6.25 },
+    });
+
+    expect(normalized.custom).toEqual({
+      ...legacyCustom,
+      nodeSize: 6.25,
+      referenceDegreeSizeInfluence: DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE,
+    });
+  });
+
   it('retains strength while clustering is Off and round-trips old custom data', () => {
     const existing = validateGlobalLayoutSettings({
       folderClustering: false,
@@ -76,4 +132,19 @@ describe('Global folder clustering strength', () => {
       withFolderClusteringStrength(DEFAULT_GLOBAL_LAYOUT_SETTINGS, NaN),
     ).toThrow('finite');
   });
+
+  it.each([-1, 101, Number.NaN])(
+    'rejects invalid link influence %s',
+    (referenceDegreeSizeInfluence) => {
+      expect(() =>
+        validateGlobalLayoutSettings({
+          ...DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+          custom: {
+            ...customGlobalLayoutSettings('normal'),
+            referenceDegreeSizeInfluence,
+          },
+        }),
+      ).toThrow('referenceDegreeSizeInfluence');
+    },
+  );
 });

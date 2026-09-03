@@ -18,6 +18,7 @@ export interface GlobalLayoutCustomSettings {
   readonly withinFolderSpacing: number;
   readonly betweenFolderSpacing: number;
   readonly nodeSize: number;
+  readonly referenceDegreeSizeInfluence: number;
   readonly linkThickness: number;
   readonly labelThreshold: number;
 }

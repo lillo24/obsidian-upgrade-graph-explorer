@@ -378,7 +378,7 @@ export const GraphSettings = memo(function GraphSettings({
   );
 });
 
-function GlobalCustomLayoutControls({
+export function GlobalCustomLayoutControls({
   onChange,
   settings,
 }: {
@@ -393,31 +393,106 @@ function GlobalCustomLayoutControls({
       className="global-layout-custom-controls"
       id="global-layout-advanced-controls"
     >
-      {(
-        [
-          ['linkForce', 'Reference pull', 0.05],
-          ['betweenFolderSpacing', 'Folder separation', 0.1],
-          ['nodeSize', 'Node size', 0.25],
-          ['linkThickness', 'Link thickness', 0.05],
-          ['labelThreshold', 'Label threshold', 0.25],
-        ] as const
-      ).map(([key, label, step]) => (
-        <label key={key}>
-          <span>
-            {label} <output>{settings[key]}</output>
-          </span>
-          <input
-            max={GLOBAL_LAYOUT_CUSTOM_RANGES[key].max}
-            min={GLOBAL_LAYOUT_CUSTOM_RANGES[key].min}
-            onChange={(event) =>
-              onChange(key, Number(event.currentTarget.value))
-            }
-            step={step}
-            type="range"
-            value={settings[key]}
-          />
-        </label>
-      ))}
+      <section aria-labelledby="global-layout-advanced-layout-heading">
+        <h4 id="global-layout-advanced-layout-heading">Layout</h4>
+        <GlobalCustomRange
+          controlKey="linkForce"
+          label="Reference pull"
+          onChange={onChange}
+          settings={settings}
+          step={0.05}
+        />
+        <GlobalCustomRange
+          controlKey="betweenFolderSpacing"
+          label="Folder separation"
+          onChange={onChange}
+          settings={settings}
+          step={0.1}
+        />
+      </section>
+      <section aria-labelledby="global-layout-advanced-visual-heading">
+        <h4 id="global-layout-advanced-visual-heading">Visual</h4>
+        <GlobalCustomRange
+          controlKey="nodeSize"
+          label="Base node size"
+          onChange={onChange}
+          settings={settings}
+          step={0.25}
+        />
+        <GlobalCustomRange
+          controlKey="referenceDegreeSizeInfluence"
+          label="Link influence on node size"
+          onChange={onChange}
+          output={`${settings.referenceDegreeSizeInfluence}%`}
+          settings={settings}
+          step={1}
+          valueText={`${settings.referenceDegreeSizeInfluence} percent`}
+        >
+          <small>
+            <span>None</span>
+            <span>Strong</span>
+          </small>
+        </GlobalCustomRange>
+        <GlobalCustomRange
+          controlKey="linkThickness"
+          label="Link thickness"
+          onChange={onChange}
+          settings={settings}
+          step={0.05}
+        />
+        <GlobalCustomRange
+          controlKey="labelThreshold"
+          label="Label threshold"
+          onChange={onChange}
+          settings={settings}
+          step={0.25}
+        />
+      </section>
     </div>
+  );
+}
+
+function GlobalCustomRange({
+  children,
+  controlKey,
+  label,
+  onChange,
+  output,
+  settings,
+  step,
+  valueText,
+}: {
+  readonly children?: ReactNode;
+  readonly controlKey: keyof GlobalLayoutCustomSettings;
+  readonly label: string;
+  readonly onChange: (
+    key: keyof GlobalLayoutCustomSettings,
+    value: number,
+  ) => void;
+  readonly output?: ReactNode;
+  readonly settings: GlobalLayoutCustomSettings;
+  readonly step: number;
+  readonly valueText?: string;
+}) {
+  const id = `global-layout-${controlKey}`;
+  return (
+    <label htmlFor={id}>
+      <span>
+        {label} <output htmlFor={id}>{output ?? settings[controlKey]}</output>
+      </span>
+      <input
+        {...(valueText === undefined ? {} : { 'aria-valuetext': valueText })}
+        id={id}
+        max={GLOBAL_LAYOUT_CUSTOM_RANGES[controlKey].max}
+        min={GLOBAL_LAYOUT_CUSTOM_RANGES[controlKey].min}
+        onChange={(event) =>
+          onChange(controlKey, Number(event.currentTarget.value))
+        }
+        step={step}
+        type="range"
+        value={settings[controlKey]}
+      />
+      {children}
+    </label>
   );
 }

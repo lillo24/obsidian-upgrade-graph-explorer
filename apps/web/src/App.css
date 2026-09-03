@@ -716,6 +716,24 @@ h2 {
   background: #f7fafb;
 }
 
+.global-layout-custom-controls section {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.global-layout-custom-controls section + section {
+  padding-top: 0.75rem;
+  border-top: 1px solid #d6e0e4;
+}
+
+.global-layout-custom-controls h4 {
+  margin: 0;
+  color: #294957;
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .global-layout-custom-controls label {
   display: grid;
   gap: 0.3rem;
@@ -727,6 +745,13 @@ h2 {
 .global-layout-custom-controls label > span {
   display: flex;
   justify-content: space-between;
+}
+
+.global-layout-custom-controls label > small {
+  display: flex;
+  justify-content: space-between;
+  color: #647983;
+  font-size: 0.66rem;
 }
 
 .global-layout-custom-controls input[type='range'] {

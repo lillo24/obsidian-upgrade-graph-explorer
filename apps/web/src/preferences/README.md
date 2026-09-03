@@ -12,11 +12,15 @@ must not be serialized into KG9 workspace state.
 The stable v1 payload contains `focusAppearance` (`outline`, `inverted`, or
 `minimal`), `trackpadZoomMode` (`scroll-zoom` or `pinch-zoom`), and one
 serializable `globalLayoutSettings` value. Global settings own the soft folder
-toggle, Compact/Normal/Spacious preset, and optional bounded Custom values. They
-are presentation preferences, not KG9 workspace state or persistent graph
+toggle, Compact/Normal/Spacious preset, and optional bounded Custom values,
+including the All Network `referenceDegreeSizeInfluence` percentage. They are
+presentation preferences, not KG9 workspace state or persistent graph
 coordinates. The defaults are `inverted`, `scroll-zoom`, and Normal with folder
-clustering on. Older payloads load missing Global settings from that default; an
-invalid field falls back independently so valid sibling preferences survive.
+clustering on; the link-influence default is `50`, which preserves the legacy
+degree-size curve. Older payloads load missing Global settings from that
+default. Legacy Custom objects that predate the influence field retain all
+existing values and normalize only the missing field to `50`; an invalid field
+falls back independently so valid sibling preferences survive.
 The storage key and schema version stay at
 `icarus.graph-explorer.preferences.v1`. If storage is unavailable, an in-memory
 change still applies immediately for the current session and the Settings UI

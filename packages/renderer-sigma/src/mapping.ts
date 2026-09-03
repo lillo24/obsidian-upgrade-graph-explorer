@@ -7,6 +7,7 @@ import type {
 
 import {
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+  DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE,
   resolveGlobalLayoutSettings,
 } from './settings';
 import type {
@@ -109,6 +110,7 @@ function nodeAttributes(
   degree: number,
   folderKey: string | undefined,
   nodeSize: number,
+  referenceDegreeSizeInfluence: number,
 ): GlobalNodeAttributes {
   const position = deterministicGlobalPosition(node.id);
   if (node.kind === 'reference-target') {
@@ -132,7 +134,8 @@ function nodeAttributes(
   }
   return {
     ...position,
-    size: nodeSize + Math.min(4, Math.log2(degree + 1) * 0.48),
+    size:
+      nodeSize + referenceDegreeSizeBoost(degree, referenceDegreeSizeInfluence),
     color: '#277b95',
     label: entityLabel(node),
     nodeKind: 'document',
@@ -142,6 +145,34 @@ function nodeAttributes(
     folderKey,
     revealableDescendantCount: node.revealableDescendantCount,
   };
+}
+
+const MAX_LEGACY_REFERENCE_DEGREE_BOOST = 4;
+const MAX_STRONG_REFERENCE_DEGREE_BOOST = 6;
+
+/**
+ * Keeps the pre-VISUAL1A curve exact at the default 50%, then gives the upper
+ * half of the product scale additional prominence without letting hubs grow
+ * by more than six display-size units.
+ */
+export function referenceDegreeSizeBoost(
+  degree: number,
+  influence: number,
+): number {
+  const legacyBoost = Math.min(
+    MAX_LEGACY_REFERENCE_DEGREE_BOOST,
+    Math.log2(degree + 1) * 0.48,
+  );
+  const influenceScale =
+    influence <= DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE
+      ? influence / DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE
+      : 1 +
+        (influence - DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE) /
+          (2 * DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE);
+  return Math.min(
+    MAX_STRONG_REFERENCE_DEGREE_BOOST,
+    legacyBoost * influenceScale,
+  );
 }
 
 function edgeAttributes(
@@ -186,6 +217,7 @@ export function mapProjectionToGlobal(
         degrees.get(node.id) ?? 0,
         spatial.folderKeyByProjectionNodeId.get(node.id),
         resolvedSettings.nodeSize,
+        resolvedSettings.referenceDegreeSizeInfluence,
       ),
     };
   });

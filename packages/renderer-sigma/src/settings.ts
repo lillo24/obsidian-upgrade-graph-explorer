@@ -17,12 +17,16 @@ export const GLOBAL_LAYOUT_CUSTOM_RANGES = {
   withinFolderSpacing: { min: 0.5, max: 3 },
   betweenFolderSpacing: { min: 1, max: 8 },
   nodeSize: { min: 2, max: 9 },
+  referenceDegreeSizeInfluence: { min: 0, max: 100 },
   linkThickness: { min: 0.2, max: 2.5 },
   labelThreshold: { min: 2, max: 16 },
 } as const satisfies Record<
   keyof GlobalLayoutCustomSettings,
   { readonly min: number; readonly max: number }
 >;
+
+/** Product percentage that reproduces the pre-VISUAL1A degree-size curve. */
+export const DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE = 50;
 
 const PRESETS = {
   compact: {
@@ -31,6 +35,7 @@ const PRESETS = {
     withinFolderSpacing: 0.8,
     betweenFolderSpacing: 2.2,
     nodeSize: 4,
+    referenceDegreeSizeInfluence: DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE,
     linkThickness: 0.75,
     labelThreshold: 8,
   },
@@ -40,6 +45,7 @@ const PRESETS = {
     withinFolderSpacing: 1.15,
     betweenFolderSpacing: 3.2,
     nodeSize: 4.5,
+    referenceDegreeSizeInfluence: DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE,
     linkThickness: 0.7,
     labelThreshold: 7,
   },
@@ -49,6 +55,7 @@ const PRESETS = {
     withinFolderSpacing: 1.65,
     betweenFolderSpacing: 4.6,
     nodeSize: 5,
+    referenceDegreeSizeInfluence: DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE,
     linkThickness: 0.65,
     labelThreshold: 6,
   },
@@ -128,6 +135,7 @@ export function validateGlobalLayoutSettings(
     );
   }
   for (const key of customKeys) {
+    if (key === 'referenceDegreeSizeInfluence') continue;
     if (!Object.hasOwn(value.custom, key)) {
       throw new Error(`Global layout custom setting ${key} is required.`);
     }
@@ -147,6 +155,15 @@ export function validateGlobalLayoutSettings(
       'betweenFolderSpacing',
     ),
     nodeSize: boundedNumber(value.custom.nodeSize, 'nodeSize'),
+    referenceDegreeSizeInfluence: Object.hasOwn(
+      value.custom,
+      'referenceDegreeSizeInfluence',
+    )
+      ? boundedNumber(
+          value.custom.referenceDegreeSizeInfluence,
+          'referenceDegreeSizeInfluence',
+        )
+      : DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE,
     linkThickness: boundedNumber(value.custom.linkThickness, 'linkThickness'),
     labelThreshold: boundedNumber(
       value.custom.labelThreshold,
@@ -188,6 +205,7 @@ function customFromResolved(
     withinFolderSpacing: settings.withinFolderSpacing,
     betweenFolderSpacing: settings.betweenFolderSpacing,
     nodeSize: settings.nodeSize,
+    referenceDegreeSizeInfluence: settings.referenceDegreeSizeInfluence,
     linkThickness: settings.linkThickness,
     labelThreshold: settings.labelThreshold,
   };
@@ -224,18 +242,22 @@ export function withFolderClusteringStrength(
   };
 }
 
-/** Applies a spacing baseline while keeping folder strength independent. */
+/** Applies a spatial baseline while keeping folder strength and visual choices independent. */
 export function withGlobalSpacingPreset(
   settings: GlobalLayoutSettings,
   spacingPreset: GlobalSpacingPreset,
 ): GlobalLayoutSettings {
-  const folderCohesion = resolveGlobalLayoutSettings(settings).folderCohesion;
+  const resolved = resolveGlobalLayoutSettings(settings);
   return {
     folderClustering: settings.folderClustering,
     spacingPreset,
     custom: {
       ...customGlobalLayoutSettings(spacingPreset),
-      folderCohesion,
+      folderCohesion: resolved.folderCohesion,
+      nodeSize: resolved.nodeSize,
+      referenceDegreeSizeInfluence: resolved.referenceDegreeSizeInfluence,
+      linkThickness: resolved.linkThickness,
+      labelThreshold: resolved.labelThreshold,
     },
   };
 }

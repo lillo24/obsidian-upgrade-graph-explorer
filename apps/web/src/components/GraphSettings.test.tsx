@@ -3,10 +3,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+  customGlobalLayoutSettings,
   withFolderClusteringStrength,
 } from '@icarus-graph-explorer/renderer-sigma/settings';
 
-import { GraphSettings } from './GraphSettings';
+import { GlobalCustomLayoutControls, GraphSettings } from './GraphSettings';
 
 describe('Graph Settings presentation', () => {
   it('groups Graph and Source controls into accessible transient tabs', () => {
@@ -70,5 +71,31 @@ describe('Graph Settings presentation', () => {
 
     expect(markup).toContain('aria-valuetext="75 percent" disabled=""');
     expect(markup).toContain('value="75"');
+  });
+
+  it('groups advanced controls by responsibility with an accessible influence scale', () => {
+    const markup = renderToStaticMarkup(
+      <GlobalCustomLayoutControls
+        onChange={() => undefined}
+        settings={{
+          ...customGlobalLayoutSettings('normal'),
+          referenceDegreeSizeInfluence: 65,
+        }}
+      />,
+    );
+
+    expect(markup).toContain('>Layout</h4>');
+    expect(markup).toContain('>Visual</h4>');
+    expect(markup).toContain('Reference pull');
+    expect(markup).toContain('Folder separation');
+    expect(markup).toContain('Base node size');
+    expect(markup).toContain('Link influence on node size');
+    expect(markup).toContain('aria-valuetext="65 percent"');
+    expect(markup).toContain('max="100" min="0" step="1"');
+    expect(markup).toContain('type="range" value="65"');
+    expect(markup).toContain('>None</span><span>Strong</span>');
+    expect(markup).toContain('Link thickness');
+    expect(markup).toContain('Label threshold');
+    expect(markup).not.toContain('Folder cohesion');
   });
 });

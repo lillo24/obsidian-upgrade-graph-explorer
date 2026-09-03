@@ -5,11 +5,103 @@ import {
   deriveGlobalSpatialMetadata,
   folderKeyFromWorkspacePath,
   mapProjectionToGlobal,
+  referenceDegreeSizeBoost,
 } from './mapping';
-import { DEFAULT_GLOBAL_LAYOUT_SETTINGS } from './settings';
+import {
+  customGlobalLayoutSettings,
+  DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+  DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE,
+} from './settings';
 import { globalTestProjection } from './test-fixture';
 
 describe('production Global mapping', () => {
+  it('preserves the exact legacy curve at the default influence', () => {
+    const expectedLegacyBoost = Math.min(4, Math.log2(3) * 0.48);
+    expect(
+      referenceDegreeSizeBoost(2, DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE),
+    ).toBe(expectedLegacyBoost);
+    const mapped = mapProjectionToGlobal(
+      globalTestProjection(),
+      DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+    );
+    expect(
+      mapped.nodes.find(({ key }) => key === 'entity:doc-a')?.attributes.size,
+    ).toBe(4.5 + expectedLegacyBoost);
+  });
+
+  it('scales degree monotonically from none to a bounded strong influence', () => {
+    const degrees = [0, 1, 2, 10, 100, 1_000];
+    const none = degrees.map((degree) => referenceDegreeSizeBoost(degree, 0));
+    const ordinary = degrees.map((degree) =>
+      referenceDegreeSizeBoost(degree, DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE),
+    );
+    const strong = degrees.map((degree) =>
+      referenceDegreeSizeBoost(degree, 100),
+    );
+
+    expect(none).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(
+      ordinary.every(
+        (value, index) => index === 0 || value >= ordinary[index - 1]!,
+      ),
+    ).toBe(true);
+    expect(
+      strong.every(
+        (value, index) => index === 0 || value >= strong[index - 1]!,
+      ),
+    ).toBe(true);
+    expect(strong[3]).toBeGreaterThan(ordinary[3]!);
+    expect(strong.at(-1)).toBeLessThanOrEqual(6);
+  });
+
+  it('uses occurrence-weighted degree for documents and keeps diagnostics separate', () => {
+    const base = globalTestProjection();
+    const document = base.nodes[0]!;
+    const diagnostic = {
+      id: 'diagnostic:missing',
+      kind: 'reference-target' as const,
+      status: 'unresolved' as const,
+      rawTarget: 'Missing',
+      referenceIds: ['reference:missing'],
+      candidateEntityIds: [],
+      reasons: [],
+    };
+    const projection = {
+      ...base,
+      nodes: [document, base.nodes[1]!, diagnostic],
+      edges: [
+        {
+          ...base.edges[0]!,
+          referenceIds: ['r1', 'r2', 'r3', 'r4'],
+        },
+      ],
+    };
+    const withInfluence = (referenceDegreeSizeInfluence: number) =>
+      mapProjectionToGlobal(projection, {
+        folderClustering: true,
+        spacingPreset: 'normal',
+        custom: {
+          ...customGlobalLayoutSettings('normal'),
+          referenceDegreeSizeInfluence,
+        },
+      });
+    const none = withInfluence(0);
+    const ordinary = withInfluence(50);
+    const strong = withInfluence(100);
+    const size = (input: typeof none, key: string) =>
+      input.nodes.find((node) => node.key === key)!.attributes.size;
+
+    expect(size(none, document.id)).toBe(4.5);
+    expect(size(ordinary, document.id)).toBe(
+      4.5 + referenceDegreeSizeBoost(4, 50),
+    );
+    expect(size(strong, document.id)).toBeGreaterThan(
+      size(ordinary, document.id),
+    );
+    expect(size(none, diagnostic.id)).toBe(2.79);
+    expect(size(strong, diagnostic.id)).toBe(2.79);
+  });
+
   it('derives normalized root and nested folder metadata without graph edges', () => {
     expect(folderKeyFromWorkspacePath('Root.md')).toBe('.');
     expect(folderKeyFromWorkspacePath('alpha/nested/A.md')).toBe(

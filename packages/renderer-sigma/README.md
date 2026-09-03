@@ -90,10 +90,28 @@ Folder clustering Off; Advanced visibility is transient UI state.
 
 `GlobalLayoutSettings` is plain JSON-compatible presentation state. Presets
 cover ordinary use; the direct Strength slider owns folder cohesion, while
-Advanced exposes bounded link force, folder separation, node size, link
-thickness, and label threshold. Settings are user
-preferences, not canonical truth. Manual folder dragging and persistent node,
-folder, or ForceAtlas2 coordinates are intentionally absent.
+Advanced separates spatial controls (reference pull and folder separation)
+from visual controls (base node size, link influence on node size, link
+thickness, and label threshold). Settings are user preferences, not canonical
+truth. Changing a spacing preset adopts its spatial baseline while preserving
+folder strength and the current advanced visual values. Manual folder dragging
+and persistent node, folder, or ForceAtlas2 coordinates are intentionally
+absent.
+
+VISUAL1A applies only to All Network. Ordinary document nodes add a bounded
+reference-degree boost to the configured base size. At the persisted
+`referenceDegreeSizeInfluence` default of `50`, the boost is exactly the prior
+`min(4, log2(degree + 1) * 0.48)` curve; `0` removes it; `100` strengthens it
+while capping the added size at six units. Projected edge degree continues to
+count represented canonical reference occurrences. Diagnostic targets keep
+their separate subordinate size formula, and Focus Network keeps its existing
+root/entity-kind sizing contract.
+
+Node size participates in ForceAtlas2 input and layout fingerprints, so a
+change to base size or link influence intentionally remaps attributes and
+requests layout without asking KG6 for a new projection. The existing settings
+update boundary also remaps the other advanced presentation values; optimizing
+those independent refresh paths remains outside this narrow settings change.
 
 The layout fingerprint includes schema, algorithm, iterations, stable node
 keys/sizes, reference endpoints/weights, folder assignment, and validated
