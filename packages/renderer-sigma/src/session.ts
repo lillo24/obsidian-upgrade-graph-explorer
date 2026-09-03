@@ -107,7 +107,10 @@ export class GlobalRendererSession {
     if (next !== this.visualLod) {
       this.visualLod = next;
       this.options.instrumentation?.count('global-style-updates');
-      this.renderer.scheduleRender();
+      // Sigma 3 caches reducer output. Render-only leaves old edge visibility
+      // until an unrelated topology change (such as Hide) refreshes that cache.
+      // Refresh only at LOD boundaries; ordinary pan/zoom stays render-only.
+      this.renderer.scheduleRefresh();
       this.options.instrumentation?.record(
         'semantic-zoom-style',
         performance.now() - started,
@@ -188,7 +191,6 @@ export class GlobalRendererSession {
       nodeReducer: (key, attributes) => this.reduceNode(key, attributes),
       edgeReducer: (key, attributes) => this.reduceEdge(key, attributes),
     });
-    this.visualLod = resolveGlobalVisualLod(this.renderer.getCamera().ratio);
     if (options.initialViewport !== undefined) {
       const initialNode = input.nodes.find(
         ({ attributes }) =>
@@ -198,6 +200,7 @@ export class GlobalRendererSession {
         this.centerImmediately(initialNode.key, options.initialViewport.ratio);
       }
     }
+    this.visualLod = resolveGlobalVisualLod(this.renderer.getCamera().ratio);
     const mountMs = Number((performance.now() - mountStart).toFixed(3));
     this.renderer.getMouseCaptor().on('wheel', this.precisionWheelHandler);
     this.renderer.getCamera().on('updated', this.cameraUpdatedHandler);

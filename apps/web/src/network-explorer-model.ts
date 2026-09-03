@@ -1,3 +1,4 @@
+import type { EntityId, WorkspacePath } from '@icarus-graph-explorer/core';
 import {
   entityDisplayName,
   type InspectionWorkspace,
@@ -32,6 +33,8 @@ export interface NetworkExplorerAdjacency {
 
 export interface NetworkExplorerNode {
   readonly id: ProjectionNodeId;
+  readonly entityId?: EntityId;
+  readonly sourcePath?: WorkspacePath;
   readonly glyph: '▰' | '◇' | '●' | '○';
   readonly kindLabel: 'File' | 'Heading' | 'Block' | 'Diagnostic';
   readonly name: string;
@@ -218,6 +221,8 @@ export function createNetworkExplorerModel(
       const visualGroup = visualGroups.get(node.entityId);
       mutableNodes.set(node.id, {
         id: node.id,
+        entityId: node.entityId,
+        sourcePath: node.sourcePath,
         ...presentation,
         name: entityDisplayName(entity),
         secondary: `${node.sourcePath} · L${entity.source.span.start.line}:C${entity.source.span.start.column}`,

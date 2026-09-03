@@ -15,12 +15,25 @@ function renderFilters(
     readonly contained?: boolean;
     readonly open?: boolean;
     readonly rendererMode?: GraphPresentationMode;
+    readonly queryInNetworkExplorer?: boolean;
     readonly savedFilters?: readonly SavedGraphFilter[];
     readonly savedFiltersWritable?: boolean;
   } = {},
 ): string {
   return renderToStaticMarkup(
     <GraphFilters
+      queryInNetworkExplorer={
+        options.queryInNetworkExplorer ?? options.rendererMode === 'global'
+      }
+      queryEditor={{
+        activeQuery: state.filters?.query ?? '',
+        queryDraft: state.filters?.query ?? '',
+        queryIssue: undefined,
+        onDraftChange: () => undefined,
+        onApply: () => undefined,
+        onClear: () => undefined,
+        onResetDraft: () => undefined,
+      }}
       contained={options.contained ?? false}
       onAction={() => undefined}
       onApplySavedFilter={() => undefined}
@@ -69,7 +82,7 @@ describe('graph Filters controls', () => {
     expect(markup).toContain('<legend>Reference Status</legend>');
     expect(markup).toContain('>Advanced query<');
     expect(markup).toContain('<textarea');
-    expect(markup).toContain('id="advanced-graph-query-help"');
+    expect(markup).toContain('id="filters-query-help"');
     expect(markup).toContain('>Saved Filters<');
     expect(markup).toContain('>Save current query<');
     expect(markup.match(/Blocks/gu)).toHaveLength(1);
@@ -87,7 +100,7 @@ describe('graph Filters controls', () => {
     );
   });
 
-  it('keeps Advanced query available in the files-only All Network view', () => {
+  it('keeps Saved Filters but moves the Advanced query editor out of Network Filters', () => {
     const markup = renderFilters(normalizeGraphState(initialGraphState()), {
       open: true,
       rendererMode: 'global',
@@ -96,8 +109,9 @@ describe('graph Filters controls', () => {
     expect(markup).toContain(
       'All Network displays files only. Entity and heading controls remain saved for Hierarchy; Advanced query still applies to files.',
     );
-    expect(markup).toContain('>Advanced query<');
-    expect(markup).toContain('id="advanced-graph-query"');
+    expect(markup).toContain('Advanced query is edited in Network Explorer.');
+    expect(markup).not.toContain('<textarea');
+    expect(markup).toContain('>Saved Filters<');
     expect(markup).not.toContain('<legend>Entity Content</legend>');
     expect(markup).not.toContain('>Heading limit<');
   });
