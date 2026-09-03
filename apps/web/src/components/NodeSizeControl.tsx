@@ -37,9 +37,11 @@ export function NodeSizeControl({
         </select>
       </label>
       {sizeScale === undefined ? null : (
-        <label>
+        <label htmlFor={`${id}-scale`}>
           Size multiplier{' '}
-          <output htmlFor={`${id}-scale`}>{value.toFixed(2)}×</output>
+          <output aria-hidden="true" htmlFor={`${id}-scale`}>
+            {value.toFixed(2)}×
+          </output>
           <input
             aria-valuetext={`${value.toFixed(2)} times automatic Network size`}
             id={`${id}-scale`}

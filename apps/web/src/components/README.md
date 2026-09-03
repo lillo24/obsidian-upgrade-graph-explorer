@@ -58,8 +58,8 @@ canonical truth, or own a platform storage implementation.
   Heading limit, Blocks option, Focus, and graph filters.
 - `NodeSizeControl.tsx` is the controlled Auto/Custom size editor content for
   Network File actions. It emits one multiplier/reset callback per input event;
-  eligibility, validation, storage, and renderer mapping remain outside. The
-  shared KG14B3 action-menu integration is pending in the VISUAL1B draft.
+  eligibility, validation, storage, and renderer mapping remain outside. It
+  occupies the editor screen of the shared Network Explorer action portal.
 - `controlled-selection.ts` prevents equivalent controlled renderer selection
   echoes from creating a React Flow update loop during programmatic handoff.
 - `GraphSettings.tsx` presents the viewport-bounded shared normal/maximized
@@ -150,8 +150,11 @@ canonical truth, or own a platform storage implementation.
   ordering, one-pass projected-edge indexes, flattened rows, stale-expansion
   reconciliation, virtual ranges, and keyboard transition planning. Neither
   file reconstructs hidden canonical topology or deaggregates references.
-  Visible rows show only the title and an optional Focus badge; path/context
-  remains in accessible names and node tooltips, without a secondary text line.
+  Visible rows show the title and an optional Focus badge. Canonical Files also
+  expose a compact Actions button and a custom-size multiplier when set;
+  path/context remains in accessible names and node tooltips, without a secondary
+  text line. Button, right-click, and keyboard invocation share one logical
+  action target. Opening Size or changing its value never selects or centers it.
 - `GraphQueryEditor.tsx` is the controlled QUERY1 presentation reused in Network
   Explorer and Hierarchy Filters. `use-graph-query-draft.ts` lives at GraphExplorer
   level and preserves transient drafts across placement/unmounts. It commits only
@@ -168,10 +171,14 @@ canonical truth, or own a platform storage implementation.
   tree. This disclosure is local presentation state, not another hidden-file list
   or query source of truth.
 - `NetworkExplorerMenu.tsx` renders one accessible portal for the current logical
-  row target. It owns enabled-item keyboard focus and outside dismissal;
+  row target, switching from its action menu to an Auto/Custom Size editor for
+  canonical Files without introducing a second menu. It owns enabled-item
+  keyboard focus, viewport bounds, and outside dismissal;
   NetworkExplorer invalidates it on scroll/projection changes and safely restores
   virtual row focus. `../network-explorer-context.ts` owns target normalization,
-  Focus/Hide eligibility and keyboard transitions. Application callbacks reuse
+  Focus/Hide/Size eligibility and keyboard transitions. Scrolling closes the
+  editor and focuses the drawer close button without revealing the selected row;
+  value changes leave input focus intact. Application callbacks reuse
   existing Focus, Inspector and QUERY1 paths, never renderer topology or hiding.
   Query and Hidden controls share a height-bounded scroll area so short windows
   retain an independently scrollable virtual list.

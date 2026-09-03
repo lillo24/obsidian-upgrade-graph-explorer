@@ -57,7 +57,8 @@ Network size overrides use
 `icarus-graph-explorer:presentation-overrides:<encodeURIComponent(workspaceId)>`.
 Only WorkspaceId, EntityId, and a finite multiplier are stored; no path, title,
 query, position, or hidden flag. Auto removes an entry. Stable workspaces save
-before adoption; transient reports and samples keep memory-only sessions.
+before adoption; transient and legacy reports keep memory-only sessions. This
+uses declared identity provenance, not whether a report is a sample or a vault.
 Corrupt data is left untouched and editing blocked with a visible recovery
 message; failed writes retain the last confirmed sizes. Reset saved view does
 not affect this registry. Missing canonical IDs remain inactive without fuzzy

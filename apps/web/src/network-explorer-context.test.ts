@@ -3,6 +3,9 @@ import {
   networkExplorerContextTarget,
   networkExplorerMenuActions,
   networkExplorerMenuIndex,
+  networkExplorerSizeEntityId,
+  currentNetworkExplorerContextTarget,
+  type NetworkExplorerContext,
 } from './network-explorer-context';
 import type {
   NetworkExplorerNode,
@@ -100,9 +103,62 @@ describe('Network Explorer context contract', () => {
       entity.sourcePath,
       new Set(),
     );
-    expect(networkExplorerMenuIndex(actions, 0, 'ArrowUp')).toBe(1);
-    expect(networkExplorerMenuIndex(actions, 1, 'ArrowDown')).toBe(0);
+    expect(networkExplorerMenuIndex(actions, 0, 'ArrowUp')).toBe(3);
+    expect(networkExplorerMenuIndex(actions, 1, 'ArrowDown')).toBe(3);
+    expect(networkExplorerMenuIndex(actions, 3, 'ArrowDown')).toBe(0);
     expect(networkExplorerMenuIndex(actions, 1, 'Home')).toBe(0);
-    expect(networkExplorerMenuIndex(actions, 0, 'End')).toBe(1);
+    expect(networkExplorerMenuIndex(actions, 0, 'End')).toBe(3);
+  });
+  it('offers Size only for canonical Files and uses EntityId rather than row key/path/name', () => {
+    expect(networkExplorerSizeEntityId(entity)).toBe('entity');
+    expect(
+      networkExplorerMenuActions(entity, undefined, new Set()).map(
+        (action) => action.id,
+      ),
+    ).toEqual(['focus', 'inspect', 'hide', 'size']);
+    for (const node of [
+      diagnostic,
+      { ...entity, kindLabel: 'Heading' as const },
+      { ...entity, kindLabel: 'Block' as const },
+      { ...diagnostic, kindLabel: 'File' as const },
+    ]) {
+      expect(networkExplorerSizeEntityId(node)).toBeUndefined();
+      expect(
+        networkExplorerMenuActions(node, undefined, new Set()).some(
+          (action) => action.id === 'size',
+        ),
+      ).toBe(false);
+    }
+  });
+  it('keeps editor targets independent of DOM mounting and closes on changed projection/logical row removal', () => {
+    const model = { nodes: [entity], nodeById: new Map([[entity.id, entity]]) };
+    const context: NetworkExplorerContext = {
+      rowId: 'node:node',
+      targetId: entity.id,
+      model,
+      screen: 'size',
+      x: 10,
+      y: 20,
+    };
+    const rows = new Map([[context.rowId, 9000]]);
+    expect(currentNetworkExplorerContextTarget(context, model, rows)).toBe(
+      entity,
+    );
+    expect(
+      currentNetworkExplorerContextTarget(context, model, new Map()),
+    ).toBeUndefined();
+    expect(
+      currentNetworkExplorerContextTarget(
+        context,
+        { nodes: [], nodeById: new Map() },
+        rows,
+      ),
+    ).toBeUndefined();
+    expect(
+      currentNetworkExplorerContextTarget(context, { ...model }, rows),
+    ).toBeUndefined();
+    expect(
+      currentNetworkExplorerContextTarget(null, model, rows),
+    ).toBeUndefined();
   });
 });

@@ -3640,6 +3640,15 @@ export function GraphExplorer({
           networkExplorerModel !== undefined &&
           networkExplorerVisible ? (
             <NetworkExplorer
+              presentationOverrides={nodePresentation.overrides}
+              sizePersistenceStatus={nodePresentation.session.status}
+              sizeEditingDisabled={
+                nodePresentation.session.persistenceMode ===
+                  'blocked-corrupt' ||
+                nodePresentation.session.persistenceMode ===
+                  'blocked-write-failure'
+              }
+              onSizeScaleChange={nodePresentation.changeSizeScale}
               queryEditor={{
                 ...queryEditor,
                 queryIssue:

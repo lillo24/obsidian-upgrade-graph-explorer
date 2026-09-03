@@ -10,18 +10,24 @@ import {
 } from 'react';
 
 import type { GraphSelection } from '@icarus-graph-explorer/renderer-reactflow';
+import type { EntityId } from '@icarus-graph-explorer/core';
+import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
 import type { ProjectionNodeId } from '@icarus-graph-explorer/view-projection';
 
 import {
   networkExplorerContextTarget,
+  currentNetworkExplorerContextTarget,
   networkExplorerMenuActions,
+  networkExplorerSizeEntityId,
   type NetworkExplorerAction,
+  type NetworkExplorerContext,
 } from '../network-explorer-context';
 import {
   GraphQueryEditor,
   type GraphQueryEditorState,
 } from './GraphQueryEditor';
 import { NetworkExplorerMenu } from './NetworkExplorerMenu';
+import { NodeSizeControl } from './NodeSizeControl';
 import { NetworkExplorerHiddenFiles } from './NetworkExplorerHiddenFiles';
 
 import {
@@ -39,6 +45,13 @@ import {
 } from '../network-explorer-model';
 
 interface NetworkExplorerProps {
+  readonly presentationOverrides: EntityPresentationOverrideMap;
+  readonly sizePersistenceStatus: string;
+  readonly sizeEditingDisabled: boolean;
+  readonly onSizeScaleChange: (
+    entityId: EntityId,
+    sizeScale: number | undefined,
+  ) => string | undefined;
   readonly queryEditor: GraphQueryEditorState;
   readonly hiddenPaths: readonly string[];
   readonly focusedSourcePath: string | undefined;
@@ -89,11 +102,17 @@ function relationshipGlyph(adjacency: NetworkExplorerAdjacency): string {
   }
 }
 
-function nodeAccessibleName(node: NetworkExplorerNode): string {
+function nodeAccessibleName(
+  node: NetworkExplorerNode,
+  sizeScale: number | undefined,
+): string {
   const details = [
     node.kindLabel,
     node.name,
     node.secondary,
+    sizeScale === undefined
+      ? undefined
+      : `Custom Network size ${sizeScale.toFixed(2)} times automatic`,
     node.focusRoot ? 'Focus' : undefined,
     node.focusDistance === null || node.focusRoot
       ? undefined
@@ -136,6 +155,10 @@ function adjacencyAccessibleName(adjacency: NetworkExplorerAdjacency): string {
 }
 
 export const NetworkExplorer = memo(function NetworkExplorer({
+  presentationOverrides,
+  sizePersistenceStatus,
+  sizeEditingDisabled,
+  onSizeScaleChange,
   queryEditor,
   hiddenPaths,
   focusedSourcePath,
@@ -167,13 +190,8 @@ export const NetworkExplorer = memo(function NetworkExplorer({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef(new Map<string, HTMLElement>());
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const [context, setContext] = useState<{
-    readonly rowId: string;
-    readonly targetId: ProjectionNodeId;
-    readonly model: NetworkExplorerModel;
-    readonly x: number;
-    readonly y: number;
-  } | null>(null);
+  const [context, setContext] = useState<NetworkExplorerContext | null>(null);
+  const [sizeError, setSizeError] = useState<string>();
   const hiddenPathSet = useMemo(() => new Set(hiddenPaths), [hiddenPaths]);
   const focusPending = useRef(false);
   const focusAfterExpansion = useRef<string | undefined>(undefined);
@@ -181,12 +199,15 @@ export const NetworkExplorer = memo(function NetworkExplorer({
     undefined,
   );
   const rowIndexById = useMemo(() => indexNetworkExplorerRows(rows), [rows]);
-  const contextTarget =
-    context === null ||
-    context.model !== model ||
-    !rowIndexById.has(context.rowId)
+  const contextTarget = currentNetworkExplorerContextTarget(
+    context,
+    model,
+    rowIndexById,
+  );
+  const sizeEntityId =
+    contextTarget === undefined
       ? undefined
-      : model.nodeById.get(context.targetId);
+      : networkExplorerSizeEntityId(contextTarget);
   const menuActions = useMemo(
     () =>
       contextTarget === undefined
@@ -217,19 +238,33 @@ export const NetworkExplorer = memo(function NetworkExplorer({
       const target = networkExplorerContextTarget(row, model);
       if (target === undefined) return;
       setActiveRowId(row.id);
-      setContext({ rowId: row.id, targetId: target.id, model, x, y });
+      setSizeError(undefined);
+      // Opening actions changes only keyboard activity, not graph selection/center.
+      setContext({
+        rowId: row.id,
+        targetId: target.id,
+        model,
+        x,
+        y,
+        screen: 'actions',
+      });
     },
     [model],
   );
   const runContextAction = useCallback(
     (action: NetworkExplorerAction) => {
+      const item = menuActions.find((item) => item.id === action);
       if (
         context === null ||
         contextTarget === undefined ||
-        menuActions.find((item) => item.id === action)?.disabledReason !==
-          undefined
+        item === undefined ||
+        item.disabledReason !== undefined
       )
         return;
+      if (action === 'size') {
+        setContext({ ...context, screen: 'size' });
+        return;
+      }
       const origin = rowRefs.current.get(context.rowId) ?? null;
       closeContextMenu(action !== 'inspect');
       if (action === 'focus') onFocusNode(contextTarget.id);
@@ -466,7 +501,13 @@ export const NetworkExplorer = memo(function NetworkExplorer({
           className="network-explorer__tree"
           onScroll={(event) => {
             setScrollTop(event.currentTarget.scrollTop);
-            if (context !== null) closeContextMenu(false);
+            if (context !== null) {
+              closeContextMenu(false);
+              // An editor's virtual row may disappear in this scroll commit.
+              // Use a stable focus fallback without revealing/snapping to it.
+              if (context.screen === 'size')
+                closeButtonRef.current?.focus({ preventScroll: true });
+            }
           }}
           ref={scrollerRef}
           role="tree"
@@ -483,6 +524,11 @@ export const NetworkExplorer = memo(function NetworkExplorer({
               } as CSSProperties;
               const isActive = row.id === activeRowId;
               if (row.kind === 'node') {
+                const fileEntityId = networkExplorerSizeEntityId(row.node);
+                const sizeScale =
+                  fileEntityId === undefined
+                    ? undefined
+                    : presentationOverrides.get(fileEntityId)?.sizeScale;
                 const expanded = expandedNodeIds.has(row.node.id);
                 const selected = selectedNodeId === row.node.id;
                 return (
@@ -496,7 +542,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                       aria-expanded={
                         row.node.adjacency.length === 0 ? undefined : expanded
                       }
-                      aria-label={nodeAccessibleName(row.node)}
+                      aria-label={nodeAccessibleName(row.node, sizeScale)}
                       aria-level={1}
                       aria-posinset={row.position}
                       aria-selected={selected}
@@ -562,6 +608,34 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                       {row.node.focusRoot ? (
                         <span className="network-explorer__badge">Focus</span>
                       ) : null}
+                      {sizeScale === undefined ? null : (
+                        <span
+                          aria-label={`Custom Network size ${sizeScale.toFixed(2)} times automatic`}
+                          className="network-explorer__size-badge"
+                          title={`Custom Network size: ${sizeScale.toFixed(2)}×`}
+                        >
+                          {sizeScale.toFixed(2)}×
+                        </span>
+                      )}
+                      {fileEntityId === undefined ? null : (
+                        <button
+                          aria-haspopup="menu"
+                          aria-label={`Actions for ${row.node.name}`}
+                          className="network-explorer__actions"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            const rect =
+                              event.currentTarget.getBoundingClientRect();
+                            openContextMenu(row, rect.left, rect.bottom);
+                          }}
+                          onKeyDown={(event) => event.stopPropagation()}
+                          tabIndex={isActive ? 0 : -1}
+                          title={`Actions for ${row.node.name}`}
+                          type="button"
+                        >
+                          <span aria-hidden="true">⋯</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -634,6 +708,34 @@ export const NetworkExplorer = memo(function NetworkExplorer({
           onCancel={closeContextMenu}
           x={context.x}
           y={context.y}
+          {...(context.screen !== 'size' || sizeEntityId === undefined
+            ? {}
+            : {
+                editor: {
+                  label: 'Network size',
+                  content: (
+                    <>
+                      <NodeSizeControl
+                        disabled={sizeEditingDisabled}
+                        onChange={(sizeScale) =>
+                          setSizeError(
+                            onSizeScaleChange(sizeEntityId, sizeScale),
+                          )
+                        }
+                        sizeScale={
+                          presentationOverrides.get(sizeEntityId)?.sizeScale
+                        }
+                        status={sizePersistenceStatus}
+                      />
+                      {sizeError === undefined ? null : (
+                        <p className="network-node-size__error" role="alert">
+                          {sizeError}
+                        </p>
+                      )}
+                    </>
+                  ),
+                },
+              })}
         />
       )}
     </aside>

@@ -52,6 +52,7 @@ describe('controlled per-File Network size editor', () => {
       if (sizeScale === undefined) expect(markup).not.toContain('type="range"');
       else {
         expect(markup).toContain('Size multiplier');
+        expect(markup).toContain('<label for="node-size-control-test-scale">');
         expect(markup).toContain(`${sizeScale.toFixed(2)}×`);
         expect(markup).toContain(`value="${sizeScale}"`);
         expect(markup).toContain('min="0.5"');
