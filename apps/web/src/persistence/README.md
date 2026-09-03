@@ -16,6 +16,9 @@ view contract.
   operation used only by the confirmed corrupt-registry recovery flow.
 - `*.test.ts` uses injected storage doubles; tests never rely on global browser
   storage.
+- `presentation-overrides.ts` adapts the source-neutral v1 per-File size
+  registry to its own workspace storage key, with explicit failures. Session
+  policy is in `../presentation-overrides/session.ts`.
 
 Malformed or unsupported values are not overwritten or deleted. Transient and
 legacy reports never read or write cross-session state. The stored record
@@ -49,3 +52,13 @@ memory. Durable mutations write before adoption; a failed write retains the
 last confirmed registry and blocks later writes until the workspace is
 reopened. Corrupt data is deleted only after the Groups panel's explicit
 two-step reset and no other localStorage key is affected.
+
+Network size overrides use
+`icarus-graph-explorer:presentation-overrides:<encodeURIComponent(workspaceId)>`.
+Only WorkspaceId, EntityId, and a finite multiplier are stored; no path, title,
+query, position, or hidden flag. Auto removes an entry. Stable workspaces save
+before adoption; transient reports and samples keep memory-only sessions.
+Corrupt data is left untouched and editing blocked with a visible recovery
+message; failed writes retain the last confirmed sizes. Reset saved view does
+not affect this registry. Missing canonical IDs remain inactive without fuzzy
+remapping, and a query-hidden File keeps its entry for when it becomes visible.

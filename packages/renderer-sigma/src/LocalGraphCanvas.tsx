@@ -1,3 +1,4 @@
+import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
 import {
   useCallback,
   useEffect,
@@ -59,6 +60,8 @@ export interface LocalGraphCanvasProps {
   readonly trackpadZoomMode: LocalTrackpadZoomMode;
   /** Style-only EntityId lookup; excluded from topology and layout inputs. */
   readonly visualGroupStyles?: VisualGroupPresentationMap;
+  /** File sizes participate in normal topology and layout fingerprints. */
+  readonly presentationOverrides?: EntityPresentationOverrideMap;
 }
 
 function errorMessage(error: unknown): string {
@@ -89,6 +92,7 @@ export function LocalGraphCanvas({
   selection,
   trackpadZoomMode,
   visualGroupStyles,
+  presentationOverrides,
 }: LocalGraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<LocalRendererSession | undefined>(undefined);
@@ -124,11 +128,16 @@ export function LocalGraphCanvas({
   ]);
 
   const topology = useMemo(() => {
-    const map = () => mapProjectionToLocalTopology(projection, rootEntityId);
+    const map = () =>
+      mapProjectionToLocalTopology(
+        projection,
+        rootEntityId,
+        presentationOverrides,
+      );
     return instrumentation === undefined
       ? map()
       : instrumentation.measure('local-map', 'local-mappings', map);
-  }, [instrumentation, projection, rootEntityId]);
+  }, [instrumentation, projection, rootEntityId, presentationOverrides]);
   const input = useMemo(() => {
     const seed = () => seedLocalRendererInput(topology);
     return instrumentation === undefined

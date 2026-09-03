@@ -1,3 +1,4 @@
+import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
 import type {
   ProjectedEntityNode,
   ProjectedNode,
@@ -19,6 +20,7 @@ import type {
   GlobalSpatialMetadata,
 } from './types';
 import { stableUnit } from './deterministic';
+import { applyNetworkNodeSizeScale } from './node-size';
 
 const STATUS_COLORS = {
   resolved: '#7b8d96',
@@ -111,6 +113,7 @@ function nodeAttributes(
   folderKey: string | undefined,
   nodeSize: number,
   referenceDegreeSizeInfluence: number,
+  presentationOverrides: EntityPresentationOverrideMap | undefined,
 ): GlobalNodeAttributes {
   const position = deterministicGlobalPosition(node.id);
   if (node.kind === 'reference-target') {
@@ -134,8 +137,10 @@ function nodeAttributes(
   }
   return {
     ...position,
-    size:
+    size: applyNetworkNodeSizeScale(
       nodeSize + referenceDegreeSizeBoost(degree, referenceDegreeSizeInfluence),
+      presentationOverrides?.get(node.entityId)?.sizeScale,
+    ),
     color: '#277b95',
     label: entityLabel(node),
     nodeKind: 'document',
@@ -198,6 +203,7 @@ function edgeAttributes(
 export function mapProjectionToGlobal(
   projection: ViewProjection,
   settings: GlobalLayoutSettings = DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+  presentationOverrides?: EntityPresentationOverrideMap,
 ): GlobalRendererInput {
   const resolvedSettings = resolveGlobalLayoutSettings(settings);
   const spatial = deriveGlobalSpatialMetadata(projection);
@@ -218,6 +224,7 @@ export function mapProjectionToGlobal(
         spatial.folderKeyByProjectionNodeId.get(node.id),
         resolvedSettings.nodeSize,
         resolvedSettings.referenceDegreeSizeInfluence,
+        presentationOverrides,
       ),
     };
   });

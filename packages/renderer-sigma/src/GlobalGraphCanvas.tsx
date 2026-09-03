@@ -1,3 +1,4 @@
+import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
 import {
   useCallback,
   useEffect,
@@ -56,6 +57,8 @@ export interface GlobalGraphCanvasProps {
   readonly trackpadZoomMode: GlobalTrackpadZoomMode;
   /** Style-only EntityId lookup; excluded from mapping and layout inputs. */
   readonly visualGroupStyles?: VisualGroupPresentationMap;
+  /** File sizes participate in normal mapping and layout fingerprints. */
+  readonly presentationOverrides?: EntityPresentationOverrideMap;
 }
 
 function errorMessage(error: unknown): string {
@@ -84,6 +87,7 @@ export function GlobalGraphCanvas({
   settings,
   trackpadZoomMode,
   visualGroupStyles,
+  presentationOverrides,
 }: GlobalGraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<GlobalRendererSession | undefined>(undefined);
@@ -107,11 +111,12 @@ export function GlobalGraphCanvas({
     };
   }, [onFailure, onNodeActivate, onSelectionChange, onViewportObservation]);
   const input = useMemo(() => {
-    const map = () => mapProjectionToGlobal(projection, settings);
+    const map = () =>
+      mapProjectionToGlobal(projection, settings, presentationOverrides);
     return instrumentation === undefined
       ? map()
       : instrumentation.measure('global-map', 'global-mappings', map);
-  }, [instrumentation, projection, settings]);
+  }, [instrumentation, projection, settings, presentationOverrides]);
   const requestTemplate = useMemo(
     () =>
       createGlobalLayoutRequest(

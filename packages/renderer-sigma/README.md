@@ -34,6 +34,7 @@ src/
   types.ts                 Serializable settings, worker, renderer, and viewport contracts.
   settings.ts              Compact/Normal/Spacious presets and bounded Custom validation.
   mapping.ts               KG6-to-Sigma mapping, deterministic seeds, and folder keys.
+  node-size.ts             Per-File multiplier composition and final display/layout bounds.
   graph.ts                 Graphology construction, neighborhood index, and reconciliation.
   interaction-contract.ts  Operation-count oracle for camera/UI versus layout-triggering work.
   layout.ts                Worker-safe ForceAtlas2, folder-prior candidates, metrics, fingerprint.
@@ -112,6 +113,17 @@ change to base size or link influence intentionally remaps attributes and
 requests layout without asking KG6 for a new projection. The existing settings
 update boundary also remaps the other advanced presentation values; optimizing
 those independent refresh paths remains outside this narrow settings change.
+
+VISUAL1B accepts a separate resolved `EntityId` presentation-override map in
+both Network canvases. All multiplies `(base + degree boost)` by a custom
+0.5–2.5 scale; Focus multiplies its existing File/root semantic size. Custom
+results are bounded to 2–24 display/layout units; a Focus root keeps at least
+its automatic 8.4 size (and root styling). Auto/no entry is exactly unchanged.
+Headings, blocks, and diagnostics ignore the map. These are normal mapper
+attributes and layout inputs, not post-mapping Graphology mutations. Group
+color continues through the independent reducer layer. The renderer never
+loads storage or changes projection/query membership. Workers remain
+latest-result-wins; no extra layout cache or persisted geometry is introduced.
 
 The layout fingerprint includes schema, algorithm, iterations, stable node
 keys/sizes, reference endpoints/weights, folder assignment, and validated
@@ -252,7 +264,8 @@ Views, QUERY1 evolution, and GROUP1 remain separate product layers.
 ## Dependency boundary and validation
 
 Production depends only on view-projection, the resolved GROUP1A presentation
-type, React/React DOM, Sigma, Graphology, and Graphology ForceAtlas2. ESLint
+type, the source-neutral presentation-overrides contract, React/React DOM,
+Sigma, Graphology, and Graphology ForceAtlas2. ESLint
 rejects canonical, source, platform,
 application, analytics/performance, React Flow, Dagre, and Node imports. React
 Sigma is not used.

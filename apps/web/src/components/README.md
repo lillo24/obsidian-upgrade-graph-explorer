@@ -56,6 +56,10 @@ canonical truth, or own a platform storage implementation.
   structural-depth action. Choosing a depth is a fresh preset: it clears
   per-entity expand/collapse exceptions while preserving the independent
   Heading limit, Blocks option, Focus, and graph filters.
+- `NodeSizeControl.tsx` is the controlled Auto/Custom size editor content for
+  Network File actions. It emits one multiplier/reset callback per input event;
+  eligibility, validation, storage, and renderer mapping remain outside. The
+  shared KG14B3 action-menu integration is pending in the VISUAL1B draft.
 - `controlled-selection.ts` prevents equivalent controlled renderer selection
   echoes from creating a React Flow update loop during programmatic handoff.
 - `GraphSettings.tsx` presents the viewport-bounded shared normal/maximized
