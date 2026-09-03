@@ -19,7 +19,6 @@ import {
   networkExplorerKeyboardAction,
   networkExplorerScrollTopForIndex,
   networkExplorerVirtualWindow,
-  reconcileNetworkExplorerExpansion,
   shouldRevealNetworkExplorerSelection,
 } from './network-explorer-model';
 
@@ -41,7 +40,7 @@ function entityNode(path: string): ProjectedEntityNode {
 }
 
 describe('Network Explorer projection model', () => {
-  it('presents every projected node in source order, with diagnostics last and one winning Visual Group', () => {
+  it('presents source-ordered nodes with focus/group context and trailing diagnostics', () => {
     const source = entityNode('Source.md');
     const groups: VisualGroupPresentationMap = new Map([
       [
@@ -62,10 +61,8 @@ describe('Network Explorer projection model', () => {
       inspectionWorkspace,
       groups,
     );
-
     expect(model.nodes).toHaveLength(projection.nodes.length);
-    expect(model.nodes[0]).toMatchObject({
-      id: source.id,
+    expect(model.nodeById.get(source.id)).toMatchObject({
       kindLabel: 'File',
       glyph: '▰',
       focusRoot: true,
@@ -80,43 +77,40 @@ describe('Network Explorer projection model', () => {
         .slice(firstDiagnostic)
         .every((node) => node.kindLabel === 'Diagnostic'),
     ).toBe(true);
-    expect(model.nodes[firstDiagnostic]).toMatchObject({ glyph: '○' });
+    expect(model.roots.at(-1)).toMatchObject({
+      kind: 'node',
+      node: { kindLabel: 'Diagnostic' },
+    });
+    expect(model.folderByPath.has('folder-a')).toBe(true);
+    expect(model.folderByPath.has('folder-b')).toBe(true);
   });
 
-  it('indexes projected hierarchy/reference adjacency symmetrically without deaggregating occurrences', () => {
+  it('does not read or change projected edges and adds no relationship index', () => {
+    const input = {
+      nodes: projection.nodes,
+      get edges(): never {
+        throw new Error('Sidebar must not index graph relationships.');
+      },
+    };
     const model = createNetworkExplorerModel(
-      projection,
+      input,
       inspectionWorkspace,
       new Map(),
     );
-    const source = model.nodeById.get(entityNode('Source.md').id);
-    const target = model.nodeById.get(entityNode('Target.md').id);
-    if (source === undefined || target === undefined) {
-      throw new Error('Missing source/target model rows.');
-    }
-    const outgoing = source.adjacency.find(
-      (adjacency) =>
-        adjacency.relationship === 'outgoing' &&
-        adjacency.targetNodeId === target.id,
-    );
-    const incoming = target.adjacency.find(
-      (adjacency) =>
-        adjacency.relationship === 'incoming' &&
-        adjacency.targetNodeId === source.id,
-    );
-
-    expect(outgoing).toBeDefined();
-    expect(incoming).toBeDefined();
-    expect(outgoing?.edgeId).toBe(incoming?.edgeId);
-    expect(outgoing?.referenceCount).toBeGreaterThan(1);
-    expect(incoming?.referenceCount).toBe(outgoing?.referenceCount);
-    expect(model.nodes.some((node) => node.internalReferenceCount > 0)).toBe(
-      true,
-    );
+    expect(
+      model.nodes.every(
+        (node) => !('adjacency' in node) && !('internalReferenceCount' in node),
+      ),
+    ).toBe(true);
+    expect(
+      flattenNetworkExplorerRows(model, new Map()).filter(
+        (row) => row.kind === 'node',
+      ),
+    ).toHaveLength(projection.nodes.length);
   });
 
-  it('uses distinct file, heading, block, and diagnostic presentations', () => {
-    const deepProjection = projectView(createProjectionWorkspace(snapshot), {
+  it('keeps every projected File, Heading, Block and Diagnostic reachable, even without its File row', () => {
+    const deep = projectView(createProjectionWorkspace(snapshot), {
       disclosure: {
         defaultDepth: 3,
         expandedEntityIds: snapshot.entities
@@ -127,48 +121,67 @@ describe('Network Explorer projection model', () => {
       },
     });
     const model = createNetworkExplorerModel(
-      deepProjection,
+      deep,
       inspectionWorkspace,
       new Map(),
     );
-
     expect(
       new Set(
         model.nodes.map(({ glyph, kindLabel }) => `${glyph}:${kindLabel}`),
       ),
     ).toEqual(new Set(['▰:File', '◇:Heading', '●:Block', '○:Diagnostic']));
+    const rows = flattenNetworkExplorerRows(model, new Map());
+    expect(rows.filter((row) => row.kind === 'node')).toHaveLength(
+      deep.nodes.length,
+    );
     expect(
-      model.nodes.some((node) =>
-        node.adjacency.some(
-          (adjacency) =>
-            adjacency.relationship === 'parent' ||
-            adjacency.relationship === 'child',
+      rows.some(
+        (row) =>
+          row.kind === 'node' &&
+          row.node.kindLabel === 'Heading' &&
+          row.nestedInFile,
+      ),
+    ).toBe(true);
+    const withoutFiles = createNetworkExplorerModel(
+      {
+        nodes: deep.nodes.filter(
+          (node) => node.kind !== 'entity' || node.entityKind !== 'document',
         ),
+      },
+      inspectionWorkspace,
+      new Map(),
+    );
+    const remaining = flattenNetworkExplorerRows(
+      withoutFiles,
+      new Map(),
+    ).filter((row) => row.kind === 'node');
+    expect(remaining).toHaveLength(withoutFiles.nodes.length);
+    expect(
+      remaining.every(
+        (row) =>
+          row.kind === 'node' &&
+          !row.nestedInFile &&
+          row.node.kindLabel !== 'File',
       ),
     ).toBe(true);
   });
 
-  it('retains only expanded projected nodes and flattens their adjacency directly after the parent', () => {
-    const model = createNetworkExplorerModel(
-      projection,
+  it('uses only current projection membership for source folders', () => {
+    const node = entityNode('folder-a/Note.md');
+    const filtered = createNetworkExplorerModel(
+      { nodes: [node] },
       inspectionWorkspace,
       new Map(),
     );
-    const source = model.nodeById.get(entityNode('Source.md').id);
-    if (source === undefined) throw new Error('Missing Source model row.');
-    const expanded = new Set([source.id, 'stale-node']);
-    const reconciled = reconcileNetworkExplorerExpansion(expanded, model);
-    const rows = flattenNetworkExplorerRows(model, reconciled);
-    const sourceIndex = rows.findIndex(
-      (row) => row.kind === 'node' && row.node.id === source.id,
+    expect([...filtered.folderByPath.keys()]).toEqual(['folder-a']);
+    expect(filtered.nodes).toHaveLength(1);
+    const empty = createNetworkExplorerModel(
+      { nodes: [] },
+      inspectionWorkspace,
+      new Map(),
     );
-
-    expect([...reconciled]).toEqual([source.id]);
-    expect(rows).toHaveLength(model.nodes.length + source.adjacency.length);
-    expect(rows[sourceIndex + 1]).toMatchObject({
-      kind: 'adjacency',
-      adjacency: { parentNodeId: source.id },
-    });
+    expect(empty.roots).toEqual([]);
+    expect(empty.folderByPath.size).toBe(0);
   });
 });
 
@@ -178,12 +191,9 @@ describe('Network Explorer keyboard and virtual window contracts', () => {
     inspectionWorkspace,
     new Map(),
   );
-  const expandable = model.nodes.find((node) => node.adjacency.length > 0);
-  if (expandable === undefined) throw new Error('Expected an expandable node.');
 
   it('reveals external selection once without reasserting it during scrolling', () => {
-    const selectedNodeId = expandable.id;
-
+    const selectedNodeId = entityNode('Source.md').id;
     expect(
       shouldRevealNetworkExplorerSelection(undefined, selectedNodeId),
     ).toBe(true);
@@ -191,105 +201,87 @@ describe('Network Explorer keyboard and virtual window contracts', () => {
       shouldRevealNetworkExplorerSelection(selectedNodeId, selectedNodeId),
     ).toBe(false);
     expect(
-      shouldRevealNetworkExplorerSelection(selectedNodeId, model.nodes[0]?.id),
-    ).toBe(model.nodes[0]?.id !== selectedNodeId);
+      shouldRevealNetworkExplorerSelection(
+        selectedNodeId,
+        entityNode('Target.md').id,
+      ),
+    ).toBe(true);
     expect(
       shouldRevealNetworkExplorerSelection(selectedNodeId, undefined),
     ).toBe(false);
   });
 
-  it('plans the complete tree keyboard contract over logical, not mounted, rows', () => {
-    const collapsedRows = flattenNetworkExplorerRows(model, new Set());
-    const collapsedRowIndex = indexNetworkExplorerRows(collapsedRows);
-    const parentIndex = collapsedRows.findIndex(
-      (row) => row.kind === 'node' && row.node.id === expandable.id,
+  it('gives disclosure keys to folders only and navigates logical rows', () => {
+    const rows = flattenNetworkExplorerRows(model, new Map());
+    const folderIndex = rows.findIndex(
+      (row) => row.kind === 'folder' && row.folder.path === 'folder-a',
     );
-    const expand = networkExplorerKeyboardAction({
-      rows: collapsedRows,
-      rowIndexById: collapsedRowIndex,
-      activeIndex: parentIndex,
-      expandedNodeIds: new Set(),
-      key: 'ArrowRight',
-    });
-    expect(expand).toEqual({
-      kind: 'expand',
-      nodeId: expandable.id,
-      focusRowId: expandable.adjacency[0]?.id,
-    });
-
-    const expandedIds = new Set([expandable.id]);
-    const rows = flattenNetworkExplorerRows(model, expandedIds);
-    const rowIndexById = indexNetworkExplorerRows(rows);
-    const expandedParentIndex = rows.findIndex(
-      (row) => row.kind === 'node' && row.node.id === expandable.id,
-    );
-    const childIndex = expandedParentIndex + 1;
+    const childIndex = folderIndex + 1;
     const child = rows[childIndex];
-    if (child?.kind !== 'adjacency') throw new Error('Missing adjacency row.');
-
-    expect(
+    if (child?.kind !== 'node') throw new Error('Expected folder child.');
+    const action = (index: number, key: string) =>
       networkExplorerKeyboardAction({
         rows,
-        rowIndexById,
-        activeIndex: expandedParentIndex,
-        expandedNodeIds: expandedIds,
+        rowIndexById: indexNetworkExplorerRows(rows),
+        activeIndex: index,
+        key,
+      });
+    expect(action(folderIndex, 'ArrowRight')).toEqual({
+      kind: 'activate',
+      index: childIndex,
+    });
+    expect(action(childIndex, 'ArrowLeft')).toEqual({
+      kind: 'activate',
+      index: folderIndex,
+    });
+    expect(action(folderIndex, 'ArrowLeft')).toEqual({
+      kind: 'toggle-folder',
+      path: 'folder-a',
+      expanded: false,
+    });
+    expect(action(folderIndex, 'Enter')).toEqual({
+      kind: 'toggle-folder',
+      path: 'folder-a',
+      expanded: false,
+    });
+    expect(action(childIndex, 'ArrowRight')).toEqual({ kind: 'none' });
+    expect(action(childIndex, 'Enter')).toEqual({
+      kind: 'select',
+      nodeId: child.node.id,
+    });
+    expect(action(childIndex, ' ')).toEqual({
+      kind: 'select',
+      nodeId: child.node.id,
+    });
+    expect(action(childIndex, 'Home')).toEqual({ kind: 'activate', index: 0 });
+    expect(action(childIndex, 'End')).toEqual({
+      kind: 'activate',
+      index: rows.length - 1,
+    });
+    expect(action(childIndex, 'ArrowUp')).toEqual({
+      kind: 'activate',
+      index: folderIndex,
+    });
+    expect(action(0, 'ArrowUp')).toEqual({ kind: 'activate', index: 0 });
+    expect(action(rows.length - 1, 'ArrowDown')).toEqual({
+      kind: 'activate',
+      index: rows.length - 1,
+    });
+    const collapsed = flattenNetworkExplorerRows(
+      model,
+      new Map([['folder-a', false]]),
+    );
+    const index = collapsed.findIndex(
+      (row) => row.kind === 'folder' && row.folder.path === 'folder-a',
+    );
+    expect(
+      networkExplorerKeyboardAction({
+        rows: collapsed,
+        rowIndexById: indexNetworkExplorerRows(collapsed),
+        activeIndex: index,
         key: 'ArrowRight',
       }),
-    ).toEqual({ kind: 'activate', index: childIndex });
-    expect(
-      networkExplorerKeyboardAction({
-        rows,
-        rowIndexById,
-        activeIndex: childIndex,
-        expandedNodeIds: expandedIds,
-        key: 'ArrowLeft',
-      }),
-    ).toEqual({ kind: 'activate', index: expandedParentIndex });
-    expect(
-      networkExplorerKeyboardAction({
-        rows,
-        rowIndexById,
-        activeIndex: expandedParentIndex,
-        expandedNodeIds: expandedIds,
-        key: 'ArrowLeft',
-      }),
-    ).toEqual({ kind: 'collapse', nodeId: expandable.id });
-    expect(
-      networkExplorerKeyboardAction({
-        rows,
-        rowIndexById,
-        activeIndex: childIndex,
-        expandedNodeIds: expandedIds,
-        key: 'Enter',
-      }),
-    ).toEqual({ kind: 'select', nodeId: child.adjacency.targetNodeId });
-    expect(
-      networkExplorerKeyboardAction({
-        rows,
-        rowIndexById,
-        activeIndex: expandedParentIndex,
-        expandedNodeIds: expandedIds,
-        key: ' ',
-      }),
-    ).toEqual({ kind: 'select', nodeId: expandable.id });
-    expect(
-      networkExplorerKeyboardAction({
-        rows,
-        rowIndexById,
-        activeIndex: childIndex,
-        expandedNodeIds: expandedIds,
-        key: 'Home',
-      }),
-    ).toEqual({ kind: 'activate', index: 0 });
-    expect(
-      networkExplorerKeyboardAction({
-        rows,
-        rowIndexById,
-        activeIndex: childIndex,
-        expandedNodeIds: expandedIds,
-        key: 'End',
-      }),
-    ).toEqual({ kind: 'activate', index: rows.length - 1 });
+    ).toEqual({ kind: 'toggle-folder', path: 'folder-a', expanded: true });
   });
 
   it('bounds mounted rows to viewport plus overscan at stress scale and scrolls logical focus into view', () => {
@@ -309,5 +301,22 @@ describe('Network Explorer keyboard and virtual window contracts', () => {
         viewportHeight: 560,
       }),
     ).toBe(55_440);
+  });
+
+  it('keeps a valid window when collapsing folders shrinks scrolled content', () => {
+    expect(
+      networkExplorerVirtualWindow({
+        rowCount: 3,
+        scrollTop: 56000,
+        viewportHeight: 560,
+      }),
+    ).toEqual({ startIndex: 0, endIndex: 3, offset: 0, totalHeight: 168 });
+    expect(
+      networkExplorerVirtualWindow({
+        rowCount: 0,
+        scrollTop: 56000,
+        viewportHeight: 560,
+      }),
+    ).toEqual({ startIndex: 0, endIndex: 0, offset: 0, totalHeight: 0 });
   });
 });

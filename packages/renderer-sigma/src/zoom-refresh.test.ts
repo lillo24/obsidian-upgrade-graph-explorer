@@ -162,8 +162,16 @@ describe.each(['global', 'local'] as const)(
 
       renderer.camera.setState({ ratio: 2 });
       expect(
-        [...renderer.displayEdges.values()].every((edge) => edge.hidden),
+        [...renderer.displayEdges.values()].every(
+          (edge) => edge.hidden === (mode === 'global'),
+        ),
       ).toBe(true);
+      if (mode === 'local') {
+        for (const [key, edge] of renderer.displayEdges)
+          expect(edge.size).toBeCloseTo(
+            (renderer.graph.getEdgeAttribute(key, 'size') as number) * 0.45,
+          );
+      }
       expect(renderer.graph.size).toBe(3);
       hideB();
       expect(renderer.graph.edges()).toEqual(['edge-ac', 'edge-cr']);
@@ -203,7 +211,9 @@ describe.each(['global', 'local'] as const)(
       const { session } = mount(mode, 2);
       const renderer = Reflect.get(session, 'renderer') as RendererProbe;
       expect(
-        [...renderer.displayEdges.values()].every((edge) => edge.hidden),
+        [...renderer.displayEdges.values()].every(
+          (edge) => edge.hidden === (mode === 'global'),
+        ),
       ).toBe(true);
       session.destroy();
     });

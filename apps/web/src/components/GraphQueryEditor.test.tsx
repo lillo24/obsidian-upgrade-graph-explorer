@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { GraphQueryEditor } from './GraphQueryEditor';
 
 describe('controlled QUERY1 editor', () => {
-  it('uses placement-specific IDs, invalid-draft context and non-destructive Reset draft', () => {
+  it('keeps compact errors and icon actions without visible draft clutter', () => {
     const markup = renderToStaticMarkup(
       <GraphQueryEditor
         activeQuery="kind:document"
@@ -20,8 +20,8 @@ describe('controlled QUERY1 editor', () => {
     expect(markup).toContain('id="test-query-input"');
     expect(markup).toContain('aria-describedby="test-query-error"');
     expect(markup).toContain('aria-invalid="true"');
-    expect(markup).toContain('>Reset draft</button>');
-    expect(markup).toContain('Draft not applied');
+    expect(markup).not.toContain('>Reset draft</button>');
+    expect(markup).not.toContain('Draft not applied');
     expect(markup).not.toContain('Advanced query');
     expect(markup).not.toContain('test-query-help');
     expect(markup).not.toContain('QUERY1:');
@@ -30,6 +30,22 @@ describe('controlled QUERY1 editor', () => {
     expect(markup).toContain('aria-label="Clear query" title="Clear query"');
     expect(markup).not.toContain('>Apply query</button>');
     expect(markup).not.toContain('>Clear query</button>');
+  });
+  it('retains dirty-draft controls in Hierarchy', () => {
+    const markup = renderToStaticMarkup(
+      <GraphQueryEditor
+        activeQuery="kind:document"
+        queryDraft="title:"
+        queryIssue={undefined}
+        onDraftChange={() => undefined}
+        onApply={() => undefined}
+        onClear={() => undefined}
+        onResetDraft={() => undefined}
+        idPrefix="hierarchy"
+      />,
+    );
+    expect(markup).toContain('>Reset draft</button>');
+    expect(markup).toContain('Draft not applied');
   });
   it('omits Reset draft for a clean editor and disables empty Clear', () => {
     const markup = renderToStaticMarkup(

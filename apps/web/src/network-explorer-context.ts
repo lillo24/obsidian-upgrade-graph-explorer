@@ -15,9 +15,7 @@ export function networkExplorerContextTarget(
   row: NetworkExplorerRow,
   model: NetworkExplorerModel,
 ): NetworkExplorerNode | undefined {
-  return model.nodeById.get(
-    row.kind === 'node' ? row.node.id : row.adjacency.targetNodeId,
-  );
+  return row.kind === 'node' ? model.nodeById.get(row.node.id) : undefined;
 }
 
 export function networkExplorerMenuActions(

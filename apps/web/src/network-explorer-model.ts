@@ -6,30 +6,28 @@ import {
 import type {
   ProjectedEntityNode,
   ProjectedNode,
-  ProjectionEdgeId,
   ProjectionNodeId,
   ReferenceResolutionStatus,
   ViewProjection,
 } from '@icarus-graph-explorer/view-projection';
 import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-groups';
+import {
+  createNetworkExplorerFolders,
+  type NetworkExplorerFolders,
+  type NetworkExplorerRow,
+} from './network-explorer-folders';
+export {
+  flattenNetworkExplorerRows,
+  networkExplorerFolderExpanded,
+  revealNetworkExplorerNode,
+} from './network-explorer-folders';
+export type {
+  NetworkExplorerFolderState,
+  NetworkExplorerRow,
+} from './network-explorer-folders';
 
 export const NETWORK_EXPLORER_ROW_HEIGHT = 56;
 export const NETWORK_EXPLORER_OVERSCAN = 6;
-
-export type NetworkExplorerRelationship =
-  'parent' | 'child' | 'outgoing' | 'incoming';
-
-export interface NetworkExplorerAdjacency {
-  readonly id: string;
-  readonly edgeId: ProjectionEdgeId;
-  readonly parentNodeId: ProjectionNodeId;
-  readonly targetNodeId: ProjectionNodeId;
-  readonly relationship: NetworkExplorerRelationship;
-  readonly targetName: string;
-  readonly targetKindLabel: string;
-  readonly status?: ReferenceResolutionStatus;
-  readonly referenceCount: number;
-}
 
 export interface NetworkExplorerNode {
   readonly id: ProjectionNodeId;
@@ -43,30 +41,12 @@ export interface NetworkExplorerNode {
   readonly focusDistance: number | null;
   readonly visualGroupName?: string;
   readonly diagnosticStatus?: Exclude<ReferenceResolutionStatus, 'resolved'>;
-  readonly internalReferenceCount: number;
-  readonly adjacency: readonly NetworkExplorerAdjacency[];
 }
 
-export interface NetworkExplorerModel {
+export interface NetworkExplorerModel extends NetworkExplorerFolders {
   readonly nodes: readonly NetworkExplorerNode[];
   readonly nodeById: ReadonlyMap<ProjectionNodeId, NetworkExplorerNode>;
 }
-
-export type NetworkExplorerRow =
-  | {
-      readonly kind: 'node';
-      readonly id: string;
-      readonly node: NetworkExplorerNode;
-      readonly position: number;
-      readonly setSize: number;
-    }
-  | {
-      readonly kind: 'adjacency';
-      readonly id: string;
-      readonly adjacency: NetworkExplorerAdjacency;
-      readonly position: number;
-      readonly setSize: number;
-    };
 
 export interface NetworkExplorerVirtualWindow {
   readonly startIndex: number;
@@ -79,19 +59,11 @@ export type NetworkExplorerKeyboardAction =
   | { readonly kind: 'none' }
   | { readonly kind: 'activate'; readonly index: number }
   | {
-      readonly kind: 'expand';
-      readonly nodeId: ProjectionNodeId;
-      readonly focusRowId: string;
+      readonly kind: 'toggle-folder';
+      readonly path: WorkspacePath;
+      readonly expanded: boolean;
     }
-  | { readonly kind: 'collapse'; readonly nodeId: ProjectionNodeId }
   | { readonly kind: 'select'; readonly nodeId: ProjectionNodeId };
-
-interface AdjacencyBuckets {
-  readonly parent: NetworkExplorerAdjacency[];
-  readonly child: NetworkExplorerAdjacency[];
-  readonly outgoing: NetworkExplorerAdjacency[];
-  readonly incoming: NetworkExplorerAdjacency[];
-}
 
 function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -113,8 +85,6 @@ function compareEntityNodes(
   right: ProjectedEntityNode,
   workspace: InspectionWorkspace,
 ): number {
-  if (left.focusDistance === 0 && right.focusDistance !== 0) return -1;
-  if (right.focusDistance === 0 && left.focusDistance !== 0) return 1;
   const leftStart = workspace.requireEntity(left.entityId).source.span.start;
   const rightStart = workspace.requireEntity(right.entityId).source.span.start;
   return (
@@ -153,88 +123,39 @@ function glyphAndKind(
   }
 }
 
-function createBuckets(): AdjacencyBuckets {
-  return { parent: [], child: [], outgoing: [], incoming: [] };
-}
-
-function adjacencyId(
-  parentNodeId: ProjectionNodeId,
-  edgeId: ProjectionEdgeId,
-  relationship: NetworkExplorerRelationship,
-): string {
-  return `adjacency:${parentNodeId}\0${edgeId}\0${relationship}`;
-}
-
-function createAdjacency(args: {
-  readonly edgeId: ProjectionEdgeId;
-  readonly parentNodeId: ProjectionNodeId;
-  readonly target: NetworkExplorerNode;
-  readonly relationship: NetworkExplorerRelationship;
-  readonly status?: ReferenceResolutionStatus;
-  readonly referenceCount: number;
-}): NetworkExplorerAdjacency {
-  return {
-    id: adjacencyId(args.parentNodeId, args.edgeId, args.relationship),
-    edgeId: args.edgeId,
-    parentNodeId: args.parentNodeId,
-    targetNodeId: args.target.id,
-    relationship: args.relationship,
-    targetName: args.target.name,
-    targetKindLabel: args.target.kindLabel,
-    ...(args.status === undefined ? {} : { status: args.status }),
-    referenceCount: args.referenceCount,
-  };
-}
-
-/**
- * Builds a projection-scoped read model. It indexes every node and projected
- * edge once; neither canonical hidden entities nor renderer topology participate.
- */
+/** Projection-only source orientation. Relationship indexing belongs to Inspector. */
 export function createNetworkExplorerModel(
-  projection: Pick<ViewProjection, 'nodes' | 'edges'>,
+  projection: Pick<ViewProjection, 'nodes'>,
   workspace: InspectionWorkspace,
   visualGroups: VisualGroupPresentationMap,
 ): NetworkExplorerModel {
-  const entityNodes: ProjectedEntityNode[] = [];
-  const diagnosticNodes: Extract<
-    ProjectedNode,
-    { kind: 'reference-target' }
-  >[] = [];
+  const entities: ProjectedEntityNode[] = [];
+  const diagnostics: Extract<ProjectedNode, { kind: 'reference-target' }>[] =
+    [];
   for (const node of projection.nodes) {
-    if (node.kind === 'entity') entityNodes.push(node);
-    else diagnosticNodes.push(node);
+    if (node.kind === 'entity') entities.push(node);
+    else diagnostics.push(node);
   }
-  entityNodes.sort((left, right) => compareEntityNodes(left, right, workspace));
-  diagnosticNodes.sort(compareDiagnosticNodes);
-
-  const orderedProjectionNodes: ProjectedNode[] = [
-    ...entityNodes,
-    ...diagnosticNodes,
-  ];
-  const mutableNodes = new Map<ProjectionNodeId, NetworkExplorerNode>();
-  const bucketsByNodeId = new Map<ProjectionNodeId, AdjacencyBuckets>();
-
-  for (const node of orderedProjectionNodes) {
-    const presentation = glyphAndKind(node);
-    if (node.kind === 'entity') {
-      const entity = workspace.requireEntity(node.entityId);
-      const visualGroup = visualGroups.get(node.entityId);
-      mutableNodes.set(node.id, {
-        id: node.id,
-        entityId: node.entityId,
-        sourcePath: node.sourcePath,
-        ...presentation,
-        name: entityDisplayName(entity),
-        secondary: `${node.sourcePath} · L${entity.source.span.start.line}:C${entity.source.span.start.column}`,
-        focusRoot: node.focusDistance === 0,
-        focusDistance: node.focusDistance,
-        ...(visualGroup === undefined
-          ? {}
-          : { visualGroupName: visualGroup.groupName }),
-        internalReferenceCount: node.internalReferenceIds.length,
-        adjacency: [],
-      });
-    } else {
+  entities.sort((left, right) => compareEntityNodes(left, right, workspace));
+  diagnostics.sort(compareDiagnosticNodes);
+  const nodes: NetworkExplorerNode[] = [...entities, ...diagnostics].map(
+    (node) => {
+      const presentation = glyphAndKind(node);
+      if (node.kind === 'entity') {
+        const entity = workspace.requireEntity(node.entityId);
+        const group = visualGroups.get(node.entityId);
+        return {
+          id: node.id,
+          entityId: node.entityId,
+          sourcePath: node.sourcePath,
+          ...presentation,
+          name: entityDisplayName(entity),
+          secondary: `${node.sourcePath} · L${entity.source.span.start.line}:C${entity.source.span.start.column}`,
+          focusRoot: node.focusDistance === 0,
+          focusDistance: node.focusDistance,
+          ...(group === undefined ? {} : { visualGroupName: group.groupName }),
+        };
+      }
       const firstReference = node.referenceIds[0];
       const occurrence =
         firstReference === undefined
@@ -244,148 +165,25 @@ export function createNetworkExplorerModel(
         occurrence === undefined
           ? undefined
           : workspace.entity(occurrence.sourceEntityId);
-      const secondary =
-        occurrence === undefined || source === undefined
-          ? `${node.status} link target`
-          : `${source.source.path} · L${occurrence.sourceSpan.start.line}:C${occurrence.sourceSpan.start.column}`;
-      mutableNodes.set(node.id, {
+      return {
         id: node.id,
         ...presentation,
         name: node.rawTarget,
-        secondary,
+        secondary:
+          occurrence === undefined || source === undefined
+            ? `${node.status} link target`
+            : `${source.source.path} · L${occurrence.sourceSpan.start.line}:C${occurrence.sourceSpan.start.column}`,
         focusRoot: false,
         focusDistance: null,
         diagnosticStatus: node.status,
-        internalReferenceCount: 0,
-        adjacency: [],
-      });
-    }
-    bucketsByNodeId.set(node.id, createBuckets());
-  }
-
-  for (const edge of projection.edges) {
-    const source = mutableNodes.get(edge.sourceNodeId);
-    const target = mutableNodes.get(edge.targetNodeId);
-    const sourceBuckets = bucketsByNodeId.get(edge.sourceNodeId);
-    const targetBuckets = bucketsByNodeId.get(edge.targetNodeId);
-    if (
-      source === undefined ||
-      target === undefined ||
-      sourceBuckets === undefined ||
-      targetBuckets === undefined
-    ) {
-      throw new Error(
-        `Network Explorer cannot index edge ${JSON.stringify(edge.id)} with a missing projected endpoint.`,
-      );
-    }
-    if (edge.kind === 'hierarchy') {
-      sourceBuckets.child.push(
-        createAdjacency({
-          edgeId: edge.id,
-          parentNodeId: source.id,
-          target,
-          relationship: 'child',
-          referenceCount: 0,
-        }),
-      );
-      targetBuckets.parent.push(
-        createAdjacency({
-          edgeId: edge.id,
-          parentNodeId: target.id,
-          target: source,
-          relationship: 'parent',
-          referenceCount: 0,
-        }),
-      );
-    } else {
-      sourceBuckets.outgoing.push(
-        createAdjacency({
-          edgeId: edge.id,
-          parentNodeId: source.id,
-          target,
-          relationship: 'outgoing',
-          status: edge.status,
-          referenceCount: edge.referenceIds.length,
-        }),
-      );
-      targetBuckets.incoming.push(
-        createAdjacency({
-          edgeId: edge.id,
-          parentNodeId: target.id,
-          target: source,
-          relationship: 'incoming',
-          status: edge.status,
-          referenceCount: edge.referenceIds.length,
-        }),
-      );
-    }
-  }
-
-  const nodes = orderedProjectionNodes.map((node) => {
-    const value = mutableNodes.get(node.id);
-    const buckets = bucketsByNodeId.get(node.id);
-    if (value === undefined || buckets === undefined) {
-      throw new Error(
-        `Network Explorer lost projected node ${JSON.stringify(node.id)} while indexing.`,
-      );
-    }
-    return {
-      ...value,
-      adjacency: [
-        ...buckets.parent,
-        ...buckets.child,
-        ...buckets.outgoing,
-        ...buckets.incoming,
-      ],
-    };
-  });
-  return { nodes, nodeById: new Map(nodes.map((node) => [node.id, node])) };
-}
-
-export function reconcileNetworkExplorerExpansion(
-  expandedNodeIds: ReadonlySet<ProjectionNodeId>,
-  model: NetworkExplorerModel,
-): ReadonlySet<ProjectionNodeId> {
-  const next = new Set<ProjectionNodeId>();
-  for (const nodeId of expandedNodeIds) {
-    if ((model.nodeById.get(nodeId)?.adjacency.length ?? 0) > 0) {
-      next.add(nodeId);
-    }
-  }
-  if (
-    next.size === expandedNodeIds.size &&
-    [...next].every((nodeId) => expandedNodeIds.has(nodeId))
-  ) {
-    return expandedNodeIds;
-  }
-  return next;
-}
-
-export function flattenNetworkExplorerRows(
-  model: NetworkExplorerModel,
-  expandedNodeIds: ReadonlySet<ProjectionNodeId>,
-): readonly NetworkExplorerRow[] {
-  const rows: NetworkExplorerRow[] = [];
-  for (const [index, node] of model.nodes.entries()) {
-    rows.push({
-      kind: 'node',
-      id: `node:${node.id}`,
-      node,
-      position: index + 1,
-      setSize: model.nodes.length,
-    });
-    if (!expandedNodeIds.has(node.id)) continue;
-    for (const [adjacencyIndex, adjacency] of node.adjacency.entries()) {
-      rows.push({
-        kind: 'adjacency',
-        id: adjacency.id,
-        adjacency,
-        position: adjacencyIndex + 1,
-        setSize: node.adjacency.length,
-      });
-    }
-  }
-  return rows;
+      };
+    },
+  );
+  return {
+    nodes,
+    nodeById: new Map(nodes.map((node) => [node.id, node])),
+    ...createNetworkExplorerFolders(nodes),
+  };
 }
 
 export function indexNetworkExplorerRows(
@@ -414,10 +212,15 @@ export function networkExplorerVirtualWindow(args: {
   if (args.rowCount === 0) {
     return { startIndex: 0, endIndex: 0, offset: 0, totalHeight: 0 };
   }
-  const visibleStart = Math.max(0, Math.floor(args.scrollTop / rowHeight));
+  // Folder collapse/query changes can shrink content before the browser clamps scrollTop.
+  const scrollTop = Math.min(
+    Math.max(0, args.scrollTop),
+    Math.max(0, totalHeight - Math.max(0, args.viewportHeight)),
+  );
+  const visibleStart = Math.floor(scrollTop / rowHeight);
   const visibleEnd = Math.min(
     args.rowCount,
-    Math.ceil((args.scrollTop + Math.max(0, args.viewportHeight)) / rowHeight),
+    Math.ceil((scrollTop + Math.max(0, args.viewportHeight)) / rowHeight),
   );
   const startIndex = Math.max(0, visibleStart - overscan);
   const endIndex = Math.min(args.rowCount, visibleEnd + overscan);
@@ -449,7 +252,6 @@ export function networkExplorerKeyboardAction(args: {
   readonly rows: readonly NetworkExplorerRow[];
   readonly rowIndexById: ReadonlyMap<string, number>;
   readonly activeIndex: number;
-  readonly expandedNodeIds: ReadonlySet<ProjectionNodeId>;
   readonly key: string;
 }): NetworkExplorerKeyboardAction {
   const row = args.rows[args.activeIndex];
@@ -466,44 +268,39 @@ export function networkExplorerKeyboardAction(args: {
       return { kind: 'activate', index: 0 };
     case 'End':
       return { kind: 'activate', index: args.rows.length - 1 };
-    case 'ArrowRight': {
-      if (row.kind !== 'node' || row.node.adjacency.length === 0) {
-        return { kind: 'none' };
-      }
-      if (args.expandedNodeIds.has(row.node.id)) {
+    case 'ArrowRight':
+      if (row.kind !== 'folder') return { kind: 'none' };
+      return row.expanded
+        ? {
+            kind: 'activate',
+            index: Math.min(args.rows.length - 1, args.activeIndex + 1),
+          }
+        : { kind: 'toggle-folder', path: row.folder.path, expanded: true };
+    case 'ArrowLeft': {
+      if (row.kind === 'folder' && row.expanded) {
         return {
-          kind: 'activate',
-          index: Math.min(args.rows.length - 1, args.activeIndex + 1),
+          kind: 'toggle-folder',
+          path: row.folder.path,
+          expanded: false,
         };
       }
-      const firstAdjacency = row.node.adjacency[0];
-      return firstAdjacency === undefined
+      const parentIndex =
+        row.parentFolderId === undefined
+          ? undefined
+          : args.rowIndexById.get(row.parentFolderId);
+      return parentIndex === undefined
         ? { kind: 'none' }
-        : {
-            kind: 'expand',
-            nodeId: row.node.id,
-            focusRowId: firstAdjacency.id,
-          };
-    }
-    case 'ArrowLeft': {
-      if (row.kind === 'adjacency') {
-        const parentIndex = args.rowIndexById.get(
-          `node:${row.adjacency.parentNodeId}`,
-        );
-        return parentIndex === undefined
-          ? { kind: 'none' }
-          : { kind: 'activate', index: parentIndex };
-      }
-      return args.expandedNodeIds.has(row.node.id)
-        ? { kind: 'collapse', nodeId: row.node.id }
-        : { kind: 'none' };
+        : { kind: 'activate', index: parentIndex };
     }
     case 'Enter':
     case ' ':
-      return {
-        kind: 'select',
-        nodeId: row.kind === 'node' ? row.node.id : row.adjacency.targetNodeId,
-      };
+      return row.kind === 'folder'
+        ? {
+            kind: 'toggle-folder',
+            path: row.folder.path,
+            expanded: !row.expanded,
+          }
+        : { kind: 'select', nodeId: row.node.id };
     default:
       return { kind: 'none' };
   }
