@@ -845,8 +845,9 @@ default open and 3+ closed; memory-only path overrides survive query/live
 membership changes. Files never disclose, projected headings/blocks remain
 reachable, and diagnostic rows trail at root. Inspector remains the relationship
 detail surface. Shared Saved queries management uses the existing registry,
-behind the Network button and in Hierarchy Filters. Compact draft/reset clutter
-is removed without changing atomic Hide/restore safety.
+behind the bookmark beside Network's larger Query label and in Hierarchy
+Filters. Compact draft/reset clutter is removed without changing atomic
+Hide/restore safety.
 
 The branch incorporates main's PR #53 click/navigation fix. Confirmed graph
 clicks open collapsed ancestors before consuming the one-shot reveal request;

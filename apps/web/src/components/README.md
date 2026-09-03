@@ -88,7 +88,8 @@ canonical truth, or own a platform storage implementation.
   panel for path, entity content, literal Markdown Heading limit, reference
   status, the shared Advanced query editor for Hierarchy, and workspace-scoped
   Saved queries. In Network it points to the drawer's query and Saved queries
-  controls instead of rendering duplicates. Hierarchy depth remains a separate four-option select.
+  bookmark control instead of rendering duplicates. Hierarchy depth remains a
+  separate four-option select.
   Blocks is
   represented once through disclosure state; `graph-filter-count.ts` derives
   its user-visible active-group badge, while `graph-filters-overlay.ts` gives

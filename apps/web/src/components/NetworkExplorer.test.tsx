@@ -138,7 +138,10 @@ describe('Network Explorer drawer', () => {
     );
     expect(rows.filter((row) => row.includes('aria-expanded'))).toHaveLength(2);
     expect(rows.filter((row) => row.includes('aria-selected'))).toHaveLength(3);
-    expect(markup).toContain('>Saved queries</button>');
+    expect(markup).toContain('aria-label="Saved queries"');
+    expect(markup).toContain('title="Saved queries"');
+    expect(markup).toContain('network-explorer__saved-queries-icon');
+    expect(markup).not.toContain('>Saved queries</button>');
   });
 
   it('keeps stress-scale DOM bounded to the initial viewport and overscan', () => {

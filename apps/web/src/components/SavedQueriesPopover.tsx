@@ -94,15 +94,28 @@ export const SavedQueriesPopover = memo(function SavedQueriesPopover(
   return (
     <>
       <button
+        aria-label="Saved queries"
         aria-controls="network-saved-queries-panel"
         aria-expanded={open}
         aria-haspopup="dialog"
         className="network-explorer__saved-queries"
         onClick={() => setOpen((current) => !current)}
         ref={triggerRef}
+        title="Saved queries"
         type="button"
       >
-        Saved queries
+        <svg
+          aria-hidden="true"
+          className="network-explorer__saved-queries-icon"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+          viewBox="0 0 24 24"
+        >
+          <path d="M6 3h12v18l-6-4-6 4V3Z" />
+        </svg>
       </button>
       {!open
         ? null

@@ -1043,6 +1043,7 @@ h2 {
 }
 
 .network-explorer__query {
+  position: relative;
   padding: 0.55rem 0.75rem;
 }
 
@@ -1050,6 +1051,11 @@ h2 {
   gap: 0.4rem;
   padding-top: 0;
   border-top: 0;
+}
+
+.network-explorer .advanced-graph-query__label {
+  padding-right: 2.5rem;
+  font-size: 0.84rem;
 }
 
 .network-explorer .advanced-graph-query--compact textarea {
@@ -1275,16 +1281,30 @@ h2 {
 }
 
 .network-explorer__saved-queries {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.75rem;
+  display: grid;
+  width: 2rem;
   min-height: 2rem;
-  margin-top: 0.5rem;
-  padding: 0.25rem 0.6rem;
+  margin: 0;
+  padding: 0.25rem;
   border: 1px solid #b9cbd3;
   border-radius: 0.5rem;
   color: #395966;
   background: #edf4f6;
-  font-size: 0.72rem;
-  font-weight: 750;
   cursor: pointer;
+  place-items: center;
+}
+
+.network-explorer__saved-queries:hover {
+  border-color: #6e929e;
+  background: #dceff0;
+}
+
+.network-explorer__saved-queries-icon {
+  width: 1rem;
+  height: 1rem;
 }
 
 .network-saved-queries {

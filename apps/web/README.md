@@ -195,7 +195,8 @@ KG14B3 makes this drawer the Network precision control surface. Its Advanced
 query editor is the same controlled component used in Hierarchy Filters; Network
 Filters duplicates neither query editor nor Saved queries management. Network
 Explorer exposes the existing registry behind a compact, viewport-bounded
-Saved queries button/panel; Hierarchy retains management in Filters. Opening
+bookmark beside the Query label and its viewport-bounded panel; Hierarchy
+retains management in Filters. Opening
 folders, the drawer, or Saved queries never projects or requests layout/workspace
 work. `GraphExplorer` owns the
 transient draft, so closing the drawer or switching layouts preserves it. A clean

@@ -21,7 +21,10 @@ describe('shared Saved queries presentation', () => {
     const markup = renderToStaticMarkup(<SavedQueriesPopover {...state} />);
     expect(markup).toContain('aria-haspopup="dialog"');
     expect(markup).toContain('aria-expanded="false"');
-    expect(markup).toContain('>Saved queries</button>');
+    expect(markup).toContain('aria-label="Saved queries"');
+    expect(markup).toContain('title="Saved queries"');
+    expect(markup).toContain('network-explorer__saved-queries-icon');
+    expect(markup).not.toContain('>Saved queries</button>');
     expect(markup).not.toContain('Save current query');
   });
 
