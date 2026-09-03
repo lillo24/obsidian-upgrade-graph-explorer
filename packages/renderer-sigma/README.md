@@ -43,6 +43,7 @@ src/
   global-label.ts          Viewport-aware Global label/hover placement after adaptive culling.
   precision-wheel-zoom.ts  Fine-linear/coarse-compressed wheel curve and Sigma default guard.
   session.ts               Imperative Sigma lifecycle and high-frequency interaction ownership.
+  node-click.ts            Shared 300 ms single/double-click arbitration; selection stays immediate.
   viewport-request.ts      Layout-commit gate for semantic center and Fit requests.
   GlobalGraphEmptyState.tsx  Explicit zero-match state shared by Global mount decisions.
   GlobalGraphCanvas.tsx    Thin React mount/update boundary and background-layout adoption.
@@ -64,6 +65,16 @@ src/
 ```
 
 ## Projection and spatial contracts
+
+Both Network sessions emit confirmed single-click intent separately from immediate
+selection. The shared 300 ms constant also configures Sigma's double-click window.
+Node double-click cancels reveal, suppresses Sigma's default zoom, and invokes the
+existing application Focus action once (diagnostics do not activate). Projection
+updates, controlled selection changes, stage clicks, and session disposal cancel
+pending reveals. The renderer never scrolls sidebar DOM.
+
+Network layout progress remains visible while preparing/refining; success clears
+the status, while layout failure retains the error and last-position recovery text.
 
 Global is documents-first. A section or block at this boundary is an error;
 headings never enter Global layout. Reference edges remain the only semantic

@@ -14,6 +14,10 @@ import {
 } from './global-label';
 import { createGlobalLayoutRequest } from './layout';
 import {
+  NodeClickArbitrator,
+  NODE_DOUBLE_CLICK_TIMEOUT_MS,
+} from './node-click';
+import {
   isCoarseWheelDelta,
   normalizeWheelDeltaPixels,
   preventSigmaWheelDefault,
@@ -63,6 +67,8 @@ export interface GlobalRendererSessionOptions {
     attributes: GlobalNodeAttributes,
   ) => void;
   readonly onNodeHovered?: (key: string | undefined) => void;
+  /** Confirmed pointer click; independent of controlled selection echoes. */
+  readonly onNodeSingleClick?: (key: string) => void;
   readonly onViewportObservation?: (
     viewport: SemanticGlobalViewport | undefined,
   ) => void;
@@ -99,6 +105,7 @@ export class GlobalRendererSession {
   private topologyRefreshPending: Promise<void> | undefined;
   private visualStyleRefreshPending = false;
   private destroyed = false;
+  private nodeClicks: NodeClickArbitrator | undefined;
   private readonly wheelDirection = new WheelDirectionStabilizer();
 
   private readonly cameraUpdatedHandler = (): void => {
@@ -175,6 +182,7 @@ export class GlobalRendererSession {
     container.setAttribute('aria-hidden', 'true');
     this.renderer = new Sigma(this.graph, container, {
       allowInvalidContainer: false,
+      doubleClickTimeout: NODE_DOUBLE_CLICK_TIMEOUT_MS,
       enableEdgeEvents: options.edgeEvents ?? false,
       hideEdgesOnMove: this.graph.size > 20_000,
       hideLabelsOnMove: true,
@@ -285,6 +293,8 @@ export class GlobalRendererSession {
   }
 
   private bindEvents(): void {
+    const nodeClicks = new NodeClickArbitrator();
+    this.nodeClicks = nodeClicks;
     this.renderer.on('enterNode', ({ node }) => {
       const started = performance.now();
       const previous = this.hoveredNode;
@@ -304,11 +314,15 @@ export class GlobalRendererSession {
       this.options.instrumentation?.count('global-hover-applications');
       this.refreshNodeStyles(previous);
     });
-    this.renderer.on('clickNode', ({ node }) => this.selectNode(node));
+    this.renderer.on('clickNode', ({ node }) => {
+      this.selectNode(node);
+      nodeClicks.schedule(() => this.options.onNodeSingleClick?.(node));
+    });
     this.renderer.on('doubleClickNode', ({ node, preventSigmaDefault }) => {
       // Sigma 3.0.3 otherwise applies its own camera zoom after this event.
       // Every node double-click is consumed; only canonical documents activate.
       preventSigmaDefault();
+      nodeClicks.cancel();
       if (!this.graph.hasNode(node)) return;
       const attributes = this.graph.getNodeAttributes(node);
       if (attributes.nodeKind !== 'document' || attributes.entityId === null) {
@@ -316,7 +330,11 @@ export class GlobalRendererSession {
       }
       this.options.onNodeActivated?.(node, attributes);
     });
-    this.renderer.on('clickStage', () => this.selectNode(undefined));
+    this.renderer.on('clickStage', () => {
+      nodeClicks.cancel();
+      this.selectNode(undefined);
+    });
+    this.renderer.on('doubleClickStage', () => nodeClicks.cancel());
   }
 
   updateSettings(settings: GlobalLayoutSettings): void {
@@ -356,6 +374,7 @@ export class GlobalRendererSession {
   }
 
   update(input: GlobalRendererInput): GlobalGraphReconciliation {
+    this.nodeClicks?.cancel();
     const run = () => reconcileGlobalGraph(this.graph, input);
     const reconciliation =
       this.options.instrumentation === undefined
@@ -395,6 +414,7 @@ export class GlobalRendererSession {
 
   /** Development harness baseline; product live updates use in-place update(). */
   replace(input: GlobalRendererInput): void {
+    this.nodeClicks?.cancel();
     this.graph = buildGlobalGraph(input);
     this.neighborhoods = createGlobalNeighborhoodIndex(input);
     this.hoveredNode = undefined;
@@ -529,6 +549,7 @@ export class GlobalRendererSession {
   setControlledSelection(key: string | undefined): void {
     if (key !== undefined && !this.graph.hasNode(key)) return;
     if (key === this.selectedNode) return;
+    this.nodeClicks?.cancel();
     const previous = this.selectedNode;
     this.selectedNode = key;
     this.refreshNodeStyles(previous, key);
@@ -690,6 +711,7 @@ export class GlobalRendererSession {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.nodeClicks?.cancel();
     this.renderer.getMouseCaptor().off('wheel', this.precisionWheelHandler);
     this.renderer.getCamera().off('updated', this.cameraUpdatedHandler);
     if (this.precisionWheelIdleTimer !== undefined) {
