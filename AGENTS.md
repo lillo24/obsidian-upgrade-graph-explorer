@@ -1,6 +1,7 @@
 # Code Organization for Multi-file projects (folder/file-level abstraction)
 
-- Use the **file/folder** as the main unit of abstraction.
+Use a clear **module / feature / package / subsystem boundary** as the main unit of abstraction, following the structure already established by the repository.
+
 - Each file should have a clear **abstract purpose** (what it owns / what it is responsible for).
 
 ## Folder map policy
@@ -15,18 +16,6 @@ Each folder README should briefly say:
 - what the folder owns
 - what each file does
 - how the files relate
-- optional status: `DRAFT`, `STABLE`, `FROZEN`
-
-## Stability status (“polished” vs “under production”)
-
-Optionally, assign a stability/status label per file (or per module) to make it obvious what is:
-
-- `DRAFT` = still being experimented on / needs review
-- `STABLE` = solid and unlikely to change
-  Use these only when they add real signal.
-  Do not label everything mechanically.
-
-Include a short note explaining _why_ a file has that status (e.g., “missing tests”, “interface still changing”, etc.).
 
 ### Rule of thumb
 
@@ -94,12 +83,10 @@ If your change would violate an existing abstraction, either:
 —
 
 # GitHub Repo Workflow
-
 ## Branching, Parallel Work, PR Merge, and Cleanup
-
 ### Default workflow
-
-Use one branch/worktree per `.md` implementation plan.
+Use one **isolated branch/worktree** per `.md` implementation plan.
+If the execution environment already provides an isolated managed worktree, use it rather than creating a nested one unnecessarily.
 
 Do not mix unrelated plans in the same branch.
 
@@ -110,34 +97,26 @@ After finishing a plan:
 - commit only intended files
 - push the branch
 - open/merge a PR into `main`
-- delete the branch locally and remotely after merge
+- after the PR is merged and no further QA, review, or fix-up work requires the isolated checkout, remove the task worktree if it was created manually or is still present
+- then delete the task branch locally and remotely when the repository/workflow expects manual cleanup
+- do not leave merged-plan worktrees behind; before creating a new manual worktree, check `git worktree list` and remove stale worktrees from already-merged plans
 
-Never push WIP directly to `main`.
-
-### Tiny-change exception
-
-Codex may work directly on `main` only when all are true:
-
-- no other Codex task is running
-- the change is tiny and low-risk
-- no behavior, dependency, lockfile, generated file, or config change
-- the final diff is easy to inspect
-
-If unsure, use a branch.
+Do not push directly to `main` unless the active user/task instruction explicitly authorizes it.
 
 ### Parallel tasks
-
 Parallel Codex tasks must use separate branches/worktrees.
 The first finished task may merge first.
 Every later task must update from latest `main` before merging.
+
+When the coding environment manages worktrees automatically, preserve that isolation and focus on the integration rule above rather than recreating the worktree manually.
 
 —
 
 # Libraries and Dependencies
 
 ## Follow the versioned documentation
+Inspect the dependency manifests, lockfiles, and existing code before relying on an API. When behavior is version-sensitive, use documentation compatible with the version actually resolved or required by the repository.
 
-- Always check the documentation for the **exact version** used in the repository (lockfile / package manager / requirements).
 - If you want to use **bleeding-edge** or unreleased features, you must:
   - state it explicitly
   - explain why it’s worth the risk
@@ -150,9 +129,7 @@ Every later task must update from latest `main` before merging.
 - Keep versions pinned (or consistent with the repo’s policy).
 
 ## Removing dependencies (double-check usage)
-
-- Before removing a dependency, verify it’s not used in:
-  - Before removing, run a repo-wide search for the dependency name and its common import paths.
+Before removing a dependency, run a repo-wide search for the dependency name and common import paths, and verify it is not used in:
   - runtime code imports
   - build scripts / CI
   - tooling configs (lint/format/test)
@@ -247,9 +224,11 @@ When failing, include minimal context:
 This file defines the minimum checks that must pass before a task is considered “done”.
 
 ## Required
-
-- Build succeeds locally **or** the project’s standard build command succeeds.
-- Tests pass locally **or** the project’s standard test command succeeds.
+- Run the smallest complete set of formatting, static-analysis, build, test, migration, integration, or smoke checks that validates **every changed area**.
+- Use the repository’s standard commands when they exist.
+- Full repository CI should pass before merge unless the repository explicitly defines a narrower merge policy.
+- Do not state that a check passed if it was not run.
+- If a required check cannot run because of an environment/tool limitation, report the limitation clearly and distinguish it from a failing check.
 
 ## When behavior changes
 
