@@ -10,6 +10,11 @@ import { seedLocalStructuredGraph } from '../../../packages/renderer-reactflow/s
 import { layoutRendererGraph } from '../../../packages/renderer-reactflow/src/layout-sync';
 import { fallbackRendererGraph } from '../../../packages/renderer-reactflow/src/layout';
 import type { GraphFlowNode } from '../../../packages/renderer-reactflow/src/types';
+import {
+  findRectangleOverlaps,
+  HIERARCHY_NODE_CLEARANCE,
+  nodeRectangle,
+} from '../../../packages/renderer-reactflow/src/geometry';
 import { planLocalEntry } from './local-view';
 import sampleReport from './sample-report.json';
 
@@ -74,6 +79,14 @@ describe('Synthetic Sample hierarchy geometry', () => {
       ).toEqual([]);
       expect(overlaps(final.nodes)).toEqual([]);
       expect(overlaps(fallback.nodes)).toEqual([]);
+      for (const graph of [seed, final, fallback]) {
+        expect(
+          findRectangleOverlaps(
+            graph.nodes.map(nodeRectangle),
+            HIERARCHY_NODE_CLEARANCE,
+          ),
+        ).toEqual([]);
+      }
       expect(final.layoutWarning).toBeNull();
     }
   });
