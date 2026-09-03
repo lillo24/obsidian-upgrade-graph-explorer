@@ -147,6 +147,12 @@ canonical truth, or own a platform storage implementation.
   incoming/outgoing rows select and center their existing projected endpoint.
   External selection reveal is edge-triggered, so ordinary scrolling and row
   virtualization never pull the drawer back to an unchanged selected root.
+  Graph selection highlights immediately but defers that automatic reveal;
+  confirmed canvas single-clicks carry a fresh, projection-scoped transient request
+  through `GraphExplorer.tsx`, even for the same selected node. Those requests align
+  the row top with the viewport, clamped at the list end, and mount virtual rows
+  without taking keyboard focus. Keyboard and other selection reveals retain
+  minimum scrolling. Requests are not persisted or replayed when reopening a drawer.
   Expansion, active row, scroll position, and drawer visibility are transient
   presentation state. `../network-explorer-model.ts` owns deterministic source
   ordering, one-pass projected-edge indexes, flattened rows, stale-expansion

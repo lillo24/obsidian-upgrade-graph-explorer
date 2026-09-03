@@ -47,6 +47,8 @@ export interface LocalGraphCanvasProps {
   readonly onFailure: (message: string) => void;
   readonly onFitRequestConsumed?: (key: number) => void;
   readonly onSelectionChange: (selection: LocalSelection | null) => void;
+  readonly onNodeSingleClick?: (nodeId: string) => void;
+  readonly onNodeActivate?: (entityId: string) => void;
   readonly onTransitionAnchorConsumed?: (key: number) => void;
   readonly onTransitionAnchorApiChange?: (
     api: LocalTransitionAnchorApi | undefined,
@@ -84,6 +86,8 @@ export function LocalGraphCanvas({
   onFailure,
   onFitRequestConsumed,
   onSelectionChange,
+  onNodeSingleClick,
+  onNodeActivate,
   onTransitionAnchorApiChange,
   onTransitionAnchorConsumed,
   onViewportObservation,
@@ -105,6 +109,8 @@ export function LocalGraphCanvas({
     onFailure,
     onFitRequestConsumed,
     onSelectionChange,
+    onNodeSingleClick,
+    onNodeActivate,
     onTransitionAnchorApiChange,
     onTransitionAnchorConsumed,
     onViewportObservation,
@@ -114,6 +120,8 @@ export function LocalGraphCanvas({
       onFailure,
       onFitRequestConsumed,
       onSelectionChange,
+      onNodeSingleClick,
+      onNodeActivate,
       onTransitionAnchorApiChange,
       onTransitionAnchorConsumed,
       onViewportObservation,
@@ -122,6 +130,8 @@ export function LocalGraphCanvas({
     onFailure,
     onFitRequestConsumed,
     onSelectionChange,
+    onNodeSingleClick,
+    onNodeActivate,
     onTransitionAnchorApiChange,
     onTransitionAnchorConsumed,
     onViewportObservation,
@@ -164,10 +174,8 @@ export function LocalGraphCanvas({
   const appliedPresentationOverrides = useRef(initial.presentationOverrides);
   const [ready, setReady] = useState(false);
   const [layoutCommitKey, setLayoutCommitKey] = useState(0);
-  const [layoutStatus, setLayoutStatus] = useState(
-    initial.cached
-      ? 'Focus Network layout restored from memory.'
-      : 'Focus Network is ready; refining layout…',
+  const [layoutStatus, setLayoutStatus] = useState<string | undefined>(
+    initial.cached ? undefined : 'Focus Network is ready; refining layout…',
   );
   const [layoutError, setLayoutError] = useState<string>();
 
@@ -200,6 +208,10 @@ export function LocalGraphCanvas({
             callbacks.current.onSelectionChange(
               key === undefined ? null : { kind: 'node', id: key },
             ),
+          onNodeSingleClick: (key) =>
+            callbacks.current.onNodeSingleClick?.(key),
+          onNodeActivated: (entityId) =>
+            callbacks.current.onNodeActivate?.(entityId),
           onViewportObservation: (viewport) =>
             callbacks.current.onViewportObservation(viewport),
         }),
@@ -282,7 +294,7 @@ export function LocalGraphCanvas({
           if (cancelled) return;
           layoutPending.current = false;
           setLayoutError(undefined);
-          setLayoutStatus('Focus Network layout restored from memory.');
+          setLayoutStatus(undefined);
           setLayoutCommitKey((current) => current + 1);
         })
         .catch((error: unknown) => {
@@ -317,7 +329,7 @@ export function LocalGraphCanvas({
         instrumentation?.record('local-layout-worker', result.computeMs);
         cache.set(fingerprint, result.positions);
         layoutPending.current = false;
-        setLayoutStatus('Focus Network layout ready.');
+        setLayoutStatus(undefined);
         setLayoutCommitKey((current) => current + 1);
       })
       .catch((error: unknown) => {
@@ -401,13 +413,15 @@ export function LocalGraphCanvas({
           Fit
         </button>
       </div>
-      <p
-        aria-atomic="true"
-        aria-live="polite"
-        className="local-graph-canvas__status"
-      >
-        {layoutStatus}
-      </p>
+      {layoutStatus === undefined ? null : (
+        <p
+          aria-atomic="true"
+          aria-live="polite"
+          className="local-graph-canvas__status"
+        >
+          {layoutStatus}
+        </p>
+      )}
       {layoutError === undefined ? null : (
         <p className="local-graph-canvas__error" role="alert">
           {layoutError}

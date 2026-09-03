@@ -1,11 +1,22 @@
 # VISUAL1B implementation report
 
-Status: **Draft/unmerged. Render-only flicker correction implemented; renewed
-native interaction/live-update QA remains pending. Do not merge.**
+Status: **Correction accepted and merge explicitly approved by the user on
+2026-09-03 ("Good. Now merge"). The linked PR records merge and CI outcomes.**
 
 [PR #51](https://github.com/lillo24/icarus-graph-explorer/pull/51) integrates
-`main` at `b81cc2c`, including merged KG14B3 PR #52. No competing action menu or
-Hide mechanism was introduced. The task checkout remains available for QA.
+`main` at `495a7a1`, including merged KG14B3 PR #52 and navigation PR #53. The
+merge preserves both Size context validation and confirmed-click sidebar reveal,
+plus both Local presentation overrides and activation callbacks. No competing
+action menu or Hide mechanism was introduced. The isolated checkout is removed
+after merge and successful post-merge CI.
+
+Final integration with PR #53 passed frozen-lockfile installation, full
+`pnpm check` (**1,018 tests across 117 files**), and `pnpm desktop:check`.
+The navigation test fixtures now include the required Size props and canonical
+File IDs. A combined regression verifies that changing/resetting size never
+replays a confirmed sidebar reveal or selects a File. Conflict resolution
+preserves independent presentation and click/reveal responsibilities, following
+the React performance guidance; no new production behavior was introduced.
 
 ## QA correction — render-only Size ownership
 
@@ -54,7 +65,8 @@ A genuine subsequent topology edit still submits a new layout. Session tests
 cover initial stored size, sparse changes, group composition, same-value no-op,
 Reset, hover/click callback continuity, pending-topology coalescing, removed keys,
 and hide/unhide with the latest stored multiplier. Radius picking is additionally
-checked in production-browser smoke; native confirmation remains required.
+checked in production-browser smoke. Native acceptance is user-reported, not an
+agent-performed native interaction/live-update test.
 
 ### Current validation
 
@@ -76,8 +88,10 @@ checked in production-browser smoke; native confirmation remains required.
   resizing kept its and Source's centers fixed, enlarged-edge clicking selected
   Target, and Hide/unhide retained 2.50 without a stale-node failure. No console
   errors/warnings were logged. Temporary size overrides/query were restored.
-- Latest PR CI is tracked separately on the pushed correction. Native
-  interaction/live-update QA remains **pending**, and the PR remains draft.
+- The user accepted the correction and explicitly approved merge. The agent
+  did not perform native interaction/live-update QA and does not independently
+  certify each checklist item. Latest integrated PR/post-merge CI is tracked
+  on GitHub.
 - The React performance skill informed the separation of presentation effects
   from layout dependencies. No dependency was added.
 
@@ -212,7 +226,7 @@ browser QA group/size edits were removed and global settings restored afterward.
   whitespace changes required after the latest main commit; instruction text is
   unchanged.
 
-## Remaining manual native QA gate
+## Native QA checklist supplied to the user
 
 Use the newly built optimized executable, not an older running app:
 
@@ -242,11 +256,11 @@ radius may change; all node centers and Source-to-Target distance must stay fixe
 Repeat in Focus + Network. Hover and click the resized visible node to verify
 label/picking behavior, and combine resizing with Hide/unhide and query changes.
 
-**Native interaction/live-update QA is not marked passed. Do not merge until
-the user confirms this flicker correction and the checklist above.** After
-native QA passes, check current main/CI again,
-merge through the PR, verify post-merge CI, and remove only this task's checkout
-and branch when no further QA is needed.
+The user replied **"Good. Now merge"** after receiving the correction and this
+checklist. That approval releases the native merge gate; it does not convert
+unperformed agent-native checks into passing results. Merge through the PR only
+after current-main integration and green CI, verify post-merge CI, then remove
+only this task's checkout and branch when no further QA is needed.
 
 ## Parked future work
 

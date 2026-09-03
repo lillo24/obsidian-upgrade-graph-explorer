@@ -36,12 +36,14 @@ import {
   NETWORK_EXPLORER_ROW_HEIGHT,
   networkExplorerKeyboardAction,
   networkExplorerScrollTopForIndex,
+  networkExplorerTopAlignedScrollTop,
   networkExplorerVirtualWindow,
   shouldRevealNetworkExplorerSelection,
   type NetworkExplorerAdjacency,
   type NetworkExplorerModel,
   type NetworkExplorerNode,
   type NetworkExplorerRow,
+  type NetworkExplorerRevealRequest,
 } from '../network-explorer-model';
 
 interface NetworkExplorerProps {
@@ -70,6 +72,9 @@ interface NetworkExplorerProps {
   ) => void;
   readonly onSelectNode: (nodeId: ProjectionNodeId) => void;
   readonly selection: GraphSelection | null;
+  /** Raw graph selection highlights now; its confirmed click reveals later. */
+  readonly deferSelectionReveal?: boolean;
+  readonly revealRequest?: NetworkExplorerRevealRequest | undefined;
 }
 
 const DEFAULT_VIEWPORT_HEIGHT = NETWORK_EXPLORER_ROW_HEIGHT * 8;
@@ -172,6 +177,8 @@ export const NetworkExplorer = memo(function NetworkExplorer({
   onExpandedNodeIdsChange,
   onSelectNode,
   selection,
+  deferSelectionReveal = false,
+  revealRequest,
 }: NetworkExplorerProps) {
   const rows = useMemo(
     () => flattenNetworkExplorerRows(model, expandedNodeIds),
@@ -199,6 +206,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
     undefined,
   );
   const rowIndexById = useMemo(() => indexNetworkExplorerRows(rows), [rows]);
+  const handledRevealRequest = useRef(revealRequest?.key);
   const contextTarget = currentNetworkExplorerContextTarget(
     context,
     model,
@@ -345,7 +353,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
       selectedNodeId,
     );
     lastRevealedSelectionNodeId.current = selectedNodeId;
-    if (!shouldReveal) return;
+    if (!shouldReveal || deferSelectionReveal) return;
     if (
       typeof document !== 'undefined' &&
       scrollerRef.current?.contains(document.activeElement)
@@ -357,7 +365,31 @@ export const NetworkExplorer = memo(function NetworkExplorer({
     if (index === undefined) return;
     setActiveRowId(selectedRowId);
     revealIndex(index);
-  }, [revealIndex, rowIndexById, selectedNodeId]);
+  }, [deferSelectionReveal, revealIndex, rowIndexById, selectedNodeId]);
+
+  useEffect(() => {
+    if (
+      revealRequest === undefined ||
+      revealRequest.key === handledRevealRequest.current
+    )
+      return;
+    handledRevealRequest.current = revealRequest.key;
+    const rowId = `node:${revealRequest.nodeId}`;
+    const index = rowIndexById.get(rowId);
+    const scroller = scrollerRef.current;
+    if (index === undefined || scroller === null) return;
+    const nextScrollTop = networkExplorerTopAlignedScrollTop({
+      index,
+      rowCount: rows.length,
+      viewportHeight: scroller.clientHeight || viewportHeight,
+    });
+    // Updating both DOM and virtual range mounts an off-screen target without
+    // moving keyboard focus out of the canvas or relying on scroll event timing.
+    focusPending.current = false;
+    setActiveRowId(rowId);
+    scroller.scrollTop = nextScrollTop;
+    setScrollTop(nextScrollTop);
+  }, [revealRequest, rowIndexById, rows.length, viewportHeight]);
 
   useEffect(() => {
     if (rows.length === 0) return;

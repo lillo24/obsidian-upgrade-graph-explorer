@@ -15,6 +15,10 @@ import {
 } from './local-graph';
 import { createLocalLayoutRequest } from './local-layout';
 import {
+  NodeClickArbitrator,
+  NODE_DOUBLE_CLICK_TIMEOUT_MS,
+} from './node-click';
+import {
   isCoarseWheelDelta,
   normalizeWheelDeltaPixels,
   preventSigmaWheelDefault,
@@ -50,6 +54,8 @@ export interface LocalRendererSessionOptions {
   readonly instrumentation?: LocalRendererInstrumentation;
   readonly visualGroupStyles?: VisualGroupPresentationMap;
   readonly presentationOverrides?: EntityPresentationOverrideMap;
+  readonly onNodeSingleClick?: (key: string) => void;
+  readonly onNodeActivated?: (entityId: string) => void;
   readonly onNodeSelected?: (
     key: string | undefined,
     attributes: LocalNodeAttributes | undefined,
@@ -94,6 +100,7 @@ export class LocalRendererSession {
   private topologyRefreshPending: Promise<void> | undefined;
   private visualStyleRefreshPending = false;
   private destroyed = false;
+  private nodeClicks: NodeClickArbitrator | undefined;
   private readonly wheelDirection = new WheelDirectionStabilizer();
 
   private readonly cameraUpdatedHandler = (): void => {
@@ -173,6 +180,7 @@ export class LocalRendererSession {
     container.setAttribute('aria-hidden', 'true');
     this.renderer = new Sigma(this.graph, container, {
       allowInvalidContainer: false,
+      doubleClickTimeout: NODE_DOUBLE_CLICK_TIMEOUT_MS,
       enableEdgeEvents: false,
       hideEdgesOnMove: this.graph.size > 4_000,
       hideLabelsOnMove: true,
@@ -279,6 +287,8 @@ export class LocalRendererSession {
   }
 
   private bindEvents(): void {
+    const nodeClicks = new NodeClickArbitrator();
+    this.nodeClicks = nodeClicks;
     this.renderer.on('enterNode', ({ node }) => {
       const started = performance.now();
       this.hoveredNode = node;
@@ -294,8 +304,22 @@ export class LocalRendererSession {
       this.options.instrumentation?.count('local-hover-applications');
       this.renderer.scheduleRender();
     });
-    this.renderer.on('clickNode', ({ node }) => this.selectNode(node));
-    this.renderer.on('clickStage', () => this.selectNode(undefined));
+    this.renderer.on('clickNode', ({ node }) => {
+      this.selectNode(node);
+      nodeClicks.schedule(() => this.options.onNodeSingleClick?.(node));
+    });
+    this.renderer.on('doubleClickNode', ({ node, preventSigmaDefault }) => {
+      preventSigmaDefault();
+      nodeClicks.cancel();
+      if (!this.graph.hasNode(node)) return;
+      const { entityId } = this.graph.getNodeAttributes(node);
+      if (entityId !== null) this.options.onNodeActivated?.(entityId);
+    });
+    this.renderer.on('clickStage', () => {
+      nodeClicks.cancel();
+      this.selectNode(undefined);
+    });
+    this.renderer.on('doubleClickStage', () => nodeClicks.cancel());
   }
 
   updateTrackpadZoomMode(mode: LocalTrackpadZoomMode): void {
@@ -351,6 +375,7 @@ export class LocalRendererSession {
   }
 
   update(input: LocalRendererInput): LocalGraphReconciliation {
+    this.nodeClicks?.cancel();
     const anchorKey =
       this.pendingViewportAnchorNodeKey ?? this.viewportAnchorNodeKey();
     this.pendingViewportAnchorNodeKey = undefined;
@@ -404,6 +429,7 @@ export class LocalRendererSession {
   setControlledSelection(key: string | undefined): void {
     if (key !== undefined && !this.graph.hasNode(key)) return;
     if (key === this.selectedNode) return;
+    this.nodeClicks?.cancel();
     this.selectedNode = key;
     this.renderer.scheduleRender();
   }
@@ -632,6 +658,7 @@ export class LocalRendererSession {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.nodeClicks?.cancel();
     this.renderer.getMouseCaptor().off('wheel', this.precisionWheelHandler);
     this.renderer.getCamera().off('updated', this.cameraUpdatedHandler);
     if (this.precisionWheelIdleTimer !== undefined) {
