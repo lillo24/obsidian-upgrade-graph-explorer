@@ -43,6 +43,7 @@ export interface GlobalGraphCanvasProps {
   readonly layoutService: GlobalLayoutService;
   readonly onFailure: (message: string) => void;
   readonly onNodeActivate: (entityId: string) => void;
+  readonly onNodeSingleClick?: (nodeId: string) => void;
   readonly onSelectionChange: (selection: GlobalSelection | null) => void;
   readonly onTransitionAnchorApiChange?: (
     api: GlobalTransitionAnchorApi | undefined,
@@ -76,6 +77,7 @@ export function GlobalGraphCanvas({
   layoutService,
   onFailure,
   onNodeActivate,
+  onNodeSingleClick,
   onSelectionChange,
   onTransitionAnchorApiChange,
   onViewportObservation,
@@ -95,6 +97,7 @@ export function GlobalGraphCanvas({
   const callbacks = useRef({
     onFailure,
     onNodeActivate,
+    onNodeSingleClick,
     onSelectionChange,
     onViewportObservation,
   });
@@ -102,10 +105,17 @@ export function GlobalGraphCanvas({
     callbacks.current = {
       onFailure,
       onNodeActivate,
+      onNodeSingleClick,
       onSelectionChange,
       onViewportObservation,
     };
-  }, [onFailure, onNodeActivate, onSelectionChange, onViewportObservation]);
+  }, [
+    onFailure,
+    onNodeActivate,
+    onNodeSingleClick,
+    onSelectionChange,
+    onViewportObservation,
+  ]);
   const input = useMemo(() => {
     const map = () => mapProjectionToGlobal(projection, settings);
     return instrumentation === undefined
@@ -170,6 +180,8 @@ export function GlobalGraphCanvas({
               callbacks.current.onNodeActivate(attributes.entityId);
             }
           },
+          onNodeSingleClick: (key) =>
+            callbacks.current.onNodeSingleClick?.(key),
           onViewportObservation: (viewport) =>
             callbacks.current.onViewportObservation(viewport),
         }),
@@ -285,11 +297,7 @@ export function GlobalGraphCanvas({
         instrumentation?.record('folder-prior', result.folderPriorMs);
         cache.set(fingerprint, result.positions);
         layoutPending.current = false;
-        setLayoutStatus(
-          result.algorithm === 'reference-only'
-            ? 'Reference layout ready.'
-            : 'Reference and soft folder layout ready.',
-        );
+        setLayoutStatus(undefined);
         setLayoutCommitKey((current) => current + 1);
       })
       .catch((error: unknown) => {

@@ -83,8 +83,11 @@ If your change would violate an existing abstraction, either:
 —
 
 # GitHub Repo Workflow
+
 ## Branching, Parallel Work, PR Merge, and Cleanup
+
 ### Default workflow
+
 Use one **isolated branch/worktree** per `.md` implementation plan.
 If the execution environment already provides an isolated managed worktree, use it rather than creating a nested one unnecessarily.
 
@@ -104,6 +107,7 @@ After finishing a plan:
 Do not push directly to `main` unless the active user/task instruction explicitly authorizes it.
 
 ### Parallel tasks
+
 Parallel Codex tasks must use separate branches/worktrees.
 The first finished task may merge first.
 Every later task must update from latest `main` before merging.
@@ -115,6 +119,7 @@ When the coding environment manages worktrees automatically, preserve that isola
 # Libraries and Dependencies
 
 ## Follow the versioned documentation
+
 Inspect the dependency manifests, lockfiles, and existing code before relying on an API. When behavior is version-sensitive, use documentation compatible with the version actually resolved or required by the repository.
 
 - If you want to use **bleeding-edge** or unreleased features, you must:
@@ -129,11 +134,13 @@ Inspect the dependency manifests, lockfiles, and existing code before relying on
 - Keep versions pinned (or consistent with the repo’s policy).
 
 ## Removing dependencies (double-check usage)
+
 Before removing a dependency, run a repo-wide search for the dependency name and common import paths, and verify it is not used in:
-  - runtime code imports
-  - build scripts / CI
-  - tooling configs (lint/format/test)
-  - documentation examples
+
+- runtime code imports
+- build scripts / CI
+- tooling configs (lint/format/test)
+- documentation examples
 
 —
 
@@ -224,6 +231,7 @@ When failing, include minimal context:
 This file defines the minimum checks that must pass before a task is considered “done”.
 
 ## Required
+
 - Run the smallest complete set of formatting, static-analysis, build, test, migration, integration, or smoke checks that validates **every changed area**.
 - Use the repository’s standard commands when they exist.
 - Full repository CI should pass before merge unless the repository explicitly defines a narrower merge policy.
