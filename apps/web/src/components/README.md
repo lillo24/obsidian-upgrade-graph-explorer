@@ -249,3 +249,11 @@ source-neutral schema/reconciliation lives in `packages/view-state`.
 `../preferences/` separately owns global focus-root/trackpad preferences and
 the persisted Local Free/Structured presentation preference in its existing
 versioned localStorage key.
+
+HIER0: `ExplorationControls` receives explicit All-Hierarchy exposure and retains
+Network-failure recovery; Focus always has both layouts. `GraphSettings` appends a
+collapsed, keyboard-accessible Experimental disclosure at the end of Graph.
+`GraphExplorer` owns the complete preference record and applies the pure
+availability policy at every activation boundary, including exact navigation,
+history, live reconciliation, reset, and renderer failures. Both normal and
+maximized Settings instances receive the same preference callbacks.

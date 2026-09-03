@@ -893,12 +893,32 @@ missing target for native QA. In the release executable verify:
 3. Save/apply/delete a temporary query. Make a harmless edit in the synthetic
    vault and confirm live updates preserve folder choices and the valid graph.
 
-PR #51 (VISUAL1B) remains draft/unmerged and untouched. It must incorporate this
-branch if NETWORKPOLISH1 merges first; Size and its separate flicker are not
-implemented here. A separate browser observation was that a sparse two-file
-All Network query could require extra zoom-out after Fit; its framing was not
-diagnosed or changed in this task.
+VISUAL1B merged to main before NETWORKPOLISH1. Merge reconciliation retains its
+per-file Size action and render-only override behavior inside the foldered
+sidebar; Size remains available only for canonical Files, while the shared
+Focus/Inspect/Hide actions remain available for supported projected nodes. A
+separate browser observation was that a sparse two-file All Network query could
+require extra zoom-out after Fit; its framing was not diagnosed or changed in
+this task.
+
+After reconciling VISUAL1B and HIER0 from current main, the combined branch
+passed `pnpm check` (126 files / 1,096 tests), `pnpm desktop:check`, a release
+desktop build, and focused browser checks of the folder tree, bookmark trigger,
+node Actions, and File Size editor.
 
 Sparse Focus graph spacing / normalization / camera framing remains unresolved
-and was intentionally not changed. Native QA, PR CI, merge, post-merge CI, and
-task-checkout cleanup remain the completion gates; no spacing work starts here.
+and was intentionally not changed. The user explicitly approved merge after the
+documented validation; no spacing work starts here.
+
+## HIER0 follow-up
+
+The Synthetic Sample reproduced actual diagnostic/entity collisions: one pair
+in All Hierarchy at Files only, and three pairs in Source Focus Hierarchy at
+three levels. The immediate Focus seed had nine pairs (one entity/entity, one
+entity/diagnostic, seven diagnostic/diagnostic). Entity-only Dagre output and the
+fallback grid had zero. Duplicate compact Note cards also lacked visible parent
+context. HIER0 uses dimension-aware seed packing, collision-aware diagnostic
+placement and compact parent context; no Dagre rank or decorative-state change
+was needed to address these measured failures. All Hierarchy remains available
+behind a default-Off Experimental preference and for Network recovery. See
+[the validation record](HIER0_VALIDATION.md) for completed and outstanding gates.

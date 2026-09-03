@@ -94,6 +94,7 @@ import {
   goForwardInGraphHistory,
   graphHistoryActionPolicy,
   nextGraphViewportRequestKey,
+  normalizeAvailableGraphHistory,
   planSemanticViewportRestore,
   recordGraphNavigation,
   returnToAllInGraphHistory,
@@ -106,6 +107,8 @@ import { planEntityNavigation, topLevelPathScopes } from '../navigation';
 import { planLocalEntityNavigation, planLocalEntry } from '../local-view';
 import {
   allPresentationMode,
+  allHierarchyAvailable,
+  resolveAvailablePresentationMode,
   explorationLayout,
   explorationScope,
   focusLayoutMode,
@@ -136,6 +139,7 @@ import {
 import {
   loadGraphPreferences,
   saveGraphPreferences,
+  type GraphPreferences,
 } from '../preferences/graph-preferences';
 import { deriveProjectionVisualGroupPresentationMap } from '../visual-groups/presentation';
 import { usePresentationOverrides } from '../presentation-overrides/use-presentation-overrides';
@@ -350,16 +354,6 @@ export function GraphExplorer({
   const [preferenceLoad] = useState(() =>
     loadGraphPreferences(persistenceStorage),
   );
-  const [trackpadZoomMode, setTrackpadZoomMode] = useState<TrackpadZoomMode>(
-    preferenceLoad.preferences.trackpadZoomMode,
-  );
-  const [focusAppearance, setFocusAppearance] = useState<FocusAppearance>(
-    preferenceLoad.preferences.focusAppearance,
-  );
-  const [globalLayoutSettings, setGlobalLayoutSettings] =
-    useState<GlobalLayoutSettings>(
-      preferenceLoad.preferences.globalLayoutSettings,
-    );
   const [preferenceWarning, setPreferenceWarning] = useState<
     string | undefined
   >(preferenceLoad.warning ?? undefined);
@@ -447,14 +441,39 @@ export function GraphExplorer({
   const legacyFocusedStructure =
     hydration.presentationMode === 'structure' &&
     initialViewState.focus !== undefined;
-  const [localLayoutMode, setLocalLayoutMode] = useState<LocalLayoutMode>(
-    legacyFocusedStructure
+  const [preferences, setPreferences] = useState<GraphPreferences>(() => ({
+    ...preferenceLoad.preferences,
+    localLayoutMode: legacyFocusedStructure
       ? 'structured'
       : preferenceLoad.preferences.localLayoutMode,
+  }));
+  const preferencesRef = useRef(preferences);
+  const {
+    focusAppearance,
+    globalLayoutSettings,
+    localLayoutMode,
+    trackpadZoomMode,
+    showExperimentalAllHierarchy,
+  } = preferences;
+  // Every control patches the same complete record, including updates batched
+  // before React renders. Storage failure does not roll back session behavior.
+  const updateGraphPreferences = useCallback(
+    (patch: Partial<GraphPreferences>) => {
+      const next = { ...preferencesRef.current, ...patch };
+      preferencesRef.current = next;
+      setPreferences(next);
+      const saved = saveGraphPreferences(persistenceStorage, next);
+      setPreferenceWarning(saved.ok ? undefined : saved.message);
+    },
+    [persistenceStorage],
   );
   const localLayoutModeRef = useRef(localLayoutMode);
   const [rendererMode, setRendererMode] = useState<GraphPresentationMode>(
-    legacyFocusedStructure ? 'local' : hydration.presentationMode,
+    resolveAvailablePresentationMode(
+      legacyFocusedStructure ? 'local' : hydration.presentationMode,
+      initialViewState,
+      { showExperimentalAllHierarchy, allNetworkAvailable: true },
+    ),
   );
   const rendererModeRef = useRef(rendererMode);
   const [globalUnavailable, setGlobalUnavailable] = useState<string>();
@@ -514,25 +533,6 @@ export function GraphExplorer({
     [projectionWorkspace, viewState],
   );
   const activeViewState = currentReconciliation.state;
-  const structureResult = useMemo<ProjectionResult | undefined>(() => {
-    // Local owns its bounded projection. Avoid an invisible full Structure
-    // projection on every Local disclosure, search, and live update.
-    if (rendererMode === 'local') return undefined;
-    try {
-      return {
-        ok: true,
-        projection:
-          performance === undefined
-            ? projectStructureView(projectionWorkspace, activeViewState)
-            : performance.measure('project-view', 'projections', () =>
-                projectStructureView(projectionWorkspace, activeViewState),
-              ),
-      };
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      return { ok: false, message: `Graph projection failed: ${message}` };
-    }
-  }, [activeViewState, performance, projectionWorkspace, rendererMode]);
   const globalViewState = useMemo(
     () => effectiveGlobalProjectionState(projectionWorkspace, activeViewState),
     [activeViewState, projectionWorkspace],
@@ -586,12 +586,47 @@ export function GraphExplorer({
       ? `${globalResult.message} All Hierarchy remains available for this session.`
       : undefined;
   const globalFailure = globalUnavailable ?? globalProjectionFailure;
-  const effectiveRendererMode: GraphPresentationMode =
-    rendererMode === 'global' && globalFailure === undefined
-      ? 'global'
-      : rendererMode === 'local'
-        ? 'local'
-        : 'structure';
+  const availability = useMemo(
+    () => ({
+      showExperimentalAllHierarchy,
+      allNetworkAvailable: globalFailure === undefined,
+    }),
+    [showExperimentalAllHierarchy, globalFailure],
+  );
+  const availabilityRef = useRef(availability);
+  useLayoutEffect(() => {
+    availabilityRef.current = availability;
+  }, [availability]);
+  const allHierarchyExposed = allHierarchyAvailable(availability);
+  const effectiveRendererMode = resolveAvailablePresentationMode(
+    rendererMode,
+    activeViewState,
+    availability,
+  );
+  const structureResult = useMemo<ProjectionResult | undefined>(() => {
+    // Local owns its bounded projection. Avoid an invisible full Structure
+    // projection on every Local disclosure, search, and live update.
+    if (effectiveRendererMode !== 'structure') return undefined;
+    try {
+      return {
+        ok: true,
+        projection:
+          performance === undefined
+            ? projectStructureView(projectionWorkspace, activeViewState)
+            : performance.measure('project-view', 'projections', () =>
+                projectStructureView(projectionWorkspace, activeViewState),
+              ),
+      };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { ok: false, message: `Graph projection failed: ${message}` };
+    }
+  }, [
+    activeViewState,
+    performance,
+    projectionWorkspace,
+    effectiveRendererMode,
+  ]);
   const activeScope = explorationScope(effectiveRendererMode);
   const activeLayout = explorationLayout(
     effectiveRendererMode,
@@ -1193,14 +1228,11 @@ export function GraphExplorer({
         activeViewStateRef.current = reconciled.state;
         dispatch({ type: 'replace-state', state: reconciled.state });
       }
-      const restoredSessionMode: GraphPresentationMode =
-        traversal.target.presentationMode === 'local' &&
-        reconciled.state.focus === undefined
-          ? 'global'
-          : traversal.target.presentationMode === 'global' &&
-              globalFailure !== undefined
-            ? 'structure'
-            : traversal.target.presentationMode;
+      const restoredSessionMode = resolveAvailablePresentationMode(
+        traversal.target.presentationMode,
+        reconciled.state,
+        availabilityRef.current,
+      );
       rendererModeRef.current = restoredSessionMode;
       setRendererMode(restoredSessionMode);
       setSemanticViewportBookmark(reconciled.viewports.structure);
@@ -1220,13 +1252,14 @@ export function GraphExplorer({
           (restoredSessionMode === traversal.target.presentationMode
             ? ''
             : traversal.target.presentationMode === 'local'
-              ? ' The Focus root no longer exists, so the checkpoint recovered to All Network.'
-              : ' All Network is unavailable, so this checkpoint is shown in All Hierarchy for this session.'),
+              ? ` The Focus root no longer exists, so the checkpoint recovered to All ${restoredSessionMode === 'global' ? 'Network' : 'Hierarchy'}.`
+              : restoredSessionMode === 'global'
+                ? ' Experimental All Hierarchy is hidden; this checkpoint is shown in All Network.'
+                : ' All Network is unavailable, so this checkpoint is shown in All Hierarchy for this session.'),
       );
       return true;
     },
     [
-      globalFailure,
       projectionWorkspace,
       replaceNavigationHistory,
       requestHistoryViewportRestore,
@@ -1237,16 +1270,15 @@ export function GraphExplorer({
   );
   const traverseGraphHistory = useCallback(
     (direction: 'back' | 'forward'): boolean => {
+      const normalized = normalizeAvailableGraphHistory(
+        navigationHistoryRef.current,
+        currentHistoryCheckpoint(),
+        availabilityRef.current,
+      );
       const traversal =
         direction === 'back'
-          ? goBackInGraphHistory(
-              navigationHistoryRef.current,
-              currentHistoryCheckpoint(),
-            )
-          : goForwardInGraphHistory(
-              navigationHistoryRef.current,
-              currentHistoryCheckpoint(),
-            );
+          ? goBackInGraphHistory(normalized.history, normalized.current)
+          : goForwardInGraphHistory(normalized.history, normalized.current);
       return traversal === null
         ? false
         : applyHistoryTraversal(
@@ -1259,9 +1291,14 @@ export function GraphExplorer({
     [applyHistoryTraversal, currentHistoryCheckpoint],
   );
   const returnToPriorAll = useCallback((): boolean => {
-    const traversal = returnToAllInGraphHistory(
+    const normalized = normalizeAvailableGraphHistory(
       navigationHistoryRef.current,
       currentHistoryCheckpoint(),
+      availabilityRef.current,
+    );
+    const traversal = returnToAllInGraphHistory(
+      normalized.history,
+      normalized.current,
     );
     if (traversal === null) return false;
     const apply = () =>
@@ -1285,8 +1322,12 @@ export function GraphExplorer({
           ? {}
           : { filters: focusState.filters }),
       };
-      const targetMode = allPresentationMode(
-        localLayoutModeRef.current === 'free' ? 'network' : 'hierarchy',
+      const targetMode = resolveAvailablePresentationMode(
+        allPresentationMode(
+          localLayoutModeRef.current === 'free' ? 'network' : 'hierarchy',
+        ),
+        allState,
+        availabilityRef.current,
       );
       const candidateProjection =
         targetMode === 'global'
@@ -1493,7 +1534,7 @@ export function GraphExplorer({
         if (cancelled) return;
         const message = error instanceof Error ? error.message : String(error);
         setLocalFreeUnavailable(
-          `Focus Network could not be loaded: ${message} Open full hierarchy remains available.`,
+          `Focus Network could not be loaded: ${message} Use Focus Hierarchy or return to All.`,
         );
       });
     return () => {
@@ -1519,7 +1560,7 @@ export function GraphExplorer({
         if (cancelled) return;
         const message = error instanceof Error ? error.message : String(error);
         setLocalStructuredUnavailable(
-          `Focus Hierarchy could not be loaded: ${message} Focus Network and All Hierarchy remain available.`,
+          `Focus Hierarchy could not be loaded: ${message} Use an available Focus layout or return to All.`,
         );
       });
     return () => {
@@ -1539,7 +1580,8 @@ export function GraphExplorer({
 
   useLayoutEffect(() => {
     activeViewStateRef.current = activeViewState;
-    rendererModeRef.current = effectiveRendererMode;
+    if (!(rendererMode === 'local' && activeViewState.focus === undefined))
+      rendererModeRef.current = effectiveRendererMode;
     localLayoutModeRef.current = localLayoutMode;
     viewportBookmarkRef.current = viewportBookmark;
     globalViewportBookmarkRef.current = globalViewportBookmark;
@@ -1547,6 +1589,7 @@ export function GraphExplorer({
   }, [
     activeViewState,
     effectiveRendererMode,
+    rendererMode,
     globalViewportBookmark,
     localLayoutMode,
     localViewportBookmark,
@@ -1693,8 +1736,11 @@ export function GraphExplorer({
         rendererModeRef.current === 'local' &&
         reconciled.state.focus === undefined
       ) {
-        const recoveryMode: GraphPresentationMode =
-          globalFailure === undefined ? 'global' : 'structure';
+        const recoveryMode = resolveAvailablePresentationMode(
+          'local',
+          reconciled.state,
+          availabilityRef.current,
+        );
         rendererModeRef.current = recoveryMode;
         setRendererMode(recoveryMode);
         setSelection(null);
@@ -2207,64 +2253,26 @@ export function GraphExplorer({
   );
   const changeTrackpadZoomMode = useCallback(
     (mode: TrackpadZoomMode) => {
-      setTrackpadZoomMode(mode);
-      const saved = saveGraphPreferences(persistenceStorage, {
-        focusAppearance,
-        globalLayoutSettings,
-        localLayoutMode,
-        trackpadZoomMode: mode,
-      });
-      setPreferenceWarning(saved.ok ? undefined : saved.message);
+      updateGraphPreferences({ trackpadZoomMode: mode });
     },
-    [
-      focusAppearance,
-      globalLayoutSettings,
-      localLayoutMode,
-      persistenceStorage,
-    ],
+    [updateGraphPreferences],
   );
   const changeFocusAppearance = useCallback(
     (appearance: FocusAppearance) => {
-      setFocusAppearance(appearance);
-      const saved = saveGraphPreferences(persistenceStorage, {
-        focusAppearance: appearance,
-        globalLayoutSettings,
-        localLayoutMode,
-        trackpadZoomMode,
-      });
-      setPreferenceWarning(saved.ok ? undefined : saved.message);
+      updateGraphPreferences({ focusAppearance: appearance });
     },
-    [
-      globalLayoutSettings,
-      localLayoutMode,
-      persistenceStorage,
-      trackpadZoomMode,
-    ],
+    [updateGraphPreferences],
   );
   // Settings are inert while another renderer is mounted. All Network observes
   // the new settings directly and its worker keeps only the latest request.
   const changeGlobalLayoutSettings = useCallback(
     (settings: GlobalLayoutSettings) => {
-      setGlobalLayoutSettings(settings);
       if (globalLayoutSettingsApplyImmediately(activeScope, activeLayout)) {
         setGlobalLayoutRequestKey((current) => current + 1);
       }
-      const saved = saveGraphPreferences(persistenceStorage, {
-        focusAppearance,
-        globalLayoutSettings: settings,
-        localLayoutMode,
-        trackpadZoomMode,
-      });
-      setPreferenceWarning(saved.ok ? undefined : saved.message);
+      updateGraphPreferences({ globalLayoutSettings: settings });
     },
-    [
-      activeLayout,
-      activeScope,
-      focusAppearance,
-      localLayoutMode,
-      persistenceStorage,
-      trackpadZoomMode,
-    ],
+    [updateGraphPreferences, activeLayout, activeScope],
   );
   const changeLocalLayoutMode = useCallback(
     (mode: LocalLayoutMode) => {
@@ -2302,7 +2310,6 @@ export function GraphExplorer({
           : (bookmark?.freeRatio ?? LOCAL_NAVIGATION_RATIO);
 
       localLayoutModeRef.current = mode;
-      setLocalLayoutMode(mode);
       setLocalCenterRequest(undefined);
       setLocalStructuredCenterRequest(undefined);
       if (point !== undefined && anchorNode !== undefined) {
@@ -2328,13 +2335,7 @@ export function GraphExplorer({
       if (mode === 'free' && selection?.kind === 'edge') {
         setSelection(null);
       }
-      const saved = saveGraphPreferences(persistenceStorage, {
-        focusAppearance,
-        globalLayoutSettings,
-        localLayoutMode: mode,
-        trackpadZoomMode,
-      });
-      setPreferenceWarning(saved.ok ? undefined : saved.message);
+      updateGraphPreferences({ localLayoutMode: mode });
       setNavigationAnnouncement(
         mode === 'structured'
           ? 'Focus Hierarchy opened with the same bounded graph.'
@@ -2345,15 +2346,7 @@ export function GraphExplorer({
             }`,
       );
     },
-    [
-      focusAppearance,
-      globalLayoutSettings,
-      persistenceStorage,
-      projection,
-      requestLocalSemanticCenter,
-      selection,
-      trackpadZoomMode,
-    ],
+    [updateGraphPreferences, projection, requestLocalSemanticCenter, selection],
   );
   const changeSettingsOpen = useCallback((open: boolean) => {
     dispatchWorkspaceOverlay({ type: 'change-settings', open });
@@ -2490,6 +2483,11 @@ export function GraphExplorer({
   const changeRendererMode = useCallback(
     (nextMode: GraphPresentationMode) => {
       if (nextMode === 'local') return;
+      nextMode = resolveAvailablePresentationMode(
+        nextMode,
+        activeViewStateRef.current,
+        availabilityRef.current,
+      );
       if (rendererModeRef.current === 'local' && nextMode === 'global') {
         exitFocusToAll();
         return;
@@ -2698,6 +2696,40 @@ export function GraphExplorer({
       structureResult,
     ],
   );
+  const changeExperimentalAllHierarchy = useCallback(
+    (show: boolean) => {
+      const wasStructure = rendererModeRef.current === 'structure';
+      updateGraphPreferences({ showExperimentalAllHierarchy: show });
+      availabilityRef.current = {
+        ...availabilityRef.current,
+        showExperimentalAllHierarchy: show,
+      };
+      if (!show && wasStructure) {
+        if (availabilityRef.current.allNetworkAvailable) {
+          changeRendererMode('global');
+          setNavigationAnnouncement(
+            'Experimental All Hierarchy hidden. Opened All Network.',
+          );
+        } else {
+          setNavigationAnnouncement(
+            'All Hierarchy remains visible because All Network is unavailable. The experiment is off.',
+          );
+        }
+      }
+      const normalized = normalizeAvailableGraphHistory(
+        navigationHistoryRef.current,
+        currentHistoryCheckpoint(),
+        availabilityRef.current,
+      );
+      replaceNavigationHistory(normalized.history);
+    },
+    [
+      changeRendererMode,
+      currentHistoryCheckpoint,
+      replaceNavigationHistory,
+      updateGraphPreferences,
+    ],
+  );
   const enterFocusScope = useCallback(
     (entityId: EntityId): void => {
       const sourceMode = rendererModeRef.current;
@@ -2784,14 +2816,7 @@ export function GraphExplorer({
         dispatch({ type: 'replace-state', state: plan.state });
         if (localLayoutModeRef.current !== targetLayoutMode) {
           localLayoutModeRef.current = targetLayoutMode;
-          setLocalLayoutMode(targetLayoutMode);
-          const saved = saveGraphPreferences(persistenceStorage, {
-            focusAppearance,
-            globalLayoutSettings,
-            localLayoutMode: targetLayoutMode,
-            trackpadZoomMode,
-          });
-          setPreferenceWarning(saved.ok ? undefined : saved.message);
+          updateGraphPreferences({ localLayoutMode: targetLayoutMode });
         }
         rendererModeRef.current = 'local';
         setRendererMode('local');
@@ -2831,24 +2856,26 @@ export function GraphExplorer({
       }
     },
     [
+      updateGraphPreferences,
       cancelPendingHistoryViewportRestore,
       currentHistoryCheckpoint,
-      focusAppearance,
-      globalLayoutSettings,
       performance,
-      persistenceStorage,
       projection,
       projectionWorkspace,
       replaceNavigationHistory,
       requestLocalSemanticCenter,
       setLocalSemanticViewportBookmark,
-      trackpadZoomMode,
     ],
   );
   const navigateToEntity = useCallback(
     (entityId: EntityId, origin: string) => {
       const target = projectionWorkspace.entity(entityId);
-      if (rendererModeRef.current === 'local') {
+      const enterExactFocus =
+        rendererModeRef.current !== 'local' &&
+        target !== undefined &&
+        target.kind !== 'document' &&
+        !allHierarchyAvailable(availabilityRef.current);
+      if (rendererModeRef.current === 'local' || enterExactFocus) {
         try {
           const plan = planLocalEntityNavigation(
             projectionWorkspace,
@@ -2888,6 +2915,12 @@ export function GraphExplorer({
           cancelPendingHistoryViewportRestore();
           activeViewStateRef.current = plan.state;
           dispatch({ type: 'replace-state', state: plan.state });
+          if (enterExactFocus) {
+            localLayoutModeRef.current = 'structured';
+            updateGraphPreferences({ localLayoutMode: 'structured' });
+            rendererModeRef.current = 'local';
+            setRendererMode('local');
+          }
           setLocalSemanticViewportBookmark(viewport);
           setSelection({ kind: 'node', id: plan.projectionNodeId });
           requestLocalSemanticCenter({
@@ -2896,7 +2929,13 @@ export function GraphExplorer({
             structuredZoom: viewport.structuredZoom,
           });
           setNavigationError(undefined);
-          setNavigationAnnouncement(`${origin}: ${plan.announcement}`);
+          setNavigationAnnouncement(
+            `${origin}: ${
+              enterExactFocus
+                ? 'Opened Focus Hierarchy and revealed the exact target.'
+                : plan.announcement
+            }`,
+          );
         } catch (error: unknown) {
           setNavigationError(
             `${origin}: ${
@@ -2963,6 +3002,7 @@ export function GraphExplorer({
       setNavigationAnnouncement(`${origin}: ${plan.announcement}`);
     },
     [
+      updateGraphPreferences,
       cancelPendingHistoryViewportRestore,
       changeRendererMode,
       commitGraphDestination,
@@ -3100,11 +3140,16 @@ export function GraphExplorer({
       return;
     }
     const defaults = initialGraphState();
+    const defaultMode = resolveAvailablePresentationMode(
+      'global',
+      defaults,
+      availabilityRef.current,
+    );
     lastSerializedView.current = serializePersistedWorkspaceView(
       createPersistedWorkspaceView({
         workspace: projectionWorkspace,
         state: defaults,
-        presentationMode: 'structure',
+        presentationMode: defaultMode,
         viewports: {},
       }),
     );
@@ -3112,8 +3157,8 @@ export function GraphExplorer({
     dispatch({ type: 'reset-view' });
     activeViewStateRef.current = defaults;
     setSelection(null);
-    rendererModeRef.current = 'structure';
-    setRendererMode('structure');
+    rendererModeRef.current = defaultMode;
+    setRendererMode(defaultMode);
     setCenterRequest(undefined);
     setGlobalCenterRequest(undefined);
     setLocalCenterRequest(undefined);
@@ -3208,6 +3253,10 @@ export function GraphExplorer({
             <span>Tools</span>
           </button>
           <GraphSettings
+            showExperimentalAllHierarchy={showExperimentalAllHierarchy}
+            onShowExperimentalAllHierarchyChange={
+              changeExperimentalAllHierarchy
+            }
             focusAppearance={focusAppearance}
             globalLayoutSettings={globalLayoutSettings}
             onFocusAppearanceChange={changeFocusAppearance}
@@ -3254,6 +3303,7 @@ export function GraphExplorer({
               />
             )}
             <ExplorationControls
+              allHierarchyExposed={allHierarchyExposed}
               {...(activeScope === 'all' &&
               selectedFocusableEntityId === undefined
                 ? { focusDisabledReason: 'Select a file first.' }
@@ -3385,6 +3435,10 @@ export function GraphExplorer({
               ) : null}
               {maximized ? null : (
                 <GraphSettings
+                  showExperimentalAllHierarchy={showExperimentalAllHierarchy}
+                  onShowExperimentalAllHierarchyChange={
+                    changeExperimentalAllHierarchy
+                  }
                   focusAppearance={focusAppearance}
                   globalLayoutSettings={globalLayoutSettings}
                   onFocusAppearanceChange={changeFocusAppearance}
@@ -3531,7 +3585,7 @@ export function GraphExplorer({
               <div className="graph-failure" role="alert">
                 <p>
                   {localUnavailable ??
-                    `Focus ${localLayoutMode === 'free' ? 'Network' : 'Hierarchy'} has no stable document root. Open full hierarchy to recover.`}
+                    `Focus ${localLayoutMode === 'free' ? 'Network' : 'Hierarchy'} has no stable document root. Return to All to recover.`}
                 </p>
                 {localLayoutMode === 'structured' &&
                 localStructuredUnavailable !== undefined ? (
@@ -3542,11 +3596,25 @@ export function GraphExplorer({
                     Open Focus Network
                   </button>
                 ) : null}
-                <button
-                  onClick={() => changeRendererMode('structure')}
-                  type="button"
-                >
-                  Open full hierarchy
+                {localLayoutMode === 'free' &&
+                localStructuredUnavailable === undefined ? (
+                  <button
+                    onClick={() => changeLocalLayoutMode('structured')}
+                    type="button"
+                  >
+                    Open Focus Hierarchy
+                  </button>
+                ) : null}
+                {allHierarchyExposed ? (
+                  <button
+                    onClick={() => changeRendererMode('structure')}
+                    type="button"
+                  >
+                    Open full hierarchy
+                  </button>
+                ) : null}
+                <button onClick={exitFocusToAll} type="button">
+                  Return to All
                 </button>
               </div>
             ) : localLayoutMode === 'free' && LocalGraphView === undefined ? (
@@ -3578,7 +3646,7 @@ export function GraphExplorer({
                   : { instrumentation: performance })}
                 onFailure={(message) =>
                   setLocalFreeUnavailable(
-                    `Focus Network renderer failed: ${message} Open full hierarchy remains available.`,
+                    `Focus Network renderer failed: ${message} Use Focus Hierarchy or return to All.`,
                   )
                 }
                 onFitRequestConsumed={consumeLocalFitRequest}
@@ -3611,7 +3679,7 @@ export function GraphExplorer({
                 layoutRequestKey={localLayoutRequestKey}
                 onFailure={(message) =>
                   setLocalStructuredUnavailable(
-                    `Focus Hierarchy renderer failed: ${message} Focus Network and All Hierarchy remain available.`,
+                    `Focus Hierarchy renderer failed: ${message} Use an available Focus layout or return to All.`,
                   )
                 }
                 onFitRequestConsumed={consumeLocalFitRequest}
@@ -3732,7 +3800,8 @@ export function GraphExplorer({
               onClear={clearSelection}
               onClose={closeInspector}
               onNavigate={navigateToEntity}
-              {...((effectiveRendererMode === 'global' ||
+              {...(allHierarchyExposed &&
+              (effectiveRendererMode === 'global' ||
                 effectiveRendererMode === 'local') &&
               activeSelection?.kind === 'node'
                 ? {

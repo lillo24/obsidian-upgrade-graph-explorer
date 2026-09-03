@@ -60,6 +60,7 @@ describe('graph preferences', () => {
       focusAppearance: 'inverted',
       globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
       localLayoutMode: 'free',
+      showExperimentalAllHierarchy: false,
       trackpadZoomMode: 'pinch-zoom',
     });
 
@@ -68,11 +69,12 @@ describe('graph preferences', () => {
         focusAppearance: 'minimal',
         globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
         localLayoutMode: 'free',
+        showExperimentalAllHierarchy: false,
         trackpadZoomMode: 'scroll-zoom',
       }),
     ).toEqual({ ok: true });
     expect(storage.value).toBe(
-      '{"focusAppearance":"minimal","globalLayoutSettings":{"folderClustering":true,"spacingPreset":"normal"},"localLayoutMode":"free","trackpadZoomMode":"scroll-zoom"}',
+      '{"focusAppearance":"minimal","globalLayoutSettings":{"folderClustering":true,"spacingPreset":"normal"},"localLayoutMode":"free","showExperimentalAllHierarchy":false,"trackpadZoomMode":"scroll-zoom"}',
     );
   });
 
@@ -105,6 +107,7 @@ describe('graph preferences', () => {
       focusAppearance: 'inverted',
       globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
       localLayoutMode: 'free',
+      showExperimentalAllHierarchy: false,
       trackpadZoomMode: 'pinch-zoom',
     });
     expect(
@@ -117,6 +120,7 @@ describe('graph preferences', () => {
       focusAppearance: 'inverted',
       globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
       localLayoutMode: 'free',
+      showExperimentalAllHierarchy: false,
       trackpadZoomMode: 'scroll-zoom',
     });
   });
@@ -251,6 +255,7 @@ describe('graph preferences', () => {
         focusAppearance: 'inverted',
         globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
         localLayoutMode: 'free',
+        showExperimentalAllHierarchy: false,
         trackpadZoomMode: 'pinch-zoom',
       }),
     ).toEqual({
@@ -269,6 +274,53 @@ describe('graph preferences', () => {
       preferences: DEFAULT_GRAPH_PREFERENCES,
       warning:
         'Could not read saved graph settings; defaults are active for this session.',
+    });
+  });
+});
+
+describe('Experimental All Hierarchy preference compatibility', () => {
+  it.each([undefined, null, 0, 1, 'true', {}, [], false])(
+    'defaults malformed/absent field %j to Off',
+    (field) => {
+      const storage = memoryStorage(
+        JSON.stringify({
+          showExperimentalAllHierarchy: field,
+          focusAppearance: 'minimal',
+        }),
+      );
+      expect(loadGraphPreferences(storage).preferences).toMatchObject({
+        showExperimentalAllHierarchy: false,
+        focusAppearance: 'minimal',
+      });
+    },
+  );
+  it('round trips true and false under the unchanged v1 key', () => {
+    const storage = memoryStorage();
+    for (const show of [true, false]) {
+      expect(
+        saveGraphPreferences(storage, {
+          ...DEFAULT_GRAPH_PREFERENCES,
+          showExperimentalAllHierarchy: show,
+        }).ok,
+      ).toBe(true);
+      expect(
+        loadGraphPreferences(storage).preferences.showExperimentalAllHierarchy,
+      ).toBe(show);
+    }
+    expect(GRAPH_PREFERENCES_STORAGE_KEY).toBe(
+      'icarus.graph-explorer.preferences.v1',
+    );
+  });
+  it('retains the experimental field when another setting patches the complete record', () => {
+    const storage = memoryStorage('{"showExperimentalAllHierarchy":true}');
+    const current = loadGraphPreferences(storage).preferences;
+    saveGraphPreferences(storage, {
+      ...current,
+      trackpadZoomMode: 'pinch-zoom',
+    });
+    expect(loadGraphPreferences(storage).preferences).toMatchObject({
+      showExperimentalAllHierarchy: true,
+      trackpadZoomMode: 'pinch-zoom',
     });
   });
 });

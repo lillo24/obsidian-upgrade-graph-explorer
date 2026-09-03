@@ -21,6 +21,8 @@ import {
 } from './graph-settings-tabs';
 
 interface GraphSettingsProps {
+  readonly showExperimentalAllHierarchy?: boolean;
+  readonly onShowExperimentalAllHierarchyChange?: (show: boolean) => void;
   readonly children?: ReactNode;
   readonly focusAppearance: FocusAppearance;
   readonly globalLayoutSettings: GlobalLayoutSettings;
@@ -50,6 +52,8 @@ function SettingsIcon() {
 }
 
 export const GraphSettings = memo(function GraphSettings({
+  showExperimentalAllHierarchy = false,
+  onShowExperimentalAllHierarchyChange,
   children,
   focusAppearance,
   globalLayoutSettings,
@@ -63,6 +67,7 @@ export const GraphSettings = memo(function GraphSettings({
 }: GraphSettingsProps) {
   const [activeTab, setActiveTab] = useState<GraphSettingsTab>('graph');
   const [advancedLayoutOpen, setAdvancedLayoutOpen] = useState(false);
+  const [experimentalOpen, setExperimentalOpen] = useState(false);
   const folderStrength = folderClusteringStrength(globalLayoutSettings);
   const graphTabRef = useRef<HTMLButtonElement>(null);
   const sourceTabRef = useRef<HTMLButtonElement>(null);
@@ -356,6 +361,40 @@ export const GraphSettings = memo(function GraphSettings({
                     </span>
                   </label>
                 </fieldset>
+              </section>
+              <section className="graph-settings__section">
+                <button
+                  aria-controls="graph-experimental-controls"
+                  aria-expanded={experimentalOpen}
+                  className="graph-settings__disclosure"
+                  onClick={() => setExperimentalOpen((current) => !current)}
+                  type="button"
+                >
+                  <span aria-hidden="true">{experimentalOpen ? '▾' : '▸'}</span>{' '}
+                  Experimental
+                </button>
+                {experimentalOpen ? (
+                  <div id="graph-experimental-controls">
+                    <label className="graph-settings__check">
+                      <input
+                        checked={showExperimentalAllHierarchy}
+                        onChange={(event) =>
+                          onShowExperimentalAllHierarchyChange?.(
+                            event.currentTarget.checked,
+                          )
+                        }
+                        type="checkbox"
+                      />
+                      <span>
+                        <strong>Show All Hierarchy</strong>
+                        <small>
+                          Exposes the whole-vault Hierarchy layout. Focus
+                          Hierarchy remains available normally.
+                        </small>
+                      </span>
+                    </label>
+                  </div>
+                ) : null}
               </section>
             </div>
             <div
