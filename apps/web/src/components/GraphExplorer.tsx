@@ -139,6 +139,7 @@ import {
 } from '../preferences/graph-preferences';
 import { deriveProjectionVisualGroupPresentationMap } from '../visual-groups/presentation';
 import { usePresentationOverrides } from '../presentation-overrides/use-presentation-overrides';
+import { useSpatialOverrides } from '../spatial-overrides/use-spatial-overrides';
 import {
   commitVisualGroupSessionMutation,
   createVisualGroupSession,
@@ -507,6 +508,11 @@ export function GraphExplorer({
     eligibility,
     storage: persistenceStorage,
     entityById: visualGroupEntityById,
+  });
+  const spatialOverrides = useSpatialOverrides({
+    workspaceId,
+    eligibility,
+    storage: persistenceStorage,
   });
   const currentReconciliation = useMemo(
     () => reconcileCurrentWorkspaceView(projectionWorkspace, viewState),
@@ -3462,6 +3468,11 @@ export function GraphExplorer({
             {nodePresentation.session.error}
           </p>
         )}
+        {spatialOverrides.session.error === undefined ? null : (
+          <p className="graph-alert" role="alert">
+            {spatialOverrides.session.error}
+          </p>
+        )}
         {globalFailure === undefined ? null : (
           <p className="graph-alert" role="alert">
             {globalFailure}
@@ -3512,6 +3523,7 @@ export function GraphExplorer({
                 selection={activeSelection}
                 settings={globalLayoutSettings}
                 presentationOverrides={nodePresentation.overrides}
+                spatialOverrides={spatialOverrides.anchors}
                 trackpadZoomMode={trackpadZoomMode}
                 visualGroupStyles={visualGroupPresentation.styles}
               />

@@ -46,6 +46,7 @@ apps/web/
     navigation.ts     Shared reveal/filter-widening/navigation planner.
     local-view.ts     Local entry/reroot/minimum-reveal planner over KG6 state.
     visual-groups/    Visible-entity GROUP1A presentation-map derivation; no projection calls.
+    spatial-overrides/ Workspace persistence/session policy for normalized All-Network folder anchors.
     navigation-history.ts Bounded session history over semantic graph checkpoints.
     graph-history-shortcuts.ts Exact graph-context Back/Forward shortcut policy.
     network-explorer-model.ts Projection-only node/adjacency indexes, row flattening, keyboard plans, and virtual ranges.
@@ -91,6 +92,18 @@ ID. It strictly retains ordered priority and stores only name, canonical QUERY1
 string, fixed palette token, and enabled boolean. It is not graph-view state,
 does not bump schema v3, and is not wired into GraphExplorer, NAV1 history,
 DISC1 counts, active QUERY1 filtering, or Saved Filters.
+
+SPATIAL1A wires a separate source-neutral normalized folder-anchor registry into
+All Network without adding production editing controls. Its stable-workspace
+session uses declared identity provenance and an encoded workspace key;
+transient/legacy or storage-unavailable sources stay session-only. The renderer
+receives only the resolved exact-folder anchor map. Focus Network, both Hierarchy
+presentations, KG6 projection, navigation history, Graph Preferences, saved view
+schema v3, and the per-File size registry do not observe it. Automatic layout
+positions remain distinct from displayed translated positions, so anchor edits
+neither submit layout work nor contaminate the automatic cache. The development
+Global Renderer harness is the only current editing surface; SPATIAL1B will add
+the user-facing Arrange Folders interaction.
 
 Graph history remains a web-layer session concern above KG9 view state.
 Each checkpoint contains one immutable KG6 `ViewProjectionState` reference and

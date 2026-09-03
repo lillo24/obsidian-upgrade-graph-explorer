@@ -18,7 +18,11 @@ export type {
 export {
   computeGlobalLayout,
   createGlobalLayoutRequest,
+  createGlobalLayoutRequestFromAutomaticPositions,
+  globalLayoutPositionsFromInput,
   globalLayoutFingerprint,
+  reconcileGlobalAutomaticPositions,
+  warmGlobalRendererInput,
 } from './layout';
 export { GlobalLayoutCache } from './layout-cache';
 export { LocalLayoutCache } from './local-layout-cache';
@@ -65,6 +69,11 @@ export {
   resolveGlobalNodeStyle,
   resolveGlobalVisualLod,
 } from './style';
+export {
+  composeGlobalSpatialOverrides,
+  globalFolderKeyByNodeKey,
+  SIGMA_VISUAL_DOWN_GRAPH_Y_SIGN,
+} from './spatial';
 export {
   resolveLocalEdgeStyle,
   resolveLocalNodeStyle,

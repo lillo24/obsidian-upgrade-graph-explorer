@@ -70,6 +70,8 @@ export const PERFORMANCE_PHASES = [
   'global-layout-worker',
   'folder-prior',
   'layout-apply',
+  'spatial-compose',
+  'spatial-apply',
   'sigma-mount-render',
   'semantic-zoom-style',
   'global-hover',
@@ -105,6 +107,8 @@ export const PERFORMANCE_OPERATIONS = [
   'global-mappings',
   'graphology-reconciliations',
   'global-layouts',
+  'spatial-compositions',
+  'spatial-applies',
   'global-style-updates',
   'global-hover-applications',
   'global-selection-applications',
@@ -163,6 +167,8 @@ export interface PerformanceOperationCounts {
   readonly 'global-mappings': number;
   readonly 'graphology-reconciliations': number;
   readonly 'global-layouts': number;
+  readonly 'spatial-compositions': number;
+  readonly 'spatial-applies': number;
   readonly 'global-style-updates': number;
   readonly 'global-hover-applications': number;
   readonly 'global-selection-applications': number;
@@ -281,6 +287,8 @@ export function emptyPerformanceOperationCounts(): PerformanceOperationCounts {
     'global-mappings': 0,
     'graphology-reconciliations': 0,
     'global-layouts': 0,
+    'spatial-compositions': 0,
+    'spatial-applies': 0,
     'global-style-updates': 0,
     'global-hover-applications': 0,
     'global-selection-applications': 0,

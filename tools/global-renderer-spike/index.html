@@ -88,6 +88,51 @@
             </div>
           </section>
           <section>
+            <h2>Normalized folder anchor</h2>
+            <form id="spatial-form">
+              <label>
+                Synthetic folder key
+                <input id="spatial-folder" value="folder-0" />
+              </label>
+              <div class="spatial-coordinate-grid">
+                <label>
+                  Normalized X
+                  <input
+                    id="spatial-x"
+                    max="2"
+                    min="-2"
+                    step="0.1"
+                    type="number"
+                    value="0.7"
+                  />
+                </label>
+                <label>
+                  Normalized Y
+                  <input
+                    id="spatial-y"
+                    max="2"
+                    min="-2"
+                    step="0.1"
+                    type="number"
+                    value="0.7"
+                  />
+                </label>
+              </div>
+              <div class="button-grid">
+                <button type="submit">Apply Anchor</button>
+                <button id="spatial-reset-folder" type="button">
+                  Reset Folder
+                </button>
+                <button id="spatial-reset-all" type="button">Reset All</button>
+              </div>
+            </form>
+            <dl
+              class="spatial-summary"
+              id="spatial-summary"
+              aria-label="Spatial composition evidence"
+            ></dl>
+          </section>
+          <section>
             <h2>Find files</h2>
             <label>
               File name or stable ID

@@ -1,4 +1,5 @@
 import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
+import type { FolderClusterAnchorMap } from '@icarus-graph-explorer/spatial-overrides';
 import {
   useCallback,
   useEffect,
@@ -14,16 +15,21 @@ import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-g
 import { GlobalLayoutCache } from './layout-cache';
 import {
   createGlobalLayoutRequest,
+  createGlobalLayoutRequestFromAutomaticPositions,
+  globalLayoutPositionsFromInput,
   globalLayoutFingerprint,
+  reconcileGlobalAutomaticPositions,
   warmGlobalRendererInput,
 } from './layout';
 import { GlobalGraphEmptyState } from './GlobalGraphEmptyState';
 import { mountGlobalRendererSession } from './lifecycle';
 import { mapProjectionToGlobal } from './mapping';
 import { GlobalRendererSession } from './session';
+import { composeGlobalSpatialOverrides } from './spatial';
 import { shouldApplyGlobalViewportRequest } from './viewport-request';
 import type {
   GlobalCenterRequest,
+  GlobalLayoutPosition,
   GlobalLayoutService,
   GlobalLayoutSettings,
   GlobalRendererInstrumentation,
@@ -55,6 +61,8 @@ export interface GlobalGraphCanvasProps {
   readonly projection: ViewProjection;
   readonly selection: GlobalSelection | null;
   readonly settings: GlobalLayoutSettings;
+  /** All Network-only position intent composed after automatic layout. */
+  readonly spatialOverrides?: FolderClusterAnchorMap;
   readonly trackpadZoomMode: GlobalTrackpadZoomMode;
   /** Style-only EntityId lookup; excluded from mapping and layout inputs. */
   readonly visualGroupStyles?: VisualGroupPresentationMap;
@@ -68,6 +76,68 @@ function errorMessage(error: unknown): string {
 
 function layoutIterations(nodeCount: number): number {
   return nodeCount <= 1_000 ? 100 : nodeCount <= 5_000 ? 30 : 20;
+}
+
+function displayedPositions(
+  automaticPositions: readonly GlobalLayoutPosition[],
+  input: ReturnType<typeof mapProjectionToGlobal>,
+  anchors: FolderClusterAnchorMap | undefined,
+  instrumentation: GlobalRendererInstrumentation | undefined,
+  forceSpatialOperation = false,
+) {
+  const hasAnchors = anchors !== undefined && anchors.size > 0;
+  if (!hasAnchors && !forceSpatialOperation) return automaticPositions;
+  const compose = () =>
+    hasAnchors
+      ? composeGlobalSpatialOverrides(automaticPositions, input, anchors)
+          .displayedPositions
+      : automaticPositions;
+  return instrumentation === undefined
+    ? compose()
+    : instrumentation.measure(
+        'spatial-compose',
+        'spatial-compositions',
+        compose,
+      );
+}
+
+function applyDisplayedPositions(
+  session: GlobalRendererSession,
+  automaticPositions: readonly GlobalLayoutPosition[],
+  input: ReturnType<typeof mapProjectionToGlobal>,
+  anchors: FolderClusterAnchorMap | undefined,
+  instrumentation: GlobalRendererInstrumentation | undefined,
+  forceSpatialOperation = false,
+): Promise<void> {
+  const positions = displayedPositions(
+    automaticPositions,
+    input,
+    anchors,
+    instrumentation,
+    forceSpatialOperation,
+  );
+  return applyComposedPositions(
+    session,
+    positions,
+    anchors,
+    instrumentation,
+    forceSpatialOperation,
+  );
+}
+
+function applyComposedPositions(
+  session: GlobalRendererSession,
+  positions: readonly GlobalLayoutPosition[],
+  anchors: FolderClusterAnchorMap | undefined,
+  instrumentation: GlobalRendererInstrumentation | undefined,
+  forceSpatialOperation = false,
+): Promise<void> {
+  const apply = () => session.applyPositions(positions);
+  return (anchors === undefined || anchors.size === 0) && !forceSpatialOperation
+    ? apply()
+    : instrumentation === undefined
+      ? apply()
+      : instrumentation.measure('spatial-apply', 'spatial-applies', apply);
 }
 
 export function GlobalGraphCanvas({
@@ -87,6 +157,7 @@ export function GlobalGraphCanvas({
   projection,
   selection,
   settings,
+  spatialOverrides,
   trackpadZoomMode,
   visualGroupStyles,
   presentationOverrides,
@@ -141,12 +212,24 @@ export function GlobalGraphCanvas({
   );
   const [initial] = useState(() => {
     const cached = cache.get(fingerprint);
+    const automaticPositions = cached ?? globalLayoutPositionsFromInput(input);
+    const initialDisplayedPositions = displayedPositions(
+      automaticPositions,
+      input,
+      spatialOverrides,
+      instrumentation,
+    );
     return {
+      automaticPositions,
       cached: cached !== undefined,
       initialViewport,
       input:
-        cached === undefined ? input : warmGlobalRendererInput(input, cached),
+        cached === undefined && initialDisplayedPositions === automaticPositions
+          ? input
+          : warmGlobalRendererInput(input, initialDisplayedPositions),
+      sourceInput: input,
       settings,
+      spatialOverrides,
       trackpadZoomMode,
       visualGroupStyles,
       presentationOverrides,
@@ -154,6 +237,12 @@ export function GlobalGraphCanvas({
   });
   const appliedVisualGroupStyles = useRef(initial.visualGroupStyles);
   const appliedPresentationOverrides = useRef(initial.presentationOverrides);
+  const appliedSpatialOverrides = useRef(initial.spatialOverrides);
+  const latestAutomaticPositions = useRef(initial.automaticPositions);
+  const latestSpatialOverrides = useRef(spatialOverrides);
+  useLayoutEffect(() => {
+    latestSpatialOverrides.current = spatialOverrides;
+  }, [spatialOverrides]);
   const [ready, setReady] = useState(false);
   const [layoutCommitKey, setLayoutCommitKey] = useState(0);
   const [layoutStatus, setLayoutStatus] = useState<string | undefined>(
@@ -222,13 +311,50 @@ export function GlobalGraphCanvas({
 
   useEffect(() => {
     const session = sessionRef.current;
-    if (session === undefined || input === initial.input) return;
+    if (session === undefined || input === initial.sourceInput) return;
     try {
-      session.update(input);
+      const automaticPositions = reconcileGlobalAutomaticPositions(
+        input,
+        latestAutomaticPositions.current,
+      );
+      latestAutomaticPositions.current = automaticPositions;
+      const anchors = latestSpatialOverrides.current;
+      const previousAnchors = appliedSpatialOverrides.current;
+      const clearingAnchors =
+        (anchors === undefined || anchors.size === 0) &&
+        previousAnchors !== undefined &&
+        previousAnchors.size > 0;
+      const positions = displayedPositions(
+        automaticPositions,
+        input,
+        anchors,
+        instrumentation,
+        clearingAnchors,
+      );
+      appliedSpatialOverrides.current = anchors;
+      session.update(
+        anchors === undefined || anchors.size === 0
+          ? input
+          : warmGlobalRendererInput(input, positions),
+      );
+      if (
+        (anchors !== undefined && anchors.size > 0) ||
+        (previousAnchors !== undefined && previousAnchors.size > 0)
+      ) {
+        void applyComposedPositions(
+          session,
+          positions,
+          anchors,
+          instrumentation,
+          clearingAnchors,
+        ).catch((error: unknown) => {
+          callbacks.current.onFailure(errorMessage(error));
+        });
+      }
     } catch (error: unknown) {
       callbacks.current.onFailure(errorMessage(error));
     }
-  }, [initial.input, input]);
+  }, [initial.sourceInput, input, instrumentation]);
 
   useEffect(() => {
     const session = sessionRef.current;
@@ -253,6 +379,26 @@ export function GlobalGraphCanvas({
   }, [presentationOverrides]);
 
   useEffect(() => {
+    if (appliedSpatialOverrides.current === spatialOverrides) return;
+    const previousSpatialOverrides = appliedSpatialOverrides.current;
+    appliedSpatialOverrides.current = spatialOverrides;
+    const session = sessionRef.current;
+    if (session === undefined) return;
+    void applyDisplayedPositions(
+      session,
+      latestAutomaticPositions.current,
+      input,
+      spatialOverrides,
+      instrumentation,
+      (spatialOverrides === undefined || spatialOverrides.size === 0) &&
+        previousSpatialOverrides !== undefined &&
+        previousSpatialOverrides.size > 0,
+    ).catch((error: unknown) => {
+      callbacks.current.onFailure(errorMessage(error));
+    });
+  }, [input, instrumentation, spatialOverrides]);
+
+  useEffect(() => {
     sessionRef.current?.setControlledSelection(
       selection?.kind === 'node' ? selection.id : undefined,
     );
@@ -269,8 +415,14 @@ export function GlobalGraphCanvas({
     const cached = cache.get(fingerprint);
     let cancelled = false;
     if (cached !== undefined) {
-      void session
-        .applyPositions(cached)
+      latestAutomaticPositions.current = cached;
+      void applyDisplayedPositions(
+        session,
+        cached,
+        input,
+        latestSpatialOverrides.current,
+        instrumentation,
+      )
         .then(() => {
           if (cancelled) return;
           layoutPending.current = false;
@@ -291,21 +443,33 @@ export function GlobalGraphCanvas({
       setLayoutError(undefined);
       setLayoutStatus('Refining All Network layout in the background…');
     });
-    const request = session.createLayoutRequest(
+    const request = createGlobalLayoutRequestFromAutomaticPositions(
       input,
       settings,
       requestTemplate.iterations,
+      latestAutomaticPositions.current,
     );
     instrumentation?.count('global-layouts');
     void layoutService
       .layout(request)
       .then(async (result) => {
         if (cancelled) return;
-        const apply = () => session.applyPositions(result.positions);
+        latestAutomaticPositions.current = result.positions;
+        const anchors = latestSpatialOverrides.current;
+        const apply = () =>
+          applyDisplayedPositions(
+            session,
+            result.positions,
+            input,
+            anchors,
+            instrumentation,
+          );
         const rendered =
-          instrumentation === undefined
-            ? apply()
-            : instrumentation.measure('layout-apply', undefined, apply);
+          anchors === undefined || anchors.size === 0
+            ? instrumentation === undefined
+              ? apply()
+              : instrumentation.measure('layout-apply', undefined, apply)
+            : apply();
         await rendered;
         if (cancelled) return;
         instrumentation?.record('global-layout-worker', result.computeMs);

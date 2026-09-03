@@ -19,6 +19,10 @@ view contract.
 - `presentation-overrides.ts` adapts the source-neutral v1 per-File size
   registry to its own workspace storage key, with explicit failures. Session
   policy is in `../presentation-overrides/session.ts`.
+- `spatial-overrides.ts` adapts the source-neutral v1 normalized folder-anchor
+  registry to a third, independent workspace key. Session policy, including
+  durable write-before-adopt behavior and explicit corrupt-value recovery, is
+  in `../spatial-overrides/session.ts`.
 
 Malformed or unsupported values are not overwritten or deleted. Transient and
 legacy reports never read or write cross-session state. The stored record
@@ -63,3 +67,15 @@ Corrupt data is left untouched and editing blocked with a visible recovery
 message; failed writes retain the last confirmed sizes. Reset saved view does
 not affect this registry. Missing canonical IDs remain inactive without fuzzy
 remapping, and a query-hidden File keeps its entry for when it becomes visible.
+
+All-Network spatial overrides use
+`icarus-graph-explorer:spatial-overrides:<encodeURIComponent(workspaceId)>`.
+They contain only the workspace ID and exact normalized folder keys with bounded
+logical X/Y anchor values. Stable identities load and save durably; transient
+and legacy reports remain editable only for the current session. Missing or
+unreadable storage falls back to a visible session-only state. A corrupt record
+remains untouched and blocks edits until the explicit spatial reset deletes
+only this key. Durable mutations write before adoption, and a failed write
+retains the last confirmed registry. Reset saved view, Graph Preferences,
+Visual Groups, Saved Filters, and per-File presentation overrides do not clear
+or merge with this registry.

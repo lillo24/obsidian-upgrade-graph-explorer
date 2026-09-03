@@ -18,6 +18,7 @@
     "@icarus-graph-explorer/presentation-overrides": "workspace:*",
     "@icarus-graph-explorer/renderer-reactflow": "workspace:*",
     "@icarus-graph-explorer/renderer-sigma": "workspace:*",
+    "@icarus-graph-explorer/spatial-overrides": "workspace:*",
     "@icarus-graph-explorer/source-provider-tauri": "workspace:*",
     "@icarus-graph-explorer/view-state": "workspace:*",
     "@icarus-graph-explorer/view-projection": "workspace:*",

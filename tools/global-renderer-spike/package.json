@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@icarus-graph-explorer/renderer-sigma": "workspace:*",
+    "@icarus-graph-explorer/spatial-overrides": "workspace:*",
     "@icarus-graph-explorer/view-projection": "workspace:*"
   },
   "devDependencies": {

@@ -229,6 +229,43 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/spatial-overrides/**/*.{ts,tsx}'],
+    ignores: ['packages/spatial-overrides/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@icarus-graph-explorer/*',
+                '!@icarus-graph-explorer/core',
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                '@xyflow/*',
+                '@dagrejs/*',
+                '@tauri-apps/*',
+                '@react-sigma/*',
+                'sigma',
+                'sigma/*',
+                'graphology',
+                'graphology-*',
+                'obsidian',
+                'obsidian-*',
+                '@obsidian/*',
+                'node:*',
+              ],
+              message:
+                'Spatial overrides may depend only on source-neutral core; storage, query, projection, UI, renderer, layout, and platform concerns stay outside.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['packages/parser-markdown/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [

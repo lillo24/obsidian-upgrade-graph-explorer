@@ -504,6 +504,32 @@ now wait for Sigma's matching `afterRender`; both first-worker and exact-cache
 Structure→Global transitions passed the repeated release check without manual
 Fit.
 
+### SPATIAL1A normalized-anchor composition
+
+SPATIAL1A adds `spatial-compose` and `spatial-apply` phases plus aggregate
+`spatial-compositions` and `spatial-applies` operation counts. The empty-map
+production path returns the automatic position object directly. A nonempty map
+computes one document-only automatic frame and rigid folder translations; it
+does not project KG6, reconcile Graphology topology, or submit ForceAtlas2.
+
+`pnpm benchmark:global-renderer -- --profile small` and `--profile medium`
+measure three generic synthetic anchors over the production source-neutral
+composition. Local Windows/Node evidence recorded on 2026-09-03 is
+investigative, not a CI timing threshold:
+
+| Profile | Positions | Active/inactive anchors | Composition median/p95 | Layout / projection / topology per anchor edit |
+| ------- | --------: | ----------------------: | ---------------------: | ---------------------------------------------: |
+| Small   |       100 |                     3/0 |         0.168/1.018 ms |                                          0/0/0 |
+| Medium  |       500 |                     3/0 |         0.442/0.686 ms |                                          0/0/0 |
+
+Renderer regression tests supply the stronger operation oracle: one anchor edit
+adds exactly one composition and one display apply while preserving the
+automatic cache and explicit worker seed. Accepted worker completion and
+query/topology updates perform their ordinary automatic work followed by one
+composition/apply. The automatic frame excludes diagnostics, displayed node
+sizes, viewport state, and earlier translations, preventing cumulative drift.
+Benchmark output contains aggregate counts and generic synthetic data only.
+
 ## KG13B2A bounded Local Free evidence
 
 Local profiles describe the projected neighborhood itself rather than a large

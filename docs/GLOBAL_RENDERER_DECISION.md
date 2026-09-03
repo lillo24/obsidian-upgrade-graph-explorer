@@ -202,6 +202,11 @@ offsets. Tests cover node add/remove, reference-only changes, filtered projectio
 updates, and position preservation. Selection survives reconciliation when its
 stable key remains and clears only when that key disappears.
 
+SPATIAL1A retains this automatic topology/layout contract and adds a post-layout
+presentation layer: exact-folder normalized anchors translate displayed
+clusters while the worker and memory cache continue to consume and store only
+automatic positions. Raw positions still do not persist.
+
 At medium actual-product scale, 10% mutation had a 9.3 ms median versus 13.3 ms
 for full rebuild. At large scale, 1% mutation had a 37.5 ms median versus 56.0 ms
 full rebuild. Small graphs may rebuild faster, but KG13B should reconcile in

@@ -479,6 +479,51 @@ export function createGlobalLayoutRequest(
   };
 }
 
+export function globalLayoutPositionsFromInput(
+  input: GlobalRendererInput,
+): readonly GlobalLayoutPosition[] {
+  return input.nodes.map(({ key, attributes }) => ({
+    key,
+    x: attributes.x,
+    y: attributes.y,
+  }));
+}
+
+/**
+ * Retains only automatic survivor coordinates. Displayed override positions
+ * are never accepted as an implicit warm-seed source.
+ */
+export function reconcileGlobalAutomaticPositions(
+  input: GlobalRendererInput,
+  previous: readonly GlobalLayoutPosition[],
+): readonly GlobalLayoutPosition[] {
+  const previousByKey = new Map(
+    previous.map((position) => [position.key, position] as const),
+  );
+  return input.nodes.map(({ key, attributes }) => {
+    const position = previousByKey.get(key);
+    return position === undefined
+      ? { key, x: attributes.x, y: attributes.y }
+      : { key, x: position.x, y: position.y };
+  });
+}
+
+/** Explicit automatic-position request path; never reads a live renderer graph. */
+export function createGlobalLayoutRequestFromAutomaticPositions(
+  input: GlobalRendererInput,
+  settings: GlobalLayoutRequest['settings'],
+  iterations: number,
+  automaticPositions: readonly GlobalLayoutPosition[],
+  algorithm?: GlobalFolderPriorAlgorithm,
+): Omit<GlobalLayoutRequest, 'requestId'> {
+  return createGlobalLayoutRequest(
+    warmGlobalRendererInput(input, automaticPositions),
+    settings,
+    iterations,
+    algorithm,
+  );
+}
+
 /** Applies an exact memory-cache hit before a remounted Sigma session draws. */
 export function warmGlobalRendererInput(
   input: GlobalRendererInput,

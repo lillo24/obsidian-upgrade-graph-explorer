@@ -10,10 +10,12 @@ import {
 } from '@icarus-graph-explorer/global-renderer-spike/core';
 import {
   buildGlobalGraph,
+  composeGlobalSpatialOverrides,
   computeGlobalLayout,
   createGlobalLayoutRequest,
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
   GlobalLayoutCache,
+  globalLayoutPositionsFromInput,
   globalLayoutFingerprint,
   mapProjectionToGlobal,
   reconcileGlobalGraph,
@@ -217,6 +219,32 @@ async function main(): Promise<void> {
   const graphBuild = measureRepeated(() => {
     buildGlobalGraph(productInput);
   }, repeats);
+  const syntheticFolderKeys = [
+    ...new Set(
+      productInput.nodes.flatMap((node) =>
+        node.attributes.folderKey === null ? [] : [node.attributes.folderKey],
+      ),
+    ),
+  ].slice(0, 3);
+  const syntheticAnchors = new Map(
+    syntheticFolderKeys.map((folderKey, index) => [
+      folderKey,
+      { x: 0.35 + index * 0.2, y: 0.7 - index * 0.15 },
+    ]),
+  );
+  const automaticPositions = globalLayoutPositionsFromInput(productInput);
+  let spatialResult:
+    ReturnType<typeof composeGlobalSpatialOverrides> | undefined;
+  const spatialComposition = measureRepeated(() => {
+    spatialResult = composeGlobalSpatialOverrides(
+      automaticPositions,
+      productInput,
+      syntheticAnchors,
+    );
+  }, repeats);
+  if (spatialResult === undefined) {
+    throw new Error('Spatial composition benchmark produced no result.');
+  }
   const onePercentInput = mapProjectionToGlobal(
     changedProjection(projection, 0.01),
   );
@@ -400,6 +428,16 @@ async function main(): Promise<void> {
           graphologyBuild: stressBuild,
         },
         forceAtlas2AndFolderPrior: layout,
+        normalizedSpatialOverrides: {
+          anchorCount: syntheticAnchors.size,
+          activeFolderCount: spatialResult.activeFolders.length,
+          inactiveFolderCount: spatialResult.inactiveFolderKeys.length,
+          positionCount: spatialResult.displayedPositions.length,
+          composition: spatialComposition,
+          automaticLayoutRequestsPerAnchorEdit: 0,
+          projectionRequestsPerAnchorEdit: 0,
+          topologyReconciliationsPerAnchorEdit: 0,
+        },
         bundle: await bundleEvidence(),
         rendererRuntime: {
           measuredBy: 'production browser/Tauri harness',

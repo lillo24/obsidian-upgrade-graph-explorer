@@ -187,6 +187,8 @@ export interface GlobalOperationCounts {
   readonly projections: number;
   readonly topologyReconciliations: number;
   readonly layoutRequests: number;
+  readonly spatialCompositions: number;
+  readonly spatialApplies: number;
   readonly visualLodChanges: number;
 }
 
@@ -203,6 +205,8 @@ export type GlobalPerformancePhase =
   | 'global-layout-worker'
   | 'folder-prior'
   | 'layout-apply'
+  | 'spatial-compose'
+  | 'spatial-apply'
   | 'sigma-mount-render'
   | 'semantic-zoom-style'
   | 'global-hover'
@@ -213,6 +217,8 @@ export type GlobalPerformanceOperation =
   | 'global-mappings'
   | 'graphology-reconciliations'
   | 'global-layouts'
+  | 'spatial-compositions'
+  | 'spatial-applies'
   | 'global-style-updates'
   | 'global-hover-applications'
   | 'global-selection-applications'

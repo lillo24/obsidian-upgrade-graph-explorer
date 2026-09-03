@@ -44,6 +44,7 @@
   },
   "dependencies": {
     "@icarus-graph-explorer/presentation-overrides": "workspace:*",
+    "@icarus-graph-explorer/spatial-overrides": "workspace:*",
     "@icarus-graph-explorer/view-projection": "workspace:*",
     "@icarus-graph-explorer/visual-groups": "workspace:*",
     "graphology": "0.26.0",
