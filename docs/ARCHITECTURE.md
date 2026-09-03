@@ -639,7 +639,9 @@ selection writes the shared `GraphSelection` and sends exactly one Global or
 Local semantic center request at the current bookmark ratio. It creates no KG6
 action or navigation checkpoint and never asks Sigma to report topology. Canvas
 selection scrolls the matching top-level row into the virtual window without
-moving DOM focus or expanding adjacency. The overlay never resizes the graph;
+moving DOM focus or expanding adjacency. That reveal runs once per selection
+change; scrolling and virtual-window updates do not reassert an unchanged
+selection. The overlay never resizes the graph;
 it may coexist with Inspector above 900 px, while the last-opened drawer wins at
 the existing narrow breakpoint. Drawer, expansion, active-row, and scroll state
 are memory-only and absent from schema v3.

@@ -20,6 +20,7 @@ import {
   networkExplorerScrollTopForIndex,
   networkExplorerVirtualWindow,
   reconcileNetworkExplorerExpansion,
+  shouldRevealNetworkExplorerSelection,
 } from './network-explorer-model';
 
 const validation = validateObsidianDiagnosticReport(sampleReport);
@@ -179,6 +180,23 @@ describe('Network Explorer keyboard and virtual window contracts', () => {
   );
   const expandable = model.nodes.find((node) => node.adjacency.length > 0);
   if (expandable === undefined) throw new Error('Expected an expandable node.');
+
+  it('reveals external selection once without reasserting it during scrolling', () => {
+    const selectedNodeId = expandable.id;
+
+    expect(
+      shouldRevealNetworkExplorerSelection(undefined, selectedNodeId),
+    ).toBe(true);
+    expect(
+      shouldRevealNetworkExplorerSelection(selectedNodeId, selectedNodeId),
+    ).toBe(false);
+    expect(
+      shouldRevealNetworkExplorerSelection(selectedNodeId, model.nodes[0]?.id),
+    ).toBe(model.nodes[0]?.id !== selectedNodeId);
+    expect(
+      shouldRevealNetworkExplorerSelection(selectedNodeId, undefined),
+    ).toBe(false);
+  });
 
   it('plans the complete tree keyboard contract over logical, not mounted, rows', () => {
     const collapsedRows = flattenNetworkExplorerRows(model, new Set());

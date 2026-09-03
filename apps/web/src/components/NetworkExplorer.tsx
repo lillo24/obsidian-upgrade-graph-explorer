@@ -19,6 +19,7 @@ import {
   networkExplorerKeyboardAction,
   networkExplorerScrollTopForIndex,
   networkExplorerVirtualWindow,
+  shouldRevealNetworkExplorerSelection,
   type NetworkExplorerAdjacency,
   type NetworkExplorerModel,
   type NetworkExplorerNode,
@@ -137,6 +138,9 @@ export const NetworkExplorer = memo(function NetworkExplorer({
   const rowRefs = useRef(new Map<string, HTMLElement>());
   const focusPending = useRef(false);
   const focusAfterExpansion = useRef<string | undefined>(undefined);
+  const lastRevealedSelectionNodeId = useRef<ProjectionNodeId | undefined>(
+    undefined,
+  );
   const rowIndexById = useMemo(() => indexNetworkExplorerRows(rows), [rows]);
 
   const activeIndex =
@@ -195,7 +199,12 @@ export const NetworkExplorer = memo(function NetworkExplorer({
   );
 
   useEffect(() => {
-    if (selectedNodeId === undefined) return;
+    const shouldReveal = shouldRevealNetworkExplorerSelection(
+      lastRevealedSelectionNodeId.current,
+      selectedNodeId,
+    );
+    lastRevealedSelectionNodeId.current = selectedNodeId;
+    if (!shouldReveal) return;
     if (
       typeof document !== 'undefined' &&
       scrollerRef.current?.contains(document.activeElement)

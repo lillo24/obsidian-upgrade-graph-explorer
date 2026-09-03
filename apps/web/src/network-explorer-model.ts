@@ -389,6 +389,13 @@ export function indexNetworkExplorerRows(
   return new Map(rows.map((row, index) => [row.id, index]));
 }
 
+export function shouldRevealNetworkExplorerSelection(
+  previousNodeId: ProjectionNodeId | undefined,
+  selectedNodeId: ProjectionNodeId | undefined,
+): boolean {
+  return selectedNodeId !== undefined && selectedNodeId !== previousNodeId;
+}
+
 export function networkExplorerVirtualWindow(args: {
   readonly rowCount: number;
   readonly scrollTop: number;

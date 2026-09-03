@@ -137,6 +137,8 @@ canonical truth, or own a platform storage implementation.
   logical node/adjacency list. Top-level File/Heading/Block/Diagnostic rows
   synchronize controlled canvas selection; projected parent/child and
   incoming/outgoing rows select and center their existing projected endpoint.
+  External selection reveal is edge-triggered, so ordinary scrolling and row
+  virtualization never pull the drawer back to an unchanged selected root.
   Expansion, active row, scroll position, and drawer visibility are transient
   presentation state. `../network-explorer-model.ts` owns deterministic source
   ordering, one-pass projected-edge indexes, flattened rows, stale-expansion
