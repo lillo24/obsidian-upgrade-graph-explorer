@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
+import { createNetworkExplorerFolders } from '../network-explorer-folders';
 import type { GraphSelection } from '@icarus-graph-explorer/renderer-reactflow';
 import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
 
@@ -16,6 +17,7 @@ function node(
 ): NetworkExplorerNode {
   return {
     id,
+    sourcePath: `${id}.md`,
     entityId: `canonical:${id}`,
     glyph: '▰',
     kindLabel: 'File',
@@ -23,14 +25,16 @@ function node(
     secondary: `${id}.md · L1:C1`,
     focusRoot: false,
     focusDistance: null,
-    internalReferenceCount: 0,
-    adjacency: [],
     ...overrides,
   };
 }
 
 function model(nodes: readonly NetworkExplorerNode[]): NetworkExplorerModel {
-  return { nodes, nodeById: new Map(nodes.map((item) => [item.id, item])) };
+  return {
+    nodes,
+    nodeById: new Map(nodes.map((item) => [item.id, item])),
+    ...createNetworkExplorerFolders(nodes),
+  };
 }
 
 function renderExplorer(
@@ -59,10 +63,19 @@ function renderExplorer(
       onFocusNode={() => undefined}
       onInspectNode={() => undefined}
       onHideFile={() => undefined}
-      expandedNodeIds={new Set()}
+      folderState={new Map()}
+      savedQueries={{
+        activeQuery: '',
+        savedFilters: [],
+        savedFiltersStatus: '',
+        savedFiltersWritable: true,
+        onApplySavedFilter: () => undefined,
+        onDeleteSavedFilter: () => undefined,
+        onSaveCurrentQuery: () => undefined,
+      }}
       model={explorerModel}
       onClose={() => undefined}
-      onExpandedNodeIdsChange={() => undefined}
+      onFolderStateChange={() => undefined}
       onSelectNode={() => undefined}
       selection={selection}
     />,
@@ -74,7 +87,6 @@ describe('Network Explorer drawer', () => {
     const root = node('source', {
       focusRoot: true,
       visualGroupName: 'Core notes',
-      internalReferenceCount: 2,
     });
     const markup = renderExplorer(model([root, node('target')]), {
       kind: 'node',
@@ -98,11 +110,48 @@ describe('Network Explorer drawer', () => {
     expect(markup).not.toContain('>Advanced query<');
     expect(markup).not.toContain('QUERY1:');
     expect(markup).toContain('class="network-explorer__close"');
+    expect(
+      (markup.match(/<div\b[^>]*>/gu) ?? []).filter(
+        (tag) =>
+          tag.includes('role="treeitem"') && tag.includes('tabindex="0"'),
+      ),
+    ).toHaveLength(1);
     // One roving tree row plus its explicitly keyboard-reachable Actions button.
     expect(markup.match(/tabindex="0"/gu)).toHaveLength(2);
     expect(markup).toContain('aria-label="Actions for source.md"');
     expect(markup).toContain('data-graph-history-shortcuts="off"');
     expect(markup).toContain('class="network-explorer__controls"');
+  });
+
+  it('discloses only real folders, labels diagnostics, and exposes node Actions', () => {
+    const markup = renderExplorer(
+      model([
+        node('note', { sourcePath: 'Notes/Deep/Note.md' }),
+        node('heading', {
+          sourcePath: 'Notes/Deep/Note.md',
+          kindLabel: 'Heading',
+          glyph: '◇',
+        }),
+        node('missing', { kindLabel: 'Diagnostic', glyph: '○' }),
+      ]),
+    );
+    expect(markup).toContain('aria-label="Folder, Notes"');
+    expect(markup).toContain('aria-expanded="true"');
+    expect(markup).toContain('aria-label="Actions for note.md"');
+    expect(markup).toContain('aria-label="Actions for heading.md"');
+    expect(markup).not.toContain('Actions for Notes');
+    expect(markup).toContain('Diagnostic: missing.md');
+    expect(markup).not.toContain('aria-label="Connections');
+    expect(markup).not.toContain('network-explorer__relationship');
+    const rows = (markup.match(/<div\b[^>]*>/gu) ?? []).filter((tag) =>
+      tag.includes('role="treeitem"'),
+    );
+    expect(rows.filter((row) => row.includes('aria-expanded'))).toHaveLength(2);
+    expect(rows.filter((row) => row.includes('aria-selected'))).toHaveLength(3);
+    expect(markup).toContain('aria-label="Saved queries"');
+    expect(markup).toContain('title="Saved queries"');
+    expect(markup).toContain('network-explorer__saved-queries-icon');
+    expect(markup).not.toContain('>Saved queries</button>');
   });
 
   it('keeps stress-scale DOM bounded to the initial viewport and overscan', () => {
@@ -121,7 +170,7 @@ describe('Network Explorer drawer', () => {
     expect(markup).not.toContain('node-4999.md');
   });
 
-  it('shows a canonical File override indicator without adding actions/sizes to other node kinds', () => {
+  it('shows size only for canonical Files while retaining actions for every node kind', () => {
     const nodes = [
       node('file'),
       node('heading', { kindLabel: 'Heading' }),
@@ -138,9 +187,8 @@ describe('Network Explorer drawer', () => {
     );
     expect(markup).toContain('File size: 1.50×');
     expect(markup).not.toContain('Custom Network size');
-    expect(markup).toContain('aria-label="Actions for file.md"');
-    for (const name of ['heading', 'block', 'diagnostic'])
-      expect(markup).not.toContain(`aria-label="Actions for ${name}.md"`);
+    for (const name of ['file', 'heading', 'block', 'diagnostic'])
+      expect(markup).toContain(`aria-label="Actions for ${name}.md"`);
     expect(renderExplorer(model([node('file')]))).not.toContain(
       'network-explorer__size-badge',
     );

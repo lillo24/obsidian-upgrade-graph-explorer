@@ -3,6 +3,7 @@ import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { createNetworkExplorerFolders } from '../network-explorer-folders';
 import { NetworkExplorer } from './NetworkExplorer';
 import type {
   NetworkExplorerModel,
@@ -21,12 +22,11 @@ const nodes: readonly NetworkExplorerNode[] = Array.from(
     secondary: `Node ${index}.md`,
     focusRoot: false,
     focusDistance: null,
-    internalReferenceCount: 0,
-    adjacency: [],
   }),
 );
 const model: NetworkExplorerModel = {
   nodes,
+  ...createNetworkExplorerFolders(nodes),
   nodeById: new Map(nodes.map((node) => [node.id, node])),
 };
 
@@ -60,10 +60,19 @@ describe('Network Explorer graph reveal and keyboard scrolling', () => {
       onFocusNode: vi.fn(),
       onInspectNode: vi.fn(),
       onHideFile: vi.fn(),
-      expandedNodeIds: new Set(),
+      folderState: new Map(),
+      savedQueries: {
+        activeQuery: '',
+        savedFilters: [],
+        savedFiltersStatus: '',
+        savedFiltersWritable: true,
+        onApplySavedFilter: vi.fn(),
+        onDeleteSavedFilter: vi.fn(),
+        onSaveCurrentQuery: vi.fn(),
+      },
       model,
       onClose: vi.fn(),
-      onExpandedNodeIdsChange: vi.fn(),
+      onFolderStateChange: vi.fn(),
       onSelectNode: vi.fn(),
       selection: null,
     };
@@ -183,5 +192,68 @@ describe('Network Explorer graph reveal and keyboard scrolling', () => {
     await render({ revealRequest: { key: 1, nodeId: 'missing' } });
     expect(tree().scrollTop).toBe(0);
     expect(row(0)).not.toBeNull();
+  });
+
+  it('opens confirmed-click ancestors before consuming the request and does not reopen them during ordinary updates', async () => {
+    const nested = nodes.map((node) => ({
+      ...node,
+      sourcePath: `One/Two/Three/${node.id}.md`,
+    }));
+    const nestedModel = {
+      nodes: nested,
+      nodeById: new Map(nested.map((node) => [node.id, node])),
+      ...createNetworkExplorerFolders(nested),
+    };
+    const onFolderStateChange = vi.fn();
+    await render({ model: nestedModel, onFolderStateChange });
+    expect(container.querySelectorAll('[role="treeitem"]')).toHaveLength(3);
+    await render({
+      selection: { kind: 'node', id: 'node-70' },
+      deferSelectionReveal: true,
+    });
+    expect(onFolderStateChange).not.toHaveBeenCalled();
+    await render({ revealRequest: { key: 1, nodeId: 'node-70' } });
+    expect(onFolderStateChange).toHaveBeenCalledTimes(1);
+    const opened = onFolderStateChange.mock.calls[0]![0];
+    expect(opened.get('One/Two/Three')).toBe(true);
+    await render({ folderState: opened });
+    expect(tree().scrollTop).toBe(73 * 56);
+    expect(
+      container.querySelector('[aria-selected="true"]')?.textContent,
+    ).toContain('Node 70');
+    expect(document.activeElement?.getAttribute('aria-selected')).not.toBe(
+      'true',
+    );
+    await render({ folderState: new Map([['One/Two/Three', false]]) });
+    expect(container.querySelectorAll('[role="treeitem"]')).toHaveLength(3);
+    expect(onFolderStateChange).toHaveBeenCalledTimes(1);
+    await render({ revealRequest: { key: 2, nodeId: 'node-70' } });
+    expect(onFolderStateChange).toHaveBeenCalledTimes(2);
+  });
+
+  it('reveals new non-graph selection inside folders once, while preserving later user collapse', async () => {
+    const nested = nodes.map((node) => ({
+      ...node,
+      sourcePath: `One/Two/Three/${node.id}.md`,
+    }));
+    const onFolderStateChange = vi.fn();
+    await render({
+      model: {
+        nodes: nested,
+        nodeById: new Map(nested.map((node) => [node.id, node])),
+        ...createNetworkExplorerFolders(nested),
+      },
+      onFolderStateChange,
+    });
+    await render({ selection: { kind: 'node', id: 'node-70' } });
+    expect(onFolderStateChange).toHaveBeenCalledTimes(1);
+    await render({ folderState: onFolderStateChange.mock.calls[0]![0] });
+    expect(tree().scrollTop).toBe(74 * 56 - 560);
+    expect(
+      container.querySelector('[aria-selected="true"]')?.textContent,
+    ).toContain('Node 70');
+    await render({ folderState: new Map([['One', false]]) });
+    expect(container.querySelectorAll('[role="treeitem"]')).toHaveLength(1);
+    expect(onFolderStateChange).toHaveBeenCalledTimes(1);
   });
 });

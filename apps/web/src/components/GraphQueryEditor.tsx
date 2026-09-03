@@ -117,24 +117,20 @@ export const GraphQueryEditor = memo(function GraphQueryEditor({
           {queryIssue}
         </p>
       )}
-      {!compact || dirty ? (
+      {!compact ? (
         <div className="advanced-graph-query__actions">
-          {compact ? (
-            <span>Draft not applied</span>
-          ) : (
-            <>
-              <button onClick={onApply} type="button">
-                Apply query
-              </button>
-              <button
-                disabled={activeQuery.length === 0 && queryDraft.length === 0}
-                onClick={onClear}
-                type="button"
-              >
-                Clear query
-              </button>
-            </>
-          )}
+          <>
+            <button onClick={onApply} type="button">
+              Apply query
+            </button>
+            <button
+              disabled={activeQuery.length === 0 && queryDraft.length === 0}
+              onClick={onClear}
+              type="button"
+            >
+              Clear query
+            </button>
+          </>
           {dirty ? (
             <button onClick={onResetDraft} type="button">
               Reset draft

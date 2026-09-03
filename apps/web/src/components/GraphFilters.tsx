@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 
 import type { EntityKind } from '@icarus-graph-explorer/core';
 import type {
@@ -18,6 +18,7 @@ import {
   GraphQueryEditor,
   type GraphQueryEditorState,
 } from './GraphQueryEditor';
+import { SavedGraphQueries } from './SavedGraphQueries';
 import { activeGraphFilterCount } from './graph-filter-count';
 import { activateGraphFiltersOverlay } from './graph-filters-overlay';
 
@@ -76,8 +77,6 @@ export const GraphFilters = memo(function GraphFilters({
   const panelRef = useRef<HTMLElement>(null);
   const filters = state.filters;
   const activeQuery = filters?.query ?? '';
-  const [savedFilterName, setSavedFilterName] = useState('');
-  const [savedFilterIssue, setSavedFilterIssue] = useState<string>();
   const displayedReferenceStatuses =
     rendererMode === 'global' && filters?.referenceStatuses === undefined
       ? (['resolved'] as const)
@@ -119,12 +118,6 @@ export const GraphFilters = memo(function GraphFilters({
       () => onOpenChange(false),
     );
   }, [onOpenChange, open]);
-
-  const saveCurrentQuery = useCallback(() => {
-    const error = onSaveCurrentQuery(savedFilterName);
-    setSavedFilterIssue(error);
-    if (error === undefined) setSavedFilterName('');
-  }, [onSaveCurrentQuery, savedFilterName]);
 
   return (
     <div className="graph-filters">
@@ -300,78 +293,23 @@ export const GraphFilters = memo(function GraphFilters({
             </fieldset>
             {queryInNetworkExplorer ? (
               <p className="graph-filter-note">
-                Advanced query is edited in Network Explorer.
+                Query and Saved queries are available in Network Explorer.
               </p>
             ) : (
               <GraphQueryEditor {...queryEditor} idPrefix="filters-query" />
             )}
-            <section
-              aria-labelledby="saved-filters-heading"
-              className="saved-graph-filters"
-            >
-              <h4 id="saved-filters-heading">Saved Filters</h4>
-              <p>{savedFiltersStatus}</p>
-              <label htmlFor="saved-filter-name">
-                Name
-                <input
-                  autoComplete="off"
-                  id="saved-filter-name"
-                  maxLength={64}
-                  onChange={(event) => {
-                    setSavedFilterName(event.currentTarget.value);
-                    setSavedFilterIssue(undefined);
-                  }}
-                  value={savedFilterName}
-                />
-              </label>
-              <button
-                disabled={!savedFiltersWritable || activeQuery.length === 0}
-                onClick={saveCurrentQuery}
-                type="button"
-              >
-                Save current query
-              </button>
-              {savedFilterIssue === undefined ? null : (
-                <p className="graph-filter-error" role="alert">
-                  {savedFilterIssue}
-                </p>
-              )}
-              {savedFilters.length === 0 ? (
-                <p>No saved filters for this workspace.</p>
-              ) : (
-                <ul>
-                  {savedFilters.map((savedFilter) => (
-                    <li key={savedFilter.name}>
-                      <span>
-                        <strong>{savedFilter.name}</strong>
-                        <code>{savedFilter.query}</code>
-                      </span>
-                      <span>
-                        <button
-                          onClick={() => {
-                            onApplySavedFilter(savedFilter.query);
-                          }}
-                          type="button"
-                        >
-                          Apply
-                        </button>
-                        <button
-                          disabled={!savedFiltersWritable}
-                          onClick={() => {
-                            setSavedFilterIssue(
-                              onDeleteSavedFilter(savedFilter.name),
-                            );
-                          }}
-                          type="button"
-                        >
-                          Delete
-                        </button>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+            {queryInNetworkExplorer ? null : (
+              <SavedGraphQueries
+                activeQuery={activeQuery}
+                idPrefix="filters-saved-queries"
+                onApplySavedFilter={onApplySavedFilter}
+                onDeleteSavedFilter={onDeleteSavedFilter}
+                onSaveCurrentQuery={onSaveCurrentQuery}
+                savedFilters={savedFilters}
+                savedFiltersStatus={savedFiltersStatus}
+                savedFiltersWritable={savedFiltersWritable}
+              />
+            )}
           </div>
         </section>
       ) : null}

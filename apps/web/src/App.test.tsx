@@ -94,24 +94,18 @@ describe('graph-first explorer shell', () => {
     );
     expect(markup).toContain('aria-label="Layout"');
     expect(markup).toContain(
-      '<button aria-pressed="true" type="button">Hierarchy</button>',
+      '<button aria-pressed="true" type="button">Network</button>',
     );
-    expect(markup).toContain('aria-label="Hierarchy depth"');
-    expect(markup).toContain('>Hierarchy depth<select');
-    expect(markup).toContain('>Files only</option>');
-    expect(markup).toContain('>1 level</option>');
-    expect(markup).toContain('>2 levels</option>');
-    expect(markup).toContain('>3 levels</option>');
+    expect(markup).not.toContain('aria-label="Hierarchy depth"');
+    expect(markup).not.toContain('>Hierarchy</button>');
     expect(markup).not.toContain('>Documents</button>');
     expect(markup).not.toContain('>Top-Level</button>');
     expect(markup).not.toContain('Focus Selected');
     expect(markup).not.toContain('aria-label="Focus controls"');
-    expect(markup).toContain('data-focus-appearance="inverted"');
     expect(markup).toContain('aria-label="Open Inspector"');
     expect(markup).not.toContain('>Inspector</button>');
-    expect(markup).toContain('Laying out graph…');
+    expect(markup).toContain('Loading All Network');
     expect(markup).not.toContain('aria-label="Fit graph to view"');
-    expect(markup).toContain('aria-label="Maximize graph"');
     expect(markup).not.toContain('>Maximize Graph</button>');
     expect(markup).not.toContain('diagnostic-evidence');
     expect(markup).not.toContain('Filter Evidence');
@@ -209,7 +203,13 @@ describe('graph-first explorer shell', () => {
         maximized={false}
         onMaximizedChange={() => undefined}
         snapshot={report.snapshot}
-        storage={storage}
+        storage={{
+          ...storage,
+          getItem: (key) =>
+            key === GRAPH_PREFERENCES_STORAGE_KEY
+              ? '{"showExperimentalAllHierarchy":true}'
+              : null,
+        }}
       />,
     );
     const maximizedMarkup = renderToStaticMarkup(
@@ -218,7 +218,13 @@ describe('graph-first explorer shell', () => {
         maximized
         onMaximizedChange={() => undefined}
         snapshot={report.snapshot}
-        storage={storage}
+        storage={{
+          ...storage,
+          getItem: (key) =>
+            key === GRAPH_PREFERENCES_STORAGE_KEY
+              ? '{"showExperimentalAllHierarchy":true}'
+              : null,
+        }}
       />,
     );
 
@@ -294,7 +300,15 @@ describe('graph-first explorer shell', () => {
         maximized={false}
         onMaximizedChange={() => undefined}
         snapshot={report.snapshot}
-        storage={{ ...storage, getItem: () => persisted }}
+        storage={{
+          ...storage,
+          getItem: (key) =>
+            key === GRAPH_PREFERENCES_STORAGE_KEY
+              ? '{"showExperimentalAllHierarchy":true}'
+              : key.includes('view')
+                ? persisted
+                : null,
+        }}
       />,
     );
 
@@ -378,7 +392,7 @@ describe('graph-first explorer shell', () => {
           ...storage,
           getItem: (key) =>
             key === GRAPH_PREFERENCES_STORAGE_KEY
-              ? '{"trackpadZoomMode":"pinch-zoom"}'
+              ? '{"trackpadZoomMode":"pinch-zoom","showExperimentalAllHierarchy":true}'
               : null,
         }}
       />,

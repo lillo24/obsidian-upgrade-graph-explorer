@@ -1043,6 +1043,7 @@ h2 {
 }
 
 .network-explorer__query {
+  position: relative;
   padding: 0.55rem 0.75rem;
 }
 
@@ -1050,6 +1051,11 @@ h2 {
   gap: 0.4rem;
   padding-top: 0;
   border-top: 0;
+}
+
+.network-explorer .advanced-graph-query__label {
+  padding-right: 2.5rem;
+  font-size: 0.84rem;
 }
 
 .network-explorer .advanced-graph-query--compact textarea {
@@ -1307,31 +1313,10 @@ h2 {
   border-bottom: 1px solid #e3e9ec;
 }
 
-.network-explorer__virtual-row--adjacency {
-  background: #f4f8f9;
-}
-
-.network-explorer__disclosure,
-.network-explorer__disclosure-placeholder {
-  width: 2rem;
-  min-width: 2rem;
-  height: 100%;
-}
-
-.network-explorer__disclosure {
-  display: grid;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
+.network-explorer__folder-disclosure {
+  width: 0.65rem;
+  flex: 0 0 auto;
   color: #526b77;
-  background: transparent;
-  cursor: pointer;
-  place-items: center;
-}
-
-.network-explorer__disclosure:hover {
-  color: #0b6670;
-  background: #e8f2f3;
 }
 
 .network-explorer__treeitem {
@@ -1341,7 +1326,8 @@ h2 {
   flex: 1;
   gap: 0.55rem;
   align-items: center;
-  padding: 0.35rem 0.55rem 0.35rem 0.15rem;
+  padding: 0.35rem 0.55rem 0.35rem
+    calc(0.65rem + var(--network-row-indent, 0rem));
   border: 0;
   border-radius: 0;
   color: inherit;
@@ -1360,12 +1346,7 @@ h2 {
   box-shadow: inset 3px 0 #167985;
 }
 
-.network-explorer__treeitem--adjacency {
-  padding-left: 0.7rem;
-}
-
-.network-explorer__kind-glyph,
-.network-explorer__relationship {
+.network-explorer__kind-glyph {
   width: 1.15rem;
   min-width: 1.15rem;
   color: #52717d;
@@ -1373,9 +1354,69 @@ h2 {
   text-align: center;
 }
 
-.network-explorer__relationship {
-  color: #0d727c;
-  font-size: 0.95rem;
+.network-explorer__node-actions {
+  display: grid;
+  width: 1.75rem;
+  min-height: 1.75rem;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  color: #395966;
+  background: transparent;
+  font-size: 1rem;
+  cursor: pointer;
+  place-items: center;
+}
+
+.network-explorer__node-actions:hover {
+  border-color: #b9cbd3;
+  background: #edf4f6;
+}
+
+.network-explorer__saved-queries {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.75rem;
+  display: grid;
+  width: 2rem;
+  min-height: 2rem;
+  margin: 0;
+  padding: 0.25rem;
+  border: 1px solid #b9cbd3;
+  border-radius: 0.5rem;
+  color: #395966;
+  background: #edf4f6;
+  cursor: pointer;
+  place-items: center;
+}
+
+.network-explorer__saved-queries:hover {
+  border-color: #6e929e;
+  background: #dceff0;
+}
+
+.network-explorer__saved-queries-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.network-saved-queries {
+  position: fixed;
+  z-index: 145;
+  width: min(24rem, calc(100vw - 1rem));
+  max-height: calc(100dvh - 1rem);
+  overflow: auto;
+  padding: 0.65rem;
+  border: 1px solid #99acb6;
+  border-radius: 0.65rem;
+  background: #fff;
+  box-shadow: 0 0.5rem 2rem rgb(16 35 45 / 25%);
+  overscroll-behavior: contain;
+}
+
+.network-saved-queries > .network-explorer__close {
+  margin: 0 0 0.4rem auto;
 }
 
 .network-explorer__row-copy {

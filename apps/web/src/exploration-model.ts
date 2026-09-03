@@ -3,9 +3,40 @@ import type {
   LocalLayoutMode,
 } from '@icarus-graph-explorer/view-state';
 import type { GraphVisualVariant } from '@icarus-graph-explorer/renderer-reactflow';
+import type { ViewProjectionState } from '@icarus-graph-explorer/view-projection';
 
 export type ExplorationScope = 'all' | 'focus';
 export type ExplorationLayout = 'network' | 'hierarchy';
+
+export interface ExplorationAvailability {
+  readonly showExperimentalAllHierarchy: boolean;
+  readonly allNetworkAvailable: boolean;
+}
+
+export function allHierarchyAvailable(
+  availability: ExplorationAvailability,
+): boolean {
+  return (
+    availability.showExperimentalAllHierarchy ||
+    !availability.allNetworkAvailable
+  );
+}
+
+/** All activation routes share this policy; callers reconcile missing roots first. */
+export function resolveAvailablePresentationMode(
+  requested: GraphPresentationMode,
+  state: ViewProjectionState,
+  availability: ExplorationAvailability,
+  preferredAll: 'global' | 'structure' = 'global',
+): GraphPresentationMode {
+  if (requested === 'local') {
+    if (state.focus !== undefined) return 'local';
+    requested = preferredAll;
+  }
+  if (requested === 'structure' && allHierarchyAvailable(availability))
+    return 'structure';
+  return availability.allNetworkAvailable ? 'global' : 'structure';
+}
 
 export function explorationScope(
   presentationMode: GraphPresentationMode,

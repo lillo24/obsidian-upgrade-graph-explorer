@@ -77,10 +77,9 @@ export function resolveLocalEdgeStyle(
         ? '#7c8790'
         : attributes.color
       : '#e1e8ea',
-    hidden:
-      context.lod === 'far-local' &&
-      !hierarchy &&
-      !(context.hoverActive && context.relatedToHover),
+    // Focus is already a bounded projection: far LOD simplifies styling, never
+    // removes its reference relationships. All Network has a separate policy.
+    hidden: false,
     size:
       attributes.size *
       (context.lod === 'far-local'

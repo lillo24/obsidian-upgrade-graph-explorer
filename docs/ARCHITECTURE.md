@@ -219,12 +219,12 @@ mechanically excluded from production source.
 The web-owned `network-explorer-model.ts` is a narrower projection read model.
 It receives one completed Network `ViewProjection`, the snapshot-scoped
 inspection lookup, and the already-resolved Visual Group presentation map. It
-orders the Focus root first, then canonical entities by source position, then
-diagnostics; indexes projected hierarchy and reference edges once into
-parent/child and incoming/outgoing adjacency; and retains aggregated
-`referenceIds.length` rather than reconstructing occurrences. Hidden canonical
+orders canonical entities by source path/position, then diagnostics, without
+reading projected edges. `network-explorer-folders.ts` derives only real source
+folders represented by those nodes, with no canonical folder entities or
+independent vault enumeration. Hidden canonical
 entities, Graphology, Sigma sessions, layout coordinates, and renderer events
-are outside this boundary. Flattening, virtual ranges, stale expansion pruning,
+are outside this boundary. Iterative folder flattening, virtual ranges, ancestor reveal,
 and keyboard transitions are pure derived presentation operations.
 
 `packages/renderer-reactflow` depends inward on view-projection and adapts one
@@ -680,13 +680,19 @@ logical row list; offscreen activation scrolls before focus is restored. A row
 selection writes the shared `GraphSelection` and sends exactly one Global or
 Local semantic center request at the current bookmark ratio. It creates no KG6
 action or navigation checkpoint and never asks Sigma to report topology. Canvas
-selection scrolls the matching top-level row into the virtual window without
-moving DOM focus or expanding adjacency. That reveal runs once per selection
+selection opens the matching source-folder ancestors and scrolls its row into
+the virtual window without moving DOM focus. That reveal runs once per selection
 change; scrolling and virtual-window updates do not reassert an unchanged
 selection. The overlay never resizes the graph;
 it may coexist with Inspector above 900 px, while the last-opened drawer wins at
 the existing narrow breakpoint. Drawer, expansion, active-row, and scroll state
-are memory-only and absent from schema v3.
+are memory-only and absent from schema v3. NETWORKPOLISH1 gives disclosure only
+to folders: depths 1/2 default open, 3+ closed (root excluded); path-keyed overrides
+survive ordinary query/live membership changes and sidebar remounts until the
+source session ends. Files never disclose. Projected headings/blocks visually
+follow their File, or remain under the real folder when File is filtered out;
+their keyboard/ARIA parent is the source folder. Diagnostics trail at root.
+Folder and Saved queries disclosure performs no projection, workspace, or layout work.
 
 KG14B3 adds QUERY1 and contextual actions to that projection companion. The
 single applied formula remains `ViewProjectionState.filters.query`; the shared
@@ -694,14 +700,18 @@ controlled editor appears in Network Explorer for Network and Filters for
 Hierarchy. Its transient controller stays at GraphExplorer level. Clean drafts
 follow external/history updates, dirty drafts survive placement changes, Saved
 Filter Apply intentionally adopts its formula, and Reset draft mutates no graph
-state. There is no new persisted hidden-files array or schema version.
+state. Compact Network omits visible dirty/reset clutter, not the draft controller
+or atomic mutation safety. `SavedGraphQueries` shares the existing registry UI
+between Hierarchy Filters and Network's local Saved queries popover; Network
+Filters duplicates neither query nor Saved queries. Apply still uses semantic
+QUERY1/history. There is no new persisted hidden-files array or schema version.
 
 Hidden chips are the KG14B1 global exact-path exclusion list, not source-inventory
 state. A pure planner applies add/remove independently to the active query and a
 valid dirty draft before either is adopted. Parse/limit failures block both;
 each successful semantic mutation uses one normal set-query history checkpoint.
 No chip operation centers or fits the returning graph. One contextual menu
-normalizes both row kinds through the current model, uses canonical entity/path
+accepts only graph-node rows through the current model, uses canonical entity/path
 metadata, and is invalidated by virtual scrolling or projection replacement.
 Focus calls the existing All entry or Local navigation pipeline. Inspect changes
 controlled selection and opens the existing responsive Inspector without layout
@@ -983,9 +993,12 @@ Inspector Primary/Also matches. Existing GROUP1A renderer operation oracles
 remain the style-only regression gate.
 
 KG14B2 adds projection-model tests for deterministic File/Heading/Block/
-Diagnostic presentation, source/root ordering, symmetric projected adjacency,
-aggregated reference counts, internal-link metadata, stale expansion pruning,
-and every tree key transition. Stress-scale virtual-range and server-rendered
+Diagnostic presentation and every tree key transition. NETWORKPOLISH1 replaces
+adjacency tests with projection-only source folders, depth defaults/overrides,
+filtered-file reachability, trailing diagnostics, ancestor reveal, and folder-only
+actions. Local edge tests require far references to remain visible through camera
+ratio 6 while preserving labels, hierarchy widths, and separate Global behavior.
+Stress-scale virtual-range and server-rendered
 DOM tests bound mounted rows to viewport plus overscan. App shell tests retain
 lazy Sigma loading while proving that only Network layouts expose the closed
 drawer controls. Browser and release-desktop QA cover responsive coexistence,
@@ -996,3 +1009,14 @@ touchpad behavior.
 ## Changing these decisions
 
 Change an expensive decision through a focused ADR that supplies evidence: a product requirement, compatibility constraint, measurement, or demonstrated failure of the current boundary. Roadmap speculation alone is not evidence. Keep documentation clear about what is implemented now, what is an invariant, and what is only planned.
+
+## HIER0 product exposure and geometry
+
+All Hierarchy is retained as an experimental whole-vault presentation, hidden by
+default and available for All Network failure recovery. Focus Hierarchy remains
+supported normally. A web-owned pure availability policy gates all activation
+routes; the boolean is a general v1 preference, not schema-v3 view state.
+Renderer-owned rectangle geometry now packs the immediate Focus seed and reserves
+entities/diagnostics during final diagnostic placement. Dagre topology, canonical
+semantics, Focus document membership and fixed dimensions are unchanged. This is
+a collision baseline, not the future Focus Schematic/File-module model.

@@ -49,7 +49,8 @@ apps/web/
     spatial-overrides/ Workspace persistence/session policy for normalized All-Network folder anchors.
     navigation-history.ts Bounded session history over semantic graph checkpoints.
     graph-history-shortcuts.ts Exact graph-context Back/Forward shortcut policy.
-    network-explorer-model.ts Projection-only node/adjacency indexes, row flattening, keyboard plans, and virtual ranges.
+    network-explorer-model.ts Projection-only source ordering, keyboard plans, and virtual ranges.
+    network-explorer-folders.ts Canonical source folders, transient depth defaults/overrides, and iterative row flattening.
     network-explorer-context.ts Logical context targets, action eligibility, and menu keyboard planning.
     network-explorer-query-actions.ts Atomic applied/draft QUERY1 exclusion planning and hidden-path labels.
     persistence/      Stable-report eligibility, hydration, and localStorage adapter.
@@ -188,23 +189,35 @@ schema.
 
 All + Network and Focus + Network also expose a transient **Network Explorer**
 from the toolbar or left-edge handle. It is a DOM `tree` over the active
-`ViewProjection`, not a second graph: top-level File, Heading, Block, and
-Diagnostic rows plus expanded parent/child and incoming/outgoing rows use only
-the projection's already-aggregated nodes and edges. A fixed-height flattened
+`ViewProjection`, not a second graph: File, Heading, and Block rows are grouped
+by their canonical source folders, with diagnostics trailing at root. Only
+folders disclose; headings/blocks remain visible below their projected File,
+or directly in the real folder if that File is filtered out. Folders at depths
+1/2 default open and 3+ closed, excluding root. Path-keyed memory-only overrides
+survive ordinary query/live membership changes and drawer remounts, but reset
+with the source session. The sidebar no longer reads edges. A fixed-height flattened
 model virtualizes the viewport with overscan, while roving focus and
 Arrow/Home/End/Enter/Space behavior operate over every logical row, including
 offscreen rows. Row selection writes the existing controlled graph selection
 and centers the matching Sigma node at the current semantic zoom ratio without
 creating graph history, projection, topology, or layout work. Canvas selection
-reveals the matching top-level row without moving DOM focus or expanding it.
+reveals the matching row and its source-folder ancestors without moving DOM
+focus; unchanged selection never pulls ordinary scrolling back to the root.
 
 KG14B3 makes this drawer the Network precision control surface. Its Advanced
 query editor is the same controlled component used in Hierarchy Filters; Network
-Filters keeps Saved Filters but no duplicate editor. `GraphExplorer` owns the
+Filters duplicates neither query editor nor Saved queries management. Network
+Explorer exposes the existing registry behind a compact, viewport-bounded
+bookmark beside the Query label and its viewport-bounded panel; Hierarchy
+retains management in Filters. Opening
+folders, the drawer, or Saved queries never projects or requests layout/workspace
+work. `GraphExplorer` owns the
 transient draft, so closing the drawer or switching layouts preserves it. A clean
 draft follows applied-query/history changes; a dirty draft remains untouched.
-Saved Filter Apply explicitly adopts that formula, and Reset draft abandons only
-the draft. The sole semantic query remains `ViewProjectionState.filters.query`.
+Saved Query Apply explicitly adopts that formula through normal history. Compact
+Network hides dirty/reset copy but retains errors and Apply/Clear icons;
+Hierarchy's Reset draft abandons only the draft. The sole semantic query remains
+`ViewProjectionState.filters.query`.
 
 Hidden-file chips derive from QUERY1 global exact-path exclusions, including
 manually authored clauses and paths no longer present in the source. Hide and
@@ -213,8 +226,8 @@ Valid dirty drafts receive the same operation independently; invalid drafts or
 query-limit failures block both changes atomically. Each successful semantic
 change uses the existing set-query history path, with no extra Fit or centering.
 
-Right-click, Shift+F10, or the ContextMenu key opens one shared menu for a row's
-logical target (adjacency rows target their endpoint). Focus reuses existing
+Right-click, Shift+F10, the ContextMenu key, or the visible Actions button opens
+one shared menu for a graph-node row. Folders have no node actions. Focus reuses existing
 All-entry/Local-navigation pipelines; Inspect selects and opens the existing
 Inspector without graph history. Hide file applies to the whole canonical source
 file, including when invoked on a heading/block; diagnostics, the active Focus
@@ -440,3 +453,28 @@ pnpm --filter @icarus-graph-explorer/web build
 pnpm dev
 pnpm desktop:dev
 ```
+
+## HIER0 availability
+
+All opens in Network by default. All Hierarchy remains intact behind Settings >
+Graph > Experimental > Show All Hierarchy (Off by default), or as emergency
+recovery when All Network is unavailable. Focus always exposes Network and
+Hierarchy. The collapsed Experimental disclosure is transient; its checkbox is a
+general graph preference in the existing v1 record, separate from schema-v3 views.
+Enabling it does not prepare a projection/layout or change the active layout.
+Disabling it while All Hierarchy is active performs the normal anchored Network
+transition and retains renderer viewport bookmarks. Other graph controls patch
+one complete preference record; failed storage writes preserve session behavior.
+
+`exploration-model.ts` owns the pure availability policy. GraphExplorer applies
+it to hydration (after saved metadata is restored), Layout, history, Focus exit,
+live root removal, reset and renderer recovery. `navigation-history.ts` normalizes
+inaccessible checkpoints to available modes and coalesces adjacent equivalent
+semantic states created by normalization, retaining renderer bookmarks. Exact
+Heading/Block Search, breadcrumbs and Inspector navigation reuse the Local
+navigation planner to reveal/select/center the target in Focus Hierarchy when
+All Hierarchy is hidden. Explicit full-hierarchy actions respect the same gate.
+Focus Network failure offers Focus Hierarchy or Return to All; it does not enable
+the experiment. No canonical, QUERY1, Saved Filter, or view schema changes occur.
+
+See [HIER0 validation](../../docs/HIER0_VALIDATION.md) for measurements and gates.

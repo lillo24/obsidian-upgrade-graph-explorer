@@ -49,6 +49,13 @@ describe('Graph Settings presentation', () => {
     expect(markup).toContain('aria-expanded="false"');
     expect(markup).toContain('Advanced controls</button>');
     expect(markup).not.toContain('Folder tendency');
+    expect(markup).toContain(
+      'aria-controls="graph-experimental-controls" aria-expanded="false"',
+    );
+    expect(markup.indexOf('Experimental</button>')).toBeGreaterThan(
+      markup.indexOf('>Graph Interaction<'),
+    );
+    expect(markup).not.toContain('Show All Hierarchy');
   });
 
   it('disables the normalized strength slider without discarding its value', () => {

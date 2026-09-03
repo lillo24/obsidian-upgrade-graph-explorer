@@ -3,6 +3,7 @@ import { useId } from 'react';
 import type { ExplorationLayout, ExplorationScope } from '../exploration-model';
 
 export function ExplorationControls({
+  allHierarchyExposed = false,
   focusDisabledReason,
   focusedRootLabel,
   layout,
@@ -11,6 +12,7 @@ export function ExplorationControls({
   onScopeChange,
   scope,
 }: {
+  readonly allHierarchyExposed?: boolean;
   readonly focusDisabledReason?: string;
   readonly focusedRootLabel?: string;
   readonly layout: ExplorationLayout;
@@ -74,13 +76,25 @@ export function ExplorationControls({
         >
           Network
         </button>
-        <button
-          aria-pressed={layout === 'hierarchy'}
-          onClick={() => onLayoutChange('hierarchy')}
-          type="button"
-        >
-          Hierarchy
-        </button>
+        {scope === 'focus' || allHierarchyExposed || networkDisabled ? (
+          <button
+            {...(scope === 'all'
+              ? {
+                  'aria-label': networkDisabled
+                    ? 'Hierarchy, Network recovery'
+                    : 'Hierarchy, experimental in All scope',
+                  title: networkDisabled
+                    ? 'All Network is unavailable; Hierarchy remains available for recovery'
+                    : 'Experimental whole-vault Hierarchy',
+                }
+              : {})}
+            aria-pressed={layout === 'hierarchy'}
+            onClick={() => onLayoutChange('hierarchy')}
+            type="button"
+          >
+            Hierarchy
+          </button>
+        ) : null}
       </div>
       {networkDisabledReason === undefined ? null : (
         <span className="visually-hidden" id={networkExplanationId}>

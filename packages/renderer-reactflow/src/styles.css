@@ -188,6 +188,16 @@
   display: none;
 }
 
+/* The fixed 156px File with a 44px disclosure target leaves 78px for text.
+   A separate compact line keeps folder-a/folder-b distinguishable at that size. */
+.entity-card--compact-schematic .compact-file-context {
+  display: block;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .compact-hierarchy-marker {
   display: inline-grid;
   width: 1.05rem;
