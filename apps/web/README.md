@@ -49,6 +49,8 @@ apps/web/
     navigation-history.ts Bounded session history over semantic graph checkpoints.
     graph-history-shortcuts.ts Exact graph-context Back/Forward shortcut policy.
     network-explorer-model.ts Projection-only node/adjacency indexes, row flattening, keyboard plans, and virtual ranges.
+    network-explorer-context.ts Logical context targets, action eligibility, and menu keyboard planning.
+    network-explorer-query-actions.ts Atomic applied/draft QUERY1 exclusion planning and hidden-path labels.
     persistence/      Stable-report eligibility, hydration, and localStorage adapter.
     report-view.ts    Pure reference/hierarchy presentation transformations.
     sample-report.json Deterministic private-safe report generated from fixtures.
@@ -182,6 +184,29 @@ offscreen rows. Row selection writes the existing controlled graph selection
 and centers the matching Sigma node at the current semantic zoom ratio without
 creating graph history, projection, topology, or layout work. Canvas selection
 reveals the matching top-level row without moving DOM focus or expanding it.
+
+KG14B3 makes this drawer the Network precision control surface. Its Advanced
+query editor is the same controlled component used in Hierarchy Filters; Network
+Filters keeps Saved Filters but no duplicate editor. `GraphExplorer` owns the
+transient draft, so closing the drawer or switching layouts preserves it. A clean
+draft follows applied-query/history changes; a dirty draft remains untouched.
+Saved Filter Apply explicitly adopts that formula, and Reset draft abandons only
+the draft. The sole semantic query remains `ViewProjectionState.filters.query`.
+
+Hidden-file chips derive from QUERY1 global exact-path exclusions, including
+manually authored clauses and paths no longer present in the source. Hide and
+chip restore use the KG14B1 helpers, preserving the rest of the Boolean query.
+Valid dirty drafts receive the same operation independently; invalid drafts or
+query-limit failures block both changes atomically. Each successful semantic
+change uses the existing set-query history path, with no extra Fit or centering.
+
+Right-click, Shift+F10, or the ContextMenu key opens one shared menu for a row's
+logical target (adjacency rows target their endpoint). Focus reuses existing
+All-entry/Local-navigation pipelines; Inspect selects and opens the existing
+Inspector without graph history. Hide file applies to the whole canonical source
+file, including when invoked on a heading/block; diagnostics, the active Focus
+root file, and already-hidden files are ineligible. Menu state is transient,
+closes on scrolling/projection invalidation, and restores mounted row focus safely.
 
 The drawer starts closed, persists nothing, overlays rather than resizes the
 canvas, and closes when Layout leaves Network. Inspector and Network Explorer

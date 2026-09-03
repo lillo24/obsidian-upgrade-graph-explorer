@@ -25,6 +25,7 @@ import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
 import type { VisualGroupMatch } from '@icarus-graph-explorer/visual-groups';
 
 interface ProvenanceInspectorProps {
+  readonly focusRequestKey?: number;
   readonly workspace: InspectionWorkspace;
   readonly projection: ViewProjection;
   readonly selection: GraphSelection | null;
@@ -885,6 +886,7 @@ function EdgeInspector({
 }
 
 export const ProvenanceInspector = memo(function ProvenanceInspector({
+  focusRequestKey,
   onClear,
   onClose,
   disclosureControl,
@@ -934,7 +936,7 @@ export const ProvenanceInspector = memo(function ProvenanceInspector({
 
   useEffect(() => {
     collapseButtonRef.current?.focus();
-  }, []);
+  }, [focusRequestKey]);
 
   return (
     <aside className="selection-panel" aria-label="Inspector">

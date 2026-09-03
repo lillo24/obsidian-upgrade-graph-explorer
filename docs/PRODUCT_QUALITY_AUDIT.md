@@ -177,7 +177,8 @@ or adding a general cache in KG14.
   every projected node, expands only projected parent/child and
   incoming/outgoing adjacency, synchronizes graph selection, and preserves zoom
   while centering. It uses bounded row virtualization and never reads renderer
-  topology or changes graph history.
+  topology. KG14B3 adds the shared QUERY1 editor and Focus/Inspect/Hide context
+  actions; only explicit semantic query/Focus actions use existing graph history.
 - **Decision required?:** No; D-01 selected Option A.
 
 ### KG14A-03 — desktop configuration is not an external-release configuration
@@ -475,6 +476,15 @@ Blocks, heading limit, and reference-status semantics are covered by projection
 and query fast-path tests. All + Network truthfully states that it is files-only
 and that entity/heading controls remain saved for Hierarchy.
 
+KG14B3 places the shared query editor in Network Explorer for both Network scopes
+and retains it in Filters for Hierarchy. A lifted transient draft survives both
+placements. Hidden chips derive only from global exact-path clauses and remain
+removable after source deletion. Hide/restore validates the active formula and
+any dirty draft atomically using KG14B1 helpers; it creates no independent hidden
+state. Context actions use existing Focus and Inspector pipelines, with guards
+for diagnostics, already-hidden paths, and the active focused file. QUERY1 live
+announcement remains KG14A-07/KG14B4 work, not part of this integration slice.
+
 Saved Filters are workspace-scoped and do not silently overwrite corruption.
 Their immediate deletion should adopt the existing guarded pattern
 (KG14A-08). A concise active-filter summary exists as the Filters badge, but a
@@ -721,9 +731,36 @@ KG14 is complete when all of the following are true:
    browser QA, release Tauri QA, physical touchpad QA, and post-merge CI pass
    without private vault artifacts.
 
-KG14A established this queue and gate. KG14B2 addresses D-01/KG14A-02 without
-starting later context-menu/query actions; the remaining queue and completion
-gate are still open, so KG14 is not marked complete.
+KG14A established this queue and gate. KG14B2 addresses D-01/KG14A-02 and KG14B3
+adds query/context-menu control over the same projection-backed surface. The
+remaining queue and completion gate are still open; KG14 is not marked complete
+and KG14B4 is not started automatically.
+
+## KG14B3 QA record
+
+The production-browser sample check covered shared editor placement, dirty draft
+survival across drawer/layout changes, invalid-draft blocking, OR-query Hide,
+Apply after Hide, manual/stale exclusions, sole-term restore, zero-result
+recovery, Back/Forward, Saved Filter save/Apply, adjacency-target Focus, Local
+reroot, and entity/diagnostic Inspect. Keyboard menu checks covered first enabled
+focus, arrows/Home/End, Enter, Escape restoration, and Tab dismissal. Pointer
+right-click, outside-click dismissal, and scroll dismissal also passed. Inspect
+kept both drawers on wide layouts and used mutual exclusion with safe fallback
+focus at 720×800. Console warnings/errors were empty. Draft typing did not move
+the scrolled virtual tree; the deterministic 5,000-node test still mounted only
+14 initial rows.
+
+The 900×400 browser check found and fixed query/chips consuming the entire tree.
+They now share one bounded scroll area, reserving the drawer heading, list label,
+and a virtual row; the retest retained 66px of independently scrollable tree.
+The controls remain keyboard reachable when that short-window area scrolls.
+
+`pnpm check` passed formatting, lint, workspace typechecks, 104 test files / 894
+tests, and the web production build. Desktop check/build passed locally; the
+release artifact includes the short-window fix. Physical Windows
+pointer/keyboard/touchpad and real-vault/live-update smoke remain the user QA
+gate; PR and post-merge CI remain separate gates. No native QA pass or KG14
+completion is claimed here.
 
 ## KG14A QA record and low-risk fixes
 
