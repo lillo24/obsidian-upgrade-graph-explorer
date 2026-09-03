@@ -2,6 +2,10 @@
 
 Icarus Graph Explorer is an early-stage, hierarchical knowledge-graph explorer for Markdown workspaces. Its intended model treats documents, their nested sections, and optional addressable blocks as distinct entities so references can retain their precise source and target locations.
 
+The source-neutral workspace includes `packages/focus-schematic`, which owns
+the HIER1 File-module semantic contract and common future-layout quality
+harness. It is not part of the production renderer graph.
+
 KG0 established the repository foundation, KG1 added the versioned canonical model, KG2 added deterministic CommonMark document/section structure parsing, KG3 added tested Obsidian syntax interpretation, KG4 added conservative workspace resolution plus validated canonical snapshot assembly, KG5 added a local diagnostic-report workflow, KG6 added renderer-independent disclosure and focus, KG7 added the projection-driven React Flow structural graph, KG8 added source-neutral provenance inspection, backlinks, canonical search, and targeted graph navigation, KG9 completed private app-owned stable identity plus local renderer-independent view restoration, KG10 added file-granular parsed-document caching with exact stable snapshot deltas, and KG11 completes the Tauri local-vault workflow from secure selection through coalesced live updates, transactional KG10 application, recovery resync, and in-place view preservation. KG12 establishes repeated baselines and Class A/B/C budgets, moves stateful KG10 plus diagnostics into a transactional W1 worker, and moves stateless Dagre layout into a latest-result-wins W3 worker.
 
 The application is local-first and read-only with respect to Markdown. The initial architecture has no backend, account, cloud upload, telemetry, or source-file write path.

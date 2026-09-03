@@ -23,6 +23,7 @@
     "benchmark:local-renderer": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:local-renderer",
     "benchmark:visual-groups": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:visual-groups",
     "analyze:focus-spacing": "pnpm --filter @icarus-graph-explorer/vault-diagnostics analyze:focus-spacing",
+    "benchmark:focus-schematic": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:focus-schematic",
     "global-renderer:dev": "pnpm --filter @icarus-graph-explorer/global-renderer-spike dev",
     "global-renderer:build": "pnpm --filter @icarus-graph-explorer/global-renderer-spike build",
     "desktop:global-renderer:build": "pnpm --filter @icarus-graph-explorer/desktop build:global-renderer",

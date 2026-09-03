@@ -1,0 +1,26 @@
+{
+  "name": "@icarus-graph-explorer/focus-schematic",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@icarus-graph-explorer/core": "workspace:*",
+    "@icarus-graph-explorer/view-projection": "workspace:*"
+  },
+  "devDependencies": {
+    "@icarus-graph-explorer/adapter-obsidian": "workspace:*",
+    "@icarus-graph-explorer/resolver-obsidian": "workspace:*",
+    "@types/node": "24.13.3"
+  }
+}

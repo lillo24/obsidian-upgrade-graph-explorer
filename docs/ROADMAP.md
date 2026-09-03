@@ -24,6 +24,15 @@ Future package names, state libraries, and implementation details are intentiona
 
 ## Parallel derived-presentation track
 
+### HIER — Focus Schematic redesign
+
+| Milestone  | Outcome                                                                      | Status        |
+| ---------- | ---------------------------------------------------------------------------- | ------------- |
+| **HIER0**  | Experimental All-Hierarchy gate and collision-safe geometry baseline.        | **Complete.** |
+| **HIER1**  | Source-neutral File-module semantic model and shared layout-quality harness. | **Complete.** |
+| **HIER2**  | Dagre/custom prototype bake-off through the HIER1 candidate contract.        | **Next.**     |
+| **HIER3+** | Production integration, folder treatment, routing, and stability policy.     | **Later.**    |
+
 This track composes with the active KG14 sequence; it does not replace or
 reorder KG14.
 

@@ -6,6 +6,11 @@ export type {
   SectionEntity,
 } from './model/entities';
 export type { EntityId, ReferenceId, WorkspaceId } from './model/ids';
+export {
+  isNormalizedWorkspaceFolderKey,
+  workspaceFolderKeyFromPath,
+  type WorkspaceFolderKey,
+} from './model/folder-key';
 export type {
   Reference,
   ReferenceKind,

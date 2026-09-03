@@ -1,5 +1,13 @@
 # Local Vault Diagnostics
 
+## Focus Schematic benchmark
+
+Run `pnpm benchmark:focus-schematic -- --profile small`, `medium`, or `hub`.
+The synthetic benchmark reports median/p95 time separately for document
+neighborhood description, detailed projection, prepared and unprepared model
+construction, independent validation, summary, serialization, and total. Its
+output contains aggregate counts and timings only and is not a CI timing gate.
+
 Status: **STABLE — KG12B adds aggregate W1 and W3 worker responsiveness evidence.**
 
 This development-only workspace package is the Node KG5 filesystem boundary.

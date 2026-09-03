@@ -1,4 +1,9 @@
-import type { WorkspaceId } from '@icarus-graph-explorer/core';
+import type {
+  WorkspaceFolderKey,
+  WorkspaceId,
+} from '@icarus-graph-explorer/core';
+
+export type { WorkspaceFolderKey } from '@icarus-graph-explorer/core';
 
 export const SPATIAL_OVERRIDE_SCHEMA_VERSION = 1 as const;
 export const NORMALIZED_FOLDER_ANCHOR_RANGE = {
@@ -6,9 +11,6 @@ export const NORMALIZED_FOLDER_ANCHOR_RANGE = {
   max: 2,
 } as const;
 export const MINIMUM_AUTOMATIC_FRAME_HALF_EXTENT = 1;
-
-/** Exact normalized workspace-relative folder path, or `.` for the root. */
-export type WorkspaceFolderKey = string;
 
 /** User-facing semantics: positive X is right and positive Y is down. */
 export interface NormalizedFolderAnchor {

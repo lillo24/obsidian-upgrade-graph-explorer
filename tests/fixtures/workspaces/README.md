@@ -1,5 +1,9 @@
 # Workspace fixtures
 
+`focus-schematic` is the synthetic Markdown-to-model fixture for HIER1. It
+covers direct incoming/outgoing references, an outgoing two-hop path, precise
+Heading resolution, two folders, and one unresolved target.
+
 Parser and adapter work uses this convention:
 
 ```text
