@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createNetworkExplorerFolders } from '../network-explorer-folders';
 import type { GraphSelection } from '@icarus-graph-explorer/renderer-reactflow';
+import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
 
 import type {
   NetworkExplorerModel,
@@ -17,6 +18,7 @@ function node(
   return {
     id,
     sourcePath: `${id}.md`,
+    entityId: `canonical:${id}`,
     glyph: '▰',
     kindLabel: 'File',
     name: `${id}.md`,
@@ -38,9 +40,14 @@ function model(nodes: readonly NetworkExplorerNode[]): NetworkExplorerModel {
 function renderExplorer(
   explorerModel: NetworkExplorerModel,
   selection: GraphSelection | null = null,
+  presentationOverrides: EntityPresentationOverrideMap = new Map(),
 ): string {
   return renderToStaticMarkup(
     <NetworkExplorer
+      presentationOverrides={presentationOverrides}
+      sizePersistenceStatus="Session only — workspace identity is not stable"
+      sizeEditingDisabled={false}
+      onSizeScaleChange={() => undefined}
       queryEditor={{
         activeQuery: '',
         queryDraft: '',
@@ -109,6 +116,9 @@ describe('Network Explorer drawer', () => {
           tag.includes('role="treeitem"') && tag.includes('tabindex="0"'),
       ),
     ).toHaveLength(1);
+    // One roving tree row plus its explicitly keyboard-reachable Actions button.
+    expect(markup.match(/tabindex="0"/gu)).toHaveLength(2);
+    expect(markup).toContain('aria-label="Actions for source.md"');
     expect(markup).toContain('data-graph-history-shortcuts="off"');
     expect(markup).toContain('class="network-explorer__controls"');
   });
@@ -151,8 +161,37 @@ describe('Network Explorer drawer', () => {
     const markup = renderExplorer(model(nodes));
 
     expect(markup.match(/role="treeitem"/gu)).toHaveLength(14);
+    expect(markup.match(/class="network-explorer__actions"/gu)).toHaveLength(
+      14,
+    );
+    expect(markup).not.toContain('role="menu"');
+    expect(markup).not.toContain('role="dialog"');
     expect(markup).toContain('height:280000px');
     expect(markup).not.toContain('node-4999.md');
+  });
+
+  it('shows size only for canonical Files while retaining actions for every node kind', () => {
+    const nodes = [
+      node('file'),
+      node('heading', { kindLabel: 'Heading' }),
+      node('block', { kindLabel: 'Block' }),
+      node('diagnostic', { kindLabel: 'Diagnostic' }),
+    ];
+    const markup = renderExplorer(
+      model(nodes),
+      null,
+      new Map(nodes.map((node) => [node.entityId!, { sizeScale: 1.5 }])),
+    );
+    expect(markup.match(/class="network-explorer__size-badge"/gu)).toHaveLength(
+      1,
+    );
+    expect(markup).toContain('File size: 1.50×');
+    expect(markup).not.toContain('Custom Network size');
+    for (const name of ['file', 'heading', 'block', 'diagnostic'])
+      expect(markup).toContain(`aria-label="Actions for ${name}.md"`);
+    expect(renderExplorer(model([node('file')]))).not.toContain(
+      'network-explorer__size-badge',
+    );
   });
 
   it('uses the explicit empty state instead of mounting a virtualizer', () => {

@@ -1,3 +1,4 @@
+import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
 import {
   useCallback,
   useEffect,
@@ -61,6 +62,8 @@ export interface LocalGraphCanvasProps {
   readonly trackpadZoomMode: LocalTrackpadZoomMode;
   /** Style-only EntityId lookup; excluded from topology and layout inputs. */
   readonly visualGroupStyles?: VisualGroupPresentationMap;
+  /** Display-only File multipliers; never topology/layout/fingerprint inputs. */
+  readonly presentationOverrides?: EntityPresentationOverrideMap;
 }
 
 function errorMessage(error: unknown): string {
@@ -93,6 +96,7 @@ export function LocalGraphCanvas({
   selection,
   trackpadZoomMode,
   visualGroupStyles,
+  presentationOverrides,
 }: LocalGraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<LocalRendererSession | undefined>(undefined);
@@ -163,9 +167,11 @@ export function LocalGraphCanvas({
       initialViewport,
       trackpadZoomMode,
       visualGroupStyles,
+      presentationOverrides,
     };
   });
   const appliedVisualGroupStyles = useRef(initial.visualGroupStyles);
+  const appliedPresentationOverrides = useRef(initial.presentationOverrides);
   const [ready, setReady] = useState(false);
   const [layoutCommitKey, setLayoutCommitKey] = useState(0);
   const [layoutStatus, setLayoutStatus] = useState<string | undefined>(
@@ -182,6 +188,9 @@ export function LocalGraphCanvas({
         new LocalRendererSession(container, initial.input, {
           rootNodeKey: initial.input.rootNodeKey,
           trackpadZoomMode: initial.trackpadZoomMode,
+          ...(initial.presentationOverrides === undefined
+            ? {}
+            : { presentationOverrides: initial.presentationOverrides }),
           ...(initial.visualGroupStyles === undefined
             ? {}
             : { visualGroupStyles: initial.visualGroupStyles }),
@@ -256,6 +265,12 @@ export function LocalGraphCanvas({
     appliedVisualGroupStyles.current = visualGroupStyles;
     sessionRef.current?.setVisualGroupStyles(visualGroupStyles);
   }, [visualGroupStyles]);
+
+  useEffect(() => {
+    if (appliedPresentationOverrides.current === presentationOverrides) return;
+    appliedPresentationOverrides.current = presentationOverrides;
+    sessionRef.current?.setPresentationOverrides(presentationOverrides);
+  }, [presentationOverrides]);
 
   useEffect(() => {
     sessionRef.current?.setControlledSelection(

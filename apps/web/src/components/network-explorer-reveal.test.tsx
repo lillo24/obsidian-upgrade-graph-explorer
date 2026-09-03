@@ -14,11 +14,12 @@ const nodes: readonly NetworkExplorerNode[] = Array.from(
   { length: 100 },
   (_, index) => ({
     id: `node-${index}`,
+    entityId: `entity-${index}`,
+    sourcePath: `Node ${index}.md`,
     name: `Node ${index}`,
     glyph: '▰',
     kindLabel: 'File',
     secondary: `Node ${index}.md`,
-    sourcePath: `Node ${index}.md`,
     focusRoot: false,
     focusDistance: null,
   }),
@@ -40,6 +41,10 @@ describe('Network Explorer graph reveal and keyboard scrolling', () => {
     document.body.append(container);
     root = createRoot(container);
     props = {
+      presentationOverrides: new Map(),
+      sizePersistenceStatus: 'Session only',
+      sizeEditingDisabled: false,
+      onSizeScaleChange: vi.fn(),
       queryEditor: {
         activeQuery: '',
         queryDraft: '',
@@ -150,6 +155,29 @@ describe('Network Explorer graph reveal and keyboard scrolling', () => {
     await render({ revealRequest: { key: 1, nodeId: 'node-99' } });
     expect(tree().scrollTop).toBe(100 * 56 - 560);
     expect(row(99)).not.toBeNull();
+  });
+
+  it('does not replay a confirmed graph reveal when File size changes or resets', async () => {
+    await render();
+    await render({
+      selection: { kind: 'node', id: 'node-5' },
+      deferSelectionReveal: true,
+      revealRequest: { key: 1, nodeId: 'node-5' },
+    });
+    expect(tree().scrollTop).toBe(5 * 56);
+    await act(() => {
+      tree().scrollTop = 0;
+      tree().dispatchEvent(new Event('scroll', { bubbles: true }));
+    });
+    await render({
+      presentationOverrides: new Map([['entity-5', { sizeScale: 1.3 }]]),
+    });
+    expect(row(5)?.getAttribute('aria-label')).toContain('File size 1.30');
+    expect(tree().scrollTop).toBe(0);
+    await render({ presentationOverrides: new Map() });
+    expect(row(5)?.getAttribute('aria-label')).not.toContain('File size');
+    expect(tree().scrollTop).toBe(0);
+    expect(props.onSelectNode).not.toHaveBeenCalled();
   });
 
   it('preserves minimum-scroll reveal for non-graph selection changes', async () => {

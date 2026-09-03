@@ -1,14 +1,46 @@
+import type { EntityId } from '@icarus-graph-explorer/core';
+import type { ProjectionNodeId } from '@icarus-graph-explorer/view-projection';
 import type {
   NetworkExplorerModel,
   NetworkExplorerNode,
   NetworkExplorerRow,
 } from './network-explorer-model';
 
-export type NetworkExplorerAction = 'focus' | 'inspect' | 'hide';
+export type NetworkExplorerAction = 'focus' | 'inspect' | 'hide' | 'size';
 export interface NetworkExplorerMenuAction {
   readonly id: NetworkExplorerAction;
   readonly label: string;
   readonly disabledReason?: string;
+}
+
+export interface NetworkExplorerContext {
+  readonly rowId: string;
+  readonly targetId: ProjectionNodeId;
+  readonly model: NetworkExplorerModel;
+  readonly x: number;
+  readonly y: number;
+  readonly origin?: HTMLElement | null;
+  readonly screen: 'actions' | 'size';
+}
+
+/** Canonical File identity, never a row key, source path, or displayed name. */
+export function networkExplorerSizeEntityId(
+  node: NetworkExplorerNode,
+): EntityId | undefined {
+  return node.kindLabel === 'File' ? node.entityId : undefined;
+}
+
+/** Logical rows outlive DOM virtualization; projection changes invalidate actions. */
+export function currentNetworkExplorerContextTarget(
+  context: NetworkExplorerContext | null,
+  model: NetworkExplorerModel,
+  rowIndexById: ReadonlyMap<string, number>,
+): NetworkExplorerNode | undefined {
+  return context === null ||
+    context.model !== model ||
+    !rowIndexById.has(context.rowId)
+    ? undefined
+    : model.nodeById.get(context.targetId);
 }
 
 export function networkExplorerContextTarget(
@@ -45,6 +77,9 @@ export function networkExplorerMenuActions(
       label: 'Hide file',
       ...(hideReason === undefined ? {} : { disabledReason: hideReason }),
     },
+    ...(networkExplorerSizeEntityId(node) === undefined
+      ? []
+      : [{ id: 'size' as const, label: 'Size' }]),
   ];
 }
 

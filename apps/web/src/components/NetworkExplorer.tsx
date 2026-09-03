@@ -10,18 +10,24 @@ import {
 } from 'react';
 
 import type { GraphSelection } from '@icarus-graph-explorer/renderer-reactflow';
+import type { EntityId } from '@icarus-graph-explorer/core';
+import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
 import type { ProjectionNodeId } from '@icarus-graph-explorer/view-projection';
 
 import {
   networkExplorerContextTarget,
+  currentNetworkExplorerContextTarget,
   networkExplorerMenuActions,
+  networkExplorerSizeEntityId,
   type NetworkExplorerAction,
+  type NetworkExplorerContext,
 } from '../network-explorer-context';
 import {
   GraphQueryEditor,
   type GraphQueryEditorState,
 } from './GraphQueryEditor';
 import { NetworkExplorerMenu } from './NetworkExplorerMenu';
+import { NodeSizeControl } from './NodeSizeControl';
 import { NetworkExplorerHiddenFiles } from './NetworkExplorerHiddenFiles';
 import { SavedQueriesPopover } from './SavedQueriesPopover';
 import type { SavedGraphQueriesState } from './SavedGraphQueries';
@@ -44,6 +50,13 @@ import {
 } from '../network-explorer-model';
 
 interface NetworkExplorerProps {
+  readonly presentationOverrides: EntityPresentationOverrideMap;
+  readonly sizePersistenceStatus: string;
+  readonly sizeEditingDisabled: boolean;
+  readonly onSizeScaleChange: (
+    entityId: EntityId,
+    sizeScale: number | undefined,
+  ) => string | undefined;
   readonly queryEditor: GraphQueryEditorState;
   readonly savedQueries: SavedGraphQueriesState;
   readonly hiddenPaths: readonly string[];
@@ -68,11 +81,17 @@ interface NetworkExplorerProps {
 
 const DEFAULT_VIEWPORT_HEIGHT = NETWORK_EXPLORER_ROW_HEIGHT * 8;
 
-function nodeAccessibleName(node: NetworkExplorerNode): string {
+function nodeAccessibleName(
+  node: NetworkExplorerNode,
+  sizeScale: number | undefined,
+): string {
   const details = [
     node.kindLabel,
     node.name,
     node.secondary,
+    sizeScale === undefined
+      ? undefined
+      : `File size ${sizeScale.toFixed(2)} times calculated Network size`,
     node.focusRoot ? 'Focus' : undefined,
     node.focusDistance === null || node.focusRoot
       ? undefined
@@ -88,6 +107,10 @@ function nodeAccessibleName(node: NetworkExplorerNode): string {
 }
 
 export const NetworkExplorer = memo(function NetworkExplorer({
+  presentationOverrides,
+  sizePersistenceStatus,
+  sizeEditingDisabled,
+  onSizeScaleChange,
   queryEditor,
   savedQueries,
   hiddenPaths,
@@ -122,14 +145,8 @@ export const NetworkExplorer = memo(function NetworkExplorer({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef(new Map<string, HTMLElement>());
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const [context, setContext] = useState<{
-    readonly rowId: string;
-    readonly targetId: ProjectionNodeId;
-    readonly model: NetworkExplorerModel;
-    readonly x: number;
-    readonly y: number;
-    readonly origin: HTMLElement | null;
-  } | null>(null);
+  const [context, setContext] = useState<NetworkExplorerContext | null>(null);
+  const [sizeError, setSizeError] = useState<string>();
   const hiddenPathSet = useMemo(() => new Set(hiddenPaths), [hiddenPaths]);
   const focusPending = useRef(false);
   const pendingSelectionReveal = useRef<ProjectionNodeId | undefined>(
@@ -140,12 +157,15 @@ export const NetworkExplorer = memo(function NetworkExplorer({
   );
   const rowIndexById = useMemo(() => indexNetworkExplorerRows(rows), [rows]);
   const handledRevealRequest = useRef(revealRequest?.key);
-  const contextTarget =
-    context === null ||
-    context.model !== model ||
-    !rowIndexById.has(context.rowId)
+  const contextTarget = currentNetworkExplorerContextTarget(
+    context,
+    model,
+    rowIndexById,
+  );
+  const sizeEntityId =
+    contextTarget === undefined
       ? undefined
-      : model.nodeById.get(context.targetId);
+      : networkExplorerSizeEntityId(contextTarget);
   const menuActions = useMemo(
     () =>
       contextTarget === undefined
@@ -178,6 +198,8 @@ export const NetworkExplorer = memo(function NetworkExplorer({
       const target = networkExplorerContextTarget(row, model);
       if (target === undefined) return;
       setActiveRowId(row.id);
+      setSizeError(undefined);
+      // Opening actions changes only keyboard activity, not graph selection/center.
       setContext({
         rowId: row.id,
         targetId: target.id,
@@ -185,19 +207,25 @@ export const NetworkExplorer = memo(function NetworkExplorer({
         x,
         y,
         origin: origin ?? rowRefs.current.get(row.id) ?? null,
+        screen: 'actions',
       });
     },
     [model],
   );
   const runContextAction = useCallback(
     (action: NetworkExplorerAction) => {
+      const item = menuActions.find((item) => item.id === action);
       if (
         context === null ||
         contextTarget === undefined ||
-        menuActions.find((item) => item.id === action)?.disabledReason !==
-          undefined
+        item === undefined ||
+        item.disabledReason !== undefined
       )
         return;
+      if (action === 'size') {
+        setContext({ ...context, screen: 'size' });
+        return;
+      }
       const origin = context.origin?.isConnected
         ? context.origin
         : (rowRefs.current.get(context.rowId) ?? null);
@@ -480,7 +508,13 @@ export const NetworkExplorer = memo(function NetworkExplorer({
           className="network-explorer__tree"
           onScroll={(event) => {
             setScrollTop(event.currentTarget.scrollTop);
-            if (context !== null) closeContextMenu(false);
+            if (context !== null) {
+              closeContextMenu(false);
+              // An editor's virtual row may disappear in this scroll commit.
+              // Use a stable focus fallback without revealing/snapping to it.
+              if (context.screen === 'size')
+                closeButtonRef.current?.focus({ preventScroll: true });
+            }
           }}
           ref={scrollerRef}
           role="tree"
@@ -497,6 +531,14 @@ export const NetworkExplorer = memo(function NetworkExplorer({
               } as CSSProperties;
               const folder = row.kind === 'folder' ? row : undefined;
               const node = row.kind === 'node' ? row.node : undefined;
+              const fileEntityId =
+                node === undefined
+                  ? undefined
+                  : networkExplorerSizeEntityId(node);
+              const sizeScale =
+                fileEntityId === undefined
+                  ? undefined
+                  : presentationOverrides.get(fileEntityId)?.sizeScale;
               const selected = node !== undefined && selectedNodeId === node.id;
               return (
                 <div
@@ -510,7 +552,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                     aria-label={
                       node === undefined
                         ? `Folder, ${folder?.folder.path}`
-                        : nodeAccessibleName(node)
+                        : nodeAccessibleName(node, sizeScale)
                     }
                     aria-level={row.level}
                     aria-posinset={row.position}
@@ -577,11 +619,20 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                     {node?.focusRoot ? (
                       <span className="network-explorer__badge">Focus</span>
                     ) : null}
+                    {sizeScale === undefined ? null : (
+                      <span
+                        aria-label={`File size ${sizeScale.toFixed(2)} times calculated Network size`}
+                        className="network-explorer__size-badge"
+                        title={`File size: ${sizeScale.toFixed(2)}×`}
+                      >
+                        {sizeScale.toFixed(2)}×
+                      </span>
+                    )}
                     {node === undefined ? null : (
                       <button
                         aria-label={`Actions for ${node.name}`}
                         aria-haspopup="menu"
-                        className="network-explorer__node-actions"
+                        className="network-explorer__actions"
                         onClick={(event) => {
                           event.stopPropagation();
                           const rect =
@@ -593,6 +644,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                             event.currentTarget,
                           );
                         }}
+                        onKeyDown={(event) => event.stopPropagation()}
                         title={`Actions for ${node.name}`}
                         tabIndex={row.id === activeRowId ? 0 : -1}
                         type="button"
@@ -615,6 +667,34 @@ export const NetworkExplorer = memo(function NetworkExplorer({
           onCancel={closeContextMenu}
           x={context.x}
           y={context.y}
+          {...(context.screen !== 'size' || sizeEntityId === undefined
+            ? {}
+            : {
+                editor: {
+                  label: 'Network size',
+                  content: (
+                    <>
+                      <NodeSizeControl
+                        disabled={sizeEditingDisabled}
+                        onChange={(sizeScale) =>
+                          setSizeError(
+                            onSizeScaleChange(sizeEntityId, sizeScale),
+                          )
+                        }
+                        sizeScale={
+                          presentationOverrides.get(sizeEntityId)?.sizeScale
+                        }
+                        status={sizePersistenceStatus}
+                      />
+                      {sizeError === undefined ? null : (
+                        <p className="network-node-size__error" role="alert">
+                          {sizeError}
+                        </p>
+                      )}
+                    </>
+                  ),
+                },
+              })}
         />
       )}
     </aside>
