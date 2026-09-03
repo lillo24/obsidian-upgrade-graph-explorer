@@ -46,6 +46,7 @@ import {
   projectLocalView,
   projectStructureView,
   projectView,
+  type ProjectionNodeId,
   type ViewProjection,
   type ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
@@ -69,6 +70,10 @@ import {
 } from '@icarus-graph-explorer/visual-groups';
 
 import { graphHistoryShortcut } from '../graph-history-shortcuts';
+import {
+  createNetworkExplorerModel,
+  reconcileNetworkExplorerExpansion,
+} from '../network-explorer-model';
 import {
   containingDocumentEntityId,
   effectiveGlobalProjectionState,
@@ -149,6 +154,7 @@ import {
 } from './graph-workspace-overlays';
 import { activateMaximizedGraphMode } from './maximized-graph-mode';
 import { ProvenanceInspector } from './ProvenanceInspector';
+import { NetworkExplorer } from './NetworkExplorer';
 import { StructureDepthControl } from './StructureDepthControl';
 import { VisualGroups } from './VisualGroups';
 import type { GlobalGraphViewProps } from './GlobalGraphView';
@@ -198,6 +204,7 @@ const ENTITY_NAVIGATION_ZOOM = 1.1;
 const GLOBAL_NAVIGATION_RATIO = 0.32;
 const LOCAL_NAVIGATION_RATIO = 0.48;
 const LOCAL_STRUCTURED_NAVIGATION_ZOOM = 0.92;
+const NARROW_GRAPH_WORKSPACE_MEDIA_QUERY = '(max-width: 900px)';
 
 const GRAPH_HISTORY_SHORTCUT_EXCLUSION_SELECTOR =
   'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [data-graph-history-shortcuts="off"]';
@@ -261,6 +268,20 @@ function InspectorSidebarIcon() {
     >
       <rect height="16" rx="2" width="18" x="3" y="4" />
       <path d="M15 4v16" />
+    </svg>
+  );
+}
+
+function NetworkExplorerIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="graph-shell-icon"
+      focusable="false"
+      viewBox="0 0 24 24"
+    >
+      <rect height="16" rx="2" width="18" x="3" y="4" />
+      <path d="M9 4v16M5.5 8h1M5.5 12h1M5.5 16h1" />
     </svg>
   );
 }
@@ -565,6 +586,9 @@ export function GraphExplorer({
     effectiveRendererMode,
     localLayoutMode,
   );
+  const networkLayoutActive =
+    rendererMode === 'global' ||
+    (rendererMode === 'local' && localLayoutMode === 'free');
   const unavailableProjection: ProjectionResult = {
     ok: false,
     message: 'The active graph presentation could not be prepared.',
@@ -757,6 +781,44 @@ export function GraphExplorer({
   const inspectorToolbarRef = useRef<HTMLButtonElement>(null);
   const inspectorHandleRef = useRef<HTMLButtonElement>(null);
   const inspectorRestoreTarget = useRef<HTMLButtonElement | null>(null);
+  const [networkExplorerOpen, setNetworkExplorerOpen] = useState(false);
+  const [networkExplorerExpandedNodeIds, setNetworkExplorerExpandedNodeIds] =
+    useState<ReadonlySet<ProjectionNodeId>>(() => new Set());
+  const networkExplorerToolbarRef = useRef<HTMLButtonElement>(null);
+  const networkExplorerHandleRef = useRef<HTMLButtonElement>(null);
+  const networkExplorerRestoreTarget = useRef<HTMLButtonElement | null>(null);
+  const [narrowGraphWorkspace, setNarrowGraphWorkspace] = useState(false);
+  const mostRecentlyOpenedDrawer = useRef<'inspector' | 'network-explorer'>(
+    'inspector',
+  );
+  const networkExplorerVisible = networkExplorerOpen && networkLayoutActive;
+  useEffect(() => {
+    if (typeof window === 'undefined' || window.matchMedia === undefined)
+      return;
+    const mediaQuery = window.matchMedia(NARROW_GRAPH_WORKSPACE_MEDIA_QUERY);
+    const observe = () => setNarrowGraphWorkspace(mediaQuery.matches);
+    observe();
+    mediaQuery.addEventListener('change', observe);
+    return () => mediaQuery.removeEventListener('change', observe);
+  }, []);
+  useEffect(() => {
+    if (!narrowGraphWorkspace || !inspectorOpen || !networkExplorerOpen) return;
+    if (mostRecentlyOpenedDrawer.current === 'network-explorer') {
+      setInspectorOpen(false);
+    } else {
+      setNetworkExplorerOpen(false);
+    }
+  }, [inspectorOpen, narrowGraphWorkspace, networkExplorerOpen]);
+  useEffect(() => {
+    if (networkLayoutActive || !networkExplorerOpen) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setNetworkExplorerOpen(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [networkExplorerOpen, networkLayoutActive]);
   const [initialSerializedView] = useState(() =>
     hydration.writable
       ? serializePersistedWorkspaceView(
@@ -806,6 +868,38 @@ export function GraphExplorer({
       };
     }
   }, [projection, visualGroupCompilation.compiled, visualGroupEntityById]);
+  const networkProjection =
+    rendererMode === 'global' && globalResult?.ok === true
+      ? globalResult.projection
+      : rendererMode === 'local' &&
+          localLayoutMode === 'free' &&
+          localResult?.ok === true
+        ? localResult.projection
+        : undefined;
+  const networkExplorerModel = useMemo(
+    () =>
+      networkProjection === undefined
+        ? undefined
+        : createNetworkExplorerModel(
+            networkProjection,
+            inspectionWorkspace,
+            visualGroupPresentation.styles,
+          ),
+    [inspectionWorkspace, networkProjection, visualGroupPresentation.styles],
+  );
+  useEffect(() => {
+    if (networkExplorerModel === undefined) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setNetworkExplorerExpandedNodeIds((current) =>
+        reconcileNetworkExplorerExpansion(current, networkExplorerModel),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [networkExplorerModel]);
   const activeSelection =
     projection !== undefined && selectionExists(projection, selection)
       ? selection
@@ -2222,6 +2316,15 @@ export function GraphExplorer({
       } else inspectorHandleRef.current?.focus();
     });
   }, []);
+  const closeNetworkExplorer = useCallback(() => {
+    setNetworkExplorerOpen(false);
+    queueMicrotask(() => {
+      const target = networkExplorerRestoreTarget.current;
+      if (target?.isConnected && target.closest('[hidden]') === null) {
+        target.focus();
+      } else networkExplorerHandleRef.current?.focus();
+    });
+  }, []);
   const toggleInspector = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>) => {
       if (inspectorOpen) {
@@ -2229,9 +2332,55 @@ export function GraphExplorer({
         return;
       }
       inspectorRestoreTarget.current = event.currentTarget;
+      mostRecentlyOpenedDrawer.current = 'inspector';
+      if (narrowGraphWorkspace) setNetworkExplorerOpen(false);
       setInspectorOpen(true);
     },
-    [closeInspector, inspectorOpen],
+    [closeInspector, inspectorOpen, narrowGraphWorkspace],
+  );
+  const toggleNetworkExplorer = useCallback(
+    (event: ReactMouseEvent<HTMLButtonElement>) => {
+      if (networkExplorerOpen) {
+        closeNetworkExplorer();
+        return;
+      }
+      networkExplorerRestoreTarget.current = event.currentTarget;
+      mostRecentlyOpenedDrawer.current = 'network-explorer';
+      if (narrowGraphWorkspace) setInspectorOpen(false);
+      setNetworkExplorerOpen(true);
+    },
+    [closeNetworkExplorer, narrowGraphWorkspace, networkExplorerOpen],
+  );
+  const selectNetworkExplorerNode = useCallback(
+    (nodeId: ProjectionNodeId) => {
+      if (networkExplorerModel?.nodeById.has(nodeId) !== true) return;
+      setSelection({ kind: 'node', id: nodeId });
+      if (rendererModeRef.current === 'global') {
+        requestGlobalSemanticCenter({
+          nodeId,
+          ratio:
+            globalViewportBookmarkRef.current?.ratio ?? GLOBAL_NAVIGATION_RATIO,
+        });
+      } else if (
+        rendererModeRef.current === 'local' &&
+        localLayoutModeRef.current === 'free'
+      ) {
+        requestLocalSemanticCenter({
+          nodeId,
+          freeRatio:
+            localViewportBookmarkRef.current?.freeRatio ??
+            LOCAL_NAVIGATION_RATIO,
+        });
+      }
+      setNavigationAnnouncement(
+        'Network Explorer selected and centered the visible node.',
+      );
+    },
+    [
+      networkExplorerModel,
+      requestGlobalSemanticCenter,
+      requestLocalSemanticCenter,
+    ],
   );
   const changeRendererMode = useCallback(
     (nextMode: GraphPresentationMode) => {
@@ -2910,6 +3059,11 @@ export function GraphExplorer({
     effectiveRendererMode === 'local'
       ? activeViewState.focus?.rootEntityId
       : undefined;
+  const networkExplorerSelection =
+    networkProjection !== undefined &&
+    selectionExists(networkProjection, selection)
+      ? selection
+      : null;
 
   return (
     <section
@@ -3130,6 +3284,27 @@ export function GraphExplorer({
                   {settingsContent}
                 </GraphSettings>
               )}
+              {networkLayoutActive && networkExplorerModel !== undefined ? (
+                <button
+                  aria-label={
+                    networkExplorerVisible
+                      ? 'Close Network Explorer'
+                      : 'Open Network Explorer'
+                  }
+                  aria-pressed={networkExplorerVisible}
+                  className="graph-inspector-toggle graph-network-explorer-toggle"
+                  onClick={toggleNetworkExplorer}
+                  ref={networkExplorerToolbarRef}
+                  title={
+                    networkExplorerVisible
+                      ? 'Close Network Explorer'
+                      : 'Open Network Explorer'
+                  }
+                  type="button"
+                >
+                  <NetworkExplorerIcon />
+                </button>
+              ) : null}
               <button
                 aria-label={
                   inspectorOpen ? 'Close Inspector' : 'Open Inspector'
@@ -3191,7 +3366,7 @@ export function GraphExplorer({
         <div
           className={`graph-stage${
             inspectorOpen ? ' graph-stage--inspector-drawer-open' : ''
-          }`}
+          }${networkExplorerVisible ? ' graph-stage--network-explorer-open' : ''}`}
         >
           {effectiveRendererMode === 'global' ? (
             GlobalGraphView === undefined ? (
@@ -3357,6 +3532,32 @@ export function GraphExplorer({
               visualVariant={hierarchyVisualVariantForScope(activeScope)}
             />
           )}
+          {networkLayoutActive &&
+          networkExplorerModel !== undefined &&
+          !networkExplorerVisible ? (
+            <button
+              aria-label="Open Network Explorer"
+              className="graph-network-explorer-handle"
+              onClick={toggleNetworkExplorer}
+              ref={networkExplorerHandleRef}
+              title="Open Network Explorer"
+              type="button"
+            >
+              <span aria-hidden="true">›</span>
+            </button>
+          ) : null}
+          {networkLayoutActive &&
+          networkExplorerModel !== undefined &&
+          networkExplorerVisible ? (
+            <NetworkExplorer
+              expandedNodeIds={networkExplorerExpandedNodeIds}
+              model={networkExplorerModel}
+              onClose={closeNetworkExplorer}
+              onExpandedNodeIdsChange={setNetworkExplorerExpandedNodeIds}
+              onSelectNode={selectNetworkExplorerNode}
+              selection={networkExplorerSelection}
+            />
+          ) : null}
           {!inspectorOpen ? (
             <button
               aria-label="Open Inspector"

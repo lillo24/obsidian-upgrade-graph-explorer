@@ -426,6 +426,9 @@ describe('graph-first explorer shell', () => {
     );
     expect(markup).toContain('Loading All Network…');
     expect(markup).not.toContain('aria-label="Hierarchy depth"');
+    expect(markup).toContain('aria-label="Open Network Explorer"');
+    expect(markup).toContain('class="graph-network-explorer-handle"');
+    expect(markup).not.toContain('class="network-explorer"');
   });
 
   it('restores an explicit Local presentation lazily with scale-up recovery controls', () => {
@@ -481,6 +484,8 @@ describe('graph-first explorer shell', () => {
       '<button aria-pressed="false" type="button">Hierarchy</button>',
     );
     expect(markup).toContain('aria-label="Hierarchy depth"');
+    expect(markup).toContain('aria-label="Open Network Explorer"');
+    expect(markup).toContain('class="graph-network-explorer-handle"');
     expect(markup).not.toContain('>Back to Global</button>');
     expect(markup).not.toContain('>Open in Structure</button>');
   });

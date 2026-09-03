@@ -7,7 +7,7 @@ canonical truth, or own a platform storage implementation.
 - `GraphExplorer.tsx` composes report-scoped projection/inspection workspaces,
   compact structural/focus/workspace controls, controlled Filters and Settings
   overlays, shared canonical navigation, graph selection, the transient unified
-  Inspector drawer,
+  Inspector drawer, and the transient Network Explorer drawer,
   saved-view hydration/alert/reset orchestration, transient graph Back/Forward
   checkpoints, and semantic renderer viewport requests. Across live snapshots it
   reconciles current KG6 state before
@@ -27,6 +27,14 @@ canonical truth, or own a platform storage implementation.
   preserve that camera. Transition anchors and Local Fit requests are consumed
   once, preventing remount or Back/Forward from replaying stale camera work.
   Graphology, worker positions, and transition points are never persisted.
+  Network Explorer consumes the same already-completed All/Focus Network
+  projection and resolved Visual Group presentation map as the canvas. Its
+  selection callback updates the single controlled graph selection and issues a
+  renderer-specific semantic center request at the current zoom ratio; it never
+  records history, changes projection, or reads Sigma/Graphology state. On wide
+  screens both side drawers may coexist; at the existing 900 px breakpoint the
+  most recently opened drawer owns the overlay and the other closes without
+  stealing focus.
   `ExplorationControls.tsx` presents accessible All/Focus and Network/Hierarchy
   choices derived from schema-v3 state. Both Focus layouts share the same
   memoized projection. The selected visible node, or root fallback, crosses the
@@ -96,11 +104,13 @@ canonical truth, or own a platform storage implementation.
   the single write-before-adopt session commit and memoized compile/lookup/map
   boundaries; `visual-group-editor.ts` owns submit-time trim, name bounds, and
   positioned QUERY1 canonicalization. Filters and Groups share one active
-  tool-panel owner; Inspector remains independent.
+  tool-panel owner; the side drawers remain independent on wide screens and
+  mutually exclusive only at the narrow workspace breakpoint.
 - `maximized-graph-mode.ts` owns the reversible body scroll lock and Escape-key
   exit listener for the transient application maximize mode. The graph shell
   closes a nearer Tools, Settings, or Filters surface before leaving maximized
-  mode. Their visibility and Inspector visibility remain session-only state.
+  mode. Their visibility plus Inspector and Network Explorer visibility remain
+  session-only state.
 - `GlobalGraphView.tsx` is the only lazy production import of the direct Sigma
   canvas. It owns the Worker service and a bounded module-lifetime layout cache
   so Structure startup stays Sigma-free and exact results survive mode switches.
@@ -122,6 +132,19 @@ canonical truth, or own a platform storage implementation.
   than duplicating its latest-layout lifecycle.
 - `use-worker-service-disposal.ts` owns Strict Mode-safe Worker service leases:
   same-tick development probes keep the service, while a real unmount disposes it.
+- `NetworkExplorer.tsx` owns the accessible, projection-scoped `tree` surface
+  for both Sigma layouts. Fixed-height row virtualization keeps only the
+  viewport plus overscan mounted while roving focus operates over the complete
+  logical node/adjacency list. Top-level File/Heading/Block/Diagnostic rows
+  synchronize controlled canvas selection; projected parent/child and
+  incoming/outgoing rows select and center their existing projected endpoint.
+  External selection reveal is edge-triggered, so ordinary scrolling and row
+  virtualization never pull the drawer back to an unchanged selected root.
+  Expansion, active row, scroll position, and drawer visibility are transient
+  presentation state. `../network-explorer-model.ts` owns deterministic source
+  ordering, one-pass projected-edge indexes, flattened rows, stale-expansion
+  reconciliation, virtual ranges, and keyboard transition planning. Neither
+  file reconstructs hidden canonical topology or deaggregates references.
 - `ProvenanceInspector.tsx` presents user-facing identity, breadcrumbs,
   outgoing links, backlinks, connection occurrences, structural containment,
   and plain-language link problems in bounded groups. Canonical IDs, exact
