@@ -1,6 +1,6 @@
 import { isValidNodeSizeScale } from '@icarus-graph-explorer/presentation-overrides';
 
-/** Final display/layout radius bounds, separate from the user multiplier. */
+/** Final display-only radius bounds, separate from automatic/layout size. */
 export const NETWORK_NODE_SIZE_RANGE = { min: 2, max: 24 } as const;
 
 /** Auto remains exact. Focus roots cannot shrink below their semantic base. */

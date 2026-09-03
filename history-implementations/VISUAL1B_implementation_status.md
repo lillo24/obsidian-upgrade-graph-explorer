@@ -1,13 +1,87 @@
 # VISUAL1B implementation report
 
-Status: **Draft/unmerged. Native QA is blocked by the separately reported
-Network-layout flicker issue; the Size UI correction does not address it.**
+Status: **Draft/unmerged. Render-only flicker correction implemented; renewed
+native interaction/live-update QA remains pending. Do not merge.**
 
 [PR #51](https://github.com/lillo24/icarus-graph-explorer/pull/51) integrates
 `main` at `b81cc2c`, including merged KG14B3 PR #52. No competing action menu or
 Hide mechanism was introduced. The task checkout remains available for QA.
 
-## QA correction — Size UI only
+## QA correction — render-only Size ownership
+
+Native QA found that a tiny Size change moved unrelated nodes and changed
+Source-to-Target distance. The cause was the override entering mapped size,
+then the KG13 fingerprint, then a fresh worker relaxation warmed from live
+coordinates on every changed value. Installed ForceAtlas2 0.10.1 defaults to
+`adjustSizes: false`; neither layout enables it. The multiplier was invalidating
+layout, not intentionally participating in size-aware collision physics.
+
+All/Focus now retain automatic size in mapper/topology/seed/request/fingerprint
+inputs. Independent canvas effects and initial session options deliver sparse
+overrides to Sigma node reducers only. Final display size preserves bounds,
+Focus root emphasis, group color, and Global displayed-size label LOD. No
+layout/worker/cache/physics code or settings changed, and the simplified slider,
+registry/persistence schema, identity handling, Hide/query/history, and v3 saved
+views remain unchanged.
+
+Affected File reducers refresh through a topology-owned EntityId-to-node-key
+index. Sigma 3.0.3's indexed refresh (`skipIndexation: false`) is required for
+size-dependent label/program/picking data. It does not run graph layout or
+mutate Graphology coordinates. The Sigma process can scan its graph; only the
+application's override diff/reducer targets are sparse. Color-only refreshes
+keep the existing fast path. Pending topology gates/coalesces group and size
+updates, filtering removed keys before any partial repaint.
+
+### Regression evidence
+
+The new test executes the real All/Focus canvas functions, memo/effect
+dependencies, sessions, Graphology graph, mappers, and request/fingerprint/cache
+paths, with a deterministic hook driver, Sigma double, and controlled layout
+service. It is not a WebGL/native interaction test.
+
+Fixture: isolated `Note.md`, plus `Source.md → Target.md`. After one initial
+layout, the sequence `1.00, 1.05, 1.10, 1.15, 1.20, 1.25, 1.30` previously
+submitted **6 additional requests in each mode** (total calls
+`1, 2, 3, 4, 5, 6, 7`; 1.00 reused cache). The same sequence now submits
+**0 additional requests** (all totals `1`). The passing test additionally
+covers 2.50, Reset, and a saved initial multiplier.
+
+Every node's exact x/y tuple and Source-to-Target distance remain identical,
+while Note's displayed radius changes proportionally. Mapping, seeding,
+reconciliation, request-template/fingerprint computation, and cache writes
+remain unchanged. No selection or camera change occurs after initial layout.
+A genuine subsequent topology edit still submits a new layout. Session tests
+cover initial stored size, sparse changes, group composition, same-value no-op,
+Reset, hover/click callback continuity, pending-topology coalescing, removed keys,
+and hide/unhide with the latest stored multiplier. Radius picking is additionally
+checked in production-browser smoke; native confirmation remains required.
+
+### Current validation
+
+- Frozen-lockfile install passed.
+- Renderer tests: **122 passed across 19 files**.
+- Web tests: **312 passed across 47 files**.
+- Full `pnpm check` passed: formatting, lint, all workspace typechecks,
+  **991 tests across 115 files**, and production web build. The existing large
+  bundle-size warning remains; no new runtime warning is claimed away.
+- `pnpm desktop:check` and `pnpm desktop:build` passed. The fresh optimized
+  executable is in this task checkout at
+  `apps/desktop/src-tauri/target/release/icarus-graph-explorer-desktop.exe`.
+- Both requested small renderer benchmarks passed. All 100-node mapping median
+  was 0.296 ms; Focus 13-node topology mapping median was 0.017 ms. These are
+  local automatic-path evidence, not end-to-end slider timing or CI thresholds.
+- Production-browser smoke passed on the three-File filtered Synthetic Sample:
+  small steps through 1.30, maximum/minimum, rapid drags, Reset, unchanged
+  connected-node centers, and visible resized-radius picking. Focus Target
+  resizing kept its and Source's centers fixed, enlarged-edge clicking selected
+  Target, and Hide/unhide retained 2.50 without a stale-node failure. No console
+  errors/warnings were logged. Temporary size overrides/query were restored.
+- Latest PR CI is tracked separately on the pushed correction. Native
+  interaction/live-update QA remains **pending**, and the PR remains draft.
+- The React performance skill informed the separation of presentation effects
+  from layout dependencies. No dependency was added.
+
+## Earlier QA correction — Size UI only
 
 The follow-up correction removes Auto/Custom modes and long visible explanatory
 copy. Size is now one always-visible 0.50–2.50× slider, current value, and Reset.
@@ -58,9 +132,10 @@ sizing still composes base node size and link-degree influence before applying
 the per-file multiplier. No override preserves the existing mapper path. Headings,
 blocks, diagnostic nodes, and Hierarchy sizing remain unchanged.
 
-Final sizes enter the normal mapping/layout fingerprints; no post-mapping
-Graphology size mutation or new cache was added. Existing latest-wins worker
-handling remains responsible for superseded layout work.
+Final sizes now exist only in Sigma reducer output. Automatic sizes enter the
+normal mapping/layout fingerprints, and neither Graphology size/positions nor
+layout caches change when a per-File multiplier changes. Existing latest-wins
+worker handling remains responsible for legitimate layout work.
 
 ## Network Explorer actions and visibility
 
@@ -160,10 +235,16 @@ Use the newly built optimized executable, not an older running app:
    size must follow. Remove it while its editor is open; the editor must close
    safely. An unrelated replacement/new identity must not inherit that size.
 
-**Native QA is blocked by the separate Network-layout flicker issue. This UI-only
-correction does not investigate or fix that issue, and native interaction/live-update
-QA is not marked passed. Do not merge this correction.** After that separate
-issue and native QA are resolved, check current main/CI again,
+First repeat the reported flicker case: in All + Network, wait for layout to
+settle with `Note.md` isolated and `Source.md → Target.md` connected. Slowly move
+Note from 1.00 to 1.30, drag rapidly across the full range, then Reset. Only Note's
+radius may change; all node centers and Source-to-Target distance must stay fixed.
+Repeat in Focus + Network. Hover and click the resized visible node to verify
+label/picking behavior, and combine resizing with Hide/unhide and query changes.
+
+**Native interaction/live-update QA is not marked passed. Do not merge until
+the user confirms this flicker correction and the checklist above.** After
+native QA passes, check current main/CI again,
 merge through the PR, verify post-merge CI, and remove only this task's checkout
 and branch when no further QA is needed.
 

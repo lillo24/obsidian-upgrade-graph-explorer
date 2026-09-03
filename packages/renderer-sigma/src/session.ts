@@ -1,6 +1,11 @@
 import Sigma from 'sigma';
 import type { WheelCoords } from 'sigma/types';
 import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-groups';
+import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
+import {
+  changedFileSizeNodeKeys,
+  indexFileNodeKeys,
+} from './node-size-presentation';
 
 import {
   buildGlobalGraph,
@@ -54,6 +59,7 @@ export interface GlobalRendererSessionOptions {
   readonly edgeEvents?: boolean;
   readonly instrumentation?: GlobalRendererInstrumentation;
   readonly visualGroupStyles?: VisualGroupPresentationMap;
+  readonly presentationOverrides?: EntityPresentationOverrideMap;
   readonly onNodeSelected?: (
     key: string | undefined,
     attributes: GlobalNodeAttributes | undefined,
@@ -94,6 +100,9 @@ export class GlobalRendererSession {
   private readonly options: GlobalRendererSessionOptions;
   private visualLod: GlobalVisualLod;
   private visualGroupStyles: VisualGroupPresentationMap | undefined;
+  private presentationOverrides: EntityPresentationOverrideMap | undefined;
+  private fileNodeKeys: ReturnType<typeof indexFileNodeKeys>;
+  private sizeStyleRefreshPending: Set<string> | undefined;
   private precisionWheelIdleTimer: number | undefined;
   private viewportObservationTimer: number | undefined;
   private topologyRefreshPending: Promise<void> | undefined;
@@ -169,6 +178,8 @@ export class GlobalRendererSession {
     this.settings = resolveGlobalLayoutSettings(options.settings);
     this.trackpadZoomMode = options.trackpadZoomMode;
     this.visualGroupStyles = options.visualGroupStyles;
+    this.presentationOverrides = options.presentationOverrides;
+    this.fileNodeKeys = indexFileNodeKeys(input.nodes);
     this.graph = buildGlobalGraph(input);
     this.neighborhoods = createGlobalNeighborhoodIndex(input);
     const mountStart = performance.now();
@@ -248,6 +259,10 @@ export class GlobalRendererSession {
   }
 
   private reduceNode(key: string, attributes: GlobalNodeAttributes) {
+    const sizeScale =
+      attributes.entityId === null
+        ? undefined
+        : this.presentationOverrides?.get(attributes.entityId)?.sizeScale;
     const hovered = key === this.hoveredNode;
     const visualGroup =
       attributes.entityId === null
@@ -265,6 +280,7 @@ export class GlobalRendererSession {
       lod: this.visualLod,
       settings: this.settings,
       ...(visualGroup === undefined ? {} : { visualGroup }),
+      ...(sizeScale === undefined ? {} : { sizeScale }),
     });
   }
 
@@ -335,22 +351,47 @@ export class GlobalRendererSession {
   setVisualGroupStyles(styles?: VisualGroupPresentationMap): void {
     this.visualGroupStyles = styles;
     this.options.instrumentation?.count('global-style-updates');
+    this.visualStyleRefreshPending = true;
     if (this.topologyRefreshPending !== undefined) {
       // Reconciliation has already changed Graphology, but Sigma still owns
       // indices for the previous graph until its next process/render pass.
       // A partial repaint during that gap can target an added or removed node.
-      this.visualStyleRefreshPending = true;
       return;
     }
-    this.refreshVisualGroupStyles();
+    this.refreshPendingStyles();
   }
 
-  private refreshVisualGroupStyles(): void {
-    // Sigma 3 applies node reducers during refresh, not a render-only pass.
-    // Repaint existing nodes without rebuilding its node/edge indices.
+  setPresentationOverrides(overrides?: EntityPresentationOverrideMap): void {
+    const keys = changedFileSizeNodeKeys(
+      this.presentationOverrides,
+      overrides,
+      this.fileNodeKeys,
+    );
+    this.presentationOverrides = overrides;
+    if (this.destroyed || keys.length === 0) return;
+    this.options.instrumentation?.count('global-style-updates');
+    this.sizeStyleRefreshPending ??= new Set();
+    for (const key of keys) this.sizeStyleRefreshPending.add(key);
+    if (this.topologyRefreshPending === undefined) this.refreshPendingStyles();
+  }
+
+  private refreshPendingStyles(): void {
+    if (this.destroyed) return;
+    const sizeKeys = [...(this.sizeStyleRefreshPending ?? [])].filter((key) =>
+      this.graph.hasNode(key),
+    );
+    const nodes = this.visualStyleRefreshPending
+      ? this.graph.nodes()
+      : sizeKeys;
+    this.visualStyleRefreshPending = false;
+    this.sizeStyleRefreshPending = undefined;
+    if (nodes.length === 0) return;
+    // Sigma 3.0.3 refresh reruns only these reducers. Radius changes must also
+    // process label/program/picking indices (skipIndexation=false), but never
+    // submit a layout or change Graphology coordinates. Color-only stays fast.
     this.renderer.refresh({
-      partialGraph: { nodes: this.graph.nodes() },
-      skipIndexation: true,
+      partialGraph: { nodes },
+      skipIndexation: sizeKeys.length === 0,
       schedule: true,
     });
   }
@@ -366,6 +407,7 @@ export class GlobalRendererSession {
             run,
           );
     this.neighborhoods = createGlobalNeighborhoodIndex(input);
+    this.fileNodeKeys = indexFileNodeKeys(input.nodes);
     if (
       this.selectedNode !== undefined &&
       !this.graph.hasNode(this.selectedNode)
@@ -383,9 +425,7 @@ export class GlobalRendererSession {
       void refresh.then(() => {
         if (this.topologyRefreshPending !== refresh) return;
         this.topologyRefreshPending = undefined;
-        if (!this.visualStyleRefreshPending || this.destroyed) return;
-        this.visualStyleRefreshPending = false;
-        this.refreshVisualGroupStyles();
+        this.refreshPendingStyles();
       });
     } else {
       this.renderer.scheduleRefresh();
@@ -396,6 +436,7 @@ export class GlobalRendererSession {
   /** Development harness baseline; product live updates use in-place update(). */
   replace(input: GlobalRendererInput): void {
     this.graph = buildGlobalGraph(input);
+    this.fileNodeKeys = indexFileNodeKeys(input.nodes);
     this.neighborhoods = createGlobalNeighborhoodIndex(input);
     this.hoveredNode = undefined;
     if (
@@ -411,6 +452,7 @@ export class GlobalRendererSession {
 
   resetPositions(input: GlobalRendererInput): void {
     reconcileGlobalGraph(this.graph, input, { preservePositions: false });
+    this.fileNodeKeys = indexFileNodeKeys(input.nodes);
     this.renderer.scheduleRefresh();
   }
 

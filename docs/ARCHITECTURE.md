@@ -183,8 +183,13 @@ deterministic serialization, and sparse canonical-Document reconciliation, not
 storage or projection. Missing IDs remain stored but inactive; path/title
 matching and query-driven pruning are forbidden. The app owns stable versus
 session-only persistence and supplies the resolved map to All/Focus Network
-mappers. Size participates in normal layout inputs/fingerprints; group colors
-remain independent. Saved-view schema v3, preferences, query membership,
+sessions through independent canvas effects. Per-File multipliers affect Sigma
+node display reducers only; automatic sizes remain in mapping/layout inputs and
+fingerprints. Size edits refresh affected node reducers with Sigma indexation
+for labels/picking but never submit layout or change coordinates. Sparse map
+diffs use a topology-owned File-key index, and pending topology processing gates
+style refreshes. Group colors remain independent. Saved-view schema v3,
+preferences, query membership,
 visibility, canonical snapshots, and identity catalogs are unchanged.
 
 `packages/explorer-inspection` depends inward on core and view-projection. It

@@ -6,6 +6,7 @@ import { localTestProjection } from './local-test-fixture';
 import {
   customGlobalLayoutSettings,
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+  resolveGlobalLayoutSettings,
 } from './settings';
 import { createGlobalLayoutRequest, globalLayoutFingerprint } from './layout';
 import {
@@ -14,66 +15,53 @@ import {
 } from './local-layout';
 import { applyNetworkNodeSizeScale } from './node-size';
 import { resolveGlobalNodeStyle } from './style';
-import { resolveGlobalLayoutSettings } from './settings';
+import { resolveLocalNodeStyle } from './local-style';
 
-describe('per-File Network sizing composition', () => {
-  it('leaves All diagnostics unchanged and composes group color with custom size', () => {
-    const base = globalTestProjection();
-    const diagnostic = localTestProjection().nodes.find(
-      (node) => node.kind === 'reference-target',
-    )!;
-    const projection = { ...base, nodes: [...base.nodes, diagnostic] };
-    const auto = mapProjectionToGlobal(projection);
-    const custom = mapProjectionToGlobal(
-      projection,
-      DEFAULT_GLOBAL_LAYOUT_SETTINGS,
-      new Map([
-        ['doc-a', { sizeScale: 2 }],
-        [diagnostic.id, { sizeScale: 2 }],
-      ]),
-    );
-    expect(custom.nodes.at(-1)).toEqual(auto.nodes.at(-1));
-    const attributes = custom.nodes.find(
-      ({ key }) => key === 'entity:doc-a',
-    )!.attributes;
-    const style = resolveGlobalNodeStyle(attributes, {
-      hovered: false,
-      selected: false,
-      relatedToHover: true,
-      lod: 'near',
-      settings: resolveGlobalLayoutSettings(DEFAULT_GLOBAL_LAYOUT_SETTINGS),
-      visualGroup: { groupName: 'Group', color: 'violet', accent: '#7c3aed' },
-    });
-    expect(style.size).toBe(attributes.size);
-    expect(style.color).toBe('#7c3aed');
-  });
-  it.each([0.5, 1, 1.5, 2.5])(
-    'multiplies the VISUAL1A automatic size by %s, preserving topology',
+const context = { hovered: false, selected: false, relatedToHover: true };
+const settings = resolveGlobalLayoutSettings(DEFAULT_GLOBAL_LAYOUT_SETTINGS);
+
+describe('render-only per-File size composition', () => {
+  it.each([undefined, 0.5, 1, 1.3, 1.5, 2.5])(
+    'scales only displayed All size by %s and leaves automatic input unchanged',
     (sizeScale) => {
-      const projection = globalTestProjection();
-      const automatic = mapProjectionToGlobal(projection);
-      const custom = mapProjectionToGlobal(
-        projection,
-        DEFAULT_GLOBAL_LAYOUT_SETTINGS,
-        new Map([['doc-a', { sizeScale }]]),
-      );
-      expect(custom.nodes.map(({ key }) => key)).toEqual(
-        automatic.nodes.map(({ key }) => key),
-      );
-      expect(custom.edges).toEqual(automatic.edges);
-      expect(
-        custom.nodes.find(({ key }) => key === 'entity:doc-a')!.attributes.size,
-      ).toBe(
-        automatic.nodes.find(({ key }) => key === 'entity:doc-a')!.attributes
-          .size * sizeScale,
-      );
-      expect(custom.nodes.filter(({ key }) => key !== 'entity:doc-a')).toEqual(
-        automatic.nodes.filter(({ key }) => key !== 'entity:doc-a'),
-      );
+      const input = mapProjectionToGlobal(globalTestProjection());
+      const attributes = { ...input.nodes[0]!.attributes, size: 6 };
+      const before = { ...attributes };
+      const result = resolveGlobalNodeStyle(attributes, {
+        ...context,
+        lod: 'near',
+        settings,
+        ...(sizeScale === undefined ? {} : { sizeScale }),
+      });
+      expect(result.size).toBe(6 * (sizeScale ?? 1));
+      expect(attributes).toEqual(before);
+      expect(result.x).toBe(attributes.x);
+      expect(result.y).toBe(attributes.y);
     },
   );
 
-  it('applies a safe final cap after high degree/global size and preserves Auto exactly', () => {
+  it('composes Visual Groups and displayed-size LOD labels without changing thresholds', () => {
+    const attributes = {
+      ...mapProjectionToGlobal(globalTestProjection()).nodes[0]!.attributes,
+      size: 6,
+    };
+    const styleContext = {
+      ...context,
+      lod: 'far' as const,
+      settings: { ...settings, labelThreshold: 7 },
+      visualGroup: {
+        groupName: 'Group',
+        color: 'violet' as const,
+        accent: '#7c3aed',
+      },
+    };
+    expect(resolveGlobalNodeStyle(attributes, styleContext).label).toBe('');
+    expect(
+      resolveGlobalNodeStyle(attributes, { ...styleContext, sizeScale: 1.5 }),
+    ).toMatchObject({ size: 9, label: attributes.label, color: '#7c3aed' });
+  });
+
+  it('keeps normal VISUAL1A degree sizes in layout input, caps only displayed size', () => {
     const base = globalTestProjection();
     const projection = {
       ...base,
@@ -81,12 +69,12 @@ describe('per-File Network sizing composition', () => {
         edge.kind === 'reference'
           ? {
               ...edge,
-              referenceIds: Array.from({ length: 10000 }, (_, i) => `r${i}`),
+              referenceIds: Array.from({ length: 10000 }, (_, i) => 'r' + i),
             }
           : edge,
       ),
     };
-    const settings = {
+    const custom = {
       folderClustering: true,
       spacingPreset: 'normal' as const,
       custom: {
@@ -95,92 +83,117 @@ describe('per-File Network sizing composition', () => {
         referenceDegreeSizeInfluence: 100,
       },
     };
-    const auto = mapProjectionToGlobal(projection, settings);
-    const scaled = mapProjectionToGlobal(
-      projection,
-      settings,
-      new Map([['doc-a', { sizeScale: 2.5 }]]),
-    );
+    const input = mapProjectionToGlobal(projection, custom);
+    const attributes = input.nodes[0]!.attributes;
+    expect(attributes.size).toBe(15);
     expect(
-      auto.nodes.find(({ key }) => key === 'entity:doc-a')!.attributes.size,
-    ).toBe(15);
-    expect(
-      scaled.nodes.find(({ key }) => key === 'entity:doc-a')!.attributes.size,
+      resolveGlobalNodeStyle(attributes, {
+        ...context,
+        lod: 'near',
+        settings: resolveGlobalLayoutSettings(custom),
+        sizeScale: 2.5,
+      }).size,
     ).toBe(24);
-    expect(mapProjectionToGlobal(projection, settings, new Map())).toEqual(
-      auto,
-    );
+    expect(attributes.size).toBe(15);
     expect(applyNetworkNodeSizeScale(2, 0.5)).toBe(2);
     expect(() => applyNetworkNodeSizeScale(4, Infinity)).toThrow('Invalid');
   });
 
-  it('shares multipliers with Focus, keeps root emphasis, and ignores non-File entries', () => {
-    const projection = localTestProjection();
-    const auto = mapProjectionToLocalTopology(projection, 'root');
-    const overrides = new Map(
-      projection.nodes.map((node) => [
-        node.kind === 'entity' ? node.entityId : node.id,
-        { sizeScale: 0.5 },
-      ]),
-    );
-    const custom = mapProjectionToLocalTopology(projection, 'root', overrides);
-    const sizes = Object.fromEntries(
-      custom.nodes.map((node) => [node.key, node.attributes.size]),
-    );
-    expect(sizes).toEqual({
+  it('keeps Focus semantic sizes in topology, scales File display, and protects the root minimum', () => {
+    const input = mapProjectionToLocalTopology(localTestProjection(), 'root');
+    expect(
+      Object.fromEntries(
+        input.nodes.map(({ key, attributes }) => [key, attributes.size]),
+      ),
+    ).toEqual({
+      'entity:root': 8.4,
+      'entity:heading': 4.7,
+      'entity:block': 3.1,
+      'entity:neighbor': 6.4,
+      'diagnostic:missing': 3.8,
+    });
+    const rendered = input.nodes.map(({ key, attributes }) => [
+      key,
+      resolveLocalNodeStyle(attributes, {
+        ...context,
+        lod: 'near-local',
+        sizeScale: 0.5,
+      }).size,
+    ]);
+    expect(Object.fromEntries(rendered)).toEqual({
       'entity:root': 8.4,
       'entity:heading': 4.7,
       'entity:block': 3.1,
       'entity:neighbor': 3.2,
       'diagnostic:missing': 3.8,
     });
+    const file = input.nodes.find(
+      ({ key }) => key === 'entity:neighbor',
+    )!.attributes;
     expect(
-      custom.nodes.filter(
-        ({ attributes }) => attributes.nodeKind !== 'document',
-      ),
-    ).toEqual(
-      auto.nodes.filter(({ attributes }) => attributes.nodeKind !== 'document'),
-    );
-    expect(custom.edges).toEqual(auto.edges);
-    const larger = mapProjectionToLocalTopology(
-      projection,
-      'root',
-      new Map([['root', { sizeScale: 2 }]]),
-    );
-    expect(larger.nodes[0]!.attributes.size).toBe(16.8);
+      resolveLocalNodeStyle(file, {
+        ...context,
+        lod: 'near-local',
+        sizeScale: 1.5,
+        visualGroup: { groupName: 'Group', color: 'violet', accent: '#7c3aed' },
+      }),
+    ).toMatchObject({ size: 9.600000000000001, color: '#7c3aed' });
+    const root = input.nodes[0]!.attributes;
+    expect(
+      resolveLocalNodeStyle(root, {
+        ...context,
+        lod: 'far-local',
+        sizeScale: 2,
+      }),
+    ).toMatchObject({ size: 16.8, forceLabel: true });
   });
 
-  it('makes final sizes part of both layout requests/fingerprints', () => {
-    const all = (sizeScale: number) =>
-      createGlobalLayoutRequest(
-        mapProjectionToGlobal(
-          globalTestProjection(),
-          DEFAULT_GLOBAL_LAYOUT_SETTINGS,
-          new Map([['doc-a', { sizeScale }]]),
-        ),
-        DEFAULT_GLOBAL_LAYOUT_SETTINGS,
-        1,
-      );
-    const focus = (sizeScale: number) =>
-      createLocalLayoutRequest(
-        mapProjectionToLocalTopology(
-          localTestProjection(),
-          'root',
-          new Map([['neighbor', { sizeScale }]]),
-        ),
-        1,
-      );
-    expect(globalLayoutFingerprint(all(1))).not.toBe(
-      globalLayoutFingerprint(all(2)),
-    );
-    expect(localLayoutFingerprint(focus(1))).not.toBe(
-      localLayoutFingerprint(focus(2)),
-    );
-    expect(all(2).nodes.find(({ key }) => key === 'entity:doc-a')!.size).toBe(
-      all(1).nodes.find(({ key }) => key === 'entity:doc-a')!.size * 2,
-    );
+  it('never scales a diagnostic target even when a multiplier is supplied', () => {
+    const diagnostic = localTestProjection().nodes.find(
+      (node) => node.kind === 'reference-target',
+    )!;
+    const input = mapProjectionToGlobal({
+      ...globalTestProjection(),
+      nodes: [diagnostic],
+      edges: [],
+    });
+    const attributes = input.nodes[0]!.attributes;
     expect(
-      focus(2).nodes.find(({ key }) => key === 'entity:neighbor')!.size,
-    ).toBe(12.8);
+      resolveGlobalNodeStyle(attributes, {
+        ...context,
+        lod: 'near',
+        settings,
+        sizeScale: 2.5,
+      }).size,
+    ).toBe(attributes.size);
+  });
+
+  it('still fingerprints legitimate automatic size changes for both layouts', () => {
+    const global = mapProjectionToGlobal(globalTestProjection());
+    const local = mapProjectionToLocalTopology(localTestProjection(), 'root');
+    const globalRequest = createGlobalLayoutRequest(
+      global,
+      DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+      1,
+    );
+    const localRequest = createLocalLayoutRequest(local, 1);
+    expect(
+      globalLayoutFingerprint({
+        ...globalRequest,
+        nodes: globalRequest.nodes.map((node) => ({
+          ...node,
+          size: node.size + 1,
+        })),
+      }),
+    ).not.toBe(globalLayoutFingerprint(globalRequest));
+    expect(
+      localLayoutFingerprint({
+        ...localRequest,
+        nodes: localRequest.nodes.map((node) => ({
+          ...node,
+          size: node.size + 1,
+        })),
+      }),
+    ).not.toBe(localLayoutFingerprint(localRequest));
   });
 });

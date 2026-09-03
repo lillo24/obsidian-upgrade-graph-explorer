@@ -1,4 +1,3 @@
-import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
 import type {
   ProjectedEntityNode,
   ProjectedNode,
@@ -6,7 +5,6 @@ import type {
 } from '@icarus-graph-explorer/view-projection';
 
 import { stableUnit } from './deterministic';
-import { applyNetworkNodeSizeScale } from './node-size';
 import type {
   LocalEdgeAttributes,
   LocalInputNode,
@@ -47,23 +45,13 @@ function nodeSize(kind: LocalNodeKind, root: boolean): number {
   }
 }
 
-function mappedNode(
-  node: ProjectedNode,
-  rootEntityId: string,
-  presentationOverrides: EntityPresentationOverrideMap | undefined,
-): LocalInputNode {
+function mappedNode(node: ProjectedNode, rootEntityId: string): LocalInputNode {
   const kind = nodeKind(node);
   const root = node.kind === 'entity' && node.entityId === rootEntityId;
   const attributes: LocalNodeAttributes = {
     x: 0,
     y: 0,
-    size: applyNetworkNodeSizeScale(
-      nodeSize(kind, root),
-      node.kind === 'entity' && node.entityKind === 'document'
-        ? presentationOverrides?.get(node.entityId)?.sizeScale
-        : undefined,
-      root,
-    ),
+    size: nodeSize(kind, root),
     color:
       node.kind === 'reference-target'
         ? node.status === 'unresolved'
@@ -113,11 +101,8 @@ function mappedEdge(
 export function mapProjectionToLocalTopology(
   projection: ViewProjection,
   rootEntityId: string,
-  presentationOverrides?: EntityPresentationOverrideMap,
 ): LocalRendererInput {
-  const nodes = projection.nodes.map((node) =>
-    mappedNode(node, rootEntityId, presentationOverrides),
-  );
+  const nodes = projection.nodes.map((node) => mappedNode(node, rootEntityId));
   const nodeKeys = new Set(nodes.map(({ key }) => key));
   const root = nodes.find(({ attributes }) => attributes.root);
   if (root === undefined) {
@@ -231,13 +216,8 @@ export function seedLocalRendererInput(
 export function mapProjectionToLocal(
   projection: ViewProjection,
   rootEntityId: string,
-  presentationOverrides?: EntityPresentationOverrideMap,
 ): LocalRendererInput {
   return seedLocalRendererInput(
-    mapProjectionToLocalTopology(
-      projection,
-      rootEntityId,
-      presentationOverrides,
-    ),
+    mapProjectionToLocalTopology(projection, rootEntityId),
   );
 }

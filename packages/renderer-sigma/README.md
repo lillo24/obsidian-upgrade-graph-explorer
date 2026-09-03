@@ -34,7 +34,8 @@ src/
   types.ts                 Serializable settings, worker, renderer, and viewport contracts.
   settings.ts              Compact/Normal/Spacious presets and bounded Custom validation.
   mapping.ts               KG6-to-Sigma mapping, deterministic seeds, and folder keys.
-  node-size.ts             Per-File multiplier composition and final display/layout bounds.
+  node-size.ts             Per-File multiplier composition and final display-only bounds.
+  node-size-presentation.ts  Sparse override diff and topology-owned File-to-node key index.
   graph.ts                 Graphology construction, neighborhood index, and reconciliation.
   interaction-contract.ts  Operation-count oracle for camera/UI versus layout-triggering work.
   layout.ts                Worker-safe ForceAtlas2, folder-prior candidates, metrics, fingerprint.
@@ -61,6 +62,10 @@ src/
   styles.css               Canvas controls, progress/error surface, and reduced-motion rules.
   core.ts                  DOM-free mapping/layout/settings exports for tests and benchmarks.
   index.ts                 Browser-capable public API.
+  canvas-test-harness.ts    Test-only hook/effect driver for the real canvas dependency paths.
+  sigma-test-renderer.ts    Test-only reducer cache and process-boundary Sigma double.
+  size-canvas-regression.test.tsx  Real canvas/session layout-count and exact-coordinate regression.
+  node-size-session.test.ts  Initial display, sparse indexed refresh, and topology-race contracts.
   *.test.ts                Mapping, layout, cache, LOD, settings, and precision contracts.
 ```
 
@@ -115,15 +120,35 @@ update boundary also remaps the other advanced presentation values; optimizing
 those independent refresh paths remains outside this narrow settings change.
 
 VISUAL1B accepts a separate resolved `EntityId` presentation-override map in
-both Network canvases. All multiplies `(base + degree boost)` by a custom
-0.5–2.5 scale; Focus multiplies its existing File/root semantic size. Custom
-results are bounded to 2–24 display/layout units; a Focus root keeps at least
-its automatic 8.4 size (and root styling). Auto/no entry is exactly unchanged.
-Headings, blocks, and diagnostics ignore the map. These are normal mapper
-attributes and layout inputs, not post-mapping Graphology mutations. Group
-color continues through the independent reducer layer. The renderer never
-loads storage or changes projection/query membership. Workers remain
-latest-result-wins; no extra layout cache or persisted geometry is introduced.
+both Network canvases. The mount options and an independent effect deliver it
+to each session, never to mapping, topology, seeds, requests, or fingerprints.
+The node reducers multiply All's automatic `(base + degree boost)` or Focus's
+existing File/root semantic size by the 0.5–2.5 scale exactly once. Custom
+results are bounded to 2–24 display units; a Focus root keeps at least its
+automatic 8.4 size (and root styling). No entry is exactly unchanged. Headings,
+blocks, and diagnostics ignore the map. Global label LOD uses that same final
+displayed size; thresholds are unchanged. Group color composes independently.
+Graphology retains automatic size and exact coordinates. The renderer never
+loads storage or changes projection/query membership.
+
+`setPresentationOverrides()` diffs the sparse maps and resolves changed File
+IDs through a session index rebuilt only on topology updates. Only affected
+visible node reducers are refreshed. Sigma **3.0.3** requires
+`skipIndexation: false` for radius changes: its next process pass rebuilds
+label/program/picking indices, not spatial layout. This Sigma indexing may scan
+the graph; the application does not remap or scan all nodes per slider tick.
+Color-only group changes retain `skipIndexation: true`. If topology is awaiting
+Sigma processing, both style updates coalesce behind its existing after-render
+boundary and removed keys are excluded from the partial refresh. Initial
+overrides are installed before the first draw.
+
+The flicker correction removes accidental layout-cache invalidation, not
+physical radius coupling: resolved ForceAtlas2 **0.10.1** defaults to
+`adjustSizes: false`, and neither Global nor Local enables it. Per-File display
+changes must submit zero layouts and preserve exact x/y coordinates, including
+the distance between unrelated connected Files. Normal automatic sizes still
+participate in layout fingerprints. Workers, latest-wins handling, and bounded
+position caches are unchanged; no new layout cache or persisted geometry exists.
 
 The layout fingerprint includes schema, algorithm, iterations, stable node
 keys/sizes, reference endpoints/weights, folder assignment, and validated

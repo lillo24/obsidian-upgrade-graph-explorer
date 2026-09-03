@@ -4,6 +4,7 @@ import type {
   LocalVisualLod,
 } from './local-types';
 import type { VisualGroupNodePresentation } from '@icarus-graph-explorer/visual-groups';
+import { applyNetworkNodeSizeScale } from './node-size';
 
 export function resolveLocalVisualLod(cameraRatio: number): LocalVisualLod {
   if (!Number.isFinite(cameraRatio) || cameraRatio <= 0) {
@@ -22,6 +23,7 @@ export function resolveLocalNodeStyle(
     readonly selected: boolean;
     readonly lod: LocalVisualLod;
     readonly visualGroup?: VisualGroupNodePresentation;
+    readonly sizeScale?: number;
   },
 ) {
   const emphasized = context.selected || context.hovered;
@@ -37,6 +39,14 @@ export function resolveLocalNodeStyle(
     (context.lod === 'far-local' && attributes.nodeKind === 'document');
   return {
     ...attributes,
+    size:
+      attributes.nodeKind === 'document' && attributes.entityId !== null
+        ? applyNetworkNodeSizeScale(
+            attributes.size,
+            context.sizeScale,
+            attributes.root,
+          )
+        : attributes.size,
     color: context.selected
       ? '#d29b22'
       : context.hovered

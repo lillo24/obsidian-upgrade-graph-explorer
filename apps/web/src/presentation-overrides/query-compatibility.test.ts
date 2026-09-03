@@ -19,6 +19,10 @@ import {
 import {
   mapProjectionToGlobal,
   mapProjectionToLocalTopology,
+  resolveGlobalNodeStyle,
+  resolveLocalNodeStyle,
+  resolveGlobalLayoutSettings,
+  DEFAULT_GLOBAL_LAYOUT_SETTINGS,
 } from '@icarus-graph-explorer/renderer-sigma/core';
 import { planExactPathQueryMutation } from '../network-explorer-query-actions';
 import { effectiveGlobalProjectionState } from '../global-view';
@@ -88,19 +92,35 @@ describe('size overrides remain separate from QUERY1/navigation', () => {
           ? mapProjectionToLocalTopology(
               projectLocalView(workspace, state),
               'A',
-              overrides,
             )
           : mapProjectionToGlobal(
               projectView(
                 workspace,
                 effectiveGlobalProjectionState(workspace, state),
               ),
-              undefined,
-              overrides,
             );
-      const initialSize = render(initial).nodes.find(
-        (node) => node.attributes.entityId === 'B',
-      )!.attributes.size;
+      const displayedSize = (state: typeof initial) => {
+        const attributes = render(state).nodes.find(
+          (node) => node.attributes.entityId === 'B',
+        )!.attributes;
+        const context = {
+          hovered: false,
+          selected: false,
+          relatedToHover: true,
+          sizeScale: overrides.get('B')!.sizeScale,
+        };
+        return 'root' in attributes
+          ? resolveLocalNodeStyle(attributes, { ...context, lod: 'near-local' })
+              .size
+          : resolveGlobalNodeStyle(attributes, {
+              ...context,
+              lod: 'near',
+              settings: resolveGlobalLayoutSettings(
+                DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+              ),
+            }).size;
+      };
+      const initialSize = displayedSize(initial);
       const hide = planExactPathQueryMutation({
         activeQuery: undefined,
         queryDraft: '',
@@ -134,10 +154,7 @@ describe('size overrides remain separate from QUERY1/navigation', () => {
         type: 'set-query',
         query: unhide.query ?? null,
       });
-      expect(
-        render(restored).nodes.find((node) => node.attributes.entityId === 'B')!
-          .attributes.size,
-      ).toBe(initialSize);
+      expect(displayedSize(restored)).toBe(initialSize);
       const before = createGraphHistoryCheckpoint(
         initial,
         undefined,

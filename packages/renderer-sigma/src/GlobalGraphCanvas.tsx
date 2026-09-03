@@ -57,7 +57,7 @@ export interface GlobalGraphCanvasProps {
   readonly trackpadZoomMode: GlobalTrackpadZoomMode;
   /** Style-only EntityId lookup; excluded from mapping and layout inputs. */
   readonly visualGroupStyles?: VisualGroupPresentationMap;
-  /** File sizes participate in normal mapping and layout fingerprints. */
+  /** Display-only File multipliers; never mapping/layout/fingerprint inputs. */
   readonly presentationOverrides?: EntityPresentationOverrideMap;
 }
 
@@ -111,12 +111,11 @@ export function GlobalGraphCanvas({
     };
   }, [onFailure, onNodeActivate, onSelectionChange, onViewportObservation]);
   const input = useMemo(() => {
-    const map = () =>
-      mapProjectionToGlobal(projection, settings, presentationOverrides);
+    const map = () => mapProjectionToGlobal(projection, settings);
     return instrumentation === undefined
       ? map()
       : instrumentation.measure('global-map', 'global-mappings', map);
-  }, [instrumentation, projection, settings, presentationOverrides]);
+  }, [instrumentation, projection, settings]);
   const requestTemplate = useMemo(
     () =>
       createGlobalLayoutRequest(
@@ -140,9 +139,11 @@ export function GlobalGraphCanvas({
       settings,
       trackpadZoomMode,
       visualGroupStyles,
+      presentationOverrides,
     };
   });
   const appliedVisualGroupStyles = useRef(initial.visualGroupStyles);
+  const appliedPresentationOverrides = useRef(initial.presentationOverrides);
   const [ready, setReady] = useState(false);
   const [layoutCommitKey, setLayoutCommitKey] = useState(0);
   const [layoutStatus, setLayoutStatus] = useState<string | undefined>(
@@ -159,6 +160,9 @@ export function GlobalGraphCanvas({
         new GlobalRendererSession(container, initial.input, {
           settings: initial.settings,
           trackpadZoomMode: initial.trackpadZoomMode,
+          ...(initial.presentationOverrides === undefined
+            ? {}
+            : { presentationOverrides: initial.presentationOverrides }),
           ...(initial.visualGroupStyles === undefined
             ? {}
             : { visualGroupStyles: initial.visualGroupStyles }),
@@ -229,6 +233,12 @@ export function GlobalGraphCanvas({
     appliedVisualGroupStyles.current = visualGroupStyles;
     sessionRef.current?.setVisualGroupStyles(visualGroupStyles);
   }, [visualGroupStyles]);
+
+  useEffect(() => {
+    if (appliedPresentationOverrides.current === presentationOverrides) return;
+    appliedPresentationOverrides.current = presentationOverrides;
+    sessionRef.current?.setPresentationOverrides(presentationOverrides);
+  }, [presentationOverrides]);
 
   useEffect(() => {
     sessionRef.current?.setControlledSelection(

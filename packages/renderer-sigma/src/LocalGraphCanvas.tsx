@@ -60,7 +60,7 @@ export interface LocalGraphCanvasProps {
   readonly trackpadZoomMode: LocalTrackpadZoomMode;
   /** Style-only EntityId lookup; excluded from topology and layout inputs. */
   readonly visualGroupStyles?: VisualGroupPresentationMap;
-  /** File sizes participate in normal topology and layout fingerprints. */
+  /** Display-only File multipliers; never topology/layout/fingerprint inputs. */
   readonly presentationOverrides?: EntityPresentationOverrideMap;
 }
 
@@ -128,16 +128,11 @@ export function LocalGraphCanvas({
   ]);
 
   const topology = useMemo(() => {
-    const map = () =>
-      mapProjectionToLocalTopology(
-        projection,
-        rootEntityId,
-        presentationOverrides,
-      );
+    const map = () => mapProjectionToLocalTopology(projection, rootEntityId);
     return instrumentation === undefined
       ? map()
       : instrumentation.measure('local-map', 'local-mappings', map);
-  }, [instrumentation, projection, rootEntityId, presentationOverrides]);
+  }, [instrumentation, projection, rootEntityId]);
   const input = useMemo(() => {
     const seed = () => seedLocalRendererInput(topology);
     return instrumentation === undefined
@@ -162,9 +157,11 @@ export function LocalGraphCanvas({
       initialViewport,
       trackpadZoomMode,
       visualGroupStyles,
+      presentationOverrides,
     };
   });
   const appliedVisualGroupStyles = useRef(initial.visualGroupStyles);
+  const appliedPresentationOverrides = useRef(initial.presentationOverrides);
   const [ready, setReady] = useState(false);
   const [layoutCommitKey, setLayoutCommitKey] = useState(0);
   const [layoutStatus, setLayoutStatus] = useState(
@@ -183,6 +180,9 @@ export function LocalGraphCanvas({
         new LocalRendererSession(container, initial.input, {
           rootNodeKey: initial.input.rootNodeKey,
           trackpadZoomMode: initial.trackpadZoomMode,
+          ...(initial.presentationOverrides === undefined
+            ? {}
+            : { presentationOverrides: initial.presentationOverrides }),
           ...(initial.visualGroupStyles === undefined
             ? {}
             : { visualGroupStyles: initial.visualGroupStyles }),
@@ -253,6 +253,12 @@ export function LocalGraphCanvas({
     appliedVisualGroupStyles.current = visualGroupStyles;
     sessionRef.current?.setVisualGroupStyles(visualGroupStyles);
   }, [visualGroupStyles]);
+
+  useEffect(() => {
+    if (appliedPresentationOverrides.current === presentationOverrides) return;
+    appliedPresentationOverrides.current = presentationOverrides;
+    sessionRef.current?.setPresentationOverrides(presentationOverrides);
+  }, [presentationOverrides]);
 
   useEffect(() => {
     sessionRef.current?.setControlledSelection(

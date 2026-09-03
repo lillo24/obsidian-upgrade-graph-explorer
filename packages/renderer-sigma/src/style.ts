@@ -5,6 +5,7 @@ import type {
   ResolvedGlobalLayoutSettings,
 } from './types';
 import type { VisualGroupNodePresentation } from '@icarus-graph-explorer/visual-groups';
+import { applyNetworkNodeSizeScale } from './node-size';
 
 export const GLOBAL_ALWAYS_LABELED_NODE_LIMIT = 12;
 
@@ -29,6 +30,7 @@ export interface GlobalNodeStyleContext {
   readonly lod: GlobalVisualLod;
   readonly settings: ResolvedGlobalLayoutSettings;
   readonly visualGroup?: VisualGroupNodePresentation;
+  readonly sizeScale?: number;
 }
 
 export interface GlobalEdgeStyleContext {
@@ -42,6 +44,11 @@ export function resolveGlobalNodeStyle(
   attributes: GlobalNodeAttributes,
   context: GlobalNodeStyleContext,
 ) {
+  // Per-File radius is presentation only; Graphology retains automatic size.
+  const size =
+    attributes.nodeKind === 'document' && attributes.entityId !== null
+      ? applyNetworkNodeSizeScale(attributes.size, context.sizeScale)
+      : attributes.size;
   const emphasized = context.selected || context.hovered;
   const forceLabel = emphasized || context.alwaysShowLabel === true;
   const baseColor =
@@ -51,8 +58,8 @@ export function resolveGlobalNodeStyle(
   const visibleByScale =
     context.lod === 'near' ||
     (context.lod === 'regional'
-      ? attributes.size >= context.settings.labelThreshold * 0.68
-      : attributes.size >= context.settings.labelThreshold);
+      ? size >= context.settings.labelThreshold * 0.68
+      : size >= context.settings.labelThreshold);
   const color = context.selected
     ? '#d7a126'
     : context.hovered
@@ -62,6 +69,7 @@ export function resolveGlobalNodeStyle(
         : '#d8e0e3';
   return {
     ...attributes,
+    size,
     color,
     forceLabel,
     highlighted: emphasized,
