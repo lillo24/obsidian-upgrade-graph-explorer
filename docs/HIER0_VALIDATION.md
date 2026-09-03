@@ -1,12 +1,10 @@
 # HIER0 implementation and validation
 
 Validation date: 2026-09-03. Implementation started from `b81cc2c`, then
-integrated `495a7a1` (PR #53) and `8637dcb` (PR #51). This report separates
-implemented behavior and measured checks from the remaining release gate.
+integrated `495a7a1` (PR #53) and `8637dcb` (PR #51). This report records
+the implementation, measured checks, and user-verified release QA.
 
-**Status: implementation ready for review; native release interaction QA is
-pending. HIER0 is not yet complete and must not be merged on build evidence
-alone.**
+**Status: implementation and release QA passed; ready to merge.**
 
 ## 1. Product exposure
 
@@ -194,11 +192,9 @@ the All Network chunk: recovery Hierarchy rendered with the experiment Off.
 The expected failed import was explicit in the UI. That temporary harness is
 outside the repository and is not application instrumentation.
 
-**Native release interaction QA: not run.** This session has browser control,
-but native computer APIs are disabled. A successful optimized Tauri build
-does not establish real pointer, touchpad, restart, or live-vault behavior.
-Before marking the PR ready, run the current optimized executable against
-the bundled sample and a disposable synthetic vault:
+**Native release interaction QA: passed.** On 2026-09-03, the user reported
+that the complete release checklist passed against the current optimized
+executable:
 
 1. Start with a clean preference profile; verify All Network only and normal
    Focus Hierarchy availability.
@@ -212,9 +208,9 @@ the bundled sample and a disposable synthetic vault:
    synthetic vault and verify safe live recovery. Inspect normal runtime
    console output where available.
 
-PR CI and post-merge CI are separate gates. Merge, post-merge validation, and
-cleanup remain pending until native release QA passes. Keep this task worktree
-available for that QA and any fixes.
+PR CI passed before this QA record update. The resulting documentation commit
+must pass its fresh CI before merge; post-merge CI and cleanup remain separate
+gates.
 
 ## 12. Changed files and ownership
 
@@ -248,7 +244,6 @@ was made by HIER0. The prompt archive matches the supplied file byte for byte.
 
 ## 15. Follow-up
 
-Complete native release QA, resolve any resulting defects, pass PR CI, then
-merge, verify post-merge CI, and clean up this task's branch/worktree.
-Only after these gates may HIER0 be called complete. HIER1 — Focus Schematic
-model + quality harness — is the next planned task; it was not started.
+Pass the fresh PR CI, merge, verify post-merge CI, and clean up this task's
+branch/worktree. HIER1 — Focus Schematic model + quality harness — is the next
+planned task; it was not started.
