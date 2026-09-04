@@ -10,14 +10,35 @@ import {
 import { GlobalCustomLayoutControls, GraphSettings } from './GraphSettings';
 
 describe('Graph Settings presentation', () => {
-  it('groups Graph and Source controls into accessible transient tabs', () => {
+  it('separates Preferences, Sandbox, and Source into accessible transient tabs', () => {
     const markup = renderToStaticMarkup(
       <GraphSettings
+        allNetworkDensityQaDiagnostics={{
+          rawDecisionRatio: 1.4,
+          effectiveRatio: 1.2,
+          cameraRatio: 1.2,
+          fallback: false,
+          nodeCount: 50,
+          edgeCount: 0,
+          isolatedNodeCount: 50,
+        }}
+        allNetworkDensityFramingStrength={50}
+        focusNetworkDensityQaDiagnostics={{
+          rawDecisionRatio: 1.23456,
+          effectiveRatio: 1.11728,
+          cameraRatio: 1.11729,
+          fallback: true,
+          fallbackReason: 'Synthetic fallback reason.',
+        }}
+        focusNetworkDensityFramingStrength={100}
         focusAppearance="outline"
         globalLayoutSettings={DEFAULT_GLOBAL_LAYOUT_SETTINGS}
+        onAllNetworkDensityFramingStrengthChange={() => undefined}
+        onFocusNetworkDensityFramingStrengthChange={() => undefined}
         onFocusAppearanceChange={() => undefined}
         onGlobalLayoutSettingsChange={() => undefined}
         onOpenChange={() => undefined}
+        onResetSandbox={() => undefined}
         onTrackpadZoomModeChange={() => undefined}
         open
         trackpadZoomMode="pinch-zoom"
@@ -30,18 +51,59 @@ describe('Graph Settings presentation', () => {
 
     expect(markup).toContain('role="tablist"');
     expect(markup).toContain(
-      'aria-controls="graph-settings-graph-panel" aria-selected="true"',
+      'aria-controls="graph-settings-preferences-panel" aria-selected="true"',
+    );
+    expect(markup).toContain(
+      'aria-controls="graph-settings-sandbox-panel" aria-selected="false"',
     );
     expect(markup).toContain(
       'aria-controls="graph-settings-source-panel" aria-selected="false"',
     );
-    expect(markup).toContain('id="graph-settings-graph-panel" role="tabpanel"');
+    expect(markup).toContain(
+      'id="graph-settings-preferences-panel" role="tabpanel"',
+    );
+    expect(markup).toContain(
+      'hidden="" id="graph-settings-sandbox-panel" role="tabpanel"',
+    );
     expect(markup).toContain(
       'hidden="" id="graph-settings-source-panel" role="tabpanel"',
     );
-    expect(markup).toContain('>Graph Appearance<');
+    expect(markup).toContain('>Preferences</button>');
+    expect(markup).toContain('>Sandbox</button>');
+    expect(markup).toContain('>Interaction<');
+    expect(markup).toContain('>Focus Root appearance<');
     expect(markup).toContain('>All Network Layout<');
-    expect(markup).toContain('>Graph Interaction<');
+    expect(markup).toContain('>Network Density<');
+    expect(markup).toContain('>All Network Density<');
+    expect(markup).toContain('id="all-density-framing-strength"');
+    expect(markup).toContain('>Focus Network Density<');
+    expect(markup).toContain('id="focus-density-framing-strength"');
+    expect(markup).toContain(
+      '>Legacy</span><span>Auto</span><span>Stronger</span>',
+    );
+    expect(markup).toContain(
+      'id="all-density-framing-strength" max="150" min="0"',
+    );
+    expect(markup).toContain(
+      'id="focus-density-framing-strength" max="150" min="0"',
+    );
+    expect(markup).toContain(
+      'Camera-only framing for Scope = Focus, Layout = Network.',
+    );
+    expect(markup).toContain('>Temporary QA diagnostics<');
+    expect(markup).toContain('>Raw decision ratio<');
+    expect(markup).toContain('>1.2346<');
+    expect(markup).toContain('>Effective ratio<');
+    expect(markup).toContain('>1.1173<');
+    expect(markup).toContain('>Sigma camera ratio<');
+    expect(markup).toContain('>Fallback reason<');
+    expect(markup).toContain('Synthetic fallback reason.');
+    expect(markup).toContain('>Isolated nodes<');
+    expect(markup).toContain('>50</dd>');
+    expect(markup).toContain(
+      'Runtime only; never saved or used as layout input.',
+    );
+    expect(markup).toContain('>Reset Sandbox</button>');
     expect(markup).toContain('>Current Source<');
     expect(markup).toContain('Applies to Scope = All, Layout = Network.');
     expect(markup).toContain('>Folder clustering strength<');
@@ -53,7 +115,7 @@ describe('Graph Settings presentation', () => {
       'aria-controls="graph-experimental-controls" aria-expanded="false"',
     );
     expect(markup.indexOf('Experimental</button>')).toBeGreaterThan(
-      markup.indexOf('>Graph Interaction<'),
+      markup.indexOf('>Focus Network Density<'),
     );
     expect(markup).not.toContain('Show All Hierarchy');
   });
@@ -65,11 +127,16 @@ describe('Graph Settings presentation', () => {
     };
     const markup = renderToStaticMarkup(
       <GraphSettings
+        allNetworkDensityFramingStrength={35}
+        focusNetworkDensityFramingStrength={65}
         focusAppearance="outline"
         globalLayoutSettings={settings}
+        onAllNetworkDensityFramingStrengthChange={() => undefined}
+        onFocusNetworkDensityFramingStrengthChange={() => undefined}
         onFocusAppearanceChange={() => undefined}
         onGlobalLayoutSettingsChange={() => undefined}
         onOpenChange={() => undefined}
+        onResetSandbox={() => undefined}
         onTrackpadZoomModeChange={() => undefined}
         open
         trackpadZoomMode="pinch-zoom"
@@ -78,6 +145,8 @@ describe('Graph Settings presentation', () => {
 
     expect(markup).toContain('aria-valuetext="75 percent" disabled=""');
     expect(markup).toContain('value="75"');
+    expect(markup).toContain('aria-valuetext="65 percent"');
+    expect(markup).toContain('aria-valuetext="35 percent"');
   });
 
   it('groups advanced controls by responsibility with an accessible influence scale', () => {

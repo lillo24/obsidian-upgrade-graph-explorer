@@ -242,7 +242,7 @@ describe('cross-Sigma Visual Group style contract', () => {
   it('defers a Global style repaint until changed topology is indexed', async () => {
     const refresh = vi.fn();
     const scheduleRefresh = vi.fn();
-    let afterRender: (() => void) | undefined;
+    const lifecycleHandlers = new Map<string, Set<() => void>>();
     const initial = mapProjectionToGlobal(globalTestProjection(), {
       folderClustering: true,
       spacingPreset: 'normal',
@@ -250,15 +250,40 @@ describe('cross-Sigma Visual Group style contract', () => {
     const session = Object.create(
       GlobalRendererSession.prototype,
     ) as GlobalRendererSession;
-    Reflect.set(session, 'graph', buildGlobalGraph(initial));
+    const graph = buildGlobalGraph(initial);
+    let refreshScheduled = false;
+    const scheduleFromGraphology = () => {
+      if (refreshScheduled) return;
+      refreshScheduled = true;
+      scheduleRefresh();
+    };
+    graph.on('nodeDropped', scheduleFromGraphology);
+    graph.on('edgeDropped', scheduleFromGraphology);
+    graph.on('nodeAttributesUpdated', scheduleFromGraphology);
+    graph.on('edgeAttributesUpdated', scheduleFromGraphology);
+    Reflect.set(session, 'graph', graph);
     Reflect.set(session, 'neighborhoods', new Map());
     Reflect.set(session, 'renderer', {
-      once: (event: string, callback: () => void) => {
-        expect(event).toBe('afterRender');
-        afterRender = callback;
+      on: (event: string, callback: () => void) => {
+        const handlers = lifecycleHandlers.get(event) ?? new Set();
+        handlers.add(callback);
+        lifecycleHandlers.set(event, handlers);
       },
+      off: (event: string, callback: () => void) =>
+        lifecycleHandlers.get(event)?.delete(callback),
       refresh,
       scheduleRefresh,
+      getDimensions: () => ({ width: 800, height: 600 }),
+      getNodeDisplayData: (key: string) =>
+        graph.hasNode(key) ? graph.getNodeAttributes(key) : undefined,
+      framedGraphToViewport: (point: { x: number; y: number }) => point,
+      viewportToFramedGraph: (point: { x: number; y: number }) => point,
+      getGraphDimensions: () => ({ width: 1, height: 1 }),
+      getCamera: () => ({
+        ratio: 1,
+        getState: () => ({ x: 0.5, y: 0.5, ratio: 1 }),
+        setState: vi.fn(),
+      }),
     });
     Reflect.set(session, 'options', {});
 
@@ -267,9 +292,14 @@ describe('cross-Sigma Visual Group style contract', () => {
 
     expect(scheduleRefresh).toHaveBeenCalledOnce();
     expect(refresh).not.toHaveBeenCalled();
-    expect(afterRender).toBeTypeOf('function');
+    expect(lifecycleHandlers.get('afterRender')?.size).toBe(1);
 
-    afterRender?.();
+    for (const callback of [...(lifecycleHandlers.get('afterProcess') ?? [])]) {
+      callback();
+    }
+    for (const callback of [...(lifecycleHandlers.get('afterRender') ?? [])]) {
+      callback();
+    }
     await Promise.resolve();
 
     expect(refresh).toHaveBeenCalledOnce();
@@ -306,6 +336,7 @@ describe('cross-Sigma Visual Group style contract', () => {
       topologyReconciliation: 0,
       layoutRequest: 0,
       globalLayoutRequest: 0,
+      densityEvaluation: 0,
       visualRefresh: 1,
     });
   });

@@ -1,6 +1,6 @@
 # Sigma Global/Regional and Local Free Renderer
 
-Status: **STABLE — KG13B1 Global and KG13B2A Local Free contracts are test-backed.**
+Status: **QA — atomic All/Focus camera commits and 0–150% density framing are test-backed; native acceptance remains pending.**
 
 This package owns the lazy, direct Sigma 3 renderers for file-level
 Global/Regional exploration and bounded Local Free exploration. Both consume a
@@ -42,7 +42,8 @@ src/
   file-move.ts             Pure File gesture reducer and frame-coalesced coordinator.
   node-size.ts             Per-File multiplier composition and final display-only bounds.
   node-size-presentation.ts  Sparse override diff and topology-owned File-to-node key index.
-  graph.ts                 Graphology construction, neighborhood index, and reconciliation.
+  graph.ts                 Graphology construction, neighborhood index, and planned reconciliation.
+  anchored-refresh.ts      Pre-mutation Sigma process/render camera transaction.
   interaction-contract.ts  Operation-count oracle for camera/UI versus layout-triggering work.
   layout.ts                Worker-safe ForceAtlas2, folder-prior candidates, metrics, fingerprint.
   layout-cache.ts          Four-entry memory-only LRU of automatic derived positions.
@@ -59,10 +60,14 @@ src/
   local-mapping.ts         Separate Local topology and deterministic root-relative seed.
   local-graph.ts           Local Graphology construction, reconciliation, and neighborhoods.
   local-style.ts           Far/normal/near Local and GROUP1A styling without topology changes.
+  network-density-core.ts  Shared Sigma normalization, robust statistics, topology, and exact k-d-tree primitives.
+  global-density.ts        Rootless, component-safe All Network camera-ratio policy.
+  global-density-framing.ts  Transient legacy-to-density interpolation for All Network.
+  local-density.ts         Pure Sigma-faithful B4 policy for accepted-layout camera Fit.
   local-convergence.ts     Canonical bounded policy, root-aligned metrics, degree guard, and caps.
   local-layout.ts          Schema-v2 Local ForceAtlas2 lifecycle, result validation, and fingerprint.
   local-layout-cache.ts    Bounded memory-only exact Local position cache.
-  local-lifecycle.ts       Idempotent lease and pre-draw anchored refresh boundary.
+  local-lifecycle.ts       Idempotent Local renderer mount/session lease.
   local-session.ts         Local Sigma ownership, precision input, anchors, and viewport.
   local-interaction-contract.ts  Local operation-count oracle and Global-isolation proof.
   LocalGraphCanvas.tsx     Immediate seed mount and latest worker refinement boundary.
@@ -377,10 +382,13 @@ normalized to graph origin. A transient Global viewport point may place that
 root on entry; refinement captures and restores the root's screen position.
 Missing capture falls back to semantic centering. Exact cached positions and
 the saved semantic viewport are installed during the imperative mount, before
-the first visible draw. A topology or position reconciliation restores the
-selected node, or otherwise the Local root, during Sigma's `afterProcess`
-phase so the renderer cannot expose one frame with new normalization and an
-old camera.
+the first visible draw. A topology or position reconciliation arms its camera
+transaction before the first Graphology mutation. The first resulting Sigma
+`afterProcess` restores the selected node, or otherwise the Local root, before
+the changed graph can draw, so no stale-normalization frame is exposed. If a
+layout worker answers before that topology frame completes, coordinate adoption
+waits for the anchored topology render before capturing its own anchor; the two
+normalization changes cannot collapse into one stale-display-data transaction.
 
 Hierarchy edges are stronger than references and remain visually distinct.
 NETWORKPOLISH1 removes Local's far-reference hide rule without changing the
@@ -388,7 +396,71 @@ NETWORKPOLISH1 removes Local's far-reference hide rule without changing the
 hover through maximum zoom-out, with existing width factors 1 / 0.84 / 0.45
 for near / normal / far. Far hierarchy width stays 0.72; root/label LOD and
 hover emphasis remain intact. Native readability is a release-QA gate.
-Sparse Focus spacing, normalization, camera framing and ForceAtlas2 settings
+SPACING1B leaves ForceAtlas2 settings, normalization, accepted coordinates,
+fingerprints, and caches unchanged, but replaces both Network renderers'
+ratio-1 automatic Fit with scope-specific density-aware camera targets. The
+Focus policy measures accepted positions
+in a fixed 1200×800 Sigma 3.0.3 frame with 24 px padding. It takes the median of
+the raw connected-edge, nearest-neighbor/node-diameter, and p90-root-radius
+signals, then clamps once to `0.7–1.4`; invalid or degenerate metrics fall back
+to ratio 1.
+
+Fresh Local sessions are auto-framed after an exact cache hit or latest worker
+result while retaining their transition anchor's screen point. A restored
+semantic viewport, explicit center, wheel/pinch, native drag, or zoom button
+makes the session camera user-owned, so later layout completion updates only
+the stored Fit target. Manual Fit resets x/y/angle, applies that latest target,
+and returns ownership to automatic framing. Resize never recomputes or reapplies
+the policy. Automatic node sizes are the only radius input: VISUAL1B display
+multipliers and Visual Groups cannot change density, camera, layout, or cache.
+
+SPACING1B-QA adds a transient 0–150% camera-policy strength. The effective ratio
+is `1 + (densityDecision - 1) * strength / 100`, so 0% reproduces the legacy
+ratio-1 Fit and 100% preserves SPACING1B. Values from 101–150% are explicitly
+Sandbox-only amplification of the correction away from ratio 1, not production
+automatic behavior. Changing strength always previews the new ratio around the
+current selected-node/root screen anchor, even when the camera was already
+user-owned, and makes the resulting camera user-owned.
+Later topology or layout completion therefore cannot override the preview;
+Fit recenters with the selected strength and returns to automatic ownership.
+The value never enters ForceAtlas2
+requests, accepted positions, fingerprints, caches, projection, or persistence.
+Temporary SPACING1B native-QA diagnostics publish the latest raw decision ratio,
+interpolated effective ratio, actual Sigma camera ratio, and fallback evidence
+through a deduplicated session callback. The callback is display-only runtime
+state and cannot alter density, camera, topology, layout, cache, or persistence.
+
+All Network uses a separate rootless policy over the confirmed final displayed
+positions after automatic ForceAtlas2, optional dynamic Pull, and fixed-folder
+composition. Sigma's installed normalization maps those positions into the
+same 1200×800 frame before measurement. The primary nearest-neighbor signal
+works for zero-edge and multi-component scenes; connected-edge distance is
+optional; a p95 robust-radius signal and 95% useful-viewport floor guard
+outlying components. Their robust combination is clamped once to `0.7–1.4`.
+A balanced deterministic k-d tree avoids the bounded Focus policy's quadratic
+nearest-neighbor scan at Global scale. Empty, single-node, invalid, duplicate,
+or incomplete geometry falls back explicitly to ratio 1; independent graphs
+with two or more valid nodes produce a real decision.
+
+Fresh All Network sessions without a restored semantic viewport are
+auto-owned. Confirmed displayed geometry may refresh their camera target, while
+wheel/pinch, pan, zoom buttons, centering, arrangement interaction, restored
+viewports, and density-slider previews make the camera user-owned. Worker,
+query, topology, Pull, and fixed-position adoption then preserve the visual
+anchor and camera ratio. Live arrangement preview changes only displayed
+positions; confirmation updates the stored density decision without reframing.
+All Fit recenters, resets the angle, applies the current effective All ratio,
+and returns ownership to automatic. All and Focus have independent transient
+0–150% strengths, both defaulting to 100%; neither enters layout input, cache,
+fingerprint, presentation override, query, workspace state, or persistence.
+Confirmed topology and coordinate changes use Graphology-triggered Sigma
+refresh as the single authoritative process request. Their matching
+`afterProcess` and `afterRender` callbacks are armed before mutation. Global
+query anchoring prefers a surviving selected node, then an explicit
+semantic/history anchor, then the nearest viewport-center survivor with stable
+key tie-breaking. A fully replaced or empty scene is centered deterministically
+without inventing a relationship to a removed node.
+Sparse Focus spacing, normalization, and ForceAtlas2 settings
 are intentionally unchanged. CONVERGENCE1B replaces the old one-shot budget
 with `local-fa2-convergence-v1`: one Graphology graph receives public
 ForceAtlas2 calls in 32-iteration batches until three consecutive full batches

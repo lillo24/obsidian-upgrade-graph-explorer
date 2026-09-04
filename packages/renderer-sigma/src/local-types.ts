@@ -67,6 +67,15 @@ export interface LocalViewportPoint {
   readonly y: number;
 }
 
+/** Temporary, runtime-only SPACING1B native-QA evidence. */
+export interface LocalDensityQaDiagnostics {
+  readonly rawDecisionRatio: number;
+  readonly effectiveRatio: number;
+  readonly cameraRatio: number;
+  readonly fallback: boolean;
+  readonly fallbackReason?: string;
+}
+
 export interface LocalCenterRequest {
   readonly key: number;
   readonly nodeId: ProjectionNodeId;
@@ -188,6 +197,7 @@ export type LocalPerformancePhase =
   | 'local-sigma-mount'
   | 'local-layout-worker'
   | 'local-layout-apply'
+  | 'local-density'
   | 'local-visual-lod'
   | 'local-hover'
   | 'local-selection'
@@ -199,6 +209,7 @@ export type LocalPerformanceOperation =
   | 'local-seeds'
   | 'local-topology-reconciliations'
   | 'local-layouts'
+  | 'local-density-evaluations'
   | 'local-style-updates'
   | 'local-hover-applications'
   | 'local-selection-applications'

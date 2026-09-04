@@ -188,6 +188,8 @@ describe.each(['global', 'local'] as const)(
         expect(onFailure).not.toHaveBeenCalled();
         expect(layout).toHaveBeenCalledTimes(1);
         const renderer = SigmaTestRenderer.instances[0]!;
+        const cameraRatioBefore = renderer.camera.ratio;
+        const cameraSetCallsBefore = renderer.camera.setState.mock.calls.length;
         const before = coordinates(renderer);
         const distance = () =>
           Math.hypot(
@@ -216,6 +218,7 @@ describe.each(['global', 'local'] as const)(
           await harness.flush();
           snapshots.push({
             calls: layout.mock.calls.length,
+            cameraRatio: renderer.camera.ratio,
             coordinates: coordinates(renderer),
             displayed: renderer.displayNodes.get('entity:doc-c')?.size,
           });
@@ -230,6 +233,7 @@ describe.each(['global', 'local'] as const)(
         );
         for (const [i, snapshot] of snapshots.entries()) {
           expect(snapshot.coordinates).toEqual(before);
+          expect(snapshot.cameraRatio).toBe(cameraRatioBefore);
           expect(snapshot.displayed).toBeCloseTo(automaticSize * sequence[i]!);
         }
         expect(counts.get(`${mode}-layouts`)).toBe(
@@ -245,6 +249,9 @@ describe.each(['global', 'local'] as const)(
         expect(counts.get('local-topology-reconciliations')).toBe(
           countBefore.get('local-topology-reconciliations'),
         );
+        expect(counts.get('local-density-evaluations')).toBe(
+          countBefore.get('local-density-evaluations'),
+        );
         expect(writes).toHaveBeenCalledTimes(1);
         expect(onSelectionChange).not.toHaveBeenCalled();
         overrides = undefined;
@@ -255,8 +262,9 @@ describe.each(['global', 'local'] as const)(
         expect(renderer.displayNodes.get('entity:doc-c')?.size).toBe(
           automaticSize,
         );
+        expect(renderer.camera.ratio).toBe(cameraRatioBefore);
         expect(renderer.camera.setState.mock.calls.length).toBe(
-          mode === 'global' ? 0 : 1,
+          cameraSetCallsBefore,
         );
         // The same mounted canvas still submits work for a genuine topology edit.
         activeProjection = {

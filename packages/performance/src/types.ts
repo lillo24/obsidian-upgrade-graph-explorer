@@ -85,12 +85,14 @@ export const PERFORMANCE_PHASES = [
   'global-hover',
   'global-selection',
   'global-center',
+  'global-density',
   'local-projection',
   'local-map',
   'local-seed',
   'local-sigma-mount',
   'local-layout-worker',
   'local-layout-apply',
+  'local-density',
   'local-visual-lod',
   'local-hover',
   'local-selection',
@@ -127,11 +129,13 @@ export const PERFORMANCE_OPERATIONS = [
   'global-hover-applications',
   'global-selection-applications',
   'global-centers',
+  'global-density-evaluations',
   'local-projections',
   'local-mappings',
   'local-seeds',
   'local-topology-reconciliations',
   'local-layouts',
+  'local-density-evaluations',
   'local-style-updates',
   'local-hover-applications',
   'local-selection-applications',
@@ -198,11 +202,13 @@ export interface PerformanceOperationCounts {
   readonly 'global-hover-applications': number;
   readonly 'global-selection-applications': number;
   readonly 'global-centers': number;
+  readonly 'global-density-evaluations': number;
   readonly 'local-projections': number;
   readonly 'local-mappings': number;
   readonly 'local-seeds': number;
   readonly 'local-topology-reconciliations': number;
   readonly 'local-layouts': number;
+  readonly 'local-density-evaluations': number;
   readonly 'local-style-updates': number;
   readonly 'local-hover-applications': number;
   readonly 'local-selection-applications': number;
@@ -329,11 +335,13 @@ export function emptyPerformanceOperationCounts(): PerformanceOperationCounts {
     'global-hover-applications': 0,
     'global-selection-applications': 0,
     'global-centers': 0,
+    'global-density-evaluations': 0,
     'local-projections': 0,
     'local-mappings': 0,
     'local-seeds': 0,
     'local-topology-reconciliations': 0,
     'local-layouts': 0,
+    'local-density-evaluations': 0,
     'local-style-updates': 0,
     'local-hover-applications': 0,
     'local-selection-applications': 0,

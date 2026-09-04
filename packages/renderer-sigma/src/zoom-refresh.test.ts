@@ -8,6 +8,7 @@ vi.mock('sigma', () => ({
   default: class {
     readonly cameraHandlers = new Map<string, () => void>();
     readonly onceHandlers = new Map<string, (() => void)[]>();
+    readonly lifecycleHandlers = new Map<string, Set<() => void>>();
     readonly displayEdges = new Map<string, Attributes>();
     readonly camera = {
       ratio: 1,
@@ -26,10 +27,10 @@ vi.mock('sigma', () => ({
         this.cameraHandlers.get('updated')?.();
       },
     };
-    readonly captor = { on: vi.fn(), off: vi.fn() };
+    readonly captor = { on: vi.fn(), off: vi.fn(), isMouseDown: false };
+    readonly touchCaptor = { on: vi.fn(), off: vi.fn() };
     readonly scheduleRender = vi.fn();
     readonly scheduleRefresh = vi.fn(() => this.refresh());
-    readonly on = vi.fn();
     readonly kill = vi.fn();
 
     constructor(
@@ -38,7 +39,17 @@ vi.mock('sigma', () => ({
       readonly settings: {
         edgeReducer: (key: string, attributes: Attributes) => Attributes;
       },
-    ) {}
+    ) {
+      const refresh = () => this.refresh();
+      this.graph.on('nodeAdded', refresh);
+      this.graph.on('nodeDropped', refresh);
+      this.graph.on('nodeAttributesUpdated', refresh);
+      this.graph.on('eachNodeAttributesUpdated', refresh);
+      this.graph.on('edgeAdded', refresh);
+      this.graph.on('edgeDropped', refresh);
+      this.graph.on('edgeAttributesUpdated', refresh);
+      this.graph.on('eachEdgeAttributesUpdated', refresh);
+    }
 
     getCamera() {
       return this.camera;
@@ -46,11 +57,20 @@ vi.mock('sigma', () => ({
     getMouseCaptor() {
       return this.captor;
     }
+    getTouchCaptor() {
+      return this.touchCaptor;
+    }
     getNodeDisplayData(key: string) {
       return this.graph.hasNode(key) ? { x: 0.5, y: 0.5 } : undefined;
     }
     getGraphDimensions() {
       return { width: 1, height: 1 };
+    }
+    getDimensions() {
+      return { width: 1, height: 1 };
+    }
+    viewportToGraph(point: { x: number; y: number }) {
+      return point;
     }
     framedGraphToViewport(point: { x: number; y: number }) {
       return point;
@@ -64,6 +84,14 @@ vi.mock('sigma', () => ({
         callback,
       ]);
     }
+    on(event: string, callback: () => void) {
+      const handlers = this.lifecycleHandlers.get(event) ?? new Set();
+      handlers.add(callback);
+      this.lifecycleHandlers.set(event, handlers);
+    }
+    off(event: string, callback: () => void) {
+      this.lifecycleHandlers.get(event)?.delete(callback);
+    }
     refresh() {
       this.displayEdges.clear();
       this.graph.forEachEdge((key, attributes) => {
@@ -73,6 +101,9 @@ vi.mock('sigma', () => ({
         const callbacks = this.onceHandlers.get(event) ?? [];
         this.onceHandlers.delete(event);
         for (const callback of callbacks) callback();
+        for (const callback of [...(this.lifecycleHandlers.get(event) ?? [])]) {
+          callback();
+        }
       }
     }
   },

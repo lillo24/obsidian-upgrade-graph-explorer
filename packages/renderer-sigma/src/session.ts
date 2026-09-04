@@ -15,16 +15,26 @@ import {
   indexFileNodeKeys,
 } from './node-size-presentation';
 import {
+  resolveGlobalDensityFit,
+  type GlobalDensityDecision,
+} from './global-density';
+import {
+  DEFAULT_GLOBAL_DENSITY_FRAMING_STRENGTH,
+  globalDensityFramingRatio,
+} from './global-density-framing';
+import {
   isAvailableTemporaryFileMoveContext,
   TemporaryFileMoveCoordinator,
   type TemporaryFileMoveSessionContext,
 } from './file-move';
 import type { TemporaryNodeConstraintEndReason } from './temporary-node-constraint';
+import { atomicAnchoredGraphMutation } from './anchored-refresh';
 
 import {
   buildGlobalGraph,
   createGlobalNeighborhoodIndex,
   createGlobalReferenceDegreeIndex,
+  planGlobalGraphReconciliation,
   reconcileGlobalGraph,
   type GlobalGraph,
 } from './graph';
@@ -66,6 +76,7 @@ import {
 } from './style';
 import type {
   GlobalCenterRequest,
+  GlobalDensityQaDiagnostics,
   GlobalGraphReconciliation,
   GlobalLayoutPosition,
   GlobalLayoutService,
@@ -84,6 +95,10 @@ import type {
 export interface GlobalRendererSessionOptions {
   readonly settings: GlobalLayoutSettings;
   readonly trackpadZoomMode: GlobalTrackpadZoomMode;
+  /** Transient Sandbox policy; excluded from layout input and identity. */
+  readonly densityFramingStrength?: number;
+  /** Confirmed cache-restored displayed geometry, never unrefined seed data. */
+  readonly initialAcceptedPositions?: readonly GlobalLayoutPosition[];
   readonly initialViewport?: SemanticGlobalViewport;
   /** Development harness override; production leaves adaptive labels enabled. */
   readonly labels?: boolean;
@@ -117,6 +132,9 @@ export interface GlobalRendererSessionOptions {
   readonly onViewportObservation?: (
     viewport: SemanticGlobalViewport | undefined,
   ) => void;
+  readonly onDensityQaDiagnosticsChange?: (
+    diagnostics: GlobalDensityQaDiagnostics,
+  ) => void;
 }
 
 export interface GlobalFolderArrangementContext {
@@ -149,9 +167,29 @@ export class GlobalRendererSession {
   private neighborhoods: ReadonlyMap<string, ReadonlySet<string>>;
   private hoveredNode: string | undefined;
   private selectedNode: string | undefined;
+  private semanticAnchorNodeKey: string | undefined;
   private settings;
   private visualSettings: ResolvedGlobalVisualSettings;
   private trackpadZoomMode: GlobalTrackpadZoomMode;
+  private densityInput: GlobalRendererInput;
+  private densityFramingStrength: number;
+  private cameraOwnership: 'auto' | 'user';
+  private latestDensityDecision: GlobalDensityDecision = {
+    ratio: 1,
+    nearestNeighborSignal: 1,
+    robustExtentSignal: 1,
+    visibilityMinimumRatio: 1,
+    medianNearestNeighborPx: 0,
+    p95RadiusPx: 0,
+    nodeCount: 0,
+    edgeCount: 0,
+    componentCount: 0,
+    isolatedNodeCount: 0,
+    largestComponentSize: 0,
+    fallback: true,
+    fallbackReason: 'No confirmed All Network geometry has been measured yet.',
+  };
+  private lastDensityQaDiagnostics: GlobalDensityQaDiagnostics | undefined;
   private readonly options: GlobalRendererSessionOptions;
   private visualLod: GlobalVisualLod;
   private visualGroupStyles: VisualGroupPresentationMap | undefined;
@@ -200,6 +238,16 @@ export class GlobalRendererSession {
     }
   };
 
+  private readonly mouseDragHandler = (): void => {
+    if (this.renderer.getMouseCaptor().isMouseDown) {
+      this.cameraOwnership = 'user';
+    }
+  };
+
+  private readonly touchMoveHandler = (): void => {
+    this.cameraOwnership = 'user';
+  };
+
   private readonly cameraUpdatedHandler = (): void => {
     const started = performance.now();
     const next = resolveGlobalVisualLod(this.renderer.getCamera().ratio);
@@ -222,6 +270,7 @@ export class GlobalRendererSession {
       this.viewportObservationTimer = undefined;
       this.options.onViewportObservation?.(this.semanticViewport());
     }, 120);
+    this.emitDensityQaDiagnostics();
   };
 
   private readonly precisionWheelHandler = (coordinates: WheelCoords): void => {
@@ -235,6 +284,7 @@ export class GlobalRendererSession {
     }
     const original = coordinates.original as WheelEvent;
     preventSigmaWheelDefault(coordinates);
+    this.cameraOwnership = 'user';
     const deltaPixels = normalizeWheelDeltaPixels(
       original,
       this.renderer.getDimensions().height,
@@ -276,6 +326,12 @@ export class GlobalRendererSession {
     this.settings = resolveGlobalLayoutSettings(options.settings);
     this.visualSettings = resolveGlobalVisualSettings(options.settings);
     this.trackpadZoomMode = options.trackpadZoomMode;
+    this.densityInput = input;
+    this.densityFramingStrength =
+      options.densityFramingStrength ?? DEFAULT_GLOBAL_DENSITY_FRAMING_STRENGTH;
+    globalDensityFramingRatio(1, this.densityFramingStrength);
+    this.cameraOwnership =
+      options.initialViewport === undefined ? 'auto' : 'user';
     this.visualGroupStyles = options.visualGroupStyles;
     this.presentationOverrides = options.presentationOverrides;
     this.fileNodeKeys = indexFileNodeKeys(input.nodes);
@@ -303,20 +359,32 @@ export class GlobalRendererSession {
       nodeReducer: (key, attributes) => this.reduceNode(key, attributes),
       edgeReducer: (key, attributes) => this.reduceEdge(key, attributes),
     });
+    if (options.initialAcceptedPositions !== undefined) {
+      this.measureDensity(options.initialAcceptedPositions);
+      if (this.cameraOwnership === 'auto') {
+        this.renderer.getCamera().setState({
+          ratio: this.effectiveDensityRatio(),
+        });
+      }
+    }
     if (options.initialViewport !== undefined) {
       const initialNode = input.nodes.find(
         ({ attributes }) =>
           attributes.entityId === options.initialViewport?.anchorEntityId,
       );
       if (initialNode !== undefined) {
+        this.semanticAnchorNodeKey = initialNode.key;
         this.centerImmediately(initialNode.key, options.initialViewport.ratio);
       }
     }
     this.visualLod = resolveGlobalVisualLod(this.renderer.getCamera().ratio);
     const mountMs = Number((performance.now() - mountStart).toFixed(3));
     this.renderer.getMouseCaptor().on('wheel', this.precisionWheelHandler);
+    this.renderer.getMouseCaptor().on('mousemovebody', this.mouseDragHandler);
+    this.renderer.getTouchCaptor().on('touchmove', this.touchMoveHandler);
     this.renderer.getCamera().on('updated', this.cameraUpdatedHandler);
     this.bindEvents();
+    this.emitDensityQaDiagnostics();
     const renderStart = performance.now();
     this.ready = new Promise((resolve) => {
       this.renderer.once('afterRender', () => {
@@ -874,6 +942,9 @@ export class GlobalRendererSession {
     if (context?.active !== true) {
       throw new Error('Arrange folders is not active.');
     }
+    // Pointer and keyboard arrangement are explicit navigation. Confirmed
+    // geometry may update density later, but it must not steal this viewport.
+    this.cameraOwnership = 'user';
     const geometry = createFolderClusterPreviewGeometry({
       automaticPositions: context.automaticPositions,
       ...(context.currentPositions === undefined
@@ -965,6 +1036,23 @@ export class GlobalRendererSession {
     this.trackpadZoomMode = mode;
   }
 
+  updateDensityFramingStrength(strengthPercentage: number): void {
+    globalDensityFramingRatio(1, strengthPercentage);
+    if (this.densityFramingStrength === strengthPercentage) return;
+    const anchorKey = this.viewportAnchorNodeKey();
+    const anchor =
+      anchorKey === undefined ? undefined : this.nodeViewportPoint(anchorKey);
+    this.densityFramingStrength = strengthPercentage;
+    this.cameraOwnership = 'user';
+    const ratio = this.effectiveDensityRatio();
+    if (anchorKey === undefined || anchor === undefined) {
+      this.renderer.getCamera().setState({ ratio });
+    } else {
+      this.anchorNodeAtViewport(anchorKey, anchor, ratio);
+    }
+    this.emitDensityQaDiagnostics();
+  }
+
   setVisualGroupStyles(styles?: VisualGroupPresentationMap): void {
     this.visualGroupStyles = styles;
     this.options.instrumentation?.count('global-style-updates');
@@ -1026,7 +1114,45 @@ export class GlobalRendererSession {
     this.cancelFolderArrangementGesture();
     this.cancelTemporaryFileMove('topology-changed');
     this.nodeClicks?.cancel();
-    const run = () => reconcileGlobalGraph(this.graph, input);
+    const incomingNodeKeys = new Set(input.nodes.map(({ key }) => key));
+    const anchorKey = this.viewportAnchorNodeKey(incomingNodeKeys);
+    const anchor =
+      anchorKey === undefined ? undefined : this.nodeViewportPoint(anchorKey);
+    const ratio = this.renderer.getCamera().ratio;
+    let refresh: Promise<void> | undefined;
+    const run = () => {
+      const plan = planGlobalGraphReconciliation(this.graph, input);
+      if (!plan.changed) return plan.reconciliation;
+      const transaction = atomicAnchoredGraphMutation(
+        {
+          onAfterProcess: (callback) =>
+            this.renderer.on('afterProcess', callback),
+          offAfterProcess: (callback) =>
+            this.renderer.off('afterProcess', callback),
+          onAfterRender: (callback) =>
+            this.renderer.on('afterRender', callback),
+          offAfterRender: (callback) =>
+            this.renderer.off('afterRender', callback),
+        },
+        () => {
+          if (
+            anchorKey !== undefined &&
+            anchor !== undefined &&
+            this.graph.hasNode(anchorKey)
+          ) {
+            this.anchorNodeAtViewport(anchorKey, anchor, ratio);
+            return;
+          }
+          this.centerReplacedScene(ratio);
+        },
+        () => {
+          plan.apply();
+          return plan.reconciliation;
+        },
+      );
+      refresh = transaction.rendered;
+      return transaction.result;
+    };
     const reconciliation =
       this.options.instrumentation === undefined
         ? run()
@@ -1035,6 +1161,7 @@ export class GlobalRendererSession {
             'graphology-reconciliations',
             run,
           );
+    this.densityInput = input;
     this.neighborhoods = createGlobalNeighborhoodIndex(input);
     this.fileNodeKeys = indexFileNodeKeys(input.nodes);
     this.referenceDegrees = createGlobalReferenceDegreeIndex(input);
@@ -1045,20 +1172,19 @@ export class GlobalRendererSession {
       this.selectedNode = undefined;
       this.options.onNodeSelected?.(undefined, undefined);
     }
-    const changed = Object.values(reconciliation).some((count) => count > 0);
-    if (changed) {
-      const refresh = new Promise<void>((resolve) => {
-        this.renderer.once('afterRender', resolve);
-        this.renderer.scheduleRefresh();
-      });
+    if (
+      this.semanticAnchorNodeKey !== undefined &&
+      !this.graph.hasNode(this.semanticAnchorNodeKey)
+    ) {
+      this.semanticAnchorNodeKey = undefined;
+    }
+    if (refresh !== undefined) {
       this.topologyRefreshPending = refresh;
       void refresh.then(() => {
         if (this.topologyRefreshPending !== refresh) return;
         this.topologyRefreshPending = undefined;
         this.refreshPendingStyles();
       });
-    } else {
-      this.renderer.scheduleRefresh();
     }
     return reconciliation;
   }
@@ -1069,6 +1195,7 @@ export class GlobalRendererSession {
     this.cancelTemporaryFileMove('topology-changed');
     this.nodeClicks?.cancel();
     this.graph = buildGlobalGraph(input);
+    this.densityInput = input;
     this.fileNodeKeys = indexFileNodeKeys(input.nodes);
     this.neighborhoods = createGlobalNeighborhoodIndex(input);
     this.referenceDegrees = createGlobalReferenceDegreeIndex(input);
@@ -1088,6 +1215,7 @@ export class GlobalRendererSession {
     this.cancelFolderArrangementGesture();
     this.cancelTemporaryFileMove('layout-changed');
     reconcileGlobalGraph(this.graph, input, { preservePositions: false });
+    this.densityInput = input;
     this.fileNodeKeys = indexFileNodeKeys(input.nodes);
     this.referenceDegrees = createGlobalReferenceDegreeIndex(input);
     this.renderer.scheduleRefresh();
@@ -1235,36 +1363,150 @@ export class GlobalRendererSession {
     });
   }
 
+  private effectiveDensityRatio(): number {
+    return globalDensityFramingRatio(
+      this.latestDensityDecision.ratio,
+      this.densityFramingStrength,
+    );
+  }
+
+  private measureDensity(positions: readonly GlobalLayoutPosition[]): void {
+    const started = performance.now();
+    this.latestDensityDecision = resolveGlobalDensityFit(
+      this.densityInput,
+      positions,
+    );
+    this.options.instrumentation?.count('global-density-evaluations');
+    this.options.instrumentation?.record(
+      'global-density',
+      performance.now() - started,
+    );
+    this.emitDensityQaDiagnostics();
+  }
+
+  private emitDensityQaDiagnostics(): void {
+    const diagnostics: GlobalDensityQaDiagnostics = {
+      rawDecisionRatio: this.latestDensityDecision.ratio,
+      effectiveRatio: this.effectiveDensityRatio(),
+      cameraRatio: this.renderer.getCamera().ratio,
+      fallback: this.latestDensityDecision.fallback,
+      ...(this.latestDensityDecision.fallbackReason === undefined
+        ? {}
+        : { fallbackReason: this.latestDensityDecision.fallbackReason }),
+      nodeCount: this.latestDensityDecision.nodeCount,
+      edgeCount: this.latestDensityDecision.edgeCount,
+      isolatedNodeCount: this.latestDensityDecision.isolatedNodeCount,
+    };
+    const previous = this.lastDensityQaDiagnostics;
+    if (
+      previous !== undefined &&
+      previous.rawDecisionRatio === diagnostics.rawDecisionRatio &&
+      previous.effectiveRatio === diagnostics.effectiveRatio &&
+      previous.cameraRatio === diagnostics.cameraRatio &&
+      previous.fallback === diagnostics.fallback &&
+      previous.fallbackReason === diagnostics.fallbackReason &&
+      previous.nodeCount === diagnostics.nodeCount &&
+      previous.edgeCount === diagnostics.edgeCount &&
+      previous.isolatedNodeCount === diagnostics.isolatedNodeCount
+    ) {
+      return;
+    }
+    this.lastDensityQaDiagnostics = diagnostics;
+    this.options.onDensityQaDiagnosticsChange?.(diagnostics);
+  }
+
   applyPositions(positions: readonly GlobalLayoutPosition[]): Promise<void> {
+    const topologyRefresh = this.topologyRefreshPending;
+    if (topologyRefresh !== undefined) {
+      // A layout worker can answer before Sigma has processed the topology that
+      // requested it. Wait for that anchored frame so display data from the new
+      // scene exists before capturing the second, position-change anchor.
+      return topologyRefresh.then(() => this.applyPositions(positions));
+    }
     this.cancelTemporaryFileMove('layout-changed');
+    const anchorKey = this.viewportAnchorNodeKey();
+    const anchor =
+      anchorKey === undefined ? undefined : this.nodeViewportPoint(anchorKey);
+    const byKey = new Map(
+      positions.map((position) => [position.key, position]),
+    );
     try {
-      const byKey = new Map(
-        positions.map((position) => [position.key, position]),
-      );
-      this.graph.updateEachNodeAttributes(
-        (key, attributes) => {
-          const position = byKey.get(key);
-          if (position === undefined) {
-            throw new Error(`Global layout result omitted node ${key}.`);
-          }
-          if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
-            throw new Error(
-              `Global layout result has invalid position for node ${key}.`,
-            );
-          }
-          return { ...attributes, x: position.x, y: position.y };
-        },
-        { attributes: ['x', 'y'] },
-      );
+      if (
+        byKey.size !== positions.length ||
+        positions.length !== this.graph.order
+      ) {
+        throw new Error(
+          'Global layout result must match every displayed node exactly.',
+        );
+      }
+      for (const [key, position] of byKey) {
+        if (!this.graph.hasNode(key)) {
+          throw new Error(`Global layout result contains unknown node ${key}.`);
+        }
+        if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+          throw new Error(
+            `Global layout result has invalid position for node ${key}.`,
+          );
+        }
+      }
     } catch (error: unknown) {
       return Promise.reject(
         error instanceof Error ? error : new Error(String(error)),
       );
     }
-    return new Promise((resolve) => {
-      this.renderer.once('afterRender', resolve);
-      this.renderer.scheduleRefresh();
+    const changed = positions.some((position) => {
+      const attributes = this.graph.getNodeAttributes(position.key);
+      return attributes.x !== position.x || attributes.y !== position.y;
     });
+    this.measureDensity(positions);
+    if (!changed) {
+      const camera = this.renderer.getCamera();
+      const densityRatio = this.effectiveDensityRatio();
+      if (this.cameraOwnership === 'auto' && camera.ratio !== densityRatio) {
+        camera.setState({ ratio: densityRatio });
+        this.emitDensityQaDiagnostics();
+      }
+      return Promise.resolve();
+    }
+    const userRatio = this.renderer.getCamera().ratio;
+    return atomicAnchoredGraphMutation(
+      {
+        onAfterProcess: (callback) =>
+          this.renderer.on('afterProcess', callback),
+        offAfterProcess: (callback) =>
+          this.renderer.off('afterProcess', callback),
+        onAfterRender: (callback) => this.renderer.on('afterRender', callback),
+        offAfterRender: (callback) =>
+          this.renderer.off('afterRender', callback),
+      },
+      () => {
+        if (
+          this.cameraOwnership === 'user' &&
+          anchorKey !== undefined &&
+          anchor !== undefined
+        ) {
+          this.anchorNodeAtViewport(anchorKey, anchor, userRatio);
+        } else if (this.cameraOwnership === 'auto') {
+          this.renderer.getCamera().setState({
+            x: 0.5,
+            y: 0.5,
+            angle: 0,
+            ratio: this.effectiveDensityRatio(),
+          });
+        }
+        this.emitDensityQaDiagnostics();
+      },
+      () =>
+        this.graph.updateEachNodeAttributes(
+          (key, attributes) => {
+            const position = byKey.get(key)!;
+            return attributes.x === position.x && attributes.y === position.y
+              ? attributes
+              : { ...attributes, x: position.x, y: position.y };
+          },
+          { attributes: ['x', 'y'] },
+        ),
+    ).rendered;
   }
 
   /**
@@ -1318,11 +1560,72 @@ export class GlobalRendererSession {
     });
   }
 
+  private viewportAnchorNodeKey(
+    candidates?: ReadonlySet<string>,
+  ): string | undefined {
+    const survives = (key: string | undefined): key is string =>
+      key !== undefined &&
+      this.graph.hasNode(key) &&
+      (candidates === undefined || candidates.has(key));
+    if (survives(this.selectedNode)) {
+      return this.selectedNode;
+    }
+    if (survives(this.semanticAnchorNodeKey)) return this.semanticAnchorNodeKey;
+    const dimensions = this.renderer.getDimensions();
+    const center = {
+      x: dimensions.width / 2,
+      y: dimensions.height / 2,
+    };
+    let nearest:
+      { readonly key: string; readonly distanceSquared: number } | undefined;
+    this.graph.forEachNode((key) => {
+      if (!survives(key)) return;
+      const point = this.nodeViewportPoint(key);
+      if (point === undefined) return;
+      const distanceSquared =
+        (point.x - center.x) ** 2 + (point.y - center.y) ** 2;
+      if (
+        nearest === undefined ||
+        distanceSquared < nearest.distanceSquared ||
+        (distanceSquared === nearest.distanceSquared && key < nearest.key)
+      ) {
+        nearest = { key, distanceSquared };
+      }
+    });
+    return nearest?.key;
+  }
+
+  private centerReplacedScene(ratio: number): void {
+    this.renderer.getCamera().setState({ x: 0.5, y: 0.5, angle: 0, ratio });
+  }
+
+  private anchorNodeAtViewport(
+    key: string,
+    point: GlobalViewportPoint,
+    ratio: number,
+  ): void {
+    const node = this.renderer.getNodeDisplayData(key);
+    if (node === undefined) return;
+    const camera = this.renderer.getCamera();
+    const cameraState = { ...camera.getState(), ratio };
+    const current = this.renderer.viewportToFramedGraph(point, {
+      cameraState,
+      graphDimensions: this.renderer.getGraphDimensions(),
+    });
+    camera.setState({
+      x: cameraState.x + Number(node.x) - current.x,
+      y: cameraState.y + Number(node.y) - current.y,
+      ratio,
+    });
+  }
+
   async center(request: GlobalCenterRequest): Promise<void> {
     const display = this.renderer.getNodeDisplayData(request.nodeId);
     if (display === undefined) {
       throw new Error(`Cannot center missing Global node ${request.nodeId}.`);
     }
+    this.cameraOwnership = 'user';
+    this.semanticAnchorNodeKey = request.nodeId;
     const started = performance.now();
     await this.renderer
       .getCamera()
@@ -1348,6 +1651,7 @@ export class GlobalRendererSession {
   }
 
   zoomBy(factor: number): void {
+    this.cameraOwnership = 'user';
     const camera = this.renderer.getCamera();
     camera.animate(
       { ratio: Math.max(0.02, Math.min(6, camera.ratio * factor)) },
@@ -1356,9 +1660,17 @@ export class GlobalRendererSession {
   }
 
   fit(): void {
-    void this.renderer
-      .getCamera()
-      .animatedReset({ duration: preferredMotionDuration() });
+    this.cameraOwnership = 'auto';
+    this.semanticAnchorNodeKey = undefined;
+    void this.renderer.getCamera().animate(
+      {
+        x: 0.5,
+        y: 0.5,
+        ratio: this.effectiveDensityRatio(),
+        angle: 0,
+      },
+      { duration: preferredMotionDuration() },
+    );
   }
 
   semanticViewport(): SemanticGlobalViewport | undefined {
@@ -1411,6 +1723,8 @@ export class GlobalRendererSession {
     this.fileMoveContext = undefined;
     this.nodeClicks?.cancel();
     this.renderer.getMouseCaptor().off('wheel', this.precisionWheelHandler);
+    this.renderer.getMouseCaptor().off('mousemovebody', this.mouseDragHandler);
+    this.renderer.getTouchCaptor().off('touchmove', this.touchMoveHandler);
     this.renderer.getCamera().off('updated', this.cameraUpdatedHandler);
     if (this.precisionWheelIdleTimer !== undefined) {
       window.clearTimeout(this.precisionWheelIdleTimer);

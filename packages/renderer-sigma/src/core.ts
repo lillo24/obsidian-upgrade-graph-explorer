@@ -28,12 +28,39 @@ export {
 export { GlobalLayoutCache } from './layout-cache';
 export { GlobalSpatialInfluenceCache } from './spatial-influence-cache';
 export {
+  GLOBAL_DENSITY_RATIO_BOUNDS,
+  GLOBAL_DENSITY_TARGETS,
+  resolveGlobalDensityFit,
+} from './global-density';
+export type { GlobalDensityDecision } from './global-density';
+export {
+  DEFAULT_GLOBAL_DENSITY_FRAMING_STRENGTH,
+  globalDensityFramingRatio,
+} from './global-density-framing';
+export {
   computeGlobalSpatialInfluence,
   createGlobalSpatialInfluenceRequest,
   globalSpatialInfluenceFingerprint,
   validateGlobalSpatialInfluenceWorkerResponse,
 } from './spatial-influence';
 export { LocalLayoutCache } from './local-layout-cache';
+export {
+  LOCAL_DENSITY_RATIO_BOUNDS,
+  LOCAL_DENSITY_REFERENCE_FRAME,
+  LOCAL_DENSITY_TARGETS,
+  resolveLocalDensityFit,
+} from './local-density';
+export type { LocalDensityDecision, LocalDensityInput } from './local-density';
+export {
+  DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH,
+  localDensityFramingRatio,
+} from './local-density-framing';
+export {
+  NETWORK_DENSITY_REFERENCE_FRAME,
+  canonicalScreenNodes,
+  nearestNeighborDistances,
+  topologyMetrics,
+} from './network-density-core';
 export {
   convergencePercentile,
   convergenceRmsRadius,

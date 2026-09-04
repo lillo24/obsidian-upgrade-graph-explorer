@@ -10,6 +10,11 @@ SPATIAL1 establishes normalized fixed-folder intent and direct arrangement.
 SPATIAL2A evolves that independent All Network domain to schema-v2 exact/subtree
 rules plus a base → dynamic soft-pull → fixed-display pipeline while leaving the
 active KG14, HIER, QUERY, GROUP, and SPACING tracks unchanged.
+SPACING1B independently makes both Network renderers' automatic framing
+density-aware without changing Global or Local ForceAtlas2 geometry. Its QA
+Sandbox keeps separate transient All and Focus strengths; renderer geometry,
+layout identity, spatial rules, and persisted workspace/preference schemas do
+not observe them.
 MOVE1A defines temporary File movement across All and Focus as an optional
 constraint contract, while PHYSICS1 retains continuous simulation ownership and
 MOVE1B/PIN1 remain future product and persistence work.
@@ -880,6 +885,46 @@ not the main application chunk. Sigma 3.0.3, Graphology 0.26.0, and ForceAtlas2
 Sigma presentation and dedicated Global/Local Free worker chunks. Local
 Structured reuses React Flow and W3 and adds no runtime dependency. Structure startup
 does not execute them.
+
+Local Free framing is a camera-only post-layout layer. After an exact cache hit
+or latest accepted worker result, the renderer measures automatic node sizes,
+accepted positions, and Local edges using Sigma 3.0.3 normalization in a fixed
+1200×800 frame with 24 px stage padding. Raw B1 connected-edge, B2
+nearest-neighbor/diameter, and B3 p90-root-radius signals produce a median B4
+ratio with one final `0.7–1.4` clamp. Invalid geometry safely uses ratio 1.
+This decision returns no coordinates and is excluded from Local requests,
+fingerprints, caches, and persistence.
+
+The Local session owns framing authority imperatively. Fresh automatic cameras
+adopt the latest density ratio while preserving the existing root/selection
+screen anchor. Restored semantic `freeRatio`, explicit center, wheel/pinch,
+drag, and zoom-button actions remain exact and authoritative until manual Fit.
+Fit uses the stored density target and re-enters automatic ownership; resize
+does not recompute it. VISUAL1B and Visual Groups remain reducer-only because
+the policy consumes only automatic node sizes.
+
+Global framing shares Sigma-normalization and robust-statistic primitives but
+uses a separate rootless policy over confirmed final displayed positions after
+automatic ForceAtlas2, dynamic Pull, and fixed-folder composition. A
+deterministic balanced k-d tree supplies exact nearest-neighbor distances at
+Global scale. Nearest-neighbor distance per representative diameter is the
+primary signal, connected-edge distance is optional, and p95 robust extent plus
+a 95% useful-viewport floor prevents a compact component from hiding ordinary
+outliers. The robust signal combination has the same conservative `0.7–1.4`
+final bound. Independent graphs with two or more valid nodes are first-class;
+only empty, single-node, invalid, incomplete, duplicate, or degenerate geometry
+falls back to ratio 1.
+
+The Global session independently tracks auto- versus user-owned camera state.
+Fresh mounts without a restored viewport and explicit Fit are auto-owned;
+wheel/pinch, pan, zoom buttons, centering, arrangements, restored semantic
+viewports, and live All-density preview are user-owned. Confirmed geometry
+updates the stored density target, but worker/query/topology/Pull/fixed adoption
+cannot steal a user-owned camera. Arrangement pointer preview neither measures
+density nor reframes; confirmation refreshes the next Fit target. The All
+strength uses the same camera-only interpolation as Focus and does not enter
+Global layout settings, fingerprints, caches, worker requests, presentation
+overrides, QUERY1, spatial rules, or persistence.
 Visual Groups add one zero-external-dependency workspace package; renderer
 packages import only its resolved presentation type and never QUERY1 rules.
 Tauri dependencies are isolated to the desktop shell and

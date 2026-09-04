@@ -52,6 +52,7 @@ import {
 import { shouldApplyGlobalViewportRequest } from './viewport-request';
 import type {
   GlobalCenterRequest,
+  GlobalDensityQaDiagnostics,
   GlobalLayoutPosition,
   GlobalLayoutService,
   GlobalLayoutSettings,
@@ -95,6 +96,8 @@ export interface GlobalGraphCanvasProps {
   readonly centerRequest?: GlobalCenterRequest;
   readonly fitRequestKey: number;
   readonly initialViewport?: SemanticGlobalViewport;
+  /** Transient Sandbox policy; excluded from layout input and fingerprinting. */
+  readonly densityFramingStrength?: number;
   readonly instrumentation?: GlobalRendererInstrumentation;
   readonly layoutRequestKey: number;
   /** Optional session cache owner; the lazy web module keeps this across mode switches. */
@@ -105,6 +108,9 @@ export interface GlobalGraphCanvasProps {
   readonly spatialInfluenceCache?: GlobalSpatialInfluenceCache;
   readonly spatialSourceKey?: string;
   readonly onFailure: (message: string) => void;
+  readonly onDensityQaDiagnosticsChange?: (
+    diagnostics: GlobalDensityQaDiagnostics | undefined,
+  ) => void;
   readonly onNodeActivate: (entityId: string) => void;
   readonly onNodeSingleClick?: (nodeId: string) => void;
   readonly onSelectionChange: (selection: GlobalSelection | null) => void;
@@ -231,6 +237,7 @@ function applyComposedPositions(
 
 export function GlobalGraphCanvas({
   centerRequest,
+  densityFramingStrength,
   fitRequestKey,
   folderArrangement,
   initialViewport,
@@ -242,6 +249,7 @@ export function GlobalGraphCanvas({
   spatialInfluenceCache,
   spatialSourceKey,
   onFailure,
+  onDensityQaDiagnosticsChange,
   onNodeActivate,
   onNodeSingleClick,
   onSelectionChange,
@@ -271,6 +279,7 @@ export function GlobalGraphCanvas({
   const callbacks = useRef({
     folderArrangement,
     onFailure,
+    onDensityQaDiagnosticsChange,
     onNodeActivate,
     onNodeSingleClick,
     onSelectionChange,
@@ -280,6 +289,7 @@ export function GlobalGraphCanvas({
     callbacks.current = {
       folderArrangement,
       onFailure,
+      onDensityQaDiagnosticsChange,
       onNodeActivate,
       onNodeSingleClick,
       onSelectionChange,
@@ -288,6 +298,7 @@ export function GlobalGraphCanvas({
   }, [
     folderArrangement,
     onFailure,
+    onDensityQaDiagnosticsChange,
     onNodeActivate,
     onNodeSingleClick,
     onSelectionChange,
@@ -357,6 +368,7 @@ export function GlobalGraphCanvas({
           : warmGlobalRendererInput(input, initialDisplayedPositions),
       sourceInput: input,
       settings,
+      densityFramingStrength,
       spatialOverrides,
       trackpadZoomMode,
       visualGroupStyles,
@@ -495,6 +507,12 @@ export function GlobalGraphCanvas({
         new GlobalRendererSession(container, initial.input, {
           settings: initial.settings,
           trackpadZoomMode: initial.trackpadZoomMode,
+          ...(initial.densityFramingStrength === undefined
+            ? {}
+            : { densityFramingStrength: initial.densityFramingStrength }),
+          ...(initial.cached
+            ? { initialAcceptedPositions: initial.displayedPositions }
+            : {}),
           ...(initial.presentationOverrides === undefined
             ? {}
             : { presentationOverrides: initial.presentationOverrides }),
@@ -534,6 +552,8 @@ export function GlobalGraphCanvas({
           },
           onViewportObservation: (viewport) =>
             callbacks.current.onViewportObservation(viewport),
+          onDensityQaDiagnosticsChange: (diagnostics) =>
+            callbacks.current.onDensityQaDiagnosticsChange?.(diagnostics),
         }),
     );
     if (!mounted.ok) {
@@ -556,6 +576,7 @@ export function GlobalGraphCanvas({
     return () => {
       cancelled = true;
       lease.dispose();
+      callbacks.current.onDensityQaDiagnosticsChange?.(undefined);
       onTransitionAnchorApiChange?.(undefined);
       if (sessionRef.current === session) sessionRef.current = undefined;
     };
@@ -763,6 +784,11 @@ export function GlobalGraphCanvas({
   useEffect(() => {
     sessionRef.current?.updateTrackpadZoomMode(trackpadZoomMode);
   }, [trackpadZoomMode]);
+
+  useEffect(() => {
+    if (densityFramingStrength === undefined) return;
+    sessionRef.current?.updateDensityFramingStrength?.(densityFramingStrength);
+  }, [densityFramingStrength]);
 
   useEffect(() => {
     if (appliedVisualGroupStyles.current === visualGroupStyles) return;

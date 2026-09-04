@@ -38,9 +38,10 @@ src/
   benchmark.ts        Opt-in full-pipeline plus incremental timing entry point.
   incremental-benchmark.ts Edit/add/delete/move timings with exact rebuild oracles.
   focus-spacing-fixtures.ts Deterministic sparse, mixed, dense, and disconnected Local scenes.
-  focus-spacing-metrics.ts  Graph, screen-space, Sigma-transform, and candidate-density metrics.
-  focus-spacing-analysis.ts SPACING1A runner and self-contained visual comparison generator.
-  focus-spacing-metrics.test.ts Transform invariance, candidate bounds, and fixture contracts.
+  focus-spacing-metrics.ts  Graph/screen diagnostics plus production B4 policy adapter.
+  focus-spacing-analysis.ts SPACING1A/SPACING1B parity runner and visual comparison generator.
+  focus-spacing-metrics.test.ts Transform, bounds, 15-fixture, and production-parity contracts.
+  network-spacing-analysis.ts SPACING1B-GLOBAL final-geometry matrix, scale oracle, and density benchmark.
   file-move-benchmark.ts MOVE1A inverse/index/coalescing aggregate microbenchmark.
   convergence-fixtures.ts Synthetic Local and Global topology families for CONVERGENCE1A.
   convergence-metrics.ts Production-backed Local metrics plus Global diagnostic movement/quality.
@@ -143,6 +144,7 @@ pnpm benchmark:local-renderer -- --profile small
 pnpm benchmark:local-renderer -- --profile medium
 pnpm benchmark:local-renderer -- --profile stress
 pnpm analyze:focus-spacing
+pnpm analyze:network-spacing
 pnpm benchmark:file-move
 pnpm analyze:forceatlas2-convergence
 ```
@@ -234,13 +236,24 @@ visible-entity assignment, and renderer style-lookup distributions for 300 and
 outside the measured path, operation counts report zero topology/layout work,
 and the timings are evidence rather than CI gates.
 
-`analyze:focus-spacing` is the SPACING1A diagnostic-only contract. It runs the
+`analyze:focus-spacing` retains the SPACING1A diagnostic contract. It runs the
 unchanged production Local ForceAtlas2 function over deterministic sparse,
 mixed, disconnected, and dense topologies, then applies Sigma 3.0.3's actual
 normalization and camera transforms in Node. It writes ignored synthetic JSON
-and a self-contained HTML comparison to `output/spacing1a/`. The candidate
-ratios are investigative evidence only: this command does not alter production
-layout settings, camera behavior, renderer state, fingerprints, or node sizes.
+and a self-contained HTML comparison to `output/spacing1a/`. SPACING1B makes
+the selected B4 value call the production renderer policy while detailed
+candidate/bounds metrics remain analysis-only. The command does not alter
+layout settings, renderer state, fingerprints, positions, or node sizes.
+
+`analyze:network-spacing` traces the installed Global pipeline through
+ForceAtlas2, optional dynamic Pull, fixed-folder composition, final displayed
+positions, Sigma normalization, and camera policy. Its deterministic 29-scene
+matrix includes independent zero-edge graphs, multiple components, connected
+and dense families, folder clustering, dynamic/fixed composition,
+query-reduced sparsity, and 100/500/1,000-node profiles. A separate 5,000-node
+profile isolates density cost. It writes aggregate synthetic JSON only to the
+ignored `output/spacing1b-global/` directory and verifies that density strength
+adds zero layout requests, Pull requests, or spatial writes.
 
 `benchmark:file-move` exercises only MOVE1A-owned pure coordinate inversion,
 prebuilt applied-Place indexing/lookup, and frame coalescing for no-Place,

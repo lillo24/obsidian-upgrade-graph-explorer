@@ -14,6 +14,10 @@ import {
   withFolderClusteringStrength,
   withGlobalSpacingPreset,
 } from '@icarus-graph-explorer/renderer-sigma/settings';
+import type {
+  GlobalDensityQaDiagnostics,
+  LocalDensityQaDiagnostics,
+} from '@icarus-graph-explorer/renderer-sigma/types';
 
 import {
   graphSettingsTabForKey,
@@ -21,6 +25,10 @@ import {
 } from './graph-settings-tabs';
 
 interface GraphSettingsProps {
+  readonly allNetworkDensityQaDiagnostics?: GlobalDensityQaDiagnostics;
+  readonly allNetworkDensityFramingStrength: number;
+  readonly focusNetworkDensityQaDiagnostics?: LocalDensityQaDiagnostics;
+  readonly focusNetworkDensityFramingStrength: number;
   readonly showExperimentalAllHierarchy?: boolean;
   readonly onShowExperimentalAllHierarchyChange?: (show: boolean) => void;
   readonly children?: ReactNode;
@@ -28,11 +36,16 @@ interface GraphSettingsProps {
   readonly globalLayoutSettings: GlobalLayoutSettings;
   readonly open: boolean;
   readonly onFocusAppearanceChange: (appearance: FocusAppearance) => void;
+  readonly onAllNetworkDensityFramingStrengthChange: (strength: number) => void;
+  readonly onFocusNetworkDensityFramingStrengthChange: (
+    strength: number,
+  ) => void;
   readonly onGlobalLayoutSettingsChange: (
     settings: GlobalLayoutSettings,
   ) => void;
   readonly onOpenChange: (open: boolean) => void;
   readonly onTrackpadZoomModeChange: (mode: TrackpadZoomMode) => void;
+  readonly onResetSandbox: () => void;
   readonly trackpadZoomMode: TrackpadZoomMode;
   readonly warning?: string;
 }
@@ -51,25 +64,93 @@ function SettingsIcon() {
   );
 }
 
+function DensityQaDiagnostics({
+  diagnostics,
+  unavailableMessage,
+}: {
+  readonly diagnostics:
+    GlobalDensityQaDiagnostics | LocalDensityQaDiagnostics | undefined;
+  readonly unavailableMessage: string;
+}) {
+  return (
+    <div aria-atomic="true" aria-live="polite" className="focus-density-qa">
+      <h4>Temporary QA diagnostics</h4>
+      {diagnostics === undefined ? (
+        <p>{unavailableMessage}</p>
+      ) : (
+        <dl>
+          <div>
+            <dt>Raw decision ratio</dt>
+            <dd>{diagnostics.rawDecisionRatio.toFixed(4)}</dd>
+          </div>
+          <div>
+            <dt>Effective ratio</dt>
+            <dd>{diagnostics.effectiveRatio.toFixed(4)}</dd>
+          </div>
+          <div>
+            <dt>Sigma camera ratio</dt>
+            <dd>{diagnostics.cameraRatio.toFixed(4)}</dd>
+          </div>
+          <div>
+            <dt>Fallback</dt>
+            <dd>{diagnostics.fallback ? 'Yes' : 'No'}</dd>
+          </div>
+          {diagnostics.fallbackReason === undefined ? null : (
+            <div>
+              <dt>Fallback reason</dt>
+              <dd>{diagnostics.fallbackReason}</dd>
+            </div>
+          )}
+          {'nodeCount' in diagnostics ? (
+            <>
+              <div>
+                <dt>Nodes</dt>
+                <dd>{diagnostics.nodeCount}</dd>
+              </div>
+              <div>
+                <dt>Edges</dt>
+                <dd>{diagnostics.edgeCount}</dd>
+              </div>
+              <div>
+                <dt>Isolated nodes</dt>
+                <dd>{diagnostics.isolatedNodeCount}</dd>
+              </div>
+            </>
+          ) : null}
+        </dl>
+      )}
+      <p>Runtime only; never saved or used as layout input.</p>
+    </div>
+  );
+}
+
 export const GraphSettings = memo(function GraphSettings({
+  allNetworkDensityQaDiagnostics,
+  allNetworkDensityFramingStrength,
+  focusNetworkDensityQaDiagnostics,
+  focusNetworkDensityFramingStrength,
   showExperimentalAllHierarchy = false,
   onShowExperimentalAllHierarchyChange,
   children,
   focusAppearance,
   globalLayoutSettings,
+  onAllNetworkDensityFramingStrengthChange,
+  onFocusNetworkDensityFramingStrengthChange,
   onFocusAppearanceChange,
   onGlobalLayoutSettingsChange,
   onOpenChange,
   onTrackpadZoomModeChange,
+  onResetSandbox,
   open,
   trackpadZoomMode,
   warning,
 }: GraphSettingsProps) {
-  const [activeTab, setActiveTab] = useState<GraphSettingsTab>('graph');
+  const [activeTab, setActiveTab] = useState<GraphSettingsTab>('preferences');
   const [advancedLayoutOpen, setAdvancedLayoutOpen] = useState(false);
   const [experimentalOpen, setExperimentalOpen] = useState(false);
   const folderStrength = folderClusteringStrength(globalLayoutSettings);
-  const graphTabRef = useRef<HTMLButtonElement>(null);
+  const preferencesTabRef = useRef<HTMLButtonElement>(null);
+  const sandboxTabRef = useRef<HTMLButtonElement>(null);
   const sourceTabRef = useRef<HTMLButtonElement>(null);
   const changePreset = (spacingPreset: GlobalSpacingPreset) => {
     onGlobalLayoutSettingsChange(
@@ -92,7 +173,13 @@ export const GraphSettings = memo(function GraphSettings({
     const nextTab = graphSettingsTabForKey(activeTab, key);
     if (nextTab === undefined) return false;
     setActiveTab(nextTab);
-    (nextTab === 'graph' ? graphTabRef : sourceTabRef).current?.focus();
+    const nextRef =
+      nextTab === 'preferences'
+        ? preferencesTabRef
+        : nextTab === 'sandbox'
+          ? sandboxTabRef
+          : sourceTabRef;
+    nextRef.current?.focus();
     return true;
   };
   return (
@@ -127,20 +214,36 @@ export const GraphSettings = memo(function GraphSettings({
             role="tablist"
           >
             <button
-              aria-controls="graph-settings-graph-panel"
-              aria-selected={activeTab === 'graph'}
-              id="graph-settings-graph-tab"
-              onClick={() => setActiveTab('graph')}
+              aria-controls="graph-settings-preferences-panel"
+              aria-selected={activeTab === 'preferences'}
+              id="graph-settings-preferences-tab"
+              onClick={() => setActiveTab('preferences')}
               onKeyDown={(event) => {
                 if (!handleTabKey(event.key)) return;
                 event.preventDefault();
               }}
-              ref={graphTabRef}
+              ref={preferencesTabRef}
               role="tab"
-              tabIndex={activeTab === 'graph' ? 0 : -1}
+              tabIndex={activeTab === 'preferences' ? 0 : -1}
               type="button"
             >
-              Graph
+              Preferences
+            </button>
+            <button
+              aria-controls="graph-settings-sandbox-panel"
+              aria-selected={activeTab === 'sandbox'}
+              id="graph-settings-sandbox-tab"
+              onClick={() => setActiveTab('sandbox')}
+              onKeyDown={(event) => {
+                if (!handleTabKey(event.key)) return;
+                event.preventDefault();
+              }}
+              ref={sandboxTabRef}
+              role="tab"
+              tabIndex={activeTab === 'sandbox' ? 0 : -1}
+              type="button"
+            >
+              Sandbox
             </button>
             <button
               aria-controls="graph-settings-source-panel"
@@ -161,16 +264,66 @@ export const GraphSettings = memo(function GraphSettings({
           </div>
           <div className="graph-settings__sections" data-graph-scroll-container>
             <div
-              aria-labelledby="graph-settings-graph-tab"
-              hidden={activeTab !== 'graph'}
-              id="graph-settings-graph-panel"
+              aria-labelledby="graph-settings-preferences-tab"
+              hidden={activeTab !== 'preferences'}
+              id="graph-settings-preferences-panel"
               role="tabpanel"
             >
+              <section
+                aria-labelledby="graph-interaction-settings-heading"
+                className="graph-settings__section"
+              >
+                <h3 id="graph-interaction-settings-heading">Interaction</h3>
+                <fieldset>
+                  <legend>Trackpad Zoom</legend>
+                  <label>
+                    <input
+                      checked={trackpadZoomMode === 'scroll-zoom'}
+                      name="trackpad-zoom-mode"
+                      onChange={() => onTrackpadZoomModeChange('scroll-zoom')}
+                      type="radio"
+                      value="scroll-zoom"
+                    />
+                    <span>
+                      <strong>Scroll to Zoom</strong>
+                      <small>
+                        Two-finger scrolling zooms toward the pointer.
+                      </small>
+                    </span>
+                  </label>
+                  <label>
+                    <input
+                      checked={trackpadZoomMode === 'pinch-zoom'}
+                      name="trackpad-zoom-mode"
+                      onChange={() => onTrackpadZoomModeChange('pinch-zoom')}
+                      type="radio"
+                      value="pinch-zoom"
+                    />
+                    <span>
+                      <strong>Pinch to Zoom</strong>
+                      <small>Two-finger scrolling pans; pinching zooms.</small>
+                    </span>
+                  </label>
+                </fieldset>
+              </section>
+            </div>
+            <div
+              aria-labelledby="graph-settings-sandbox-tab"
+              hidden={activeTab !== 'sandbox'}
+              id="graph-settings-sandbox-panel"
+              role="tabpanel"
+            >
+              <p className="graph-settings__sandbox-note">
+                Controls for experimenting with graph presentation and choosing
+                useful defaults.
+              </p>
               <section
                 aria-labelledby="graph-appearance-settings-heading"
                 className="graph-settings__section"
               >
-                <h3 id="graph-appearance-settings-heading">Graph Appearance</h3>
+                <h3 id="graph-appearance-settings-heading">
+                  Focus Root appearance
+                </h3>
                 <fieldset>
                   <legend>Focus Root</legend>
                   <label>
@@ -324,43 +477,90 @@ export const GraphSettings = memo(function GraphSettings({
                 ) : null}
               </section>
               <section
-                aria-labelledby="graph-interaction-settings-heading"
+                aria-labelledby="network-density-settings-heading"
                 className="graph-settings__section"
               >
-                <h3 id="graph-interaction-settings-heading">
-                  Graph Interaction
-                </h3>
-                <fieldset>
-                  <legend>Trackpad Zoom</legend>
-                  <label>
-                    <input
-                      checked={trackpadZoomMode === 'scroll-zoom'}
-                      name="trackpad-zoom-mode"
-                      onChange={() => onTrackpadZoomModeChange('scroll-zoom')}
-                      type="radio"
-                      value="scroll-zoom"
-                    />
+                <h3 id="network-density-settings-heading">Network Density</h3>
+                <div className="graph-settings__scope-group">
+                  <h4>All Network Density</h4>
+                  <label
+                    className="global-layout-strength"
+                    htmlFor="all-density-framing-strength"
+                  >
                     <span>
-                      <strong>Scroll to Zoom</strong>
-                      <small>
-                        Two-finger scrolling zooms toward the pointer.
-                      </small>
+                      <strong>Strength</strong>
+                      <output htmlFor="all-density-framing-strength">
+                        {allNetworkDensityFramingStrength}%
+                      </output>
                     </span>
-                  </label>
-                  <label>
                     <input
-                      checked={trackpadZoomMode === 'pinch-zoom'}
-                      name="trackpad-zoom-mode"
-                      onChange={() => onTrackpadZoomModeChange('pinch-zoom')}
-                      type="radio"
-                      value="pinch-zoom"
+                      aria-valuetext={`${allNetworkDensityFramingStrength} percent`}
+                      id="all-density-framing-strength"
+                      max="150"
+                      min="0"
+                      onChange={(event) =>
+                        onAllNetworkDensityFramingStrengthChange(
+                          Number(event.currentTarget.value),
+                        )
+                      }
+                      step="1"
+                      type="range"
+                      value={allNetworkDensityFramingStrength}
                     />
-                    <span>
-                      <strong>Pinch to Zoom</strong>
-                      <small>Two-finger scrolling pans; pinching zooms.</small>
-                    </span>
+                    <small>
+                      <span>Legacy</span>
+                      <span>Auto</span>
+                      <span>Stronger</span>
+                    </small>
                   </label>
-                </fieldset>
+                  <p className="global-layout-scope-note">
+                    Camera-only framing for Scope = All, Layout = Network.
+                  </p>
+                  <DensityQaDiagnostics
+                    diagnostics={allNetworkDensityQaDiagnostics}
+                    unavailableMessage="Open All Network to read its live density camera."
+                  />
+                </div>
+                <div className="graph-settings__scope-group">
+                  <h4>Focus Network Density</h4>
+                  <label
+                    className="global-layout-strength"
+                    htmlFor="focus-density-framing-strength"
+                  >
+                    <span>
+                      <strong>Strength</strong>
+                      <output htmlFor="focus-density-framing-strength">
+                        {focusNetworkDensityFramingStrength}%
+                      </output>
+                    </span>
+                    <input
+                      aria-valuetext={`${focusNetworkDensityFramingStrength} percent`}
+                      id="focus-density-framing-strength"
+                      max="150"
+                      min="0"
+                      onChange={(event) =>
+                        onFocusNetworkDensityFramingStrengthChange(
+                          Number(event.currentTarget.value),
+                        )
+                      }
+                      step="1"
+                      type="range"
+                      value={focusNetworkDensityFramingStrength}
+                    />
+                    <small>
+                      <span>Legacy</span>
+                      <span>Auto</span>
+                      <span>Stronger</span>
+                    </small>
+                  </label>
+                  <p className="global-layout-scope-note">
+                    Camera-only framing for Scope = Focus, Layout = Network.
+                  </p>
+                  <DensityQaDiagnostics
+                    diagnostics={focusNetworkDensityQaDiagnostics}
+                    unavailableMessage="Open Focus Network to read its live density camera."
+                  />
+                </div>
               </section>
               <section className="graph-settings__section">
                 <button
@@ -395,6 +595,15 @@ export const GraphSettings = memo(function GraphSettings({
                     </label>
                   </div>
                 ) : null}
+              </section>
+              <section className="graph-settings__section graph-settings__reset">
+                <button onClick={onResetSandbox} type="button">
+                  Reset Sandbox
+                </button>
+                <small>
+                  Restores only graph-presentation experiments. Preferences,
+                  source configuration, and saved views stay unchanged.
+                </small>
               </section>
             </div>
             <div

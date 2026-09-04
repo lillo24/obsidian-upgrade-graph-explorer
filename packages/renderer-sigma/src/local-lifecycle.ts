@@ -2,28 +2,6 @@ interface DisposableLocalRenderer {
   readonly destroy: () => void;
 }
 
-export interface LocalAnchoredRefreshHooks {
-  readonly afterProcess: (callback: () => void) => void;
-  readonly afterRender: (callback: () => void) => void;
-  readonly scheduleRefresh: () => void;
-}
-
-/**
- * Repositions the camera after Sigma has recomputed graph normalization but
- * before it draws that changed graph. Waiting until afterRender exposes one
- * frame with stale camera coordinates and produces a visible viewport jump.
- */
-export function refreshLocalRendererWithAnchor(
-  hooks: LocalAnchoredRefreshHooks,
-  restoreAnchor: () => void,
-): Promise<void> {
-  return new Promise((resolve) => {
-    hooks.afterProcess(restoreAnchor);
-    hooks.afterRender(resolve);
-    hooks.scheduleRefresh();
-  });
-}
-
 export type LocalRendererMountResult<T extends DisposableLocalRenderer> =
   | {
       readonly ok: true;

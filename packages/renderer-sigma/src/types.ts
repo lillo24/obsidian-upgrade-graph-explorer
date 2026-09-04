@@ -122,6 +122,18 @@ export interface GlobalViewportPoint {
   readonly y: number;
 }
 
+/** Temporary, runtime-only SPACING1B-GLOBAL native-QA evidence. */
+export interface GlobalDensityQaDiagnostics {
+  readonly rawDecisionRatio: number;
+  readonly effectiveRatio: number;
+  readonly cameraRatio: number;
+  readonly fallback: boolean;
+  readonly fallbackReason?: string;
+  readonly nodeCount: number;
+  readonly edgeCount: number;
+  readonly isolatedNodeCount: number;
+}
+
 /** Narrow runtime bridge used only for the Global → Local screen anchor. */
 export interface GlobalTransitionAnchorApi {
   readonly nodeViewportPoint: (
@@ -299,6 +311,7 @@ export type GlobalPerformancePhase =
   | 'global-hover'
   | 'global-selection'
   | 'global-center'
+  | 'global-density'
   | 'file-move';
 
 export type GlobalPerformanceOperation =
@@ -316,6 +329,7 @@ export type GlobalPerformanceOperation =
   | 'global-hover-applications'
   | 'global-selection-applications'
   | 'global-centers'
+  | 'global-density-evaluations'
   | 'file-move-primes'
   | 'file-move-begins'
   | 'file-move-coalesced-updates'

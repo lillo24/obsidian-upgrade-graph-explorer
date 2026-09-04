@@ -19,7 +19,7 @@ the implementation, measured checks, and user-verified release QA.
 `icarus.graph-explorer.preferences.v1`. Absent and non-boolean values load as
 false. Neither the preference key nor view-state schema v3 changes.
 
-Settings > Graph ends with a collapsed, transient Experimental disclosure.
+Settings > Sandbox contains a collapsed, transient Experimental disclosure.
 The checkbox is labelled **Show All Hierarchy** and explains that Focus
 Hierarchy remains available normally. The same control works in maximized
 Settings. One `updateGraphPreferences` callback patches the complete current

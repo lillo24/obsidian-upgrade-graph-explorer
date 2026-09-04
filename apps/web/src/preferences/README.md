@@ -8,6 +8,8 @@ must not be serialized into KG9 workspace state.
   `icarus.graph-explorer.preferences.v1`.
 - `graph-preferences.test.ts` verifies defaults, validation, exact serialization,
   and storage-failure behavior.
+- `sandbox-settings.ts` owns the deliberately narrow Sandbox reset boundary;
+  its test proves Trackpad Zoom and Local layout choice survive that reset.
 
 The stable v1 payload contains `focusAppearance` (`outline`, `inverted`, or
 `minimal`), `trackpadZoomMode` (`scroll-zoom` or `pinch-zoom`), and one
@@ -33,3 +35,13 @@ not graph/view truth. GraphExplorer patches one current complete record for all
 controls, so another preference cannot drop the flag; storage failure keeps the
 session value and reports the existing warning. Disclosure open/closed state is
 not stored.
+
+SPACING1B-QA keeps separate All Network and Focus Network density-framing
+strengths outside this durable record. Both start at 100% on every application
+launch and exist only to compare legacy ratio 1 with each production density
+decision during the current page lifetime. Changing either previews the camera
+ratio immediately around that renderer's semantic anchor and does not request
+layout or Pull work. Reset Sandbox restores both to 100% together with Focus
+Root, All Network layout, and Experimental defaults; Trackpad Zoom, source
+configuration, workspace view/history, spatial folder intent, and Local layout
+choice are outside that reset.
