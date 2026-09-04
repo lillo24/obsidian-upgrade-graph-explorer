@@ -12,6 +12,7 @@ import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
 import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-groups';
 
 import { LocalLayoutCache } from './local-layout-cache';
+import { DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH } from './local-density-framing';
 import {
   createLocalLayoutRequest,
   localLayoutFingerprint,
@@ -25,6 +26,7 @@ import {
 import { LocalRendererSession } from './local-session';
 import type {
   LocalCenterRequest,
+  LocalDensityQaDiagnostics,
   LocalLayoutService,
   LocalRendererInstrumentation,
   LocalSelection,
@@ -44,7 +46,12 @@ export interface LocalGraphCanvasProps {
   readonly layoutCache?: LocalLayoutCache;
   readonly layoutRequestKey: number;
   readonly layoutService: LocalLayoutService;
+  /** Transient Sandbox policy; excluded from layout input and fingerprinting. */
+  readonly densityFramingStrength?: number;
   readonly onFailure: (message: string) => void;
+  readonly onDensityQaDiagnosticsChange?: (
+    diagnostics: LocalDensityQaDiagnostics | undefined,
+  ) => void;
   readonly onFitRequestConsumed?: (key: number) => void;
   readonly onSelectionChange: (selection: LocalSelection | null) => void;
   readonly onNodeSingleClick?: (nodeId: string) => void;
@@ -72,6 +79,7 @@ function errorMessage(error: unknown): string {
 
 export function LocalGraphCanvas({
   centerRequest,
+  densityFramingStrength = DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH,
   fitRequestKey,
   initialTransitionAnchor,
   initialViewport,
@@ -80,6 +88,7 @@ export function LocalGraphCanvas({
   layoutRequestKey,
   layoutService,
   onFailure,
+  onDensityQaDiagnosticsChange,
   onFitRequestConsumed,
   onSelectionChange,
   onNodeSingleClick,
@@ -100,9 +109,11 @@ export function LocalGraphCanvas({
   const handledCenterRequest = useRef(0);
   const handledFitRequest = useRef(0);
   const handledLayoutRequest = useRef(layoutRequestKey);
+  const initialCacheAccepted = useRef(false);
   const layoutPending = useRef(true);
   const callbacks = useRef({
     onFailure,
+    onDensityQaDiagnosticsChange,
     onFitRequestConsumed,
     onSelectionChange,
     onNodeSingleClick,
@@ -114,6 +125,7 @@ export function LocalGraphCanvas({
   useEffect(() => {
     callbacks.current = {
       onFailure,
+      onDensityQaDiagnosticsChange,
       onFitRequestConsumed,
       onSelectionChange,
       onNodeSingleClick,
@@ -124,6 +136,7 @@ export function LocalGraphCanvas({
     };
   }, [
     onFailure,
+    onDensityQaDiagnosticsChange,
     onFitRequestConsumed,
     onSelectionChange,
     onNodeSingleClick,
@@ -157,6 +170,9 @@ export function LocalGraphCanvas({
     const cached = cache.get(fingerprint);
     return {
       cached: cached !== undefined,
+      cachedPositions: cached,
+      densityFramingStrength,
+      fingerprint,
       input:
         cached === undefined ? input : warmLocalRendererInput(input, cached),
       initialTransitionAnchor,
@@ -183,6 +199,7 @@ export function LocalGraphCanvas({
       () =>
         new LocalRendererSession(container, initial.input, {
           rootNodeKey: initial.input.rootNodeKey,
+          densityFramingStrength: initial.densityFramingStrength,
           trackpadZoomMode: initial.trackpadZoomMode,
           ...(initial.presentationOverrides === undefined
             ? {}
@@ -199,6 +216,9 @@ export function LocalGraphCanvas({
           ...(initial.initialViewport === undefined
             ? {}
             : { initialViewport: initial.initialViewport }),
+          ...(initial.cachedPositions === undefined
+            ? {}
+            : { initialAcceptedPositions: initial.cachedPositions }),
           ...(instrumentation === undefined ? {} : { instrumentation }),
           onNodeSelected: (key) =>
             callbacks.current.onSelectionChange(
@@ -208,6 +228,8 @@ export function LocalGraphCanvas({
             callbacks.current.onNodeSingleClick?.(key),
           onNodeActivated: (entityId) =>
             callbacks.current.onNodeActivate?.(entityId),
+          onDensityQaDiagnosticsChange: (diagnostics) =>
+            callbacks.current.onDensityQaDiagnosticsChange?.(diagnostics),
           onViewportObservation: (viewport) =>
             callbacks.current.onViewportObservation(viewport),
         }),
@@ -236,6 +258,7 @@ export function LocalGraphCanvas({
     return () => {
       cancelled = true;
       mounted.dispose();
+      callbacks.current.onDensityQaDiagnosticsChange?.(undefined);
       callbacks.current.onTransitionAnchorApiChange?.(undefined);
       if (sessionRef.current === mounted.session)
         sessionRef.current = undefined;
@@ -255,6 +278,10 @@ export function LocalGraphCanvas({
   useEffect(() => {
     sessionRef.current?.updateTrackpadZoomMode(trackpadZoomMode);
   }, [trackpadZoomMode]);
+
+  useEffect(() => {
+    sessionRef.current?.updateDensityFramingStrength(densityFramingStrength);
+  }, [densityFramingStrength]);
 
   useEffect(() => {
     if (appliedVisualGroupStyles.current === visualGroupStyles) return;
@@ -285,6 +312,18 @@ export function LocalGraphCanvas({
     const cached = explicitRelayout ? undefined : cache.get(fingerprint);
     let cancelled = false;
     if (cached !== undefined) {
+      if (
+        !initialCacheAccepted.current &&
+        initial.cachedPositions !== undefined &&
+        fingerprint === initial.fingerprint
+      ) {
+        initialCacheAccepted.current = true;
+        layoutPending.current = false;
+        setLayoutError(undefined);
+        setLayoutStatus(undefined);
+        setLayoutCommitKey((current) => current + 1);
+        return;
+      }
       void session
         .applyPositions(cached)
         .then(() => {
@@ -342,6 +381,8 @@ export function LocalGraphCanvas({
   }, [
     cache,
     fingerprint,
+    initial.cachedPositions,
+    initial.fingerprint,
     input,
     instrumentation,
     layoutService,

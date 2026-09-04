@@ -2,6 +2,11 @@
 
 Status: **COMPLETE — choose a bounded camera-framing policy for SPACING1B.**
 
+Production follow-up: SPACING1B now owns the approved B4 policy in
+`renderer-sigma/local-density.ts`; this diagnostic imports that production
+decision for all 15 fixtures so the oracle cannot drift. ForceAtlas2 remains
+unchanged.
+
 SPACING1A is synthetic diagnostic evidence only. It changes no production
 layout, camera, renderer, cache, fingerprint, node-size, or persistence
 behavior. The evidence supports option B at the camera/framing layer. It does

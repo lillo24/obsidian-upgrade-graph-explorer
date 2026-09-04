@@ -13,13 +13,22 @@ import {
   type TemporaryFileMoveSessionContext,
 } from './file-move';
 import type { TemporaryNodeConstraintEndReason } from './temporary-node-constraint';
+import { atomicAnchoredGraphMutation } from './anchored-refresh';
 
 import {
   buildLocalGraph,
   createLocalNeighborhoodIndex,
-  reconcileLocalGraph,
+  planLocalGraphReconciliation,
   type LocalGraph,
 } from './local-graph';
+import {
+  resolveLocalDensityFit,
+  type LocalDensityDecision,
+} from './local-density';
+import {
+  DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH,
+  localDensityFramingRatio,
+} from './local-density-framing';
 import { createLocalLayoutRequest } from './local-layout';
 import {
   NodeClickArbitrator,
@@ -32,7 +41,6 @@ import {
   ratioAfterWheelDelta,
   WheelDirectionStabilizer,
 } from './precision-wheel-zoom';
-import { refreshLocalRendererWithAnchor } from './local-lifecycle';
 import {
   resolveLocalEdgeStyle,
   resolveLocalNodeStyle,
@@ -40,6 +48,7 @@ import {
 } from './local-style';
 import type {
   LocalCenterRequest,
+  LocalDensityQaDiagnostics,
   LocalGraphReconciliation,
   LocalLayoutPosition,
   LocalLayoutRequest,
@@ -55,9 +64,11 @@ import type {
 export interface LocalRendererSessionOptions {
   readonly rootNodeKey: string;
   readonly trackpadZoomMode: LocalTrackpadZoomMode;
+  readonly densityFramingStrength?: number;
   readonly initialViewport?: SemanticLocalViewport;
   readonly initialViewportPoint?: LocalViewportPoint;
   readonly initialViewportNodeKey?: string;
+  readonly initialAcceptedPositions?: readonly LocalLayoutPosition[];
   readonly instrumentation?: LocalRendererInstrumentation;
   readonly visualGroupStyles?: VisualGroupPresentationMap;
   readonly presentationOverrides?: EntityPresentationOverrideMap;
@@ -70,6 +81,9 @@ export interface LocalRendererSessionOptions {
   readonly onFileMoveError?: (message: string) => void;
   readonly onViewportObservation?: (
     viewport: SemanticLocalViewport | undefined,
+  ) => void;
+  readonly onDensityQaDiagnosticsChange?: (
+    diagnostics: LocalDensityQaDiagnostics,
   ) => void;
 }
 
@@ -92,6 +106,18 @@ export class LocalRendererSession {
     Parameters<typeof resolveLocalEdgeStyle>[0]
   >;
   private rootNodeKey: string;
+  private densityInput: LocalRendererInput;
+  private densityFramingStrength: number;
+  private lastDensityQaDiagnostics: LocalDensityQaDiagnostics | undefined;
+  private cameraOwnership: 'auto' | 'user';
+  private latestDensityDecision: LocalDensityDecision = {
+    ratio: 1,
+    connectedEdgeSignal: 1,
+    nearestNeighborSignal: 1,
+    rootRadiusSignal: 1,
+    fallback: true,
+    fallbackReason: 'No accepted Local layout has been measured yet.',
+  };
   private neighborhoods: ReadonlyMap<string, ReadonlySet<string>>;
   private hoveredNode: string | undefined;
   private selectedNode: string | undefined;
@@ -134,6 +160,16 @@ export class LocalRendererSession {
     }
   };
 
+  private readonly mouseDragHandler = (): void => {
+    if (this.renderer.getMouseCaptor().isMouseDown) {
+      this.cameraOwnership = 'user';
+    }
+  };
+
+  private readonly touchMoveHandler = (): void => {
+    this.cameraOwnership = 'user';
+  };
+
   private readonly cameraUpdatedHandler = (): void => {
     const started = performance.now();
     const lod = resolveLocalVisualLod(this.renderer.getCamera().ratio);
@@ -156,6 +192,7 @@ export class LocalRendererSession {
       this.viewportObservationTimer = undefined;
       this.options.onViewportObservation?.(this.semanticViewport());
     }, 120);
+    this.emitDensityQaDiagnostics();
   };
 
   private readonly precisionWheelHandler = (coordinates: WheelCoords): void => {
@@ -169,6 +206,7 @@ export class LocalRendererSession {
       original,
       this.renderer.getDimensions().height,
     );
+    this.cameraOwnership = 'user';
     if (this.trackpadZoomMode === 'pinch-zoom' && !original.ctrlKey) {
       this.applyWheelPan(original);
       return;
@@ -205,6 +243,14 @@ export class LocalRendererSession {
   ) {
     this.options = options;
     this.rootNodeKey = options.rootNodeKey;
+    this.densityInput = input;
+    this.densityFramingStrength =
+      options.densityFramingStrength ?? DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH;
+    // Validate the transient QA input before mounting Sigma so failure remains
+    // actionable instead of producing a success-shaped invalid camera.
+    localDensityFramingRatio(1, this.densityFramingStrength);
+    this.cameraOwnership =
+      options.initialViewport === undefined ? 'auto' : 'user';
     this.trackpadZoomMode = options.trackpadZoomMode;
     this.visualGroupStyles = options.visualGroupStyles;
     this.presentationOverrides = options.presentationOverrides;
@@ -229,6 +275,14 @@ export class LocalRendererSession {
       nodeReducer: (key, attributes) => this.reduceNode(key, attributes),
       edgeReducer: (key, attributes) => this.reduceEdge(key, attributes),
     });
+    if (options.initialAcceptedPositions !== undefined) {
+      this.measureDensity(options.initialAcceptedPositions);
+      if (this.cameraOwnership === 'auto') {
+        this.renderer.getCamera().setState({
+          ratio: this.effectiveDensityRatio(),
+        });
+      }
+    }
     if (options.initialViewportPoint !== undefined) {
       this.anchorNodeAtViewport(
         options.initialViewportNodeKey ?? this.rootNodeKey,
@@ -250,8 +304,11 @@ export class LocalRendererSession {
     this.visualLod = resolveLocalVisualLod(this.renderer.getCamera().ratio);
     const mountMs = Number((performance.now() - mountStarted).toFixed(3));
     this.renderer.getMouseCaptor().on('wheel', this.precisionWheelHandler);
+    this.renderer.getMouseCaptor().on('mousemovebody', this.mouseDragHandler);
+    this.renderer.getTouchCaptor().on('touchmove', this.touchMoveHandler);
     this.renderer.getCamera().on('updated', this.cameraUpdatedHandler);
     this.bindEvents();
+    this.emitDensityQaDiagnostics();
     const renderStarted = performance.now();
     this.ready = new Promise((resolve) => {
       this.renderer.once('afterRender', () => {
@@ -531,6 +588,26 @@ export class LocalRendererSession {
     this.trackpadZoomMode = mode;
   }
 
+  updateDensityFramingStrength(strengthPercentage: number): void {
+    localDensityFramingRatio(1, strengthPercentage);
+    if (this.densityFramingStrength === strengthPercentage) return;
+    const anchorKey = this.viewportAnchorNodeKey();
+    const anchor =
+      anchorKey === undefined ? undefined : this.nodeViewportPoint(anchorKey);
+    this.densityFramingStrength = strengthPercentage;
+    // Moving the Sandbox slider is an explicit camera action. Preview the
+    // accepted density decision immediately, then protect that viewport from
+    // later topology/layout completion exactly like wheel, pinch, or drag.
+    this.cameraOwnership = 'user';
+    const ratio = this.effectiveDensityRatio();
+    if (anchor === undefined) {
+      this.renderer.getCamera().setState({ ratio });
+    } else {
+      this.anchorNodeAtViewport(anchorKey!, anchor, ratio);
+    }
+    this.emitDensityQaDiagnostics();
+  }
+
   setVisualGroupStyles(styles?: VisualGroupPresentationMap): void {
     this.visualGroupStyles = styles;
     this.options.instrumentation?.count('local-style-updates');
@@ -582,12 +659,56 @@ export class LocalRendererSession {
   update(input: LocalRendererInput): LocalGraphReconciliation {
     this.cancelTemporaryFileMove('topology-changed');
     this.nodeClicks?.cancel();
+    const incomingNodeKeys = new Set(input.nodes.map(({ key }) => key));
+    const requestedAnchorKey = this.pendingViewportAnchorNodeKey;
     const anchorKey =
-      this.pendingViewportAnchorNodeKey ?? this.viewportAnchorNodeKey();
+      requestedAnchorKey !== undefined &&
+      incomingNodeKeys.has(requestedAnchorKey)
+        ? requestedAnchorKey
+        : this.viewportAnchorNodeKey(incomingNodeKeys);
     this.pendingViewportAnchorNodeKey = undefined;
-    const anchor = this.nodeViewportPoint(anchorKey);
+    const anchor =
+      anchorKey === undefined ? undefined : this.nodeViewportPoint(anchorKey);
     const ratio = this.renderer.getCamera().ratio;
-    const run = () => reconcileLocalGraph(this.graph, input);
+    let refresh: Promise<void> | undefined;
+    const run = () => {
+      const plan = planLocalGraphReconciliation(this.graph, input);
+      if (!plan.changed) return plan.reconciliation;
+      const transaction = atomicAnchoredGraphMutation(
+        {
+          onAfterProcess: (callback) =>
+            this.renderer.on('afterProcess', callback),
+          offAfterProcess: (callback) =>
+            this.renderer.off('afterProcess', callback),
+          onAfterRender: (callback) =>
+            this.renderer.on('afterRender', callback),
+          offAfterRender: (callback) =>
+            this.renderer.off('afterRender', callback),
+        },
+        () => {
+          if (
+            anchorKey !== undefined &&
+            anchor !== undefined &&
+            this.graph.hasNode(anchorKey)
+          ) {
+            this.anchorNodeAtViewport(anchorKey, anchor, ratio);
+            return;
+          }
+          this.renderer.getCamera().setState({
+            x: 0.5,
+            y: 0.5,
+            angle: 0,
+            ratio,
+          });
+        },
+        () => {
+          plan.apply();
+          return plan.reconciliation;
+        },
+      );
+      refresh = transaction.rendered;
+      return transaction.result;
+    };
     const result =
       this.options.instrumentation === undefined
         ? run()
@@ -597,6 +718,7 @@ export class LocalRendererSession {
             run,
           );
     this.rootNodeKey = input.rootNodeKey;
+    this.densityInput = input;
     this.neighborhoods = createLocalNeighborhoodIndex(input);
     this.fileNodeKeys = indexFileNodeKeys(input.nodes);
     if (
@@ -606,22 +728,7 @@ export class LocalRendererSession {
       this.selectedNode = undefined;
       this.options.onNodeSelected?.(undefined, undefined);
     }
-    const changed = Object.values(result).some((count) => count > 0);
-    if (changed) {
-      const refresh = refreshLocalRendererWithAnchor(
-        {
-          afterProcess: (callback) =>
-            this.renderer.once('afterProcess', callback),
-          afterRender: (callback) =>
-            this.renderer.once('afterRender', callback),
-          scheduleRefresh: () => void this.renderer.scheduleRefresh(),
-        },
-        () => {
-          if (anchor !== undefined) {
-            this.anchorNodeAtViewport(anchorKey, anchor, ratio);
-          }
-        },
-      );
+    if (refresh !== undefined) {
       this.topologyRefreshPending = refresh;
       void refresh.then(() => {
         if (this.topologyRefreshPending !== refresh) return;
@@ -675,54 +782,147 @@ export class LocalRendererSession {
     });
   }
 
+  private measureDensity(
+    positions: readonly LocalLayoutPosition[],
+  ): LocalDensityDecision {
+    const started = performance.now();
+    const decision = resolveLocalDensityFit(this.densityInput, positions);
+    this.latestDensityDecision = decision;
+    this.emitDensityQaDiagnostics();
+    this.options.instrumentation?.count('local-density-evaluations');
+    this.options.instrumentation?.record(
+      'local-density',
+      performance.now() - started,
+    );
+    return decision;
+  }
+
+  private effectiveDensityRatio(): number {
+    return localDensityFramingRatio(
+      this.latestDensityDecision.ratio,
+      this.densityFramingStrength,
+    );
+  }
+
+  private emitDensityQaDiagnostics(): void {
+    const diagnostics: LocalDensityQaDiagnostics = {
+      rawDecisionRatio: this.latestDensityDecision.ratio,
+      effectiveRatio: this.effectiveDensityRatio(),
+      cameraRatio: this.renderer.getCamera().ratio,
+      fallback: this.latestDensityDecision.fallback,
+      ...(this.latestDensityDecision.fallbackReason === undefined
+        ? {}
+        : { fallbackReason: this.latestDensityDecision.fallbackReason }),
+    };
+    const previous = this.lastDensityQaDiagnostics;
+    if (
+      previous !== undefined &&
+      previous.rawDecisionRatio === diagnostics.rawDecisionRatio &&
+      previous.effectiveRatio === diagnostics.effectiveRatio &&
+      previous.cameraRatio === diagnostics.cameraRatio &&
+      previous.fallback === diagnostics.fallback &&
+      previous.fallbackReason === diagnostics.fallbackReason
+    ) {
+      return;
+    }
+    this.lastDensityQaDiagnostics = diagnostics;
+    this.options.onDensityQaDiagnosticsChange?.(diagnostics);
+  }
+
   applyPositions(positions: readonly LocalLayoutPosition[]): Promise<void> {
+    const topologyRefresh = this.topologyRefreshPending;
+    if (topologyRefresh !== undefined) {
+      // A layout worker can answer before Sigma has processed the topology that
+      // requested it. Wait for that anchored frame so display data from the new
+      // scene exists before capturing the second, position-change anchor.
+      return topologyRefresh.then(() => this.applyPositions(positions));
+    }
     this.cancelTemporaryFileMove('layout-changed');
     const anchorKey = this.viewportAnchorNodeKey();
-    const anchor = this.nodeViewportPoint(anchorKey);
-    const ratio = this.renderer.getCamera().ratio;
+    const anchor =
+      anchorKey === undefined ? undefined : this.nodeViewportPoint(anchorKey);
     const byKey = new Map(
       positions.map((position) => [position.key, position]),
     );
-    let changed = false;
     try {
-      this.graph.updateEachNodeAttributes(
-        (key, attributes) => {
-          const position = byKey.get(key);
-          if (position === undefined) {
-            throw new Error(`Local layout result omitted node ${key}.`);
-          }
-          if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
-            throw new Error(
-              `Local layout result has invalid position for node ${key}.`,
-            );
-          }
-          if (attributes.x === position.x && attributes.y === position.y) {
-            return attributes;
-          }
-          changed = true;
-          return { ...attributes, x: position.x, y: position.y };
-        },
-        { attributes: ['x', 'y'] },
-      );
+      if (
+        byKey.size !== positions.length ||
+        positions.length !== this.graph.order
+      ) {
+        throw new Error(
+          'Local layout result must match every displayed node exactly.',
+        );
+      }
+      for (const [key, position] of byKey) {
+        if (!this.graph.hasNode(key)) {
+          throw new Error(`Local layout result contains unknown node ${key}.`);
+        }
+        if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+          throw new Error(
+            `Local layout result has invalid position for node ${key}.`,
+          );
+        }
+      }
     } catch (error: unknown) {
       return Promise.reject(
         error instanceof Error ? error : new Error(String(error)),
       );
     }
-    if (!changed) return Promise.resolve();
-    return refreshLocalRendererWithAnchor(
+    const changed = positions.some((position) => {
+      const attributes = this.graph.getNodeAttributes(position.key);
+      return attributes.x !== position.x || attributes.y !== position.y;
+    });
+    this.measureDensity(positions);
+    const targetRatio = () =>
+      this.cameraOwnership === 'auto'
+        ? this.effectiveDensityRatio()
+        : this.renderer.getCamera().ratio;
+    if (!changed) {
+      if (this.cameraOwnership === 'auto') {
+        if (anchor === undefined) {
+          this.renderer.getCamera().setState({
+            ratio: this.effectiveDensityRatio(),
+          });
+        } else {
+          this.anchorNodeAtViewport(
+            anchorKey!,
+            anchor,
+            this.effectiveDensityRatio(),
+          );
+        }
+      }
+      return Promise.resolve();
+    }
+    return atomicAnchoredGraphMutation(
       {
-        afterProcess: (callback) =>
-          this.renderer.once('afterProcess', callback),
-        afterRender: (callback) => this.renderer.once('afterRender', callback),
-        scheduleRefresh: () => void this.renderer.scheduleRefresh(),
+        onAfterProcess: (callback) =>
+          this.renderer.on('afterProcess', callback),
+        offAfterProcess: (callback) =>
+          this.renderer.off('afterProcess', callback),
+        onAfterRender: (callback) => this.renderer.on('afterRender', callback),
+        offAfterRender: (callback) =>
+          this.renderer.off('afterRender', callback),
       },
       () => {
         if (anchor !== undefined) {
-          this.anchorNodeAtViewport(anchorKey, anchor, ratio);
+          this.anchorNodeAtViewport(anchorKey!, anchor, targetRatio());
+        } else if (this.cameraOwnership === 'auto') {
+          this.renderer.getCamera().setState({
+            ratio: this.effectiveDensityRatio(),
+          });
         }
       },
-    );
+      () =>
+        this.graph.updateEachNodeAttributes(
+          (key, attributes) => {
+            const position = byKey.get(key)!;
+            return attributes.x === position.x && attributes.y === position.y
+              ? attributes
+              : { ...attributes, x: position.x, y: position.y };
+          },
+          { attributes: ['x', 'y'] },
+        ),
+    ).rendered;
   }
 
   nodeViewportPoint(key: string): LocalViewportPoint | undefined {
@@ -751,11 +951,15 @@ export class LocalRendererSession {
     this.anchorNodeAtViewport(this.rootNodeKey, point, ratio);
   }
 
-  private viewportAnchorNodeKey(): string {
-    return this.selectedNode !== undefined &&
-      this.graph.hasNode(this.selectedNode)
-      ? this.selectedNode
-      : this.rootNodeKey;
+  private viewportAnchorNodeKey(
+    candidates?: ReadonlySet<string>,
+  ): string | undefined {
+    const survives = (key: string | undefined): key is string =>
+      key !== undefined &&
+      this.graph.hasNode(key) &&
+      (candidates === undefined || candidates.has(key));
+    if (survives(this.selectedNode)) return this.selectedNode;
+    return survives(this.rootNodeKey) ? this.rootNodeKey : undefined;
   }
 
   private anchorNodeAtViewport(
@@ -799,6 +1003,7 @@ export class LocalRendererSession {
     if (display === undefined) {
       throw new Error(`Cannot center missing Local node ${request.nodeId}.`);
     }
+    this.cameraOwnership = 'user';
     const started = performance.now();
     await this.renderer
       .getCamera()
@@ -814,6 +1019,7 @@ export class LocalRendererSession {
   }
 
   zoomBy(factor: number): void {
+    this.cameraOwnership = 'user';
     const camera = this.renderer.getCamera();
     void camera.animate(
       { ratio: Math.max(0.02, Math.min(6, camera.ratio * factor)) },
@@ -822,9 +1028,16 @@ export class LocalRendererSession {
   }
 
   fit(): void {
-    void this.renderer.getCamera().animatedReset({
-      duration: preferredMotionDuration(),
-    });
+    this.cameraOwnership = 'auto';
+    void this.renderer.getCamera().animate(
+      {
+        x: 0.5,
+        y: 0.5,
+        angle: 0,
+        ratio: this.effectiveDensityRatio(),
+      },
+      { duration: preferredMotionDuration() },
+    );
   }
 
   semanticViewport(): SemanticLocalViewport | undefined {
@@ -867,6 +1080,8 @@ export class LocalRendererSession {
     this.fileMoveContext = undefined;
     this.nodeClicks?.cancel();
     this.renderer.getMouseCaptor().off('wheel', this.precisionWheelHandler);
+    this.renderer.getMouseCaptor().off('mousemovebody', this.mouseDragHandler);
+    this.renderer.getTouchCaptor().off('touchmove', this.touchMoveHandler);
     this.renderer.getCamera().off('updated', this.cameraUpdatedHandler);
     if (this.precisionWheelIdleTimer !== undefined) {
       window.clearTimeout(this.precisionWheelIdleTimer);

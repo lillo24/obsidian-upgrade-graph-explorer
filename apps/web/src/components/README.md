@@ -87,15 +87,25 @@ canonical truth, or own a platform storage implementation.
 - `controlled-selection.ts` prevents equivalent controlled renderer selection
   echoes from creating a React Flow update loop during programmatic handoff.
 - `GraphSettings.tsx` presents the viewport-bounded shared normal/maximized
-  Settings popover. Its transient keyboard-accessible tabs group Graph
-  Appearance/Layout/Interaction separately from the App-owned Source and
-  Diagnostic controls while keeping both panels mounted. `graph-settings-tabs.ts`
-  owns the two-tab keyboard transition. Global layout controls edit one validated
+  Settings popover. Its transient keyboard-accessible tabs separate ordinary
+  Preferences, the graph-presentation Sandbox, and App-owned Source & Diagnostics
+  controls while keeping all panels mounted. `graph-settings-tabs.ts` owns the
+  wrapping three-tab keyboard transition. Global layout controls edit one validated
   serializable preference rather than scattering component-local physics values.
   Folder Strength is a normalized view of the existing `folderCohesion` field;
   its Advanced disclosure is transient, groups Layout and Visual controls, and
   exposes the persisted 0–100 link-influence setting only for All Network;
   global focus-root and gesture preference storage remains in `../preferences/`.
+  Separate All and Focus density sliders are page-lifetime live A/B camera
+  controls: changing either preserves that renderer's semantic screen anchor
+  and previews the new ratio without Fit, layout, or Pull work, even from a
+  user-owned viewport. Their 0–150% labels distinguish Legacy (0), Auto (100),
+  and Sandbox-only Stronger amplification (101–150); both still default to 100.
+  All-only physics/visual controls remain grouped and
+  explicitly scoped. Reset Sandbox deliberately excludes Trackpad Zoom, source
+  settings, spatial folder intent, and saved view state. Temporary SPACING1B QA
+  readouts mirror the mounted renderer sessions' ratios and fallback evidence;
+  they are not product state and clear when their Network renderer unmounts.
 - `SourceSettingsSection.tsx` presents safe current-source metadata, browser
   report/sample switching, desktop vault/rescan actions, and exceptional local
   identity recovery from callbacks owned by `App.tsx`.
@@ -279,7 +289,7 @@ versioned localStorage key.
 
 HIER0: `ExplorationControls` receives explicit All-Hierarchy exposure and retains
 Network-failure recovery; Focus always has both layouts. `GraphSettings` appends a
-collapsed, keyboard-accessible Experimental disclosure at the end of Graph.
+collapsed, keyboard-accessible Experimental disclosure in Sandbox.
 `GraphExplorer` owns the complete preference record and applies the pure
 availability policy at every activation boundary, including exact navigation,
 history, live reconciliation, reset, and renderer failures. Both normal and

@@ -3,6 +3,7 @@ import type {
   LocalLayoutPosition,
   LocalLayoutRequest,
 } from '@icarus-graph-explorer/renderer-sigma/core';
+import { resolveLocalDensityFit } from '@icarus-graph-explorer/renderer-sigma/core';
 import {
   createNormalizationFunction,
   matrixFromCamera,
@@ -72,6 +73,26 @@ export interface CandidateRatios {
   readonly B2: number;
   readonly B3: number;
   readonly B4: number;
+}
+
+export function productionDensityRatio(scene: SpacingScene): number {
+  const decision = resolveLocalDensityFit(
+    {
+      rootNodeKey: scene.rootKey,
+      nodes: scene.nodes.map(({ key, size }) => ({
+        key,
+        attributes: { size },
+      })),
+      edges: scene.edges,
+    },
+    scene.nodes,
+  );
+  if (decision.fallback) {
+    throw new Error(
+      `Production density policy rejected diagnostic scene: ${decision.fallbackReason ?? 'unknown reason'}`,
+    );
+  }
+  return decision.ratio;
 }
 
 export const PRIMARY_VIEWPORT: Dimensions = { width: 1200, height: 800 };

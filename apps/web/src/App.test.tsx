@@ -320,11 +320,16 @@ describe('graph-first explorer shell', () => {
   it('uses one shared settings UI and hydrates the global trackpad choice', () => {
     const settingsMarkup = renderToStaticMarkup(
       <GraphSettings
+        allNetworkDensityFramingStrength={100}
+        focusNetworkDensityFramingStrength={100}
         focusAppearance="inverted"
         globalLayoutSettings={DEFAULT_GLOBAL_LAYOUT_SETTINGS}
+        onAllNetworkDensityFramingStrengthChange={() => undefined}
+        onFocusNetworkDensityFramingStrengthChange={() => undefined}
         onFocusAppearanceChange={() => undefined}
         onGlobalLayoutSettingsChange={() => undefined}
         onOpenChange={() => undefined}
+        onResetSandbox={() => undefined}
         onTrackpadZoomModeChange={() => undefined}
         open
         trackpadZoomMode="pinch-zoom"
@@ -349,7 +354,9 @@ describe('graph-first explorer shell', () => {
         <DeveloperSettingsSection onOpenDiagnosticEvidence={() => undefined} />
       </GraphSettings>,
     );
-    expect(settingsMarkup).toContain('>Graph Appearance</h3>');
+    expect(settingsMarkup).toContain('>Preferences</button>');
+    expect(settingsMarkup).toContain('>Sandbox</button>');
+    expect(settingsMarkup).toContain('>Focus Root appearance</h3>');
     expect(settingsMarkup).toContain('>All Network Layout</h3>');
     expect(settingsMarkup).toContain('>Folder clustering</strong>');
     expect(settingsMarkup).toContain('<legend>Spacing</legend>');
@@ -364,14 +371,17 @@ describe('graph-first explorer shell', () => {
     expect(settingsMarkup.indexOf('>Source</h3>')).toBeLessThan(
       settingsMarkup.indexOf('>Developer</h3>'),
     );
-    expect(settingsMarkup.indexOf('Graph Appearance')).toBeLessThan(
-      settingsMarkup.indexOf('Graph Interaction'),
+    expect(settingsMarkup.indexOf('>Interaction</h3>')).toBeLessThan(
+      settingsMarkup.indexOf('Focus Root appearance'),
     );
-    expect(settingsMarkup.indexOf('Graph Interaction')).toBeLessThan(
+    expect(settingsMarkup.indexOf('Focus Root appearance')).toBeLessThan(
       settingsMarkup.indexOf('>Source</h3>'),
     );
     expect(settingsMarkup).toContain('role="tablist"');
     expect(settingsMarkup).toContain('>Source &amp; Diagnostics</button>');
+    expect(settingsMarkup).toContain('All Network Density');
+    expect(settingsMarkup).toContain('Focus Network Density');
+    expect(settingsMarkup).toContain('>Reset Sandbox</button>');
     expect(settingsMarkup).toContain('Open Diagnostic Evidence');
     expect(settingsMarkup).toContain(
       'type="radio" name="trackpad-zoom-mode" checked="" value="pinch-zoom"',

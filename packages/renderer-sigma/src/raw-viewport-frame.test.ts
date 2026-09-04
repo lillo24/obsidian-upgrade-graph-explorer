@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type {
   CameraState,
   CoordinateConversionOverride,
@@ -12,11 +12,11 @@ import {
 
 import {
   captureRawViewportFrame,
-  refreshPreservingRawViewportFrame,
   restoreRawViewportFrame,
   type RawViewportFrame,
   type RawViewportRenderer,
 } from './raw-viewport-frame';
+import { atomicAnchoredGraphMutation } from './anchored-refresh';
 import { computeGlobalSpatialInfluence } from './spatial-influence';
 import type { GlobalSpatialInfluenceRequest } from './types';
 
@@ -388,34 +388,35 @@ describe('raw viewport framing across Sigma normalization', () => {
     ).toBeGreaterThan(1);
   });
 
-  it('restores after process and before the changed normalization is rendered', async () => {
+  it('uses the shared camera transaction to restore after process and before render', async () => {
     const order: string[] = [];
     let afterProcess: () => void = () => undefined;
     let afterRender: () => void = () => undefined;
-    const promise = refreshPreservingRawViewportFrame(
+    const transaction = atomicAnchoredGraphMutation(
       {
-        afterProcess: (callback) => {
+        onAfterProcess: (callback) => {
           order.push('arm-process');
           afterProcess = callback;
         },
-        afterRender: (callback) => {
+        offAfterProcess: () => undefined,
+        onAfterRender: (callback) => {
           order.push('arm-render');
           afterRender = callback;
         },
-        removeAfterProcess: vi.fn(),
-        removeAfterRender: vi.fn(),
-        scheduleRefresh: () => {
-          order.push('process');
-          afterProcess();
-          order.push('render');
-          afterRender();
-        },
+        offAfterRender: () => undefined,
       },
-      () => order.push('mutate'),
       () => order.push('restore'),
+      () => {
+        order.push('mutate');
+        // Graphology/Sigma owns the frame triggered by the coordinate mutation.
+        order.push('process');
+        afterProcess();
+        order.push('render');
+        afterRender();
+      },
     );
 
-    await promise;
+    await transaction.rendered;
     expect(order).toEqual([
       'arm-process',
       'arm-render',
@@ -426,44 +427,35 @@ describe('raw viewport framing across Sigma normalization', () => {
     ]);
   });
 
-  it('repairs the raw frame when Graphology processes synchronously during mutation', async () => {
-    const order: string[] = [];
+  it('preserves a changed normalization in the first shared atomic frame', async () => {
+    const renderer = new SyntheticSigmaTransform({
+      x: [-4, 5],
+      y: [-3, 6],
+    });
+    const before = captureRawViewportFrame(renderer);
     let afterProcess: () => void = () => undefined;
     let afterRender: () => void = () => undefined;
-    const scheduleRefresh = vi.fn();
-    const promise = refreshPreservingRawViewportFrame(
+    const transaction = atomicAnchoredGraphMutation(
       {
-        afterProcess: (callback) => {
-          order.push('arm-process');
+        onAfterProcess: (callback) => {
           afterProcess = callback;
         },
-        afterRender: (callback) => {
-          order.push('arm-render');
+        offAfterProcess: () => undefined,
+        onAfterRender: (callback) => {
           afterRender = callback;
         },
-        removeAfterProcess: vi.fn(),
-        removeAfterRender: vi.fn(),
-        scheduleRefresh,
+        offAfterRender: () => undefined,
       },
+      () => restoreRawViewportFrame(renderer, before),
       () => {
-        order.push('mutate');
-        order.push('process');
+        renderer.setExtent({ x: [-42, 16], y: [-9, 49] });
         afterProcess();
-        order.push('render');
+        expectFrameToMatch(renderer, before);
         afterRender();
       },
-      () => order.push('restore'),
     );
 
-    await promise;
-    expect(order).toEqual([
-      'arm-process',
-      'arm-render',
-      'mutate',
-      'process',
-      'restore',
-      'render',
-    ]);
-    expect(scheduleRefresh).not.toHaveBeenCalled();
+    await transaction.rendered;
+    expectFrameToMatch(renderer, before);
   });
 });

@@ -12,6 +12,12 @@ export type GlobalGraph = MultiDirectedGraph<
   GlobalEdgeAttributes
 >;
 
+export interface GlobalGraphReconciliationPlan {
+  readonly reconciliation: GlobalGraphReconciliation;
+  readonly changed: boolean;
+  readonly apply: () => void;
+}
+
 function sameNodeAttributes(
   current: GlobalNodeAttributes,
   next: GlobalNodeAttributes,
@@ -61,25 +67,26 @@ export function buildGlobalGraph(input: GlobalRendererInput): GlobalGraph {
   return graph;
 }
 
-export function reconcileGlobalGraph(
+export function planGlobalGraphReconciliation(
   graph: GlobalGraph,
   input: GlobalRendererInput,
   options: { readonly preservePositions?: boolean } = {},
-): GlobalGraphReconciliation {
+): GlobalGraphReconciliationPlan {
   const nodes = new Map(input.nodes.map((node) => [node.key, node]));
   const edges = new Map(input.edges.map((edge) => [edge.key, edge]));
-  let nodesAdded = 0;
-  let nodesUpdated = 0;
-  let nodesRemoved = 0;
-  let edgesAdded = 0;
-  let edgesUpdated = 0;
-  let edgesRemoved = 0;
-
-  graph.forEachEdge((key) => {
-    if (edges.has(key)) return;
-    graph.dropEdge(key);
-    edgesRemoved += 1;
-  });
+  const edgeKeysToRemove = graph.edges().filter((key) => !edges.has(key));
+  const nodesToAdd: GlobalRendererInput['nodes'][number][] = [];
+  const nodesToUpdate: {
+    readonly key: string;
+    readonly attributes: GlobalNodeAttributes;
+  }[] = [];
+  const edgesToAdd: GlobalRendererInput['edges'][number][] = [];
+  const edgesToUpdate: {
+    readonly key: string;
+    readonly attributes: GlobalEdgeAttributes;
+  }[] = [];
+  const replacementEdgeKeys = new Set<string>();
+  const nodeKeysToRemove = graph.nodes().filter((key) => !nodes.has(key));
 
   for (const node of input.nodes) {
     if (graph.hasNode(node.key)) {
@@ -88,16 +95,14 @@ export function reconcileGlobalGraph(
       if (sameNodeAttributes(previous, node.attributes, preservePositions)) {
         continue;
       }
-      graph.replaceNodeAttributes(
-        node.key,
-        preservePositions
+      nodesToUpdate.push({
+        key: node.key,
+        attributes: preservePositions
           ? { ...node.attributes, x: previous.x, y: previous.y }
           : node.attributes,
-      );
-      nodesUpdated += 1;
+      });
     } else {
-      graph.addNode(node.key, node.attributes);
-      nodesAdded += 1;
+      nodesToAdd.push(node);
     }
   }
 
@@ -112,44 +117,62 @@ export function reconcileGlobalGraph(
         ) {
           continue;
         }
-        graph.replaceEdgeAttributes(edge.key, edge.attributes);
-        edgesUpdated += 1;
+        edgesToUpdate.push({ key: edge.key, attributes: edge.attributes });
       } else {
-        graph.dropEdge(edge.key);
+        replacementEdgeKeys.add(edge.key);
+        edgesToAdd.push(edge);
+      }
+    } else {
+      edgesToAdd.push(edge);
+    }
+  }
+
+  const reconciliation: GlobalGraphReconciliation = {
+    nodesAdded: nodesToAdd.length,
+    nodesUpdated: nodesToUpdate.length,
+    nodesRemoved: nodeKeysToRemove.length,
+    edgesAdded: edgesToAdd.length,
+    edgesUpdated: edgesToUpdate.length,
+    edgesRemoved: edgeKeysToRemove.length + replacementEdgeKeys.size,
+  };
+  const changed = Object.values(reconciliation).some((count) => count > 0);
+
+  return {
+    reconciliation,
+    changed,
+    apply: () => {
+      for (const key of edgeKeysToRemove) graph.dropEdge(key);
+      for (const { key } of edgesToAdd) {
+        if (replacementEdgeKeys.has(key)) graph.dropEdge(key);
+      }
+      for (const node of nodesToAdd) graph.addNode(node.key, node.attributes);
+      for (const node of nodesToUpdate) {
+        graph.replaceNodeAttributes(node.key, node.attributes);
+      }
+      for (const edge of edgesToAdd) {
         graph.addDirectedEdgeWithKey(
           edge.key,
           edge.source,
           edge.target,
           edge.attributes,
         );
-        edgesRemoved += 1;
-        edgesAdded += 1;
       }
-    } else {
-      graph.addDirectedEdgeWithKey(
-        edge.key,
-        edge.source,
-        edge.target,
-        edge.attributes,
-      );
-      edgesAdded += 1;
-    }
-  }
-
-  graph.forEachNode((key) => {
-    if (nodes.has(key)) return;
-    graph.dropNode(key);
-    nodesRemoved += 1;
-  });
-
-  return {
-    nodesAdded,
-    nodesUpdated,
-    nodesRemoved,
-    edgesAdded,
-    edgesUpdated,
-    edgesRemoved,
+      for (const edge of edgesToUpdate) {
+        graph.replaceEdgeAttributes(edge.key, edge.attributes);
+      }
+      for (const key of nodeKeysToRemove) graph.dropNode(key);
+    },
   };
+}
+
+export function reconcileGlobalGraph(
+  graph: GlobalGraph,
+  input: GlobalRendererInput,
+  options: { readonly preservePositions?: boolean } = {},
+): GlobalGraphReconciliation {
+  const plan = planGlobalGraphReconciliation(graph, input, options);
+  plan.apply();
+  return plan.reconciliation;
 }
 
 export function createGlobalNeighborhoodIndex(

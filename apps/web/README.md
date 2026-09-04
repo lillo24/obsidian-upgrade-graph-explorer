@@ -422,6 +422,28 @@ the selected strength, Off retains it, and Advanced is a transient disclosure
 rather than a persistence toggle. These controls can be configured from any
 view, but Hierarchy projection and W3 layout do not observe them.
 
+Settings use three keyboard-accessible sections: **Preferences** contains the
+ordinary Trackpad Zoom choice, **Sandbox** contains graph appearance/layout
+experiments, and **Source & Diagnostics** retains source operations and evidence.
+Sandbox provides separate transient **All Network Density** and **Focus Network
+Density** framing strengths. For either scope, 0% reproduces legacy ratio 1,
+100% uses that renderer's measured SPACING1B ratio, and intermediate values
+linearly interpolate the camera target. Slider movement is a live camera
+preview under automatic or user ownership: it preserves the current semantic
+screen anchor, applies the new ratio without Fit, and leaves the viewport
+user-owned so later topology updates cannot steal it. Both default to 100% per
+launch and are intentionally absent from the v1 preference payload. Reset
+Sandbox restores only Focus Root appearance, All Network layout, both density
+strengths, and Experimental exposure; Trackpad Zoom, source configuration,
+view/history, queries, spatial folder intent, and vault data remain unchanged.
+
+For SPACING1B native QA, Sandbox temporarily shows each mounted renderer's raw
+density decision, effective interpolated ratio, Sigma camera ratio, and fallback
+reason. The All readout also includes node, edge, and isolate counts. These
+values are neither persisted nor consumed by projection, ForceAtlas2, Pull,
+layout identity, or camera policy. Scope labels distinguish the All-only layout
+and visual controls from Focus Root and the two camera-only density controls.
+
 **Hierarchy Depth** is hidden in All Network and visible in the other three
 combinations. In Focus it applies automatic depth only beneath the root file;
 depth 0 has no automatic headings, while depths 1–3 reveal the corresponding
@@ -487,7 +509,7 @@ pnpm desktop:dev
 ## HIER0 availability
 
 All opens in Network by default. All Hierarchy remains intact behind Settings >
-Graph > Experimental > Show All Hierarchy (Off by default), or as emergency
+Sandbox > Experimental > Show All Hierarchy (Off by default), or as emergency
 recovery when All Network is unavailable. Focus always exposes Network and
 Hierarchy. The collapsed Experimental disclosure is transient; its checkbox is a
 general graph preference in the existing v1 record, separate from schema-v3 views.

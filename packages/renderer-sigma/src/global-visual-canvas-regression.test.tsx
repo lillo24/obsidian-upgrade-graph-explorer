@@ -179,7 +179,7 @@ describe('All Network global visual settings ownership', () => {
     const renderer = SigmaTestRenderer.instances[0]!;
     const positionsBefore = coordinates(renderer);
     const cameraBefore = renderer.camera.getState();
-    renderer.camera.setState.mockClear();
+    const cameraSetCallsBefore = renderer.camera.setState.mock.calls.length;
     const graphSizesBefore = renderer.graph
       .nodes()
       .map((key) => renderer.graph.getNodeAttribute(key, 'size'));
@@ -283,7 +283,9 @@ describe('All Network global visual settings ownership', () => {
         .map((key) => renderer.graph.getEdgeAttribute(key, 'size')),
     ).toEqual(graphEdgeSizesBefore);
     expect(renderer.camera.getState()).toEqual(cameraBefore);
-    expect(renderer.camera.setState).not.toHaveBeenCalled();
+    expect(renderer.camera.setState).toHaveBeenCalledTimes(
+      cameraSetCallsBefore,
+    );
     expect(onSelectionChange).not.toHaveBeenCalled();
     expect(onActiveChange).not.toHaveBeenCalled();
     expect(onActiveFolderChange).not.toHaveBeenCalled();

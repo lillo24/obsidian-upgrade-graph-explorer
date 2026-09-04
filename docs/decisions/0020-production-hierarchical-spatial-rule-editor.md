@@ -68,11 +68,11 @@ semantics, persisting resolved members, or running dynamic work on pointermove.
     cooling, or hard-constraint neighbor reaction. Those policies remain owned
     by PHYSICS1/CONVERGENCE integration; MOVE1A's temporary constraint seam is
     not reused for spatial-rule target authoring.
-17. Draft PR #60 / FLICKER1 remains the long-term owner of atomic Network camera
-    transactions. SPATIAL2B keeps only the raw-frame repair needed for spatial
-    normalization. FLICKER1 integration must absorb that repair callback into
-    its single pre-mutation transaction and replace SPATIAL2B's refresh fallback;
-    the two systems must not be nested as competing camera owners.
+17. Merged PR #60 / FLICKER1 owns atomic Network camera transactions. SPATIAL2B
+    keeps only the raw-frame capture/restore needed for spatial normalization
+    and supplies it to FLICKER1's shared pre-mutation transaction. Graphology's
+    refresh remains authoritative; no nested refresh or competing camera owner
+    is introduced.
 
 ## Consequences
 

@@ -26,6 +26,7 @@ import {
   localLayoutFingerprint,
   mapProjectionToLocalTopology,
   reconcileLocalGraph,
+  resolveLocalDensityFit,
   seedLocalRendererInput,
   type LocalLayoutPosition,
   type LocalRendererInput,
@@ -351,6 +352,15 @@ function main(): void {
     () => applyPositions(graph, layoutMeasure.value.positions),
     repeats,
   );
+  const densityPolicy = measureRepeated(
+    () => resolveLocalDensityFit(seeded, layoutMeasure.value.positions),
+    repeats,
+  );
+  if (densityPolicy.value.fallback) {
+    throw new Error(
+      `Local density benchmark fell back: ${densityPolicy.value.fallbackReason ?? 'unknown reason'}`,
+    );
+  }
   const expandedState = expandedNeighborState(projection, state, rootEntityId);
   const expandedProjection = projectLocalView(workspace, expandedState);
   const expandedInput = seedLocalRendererInput(
@@ -511,6 +521,13 @@ function main(): void {
           rootNormalizedToOrigin: layoutMeasure.value.positions.some(
             ({ key, x, y }) => key === seeded.rootNodeKey && x === 0 && y === 0,
           ),
+        },
+        densityAwareCameraFit: {
+          ratio: densityPolicy.value.ratio,
+          computation: densityPolicy.distribution,
+          measuredEvaluations: repeats,
+          warmupEvaluations: 1,
+          additionalLayoutRequests: 0,
         },
         disclosureUpdate: {
           ...mappedEvidence(expandedInput),

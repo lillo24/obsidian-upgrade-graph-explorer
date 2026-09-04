@@ -634,7 +634,9 @@ Apply Place, remove-only Pull/Place, remove-with-survivors, and Reset all. A
 fresh exact cache-hit load retains its existing three logical adoptions (cached
 base, Pull settlement, and layout-commit re-evaluation), but all three now use
 the raw-frame path and no plain intermediate frame. Raw center/scale tests cover
-each mutation plus an Apply→Remove round-trip under a non-default pan/zoom.
+each mutation plus an Apply→Remove round-trip under a non-default pan/zoom. After
+PR #60 merged, the raw-frame restore runs inside its shared atomic Graphology
+transaction; spatial adoption adds no explicit refresh or second camera owner.
 
 The private-safe medium product fixture (500 nodes, 100 affected members, 24
 iterations) compares the proposed default strengths with the same base graph:
@@ -739,8 +741,9 @@ adoption, and Local imports the shared stylesheet at its own lazy boundary.
 Follow-up QA found another one-frame ordering defect: hop changes and
 Global↔Local history could expose Sigma's new graph normalization with the old
 camera before a post-render anchor or Fit returned it. Exact cached positions
-and semantic viewports now warm the first draw, reconciliation restores its
-anchor in `afterProcess`, Local hop/direction changes do not auto-fit, and
+and semantic viewports now warm the first draw, reconciliation arms its anchor
+repair before Graphology mutation and applies it in `afterProcess`, Local
+hop/direction changes do not auto-fit, and
 one-shot transition/Fit intents are cleared after consumption. The repeated
 production run kept the graph visible without Fit and emitted no console
 warning or error.
@@ -914,6 +917,100 @@ All + Network. All + Hierarchy, Focus + Network, and Focus + Hierarchy defer the
 preference with zero KG6 projection and zero active hierarchy W3 work. Rapid
 input uses the existing Global worker client, which terminates superseded work
 and adopts only the latest response; no timer, backlog, or dependency was added.
+
+## SPACING1B Focus density-policy evidence
+
+SPACING1B measures its Sigma-faithful density policy once per accepted Local
+layout. The pass returns camera metadata only and adds zero layout requests,
+projections, or topology reconciliations. It is not run on render, camera
+updates, wheel/pinch, pan, Fit, or resize. The exact nearest-neighbor scan is
+quadratic in visible Local nodes; current bounded profiles keep it well below
+the Class A reference, so no generalized cache or approximate metric is added.
+
+Local Windows/Node measurements recorded on 2026-09-03 are investigative
+evidence, not CI thresholds. Each profile includes one warm-up; smoke/small use
+seven samples, medium three, and stress one.
+
+| Profile | Local nodes / edges | Density median | Density p95 | Extra layouts |
+| ------- | ------------------: | -------------: | ----------: | ------------: |
+| Smoke   |               4 / 5 |       0.035 ms |    0.101 ms |             0 |
+| Small   |             13 / 22 |       0.057 ms |    0.108 ms |             0 |
+| Medium  |            61 / 110 |       0.591 ms |    2.037 ms |             0 |
+| Stress  |           101 / 175 |       0.657 ms |    0.657 ms |             0 |
+
+The 15 deterministic SPACING1A scenes call the production policy directly.
+They preserve relative geometry to within `6e-8` in the diagnostic transform;
+their accepted ratios range from `0.93` to `1.4` (plus the lower-clamp unit
+case at `0.7`). ForceAtlas2 worker counts, positions, fingerprints, and cache
+values remain unchanged.
+
+The SPACING1B-QA strength control performs only constant-time interpolation of
+the last accepted decision. It does not rerun density measurement, projection,
+mapping, topology reconciliation, or Local ForceAtlas2. Changing it while the
+camera is automatic or user-owned updates one camera state around the current
+semantic screen anchor and makes the resulting viewport user-owned. Fit remains
+the explicit recentering action. The benchmark figures above therefore remain
+the complete density-evaluation cost.
+
+## SPACING1B-GLOBAL density-policy evidence
+
+All Network measures confirmed final displayed positions rather than raw
+ForceAtlas2 output, so dynamic Pull and fixed-folder composition are included.
+The diagnostic's direct Global scale experiment produced a `0 px` maximum
+screen delta between `P` and `0.5 × P`, confirming that Sigma 3.0.3 auto-rescale
+also neutralizes uniform coordinate scaling in this renderer. Camera framing is
+therefore the selected B-layer correction; ForceAtlas2, Pull, spatial rules,
+layout fingerprints, position caches, and visual settings remain unchanged.
+
+The rootless policy combines median nearest-neighbor distance per representative
+node diameter, optional median connected-edge distance, and p95 robust radius,
+then applies a 95% useful-viewport floor and one `0.7–1.4` clamp. A balanced
+deterministic k-d tree builds in `O(N log² N)` with average `O(N log N)` total
+nearest queries (quadratic worst case). Valid zero-edge graphs with two or more
+nodes do not fall back. Synthetic independent-node decisions for 2/3/5/10/20/50
+nodes were all non-fallback; the one-node case safely returned ratio 1.
+
+Local Windows/Node evidence recorded on 2026-09-04 used one warm-up and seven
+samples. Values are investigative medians/p95, not CI thresholds.
+
+| Global nodes | Density median | Density p95 |
+| -----------: | -------------: | ----------: |
+|          100 |       0.395 ms |    1.385 ms |
+|          500 |       1.656 ms |    1.710 ms |
+|        1,000 |       3.066 ms |    3.856 ms |
+|        5,000 |      19.655 ms |   23.088 ms |
+
+The 29-scene aggregate matrix includes zero-edge, multi-component, connected,
+dense, folder-clustered, dynamic Pull, fixed composition, combined spatial, and
+query-reduced scenes. Density-strength changes produced zero automatic layout
+requests, zero dynamic Pull requests, and zero spatial persistence writes. All
+and Focus strength interpolation is constant-time over the last accepted
+decision; live preview moves only the camera around a stable semantic anchor.
+
+## FLICKER1 atomic Network frame evidence
+
+Sigma 3.0.3 automatically schedules refresh from node/edge add, drop, and
+attribute events, including `updateEachNodeAttributes`. FLICKER1 makes that
+Graphology-triggered request authoritative: the All/Focus camera correction and
+completion callbacks are registered before the mutation, and the former
+explicit `scheduleRefresh()` is removed. Multiple reconciliation mutations are
+planned first and still coalesce into Sigma's single next-frame process/render.
+An early layout-worker result waits for a pending anchored topology render before
+capturing its coordinate-change anchor, preventing stale Sigma display data from
+bridging the two transactions. No timer, animation, fade, extra layout, or cache
+was added.
+
+The deterministic Sigma-frame harness normalizes old and changed coordinates in
+an 800×600 viewport. Its former uncorrected control displaces the semantic node
+by more than 50 px on the first changed frame; the production transaction keeps
+the first and settled frame error below `1e-8` px. It covers Global and Local
+topology/position commits, selected and explicit-history survivors, nearest
+survivor fallback, fully replaced/empty scenes, and automatic density ratio on
+the first confirmed-position frame. One accepted coordinate commit produces
+one process/render in the harness. Density preview remains camera-only over
+0/50/100/125/150%, with 100% as Auto and 101–150% as transient Sandbox-only
+amplification; it creates no ForceAtlas2, dynamic Pull, spatial write, topology,
+fingerprint, or cache work.
 
 ## CONVERGENCE1B Local bounded-convergence evidence
 
