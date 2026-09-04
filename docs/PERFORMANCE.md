@@ -598,6 +598,31 @@ preview debounced/worker-only and establish a scale policy before exposing the
 editor in production. Stress profiles remain opt-in and no new force dependency
 or persisted coordinate cache was introduced.
 
+### MOVE1A temporary File drag foundation
+
+MOVE1A adds aggregate counts for primes, constraint begins, frame-coalesced
+updates, releases, cancels, and unavailable attempts in both Sigma sessions.
+The raw pointer path records no node IDs, coordinates, source paths, or physics
+parameters. Pointer samples run in imperative session state; React renders and
+promises are absent from the hot path. At most one update is sent per animation
+frame, while release synchronously flushes the latest pending target before the
+end command.
+
+`pnpm benchmark:file-move` measures only MOVE1A-owned pure work: identity
+display-to-dynamic conversion, conversion with an applied Place translation,
+large prebuilt translation indexing/lookup, and 10,000 raw samples through the
+coalescer. It does not model fake physics as production evidence. Results are
+aggregate synthetic timings and are investigative rather than CI gates; real
+cooling response, WebGL apply cost, and RAF gaps remain PHYSICS1/MOVE1B browser
+evidence.
+
+Local Windows/Node evidence recorded on 2026-09-04 measured no-Place
+conversion at 0.094/0.217 ms median/p95 per 1,000 targets, Place conversion at
+0.082/0.718 ms, and a 20,000-node Place conversion pass at 1.551/2.234 ms.
+Building that 20,000-node index took 3.820 ms once. Ten thousand raw pointer
+samples coalesced to three begin/update/end commands in 3.170 ms. These values
+are machine-local observations, not budgets.
+
 ## KG13B2A bounded Local Free evidence
 
 Local profiles describe the projected neighborhood itself rather than a large

@@ -14,6 +14,12 @@ import {
   changedFileSizeNodeKeys,
   indexFileNodeKeys,
 } from './node-size-presentation';
+import {
+  isAvailableTemporaryFileMoveContext,
+  TemporaryFileMoveCoordinator,
+  type TemporaryFileMoveSessionContext,
+} from './file-move';
+import type { TemporaryNodeConstraintEndReason } from './temporary-node-constraint';
 
 import {
   buildGlobalGraph,
@@ -107,6 +113,7 @@ export interface GlobalRendererSessionOptions {
   ) => void;
   readonly onArrangementPointerMove?: (point: SpatialPoint | undefined) => void;
   readonly onArrangementError?: (message: string) => void;
+  readonly onFileMoveError?: (message: string) => void;
   readonly onViewportObservation?: (
     viewport: SemanticGlobalViewport | undefined,
   ) => void;
@@ -169,6 +176,29 @@ export class GlobalRendererSession {
   private arrangementPreview: FolderClusterPreviewResult | undefined;
   private arrangementPreviewFrame: number | undefined;
   private lastAppliedArrangementPreview: FolderClusterPreviewResult | undefined;
+  private fileMoveContext: TemporaryFileMoveSessionContext | undefined;
+  private fileMoveCoordinator: TemporaryFileMoveCoordinator | undefined;
+  private fileMoveGestureSequence = 0;
+  private suppressFileMoveDoubleClick = false;
+  private fileMoveLifecycleAttached = false;
+
+  private readonly fileMoveKeyDownHandler = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') this.cancelTemporaryFileMove('cancelled');
+  };
+
+  private readonly fileMoveBlurHandler = (): void => {
+    this.cancelTemporaryFileMove('pointer-lost');
+  };
+
+  private readonly fileMovePointerLossHandler = (): void => {
+    this.cancelTemporaryFileMove('pointer-lost');
+  };
+
+  private readonly fileMoveVisibilityHandler = (): void => {
+    if (document.visibilityState !== 'visible') {
+      this.cancelTemporaryFileMove('pointer-lost');
+    }
+  };
 
   private readonly cameraUpdatedHandler = (): void => {
     const started = performance.now();
@@ -197,7 +227,8 @@ export class GlobalRendererSession {
   private readonly precisionWheelHandler = (coordinates: WheelCoords): void => {
     if (
       this.arrangementGesture.phase === 'primed' ||
-      this.arrangementGesture.phase === 'dragging'
+      this.arrangementGesture.phase === 'dragging' ||
+      this.fileMoveCoordinator?.ownsPointerSequence === true
     ) {
       preventSigmaWheelDefault(coordinates);
       return;
@@ -557,6 +588,96 @@ export class GlobalRendererSession {
     this.options.onArrangementCommit?.(next.folderKey, next.preview.anchor);
   }
 
+  private eligibleFileMoveNode(key: string): boolean {
+    if (!this.graph.hasNode(key)) return false;
+    const attributes = this.graph.getNodeAttributes(key);
+    return (
+      attributes.nodeKind === 'document' &&
+      attributes.entityId !== null &&
+      attributes.sourcePath !== null
+    );
+  }
+
+  private beginTemporaryFileMove(key: string, point: SpatialPoint): void {
+    const context = this.fileMoveContext;
+    if (context?.active !== true || !this.eligibleFileMoveNode(key)) return;
+    if (context.capability.status !== 'available') {
+      this.options.instrumentation?.count('file-move-unavailable-attempts');
+      return;
+    }
+    const attributes = this.graph.getNodeAttributes(key);
+    const graphPoint = this.viewportToGraphPoint(point);
+    this.suppressFileMoveDoubleClick = false;
+    this.fileMoveCoordinator?.prime({
+      gestureId: `${context.sessionGeneration}:${++this.fileMoveGestureSequence}`,
+      nodeKey: key,
+      startViewportPoint: point,
+      startGraphPoint: graphPoint,
+      displayedNodePoint: { x: attributes.x, y: attributes.y },
+    });
+  }
+
+  private moveTemporaryFileMove(
+    viewportPoint: SpatialPoint,
+    preventSigmaDefault: () => void,
+  ): void {
+    const coordinator = this.fileMoveCoordinator;
+    if (coordinator?.ownsPointerSequence !== true) return;
+    preventSigmaDefault();
+    coordinator.move(viewportPoint, this.viewportToGraphPoint(viewportPoint));
+  }
+
+  private finishTemporaryFileMove(): void {
+    const coordinator = this.fileMoveCoordinator;
+    if (coordinator === undefined) return;
+    const dragged = coordinator.release();
+    if (dragged) {
+      this.nodeClicks?.cancel();
+      this.suppressFileMoveDoubleClick = true;
+    }
+  }
+
+  private cancelTemporaryFileMove(
+    reason: Exclude<TemporaryNodeConstraintEndReason, 'released'>,
+  ): boolean {
+    return this.fileMoveCoordinator?.cancel(reason) ?? false;
+  }
+
+  private attachFileMoveLifecycle(): void {
+    if (this.fileMoveLifecycleAttached) return;
+    this.fileMoveLifecycleAttached = true;
+    window.addEventListener('keydown', this.fileMoveKeyDownHandler);
+    window.addEventListener('blur', this.fileMoveBlurHandler);
+    window.addEventListener('pointercancel', this.fileMovePointerLossHandler);
+    window.addEventListener(
+      'lostpointercapture',
+      this.fileMovePointerLossHandler,
+    );
+    document.addEventListener(
+      'visibilitychange',
+      this.fileMoveVisibilityHandler,
+    );
+  }
+
+  private detachFileMoveLifecycle(): void {
+    if (!this.fileMoveLifecycleAttached) return;
+    this.fileMoveLifecycleAttached = false;
+    window.removeEventListener('keydown', this.fileMoveKeyDownHandler);
+    window.removeEventListener('blur', this.fileMoveBlurHandler);
+    window.removeEventListener(
+      'pointercancel',
+      this.fileMovePointerLossHandler,
+    );
+    window.removeEventListener(
+      'lostpointercapture',
+      this.fileMovePointerLossHandler,
+    );
+    document.removeEventListener(
+      'visibilitychange',
+      this.fileMoveVisibilityHandler,
+    );
+  }
+
   private bindEvents(): void {
     const nodeClicks = new NodeClickArbitrator();
     this.nodeClicks = nodeClicks;
@@ -587,6 +708,10 @@ export class GlobalRendererSession {
       else this.refreshNodeStyles(previous);
     });
     this.renderer.on('clickNode', ({ node }) => {
+      if (this.fileMoveCoordinator?.consumeReleasedDragClick() === true) {
+        nodeClicks.cancel();
+        return;
+      }
       if (this.arrangementContext?.active === true) {
         nodeClicks.cancel();
         const folderKey = this.folderKeyForArrangementNode(node);
@@ -601,6 +726,10 @@ export class GlobalRendererSession {
       // Every node double-click is consumed; only canonical documents activate.
       preventSigmaDefault();
       nodeClicks.cancel();
+      if (this.suppressFileMoveDoubleClick) {
+        this.suppressFileMoveDoubleClick = false;
+        return;
+      }
       if (this.arrangementContext?.active === true) return;
       if (!this.graph.hasNode(node)) return;
       const attributes = this.graph.getNodeAttributes(node);
@@ -611,35 +740,65 @@ export class GlobalRendererSession {
     });
     this.renderer.on('clickStage', () => {
       nodeClicks.cancel();
+      if (this.fileMoveCoordinator?.consumeReleasedDragClick() === true) {
+        return;
+      }
       if (this.arrangementContext?.active === true) return;
       this.selectNode(undefined);
     });
     this.renderer.on('doubleClickStage', () => nodeClicks.cancel());
     this.renderer.on('rightClickNode', ({ preventSigmaDefault }) => {
-      if (this.arrangementContext?.active === true) preventSigmaDefault();
+      if (
+        this.arrangementContext?.active === true ||
+        this.fileMoveCoordinator?.ownsPointerSequence === true
+      ) {
+        preventSigmaDefault();
+      }
     });
     this.renderer.on('downNode', ({ node, event, preventSigmaDefault }) => {
+      if (
+        this.fileMoveContext?.capability.status === 'available' &&
+        this.eligibleFileMoveNode(node)
+      ) {
+        preventSigmaDefault();
+        this.beginTemporaryFileMove(node, { x: event.x, y: event.y });
+        return;
+      }
+      if (this.fileMoveContext?.capability.status === 'unavailable') {
+        this.beginTemporaryFileMove(node, { x: event.x, y: event.y });
+      }
       if (this.arrangementContext?.active !== true) return;
       preventSigmaDefault();
       this.beginArrangementDrag(node, { x: event.x, y: event.y });
     });
     this.renderer.on('moveBody', ({ event, preventSigmaDefault }) => {
+      this.moveTemporaryFileMove(
+        { x: event.x, y: event.y },
+        preventSigmaDefault,
+      );
       if (this.arrangementContext?.active === true) {
         this.options.onArrangementPointerMove?.({ x: event.x, y: event.y });
       }
       this.moveArrangementDrag({ x: event.x, y: event.y }, preventSigmaDefault);
     });
-    const finishArrangement = () => this.finishArrangementDrag();
-    this.renderer.on('upNode', finishArrangement);
-    this.renderer.on('upStage', finishArrangement);
-    this.renderer.on('leaveStage', () =>
-      this.options.onArrangementPointerMove?.(undefined),
-    );
+    const finishGestures = () => {
+      this.finishTemporaryFileMove();
+      this.finishArrangementDrag();
+    };
+    this.renderer.on('upNode', finishGestures);
+    this.renderer.on('upStage', finishGestures);
+    this.renderer.on('leaveStage', () => {
+      this.cancelTemporaryFileMove('pointer-lost');
+      this.options.onArrangementPointerMove?.(undefined);
+    });
   }
 
   setFolderArrangementContext(
     context: GlobalFolderArrangementContext | undefined,
   ): void {
+    if (context?.active === true && this.fileMoveContext !== undefined) {
+      this.setTemporaryFileMoveContext(undefined, 'mode-exit');
+    }
     const previousActive = this.arrangementContext?.active === true;
     const previousFolderKey = this.activeArrangementFolderKey();
     this.arrangementContext = context;
@@ -654,6 +813,38 @@ export class GlobalRendererSession {
     ) {
       this.refreshArrangementStyles();
     }
+  }
+
+  /** Fake-backed MOVE1A seam; production does not activate it until PHYSICS1. */
+  setTemporaryFileMoveContext(
+    context: TemporaryFileMoveSessionContext | undefined,
+    cancellationReason: Exclude<
+      TemporaryNodeConstraintEndReason,
+      'released'
+    > = 'mode-exit',
+  ): void {
+    this.detachFileMoveLifecycle();
+    this.fileMoveCoordinator?.cancel(cancellationReason);
+    this.fileMoveCoordinator = undefined;
+    this.fileMoveContext = undefined;
+    this.suppressFileMoveDoubleClick = false;
+    if (context === undefined) return;
+    if (this.arrangementContext?.active === true) {
+      this.setFolderArrangementContext(undefined);
+    }
+    this.fileMoveContext = context;
+    if (isAvailableTemporaryFileMoveContext(context)) {
+      this.fileMoveCoordinator = new TemporaryFileMoveCoordinator({
+        context,
+        count: (operation) => this.options.instrumentation?.count(operation),
+        onDragStart: (nodeKey) => {
+          this.nodeClicks?.cancel();
+          this.selectNode(nodeKey);
+        },
+        onError: (message) => this.options.onFileMoveError?.(message),
+      });
+    }
+    this.attachFileMoveLifecycle();
   }
 
   currentFolderAnchor(folderKey: string): NormalizedFolderAnchor | undefined {
@@ -833,6 +1024,7 @@ export class GlobalRendererSession {
 
   update(input: GlobalRendererInput): GlobalGraphReconciliation {
     this.cancelFolderArrangementGesture();
+    this.cancelTemporaryFileMove('topology-changed');
     this.nodeClicks?.cancel();
     const run = () => reconcileGlobalGraph(this.graph, input);
     const reconciliation =
@@ -874,6 +1066,7 @@ export class GlobalRendererSession {
   /** Development harness baseline; product live updates use in-place update(). */
   replace(input: GlobalRendererInput): void {
     this.cancelFolderArrangementGesture();
+    this.cancelTemporaryFileMove('topology-changed');
     this.nodeClicks?.cancel();
     this.graph = buildGlobalGraph(input);
     this.fileNodeKeys = indexFileNodeKeys(input.nodes);
@@ -893,6 +1086,7 @@ export class GlobalRendererSession {
 
   resetPositions(input: GlobalRendererInput): void {
     this.cancelFolderArrangementGesture();
+    this.cancelTemporaryFileMove('layout-changed');
     reconcileGlobalGraph(this.graph, input, { preservePositions: false });
     this.fileNodeKeys = indexFileNodeKeys(input.nodes);
     this.referenceDegrees = createGlobalReferenceDegreeIndex(input);
@@ -1042,6 +1236,7 @@ export class GlobalRendererSession {
   }
 
   applyPositions(positions: readonly GlobalLayoutPosition[]): Promise<void> {
+    this.cancelTemporaryFileMove('layout-changed');
     try {
       const byKey = new Map(
         positions.map((position) => [position.key, position]),
@@ -1210,6 +1405,10 @@ export class GlobalRendererSession {
     if (this.destroyed) return;
     this.destroyed = true;
     this.cancelFolderArrangementGesture();
+    this.cancelTemporaryFileMove('disposed');
+    this.detachFileMoveLifecycle();
+    this.fileMoveCoordinator = undefined;
+    this.fileMoveContext = undefined;
     this.nodeClicks?.cancel();
     this.renderer.getMouseCaptor().off('wheel', this.precisionWheelHandler);
     this.renderer.getCamera().off('updated', this.cameraUpdatedHandler);

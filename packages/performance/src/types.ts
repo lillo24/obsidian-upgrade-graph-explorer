@@ -97,6 +97,7 @@ export const PERFORMANCE_PHASES = [
   'local-center',
   'global-to-local-transition',
   'local-to-global-transition',
+  'file-move',
 ] as const;
 export type PerformancePhase = (typeof PERFORMANCE_PHASES)[number];
 
@@ -137,6 +138,12 @@ export const PERFORMANCE_OPERATIONS = [
   'local-centers',
   'global-to-local-transitions',
   'local-to-global-transitions',
+  'file-move-primes',
+  'file-move-begins',
+  'file-move-coalesced-updates',
+  'file-move-releases',
+  'file-move-cancels',
+  'file-move-unavailable-attempts',
 ] as const;
 export type PerformanceOperation = (typeof PERFORMANCE_OPERATIONS)[number];
 
@@ -202,6 +209,12 @@ export interface PerformanceOperationCounts {
   readonly 'local-centers': number;
   readonly 'global-to-local-transitions': number;
   readonly 'local-to-global-transitions': number;
+  readonly 'file-move-primes': number;
+  readonly 'file-move-begins': number;
+  readonly 'file-move-coalesced-updates': number;
+  readonly 'file-move-releases': number;
+  readonly 'file-move-cancels': number;
+  readonly 'file-move-unavailable-attempts': number;
 }
 
 export interface PerformanceEnvironment {
@@ -327,5 +340,11 @@ export function emptyPerformanceOperationCounts(): PerformanceOperationCounts {
     'local-centers': 0,
     'global-to-local-transitions': 0,
     'local-to-global-transitions': 0,
+    'file-move-primes': 0,
+    'file-move-begins': 0,
+    'file-move-coalesced-updates': 0,
+    'file-move-releases': 0,
+    'file-move-cancels': 0,
+    'file-move-unavailable-attempts': 0,
   };
 }

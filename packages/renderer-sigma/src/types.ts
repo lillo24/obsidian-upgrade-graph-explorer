@@ -298,7 +298,8 @@ export type GlobalPerformancePhase =
   | 'semantic-zoom-style'
   | 'global-hover'
   | 'global-selection'
-  | 'global-center';
+  | 'global-center'
+  | 'file-move';
 
 export type GlobalPerformanceOperation =
   | 'global-mappings'
@@ -314,7 +315,13 @@ export type GlobalPerformanceOperation =
   | 'global-style-updates'
   | 'global-hover-applications'
   | 'global-selection-applications'
-  | 'global-centers';
+  | 'global-centers'
+  | 'file-move-primes'
+  | 'file-move-begins'
+  | 'file-move-coalesced-updates'
+  | 'file-move-releases'
+  | 'file-move-cancels'
+  | 'file-move-unavailable-attempts';
 
 /** Aggregate-only optional hooks supplied by the application boundary. */
 export interface GlobalRendererInstrumentation {

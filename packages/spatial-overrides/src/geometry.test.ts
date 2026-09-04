@@ -4,6 +4,8 @@ import {
   applyFolderClusterAnchors,
   applyResolvedFolderPlacements,
   computeAutomaticGraphFrame,
+  dynamicTargetFromDisplayedTarget,
+  indexAppliedFixedTranslations,
   normalizedAnchorFromTarget,
   targetFromNormalizedAnchor,
 } from './geometry';
@@ -283,5 +285,208 @@ describe('normalized folder-anchor geometry', () => {
         0 as -1,
       ),
     ).toThrow('must be -1 or +1');
+  });
+});
+
+describe('displayed-to-dynamic fixed composition inverse', () => {
+  function composedTarget({
+    rules,
+    folderKeyByNodeKey,
+    currentPositions = automatic,
+    nodeKey,
+  }: {
+    readonly rules: Parameters<typeof resolveFolderSpatialRules>[0]['rules'];
+    readonly folderKeyByNodeKey: ReadonlyMap<string, string>;
+    readonly currentPositions?: readonly SpatialPosition[];
+    readonly nodeKey: string;
+  }) {
+    const resolved = resolveFolderSpatialRules({
+      rules,
+      folderKeyByNodeKey,
+    });
+    const composition = applyResolvedFolderPlacements({
+      baseAutomaticPositions: automatic,
+      currentPositions,
+      documentNodeKeys: folderKeyByNodeKey.keys(),
+      resolved,
+      visualDownGraphYSign: -1,
+    });
+    const displayed = position(composition.displayedPositions, nodeKey);
+    return {
+      composition,
+      dynamic: dynamicTargetFromDisplayedTarget({
+        nodeKey,
+        displayedTarget: displayed,
+        fixedTranslationByNodeKey: indexAppliedFixedTranslations(
+          composition.activeFolders,
+        ),
+      }),
+    };
+  }
+
+  it('uses identity when no Place rule applies', () => {
+    expect(
+      dynamicTargetFromDisplayedTarget({
+        nodeKey: 'a',
+        displayedTarget: { x: 7, y: -9 },
+        fixedTranslationByNodeKey: new Map(),
+      }),
+    ).toEqual({ x: 7, y: -9 });
+  });
+
+  it('subtracts an exact Place winner exactly once', () => {
+    const result = composedTarget({
+      rules: [
+        {
+          folderKey: 'alpha',
+          behavior: 'place',
+          scope: { kind: 'exact' },
+          anchor: { x: 0.75, y: -0.5 },
+        },
+      ],
+      folderKeyByNodeKey: folders,
+      nodeKey: 'a',
+    });
+    expect(result.dynamic).toEqual({ x: -4, y: -2 });
+    const translation = result.composition.activeFolders[0]!.translation;
+    const displayed = position(result.composition.displayedPositions, 'a');
+    expect({
+      x: result.dynamic.x + translation.x,
+      y: result.dynamic.y + translation.y,
+    }).toEqual({ x: displayed.x, y: displayed.y });
+    expect(
+      dynamicTargetFromDisplayedTarget({
+        nodeKey: 'a',
+        displayedTarget: result.dynamic,
+        fixedTranslationByNodeKey: new Map([['a', translation]]),
+      }),
+    ).toEqual({
+      x: result.dynamic.x - translation.x,
+      y: result.dynamic.y - translation.y,
+    });
+  });
+
+  it('preserves a dynamic Pull displacement beneath a Place translation', () => {
+    const dynamic = automatic.map((item) =>
+      item.key === 'a' ? { ...item, x: item.x + 13, y: item.y - 8 } : item,
+    );
+    const result = composedTarget({
+      rules: [
+        {
+          folderKey: 'alpha',
+          behavior: 'place',
+          scope: { kind: 'exact' },
+          anchor: { x: -0.5, y: 1 },
+        },
+      ],
+      folderKeyByNodeKey: folders,
+      currentPositions: dynamic,
+      nodeKey: 'a',
+    });
+    expect(result.dynamic).toEqual({ x: 9, y: -10 });
+  });
+
+  it('indexes the actual child Place winner under a parent subtree rule', () => {
+    const nestedFolders = new Map([
+      ['a', 'alpha'],
+      ['b', 'alpha/child'],
+      ['c', 'alpha/child/deep'],
+    ]);
+    const rules = [
+      {
+        folderKey: 'alpha',
+        behavior: 'place' as const,
+        scope: {
+          kind: 'subtree' as const,
+          includeRootFiles: true,
+          excludedSubtrees: [],
+        },
+        anchor: { x: -1, y: 0 },
+      },
+      {
+        folderKey: 'alpha/child',
+        behavior: 'place' as const,
+        scope: {
+          kind: 'subtree' as const,
+          includeRootFiles: true,
+          excludedSubtrees: [],
+        },
+        anchor: { x: 1, y: 0 },
+      },
+    ];
+    for (const nodeKey of ['a', 'b', 'c']) {
+      expect(
+        composedTarget({ rules, folderKeyByNodeKey: nestedFolders, nodeKey })
+          .dynamic,
+      ).toEqual((({ x, y }) => ({ x, y }))(position(automatic, nodeKey)));
+    }
+  });
+
+  it('keeps Pull winners, excluded descendants, and root-dot nonmembers on identity', () => {
+    const folderKeyByNodeKey = new Map([
+      ['a', '.'],
+      ['b', 'alpha/live'],
+      ['c', 'alpha/archive'],
+    ]);
+    const resolved = resolveFolderSpatialRules({
+      rules: [
+        {
+          folderKey: '.',
+          behavior: 'pull',
+          scope: {
+            kind: 'subtree',
+            includeRootFiles: true,
+            excludedSubtrees: ['alpha'],
+          },
+          anchor: { x: 0, y: 0 },
+          strength: 50,
+        },
+        {
+          folderKey: 'alpha',
+          behavior: 'place',
+          scope: {
+            kind: 'subtree',
+            includeRootFiles: true,
+            excludedSubtrees: ['alpha/archive'],
+          },
+          anchor: { x: 1, y: 1 },
+        },
+      ],
+      folderKeyByNodeKey,
+    });
+    const composition = applyResolvedFolderPlacements({
+      baseAutomaticPositions: automatic,
+      currentPositions: automatic,
+      documentNodeKeys: folderKeyByNodeKey.keys(),
+      resolved,
+      visualDownGraphYSign: -1,
+    });
+    const index = indexAppliedFixedTranslations(composition.activeFolders);
+    expect(index.has('a')).toBe(false);
+    expect(index.has('b')).toBe(true);
+    expect(index.has('c')).toBe(false);
+  });
+
+  it('is deterministic and rejects duplicate or ambiguous applied groups', () => {
+    const folder = {
+      folderKey: 'alpha',
+      memberNodeKeys: ['b', 'a'],
+      automaticCenter: { x: 0, y: 0 },
+      target: { x: 2, y: 3 },
+      translation: { x: 2, y: 3 },
+    } as const;
+    expect([...indexAppliedFixedTranslations([folder])]).toEqual([
+      ['a', { x: 2, y: 3 }],
+      ['b', { x: 2, y: 3 }],
+    ]);
+    expect(() => indexAppliedFixedTranslations([folder, folder])).toThrow(
+      'duplicate folder',
+    );
+    expect(() =>
+      indexAppliedFixedTranslations([
+        folder,
+        { ...folder, folderKey: 'beta', memberNodeKeys: ['a'] },
+      ]),
+    ).toThrow('ambiguous');
   });
 });
