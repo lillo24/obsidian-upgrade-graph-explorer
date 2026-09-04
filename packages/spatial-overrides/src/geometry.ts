@@ -3,6 +3,7 @@ import { isValidNormalizedFolderAnchor } from './registry';
 import {
   MINIMUM_AUTOMATIC_FRAME_HALF_EXTENT,
   NORMALIZED_FOLDER_ANCHOR_RANGE,
+  type AppliedFixedTranslationByNodeKey,
   type AppliedFolderTranslation,
   type AutomaticGraphFrame,
   type FolderClusterAnchorMap,
@@ -18,6 +19,103 @@ function finitePoint(value: SpatialPoint, label: string): void {
   if (!Number.isFinite(value.x) || !Number.isFinite(value.y)) {
     throw new Error(`${label} must contain finite x/y coordinates.`);
   }
+}
+
+/**
+ * Indexes the fixed translation that was actually applied by composition.
+ * Resolved Place groups must be disjoint; overlap here is an invalid layer
+ * composition rather than a winner that this helper is allowed to invent.
+ */
+export function indexAppliedFixedTranslations(
+  activeFolders: readonly AppliedFolderTranslation[],
+): AppliedFixedTranslationByNodeKey {
+  const byNodeKey = new Map<string, SpatialPoint>();
+  const folderKeys = new Set<string>();
+  const sorted = [...activeFolders].sort((left, right) =>
+    left.folderKey < right.folderKey
+      ? -1
+      : left.folderKey > right.folderKey
+        ? 1
+        : 0,
+  );
+  for (const folder of sorted) {
+    if (folderKeys.has(folder.folderKey)) {
+      throw new Error(
+        `Applied fixed translations contain duplicate folder ${JSON.stringify(folder.folderKey)}.`,
+      );
+    }
+    folderKeys.add(folder.folderKey);
+    finitePoint(
+      folder.translation,
+      `Applied fixed translation ${JSON.stringify(folder.folderKey)}`,
+    );
+    if (folder.memberNodeKeys.length === 0) {
+      throw new Error(
+        `Applied fixed translation ${JSON.stringify(folder.folderKey)} has no members.`,
+      );
+    }
+    const memberKeys = [...folder.memberNodeKeys].sort((left, right) =>
+      left < right ? -1 : left > right ? 1 : 0,
+    );
+    for (const nodeKey of memberKeys) {
+      if (nodeKey.length === 0) {
+        throw new Error('Applied fixed translations need non-empty node keys.');
+      }
+      if (byNodeKey.has(nodeKey)) {
+        throw new Error(
+          `Applied fixed translations are ambiguous for node ${JSON.stringify(nodeKey)}.`,
+        );
+      }
+      byNodeKey.set(nodeKey, {
+        x: folder.translation.x,
+        y: folder.translation.y,
+      });
+    }
+  }
+  return byNodeKey;
+}
+
+/**
+ * Converts a displayed drag target back into the dynamic/simulation layer.
+ * Nodes without an applied Place translation use the identity transform.
+ */
+export function dynamicTargetFromDisplayedTarget({
+  nodeKey,
+  displayedTarget,
+  fixedTranslationByNodeKey,
+}: {
+  readonly nodeKey: string;
+  readonly displayedTarget: SpatialPoint;
+  readonly fixedTranslationByNodeKey: AppliedFixedTranslationByNodeKey;
+}): SpatialPoint {
+  if (nodeKey.length === 0) throw new Error('Node key must not be empty.');
+  finitePoint(displayedTarget, 'Displayed target');
+  const translation = fixedTranslationByNodeKey.get(nodeKey);
+  return dynamicTargetFromDisplayedTranslation({
+    displayedTarget,
+    ...(translation === undefined
+      ? {}
+      : { appliedFixedTranslation: translation }),
+  });
+}
+
+/** Applies the same inverse when a gesture already captured its winner. */
+export function dynamicTargetFromDisplayedTranslation({
+  displayedTarget,
+  appliedFixedTranslation,
+}: {
+  readonly displayedTarget: SpatialPoint;
+  readonly appliedFixedTranslation?: SpatialPoint;
+}): SpatialPoint {
+  finitePoint(displayedTarget, 'Displayed target');
+  if (appliedFixedTranslation === undefined) {
+    return { x: displayedTarget.x, y: displayedTarget.y };
+  }
+  finitePoint(appliedFixedTranslation, 'Applied fixed translation');
+  return {
+    x: displayedTarget.x - appliedFixedTranslation.x,
+    y: displayedTarget.y - appliedFixedTranslation.y,
+  };
 }
 
 function positionIndex(

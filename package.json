@@ -26,6 +26,7 @@
     "benchmark:focus-schematic": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:focus-schematic",
     "benchmark:focus-schematic-layout": "pnpm --filter @icarus-graph-explorer/focus-schematic-bakeoff benchmark",
     "generate:focus-schematic-layout-lab": "pnpm --filter @icarus-graph-explorer/focus-schematic-bakeoff generate:lab",
+    "benchmark:file-move": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:file-move",
     "global-renderer:dev": "pnpm --filter @icarus-graph-explorer/global-renderer-spike dev",
     "global-renderer:build": "pnpm --filter @icarus-graph-explorer/global-renderer-spike build",
     "desktop:global-renderer:build": "pnpm --filter @icarus-graph-explorer/desktop build:global-renderer",
