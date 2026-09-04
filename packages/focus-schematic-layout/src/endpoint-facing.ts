@@ -12,6 +12,10 @@ import {
   createFocusSchematicEndpointPlan,
   validateFocusSchematicEndpointPlan,
 } from './endpoint-plan';
+import {
+  measureFocusSchematicEndpointOrder,
+  minimizeFocusSchematicEndpointCrossings,
+} from './crossing-minimization';
 import { assertFocusSchematicLayoutInput } from './input';
 import {
   createFocusSchematicInternalLanePlan,
@@ -87,6 +91,7 @@ function emptyTimings(totalMs = 0): FocusSchematicEndpointLayoutPhaseTimings {
     rightLayoutMs: 0,
     compositionMs: 0,
     macroMs: 0,
+    crossingMinimizationMs: 0,
     attachmentMs: 0,
     qualityMs: 0,
     validationMs: 0,
@@ -648,6 +653,7 @@ function stubObstructed(
 
 export function evaluateFocusSchematicEndpointLayoutQuality(
   input: FocusSchematicLayoutInput,
+  modulePlan: FocusSchematicLayoutPlan,
   endpointPlan: FocusSchematicEndpointPlan,
   lanePlan: FocusSchematicInternalLanePlan,
   candidate: FocusSchematicLayoutCandidate,
@@ -755,6 +761,11 @@ export function evaluateFocusSchematicEndpointLayoutQuality(
       : [Math.abs(sourceAttachment.y - targetAttachment.y)];
   });
   const totalReferenceIds = endpointPlan.summary.totalReferenceIdCount;
+  const orderMetrics = measureFocusSchematicEndpointOrder(
+    modulePlan,
+    endpointPlan,
+    candidate,
+  );
   return {
     preciseConnectionCount: endpointPlan.summary.preciseConnectionCount,
     fallbackConnectionCount: endpointPlan.summary.fallbackConnectionCount,
@@ -780,6 +791,7 @@ export function evaluateFocusSchematicEndpointLayoutQuality(
     nodeOverlapPairs: base.nodeOverlapPairs,
     nodeOutsideModuleIds: base.nodeOutsideModuleIds,
     totalBoundsArea: base.totalBoundsArea,
+    ...orderMetrics,
     meanPreciseEndpointVerticalError:
       verticalErrors.length === 0
         ? null
@@ -952,6 +964,7 @@ export function validateFocusSchematicComputedLayout(
   }
   const expectedQuality = evaluateFocusSchematicEndpointLayoutQuality(
     input,
+    computed.modulePlan,
     computed.endpointPlan,
     computed.internalLanePlan,
     computed.candidate,
@@ -996,12 +1009,21 @@ export function computeFocusSchematicComputedLayoutAttempt(
       .map((module) => internalLayout(value, module, internalLanePlan))
       .sort((left, right) => compareText(left.moduleId, right.moduleId));
     const macroStarted = now();
-    const { candidate, nativeRoutes } = macroLayout(
+    const { candidate: macroCandidate, nativeRoutes } = macroLayout(
       value,
       modulePlan,
       localLayouts,
     );
     const macroMs = now() - macroStarted;
+    const crossingMinimizationStarted = now();
+    const candidate = minimizeFocusSchematicEndpointCrossings(
+      value,
+      modulePlan,
+      endpointPlan,
+      internalLanePlan,
+      macroCandidate,
+    );
+    const crossingMinimizationMs = now() - crossingMinimizationStarted;
     const attachmentStarted = now();
     const attachments = createFocusSchematicEndpointAttachments(
       endpointPlan,
@@ -1011,6 +1033,7 @@ export function computeFocusSchematicComputedLayoutAttempt(
     const qualityStarted = now();
     const quality = evaluateFocusSchematicEndpointLayoutQuality(
       value,
+      modulePlan,
       endpointPlan,
       internalLanePlan,
       candidate,
@@ -1075,6 +1098,7 @@ export function computeFocusSchematicComputedLayoutAttempt(
           0,
         ),
         macroMs,
+        crossingMinimizationMs,
         attachmentMs,
         qualityMs,
         validationMs,

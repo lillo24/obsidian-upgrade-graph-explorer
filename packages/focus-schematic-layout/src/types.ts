@@ -246,6 +246,11 @@ export interface FocusSchematicEndpointLayoutQuality {
   readonly nodeOverlapPairs: readonly string[];
   readonly nodeOutsideModuleIds: readonly ProjectionNodeId[];
   readonly totalBoundsArea: number;
+  /** Precise selected-backbone/Focus-path straight-segment crossings. */
+  readonly exactEndpointCrossingCount: number;
+  /** Ordering inversions limited to connections between adjacent signed ranks. */
+  readonly adjacentRankOrderInversionCount: number;
+  readonly adjacentRankOrderingConnectionCount: number;
   readonly meanPreciseEndpointVerticalError: number | null;
   readonly p95PreciseEndpointVerticalError: number | null;
 }
@@ -271,6 +276,7 @@ export interface FocusSchematicEndpointLayoutPhaseTimings {
   readonly rightLayoutMs: number;
   readonly compositionMs: number;
   readonly macroMs: number;
+  readonly crossingMinimizationMs: number;
   readonly attachmentMs: number;
   readonly qualityMs: number;
   readonly validationMs: number;

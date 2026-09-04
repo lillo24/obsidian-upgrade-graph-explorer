@@ -216,6 +216,7 @@ async function isolatedAttempt(
           rightLayoutMs: 0,
           compositionMs: 0,
           macroMs: 0,
+          crossingMinimizationMs: 0,
           attachmentMs: 0,
           qualityMs: 0,
           validationMs: 0,
@@ -251,6 +252,7 @@ async function isolatedAttempt(
           rightLayoutMs: 0,
           compositionMs: 0,
           macroMs: 0,
+          crossingMinimizationMs: 0,
           attachmentMs: 0,
           qualityMs: 0,
           validationMs: 0,
@@ -297,6 +299,7 @@ async function summarize(spec: EndpointFixtureSpec, isolated = false) {
   );
   const a0EndpointQuality = evaluateFocusSchematicEndpointLayoutQuality(
     input,
+    a1.result.modulePlan,
     a1.result.endpointPlan,
     a1.result.internalLanePlan,
     a0.candidate,
@@ -318,6 +321,9 @@ async function summarize(spec: EndpointFixtureSpec, isolated = false) {
       obstructions:
         a0EndpointQuality.obstructedSourceAttachmentConnectionIds.length +
         a0EndpointQuality.obstructedTargetAttachmentConnectionIds.length,
+      exactEndpointCrossings: a0EndpointQuality.exactEndpointCrossingCount,
+      adjacentRankOrderInversions:
+        a0EndpointQuality.adjacentRankOrderInversionCount,
       dagreCallCount:
         input.model.modules.filter(
           ({ presentation }) => presentation !== 'filtered',
@@ -341,6 +347,9 @@ async function summarize(spec: EndpointFixtureSpec, isolated = false) {
       obstructions:
         a1.result.quality.obstructedSourceAttachmentConnectionIds.length +
         a1.result.quality.obstructedTargetAttachmentConnectionIds.length,
+      exactEndpointCrossings: a1.result.quality.exactEndpointCrossingCount,
+      adjacentRankOrderInversions:
+        a1.result.quality.adjacentRankOrderInversionCount,
       preciseReferenceCoverage: a1.result.quality.preciseReferenceCoverage,
     },
   };

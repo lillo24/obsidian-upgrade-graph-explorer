@@ -682,6 +682,55 @@ export const ENDPOINT_FIXTURES: readonly EndpointFixtureSpec[] = [
     ],
     references: [ref('Atlas-revised', 'Beacon-revised')],
   },
+  {
+    id: 'EP25',
+    label: 'Endpoint-aware module order',
+    authored: 'Atlas > Upper → Birch > Target; Atlas > Lower → Cedar > Target.',
+    expectation:
+      'Cedar moves above Birch so the two exact cross-file edges do not cross.',
+    inspect:
+      'The right-side File order may override alphabetical order to remove the inversion.',
+    rootDocumentId: 'Atlas',
+    documents: [doc('Atlas'), doc('Birch'), doc('Cedar')],
+    entities: [
+      section('Atlas-upper', 'Atlas', 'Atlas', 2),
+      section('Atlas-lower', 'Atlas', 'Atlas', 8),
+      section('Birch-target', 'Birch'),
+      section('Cedar-target', 'Cedar'),
+    ],
+    references: [
+      ref('Atlas-upper', 'Birch-target'),
+      ref('Atlas-lower', 'Cedar-target'),
+    ],
+    direction: 'outgoing',
+    hops: 1,
+  },
+  {
+    id: 'EP26',
+    label: 'Endpoint-aware sibling order',
+    authored:
+      'Atlas > First → Beacon > Second; Atlas > Second → Beacon > First.',
+    expectation:
+      'One sibling pair changes vertical order so the exact endpoint edges do not cross.',
+    inspect:
+      'Markdown order is a tie-break; the clearly crossing-free sibling order should win.',
+    rootDocumentId: 'Atlas',
+    documents: [doc('Atlas'), doc('Beacon')],
+    entities: [
+      section('Atlas-parent', 'Atlas', 'Atlas', 2),
+      section('Atlas-first', 'Atlas', 'Atlas-parent', 3),
+      section('Atlas-second', 'Atlas', 'Atlas-parent', 5),
+      section('Beacon-parent', 'Beacon', 'Beacon', 2),
+      section('Beacon-first', 'Beacon', 'Beacon-parent', 3),
+      section('Beacon-second', 'Beacon', 'Beacon-parent', 5),
+    ],
+    references: [
+      ref('Atlas-first', 'Beacon-second'),
+      ref('Atlas-second', 'Beacon-first'),
+    ],
+    direction: 'outgoing',
+    hops: 1,
+  },
 ];
 
 const stabilityBase: EndpointFixtureSpec = {

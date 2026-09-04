@@ -1,8 +1,10 @@
 # HIER3A validation
 
-Status: **automated candidate evidence complete; required user graphical
-review and the adoption decision are pending.** No ADR, production selection,
-PR, or merge has been finalized.
+Status: **A1 internal orientation is graphically preferred; endpoint-aware
+ordering evidence is complete and final graphical approval is pending.** The
+first review explicitly kept the A1 orientation decision closed while asking
+for crossing reduction. No ADR, production selection, PR, or merge has been
+finalized.
 
 ## Scope and isolation
 
@@ -63,6 +65,18 @@ padding and 34 px diagnostic reserve. The unchanged HIER2 macro Dagre graph
 then places the variable-size modules and normalizes the focused File to the
 origin.
 
+The refinement requested after the first graphical review runs after exact
+internal endpoint positions exist. Four fixed deterministic sweeps visit
+signed ranks outward and inward. For each rank, precise selected-backbone and
+Focus-path connections to the adjacent rank produce median desired module
+centers; variable-height rectangles are then collision-packed with the frozen
+macro separation. Disjoint sibling branches in a left/right internal lane use
+the analogous counterpart-endpoint preference when a proposed swap improves
+the exact crossing/order score. Markdown source order is a soft deterministic
+tie-break. Secondary connections are excluded from preferences and scores, so
+secondary-only geometry remains byte-identical. This pass changes rectangle
+positioning only and creates no obstacle routes or waypoints.
+
 Exact endpoint attachments use the midpoint of the demanded node boundary.
 Same-rank secondary `auto` attachments choose the deterministic boundary that
 faces the counterpart for lab display. Secondary auto stubs can report
@@ -81,11 +95,12 @@ before a success result is returned.
 
 Automated coverage includes:
 
-- EP1–EP24: File/Heading/Block combinations, both branches, root two-sided,
+- EP1–EP26: File/Heading/Block combinations, both branches, root two-sided,
   left/right multihop, one dual Heading, mixed ancestors, neutral hierarchy,
   rolled-up targets, aggregation, multiple endpoint groups, same-rank
   secondary, equal mutual, filtered anchors, diagnostics, duplicate basenames,
-  large mixed modules, expansion, and live semantic revision;
+  large mixed modules, expansion, live semantic revision, an obvious module
+  order swap, and an obvious sibling-branch swap;
 - ES1–ES8: endpoint gain/loss, neutral expansion, multihop growth,
   one-sided-to-dual, secondary-only, disclosure refinement, and stable-ID edit;
 - HIER2 F1–F18 plus 24 generated holdouts;
@@ -93,7 +108,7 @@ Automated coverage includes:
   `[[Target#Heading]]`, aliased Heading targets, and Block targets through the
   real parser/adapter/resolver/projection/model/layout pipeline.
 
-All 24 endpoint fixtures and all 42 inherited fixed/generated HIER2 cases pass
+All 26 endpoint fixtures and all 42 inherited fixed/generated HIER2 cases pass
 candidate validation, endpoint/lane validation, exact coverage, finite
 geometry, root normalization, signed-rank ordering, 16 px node/module
 clearance, containment, lane transitions, side-demand, and selected-stub
@@ -133,6 +148,12 @@ and passes every hard gate. EP18 correctly reports zero precise coverage for
 the filtered relationship provenance because both relationships require
 fallback representation in the filtered projection.
 
+EP12 reports 3 exact endpoint crossings and 3 adjacent-rank inversions in A0;
+the refined A1 reports 0/0. EP25 and EP26 each encode one deliberately inverted
+pair at the module and sibling-branch levels respectively; each moves from 1/1
+to 0/0. EP7/EP8 multi-hop, EP9 dual-endpoint, and EP22 large-fan evidence remain
+at 0/0. The lab and benchmark expose both metrics directly.
+
 ## Review lab
 
 Generate the self-contained lab with:
@@ -149,7 +170,7 @@ numbers. Every EP/ES scenario explains the authored relationship, expected
 side behavior, and what to inspect. SVG endpoints/edges are focusable and the
 adjacent details list is keyboard accessible.
 
-The generated-output test verifies EP1–EP24, ES3/ES4/ES5 revisions, defaults,
+The generated-output test verifies EP1–EP26, ES3/ES4/ES5 revisions, defaults,
 plain-language explanations, keyboard hooks, Advanced placement, and absence
 of HIER2 B/C/configuration controls. Desktop browser automation could not open
 the local `file://` artifact because its browser security policy blocked that

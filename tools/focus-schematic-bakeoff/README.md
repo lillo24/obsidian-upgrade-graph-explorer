@@ -34,7 +34,8 @@ aggregate metrics only.
 The HIER3A lab defaults to A0/A1 side-by-side with precise endpoint arrows and
 secondary links hidden. Its main controls are Scenario, Revision, View, and
 Edges. Module/lane guides, secondary and approximate center links, native
-macro route evidence, and quality numbers live under Advanced details. Every
+macro route evidence, exact crossing/rank-inversion counts, and other quality
+numbers live under Advanced details. Every
 scenario explains the authored relationship, expected physical side behavior,
 and what to inspect. Endpoint details are available through SVG focus and an
 adjacent keyboard-accessible list. Generated output is gitignored.
@@ -53,10 +54,11 @@ adjacent keyboard-accessible list. Generated output is gitignored.
 - `src/benchmark.ts` runs bounded calibration and the named evidence profiles.
 - `src/lab.ts` generates the self-contained HTML/SVG comparison lab.
 - `src/endpoint-benchmark.ts` compares A0/A1 endpoint quality, determinism,
-  phase timings, Dagre-call counts, payload sizes, and ES1–ES8 stability.
+  exact crossing/rank-order metrics, phase timings, Dagre-call counts, payload
+  sizes, and ES1–ES8 stability.
 - `src/endpoint-attempt-worker.ts` bounds the 500-module A1 hub attempt.
 - `src/endpoint-lab.ts` generates the focused self-contained HIER3A review
-  surface with EP1–EP24 and ES1–ES8.
+  surface with EP1–EP26 and ES1–ES8.
 - `src/endpoint-*.test.ts` covers the inherited HIER2 corpus and review-lab
   defaults/accessibility.
 - `src/strategies.test.ts` covers D0, compound output, dimensions, source order,

@@ -1,0 +1,609 @@
+import type {
+  FocusSchematicLayoutCandidate,
+  FocusSchematicRectangle,
+} from '@icarus-graph-explorer/focus-schematic';
+import type { ProjectionNodeId } from '@icarus-graph-explorer/view-projection';
+
+import type {
+  FocusSchematicConnectionEndpoint,
+  FocusSchematicEndpointConnection,
+  FocusSchematicEndpointPlan,
+  FocusSchematicInternalLanePlan,
+  FocusSchematicLayoutInput,
+  FocusSchematicLayoutPlan,
+} from './types';
+
+/** Two outward and two inward passes keep endpoint ordering work bounded. */
+export const FOCUS_SCHEMATIC_ENDPOINT_ORDERING_SWEEP_COUNT = 4;
+
+const EPSILON = 1e-6;
+const compareText = (left: string, right: string): number =>
+  left < right ? -1 : left > right ? 1 : 0;
+const rectangleCenterY = (rectangle: FocusSchematicRectangle): number =>
+  rectangle.y + rectangle.height / 2;
+
+type CandidateNode = FocusSchematicLayoutCandidate['nodes'][number];
+
+interface OrderingSegment {
+  readonly connectionId: string;
+  readonly lowerRank: number;
+  readonly upperRank: number;
+  readonly lowerY: number;
+  readonly upperY: number;
+}
+
+export interface FocusSchematicEndpointOrderMetrics {
+  readonly exactEndpointCrossingCount: number;
+  readonly adjacentRankOrderInversionCount: number;
+  readonly adjacentRankOrderingConnectionCount: number;
+}
+
+interface OrderingScore extends FocusSchematicEndpointOrderMetrics {
+  readonly totalVerticalError: number;
+}
+
+function median(values: readonly number[]): number {
+  if (values.length === 0) return 0;
+  const ordered = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(ordered.length / 2);
+  return ordered.length % 2 === 0
+    ? (ordered[middle - 1]! + ordered[middle]!) / 2
+    : ordered[middle]!;
+}
+
+function rankByModuleId(
+  modulePlan: FocusSchematicLayoutPlan,
+): ReadonlyMap<string, number> {
+  return new Map(
+    modulePlan.modules.map(({ moduleId, signedRank }) => [
+      moduleId,
+      signedRank,
+    ]),
+  );
+}
+
+function orderingConnections(
+  endpointPlan: FocusSchematicEndpointPlan,
+): readonly FocusSchematicEndpointConnection[] {
+  return endpointPlan.connections.filter(
+    (connection) =>
+      connection.kind === 'precise' && connection.role !== 'secondary',
+  );
+}
+
+function endpointNode(
+  candidate: FocusSchematicLayoutCandidate,
+  endpoint: FocusSchematicConnectionEndpoint,
+): CandidateNode | undefined {
+  return endpoint.kind === 'visible-entity'
+    ? candidate.nodes.find(
+        ({ projectionNodeId }) =>
+          projectionNodeId === endpoint.projectionNodeId,
+      )
+    : undefined;
+}
+
+function endpointY(
+  candidate: FocusSchematicLayoutCandidate,
+  endpoint: FocusSchematicConnectionEndpoint,
+): number | undefined {
+  const node = endpointNode(candidate, endpoint);
+  if (node !== undefined) return rectangleCenterY(node);
+  const module = candidate.modules.find(
+    ({ moduleId }) => moduleId === endpoint.moduleId,
+  );
+  return module === undefined ? undefined : rectangleCenterY(module);
+}
+
+function orderingSegments(
+  modulePlan: FocusSchematicLayoutPlan,
+  endpointPlan: FocusSchematicEndpointPlan,
+  candidate: FocusSchematicLayoutCandidate,
+): readonly OrderingSegment[] {
+  const ranks = rankByModuleId(modulePlan);
+  return orderingConnections(endpointPlan)
+    .flatMap((connection): OrderingSegment[] => {
+      const sourceRank = ranks.get(connection.sourceModuleId);
+      const targetRank = ranks.get(connection.targetModuleId);
+      const sourceY = endpointY(candidate, connection.source);
+      const targetY = endpointY(candidate, connection.target);
+      if (
+        sourceRank === undefined ||
+        targetRank === undefined ||
+        sourceRank === targetRank ||
+        sourceY === undefined ||
+        targetY === undefined
+      )
+        return [];
+      return sourceRank < targetRank
+        ? [
+            {
+              connectionId: connection.id,
+              lowerRank: sourceRank,
+              upperRank: targetRank,
+              lowerY: sourceY,
+              upperY: targetY,
+            },
+          ]
+        : [
+            {
+              connectionId: connection.id,
+              lowerRank: targetRank,
+              upperRank: sourceRank,
+              lowerY: targetY,
+              upperY: sourceY,
+            },
+          ];
+    })
+    .sort(
+      (left, right) =>
+        left.lowerRank - right.lowerRank ||
+        left.upperRank - right.upperRank ||
+        compareText(left.connectionId, right.connectionId),
+    );
+}
+
+function inversionCount(segments: readonly OrderingSegment[]): number {
+  let count = 0;
+  for (let leftIndex = 0; leftIndex < segments.length; leftIndex += 1) {
+    const left = segments[leftIndex]!;
+    for (
+      let rightIndex = leftIndex + 1;
+      rightIndex < segments.length;
+      rightIndex += 1
+    ) {
+      const right = segments[rightIndex]!;
+      if (
+        left.lowerRank !== right.lowerRank ||
+        left.upperRank !== right.upperRank
+      )
+        continue;
+      if (
+        (left.lowerY - right.lowerY) * (left.upperY - right.upperY) <
+        -EPSILON
+      )
+        count += 1;
+    }
+  }
+  return count;
+}
+
+export function measureFocusSchematicEndpointOrder(
+  modulePlan: FocusSchematicLayoutPlan,
+  endpointPlan: FocusSchematicEndpointPlan,
+  candidate: FocusSchematicLayoutCandidate,
+): FocusSchematicEndpointOrderMetrics {
+  const segments = orderingSegments(modulePlan, endpointPlan, candidate);
+  const adjacent = segments.filter(
+    ({ lowerRank, upperRank }) => upperRank - lowerRank === 1,
+  );
+  return {
+    exactEndpointCrossingCount: inversionCount(segments),
+    adjacentRankOrderInversionCount: inversionCount(adjacent),
+    adjacentRankOrderingConnectionCount: adjacent.length,
+  };
+}
+
+function orderingScore(
+  modulePlan: FocusSchematicLayoutPlan,
+  endpointPlan: FocusSchematicEndpointPlan,
+  candidate: FocusSchematicLayoutCandidate,
+): OrderingScore {
+  const metrics = measureFocusSchematicEndpointOrder(
+    modulePlan,
+    endpointPlan,
+    candidate,
+  );
+  const ranks = rankByModuleId(modulePlan);
+  const totalVerticalError = orderingConnections(endpointPlan).reduce(
+    (sum, connection) => {
+      const sourceRank = ranks.get(connection.sourceModuleId);
+      const targetRank = ranks.get(connection.targetModuleId);
+      if (
+        sourceRank === undefined ||
+        targetRank === undefined ||
+        Math.abs(sourceRank - targetRank) !== 1
+      )
+        return sum;
+      const sourceY = endpointY(candidate, connection.source);
+      const targetY = endpointY(candidate, connection.target);
+      return sourceY === undefined || targetY === undefined
+        ? sum
+        : sum + Math.abs(sourceY - targetY);
+    },
+    0,
+  );
+  return { ...metrics, totalVerticalError };
+}
+
+function improves(left: OrderingScore, right: OrderingScore): boolean {
+  return (
+    left.exactEndpointCrossingCount < right.exactEndpointCrossingCount ||
+    (left.exactEndpointCrossingCount === right.exactEndpointCrossingCount &&
+      (left.adjacentRankOrderInversionCount <
+        right.adjacentRankOrderInversionCount ||
+        (left.adjacentRankOrderInversionCount ===
+          right.adjacentRankOrderInversionCount &&
+          left.totalVerticalError < right.totalVerticalError - EPSILON)))
+  );
+}
+
+function translateNodes(
+  candidate: FocusSchematicLayoutCandidate,
+  deltaByNodeId: ReadonlyMap<ProjectionNodeId, number>,
+): FocusSchematicLayoutCandidate {
+  return {
+    ...candidate,
+    nodes: candidate.nodes.map((node) => ({
+      ...node,
+      y: node.y + (deltaByNodeId.get(node.projectionNodeId) ?? 0),
+    })),
+  };
+}
+
+function descendants(
+  rootId: ProjectionNodeId,
+  childrenByNodeId: ReadonlyMap<ProjectionNodeId, readonly ProjectionNodeId[]>,
+): readonly ProjectionNodeId[] {
+  const result: ProjectionNodeId[] = [];
+  const visit = (nodeId: ProjectionNodeId) => {
+    result.push(nodeId);
+    for (const childId of childrenByNodeId.get(nodeId) ?? []) visit(childId);
+  };
+  visit(rootId);
+  return result;
+}
+
+function reorderSiblingBranches(
+  input: FocusSchematicLayoutInput,
+  modulePlan: FocusSchematicLayoutPlan,
+  endpointPlan: FocusSchematicEndpointPlan,
+  lanePlan: FocusSchematicInternalLanePlan,
+  initial: FocusSchematicLayoutCandidate,
+): FocusSchematicLayoutCandidate {
+  const laneByNodeId = new Map(
+    lanePlan.nodes.map(({ projectionNodeId, lane }) => [
+      projectionNodeId,
+      lane,
+    ]),
+  );
+  const sourceLineByNodeId = new Map(
+    input.projection.nodes.flatMap((node) =>
+      node.kind === 'entity' ? [[node.id, node.sourceStartLine] as const] : [],
+    ),
+  );
+  const moduleByNodeId = new Map(
+    input.model.modules.flatMap((module) =>
+      module.visibleEntityNodeIds.map((nodeId) => [nodeId, module.id] as const),
+    ),
+  );
+  const childrenByNodeId = new Map<ProjectionNodeId, ProjectionNodeId[]>();
+  for (const edge of input.projection.edges) {
+    if (
+      edge.kind !== 'hierarchy' ||
+      moduleByNodeId.get(edge.sourceNodeId) !==
+        moduleByNodeId.get(edge.targetNodeId)
+    )
+      continue;
+    const children = childrenByNodeId.get(edge.sourceNodeId) ?? [];
+    children.push(edge.targetNodeId);
+    childrenByNodeId.set(edge.sourceNodeId, children);
+  }
+  for (const children of childrenByNodeId.values())
+    children.sort(
+      (left, right) =>
+        (sourceLineByNodeId.get(left) ?? Number.MAX_SAFE_INTEGER) -
+          (sourceLineByNodeId.get(right) ?? Number.MAX_SAFE_INTEGER) ||
+        compareText(left, right),
+    );
+
+  let candidate = initial;
+  const parents = [...childrenByNodeId]
+    .filter(([, children]) => children.length > 1)
+    .map(([parentId]) => parentId)
+    .sort((left, right) => {
+      const leftModule = moduleByNodeId.get(left) ?? '';
+      const rightModule = moduleByNodeId.get(right) ?? '';
+      return (
+        compareText(leftModule, rightModule) ||
+        (sourceLineByNodeId.get(left) ?? Number.MAX_SAFE_INTEGER) -
+          (sourceLineByNodeId.get(right) ?? Number.MAX_SAFE_INTEGER) ||
+        compareText(left, right)
+      );
+    });
+
+  for (const parentId of parents) {
+    const childIds = childrenByNodeId.get(parentId) ?? [];
+    for (const lane of ['left', 'right'] as const) {
+      const branches = childIds
+        .map((rootId) => ({
+          rootId,
+          nodeIds: descendants(rootId, childrenByNodeId),
+        }))
+        .filter(
+          ({ nodeIds }) =>
+            nodeIds.length > 0 &&
+            nodeIds.every((nodeId) => laneByNodeId.get(nodeId) === lane),
+        )
+        .map((branch) => {
+          const nodes = candidate.nodes.filter(({ projectionNodeId }) =>
+            branch.nodeIds.includes(projectionNodeId),
+          );
+          return nodes.length !== branch.nodeIds.length
+            ? null
+            : {
+                ...branch,
+                top: Math.min(...nodes.map(({ y }) => y)),
+                bottom: Math.max(...nodes.map(({ y, height }) => y + height)),
+              };
+        })
+        .filter((branch) => branch !== null);
+      if (branches.length < 2) continue;
+      const current = [...branches].sort(
+        (left, right) =>
+          left.top - right.top || compareText(left.rootId, right.rootId),
+      );
+      if (
+        current.some(
+          (branch, index) =>
+            index > 0 && branch.top < current[index - 1]!.bottom - EPSILON,
+        )
+      )
+        continue;
+
+      const preferred = branches.map((branch) => {
+        const nodeIds = new Set(branch.nodeIds);
+        const desiredCenters = orderingConnections(endpointPlan).flatMap(
+          (connection) => {
+            const sourceInBranch =
+              connection.source.kind === 'visible-entity' &&
+              nodeIds.has(connection.source.projectionNodeId);
+            const targetInBranch =
+              connection.target.kind === 'visible-entity' &&
+              nodeIds.has(connection.target.projectionNodeId);
+            if (sourceInBranch === targetInBranch) return [];
+            const own = sourceInBranch ? connection.source : connection.target;
+            const counterpart = sourceInBranch
+              ? connection.target
+              : connection.source;
+            const ownY = endpointY(candidate, own);
+            const counterpartY = endpointY(candidate, counterpart);
+            return ownY === undefined || counterpartY === undefined
+              ? []
+              : [
+                  counterpartY -
+                    (ownY - branch.top) +
+                    (branch.bottom - branch.top) / 2,
+                ];
+          },
+        );
+        return {
+          ...branch,
+          preferredCenter:
+            desiredCenters.length === 0
+              ? (branch.top + branch.bottom) / 2
+              : median(desiredCenters),
+        };
+      });
+      const ordered = [...preferred].sort(
+        (left, right) =>
+          left.preferredCenter - right.preferredCenter ||
+          (sourceLineByNodeId.get(left.rootId) ?? Number.MAX_SAFE_INTEGER) -
+            (sourceLineByNodeId.get(right.rootId) ?? Number.MAX_SAFE_INTEGER) ||
+          compareText(left.rootId, right.rootId),
+      );
+      if (
+        ordered.every(
+          (branch, index) => branch.rootId === current[index]?.rootId,
+        )
+      )
+        continue;
+
+      const groupTop = Math.min(...branches.map(({ top }) => top));
+      const groupBottom = Math.max(...branches.map(({ bottom }) => bottom));
+      let cursor = groupTop;
+      const deltaByNodeId = new Map<ProjectionNodeId, number>();
+      for (const branch of ordered) {
+        const delta = cursor - branch.top;
+        for (const nodeId of branch.nodeIds) deltaByNodeId.set(nodeId, delta);
+        cursor +=
+          branch.bottom - branch.top + input.settings.internalNodeSeparation;
+      }
+      cursor -= input.settings.internalNodeSeparation;
+      if (cursor > groupBottom + EPSILON) continue;
+      const proposal = translateNodes(candidate, deltaByNodeId);
+      if (
+        improves(
+          orderingScore(modulePlan, endpointPlan, proposal),
+          orderingScore(modulePlan, endpointPlan, candidate),
+        )
+      )
+        candidate = proposal;
+    }
+  }
+  return candidate;
+}
+
+function repackRank(
+  input: FocusSchematicLayoutInput,
+  modulePlan: FocusSchematicLayoutPlan,
+  endpointPlan: FocusSchematicEndpointPlan,
+  initial: FocusSchematicLayoutCandidate,
+  signedRank: number,
+  adjacentRank: number,
+): FocusSchematicLayoutCandidate {
+  const ranks = rankByModuleId(modulePlan);
+  const rankModules = initial.modules.filter(
+    ({ moduleId }) => ranks.get(moduleId) === signedRank,
+  );
+  if (rankModules.length < 2) return initial;
+  const connected = orderingConnections(endpointPlan).filter((connection) => {
+    const sourceRank = ranks.get(connection.sourceModuleId);
+    const targetRank = ranks.get(connection.targetModuleId);
+    return (
+      (sourceRank === signedRank && targetRank === adjacentRank) ||
+      (targetRank === signedRank && sourceRank === adjacentRank)
+    );
+  });
+  if (connected.length === 0) return initial;
+
+  const sourceLineByModuleId = new Map(
+    input.model.modules.map((module) => {
+      const document = input.projection.nodes.find(
+        (node) =>
+          node.kind === 'entity' && node.id === module.documentProjectionNodeId,
+      );
+      return [
+        module.id,
+        document?.kind === 'entity'
+          ? document.sourceStartLine
+          : Number.MAX_SAFE_INTEGER,
+      ];
+    }),
+  );
+  const withPreferences = rankModules.map((module) => {
+    const desiredCenters = connected.flatMap((connection) => {
+      const sourceIsOwn = connection.sourceModuleId === module.moduleId;
+      const targetIsOwn = connection.targetModuleId === module.moduleId;
+      if (!sourceIsOwn && !targetIsOwn) return [];
+      const own = sourceIsOwn ? connection.source : connection.target;
+      const counterpart = sourceIsOwn ? connection.target : connection.source;
+      const ownY = endpointY(initial, own);
+      const counterpartY = endpointY(initial, counterpart);
+      return ownY === undefined || counterpartY === undefined
+        ? []
+        : [counterpartY - (ownY - module.y) + module.height / 2];
+    });
+    return {
+      module,
+      influenced: desiredCenters.length > 0,
+      preferredCenter:
+        desiredCenters.length === 0
+          ? rectangleCenterY(module)
+          : median(desiredCenters),
+    };
+  });
+  if (!withPreferences.some(({ influenced }) => influenced)) return initial;
+  const ordered = [...withPreferences].sort(
+    (left, right) =>
+      left.preferredCenter - right.preferredCenter ||
+      rectangleCenterY(left.module) - rectangleCenterY(right.module) ||
+      (sourceLineByModuleId.get(left.module.moduleId) ??
+        Number.MAX_SAFE_INTEGER) -
+        (sourceLineByModuleId.get(right.module.moduleId) ??
+          Number.MAX_SAFE_INTEGER) ||
+      compareText(left.module.moduleId, right.module.moduleId),
+  );
+
+  let cursor = Number.NEGATIVE_INFINITY;
+  const packed = ordered.map((item) => {
+    const preferredTop = item.preferredCenter - item.module.height / 2;
+    const top =
+      cursor === Number.NEGATIVE_INFINITY
+        ? preferredTop
+        : Math.max(preferredTop, cursor + input.settings.macroNodeSeparation);
+    cursor = top + item.module.height;
+    return { ...item, top };
+  });
+  const translation = median(
+    packed.map(
+      ({ module, preferredCenter, top }) =>
+        top + module.height / 2 - preferredCenter,
+    ),
+  );
+  const deltaByModuleId = new Map(
+    packed.map(({ module, top }) => [
+      module.moduleId,
+      top - translation - module.y,
+    ]),
+  );
+  const proposal: FocusSchematicLayoutCandidate = {
+    ...initial,
+    modules: initial.modules.map((module) => ({
+      ...module,
+      y: module.y + (deltaByModuleId.get(module.moduleId) ?? 0),
+    })),
+    nodes: initial.nodes.map((node) => ({
+      ...node,
+      y: node.y + (deltaByModuleId.get(node.moduleId) ?? 0),
+    })),
+  };
+  return improves(
+    orderingScore(modulePlan, endpointPlan, proposal),
+    orderingScore(modulePlan, endpointPlan, initial),
+  )
+    ? proposal
+    : initial;
+}
+
+function sweepMacroRanks(
+  input: FocusSchematicLayoutInput,
+  modulePlan: FocusSchematicLayoutPlan,
+  endpointPlan: FocusSchematicEndpointPlan,
+  initial: FocusSchematicLayoutCandidate,
+): FocusSchematicLayoutCandidate {
+  const ranks = [
+    ...new Set(
+      modulePlan.modules
+        .map(({ signedRank }) => signedRank)
+        .filter((rank) => rank !== 0),
+    ),
+  ];
+  const available = new Set<number>([
+    ...ranks,
+    ...modulePlan.modules
+      .filter(({ signedRank }) => signedRank === 0)
+      .map(({ signedRank }) => signedRank),
+  ]);
+  let candidate = initial;
+  for (
+    let sweep = 0;
+    sweep < FOCUS_SCHEMATIC_ENDPOINT_ORDERING_SWEEP_COUNT;
+    sweep += 1
+  ) {
+    const outward = sweep % 2 === 0;
+    for (const sign of [-1, 1] as const) {
+      const sideRanks = ranks
+        .filter((rank) => Math.sign(rank) === sign)
+        .sort((left, right) =>
+          outward
+            ? Math.abs(left) - Math.abs(right)
+            : Math.abs(right) - Math.abs(left),
+        );
+      for (const rank of sideRanks) {
+        const adjacentRank = outward ? rank - sign : rank + sign;
+        if (!available.has(adjacentRank)) continue;
+        candidate = repackRank(
+          input,
+          modulePlan,
+          endpointPlan,
+          candidate,
+          rank,
+          adjacentRank,
+        );
+      }
+    }
+  }
+  return candidate;
+}
+
+/**
+ * Reorders existing A1 rectangles only. It neither creates route waypoints nor
+ * lets display-only secondary connections influence geometry.
+ */
+export function minimizeFocusSchematicEndpointCrossings(
+  input: FocusSchematicLayoutInput,
+  modulePlan: FocusSchematicLayoutPlan,
+  endpointPlan: FocusSchematicEndpointPlan,
+  lanePlan: FocusSchematicInternalLanePlan,
+  initial: FocusSchematicLayoutCandidate,
+): FocusSchematicLayoutCandidate {
+  const candidate = sweepMacroRanks(input, modulePlan, endpointPlan, initial);
+  return reorderSiblingBranches(
+    input,
+    modulePlan,
+    endpointPlan,
+    lanePlan,
+    candidate,
+  );
+}

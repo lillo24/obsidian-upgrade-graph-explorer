@@ -22,6 +22,15 @@ suggestions; candidate routes remain empty because channel/obstacle routing is
 owned by HIER5. `computeFocusSchematicUniformLayout` keeps A0 available as an
 explicit development comparison seam.
 
+After Dagre establishes exact internal endpoint positions, A1 performs four
+fixed endpoint-ordering sweeps. Each signed macro rank uses the median desired
+center from precise selected-backbone and Focus-path endpoints in its adjacent
+rank, then collision-packs the variable-height module rectangles. A bounded
+sibling-branch pass applies the same ordering evidence to disjoint left/right
+structural branches when the swap strictly improves exact-endpoint crossings
+or vertical alignment. Markdown source order breaks ties; it does not preserve
+an avoidable inversion. Secondary connections never enter either pass.
+
 Physical sides derive only from relative signed module ranks: a counterpart
 at a smaller rank attaches left, a counterpart at a larger rank attaches
 right, and same-rank secondary display uses `auto`. Authored source and target
@@ -51,10 +60,13 @@ the bakeoff evidence if changed.
   and collects direct node demands.
 - `src/lane-plan.ts` validates each module hierarchy forest, propagates subtree
   demand, assigns internal lanes, and suggests quiet hierarchy attachments.
+- `src/crossing-minimization.ts` owns the fixed forward/backward macro-rank
+  sweeps, variable-height collision packing, sibling-branch swaps, and exact
+  endpoint crossing/order metrics.
 - `src/endpoint-facing.ts` composes center TB, left RL, and right LR Dagre
-  regions, runs the unchanged macro stage, derives exact attachments, and
-  evaluates endpoint-side quality.
-- `src/endpoint-fixtures.ts` owns the synthetic EP1–EP24 and ES1–ES8 review
+  regions, runs the macro and endpoint-order stages, derives exact attachments,
+  and evaluates endpoint-side quality.
+- `src/endpoint-fixtures.ts` owns the synthetic EP1–EP26 and ES1–ES8 review
   corpus used by package tests and the development lab.
 - `src/source-order.ts` derives public Dagre adjacent-sibling constraints from
   canonical source order.
@@ -64,7 +76,7 @@ the bakeoff evidence if changed.
   and then running the shared module backbone with fresh stateless Dagre
   graphs.
 - `src/*.test.ts` covers input rejection, planning, deterministic geometry,
-  exact endpoints, lane propagation, EP1–EP24, ES1–ES8, Markdown integration,
+  exact endpoints, lane propagation, EP1–EP26, ES1–ES8, Markdown integration,
   filtered modules, containment, clearance, and the production boundary.
 
 The package depends inward on core, view-projection, focus-schematic, and the

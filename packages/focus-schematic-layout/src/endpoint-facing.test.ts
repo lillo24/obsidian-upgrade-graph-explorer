@@ -6,6 +6,8 @@ import {
 } from './endpoint-plan';
 import {
   computeFocusSchematicComputedLayoutAttempt,
+  createFocusSchematicEndpointAttachments,
+  evaluateFocusSchematicEndpointLayoutQuality,
   validateFocusSchematicComputedLayout,
 } from './endpoint-facing';
 import {
@@ -233,9 +235,81 @@ describe('HIER3A endpoint plan and endpoint-facing layout', () => {
     ).toBe(false);
   });
 
-  it('covers EP1–EP24 with valid deterministic plain-data results and hard geometry gates', () => {
+  it('uses exact endpoint order to remove an obvious module inversion', () => {
+    const { result } = run('EP25');
+    const birch = result.candidate.modules.find(
+      ({ moduleId }) => moduleId === 'Birch',
+    );
+    const cedar = result.candidate.modules.find(
+      ({ moduleId }) => moduleId === 'Cedar',
+    );
+    expect(birch).toBeDefined();
+    expect(cedar).toBeDefined();
+    expect(cedar!.y).toBeLessThan(birch!.y);
+    expect(result.quality).toMatchObject({
+      exactEndpointCrossingCount: 0,
+      adjacentRankOrderInversionCount: 0,
+      adjacentRankOrderingConnectionCount: 2,
+    });
+  });
+
+  it('removes the exact endpoint inversions exposed by EP12', () => {
+    const { input, result } = run('EP12');
+    const uniform = computeFocusSchematicUniformLayoutAttempt(input);
+    expect(uniform.status).toBe('success');
+    if (uniform.status !== 'success') return;
+    const uniformAttachments = createFocusSchematicEndpointAttachments(
+      result.endpointPlan,
+      uniform.candidate,
+    );
+    const uniformQuality = evaluateFocusSchematicEndpointLayoutQuality(
+      input,
+      result.modulePlan,
+      result.endpointPlan,
+      result.internalLanePlan,
+      uniform.candidate,
+      uniformAttachments,
+    );
+    expect(uniformQuality).toMatchObject({
+      exactEndpointCrossingCount: 3,
+      adjacentRankOrderInversionCount: 3,
+    });
+    expect(result.quality).toMatchObject({
+      exactEndpointCrossingCount: 0,
+      adjacentRankOrderInversionCount: 0,
+    });
+  });
+
+  it('uses exact endpoint order to swap sibling structural branches', () => {
+    const { fixture, result } = run('EP26');
+    const atlasFirst = result.candidate.nodes.find(
+      ({ projectionNodeId: id }) =>
+        id === projectionNodeId(fixture, 'Atlas-first'),
+    );
+    const atlasSecond = result.candidate.nodes.find(
+      ({ projectionNodeId: id }) =>
+        id === projectionNodeId(fixture, 'Atlas-second'),
+    );
+    const beaconFirst = result.candidate.nodes.find(
+      ({ projectionNodeId: id }) =>
+        id === projectionNodeId(fixture, 'Beacon-first'),
+    );
+    const beaconSecond = result.candidate.nodes.find(
+      ({ projectionNodeId: id }) =>
+        id === projectionNodeId(fixture, 'Beacon-second'),
+    );
+    expect(atlasSecond!.y).toBeLessThan(atlasFirst!.y);
+    expect(beaconFirst!.y).toBeLessThan(beaconSecond!.y);
+    expect(result.quality).toMatchObject({
+      exactEndpointCrossingCount: 0,
+      adjacentRankOrderInversionCount: 0,
+      adjacentRankOrderingConnectionCount: 2,
+    });
+  });
+
+  it('covers EP1–EP26 with valid deterministic plain-data results and hard geometry gates', () => {
     expect(ENDPOINT_FIXTURES.map(({ id }) => id)).toEqual(
-      Array.from({ length: 24 }, (_, index) => `EP${index + 1}`),
+      Array.from({ length: 26 }, (_, index) => `EP${index + 1}`),
     );
     for (const endpointSpec of ENDPOINT_FIXTURES) {
       const fixture = buildEndpointFixture(endpointSpec);

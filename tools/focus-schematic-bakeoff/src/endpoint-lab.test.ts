@@ -22,7 +22,7 @@ describe('HIER3A endpoint review lab', () => {
     const indexPath = await writeEndpointLab(directory);
     const html = await readFile(indexPath, 'utf8');
 
-    for (let index = 1; index <= 24; index += 1)
+    for (let index = 1; index <= 26; index += 1)
       expect(html).toContain(`EP${index}`);
     for (const id of ['ES3', 'ES4', 'ES5']) expect(html).toContain(id);
     expect(html).toContain('Scenario<select id="scenario"');
@@ -41,6 +41,10 @@ describe('HIER3A endpoint review lab', () => {
     expect(html).toContain('What to inspect');
     expect(html).toContain('tabindex=');
     expect(html).toContain('Keyboard-accessible endpoint details');
+    expect(html).toContain("crossings '+quality.exactEndpointCrossingCount");
+    expect(html).toContain(
+      "rank inversions '+quality.adjacentRankOrderInversionCount",
+    );
     expect(html).not.toContain('D0 / A / B / C');
     expect(html).not.toContain('Compound Dagre');
     expect(html).not.toContain('Configuration<select');

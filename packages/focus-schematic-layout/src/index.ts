@@ -18,6 +18,12 @@ export {
   validateFocusSchematicEndpointPlan,
 } from './endpoint-plan';
 export {
+  FOCUS_SCHEMATIC_ENDPOINT_ORDERING_SWEEP_COUNT,
+  measureFocusSchematicEndpointOrder,
+  minimizeFocusSchematicEndpointCrossings,
+  type FocusSchematicEndpointOrderMetrics,
+} from './crossing-minimization';
+export {
   createFocusSchematicInternalLanePlan,
   validateFocusSchematicInternalLanePlan,
 } from './lane-plan';
