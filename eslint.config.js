@@ -1277,6 +1277,58 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/focus-schematic-layout/**/*.{ts,tsx}'],
+    ignores: [
+      'packages/focus-schematic-layout/**/*.test.{ts,tsx}',
+      'packages/focus-schematic-layout/**/test-helpers.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                '@xyflow/*',
+                'sigma',
+                'sigma/*',
+                'graphology*',
+                '@tauri-apps/*',
+                'obsidian*',
+                '@obsidian/*',
+                'node:*',
+                '@icarus-graph-explorer/adapter-obsidian',
+                '@icarus-graph-explorer/adapter-obsidian/*',
+                '@icarus-graph-explorer/resolver-obsidian',
+                '@icarus-graph-explorer/resolver-obsidian/*',
+                '@icarus-graph-explorer/diagnostics-obsidian',
+                '@icarus-graph-explorer/diagnostics-obsidian/*',
+                '@icarus-graph-explorer/renderer-reactflow',
+                '@icarus-graph-explorer/renderer-reactflow/*',
+                '@icarus-graph-explorer/renderer-sigma',
+                '@icarus-graph-explorer/renderer-sigma/*',
+                '@icarus-graph-explorer/dagre-layout',
+                '@icarus-graph-explorer/dagre-layout/*',
+                '@icarus-graph-explorer/workspace-worker',
+                '@icarus-graph-explorer/workspace-worker/*',
+                '@icarus-graph-explorer/view-state',
+                '@icarus-graph-explorer/view-state/*',
+                '@icarus-graph-explorer/web',
+                '@icarus-graph-explorer/web/*',
+              ],
+              message:
+                'Focus Schematic layout may depend only on Dagre, core, view-projection, and focus-schematic.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['packages/renderer-sigma/**/*.{ts,tsx}'],
     ignores: ['packages/renderer-sigma/**/*.test.{ts,tsx}'],
     extends: [reactHooks.configs.flat.recommended],

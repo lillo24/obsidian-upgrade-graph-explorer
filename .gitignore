@@ -4,6 +4,8 @@ coverage/
 /output/diagnostics/
 /output/performance/
 /output/spacing1a/
+/output/hier2-layout-lab/
+/tools/focus-schematic-bakeoff/output/
 *.tsbuildinfo
 .DS_Store
 *.local

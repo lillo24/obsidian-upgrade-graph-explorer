@@ -1,0 +1,26 @@
+{
+  "name": "@icarus-graph-explorer/focus-schematic-layout",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@dagrejs/dagre": "3.1.1",
+    "@icarus-graph-explorer/core": "workspace:*",
+    "@icarus-graph-explorer/focus-schematic": "workspace:*",
+    "@icarus-graph-explorer/view-projection": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3"
+  }
+}

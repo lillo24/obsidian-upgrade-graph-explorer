@@ -59,4 +59,10 @@ root-relative displacement; percentiles use nearest-rank selection on a sorted
 array.
 
 HIER1 does not generate coordinates and is absent from the production renderer
-graph. HIER2 may compare layout strategies through this shared contract.
+graph. HIER2 now consumes this contract through the separate
+`focus-schematic-layout` package; the semantic model remains unchanged and
+equal-mutual ambiguity is resolved only in the HIER2 layout plan.
+
+HIER3 must use the model's precise visible File, Heading, and Block endpoints
+when drawing cross-file references. Endpoint-facing internal lanes are a layout
+refinement over those existing semantics, not a new relationship model.

@@ -161,6 +161,20 @@ neighborhood, strict construction/validation, aggregate semantic summary, and
 renderer-independent layout-candidate, quality, and stability contracts. It is
 not imported by production rendering in HIER1. See ADR 0017.
 
+`packages/focus-schematic-layout` depends inward on core, view-projection,
+focus-schematic, and pinned Dagre 3.1.1. It owns the strict explicit-dimension
+input, deterministic equal-mutual layout plan, fixed module-box policy,
+canonical sibling constraints, and selected stateless two-stage Dagre
+candidate. HIER2 production-boundary tests keep it out of apps,
+renderer-reactflow, view-state, workspace-worker, and platform code. HIER3 may
+place `model + projection + dimensions + settings → validated candidate`
+behind a new latest-result-wins worker boundary; HIER2 does not change W3. HIER3
+must attach cross-file references to their actual visible File, Heading, or
+Block endpoints and may orient relevant internal entities into incoming-facing
+and outgoing-facing lanes toward neighbouring macro ranks. That internal
+semantic refinement is layered on the selected two-stage macro architecture;
+it does not reopen the strategy decision. See ADR 0018.
+
 `packages/view-state` depends inward on core and view-projection only. It owns a
 versioned plain-data subset of KG6 disclosure, focus, user-facing filters,
 presentation mode, and separate semantic Structure/Global/Local
@@ -319,6 +333,12 @@ zoom. Diagnostic nodes never become bookmarks. Raw x/y, renderer node IDs,
 Dagre coordinates, and per-frame movement never cross into saved view state.
 Restoration reuses the KG8 center request after layout; missing or filtered
 anchors use normal fit without widening the restored view.
+
+`tools/focus-schematic-bakeoff` is the development-only HIER2 comparison
+boundary. It owns synthetic fixtures, the renderer-dimension drift adapter,
+D0/compound prototypes, isolated benchmark workers, dynamic experiments, and
+the generated static SVG lab. It may import renderer dimensions for evidence;
+none of its code is reachable from a production app or renderer.
 
 `tools/vault-diagnostics` is the Node development filesystem boundary. It recursively
 discovers one explicitly selected vault, reads strict UTF-8 Markdown, inventories
