@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createLocalConvergenceDegreeIndex,
+  measureLocalConvergenceMovement,
+} from '@icarus-graph-explorer/renderer-sigma/local-convergence';
+
+import {
   measureDisplacement,
   measureLayoutQuality,
   percentile,
@@ -46,6 +51,17 @@ describe('convergence displacement metrics', () => {
     expect(measured.degree1.count).toBe(2);
     expect(measured.degree2Plus.count).toBe(1);
     expect(measured.lowDegree.count).toBe(3);
+    expect(measured).toMatchObject(
+      measureLocalConvergenceMovement({
+        before,
+        after,
+        rootKey: 'root',
+        degreeByKey: createLocalConvergenceDegreeIndex(
+          before.map(({ key }) => key),
+          edges,
+        ),
+      }),
+    );
   });
 
   it('centroid-aligns Global shape movement and reports rigid drift separately', () => {

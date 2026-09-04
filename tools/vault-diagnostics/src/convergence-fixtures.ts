@@ -44,7 +44,7 @@ export function focusConvergenceFixtures(): readonly LocalConvergenceFixture[] {
       id: `focus-${fixture.id}`,
       description: fixture.description,
       currentBudget,
-      request: createLocalLayoutRequest(fixture.input, currentBudget),
+      request: createLocalLayoutRequest(fixture.input),
     };
   });
 }

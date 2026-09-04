@@ -32,6 +32,11 @@
       "import": "./src/local-layout.ts",
       "default": "./src/local-layout.ts"
     },
+    "./local-convergence": {
+      "types": "./src/local-convergence.ts",
+      "import": "./src/local-convergence.ts",
+      "default": "./src/local-convergence.ts"
+    },
     "./settings": {
       "types": "./src/settings.ts",
       "import": "./src/settings.ts",

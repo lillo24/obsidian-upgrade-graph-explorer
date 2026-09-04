@@ -1,3 +1,10 @@
+import {
+  convergencePercentile,
+  convergenceRmsRadius,
+  createLocalConvergenceDegreeIndex,
+  measureLocalConvergenceMovement,
+} from '@icarus-graph-explorer/renderer-sigma/local-convergence';
+
 export interface ConvergencePosition {
   readonly key: string;
   readonly x: number;
@@ -41,7 +48,6 @@ export interface LayoutQualityMetrics {
   readonly nonFiniteCoordinates: number;
 }
 
-const RMS_SCALE_FLOOR = 1e-6;
 const NEAR_COINCIDENT_NORMALIZED_DISTANCE = 0.01;
 
 function finite(value: number, label: string): void {
@@ -54,18 +60,7 @@ export function percentile(
   values: readonly number[],
   fraction: number,
 ): number {
-  if (!Number.isFinite(fraction) || fraction < 0 || fraction > 1) {
-    throw new Error('Convergence percentile fraction must be from 0 to 1.');
-  }
-  if (values.length === 0) return 0;
-  for (const value of values) finite(value, 'percentile value');
-  const sorted = [...values].sort((left, right) => left - right);
-  const index = (sorted.length - 1) * fraction;
-  const lower = Math.floor(index);
-  const upper = Math.ceil(index);
-  if (lower === upper) return sorted[lower]!;
-  const weight = index - lower;
-  return sorted[lower]! * (1 - weight) + sorted[upper]! * weight;
+  return convergencePercentile(values, fraction);
 }
 
 function distribution(values: readonly number[]): MovementDistribution {
@@ -143,37 +138,7 @@ export function rmsRadius(
   positions: readonly ConvergencePosition[],
   origin = centroid(positions),
 ): number {
-  if (positions.length === 0) {
-    throw new Error('Convergence RMS radius requires at least one node.');
-  }
-  let squared = 0;
-  for (const position of positions) {
-    finite(position.x, `RMS x for ${position.key}`);
-    finite(position.y, `RMS y for ${position.key}`);
-    squared += (position.x - origin.x) ** 2 + (position.y - origin.y) ** 2;
-  }
-  return Math.max(RMS_SCALE_FLOOR, Math.sqrt(squared / positions.length));
-}
-
-function degrees(
-  nodeKeys: ReadonlySet<string>,
-  edges: readonly ConvergenceEdge[],
-): ReadonlyMap<string, number> {
-  const neighbors = new Map(
-    [...nodeKeys].map((key) => [key, new Set<string>()] as const),
-  );
-  for (const edge of edges) {
-    if (!nodeKeys.has(edge.source) || !nodeKeys.has(edge.target)) {
-      throw new Error(
-        `Convergence edge ${edge.source} → ${edge.target} has a missing endpoint.`,
-      );
-    }
-    neighbors.get(edge.source)!.add(edge.target);
-    neighbors.get(edge.target)!.add(edge.source);
-  }
-  return new Map(
-    [...neighbors].map(([key, adjacent]) => [key, adjacent.size] as const),
-  );
+  return convergenceRmsRadius(positions, origin);
 }
 
 export function measureDisplacement(input: {
@@ -197,7 +162,28 @@ export function measureDisplacement(input: {
   const beforeCentroid = centroid(input.before);
   const afterCentroid = centroid(input.after);
   const scale = rmsRadius(input.before, beforeOrigin);
-  const degreeByKey = degrees(new Set(beforeByKey.keys()), input.edges);
+  const degreeByKey = createLocalConvergenceDegreeIndex(
+    [...beforeByKey.keys()],
+    input.edges,
+  );
+  if (input.alignment.kind === 'root') {
+    const movement = measureLocalConvergenceMovement({
+      before: input.before,
+      after: input.after,
+      rootKey: input.alignment.rootKey,
+      degreeByKey,
+    });
+    const rawCentroidDrift = distance(beforeCentroid, afterCentroid);
+    const rawAnchorDrift = distance(beforeOrigin, afterOrigin);
+    return {
+      nodeCount: beforeByKey.size,
+      ...movement,
+      rawCentroidDrift,
+      normalizedCentroidDrift: rawCentroidDrift / movement.scale,
+      rawAnchorDrift,
+      normalizedAnchorDrift: rawAnchorDrift / movement.scale,
+    };
+  }
   const all: number[] = [];
   const degree0: number[] = [];
   const degree1: number[] = [];
@@ -218,18 +204,13 @@ export function measureDisplacement(input: {
     if (degree <= 1) lowDegree.push(movement);
   }
   const rawCentroidDrift = distance(beforeCentroid, afterCentroid);
-  const rawAnchorDrift =
-    input.alignment.kind === 'root'
-      ? distance(beforeOrigin, afterOrigin)
-      : null;
   return {
     nodeCount: beforeByKey.size,
     scale,
     rawCentroidDrift,
     normalizedCentroidDrift: rawCentroidDrift / scale,
-    rawAnchorDrift,
-    normalizedAnchorDrift:
-      rawAnchorDrift === null ? null : rawAnchorDrift / scale,
+    rawAnchorDrift: null,
+    normalizedAnchorDrift: null,
     all: distribution(all),
     degree0: distribution(degree0),
     degree1: distribution(degree1),

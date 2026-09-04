@@ -1,9 +1,26 @@
 import { validateLocalLayoutWorkerResponse } from '@icarus-graph-explorer/renderer-sigma/local-layout';
 import type {
+  LocalLayoutFailure,
   LocalLayoutRequest,
   LocalLayoutResult,
   LocalLayoutService,
 } from '@icarus-graph-explorer/renderer-sigma/types';
+
+export class LocalLayoutWorkerFailureError extends Error {
+  readonly code: LocalLayoutFailure['code'];
+  readonly iterationsCompleted: number;
+  readonly batchesCompleted: number;
+  readonly finalMovement: LocalLayoutFailure['finalMovement'];
+
+  constructor(failure: LocalLayoutFailure) {
+    super(`The Local layout worker failed: ${failure.message}`);
+    this.name = 'LocalLayoutWorkerFailureError';
+    this.code = failure.code;
+    this.iterationsCompleted = failure.iterationsCompleted;
+    this.batchesCompleted = failure.batchesCompleted;
+    this.finalMovement = failure.finalMovement;
+  }
+}
 
 export interface LocalLayoutWorkerTransport {
   onmessage: ((event: MessageEvent<unknown>) => void) | null;
@@ -20,7 +37,7 @@ export function createLocalLayoutWorkerClient(options: {
   let active:
     | {
         readonly requestId: number;
-        readonly expectedNodeKeys: readonly string[];
+        readonly request: LocalLayoutRequest;
         readonly resolve: (result: LocalLayoutResult) => void;
         readonly reject: (error: Error) => void;
       }
@@ -72,7 +89,7 @@ export function createLocalLayoutWorkerClient(options: {
       return new Promise((resolve, reject) => {
         active = {
           requestId,
-          expectedNodeKeys: request.nodes.map(({ key }) => key),
+          request: complete,
           resolve,
           reject,
         };
@@ -83,8 +100,7 @@ export function createLocalLayoutWorkerClient(options: {
           try {
             response = validateLocalLayoutWorkerResponse(
               event.data,
-              requestId,
-              current.expectedNodeKeys,
+              current.request,
             );
           } catch (error: unknown) {
             rejectActive(
@@ -97,9 +113,7 @@ export function createLocalLayoutWorkerClient(options: {
           active = undefined;
           terminate();
           if (response.kind === 'error') {
-            reject(
-              new Error(`The Local layout worker failed: ${response.message}`),
-            );
+            reject(new LocalLayoutWorkerFailureError(response));
           } else resolve(response);
         };
         nextWorker.onerror = (event) => {

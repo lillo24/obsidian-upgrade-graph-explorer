@@ -858,3 +858,34 @@ All + Network. All + Hierarchy, Focus + Network, and Focus + Hierarchy defer the
 preference with zero KG6 projection and zero active hierarchy W3 work. Rapid
 input uses the existing Global worker client, which terminates superseded work
 and adopts only the latest response; no timer, backlog, or dependency was added.
+
+## CONVERGENCE1B Local bounded-convergence evidence
+
+The Local renderer benchmark now reports policy version, stop reason,
+iterations, batches, stable count, compute time, final all-node p90, and
+low-degree maximum. Windows/Node measurements on 2026-09-04 are investigative
+local evidence, not timing gates:
+
+| Profile | Nodes / edges | Stop           | Iterations / batches | Compute ms | Final p90 | Low-degree max |
+| ------- | ------------: | -------------- | -------------------: | ---------: | --------: | -------------: |
+| smoke   |         4 / 5 | stable         |             416 / 13 |      1.201 |   0.00408 |        0.00486 |
+| small   |       13 / 22 | stable         |              224 / 7 |      0.807 |   0.00343 |        0.00534 |
+| medium  |      61 / 110 | stable         |              192 / 6 |      3.030 |   0.00240 |        0.00334 |
+| stress  |   609 / 1,208 | max-iterations |              240 / 8 |    574.218 |   0.00707 |        0.01893 |
+
+The >500-node profile exercises Barnes-Hut, the 240 cap, and its final
+16-iteration partial batch. It remains below the 2-second production safety
+limit but is intentionally reported as capped rather than stable because its
+final movement exceeds both stable guards. Immediate deterministic geometry and
+replacement-worker execution keep this added computation off the main thread;
+browser/desktop responsiveness remains a release-QA observation rather than a
+CI timing threshold.
+
+The regenerated 22-fixture CONVERGENCE1A matrix still reports 19/19 eligible
+reference fixtures stable, zero false early stops, mean 444.63 iterations,
+hidden-probe p90 median `0.0023978` and maximum `0.0047802`, and low-degree
+probe-maximum p90 `0.00651804`. Diagnostics now import the production Local
+metric primitives. Removing intermediate diagnostic rounding re-observed the
+p25/p50/p75 candidates as `0.000655` / `0.00201` / `0.00505`; the accepted
+`0.000672` / `0.00204` / `0.00512` evidence and v1 production policy remain
+fixed rather than being retuned.
