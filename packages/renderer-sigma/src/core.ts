@@ -124,6 +124,7 @@ export {
   resolveGlobalPhysicsSettings,
   resolveGlobalLayoutSettings,
   resolveGlobalVisualSettings,
+  resolveNetworkSettings,
   sameGlobalPhysicsSettings,
   sameGlobalVisualSettings,
   validateGlobalLayoutSettings,

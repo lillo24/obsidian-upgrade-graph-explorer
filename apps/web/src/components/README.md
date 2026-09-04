@@ -43,6 +43,10 @@ canonical truth, or own a platform storage implementation.
   the explicit All Network layout generation. Visual-only preference edits are
   still saved immediately but reach only Sigma's presentation refresh path;
   true reference/folder/spacing changes retain the latest-wins worker path.
+  NETWORKSETTINGS1 resolves one narrow Network preference object and passes it
+  to Focus Network. Its Reference Pull primitive alone enters Local layout
+  identity; its three visual values reach only the Local session's reducers and
+  Sigma label threshold. All-only folder controls never reach Local physics.
   Network Explorer consumes the same already-completed All/Focus Network
   projection and resolved Visual Group presentation map as the canvas. Its
   selection callback updates the single controlled graph selection and issues a
@@ -90,12 +94,14 @@ canonical truth, or own a platform storage implementation.
   Settings popover. Its transient keyboard-accessible tabs separate ordinary
   Preferences, the graph-presentation Sandbox, and App-owned Source & Diagnostics
   controls while keeping all panels mounted. `graph-settings-tabs.ts` owns the
-  wrapping three-tab keyboard transition. Global layout controls edit one validated
-  serializable preference rather than scattering component-local physics values.
-  Folder Strength is a normalized view of the existing `folderCohesion` field;
-  its Advanced disclosure is transient, groups Layout and Visual controls, and
-  exposes the persisted 0–100 link-influence setting only for All Network;
-  global focus-root and gesture preference storage remains in `../preferences/`.
+  wrapping three-tab keyboard transition. One visible Network section owns the
+  shared Reference Pull, Base node size, Link thickness, and Label threshold for
+  All + Network and Focus + Network. The All Network section retains Folder
+  clustering, normalized Strength, Spacing, Folder separation, and the persisted
+  0–100 link-influence setting. Its Advanced disclosure is transient. All four
+  controls still edit one validated serializable preference rather than adding
+  component-local or per-renderer state; global focus-root and gesture preference
+  storage remains in `../preferences/`.
   Separate All and Focus density sliders are page-lifetime live A/B camera
   controls: changing either preserves that renderer's semantic screen anchor
   and previews the new ratio without Fit, layout, or Pull work, even from a

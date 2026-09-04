@@ -24,6 +24,8 @@ export function resolveLocalNodeStyle(
     readonly lod: LocalVisualLod;
     readonly visualGroup?: VisualGroupNodePresentation;
     readonly sizeScale?: number;
+    /** Shared Network Base node size relative to the established Focus default. */
+    readonly baseNodeSizeScale?: number;
   },
 ) {
   const emphasized = context.selected || context.hovered;
@@ -37,16 +39,17 @@ export function resolveLocalNodeStyle(
     context.lod === 'near-local' ||
     (context.lod === 'normal-local' && attributes.nodeKind !== 'block') ||
     (context.lod === 'far-local' && attributes.nodeKind === 'document');
+  const automaticSize = attributes.size * (context.baseNodeSizeScale ?? 1);
   return {
     ...attributes,
     size:
       attributes.nodeKind === 'document' && attributes.entityId !== null
         ? applyNetworkNodeSizeScale(
-            attributes.size,
+            automaticSize,
             context.sizeScale,
             attributes.root,
           )
-        : attributes.size,
+        : automaticSize,
     color: context.selected
       ? '#d29b22'
       : context.hovered
@@ -67,6 +70,8 @@ export function resolveLocalEdgeStyle(
     readonly relatedToHover: boolean;
     readonly hoverActive: boolean;
     readonly lod: LocalVisualLod;
+    /** Shared Network Link thickness relative to the established Focus default. */
+    readonly linkThicknessScale?: number;
   },
 ) {
   const hierarchy = attributes.edgeKind === 'hierarchy';
@@ -82,6 +87,7 @@ export function resolveLocalEdgeStyle(
     hidden: false,
     size:
       attributes.size *
+      (context.linkThicknessScale ?? 1) *
       (context.lod === 'far-local'
         ? hierarchy
           ? 0.72

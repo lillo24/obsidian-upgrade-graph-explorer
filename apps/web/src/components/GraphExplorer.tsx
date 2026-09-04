@@ -70,6 +70,7 @@ import type {
   SemanticGlobalViewport,
   SemanticLocalViewport,
 } from '@icarus-graph-explorer/renderer-sigma/types';
+import { resolveNetworkSettings } from '@icarus-graph-explorer/renderer-sigma/settings';
 import {
   compileVisualGroups,
   matchingVisualGroupsForEntity,
@@ -494,6 +495,10 @@ export function GraphExplorer({
     trackpadZoomMode,
     showExperimentalAllHierarchy,
   } = preferences;
+  const networkSettings = useMemo(
+    () => resolveNetworkSettings(globalLayoutSettings),
+    [globalLayoutSettings],
+  );
   const commitGraphPreferences = useCallback(
     (next: GraphPreferences) => {
       preferencesRef.current = next;
@@ -2581,8 +2586,8 @@ export function GraphExplorer({
     },
     [updateGraphPreferences],
   );
-  // Settings are inert while another renderer is mounted. Active All Network
-  // refreshes visual values in Sigma and requests workers only for physics.
+  // Network controls stay inert in Hierarchy. All explicitly requests physics;
+  // Focus keys its own worker/cache lifecycle only by shared Reference Pull.
   const changeGlobalLayoutSettings = useCallback(
     (settings: GlobalLayoutSettings) => {
       if (
@@ -4032,6 +4037,7 @@ export function GraphExplorer({
                   ? {}
                   : { initialViewport: localViewportBookmark })}
                 layoutRequestKey={localLayoutRequestKey}
+                networkSettings={networkSettings}
                 {...(localTransitionAnchor === undefined
                   ? {}
                   : { initialTransitionAnchor: localTransitionAnchor })}

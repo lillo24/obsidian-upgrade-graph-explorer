@@ -7,6 +7,7 @@ import { GlobalGraphCanvas } from './GlobalGraphCanvas';
 import { LocalGraphCanvas } from './LocalGraphCanvas';
 import { createGlobalLayoutRequest } from './layout';
 import { createLocalLayoutRequest } from './local-layout';
+import { localLayoutSettingsFromNetworkSettings } from './local-network-settings';
 import { localTestProjection } from './local-test-fixture';
 import { globalTestProjection } from './test-fixture';
 import type {
@@ -33,11 +34,21 @@ vi.mock('./local-session', () => ({
   LocalRendererSession: class {
     ready = Promise.resolve();
     applyPositions = vi.fn(async () => undefined);
-    createLayoutRequest = createLocalLayoutRequest;
+    createLayoutRequest = (
+      input: Parameters<typeof createLocalLayoutRequest>[0],
+      networkSettings: Parameters<
+        typeof localLayoutSettingsFromNetworkSettings
+      >[0],
+    ) =>
+      createLocalLayoutRequest(
+        input,
+        localLayoutSettingsFromNetworkSettings(networkSettings),
+      );
     destroy = vi.fn();
     setControlledSelection = vi.fn();
     update = vi.fn();
     updateDensityFramingStrength = vi.fn();
+    updateNetworkSettings = vi.fn();
     updateTrackpadZoomMode = vi.fn();
   },
 }));

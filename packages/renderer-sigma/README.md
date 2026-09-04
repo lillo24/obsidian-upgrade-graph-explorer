@@ -61,6 +61,7 @@ src/
   local-mapping.ts         Separate Local topology and deterministic root-relative seed.
   local-graph.ts           Local Graphology construction, reconciliation, and neighborhoods.
   local-style.ts           Far/normal/near Local and GROUP1A styling without topology changes.
+  local-network-settings.ts  Shared Network-to-Local physics and display-only adapters.
   network-density-core.ts  Shared Sigma normalization, robust statistics, topology, and exact k-d-tree primitives.
   global-density.ts        Rootless, component-safe All Network camera-ratio policy.
   global-density-framing.ts  Transient legacy-to-density interpolation for All Network.
@@ -123,22 +124,28 @@ cohesion baselines are now `0.09` / `0.08` / `0.07` (previously `0.055` /
 remain part of every ForceAtlas2 pass. Strength survives spacing changes and
 Folder clustering Off; Advanced visibility is transient UI state.
 
-`GlobalLayoutSettings` is plain JSON-compatible presentation state. Presets
-cover ordinary use; the direct Strength slider owns folder cohesion, while
-Advanced separates spatial controls (reference pull and folder separation)
-from visual controls (base node size, link influence on node size, link
-thickness, and label threshold). Settings are user preferences, not canonical
-truth. Changing a spacing preset adopts its spatial baseline while preserving
-folder strength and the current advanced visual values. SPATIAL1 stores only
-normalized folder target centers; raw node, folder, and ForceAtlas2 coordinates
-never persist.
+`GlobalLayoutSettings` remains the plain JSON-compatible persisted record, but
+NETWORKSETTINGS1 resolves a smaller product-level Network subset from it:
+Reference Pull, Base node size, Link thickness, and Label threshold. The same
+subset reaches All and Focus Network; neither Hierarchy renderer observes it.
+Reference Pull adapts to Global `edgeWeightInfluence`, while Local keeps
+`edgeWeightInfluence = 1`, keeps hierarchy weight at 6, and changes only its
+reference-edge multiplier. Folder clustering, Strength, spacing, folder
+separation, and link influence on node size remain All-only. Changing a spacing
+preset adopts only its All spatial baseline and preserves folder strength plus
+all four shared Network choices. Settings are preferences, not canonical truth.
+SPATIAL1 stores only normalized folder target centers; raw node, folder, and
+ForceAtlas2 coordinates never persist.
 
 That product split is also the runtime ownership boundary. The resolved physics
 subset (`folderClustering`, cohesion, reference pull, and within/between-folder
 spacing) owns automatic layout requests, worker settings, and cache identity.
-The resolved visual subset (base size, degree-size influence, link thickness,
-and label threshold) owns Sigma reducer/settings refreshes only. The persisted
-record and control ranges remain unchanged.
+The Global visual subset and the shared Network visual subset own Sigma
+reducer/settings refreshes only. Global keeps its degree-size influence; Focus
+adapts the shared base size and thickness into display-time scales over its
+established semantic sizes and widths, and adapts the threshold so the shared
+default reproduces Local's exact threshold of 4. The persisted record, ranges,
+and v1 storage contract remain unchanged.
 
 SPATIAL2A evolves the All Network-only position pipeline, and SPATIAL2B exposes
 its complete rule model through the production authoring controls:
@@ -255,14 +262,15 @@ reason only; it owns no alpha/cooling values, Graphology/Sigma instances,
 worker handles, source text, or persisted coordinates. PHYSICS1 owns the future
 real adapter and MOVE1B owns the visible Edit/Move mode.
 
-VISUAL1A applies only to All Network. Ordinary document nodes add a bounded
+VISUAL1A's reference-degree boost applies only to All Network. Ordinary document nodes add a bounded
 reference-degree boost to the configured base size. At the persisted
 `referenceDegreeSizeInfluence` default of `50`, the boost is exactly the prior
 `min(4, log2(degree + 1) * 0.48)` curve; `0` removes it; `100` strengthens it
 while capping the added size at six units. Projected edge degree continues to
 count represented canonical reference occurrences. Diagnostic targets keep
-their separate subordinate size formula, and Focus Network keeps its existing
-root/entity-kind sizing contract.
+their separate subordinate size formula. Focus Network keeps its
+root/entity-kind proportions, but NETWORKSETTINGS1 multiplies those display
+radii by the shared Base node size scale.
 
 GLOBALVIS1 makes all four Visual controls render-only. The mounted canvas maps a
 topology-stable baseline once per projection. Sigma recomputes automatic node
@@ -272,6 +280,16 @@ layers. Edge reducers likewise recompute displayed thickness from reference
 count without changing layout edge weight. Radius refreshes retain Sigma's
 indexed processing for labels/programs/picking; thickness and label changes do
 not submit ForceAtlas2 or reapply coordinates.
+
+NETWORKSETTINGS1 extends Base node size, Link thickness, and Label threshold to
+Focus without moving those values into Local topology or layout. Base size
+scales the automatic root/document/section/block/diagnostic radii before the
+existing per-File multiplier; the root floor and Visual Group color then compose
+as before. Thickness scales reducer output before existing 1 / 0.84 / 0.45 LOD
+factors. Label threshold updates Sigma eligibility only, so Local semantic LOD
+may still suppress a label and the shared control cannot reveal it. These three
+changes issue zero Global/Local layout requests and do not change fingerprints,
+caches, Graphology coordinates, or ForceAtlas2 work.
 
 VISUAL1B accepts a separate resolved `EntityId` presentation-override map in
 both Network canvases. The mount options and an independent effect deliver it

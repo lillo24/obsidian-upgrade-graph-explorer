@@ -870,6 +870,18 @@ Strength control normalizes the existing persisted `folderCohesion` range to
 not mutate preferences. Hierarchy renderers never observe the setting. The
 Global worker terminates superseded requests, so rapid slider input adopts only
 the latest valid result without adding a serial queue.
+NETWORKSETTINGS1 extracts Reference Pull, Base node size, Link thickness, and
+Label threshold from the same backward-compatible `GlobalLayoutSettings`
+record as a renderer-neutral Network subset. Global maps Reference Pull to its
+existing ForceAtlas2 edge-weight influence. Local maps it only to reference-edge
+weight while preserving hierarchy weight 6 and ForceAtlas2 edge-weight
+influence 1. The three visual values are reducer/Sigma settings in both Network
+renderers and therefore do not enter layout requests, fingerprints, caches, or
+coordinates. Focus converts them to scales relative to its prior defaults so
+root/entity-kind proportions, per-File Size, Visual Groups, and semantic label
+LOD continue to compose. Compact/Normal/Spacious now preserve all four shared
+choices while changing only All spatial baselines. Hierarchy renderers and
+All-only folder physics remain outside this shared boundary.
 GROUP1A's source-neutral backbone and renderer seams remain unchanged. GROUP1B
 adds a web-owned workspace session with durable, session-only, corrupt, and
 failed-write states; local create/edit drafts; one write-before-adopt commit;

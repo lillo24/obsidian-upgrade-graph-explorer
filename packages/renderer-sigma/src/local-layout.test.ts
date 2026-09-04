@@ -52,7 +52,73 @@ function noTimeout(
   return { assignBatch, maxWallTimeMs: 60_000, now: () => 0 };
 }
 
+function mixedEdgeRequest(referenceWeight: number): LocalLayoutRequest {
+  return {
+    ...directRequest({
+      nodeCount: 3,
+      edges: [
+        {
+          key: 'hierarchy-edge',
+          source: 'node-0',
+          target: 'node-1',
+          kind: 'hierarchy',
+          weight: 1,
+        },
+        {
+          key: 'reference-edge',
+          source: 'node-0',
+          target: 'node-2',
+          kind: 'reference',
+          weight: 1,
+        },
+      ],
+    }),
+    settings: {
+      hierarchyWeight: 6,
+      referenceWeight,
+      scalingRatio: 1.35,
+    },
+  };
+}
+
 describe('Local bounded ForceAtlas2 layout contract', () => {
+  it('maps weak, default, and strong Reference Pull to Local reference attraction only', () => {
+    const weakRequest = mixedEdgeRequest(0.25);
+    const defaultRequest = mixedEdgeRequest(1);
+    const strongRequest = mixedEdgeRequest(2);
+    const attraction = [weakRequest, defaultRequest, strongRequest].map(
+      (request) => {
+        let hierarchyWeight: number | undefined;
+        let referenceWeight: number | undefined;
+        computeLocalLayout(
+          request,
+          noTimeout((graph) => {
+            hierarchyWeight ??= graph.getEdgeAttribute(
+              'hierarchy-edge',
+              'weight',
+            );
+            referenceWeight ??= graph.getEdgeAttribute(
+              'reference-edge',
+              'weight',
+            );
+          }),
+        );
+        return { hierarchyWeight, referenceWeight };
+      },
+    );
+
+    expect(attraction).toEqual([
+      { hierarchyWeight: 6, referenceWeight: 0.25 },
+      { hierarchyWeight: 6, referenceWeight: 1 },
+      { hierarchyWeight: 6, referenceWeight: 2 },
+    ]);
+    expect(
+      [weakRequest, defaultRequest, strongRequest].map(
+        ({ settings }) => settings.hierarchyWeight,
+      ),
+    ).toEqual([6, 6, 6]);
+  });
+
   it('settles a representative graph before cap and root-normalizes once', () => {
     const request = createLocalLayoutRequest(
       mapProjectionToLocal(localTestProjection(), 'root'),

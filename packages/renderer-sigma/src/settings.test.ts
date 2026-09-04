@@ -9,6 +9,7 @@ import {
   resolveGlobalPhysicsSettings,
   resolveGlobalLayoutSettings,
   resolveGlobalVisualSettings,
+  resolveNetworkSettings,
   sameGlobalPhysicsSettings,
   sameGlobalVisualSettings,
   validateGlobalLayoutSettings,
@@ -57,9 +58,10 @@ describe('Global folder clustering strength', () => {
     });
   });
 
-  it('keeps advanced visual choices independent from spacing presets', () => {
+  it('keeps shared Network choices independent from All spacing presets', () => {
     const custom = {
       ...customGlobalLayoutSettings('normal'),
+      linkForce: 1.4,
       nodeSize: 7,
       referenceDegreeSizeInfluence: 85,
       linkThickness: 1.4,
@@ -75,7 +77,7 @@ describe('Global folder clustering strength', () => {
     );
 
     expect(resolveGlobalLayoutSettings(spacious)).toMatchObject({
-      linkForce: 0.85,
+      linkForce: 1.4,
       withinFolderSpacing: 1.65,
       betweenFolderSpacing: 4.6,
       nodeSize: 7,
@@ -83,6 +85,41 @@ describe('Global folder clustering strength', () => {
       linkThickness: 1.4,
       labelThreshold: 11,
     });
+  });
+
+  it('resolves a shared subset without exposing All-only folder physics', () => {
+    const baseline = {
+      folderClustering: true,
+      spacingPreset: 'normal' as const,
+      custom: {
+        ...customGlobalLayoutSettings('normal'),
+        linkForce: 1.35,
+        nodeSize: 7,
+        linkThickness: 1.4,
+        labelThreshold: 11,
+      },
+    };
+    const changedAllOnly = {
+      ...baseline,
+      folderClustering: false,
+      custom: {
+        ...baseline.custom,
+        folderCohesion: 0.16,
+        withinFolderSpacing: 2.8,
+        betweenFolderSpacing: 7.5,
+        referenceDegreeSizeInfluence: 100,
+      },
+    };
+
+    expect(resolveNetworkSettings(baseline)).toEqual({
+      referencePull: 1.35,
+      nodeSize: 7,
+      linkThickness: 1.4,
+      labelThreshold: 11,
+    });
+    expect(resolveNetworkSettings(changedAllOnly)).toEqual(
+      resolveNetworkSettings(baseline),
+    );
   });
 
   it('normalizes legacy custom settings to the old degree-size behavior', () => {

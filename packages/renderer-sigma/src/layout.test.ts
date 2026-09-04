@@ -35,7 +35,78 @@ function request(
   } as const;
 }
 
+function positionDistance(
+  positions: readonly {
+    readonly key: string;
+    readonly x: number;
+    readonly y: number;
+  }[],
+  leftKey: string,
+  rightKey: string,
+): number {
+  const left = positions.find(({ key }) => key === leftKey)!;
+  const right = positions.find(({ key }) => key === rightKey)!;
+  return Math.hypot(left.x - right.x, left.y - right.y);
+}
+
+function referencePullRequest(linkForce: number) {
+  const settings = {
+    folderClustering: false,
+    spacingPreset: 'normal' as const,
+    custom: {
+      ...customGlobalLayoutSettings('normal'),
+      linkForce,
+    },
+  };
+  return {
+    schemaVersion: 1 as const,
+    requestId: 1,
+    algorithm: 'reference-only' as const,
+    iterations: 200,
+    settings,
+    nodes: [
+      { key: 'root', x: 0, y: 0, size: 1 },
+      { key: 'reference', x: 8, y: 1, size: 1 },
+      { key: 'other', x: -5, y: 3, size: 1 },
+    ],
+    edges: [
+      {
+        key: 'reference-edge',
+        source: 'root',
+        target: 'reference',
+        weight: 4,
+      },
+      {
+        key: 'ordinary-edge',
+        source: 'root',
+        target: 'other',
+        weight: 1,
+      },
+    ],
+  };
+}
+
 describe('Global folder-aware layout', () => {
+  it('maps weak, default, and strong Reference Pull to increasing Global attraction', () => {
+    const weak = computeGlobalLayout(referencePullRequest(0.25));
+    const normal = computeGlobalLayout(referencePullRequest(1));
+    const strong = computeGlobalLayout(referencePullRequest(2));
+    const weakDistance = positionDistance(weak.positions, 'root', 'reference');
+    const normalDistance = positionDistance(
+      normal.positions,
+      'root',
+      'reference',
+    );
+    const strongDistance = positionDistance(
+      strong.positions,
+      'root',
+      'reference',
+    );
+
+    expect(normalDistance).toBeLessThan(weakDistance);
+    expect(strongDistance).toBeLessThan(normalDistance);
+  });
+
   it('keeps Off reference-only and changes positions rather than edges when On', () => {
     const baseline = computeGlobalLayout(request('reference-only'));
     const clustered = computeGlobalLayout(request('chunked-prior'));

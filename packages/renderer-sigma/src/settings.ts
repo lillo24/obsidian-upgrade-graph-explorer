@@ -5,12 +5,14 @@ import type {
   ResolvedGlobalLayoutSettings,
   ResolvedGlobalPhysicsSettings,
   ResolvedGlobalVisualSettings,
+  ResolvedNetworkSettings,
 } from './types';
 
 export type {
   GlobalLayoutCustomSettings,
   GlobalLayoutSettings,
   GlobalSpacingPreset,
+  ResolvedNetworkSettings,
 } from './types';
 
 export const GLOBAL_LAYOUT_CUSTOM_RANGES = {
@@ -217,6 +219,22 @@ export function resolveGlobalVisualSettings(
   };
 }
 
+/**
+ * Shared product boundary backed by the existing serializable Global record.
+ * `referencePull` is adapted separately to each renderer's ForceAtlas2 model.
+ */
+export function resolveNetworkSettings(
+  settings: GlobalLayoutSettings,
+): ResolvedNetworkSettings {
+  const resolved = resolveGlobalLayoutSettings(settings);
+  return {
+    referencePull: resolved.linkForce,
+    nodeSize: resolved.nodeSize,
+    linkThickness: resolved.linkThickness,
+    labelThreshold: resolved.labelThreshold,
+  };
+}
+
 export function sameGlobalPhysicsSettings(
   left: GlobalLayoutSettings,
   right: GlobalLayoutSettings,
@@ -321,7 +339,7 @@ export function withFolderClusteringStrength(
   };
 }
 
-/** Applies a spatial baseline while keeping folder strength and visual choices independent. */
+/** Applies an All spatial baseline while preserving folder strength and shared Network choices. */
 export function withGlobalSpacingPreset(
   settings: GlobalLayoutSettings,
   spacingPreset: GlobalSpacingPreset,
@@ -333,6 +351,7 @@ export function withGlobalSpacingPreset(
     custom: {
       ...customGlobalLayoutSettings(spacingPreset),
       folderCohesion: resolved.folderCohesion,
+      linkForce: resolved.linkForce,
       nodeSize: resolved.nodeSize,
       referenceDegreeSizeInfluence: resolved.referenceDegreeSizeInfluence,
       linkThickness: resolved.linkThickness,

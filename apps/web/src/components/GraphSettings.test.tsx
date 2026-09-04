@@ -7,7 +7,11 @@ import {
   withFolderClusteringStrength,
 } from '@icarus-graph-explorer/renderer-sigma/settings';
 
-import { GlobalCustomLayoutControls, GraphSettings } from './GraphSettings';
+import {
+  GlobalCustomLayoutControls,
+  GraphSettings,
+  NetworkSharedControls,
+} from './GraphSettings';
 
 describe('Graph Settings presentation', () => {
   it('separates Preferences, Sandbox, and Source into accessible transient tabs', () => {
@@ -72,7 +76,8 @@ describe('Graph Settings presentation', () => {
     expect(markup).toContain('>Sandbox</button>');
     expect(markup).toContain('>Interaction<');
     expect(markup).toContain('>Focus Root appearance<');
-    expect(markup).toContain('>All Network Layout<');
+    expect(markup).toContain('>Network<');
+    expect(markup).toContain('>All Network<');
     expect(markup).toContain('>Network Density<');
     expect(markup).toContain('>All Network Density<');
     expect(markup).toContain('id="all-density-framing-strength"');
@@ -105,11 +110,20 @@ describe('Graph Settings presentation', () => {
     );
     expect(markup).toContain('>Reset Sandbox</button>');
     expect(markup).toContain('>Current Source<');
-    expect(markup).toContain('Applies to Scope = All, Layout = Network.');
+    expect(markup).toContain(
+      'Shared by Scope = All and Scope = Focus when Layout = Network.',
+    );
+    expect(markup).toContain(
+      'Folder physics apply only to Scope = All, Layout = Network.',
+    );
+    expect(markup).toContain('Reference Pull');
+    expect(markup).toContain('Base node size');
+    expect(markup).toContain('Link thickness');
+    expect(markup).toContain('Label threshold');
     expect(markup).toContain('>Folder clustering strength<');
     expect(markup).toContain('aria-valuetext="44 percent"');
     expect(markup).toContain('aria-expanded="false"');
-    expect(markup).toContain('Advanced controls</button>');
+    expect(markup).toContain('Advanced All Network controls</button>');
     expect(markup).not.toContain('Folder tendency');
     expect(markup).toContain(
       'aria-controls="graph-experimental-controls" aria-expanded="false"',
@@ -149,7 +163,7 @@ describe('Graph Settings presentation', () => {
     expect(markup).toContain('aria-valuetext="35 percent"');
   });
 
-  it('groups advanced controls by responsibility with an accessible influence scale', () => {
+  it('keeps the advanced All Network controls scoped to All', () => {
     const markup = renderToStaticMarkup(
       <GlobalCustomLayoutControls
         onChange={() => undefined}
@@ -160,18 +174,39 @@ describe('Graph Settings presentation', () => {
       />,
     );
 
-    expect(markup).toContain('>Layout</h4>');
-    expect(markup).toContain('>Visual</h4>');
-    expect(markup).toContain('Reference pull');
+    expect(markup).toContain('>All-only controls</h4>');
+    expect(markup).toContain('>All-only visual</h4>');
     expect(markup).toContain('Folder separation');
-    expect(markup).toContain('Base node size');
     expect(markup).toContain('Link influence on node size');
     expect(markup).toContain('aria-valuetext="65 percent"');
     expect(markup).toContain('max="100" min="0" step="1"');
     expect(markup).toContain('type="range" value="65"');
     expect(markup).toContain('>None</span><span>Strong</span>');
-    expect(markup).toContain('Link thickness');
-    expect(markup).toContain('Label threshold');
+    expect(markup).not.toContain('Reference Pull');
+    expect(markup).not.toContain('Base node size');
+    expect(markup).not.toContain('Link thickness');
+    expect(markup).not.toContain('Label threshold');
     expect(markup).not.toContain('Folder cohesion');
+  });
+
+  it('presents the four shared Network controls as one accessible group', () => {
+    const markup = renderToStaticMarkup(
+      <NetworkSharedControls
+        onChange={() => undefined}
+        settings={customGlobalLayoutSettings('normal')}
+      />,
+    );
+
+    expect(markup).toContain('id="network-shared-controls"');
+    expect(markup).toContain('Reference Pull');
+    expect(markup).toContain('id="network-setting-linkForce"');
+    expect(markup).toContain('>Weak</span><span>Strong</span>');
+    expect(markup).toContain('Base node size');
+    expect(markup).toContain('id="network-setting-nodeSize"');
+    expect(markup).toContain('Link thickness');
+    expect(markup).toContain('id="network-setting-linkThickness"');
+    expect(markup).toContain('Label threshold');
+    expect(markup).toContain('id="network-setting-labelThreshold"');
+    expect(markup).not.toContain('Folder separation');
   });
 });

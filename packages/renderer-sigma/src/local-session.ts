@@ -31,6 +31,12 @@ import {
 } from './local-density-framing';
 import { createLocalLayoutRequest } from './local-layout';
 import {
+  DEFAULT_RESOLVED_NETWORK_SETTINGS,
+  localLayoutSettingsFromNetworkSettings,
+  resolveLocalNetworkVisualSettings,
+  type LocalNetworkVisualSettings,
+} from './local-network-settings';
+import {
   NodeClickArbitrator,
   NODE_DOUBLE_CLICK_TIMEOUT_MS,
 } from './node-click';
@@ -60,6 +66,7 @@ import type {
   LocalVisualLod,
   SemanticLocalViewport,
 } from './local-types';
+import type { ResolvedNetworkSettings } from './types';
 
 export interface LocalRendererSessionOptions {
   readonly rootNodeKey: string;
@@ -72,6 +79,7 @@ export interface LocalRendererSessionOptions {
   readonly instrumentation?: LocalRendererInstrumentation;
   readonly visualGroupStyles?: VisualGroupPresentationMap;
   readonly presentationOverrides?: EntityPresentationOverrideMap;
+  readonly networkSettings?: ResolvedNetworkSettings;
   readonly onNodeSingleClick?: (key: string) => void;
   readonly onNodeActivated?: (entityId: string) => void;
   readonly onNodeSelected?: (
@@ -125,6 +133,7 @@ export class LocalRendererSession {
   private visualLod: LocalVisualLod;
   private visualGroupStyles: VisualGroupPresentationMap | undefined;
   private presentationOverrides: EntityPresentationOverrideMap | undefined;
+  private networkVisualSettings: LocalNetworkVisualSettings;
   private fileNodeKeys: ReturnType<typeof indexFileNodeKeys>;
   private sizeStyleRefreshPending: Set<string> | undefined;
   private trackpadZoomMode: LocalTrackpadZoomMode;
@@ -133,6 +142,9 @@ export class LocalRendererSession {
   private viewportObservationTimer: number | undefined;
   private topologyRefreshPending: Promise<void> | undefined;
   private visualStyleRefreshPending = false;
+  private networkNodeStyleRefreshPending = false;
+  private networkNodeIndexationPending = false;
+  private networkEdgeStyleRefreshPending = false;
   private destroyed = false;
   private nodeClicks: NodeClickArbitrator | undefined;
   private readonly wheelDirection = new WheelDirectionStabilizer();
@@ -254,6 +266,9 @@ export class LocalRendererSession {
     this.trackpadZoomMode = options.trackpadZoomMode;
     this.visualGroupStyles = options.visualGroupStyles;
     this.presentationOverrides = options.presentationOverrides;
+    this.networkVisualSettings = resolveLocalNetworkVisualSettings(
+      options.networkSettings ?? DEFAULT_RESOLVED_NETWORK_SETTINGS,
+    );
     this.fileNodeKeys = indexFileNodeKeys(input.nodes);
     this.graph = buildLocalGraph(input);
     this.neighborhoods = createLocalNeighborhoodIndex(input);
@@ -267,7 +282,8 @@ export class LocalRendererSession {
       hideLabelsOnMove: true,
       labelDensity: 0.12,
       labelGridCellSize: 100,
-      labelRenderedSizeThreshold: 4,
+      labelRenderedSizeThreshold:
+        this.networkVisualSettings.labelRenderedSizeThreshold,
       minCameraRatio: 0.02,
       maxCameraRatio: 6,
       renderEdgeLabels: false,
@@ -360,6 +376,7 @@ export class LocalRendererSession {
       lod: this.visualLod,
       ...(visualGroup === undefined ? {} : { visualGroup }),
       ...(sizeScale === undefined ? {} : { sizeScale }),
+      baseNodeSizeScale: this.networkVisualSettings.nodeSizeScale,
     });
   }
 
@@ -375,6 +392,7 @@ export class LocalRendererSession {
         this.graph.source(key) === this.hoveredNode ||
         this.graph.target(key) === this.hoveredNode,
       lod: this.visualLod,
+      linkThicknessScale: this.networkVisualSettings.linkThicknessScale,
     });
   }
 
@@ -635,23 +653,55 @@ export class LocalRendererSession {
     if (this.topologyRefreshPending === undefined) this.refreshPendingStyles();
   }
 
+  updateNetworkSettings(settings: ResolvedNetworkSettings): void {
+    const previous = this.networkVisualSettings;
+    const next = resolveLocalNetworkVisualSettings(settings);
+    const nodeSizeChanged = previous.nodeSizeScale !== next.nodeSizeScale;
+    const edgeSizeChanged =
+      previous.linkThicknessScale !== next.linkThicknessScale;
+    const labelChanged =
+      previous.labelRenderedSizeThreshold !== next.labelRenderedSizeThreshold;
+    this.networkVisualSettings = next;
+    if (labelChanged) {
+      this.renderer.setSetting(
+        'labelRenderedSizeThreshold',
+        next.labelRenderedSizeThreshold,
+      );
+    }
+    if (!nodeSizeChanged && !edgeSizeChanged && !labelChanged) return;
+    this.options.instrumentation?.count('local-style-updates');
+    this.networkNodeStyleRefreshPending ||= nodeSizeChanged || labelChanged;
+    this.networkNodeIndexationPending ||= nodeSizeChanged;
+    this.networkEdgeStyleRefreshPending ||= edgeSizeChanged;
+    if (this.topologyRefreshPending === undefined) this.refreshPendingStyles();
+  }
+
   private refreshPendingStyles(): void {
     if (this.destroyed) return;
     const sizeKeys = [...(this.sizeStyleRefreshPending ?? [])].filter((key) =>
       this.graph.hasNode(key),
     );
-    const nodes = this.visualStyleRefreshPending
-      ? this.graph.nodes()
-      : sizeKeys;
+    const refreshAllNodes =
+      this.visualStyleRefreshPending || this.networkNodeStyleRefreshPending;
+    const nodes = refreshAllNodes ? this.graph.nodes() : sizeKeys;
+    const edges = this.networkEdgeStyleRefreshPending ? this.graph.edges() : [];
+    const needsNodeIndexation =
+      this.networkNodeIndexationPending || sizeKeys.length > 0;
     this.visualStyleRefreshPending = false;
+    this.networkNodeStyleRefreshPending = false;
+    this.networkNodeIndexationPending = false;
+    this.networkEdgeStyleRefreshPending = false;
     this.sizeStyleRefreshPending = undefined;
-    if (nodes.length === 0) return;
+    if (nodes.length === 0 && edges.length === 0) return;
     // Sigma 3.0.3 refresh reruns only these reducers. Radius changes must also
     // process label/program/picking indices (skipIndexation=false), but never
     // submit a layout or change Graphology coordinates. Color-only stays fast.
     this.renderer.refresh({
-      partialGraph: { nodes },
-      skipIndexation: sizeKeys.length === 0,
+      partialGraph: {
+        ...(nodes.length === 0 ? {} : { nodes }),
+        ...(edges.length === 0 ? {} : { edges }),
+      },
+      skipIndexation: !needsNodeIndexation,
       schedule: true,
     });
   }
@@ -767,19 +817,26 @@ export class LocalRendererSession {
 
   createLayoutRequest(
     input: LocalRendererInput,
+    networkSettings: Pick<
+      ResolvedNetworkSettings,
+      'referencePull'
+    > = DEFAULT_RESOLVED_NETWORK_SETTINGS,
   ): Omit<LocalLayoutRequest, 'requestId'> {
-    return createLocalLayoutRequest({
-      ...input,
-      nodes: input.nodes.map((node) => {
-        const current = this.graph.hasNode(node.key)
-          ? this.graph.getNodeAttributes(node.key)
-          : node.attributes;
-        return {
-          ...node,
-          attributes: { ...node.attributes, x: current.x, y: current.y },
-        };
-      }),
-    });
+    return createLocalLayoutRequest(
+      {
+        ...input,
+        nodes: input.nodes.map((node) => {
+          const current = this.graph.hasNode(node.key)
+            ? this.graph.getNodeAttributes(node.key)
+            : node.attributes;
+          return {
+            ...node,
+            attributes: { ...node.attributes, x: current.x, y: current.y },
+          };
+        }),
+      },
+      localLayoutSettingsFromNetworkSettings(networkSettings),
+    );
   }
 
   private measureDensity(

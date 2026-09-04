@@ -14,15 +14,23 @@ must not be serialized into KG9 workspace state.
 The stable v1 payload contains `focusAppearance` (`outline`, `inverted`, or
 `minimal`), `trackpadZoomMode` (`scroll-zoom` or `pinch-zoom`), and one
 serializable `globalLayoutSettings` value. Global settings own the soft folder
-toggle, Compact/Normal/Spacious preset, and optional bounded Custom values,
-including the All Network `referenceDegreeSizeInfluence` percentage. They are
+toggle, Compact/Normal/Spacious preset, and optional bounded Custom values.
+NETWORKSETTINGS1 reuses its existing `linkForce`, `nodeSize`, `linkThickness`,
+and `labelThreshold` fields as the canonical shared Network preference for both
+All and Focus Network; no migration or duplicate Focus fields exist. Spacing
+preset changes preserve those shared choices. The separate
+`referenceDegreeSizeInfluence` percentage remains All-only. These values are
 presentation preferences, not KG9 workspace state or persistent graph
 coordinates. The defaults are `inverted`, `scroll-zoom`, and Normal with folder
-clustering on; the link-influence default is `50`, which preserves the legacy
-degree-size curve. Older payloads load missing Global settings from that
-default. Legacy Custom objects that predate the influence field retain all
-existing values and normalize only the missing field to `50`; an invalid field
-falls back independently so valid sibling preferences survive.
+clustering on; shared Network defaults resolve to Reference Pull `1`, Base node
+size `4.5`, Link thickness `0.7`, and Label threshold `7`. Their Local adapters
+reproduce the previous reference weight `1`, semantic-size scale `1`, width
+scale `1`, and Sigma threshold `4`. The link-influence default is `50`, which
+preserves the legacy Global degree-size curve. Older payloads load missing
+Global settings from that default. Legacy Custom objects that predate the
+influence field retain all existing values and normalize only the missing field
+to `50`; an invalid field falls back independently so valid sibling preferences
+survive.
 The storage key and schema version stay at
 `icarus.graph-explorer.preferences.v1`. If storage is unavailable, an in-memory
 change still applies immediately for the current session and the Settings UI

@@ -52,6 +52,14 @@ export interface ResolvedGlobalVisualSettings {
   readonly labelThreshold: number;
 }
 
+/** Product-level controls shared by both Sigma Network renderers. */
+export interface ResolvedNetworkSettings {
+  readonly referencePull: number;
+  readonly nodeSize: number;
+  readonly linkThickness: number;
+  readonly labelThreshold: number;
+}
+
 export interface GlobalNodeAttributes {
   readonly x: number;
   readonly y: number;
