@@ -83,10 +83,13 @@ retains the last confirmed registry. Reset saved view, Graph Preferences,
 Visual Groups, Saved Filters, and per-File presentation overrides do not clear
 or merge with this registry.
 
-Arrange Folders previews are never written. Pointer release or keyboard Save
-submits exactly one place/exact rule mutation; the canvas retains the transient
-preview until React receives and renders the confirmed registry. A failed write
-restores the last confirmed displayed composition and moves the session into its
-existing blocked-write state. Reset folder and the explicitly confirmed Reset
-all use the same transaction. Corrupt recovery deletes only this spatial key and
-is exposed outside the otherwise-disabled Arrange mode.
+Arrange Folders previews and editor drafts are never written. Pointer release or
+**Apply changes** submits one complete schema-v2 Pull or Place rule; behavior,
+scope, exclusions, target, and Pull strength cross the storage boundary as one
+transaction. The canvas retains a release preview until React renders the
+matching confirmed registry and, for Pull, the latest dynamic result adopts or
+fails to the visible base-plus-fixed fallback. A failed write restores the last
+confirmed displayed composition and moves the session into its existing
+blocked-write state. Reset one exact-root rule and the explicitly confirmed
+Reset all use the same transaction. Corrupt recovery deletes only this spatial
+key and is exposed outside the otherwise-disabled Arrange mode.

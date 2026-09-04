@@ -414,7 +414,7 @@ describe('Global visual interactions', () => {
       lod: 'far',
     });
     const incident = resolveGlobalEdgeStyle(edge, {
-      arrangementRelation: 'incident',
+      arrangementRelation: 'boundary',
       hoverActive: false,
       relatedToHover: true,
       lod: 'far',

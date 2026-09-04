@@ -8,8 +8,9 @@ The product will explore the structure of Markdown knowledge workspaces. Unlike 
 
 SPATIAL1 establishes normalized fixed-folder intent and direct arrangement.
 SPATIAL2A evolves that independent All Network domain to schema-v2 exact/subtree
-rules plus a base → dynamic soft-pull → fixed-display pipeline while leaving the
-active KG14, HIER, QUERY, GROUP, and SPACING tracks unchanged.
+rules plus a base → dynamic soft-pull → fixed-display pipeline. SPATIAL2B adds
+one production Pull/Place hierarchical rule editor over those contracts while
+leaving the active KG14, HIER, QUERY, GROUP, and SPACING tracks unchanged.
 
 ## Stable domain shape
 
@@ -228,7 +229,9 @@ logical target, and Pull-only strength. It accepts v1 exact anchors only for
 deterministic in-memory migration. The deepest matching rule wins per document;
 missing or query-hidden membership remains dormant without fuzzy rename
 reconciliation. The package computes the base document frame and pure fixed
-composition over dynamic positions. It owns no React, Sigma, storage,
+composition over dynamic positions. It also owns pure editor drafts, preset
+mapping, dirty comparison, minimal-antichain exclusion edits, transient draft
+classification, and generalized deepest-wins preview geometry. It owns no React, Sigma, storage,
 projection, source adapter, query, viewport, worker, or force-layout policy.
 
 `packages/explorer-inspection` depends inward on core and view-projection. It
@@ -290,15 +293,19 @@ automatic positioning. The session retains `latestAutomaticPositions`
 separately from live displayed Graphology coordinates. Seeds, exact cache hits,
 accepted worker results, worker requests, and cache writes use automatic
 positions only; the current registry is applied afterward to produce display
-positions. Anchor changes therefore perform one composition/apply and zero KG6
-projections, topology reconciliations, or ForceAtlas2 requests. Diagnostics,
-node radii, cameras, and prior translations never enter the automatic frame.
+positions. Rule edits therefore perform zero KG6 projections, topology
+reconciliations, or automatic ForceAtlas2 requests. Place-only edits reuse the
+unchanged dynamic fingerprint; committed Pull target/strength/scope/membership
+changes request one latest soft refinement. Diagnostics, node radii, cameras,
+and prior translations never enter the automatic frame.
 Focus Network and both Hierarchy renderers receive no spatial registry.
 
-Direct arrangement preserves those boundaries. `GraphExplorer` owns only the
-transient inactive/active mode and exact active folder plus the existing
-workspace persistence session. `GlobalGraphCanvas` owns accessible controls and
-the write-before-adopt display transaction. The imperative Global Sigma session
+Direct arrangement preserves those boundaries. `GraphExplorer` owns the
+transient editor lifecycle, the canonical-path folder tree derived from the full
+snapshot, and the existing workspace persistence session. `GlobalGraphCanvas`
+owns the Pull/Place draft, exact/full-subtree/Custom controls, accessible DOM
+scope tree, target controls, scope visualization, and write-before-adopt display
+transaction. The imperative Global Sigma session
 owns prime/threshold/drag/commit/cancel state, pointer conversion, one
 requestAnimationFrame coalescer, and sparse coordinate application. It validates
 the complete sparse set, changes only renderer-owned x/y attributes, and asks
@@ -306,15 +313,18 @@ Sigma 3.0.3 for one scheduled partial indexed refresh of moved nodes and inciden
 edges. Required indexation may scan renderer internals; it is not application
 mapping, topology reconciliation, full anchor composition, or layout.
 
-Arrange applies only to canonical visible document nodes. One click activates
-the exact folder without moving it; a 3 px threshold starts movement. Stage drag
-keeps camera pan, while selection/Focus/double-click/context/wheel actions are
-suppressed on nodes for the duration of the mode. Blur, visibility loss,
-topology/layout/scope change, Escape, and disposal cancel unfinished work.
-Release persists one normalized anchor and keeps the preview until the confirmed
-map is rendered; failure restores the last confirmed composition. Network
-Explorer provides exact folder actions, a root `.` fallback, markers, and
-keyboard nudge/save/reset access without adding canonical folder entities.
+One click activates a visible File's folder without moving it; a 3 px threshold
+starts rigid movement of the draft's effective deepest-wins members. Choose-mode
+graph clicks toggle folder subtrees or the complete direct-root group and cannot
+drag the target; the bounded DOM tree provides the authoritative keyboard path.
+Stage drag keeps camera pan, while selection/Focus/double-click/context/wheel
+actions are suppressed on nodes for the duration of the gesture. Blur,
+visibility loss, topology/layout/scope change, Escape, and disposal cancel
+unfinished preview. Pull release persists the complete rule and retains the
+rigid preview until the matching latest dynamic generation adopts or fails;
+Place composes exactly after the current dynamic layer. Network Explorer
+provides exact-root edit/remove actions and summaries without presenting
+inherited parent intent as child ownership or adding canonical folder entities.
 
 `tools/global-renderer-spike` is now a production renderer harness rather than
 an implementation fork. It retains only synthetic KG13A fixtures, browser/Tauri
@@ -833,13 +843,16 @@ use the compiled all-match evaluator in Inspector; diagnostics and edges opt
 out. Filters and Groups have one transient tool-panel owner while Inspector is
 independent.
 The separate LAYOUT1 idea is paused/absorbed into this Global → Regional → Local
-spatial architecture. SPATIAL2A now supplies hierarchical folder scopes and a
+spatial architecture. SPATIAL2A supplies hierarchical folder scopes and a
 separate worker-derived soft-pull layer after the automatic prior; fixed Place
-rules still compose last. The completed Arrange mode continues to author only
-exact Place rules and exposes no SPATIAL2B selector. Its transient
-preview wins visually for one exact folder, moves members and incident edges
-live, then commits one normalized release target or restores confirmed state on
-cancel/failure. Individual-node dragging is not part of this interaction. A
+rules still compose last. SPATIAL2B's completed implementation exposes Pull and
+Place plus exact, full-subtree, and declarative Custom scope in Arrange mode.
+New folders default to Pull/exact/70 at their displayed center, but selection
+alone neither moves nor persists. The draft replaces its same-root rule only for
+visualization; deepest child rules remain authoritative. The transient rigid
+preview moves effective members and relevant edges live, then commits one full
+rule or restores confirmed state on cancel/failure. Individual-node dragging is
+not part of this interaction. A
 later Saved View may
 reference, copy, or selectively override an independently serializable spatial
 profile alongside query, scope, layout, hierarchy detail, settings, and

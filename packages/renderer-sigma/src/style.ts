@@ -5,6 +5,7 @@ import type {
   ResolvedGlobalLayoutSettings,
 } from './types';
 import type { VisualGroupNodePresentation } from '@icarus-graph-explorer/visual-groups';
+import type { FolderScopeVisualizationState } from '@icarus-graph-explorer/spatial-overrides';
 import { applyNetworkNodeSizeScale } from './node-size';
 
 export const GLOBAL_ALWAYS_LABELED_NODE_LIMIT = 12;
@@ -25,6 +26,8 @@ export function resolveGlobalVisualLod(cameraRatio: number): GlobalVisualLod {
 export interface GlobalNodeStyleContext {
   readonly arrangementActive?: boolean;
   readonly arrangementMember?: boolean;
+  readonly scopeState?: FolderScopeVisualizationState;
+  readonly scopePulse?: boolean;
   readonly alwaysShowLabel?: boolean;
   readonly hovered: boolean;
   readonly relatedToHover: boolean;
@@ -38,7 +41,8 @@ export interface GlobalNodeStyleContext {
 }
 
 export interface GlobalEdgeStyleContext {
-  readonly arrangementRelation?: 'internal' | 'incident' | 'unrelated';
+  readonly arrangementRelation?:
+    'internal' | 'boundary' | 'child-owned' | 'unrelated';
   readonly relatedToHover: boolean;
   readonly hoverActive: boolean;
   readonly lod: GlobalVisualLod;
@@ -60,8 +64,11 @@ export function resolveGlobalNodeStyle(
   const emphasized = context.selected || context.hovered;
   const arrangementFocused =
     context.arrangementActive === true &&
-    context.arrangementMember !== undefined;
-  const arrangementMember = context.arrangementMember === true;
+    (context.scopeState !== undefined ||
+      context.arrangementMember !== undefined);
+  const arrangementMember =
+    context.scopeState === 'active-member' ||
+    context.arrangementMember === true;
   const forceLabel =
     emphasized || arrangementMember || context.alwaysShowLabel === true;
   const baseColor =
@@ -74,13 +81,19 @@ export function resolveGlobalNodeStyle(
       ? size >= context.settings.labelThreshold * 0.68
       : size >= context.settings.labelThreshold);
   const color = arrangementFocused
-    ? arrangementMember
-      ? context.selected
-        ? '#d7a126'
-        : context.hovered
-          ? '#55a8c2'
-          : baseColor
-      : '#e1e6e7'
+    ? context.selected
+      ? '#d7a126'
+      : context.hovered
+        ? '#55a8c2'
+        : arrangementMember
+          ? baseColor
+          : context.scopeState === undefined
+            ? '#e1e6e7'
+            : context.scopeState === 'shadowed-by-child'
+              ? '#9baec7'
+              : context.scopeState === 'excluded-candidate'
+                ? '#d9dfe1'
+                : '#edf0f1'
     : context.selected
       ? '#d7a126'
       : context.hovered
@@ -93,7 +106,11 @@ export function resolveGlobalNodeStyle(
     size,
     color,
     forceLabel,
-    highlighted: emphasized || arrangementMember,
+    highlighted:
+      emphasized ||
+      arrangementMember ||
+      context.scopeState === 'shadowed-by-child' ||
+      context.scopePulse === true,
     label: visibleByScale || forceLabel ? attributes.label : '',
     zIndex: emphasized ? 2 : 0,
   };
@@ -111,9 +128,11 @@ export function resolveGlobalEdgeStyle(
     color: arrangementActive
       ? arrangementRelation === 'internal'
         ? attributes.color
-        : arrangementRelation === 'incident'
+        : arrangementRelation === 'boundary'
           ? '#aebdc1'
-          : '#edf0f1'
+          : arrangementRelation === 'child-owned'
+            ? '#a7b6cb'
+            : '#edf0f1'
       : context.relatedToHover
         ? attributes.color
         : '#e3e9eb',
@@ -126,9 +145,11 @@ export function resolveGlobalEdgeStyle(
       (arrangementActive
         ? arrangementRelation === 'internal'
           ? 1.15
-          : arrangementRelation === 'incident'
+          : arrangementRelation === 'boundary'
             ? 0.82
-            : 0.45
+            : arrangementRelation === 'child-owned'
+              ? 0.72
+              : 0.38
         : context.lod === 'far'
           ? 0.55
           : context.lod === 'regional'
@@ -136,7 +157,8 @@ export function resolveGlobalEdgeStyle(
             : 1),
     zIndex:
       arrangementRelation === 'internal' ||
-      arrangementRelation === 'incident' ||
+      arrangementRelation === 'boundary' ||
+      arrangementRelation === 'child-owned' ||
       (context.hoverActive && context.relatedToHover)
         ? 1
         : 0,

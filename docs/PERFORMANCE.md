@@ -590,13 +590,43 @@ its small added cost. Strength zero bypasses all refinement and returns the base
 layer exactly.
 
 The medium benchmark also runs the dynamic stage over the private-safe 5,000
-node/10,000 edge stress fixture. Four-iteration compute ranged from 229 ms to a
-1.994 s cold outlier across 1/10/100/1,000/3,000-member cases; attractor work was
-1.7–10.5 ms and exact cache hits were 0.070–0.117 ms median. This is an honest
-scale boundary, not an interactive-preview claim: SPATIAL2B must keep pull
-preview debounced/worker-only and establish a scale policy before exposing the
-editor in production. Stress profiles remain opt-in and no new force dependency
-or persisted coordinate cache was introduced.
+node/10,000 edge stress fixture. The 2026-09-04 release-candidate run recorded
+about 82–102 ms compute for 10/100/1,000/3,000-member cases and a 750 ms cold
+single-member outlier; attractor work was 0.8–3.3 ms. This is an honest scale
+boundary, not an interactive-preview claim. SPATIAL2B therefore performs only
+rigid sparse work during pointer movement and starts Pull refinement after a
+committed release. Stress profiles remain opt-in and no new force dependency or
+persisted coordinate cache was introduced.
+
+### SPATIAL2B production rule editor
+
+The editor adds `spatial-rule-draft-resolution`,
+`spatial-scope-visualization`, `spatial-rigid-preview`,
+`spatial-rule-persist`, and `spatial-pull-settle`. Draft behavior/scope/strength
+changes resolve source-neutral rule state and visual membership only. Tests hold
+the automatic layout service at one initial request, require zero dynamic
+requests before Apply/release, and prove a Place-only edit reuses the Pull
+fingerprint while a Pull-strength change requests exactly one later generation.
+Pointer movement remains the SPATIAL1B rAF-coalesced sparse path generalized to
+the effective deepest-wins member set; it never invokes the worker.
+
+The private-safe medium product fixture (500 nodes, 100 affected members, 24
+iterations) compares the proposed default strengths with the same base graph:
+
+| Strength | Mean target error | Unaffected displacement | Cross-boundary reference length |
+| -------: | ----------------: | ----------------------: | ------------------------------: |
+|       60 |          6.287554 |              117.022550 |                      120.745351 |
+|       70 |          4.585954 |              117.028719 |                      120.812577 |
+|       80 |          3.233386 |              117.017767 |                      120.858675 |
+
+Seventy materially improves target response over 60 without evidence that the
+stronger 80 default is required; outside displacement is effectively unchanged
+across candidates. The product therefore retains 70 as the conservative middle
+default, while exposing the full integer 0–100 range and explicitly describing
+100 as soft rather than exact. Folder-tree unit evidence covers 120 siblings and
+a depth-180 chain iteratively. Scope resolution on the 500-node product fixture
+recorded 0.441 ms median/0.659 ms p95; the 5,000-node stress fixture recorded
+2.296/2.949 ms. Wall-clock values are local evidence, never CI thresholds.
 
 ## KG13B2A bounded Local Free evidence
 

@@ -11,11 +11,11 @@ import {
 
 import type { GraphSelection } from '@icarus-graph-explorer/renderer-reactflow';
 import {
-  workspaceFolderKeyFromPath,
   type EntityId,
   type WorkspaceFolderKey,
 } from '@icarus-graph-explorer/core';
 import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
+import type { FolderSpatialRule } from '@icarus-graph-explorer/spatial-overrides';
 import type { ProjectionNodeId } from '@icarus-graph-explorer/view-projection';
 
 import {
@@ -56,10 +56,11 @@ import {
 export interface NetworkExplorerArrangementProps {
   readonly active: boolean;
   readonly activeFolderKey?: WorkspaceFolderKey;
-  readonly anchoredFolderKeys: ReadonlySet<WorkspaceFolderKey>;
+  readonly ruleByFolderKey: ReadonlyMap<WorkspaceFolderKey, FolderSpatialRule>;
   readonly available: boolean;
   readonly unavailableReason?: string;
   readonly onArrangeFolder: (folderKey: WorkspaceFolderKey) => void;
+  readonly onRemoveFolderRule?: (folderKey: WorkspaceFolderKey) => void;
 }
 
 interface NetworkExplorerProps {
@@ -123,6 +124,17 @@ function nodeAccessibleName(
   return details.filter((detail) => detail !== undefined).join(', ');
 }
 
+function spatialRuleScopeLabel(rule: FolderSpatialRule): string {
+  if (rule.scope.kind === 'exact') return 'This folder';
+  if (rule.scope.includeRootFiles && rule.scope.excludedSubtrees.length === 0)
+    return 'Folder + subfolders';
+  return `Custom scope, ${rule.scope.includeRootFiles ? 'including' : 'excluding'} direct files, ${rule.scope.excludedSubtrees.length} excluded subtrees`;
+}
+
+function spatialRuleLabel(rule: FolderSpatialRule): string {
+  return `${rule.behavior === 'pull' ? 'Pull' : 'Place'}, ${spatialRuleScopeLabel(rule)}${rule.behavior === 'pull' ? `, strength ${rule.strength}` : ''}`;
+}
+
 export const NetworkExplorer = memo(function NetworkExplorer({
   arrangement,
   presentationOverrides,
@@ -172,17 +184,6 @@ export const NetworkExplorer = memo(function NetworkExplorer({
   const hiddenFolderKeySet = useMemo(
     () => new Set(hiddenFolderKeys),
     [hiddenFolderKeys],
-  );
-  const rootFileCount = useMemo(
-    () =>
-      model.roots.filter(
-        (entry) =>
-          entry.kind === 'node' &&
-          entry.node.kindLabel === 'File' &&
-          entry.node.sourcePath !== undefined &&
-          workspaceFolderKeyFromPath(entry.node.sourcePath) === '.',
-      ).length,
-    [model.roots],
   );
   const focusPending = useRef(false);
   const pendingSelectionReveal = useRef<ProjectionNodeId | undefined>(
@@ -541,18 +542,22 @@ export const NetworkExplorer = memo(function NetworkExplorer({
             onRestoreFolder={onRestoreFolder}
           />
         )}
-        {arrangement === undefined || rootFileCount === 0 ? null : (
+        {arrangement === undefined ? null : (
           <div className="network-explorer__root-arrangement">
             <span>Root folder</span>
-            {arrangement.anchoredFolderKeys.has('.') ? (
+            {arrangement.ruleByFolderKey.get('.') === undefined ? null : (
               <span
-                aria-label="Custom folder position"
+                aria-label={spatialRuleLabel(
+                  arrangement.ruleByFolderKey.get('.')!,
+                )}
                 className="network-explorer__arranged-marker"
-                title="Custom folder position"
+                title={spatialRuleLabel(arrangement.ruleByFolderKey.get('.')!)}
               >
-                ◆
+                {arrangement.ruleByFolderKey.get('.')!.behavior === 'pull'
+                  ? 'Pull'
+                  : 'Place'}
               </span>
-            ) : null}
+            )}
             <button
               aria-pressed={
                 arrangement.active && arrangement.activeFolderKey === '.'
@@ -566,8 +571,19 @@ export const NetworkExplorer = memo(function NetworkExplorer({
               }
               type="button"
             >
-              Arrange folder
+              {arrangement.ruleByFolderKey.has('.')
+                ? 'Edit spatial rule'
+                : 'Arrange folder'}
             </button>
+            {arrangement.ruleByFolderKey.has('.') &&
+            arrangement.onRemoveFolderRule !== undefined ? (
+              <button
+                onClick={() => arrangement.onRemoveFolderRule?.('.')}
+                type="button"
+              >
+                Remove spatial rule
+              </button>
+            ) : null}
           </div>
         )}
       </div>
@@ -614,20 +630,10 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                   : presentationOverrides.get(fileEntityId)?.sizeScale;
               const selected = node !== undefined && selectedNodeId === node.id;
               const folderKey = folder?.folder.path;
-              const directFileCount =
-                folder === undefined
-                  ? 0
-                  : folder.folder.entries.filter(
-                      (entry) =>
-                        entry.kind === 'node' &&
-                        entry.node.kindLabel === 'File',
-                    ).length;
               const folderArrangementDisabledReason =
-                directFileCount === 0
-                  ? 'This folder has no directly visible File in the current All Network view'
-                  : arrangement?.available === false
-                    ? arrangement.unavailableReason
-                    : undefined;
+                arrangement?.available === false
+                  ? arrangement.unavailableReason
+                  : undefined;
               return (
                 <div
                   className="network-explorer__virtual-row"
@@ -718,15 +724,23 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                     {folderKey === undefined ||
                     arrangement === undefined ? null : (
                       <>
-                        {arrangement.anchoredFolderKeys.has(folderKey) ? (
+                        {arrangement.ruleByFolderKey.get(folderKey) ===
+                        undefined ? null : (
                           <span
-                            aria-label="Custom folder position"
+                            aria-label={spatialRuleLabel(
+                              arrangement.ruleByFolderKey.get(folderKey)!,
+                            )}
                             className="network-explorer__arranged-marker"
-                            title="Custom folder position"
+                            title={spatialRuleLabel(
+                              arrangement.ruleByFolderKey.get(folderKey)!,
+                            )}
                           >
-                            ◆
+                            {arrangement.ruleByFolderKey.get(folderKey)!
+                              .behavior === 'pull'
+                              ? 'Pull'
+                              : 'Place'}
                           </span>
-                        ) : null}
+                        )}
                         <button
                           aria-label={`Arrange folder ${folder?.folder.name ?? folderKey}`}
                           aria-pressed={
@@ -749,8 +763,26 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                           }
                           type="button"
                         >
-                          Arrange folder
+                          {arrangement.ruleByFolderKey.has(folderKey)
+                            ? 'Edit spatial rule'
+                            : 'Arrange folder'}
                         </button>
+                        {arrangement.ruleByFolderKey.has(folderKey) &&
+                        arrangement.onRemoveFolderRule !== undefined ? (
+                          <button
+                            aria-label={`Remove spatial rule ${folder?.folder.name ?? folderKey}`}
+                            className="network-explorer__arrange-folder"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              arrangement.onRemoveFolderRule?.(folderKey);
+                            }}
+                            onKeyDown={(event) => event.stopPropagation()}
+                            tabIndex={row.id === activeRowId ? 0 : -1}
+                            type="button"
+                          >
+                            Remove
+                          </button>
+                        ) : null}
                       </>
                     )}
                     {node === undefined ? null : (

@@ -60,6 +60,13 @@ import { GlobalGraphCanvas } from './GlobalGraphCanvas';
 
 const noop = () => undefined;
 
+async function perform(action: () => void): Promise<void> {
+  await act(async () => {
+    action();
+    for (let turn = 0; turn < 20; turn += 1) await Promise.resolve();
+  });
+}
+
 describe('All Network Arrange folders canvas', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -73,7 +80,7 @@ describe('All Network Arrange folders canvas', () => {
   });
 
   afterEach(async () => {
-    await act(() => root.unmount());
+    await perform(() => root.unmount());
     container.remove();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -82,12 +89,15 @@ describe('All Network Arrange folders canvas', () => {
   async function renderArrangement(options?: {
     readonly commitFailure?: string;
     readonly active?: boolean;
+    readonly genericRules?: boolean;
+    readonly scopeChildCount?: number;
   }) {
     const onAvailabilityChange = vi.fn();
     const onCommitAnchor = vi.fn(() => options?.commitFailure);
+    const onCommitRule = vi.fn(() => options?.commitFailure);
     const onActiveChange = vi.fn();
     const onAnnouncement = vi.fn();
-    await act(() =>
+    await perform(() =>
       root.render(
         <GlobalGraphCanvas
           fitRequestKey={0}
@@ -103,6 +113,42 @@ describe('All Network Arrange folders canvas', () => {
             onAnnouncement,
             onAvailabilityChange,
             onCommitAnchor,
+            ...(options?.genericRules === true
+              ? {
+                  onCommitRule,
+                  ruleCount: 0,
+                  scopeTree: {
+                    folderKey: '.',
+                    name: 'Root folder',
+                    depth: 0,
+                    directFileCount: 0,
+                    totalFileCount: 2,
+                    visibleFileCount: 2,
+                    children: [
+                      {
+                        folderKey: 'alpha',
+                        name: 'alpha',
+                        depth: 1,
+                        directFileCount: 2,
+                        totalFileCount: 2 + (options.scopeChildCount ?? 0),
+                        visibleFileCount: 2,
+                        children: Array.from(
+                          { length: options.scopeChildCount ?? 0 },
+                          (_value, index) => ({
+                            folderKey: `alpha/child-${index}`,
+                            name: `child-${index}`,
+                            depth: 2,
+                            directFileCount: 1,
+                            totalFileCount: 1,
+                            visibleFileCount: 0,
+                            children: [],
+                          }),
+                        ),
+                      },
+                    ],
+                  },
+                }
+              : {}),
             onResetAll: () => undefined,
             onResetFolder: () => undefined,
           }}
@@ -141,6 +187,7 @@ describe('All Network Arrange folders canvas', () => {
       onAnnouncement,
       onAvailabilityChange,
       onCommitAnchor,
+      onCommitRule,
     };
   }
 
@@ -152,14 +199,14 @@ describe('All Network Arrange folders canvas', () => {
       undefined,
     );
     expect(container.textContent).toContain(
-      'Drag any File to move its folder.',
+      'Choose a folder, define its rule, then drag its included Files.',
     );
     expect(container.textContent).toContain('Active folderalpha');
 
     const up = container.querySelector<HTMLButtonElement>(
       '[aria-label="Nudge folder up"]',
     )!;
-    await act(() => up.click());
+    await perform(() => up.click());
     expect(session.previewFolderAnchor).toHaveBeenCalledWith('alpha', {
       x: 0,
       y: -0.02,
@@ -167,29 +214,29 @@ describe('All Network Arrange folders canvas', () => {
     expect(container.textContent).toContain('2% up');
 
     const save = [...container.querySelectorAll('button')].find(
-      (button) => button.textContent === 'Save position',
+      (button) => button.textContent === 'Apply changes',
     )!;
-    await act(() => save.click());
+    await perform(() => save.click());
     expect(callbacks.onCommitAnchor).toHaveBeenCalledWith('alpha', {
       x: 0,
       y: -0.02,
     });
     expect(callbacks.onAnnouncement).toHaveBeenCalledWith(
-      'Folder position set for this session only',
+      'Spatial rule set for this session only',
     );
   });
 
   it('reverts a failed write and keeps the error actionable', async () => {
     const callbacks = await renderArrangement({ commitFailure: 'disk full' });
     const session = sessionInstances[0]!;
-    await act(() =>
+    await perform(() =>
       container
         .querySelector<HTMLButtonElement>('[aria-label="Nudge folder right"]')!
         .click(),
     );
-    await act(() =>
+    await perform(() =>
       [...container.querySelectorAll('button')]
-        .find((button) => button.textContent === 'Save position')!
+        .find((button) => button.textContent === 'Apply changes')!
         .click(),
     );
 
@@ -207,7 +254,80 @@ describe('All Network Arrange folders canvas', () => {
       '[aria-label="Arrange folders"]',
     )!;
     expect(arrange.getAttribute('aria-pressed')).toBe('false');
-    await act(() => arrange.click());
+    await perform(() => arrange.click());
     expect(callbacks.onActiveChange).toHaveBeenCalledWith(true);
+  });
+
+  it('authors a complete default Pull rule and switches to Place/Custom transactionally', async () => {
+    const callbacks = await renderArrangement({ genericRules: true });
+    const fixed = [...container.querySelectorAll('label')]
+      .find((label) => label.textContent?.includes('Fixed placement'))!
+      .querySelector<HTMLInputElement>('input')!;
+    await perform(() => fixed.click());
+    const custom = [...container.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Custom',
+    )!;
+    await perform(() => custom.click());
+    const directFiles = [...container.querySelectorAll('label')]
+      .find((label) => label.textContent?.includes('Files directly in alpha'))!
+      .querySelector<HTMLInputElement>('input')!;
+    await perform(() => directFiles.click());
+    await perform(() =>
+      [...container.querySelectorAll('button')]
+        .find((button) => button.textContent === 'Apply changes')!
+        .click(),
+    );
+    expect(callbacks.onCommitRule).toHaveBeenCalledWith({
+      folderKey: 'alpha',
+      behavior: 'place',
+      scope: {
+        kind: 'subtree',
+        includeRootFiles: false,
+        excludedSubtrees: [],
+      },
+      anchor: { x: 0, y: 0 },
+    });
+  });
+
+  it('keeps a large Custom folder tree DOM-bounded with accessible paging', async () => {
+    await renderArrangement({ genericRules: true, scopeChildCount: 250 });
+    await perform(() =>
+      [...container.querySelectorAll('button')]
+        .find((button) => button.textContent === 'Custom')!
+        .click(),
+    );
+    const scopeTree = container.querySelector<HTMLElement>(
+      '[aria-label="Included subfolders"]',
+    )!;
+    expect(scopeTree.querySelectorAll('input[type="checkbox"]')).toHaveLength(
+      200,
+    );
+    const showMore = [...scopeTree.querySelectorAll('button')].find((button) =>
+      button.textContent?.startsWith('Show more folders'),
+    )!;
+    expect(showMore.textContent).toContain('50 remaining');
+    await perform(() => showMore.click());
+    expect(scopeTree.querySelectorAll('input[type="checkbox"]')).toHaveLength(
+      250,
+    );
+  });
+
+  it('discards a dirty draft explicitly before closing Arrange folders', async () => {
+    const callbacks = await renderArrangement({ genericRules: true });
+    await perform(() =>
+      [...container.querySelectorAll('label')]
+        .find((label) => label.textContent?.includes('Fixed placement'))!
+        .querySelector<HTMLInputElement>('input')!
+        .click(),
+    );
+    await perform(() =>
+      [...container.querySelectorAll('button')]
+        .find((button) => button.textContent === 'Done')!
+        .click(),
+    );
+    expect(callbacks.onActiveChange).toHaveBeenCalledWith(false);
+    expect(callbacks.onAnnouncement).toHaveBeenLastCalledWith(
+      'Unapplied spatial rule changes were discarded; Arrange folders closed.',
+    );
   });
 });

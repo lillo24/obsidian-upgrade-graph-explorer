@@ -25,11 +25,19 @@ import {
 } from '@icarus-graph-explorer/renderer-sigma';
 import {
   clearFolderSpatialRules,
+  createFolderSpatialRuleDraft,
   createEmptySpatialOverrideRegistry,
   folderClusterAnchorMap,
+  folderSpatialRuleFromDraft,
   removeFolderSpatialRule,
+  setFolderSpatialDraftAnchor,
+  setFolderSpatialDraftBehavior,
+  setFolderSpatialDraftRootFiles,
+  setFolderSpatialDraftScopePreset,
+  setFolderSpatialDraftStrength,
   setFolderClusterAnchor,
   setFolderSpatialRule,
+  toggleFolderSpatialDraftSubtree,
   type SpatialCompositionResult,
 } from '@icarus-graph-explorer/spatial-overrides';
 import type {
@@ -793,29 +801,44 @@ spatialForm.addEventListener('submit', (event) => {
   try {
     const folderKey = spatialFolderInput.value.trim();
     const behavior = spatialBehaviorInput.value === 'pull' ? 'pull' : 'place';
-    const scope =
-      spatialScopeInput.value === 'subtree'
-        ? {
-            kind: 'subtree' as const,
-            includeRootFiles: spatialIncludeRootInput.checked,
-            excludedSubtrees: spatialExclusionsInput.value
-              .split(',')
-              .map((value) => value.trim())
-              .filter((value) => value.length > 0),
-          }
-        : ({ kind: 'exact' } as const);
-    spatialRegistry = setFolderSpatialRule(spatialRegistry, {
+    let draft = createFolderSpatialRuleDraft({
       folderKey,
-      behavior,
-      scope,
-      anchor: {
+      defaultAnchor: {
         x: spatialXInput.valueAsNumber,
         y: spatialYInput.valueAsNumber,
       },
-      ...(behavior === 'pull'
-        ? { strength: spatialStrengthInput.valueAsNumber }
-        : {}),
     });
+    draft = setFolderSpatialDraftBehavior(draft, behavior);
+    draft = setFolderSpatialDraftAnchor(draft, {
+      x: spatialXInput.valueAsNumber,
+      y: spatialYInput.valueAsNumber,
+    });
+    if (behavior === 'pull') {
+      draft = setFolderSpatialDraftStrength(
+        draft,
+        spatialStrengthInput.valueAsNumber,
+      );
+    }
+    if (spatialScopeInput.value === 'subtree') {
+      draft = setFolderSpatialDraftScopePreset(draft, 'subtree');
+      const exclusions = spatialExclusionsInput.value
+        .split(',')
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0);
+      if (!spatialIncludeRootInput.checked || exclusions.length > 0) {
+        draft = setFolderSpatialDraftRootFiles(
+          draft,
+          spatialIncludeRootInput.checked,
+        );
+        for (const exclusion of exclusions) {
+          draft = toggleFolderSpatialDraftSubtree(draft, exclusion);
+        }
+      }
+    }
+    spatialRegistry = setFolderSpatialRule(
+      spatialRegistry,
+      folderSpatialRuleFromDraft(draft),
+    );
     const before = layoutRequests;
     const beforePull = pullRequests;
     const beforeCacheHits = pullCacheHits;

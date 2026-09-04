@@ -1,8 +1,12 @@
 import {
+  clearFolderSpatialRules,
   clearFolderClusterAnchors,
   folderClusterAnchorMap,
+  removeFolderSpatialRule,
   removeFolderClusterAnchor,
+  setFolderSpatialRule,
   setFolderClusterAnchor,
+  type FolderSpatialRule,
   type NormalizedFolderAnchor,
   type SpatialOverrideRegistry,
   type WorkspaceFolderKey,
@@ -55,6 +59,20 @@ export function useSpatialOverrides({
       commit(setFolderClusterAnchor(session.registry, folderKey, anchor)),
     [commit, session.registry],
   );
+  const setFolderRule = useCallback(
+    (rule: FolderSpatialRule) =>
+      commit(setFolderSpatialRule(session.registry, rule)),
+    [commit, session.registry],
+  );
+  const removeFolderRule = useCallback(
+    (folderKey: WorkspaceFolderKey) =>
+      commit(removeFolderSpatialRule(session.registry, folderKey)),
+    [commit, session.registry],
+  );
+  const clearFolderRules = useCallback(
+    () => commit(clearFolderSpatialRules(session.registry)),
+    [commit, session.registry],
+  );
   const resetFolderAnchor = useCallback(
     (folderKey: WorkspaceFolderKey) =>
       commit(removeFolderClusterAnchor(session.registry, folderKey)),
@@ -73,6 +91,9 @@ export function useSpatialOverrides({
     session,
     anchors,
     rules: session.registry.allNetwork.folderRules,
+    setFolderRule,
+    removeFolderRule,
+    clearFolderRules,
     setFolderAnchor,
     resetFolderAnchor,
     resetAllFolderAnchors,

@@ -151,9 +151,12 @@ import { deriveProjectionVisualGroupPresentationMap } from '../visual-groups/pre
 import { usePresentationOverrides } from '../presentation-overrides/use-presentation-overrides';
 import { useSpatialOverrides } from '../spatial-overrides/use-spatial-overrides';
 import {
+  folderArrangementActive,
+  folderArrangementActiveFolder,
   folderArrangementModeReducer,
   INACTIVE_FOLDER_ARRANGEMENT_MODE,
 } from '../spatial-overrides/arrangement';
+import { createFolderScopeTree } from '../spatial-overrides/folder-scope-model';
 import {
   commitVisualGroupSessionMutation,
   createVisualGroupSession,
@@ -548,6 +551,8 @@ export function GraphExplorer({
     folderArrangementModeReducer,
     INACTIVE_FOLDER_ARRANGEMENT_MODE,
   );
+  const [folderArrangementDraftDirty, setFolderArrangementDraftDirty] =
+    useState(false);
   const [
     folderArrangementFocusRequestKey,
     setFolderArrangementFocusRequestKey,
@@ -886,22 +891,69 @@ export function GraphExplorer({
     'Select a graph element to inspect it, or use Search to reveal a hidden entity.',
   );
   const [navigationError, setNavigationError] = useState<string>();
-  const beginFolderArrangement = useCallback((folderKey?: string) => {
-    dispatchFolderArrangementMode({
-      type: 'enter',
-      ...(folderKey === undefined ? {} : { folderKey }),
-    });
-    setFolderArrangementFocusRequestKey((current) => current + 1);
-  }, []);
+  const beginFolderArrangement = useCallback(
+    (folderKey?: string) => {
+      const currentFolder = folderArrangementActiveFolder(
+        folderArrangementMode,
+      );
+      if (
+        folderArrangementDraftDirty &&
+        folderKey !== undefined &&
+        currentFolder !== undefined &&
+        folderKey !== currentFolder
+      ) {
+        setNavigationAnnouncement(
+          'Apply or cancel the current spatial rule changes before switching folders.',
+        );
+        setFolderArrangementFocusRequestKey((current) => current + 1);
+        return;
+      }
+      dispatchFolderArrangementMode({
+        type: 'enter',
+        ...(folderKey === undefined ? {} : { folderKey }),
+      });
+      setFolderArrangementFocusRequestKey((current) => current + 1);
+    },
+    [folderArrangementDraftDirty, folderArrangementMode],
+  );
+  const folderArrangementIsActive = folderArrangementActive(
+    folderArrangementMode,
+  );
+  const activeArrangementFolderKey = folderArrangementActiveFolder(
+    folderArrangementMode,
+  );
+  const folderScopeTree = useMemo(
+    () =>
+      createFolderScopeTree({
+        documentPaths: snapshot.entities.flatMap((entity) =>
+          entity.kind === 'document' ? [entity.source.path] : [],
+        ),
+        visibleDocumentPaths: new Set(
+          globalResult?.ok === true
+            ? globalResult.projection.nodes.flatMap((node) =>
+                node.kind === 'entity' && node.sourcePath !== undefined
+                  ? [node.sourcePath]
+                  : [],
+              )
+            : [],
+        ),
+        rules: spatialOverrides.rules,
+      }),
+    [globalResult, snapshot.entities, spatialOverrides.rules],
+  );
   const folderArrangementViewProps = useMemo<
     NonNullable<GlobalGraphViewProps['folderArrangement']>
   >(
     () => ({
-      active: folderArrangementMode.phase === 'active',
-      ...(folderArrangementMode.phase === 'active' &&
-      folderArrangementMode.activeFolderKey !== undefined
-        ? { activeFolderKey: folderArrangementMode.activeFolderKey }
-        : {}),
+      active: folderArrangementIsActive,
+      ...(activeArrangementFolderKey === undefined
+        ? {}
+        : { activeFolderKey: activeArrangementFolderKey }),
+      ...(folderArrangementMode.phase === 'inactive'
+        ? {}
+        : { editorPhase: folderArrangementMode.phase }),
+      ruleCount: spatialOverrides.rules.length,
+      scopeTree: folderScopeTree,
       anchorCount: spatialOverrides.anchors.size,
       editable:
         spatialOverrides.session.persistenceMode !== 'blocked-corrupt' &&
@@ -925,6 +977,18 @@ export function GraphExplorer({
       onAnnouncement: setNavigationAnnouncement,
       onAvailabilityChange: changeFolderArrangementAvailability,
       onCommitAnchor: spatialOverrides.setFolderAnchor,
+      onCommitRule: spatialOverrides.setFolderRule,
+      onRemoveRule: spatialOverrides.removeFolderRule,
+      onClearRules: spatialOverrides.clearFolderRules,
+      onEditChildRule: beginFolderArrangement,
+      onChoosingScopeChange: (active) =>
+        dispatchFolderArrangementMode({ type: 'choose-scope', active }),
+      onTargetDraggingChange: (active) =>
+        dispatchFolderArrangementMode({ type: 'target-drag', active }),
+      onCommitStarted: (behavior) =>
+        dispatchFolderArrangementMode({ type: 'commit', behavior }),
+      onAdopted: () => dispatchFolderArrangementMode({ type: 'adopted' }),
+      onDraftDirtyChange: setFolderArrangementDraftDirty,
       onRecoverCorrupt: spatialOverrides.recoverCorruptRegistry,
       onResetAll: spatialOverrides.resetAllFolderAnchors,
       onResetFolder: spatialOverrides.resetFolderAnchor,
@@ -932,9 +996,15 @@ export function GraphExplorer({
     [
       beginFolderArrangement,
       changeFolderArrangementAvailability,
+      activeArrangementFolderKey,
+      folderArrangementIsActive,
+      folderScopeTree,
       folderArrangementFocusRequestKey,
       folderArrangementMode,
       spatialOverrides.anchors.size,
+      spatialOverrides.clearFolderRules,
+      spatialOverrides.removeFolderRule,
+      spatialOverrides.rules.length,
       spatialOverrides.recoverCorruptRegistry,
       spatialOverrides.resetAllFolderAnchors,
       spatialOverrides.resetFolderAnchor,
@@ -942,23 +1012,27 @@ export function GraphExplorer({
       spatialOverrides.session.persistenceMode,
       spatialOverrides.session.status,
       spatialOverrides.setFolderAnchor,
+      spatialOverrides.setFolderRule,
     ],
   );
-  const anchoredFolderKeys = useMemo(
-    () => new Set(spatialOverrides.anchors.keys()),
-    [spatialOverrides.anchors],
+  const ruleByFolderKey = useMemo(
+    () =>
+      new Map(
+        spatialOverrides.rules.map((rule) => [rule.folderKey, rule] as const),
+      ),
+    [spatialOverrides.rules],
   );
+  const removeFolderRule = spatialOverrides.removeFolderRule;
   const networkExplorerArrangement = useMemo(
     () =>
       effectiveRendererMode !== 'global'
         ? undefined
         : {
-            active: folderArrangementMode.phase === 'active',
-            ...(folderArrangementMode.phase === 'active' &&
-            folderArrangementMode.activeFolderKey !== undefined
-              ? { activeFolderKey: folderArrangementMode.activeFolderKey }
-              : {}),
-            anchoredFolderKeys,
+            active: folderArrangementIsActive,
+            ...(activeArrangementFolderKey === undefined
+              ? {}
+              : { activeFolderKey: activeArrangementFolderKey }),
+            ruleByFolderKey,
             available: folderArrangementAvailability.available,
             ...(folderArrangementAvailability.reason === undefined
               ? {}
@@ -966,13 +1040,24 @@ export function GraphExplorer({
                   unavailableReason: folderArrangementAvailability.reason,
                 }),
             onArrangeFolder: beginFolderArrangement,
+            onRemoveFolderRule: (folderKey: WorkspaceFolderKey) => {
+              const failure = removeFolderRule(folderKey);
+              if (failure === undefined) {
+                setNavigationAnnouncement(
+                  `${folderKey === '.' ? 'Root folder' : folderKey} spatial rule removed`,
+                );
+              } else
+                setNavigationError(`Spatial rule was not removed: ${failure}`);
+            },
           },
     [
-      anchoredFolderKeys,
+      activeArrangementFolderKey,
       beginFolderArrangement,
       effectiveRendererMode,
+      folderArrangementIsActive,
       folderArrangementAvailability,
-      folderArrangementMode,
+      ruleByFolderKey,
+      removeFolderRule,
     ],
   );
   const [inspectorOpen, setInspectorOpen] = useState(false);

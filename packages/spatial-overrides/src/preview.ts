@@ -1,6 +1,7 @@
 import { isNormalizedWorkspaceFolderKey } from './folder-key';
 import {
   applyFolderClusterAnchors,
+  computeAutomaticGraphFrame,
   normalizedAnchorFromTarget,
   targetFromNormalizedAnchor,
 } from './geometry';
@@ -21,6 +22,76 @@ function finitePoint(point: SpatialPoint, label: string): void {
   if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
     throw new Error(`${label} must contain finite x/y coordinates.`);
   }
+}
+
+/**
+ * Captures any already-resolved member set against the immutable base frame.
+ * Members start from current displayed geometry, so Pull and Place both preview
+ * rigidly without feeding displayed coordinates back into automatic layout.
+ */
+export function createFolderSpatialRulePreviewGeometry({
+  baseAutomaticPositions,
+  currentPositions,
+  documentNodeKeys,
+  memberNodeKeys,
+  folderKey,
+  visualDownGraphYSign,
+}: {
+  readonly baseAutomaticPositions: readonly SpatialPosition[];
+  readonly currentPositions: readonly SpatialPosition[];
+  readonly documentNodeKeys: Iterable<string>;
+  readonly memberNodeKeys: Iterable<string>;
+  readonly folderKey: WorkspaceFolderKey;
+  readonly visualDownGraphYSign: VisualDownGraphYSign;
+}): FolderClusterPreviewGeometry {
+  if (!isNormalizedWorkspaceFolderKey(folderKey)) {
+    throw new Error('Folder preview needs a normalized workspace folder key.');
+  }
+  const currentByKey = new Map(
+    currentPositions.map((position) => [position.key, position] as const),
+  );
+  if (currentByKey.size !== currentPositions.length) {
+    throw new Error('Current folder-preview positions need unique node keys.');
+  }
+  const memberAutomaticPositions = [...new Set(memberNodeKeys)]
+    .map((nodeKey) => {
+      const position = currentByKey.get(nodeKey);
+      if (position === undefined) {
+        throw new Error(
+          `Resolved folder preview references missing node ${JSON.stringify(nodeKey)}.`,
+        );
+      }
+      return position;
+    })
+    .sort((left, right) => left.key.localeCompare(right.key));
+  if (memberAutomaticPositions.length === 0) {
+    throw new Error(
+      `Folder ${JSON.stringify(folderKey)} has no visible document members.`,
+    );
+  }
+  const displayedCenter = memberAutomaticPositions.reduce(
+    (center, position) => ({
+      x: center.x + position.x / memberAutomaticPositions.length,
+      y: center.y + position.y / memberAutomaticPositions.length,
+    }),
+    { x: 0, y: 0 },
+  );
+  const automaticFrame = computeAutomaticGraphFrame(
+    baseAutomaticPositions,
+    documentNodeKeys,
+  );
+  return {
+    folderKey,
+    automaticFrame,
+    automaticCenter: displayedCenter,
+    displayedCenter,
+    displayedAnchor: normalizedAnchorFromTarget(
+      automaticFrame,
+      displayedCenter,
+      visualDownGraphYSign,
+    ),
+    memberAutomaticPositions,
+  };
 }
 
 function clamp(value: number): number {

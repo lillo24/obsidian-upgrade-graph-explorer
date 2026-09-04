@@ -41,6 +41,7 @@ describe('Global sparse folder arrangement session', () => {
     const onNodeActivated = vi.fn();
     const onNodeSelected = vi.fn();
     const onNodeSingleClick = vi.fn();
+    const onArrangementScopeFolderClick = vi.fn();
     const session = new GlobalRendererSession(
       { setAttribute: vi.fn() } as unknown as HTMLElement,
       input,
@@ -48,6 +49,7 @@ describe('Global sparse folder arrangement session', () => {
         settings,
         trackpadZoomMode: 'pinch-zoom',
         onArrangementCommit,
+        onArrangementScopeFolderClick,
         onNodeActivated,
         onNodeSelected,
         onNodeSingleClick,
@@ -62,6 +64,7 @@ describe('Global sparse folder arrangement session', () => {
     return {
       input,
       onArrangementCommit,
+      onArrangementScopeFolderClick,
       onNodeActivated,
       onNodeSelected,
       onNodeSingleClick,
@@ -198,6 +201,44 @@ describe('Global sparse folder arrangement session', () => {
       original,
     );
     expect(session.cancelFolderArrangementGesture()).toBe(true);
+    expect(onArrangementCommit).not.toHaveBeenCalled();
+  });
+
+  it('uses graph clicks as folder-scope shortcuts and disables target dragging while choosing', () => {
+    const {
+      input,
+      onArrangementCommit,
+      onArrangementScopeFolderClick,
+      renderer,
+      session,
+    } = createSession();
+    session.setFolderArrangementContext({
+      active: true,
+      activeFolderKey: 'alpha',
+      activeMemberNodeKeys: ['entity:doc-a', 'entity:doc-b'],
+      anchors: new Map(),
+      automaticPositions: globalLayoutPositionsFromInput(input),
+      chooseScope: true,
+      input,
+    });
+    renderer.handlers.get('clickNode')!({ node: 'entity:doc-a' });
+    expect(onArrangementScopeFolderClick).toHaveBeenCalledWith(
+      'entity:doc-a',
+      'alpha',
+    );
+
+    renderer.handlers.get('downNode')!({
+      node: 'entity:doc-a',
+      event: { x: 10, y: 10 },
+      preventSigmaDefault: vi.fn(),
+    });
+    const preventSigmaDefault = vi.fn();
+    renderer.handlers.get('moveBody')!({
+      event: { x: 30, y: 30 },
+      preventSigmaDefault,
+    });
+    expect(preventSigmaDefault).not.toHaveBeenCalled();
+    expect(frames).toHaveLength(0);
     expect(onArrangementCommit).not.toHaveBeenCalled();
   });
 });

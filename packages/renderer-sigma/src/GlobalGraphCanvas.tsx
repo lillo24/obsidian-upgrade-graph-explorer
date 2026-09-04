@@ -1,8 +1,23 @@
 import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
 import {
+  classifyFolderSpatialDraftScope,
+  createFolderSpatialRuleDraft,
+  folderSpatialRuleDraftIsDirty,
+  folderSpatialRuleDraftScope,
+  folderSpatialRuleFromDraft,
+  nearestExcludedFolder,
   offsetNormalizedFolderAnchor,
+  setFolderSpatialDraftAnchor,
+  setFolderSpatialDraftBehavior,
+  setFolderSpatialDraftRootFiles,
+  setFolderSpatialDraftScopePreset,
+  setFolderSpatialDraftStrength,
+  toggleFolderSpatialDraftSubtree,
   type FolderClusterAnchorMap,
+  type FolderScopeVisualization,
   type FolderSpatialRule,
+  type FolderSpatialRuleDraft,
+  type FolderSpatialScopePreset,
   type NormalizedFolderAnchor,
   type SpatialPoint,
 } from '@icarus-graph-explorer/spatial-overrides';
@@ -43,6 +58,7 @@ import {
 import {
   composeGlobalFolderSpatialRules,
   composeGlobalSpatialOverrides,
+  globalFolderKeyByNodeKey,
   resolveGlobalFolderSpatialRules,
 } from './spatial';
 import {
@@ -64,11 +80,21 @@ import type {
 } from './types';
 
 const EMPTY_FOLDER_ANCHOR_MAP: FolderClusterAnchorMap = new Map();
+const SCOPE_TREE_PAGE_SIZE = 200;
 
 export interface GlobalFolderArrangementProps {
   readonly active: boolean;
+  readonly editorPhase?:
+    | 'active-no-folder'
+    | 'editing'
+    | 'choosing-scope'
+    | 'dragging-target'
+    | 'committing'
+    | 'settling-pull';
   readonly activeFolderKey?: string;
   readonly anchorCount: number;
+  readonly ruleCount?: number;
+  readonly scopeTree?: GlobalFolderScopeTreeNode;
   readonly editable: boolean;
   readonly blockedReason?: string;
   readonly canRecoverCorrupt?: boolean;
@@ -85,9 +111,29 @@ export interface GlobalFolderArrangementProps {
     folderKey: string,
     anchor: NormalizedFolderAnchor,
   ) => string | undefined;
+  readonly onCommitRule?: (rule: FolderSpatialRule) => string | undefined;
+  readonly onRemoveRule?: (folderKey: string) => string | undefined;
+  readonly onClearRules?: () => string | undefined;
+  readonly onEditChildRule?: (folderKey: string) => void;
+  readonly onChoosingScopeChange?: (active: boolean) => void;
+  readonly onTargetDraggingChange?: (active: boolean) => void;
+  readonly onCommitStarted?: (behavior: FolderSpatialRule['behavior']) => void;
+  readonly onAdopted?: () => void;
+  readonly onDraftDirtyChange?: (dirty: boolean) => void;
   readonly onRecoverCorrupt?: () => string | undefined;
   readonly onResetAll: () => string | undefined;
   readonly onResetFolder: (folderKey: string) => string | undefined;
+}
+
+export interface GlobalFolderScopeTreeNode {
+  readonly folderKey: string;
+  readonly name: string;
+  readonly depth: number;
+  readonly directFileCount: number;
+  readonly totalFileCount: number;
+  readonly visibleFileCount: number;
+  readonly ownRule?: FolderSpatialRule;
+  readonly children: readonly GlobalFolderScopeTreeNode[];
 }
 
 export interface GlobalGraphCanvasProps {
@@ -159,8 +205,67 @@ function anchorsEqual(
   );
 }
 
+function rulesEqual(
+  left: FolderSpatialRule | undefined,
+  right: FolderSpatialRule,
+): boolean {
+  return left !== undefined && JSON.stringify(left) === JSON.stringify(right);
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function scopePresetLabel(preset: FolderSpatialScopePreset): string {
+  return preset === 'exact'
+    ? 'This folder'
+    : preset === 'subtree'
+      ? 'Folder + subfolders'
+      : 'Custom';
+}
+
+function flattenScopeTree(
+  root: GlobalFolderScopeTreeNode | undefined,
+  activeFolderKey: string,
+): readonly GlobalFolderScopeTreeNode[] {
+  if (root === undefined) return [];
+  const pending = [root];
+  let active: GlobalFolderScopeTreeNode | undefined;
+  while (pending.length > 0) {
+    const candidate = pending.pop()!;
+    if (candidate.folderKey === activeFolderKey) {
+      active = candidate;
+      break;
+    }
+    for (let index = candidate.children.length - 1; index >= 0; index -= 1) {
+      pending.push(candidate.children[index]!);
+    }
+  }
+  if (active === undefined) return [];
+  const rows: GlobalFolderScopeTreeNode[] = [];
+  const descendants = [...active.children].reverse();
+  while (descendants.length > 0) {
+    const candidate = descendants.pop()!;
+    rows.push(candidate);
+    for (let index = candidate.children.length - 1; index >= 0; index -= 1) {
+      descendants.push(candidate.children[index]!);
+    }
+  }
+  return rows;
+}
+
+function folderScopeTreeContains(
+  root: GlobalFolderScopeTreeNode | undefined,
+  folderKey: string,
+): boolean {
+  if (root === undefined) return false;
+  const pending = [root];
+  while (pending.length > 0) {
+    const candidate = pending.pop()!;
+    if (candidate.folderKey === folderKey) return true;
+    pending.push(...candidate.children);
+  }
+  return false;
 }
 
 function layoutIterations(nodeCount: number): number {
@@ -173,7 +278,33 @@ function displayedPositions(
   anchors: FolderClusterAnchorMap | undefined,
   instrumentation: GlobalRendererInstrumentation | undefined,
   forceSpatialOperation = false,
+  rules?: readonly FolderSpatialRule[],
 ) {
+  if (rules !== undefined) {
+    const resolve = () => resolveGlobalFolderSpatialRules(input, rules);
+    const resolved =
+      instrumentation === undefined
+        ? resolve()
+        : instrumentation.measure(
+            'spatial-rule-resolution',
+            'spatial-rule-resolutions',
+            resolve,
+          );
+    const compose = () =>
+      composeGlobalFolderSpatialRules(
+        automaticPositions,
+        automaticPositions,
+        input,
+        resolved,
+      ).displayedPositions;
+    return instrumentation === undefined
+      ? compose()
+      : instrumentation.measure(
+          'spatial-fixed-compose',
+          'spatial-fixed-compositions',
+          compose,
+        );
+  }
   const hasAnchors = anchors !== undefined && anchors.size > 0;
   if (!hasAnchors && !forceSpatialOperation) return automaticPositions;
   const compose = () =>
@@ -197,13 +328,15 @@ function applyDisplayedPositions(
   anchors: FolderClusterAnchorMap | undefined,
   instrumentation: GlobalRendererInstrumentation | undefined,
   forceSpatialOperation = false,
+  rules?: readonly FolderSpatialRule[],
 ): Promise<void> {
   const positions = displayedPositions(
     automaticPositions,
     input,
     anchors,
     instrumentation,
-    forceSpatialOperation,
+    forceSpatialOperation || rules !== undefined,
+    rules,
   );
   return applyComposedPositions(
     session,
@@ -259,6 +392,7 @@ export function GlobalGraphCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const arrangementPanelRef = useRef<HTMLDivElement>(null);
   const spotlightRef = useRef<HTMLDivElement>(null);
+  const targetMarkerRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<GlobalRendererSession | undefined>(undefined);
   const [cache] = useState(() => layoutCache ?? new GlobalLayoutCache());
   const [dynamicCache] = useState(
@@ -345,6 +479,8 @@ export function GlobalGraphCanvas({
       input,
       spatialOverrides,
       instrumentation,
+      false,
+      spatialRules,
     );
     return {
       automaticPositions,
@@ -370,18 +506,21 @@ export function GlobalGraphCanvas({
   const latestDynamicPositions = useRef(initial.automaticPositions);
   const latestDisplayedPositions = useRef(initial.displayedPositions);
   const latestSpatialOverrides = useRef(spatialOverrides);
+  const latestSpatialRules = useRef(spatialRules);
   const latestInput = useRef(input);
   const pendingArrangementCommit = useRef<
     | {
         readonly folderKey: string;
         readonly anchor: NormalizedFolderAnchor;
+        readonly rule?: FolderSpatialRule;
       }
     | undefined
   >(undefined);
   useLayoutEffect(() => {
     latestSpatialOverrides.current = spatialOverrides;
+    latestSpatialRules.current = spatialRules;
     latestInput.current = input;
-  }, [input, spatialOverrides]);
+  }, [input, spatialOverrides, spatialRules]);
   const [ready, setReady] = useState(false);
   const [layoutCommitKey, setLayoutCommitKey] = useState(0);
   const [layoutStatus, setLayoutStatus] = useState<string | undefined>(
@@ -403,10 +542,126 @@ export function GlobalGraphCanvas({
   useLayoutEffect(() => {
     keyboardPreviewRef.current = keyboardPreview;
   }, [keyboardPreview]);
-  const [activeFolderPosition, setActiveFolderPosition] =
-    useState<NormalizedFolderAnchor>();
+  const [, setActiveFolderPosition] = useState<NormalizedFolderAnchor>();
+  const [ruleDraft, setRuleDraft] = useState<FolderSpatialRuleDraft>();
+  const [draftBaselineRule, setDraftBaselineRule] =
+    useState<FolderSpatialRule>();
+  const ruleDraftRef = useRef(ruleDraft);
+  const scopeVisualizationRef = useRef<FolderScopeVisualization | undefined>(
+    undefined,
+  );
+  const [scopePulseKey, setScopePulseKey] = useState<string>();
+  const [scopeTreeRowLimit, setScopeTreeRowLimit] =
+    useState(SCOPE_TREE_PAGE_SIZE);
   const [arrangementError, setArrangementError] = useState<string>();
   const [confirmResetAll, setConfirmResetAll] = useState(false);
+
+  const activeConfirmedRule = useMemo(
+    () =>
+      spatialRules?.find(
+        (rule) => rule.folderKey === folderArrangement?.activeFolderKey,
+      ),
+    [folderArrangement?.activeFolderKey, spatialRules],
+  );
+  const draftRule = useMemo(() => {
+    if (ruleDraft === undefined) return undefined;
+    const resolve = () => folderSpatialRuleFromDraft(ruleDraft);
+    return instrumentation === undefined
+      ? resolve()
+      : instrumentation.measure(
+          'spatial-rule-draft-resolution',
+          undefined,
+          resolve,
+        );
+  }, [instrumentation, ruleDraft]);
+  const draftScopeFolderKey = ruleDraft?.folderKey;
+  const draftScopePreset = ruleDraft?.scopePreset;
+  const draftCustomScope = ruleDraft?.customScope;
+  const scopeVisualization = useMemo<FolderScopeVisualization | undefined>(
+    () =>
+      draftScopeFolderKey === undefined ||
+      draftScopePreset === undefined ||
+      draftCustomScope === undefined
+        ? undefined
+        : (() => {
+            const classificationRule: FolderSpatialRule = {
+              folderKey: draftScopeFolderKey,
+              behavior: 'place',
+              scope: folderSpatialRuleDraftScope({
+                folderKey: draftScopeFolderKey,
+                scopePreset: draftScopePreset,
+                customScope: draftCustomScope,
+              }),
+              anchor: { x: 0, y: 0 },
+            };
+            const classify = () =>
+              classifyFolderSpatialDraftScope({
+                confirmedRules: spatialRules ?? [],
+                draftRule: classificationRule,
+                folderKeyByNodeKey: globalFolderKeyByNodeKey(input),
+              });
+            return instrumentation === undefined
+              ? classify()
+              : instrumentation.measure(
+                  'spatial-scope-visualization',
+                  undefined,
+                  classify,
+                );
+          })(),
+    [
+      draftCustomScope,
+      draftScopeFolderKey,
+      draftScopePreset,
+      input,
+      instrumentation,
+      spatialRules,
+    ],
+  );
+  const draftDirty =
+    draftRule !== undefined &&
+    ruleDraft !== undefined &&
+    draftBaselineRule !== undefined &&
+    folderSpatialRuleDraftIsDirty(ruleDraft, draftBaselineRule);
+  const draftDirtyRef = useRef(draftDirty);
+  const onArrangementDraftDirtyChange = folderArrangement?.onDraftDirtyChange;
+  const scopePulseNodeKeys = useMemo(
+    () =>
+      scopePulseKey === undefined
+        ? undefined
+        : new Set(
+            [...globalFolderKeyByNodeKey(input)].flatMap(
+              ([nodeKey, folderKey]) =>
+                folderKey === scopePulseKey ||
+                folderKey.startsWith(`${scopePulseKey}/`)
+                  ? [nodeKey]
+                  : [],
+            ),
+          ),
+    [input, scopePulseKey],
+  );
+  const pulseScope = useCallback((folderKey: string) => {
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+    )
+      return;
+    setScopePulseKey(folderKey);
+  }, []);
+  useLayoutEffect(() => {
+    ruleDraftRef.current = ruleDraft;
+    scopeVisualizationRef.current = scopeVisualization;
+    draftDirtyRef.current = draftDirty;
+  }, [draftDirty, ruleDraft, scopeVisualization]);
+
+  useEffect(() => {
+    onArrangementDraftDirtyChange?.(draftDirty);
+  }, [draftDirty, onArrangementDraftDirtyChange]);
+
+  useEffect(() => {
+    if (scopePulseKey === undefined) return;
+    const timer = window.setTimeout(() => setScopePulseKey(undefined), 220);
+    return () => window.clearTimeout(timer);
+  }, [scopePulseKey]);
 
   const restoreArrangementDisplay = useCallback(() => {
     const session = sessionRef.current;
@@ -456,11 +711,35 @@ export function GlobalGraphCanvas({
   const commitArrangementAnchor = useCallback(
     (folderKey: string, anchor: NormalizedFolderAnchor) => {
       let failure: string | undefined;
+      const confirmedRule = latestSpatialRules.current?.find(
+        (rule) => rule.folderKey === folderKey,
+      );
+      const currentDraft = ruleDraftRef.current;
+      const nextDraft = setFolderSpatialDraftAnchor(
+        currentDraft?.folderKey === folderKey
+          ? currentDraft
+          : createFolderSpatialRuleDraft({
+              folderKey,
+              confirmedRule,
+              defaultAnchor: anchor,
+            }),
+        anchor,
+      );
+      const rule = folderSpatialRuleFromDraft(nextDraft);
       try {
-        failure = callbacks.current.folderArrangement?.onCommitAnchor(
-          folderKey,
-          anchor,
-        );
+        const arrangement = callbacks.current.folderArrangement;
+        const persist = () =>
+          arrangement?.onCommitRule
+            ? arrangement.onCommitRule(rule)
+            : arrangement?.onCommitAnchor(folderKey, anchor);
+        failure =
+          instrumentation === undefined
+            ? persist()
+            : instrumentation.measure(
+                'spatial-rule-persist',
+                undefined,
+                persist,
+              );
       } catch (error: unknown) {
         failure = errorMessage(error);
       }
@@ -473,17 +752,21 @@ export function GlobalGraphCanvas({
         restoreArrangementDisplay();
         return;
       }
-      pendingArrangementCommit.current = { folderKey, anchor };
+      pendingArrangementCommit.current = { folderKey, anchor, rule };
+      setRuleDraft(nextDraft);
       setKeyboardPreview(undefined);
       setArrangementError(undefined);
+      callbacks.current.folderArrangement?.onCommitStarted?.(rule.behavior);
       const status = callbacks.current.folderArrangement?.persistenceStatus;
       callbacks.current.folderArrangement?.onAnnouncement(
         status?.includes('session only') === true
-          ? 'Folder position set for this session only'
-          : 'Folder position saved',
+          ? 'Spatial rule set for this session only'
+          : rule.behavior === 'pull'
+            ? 'Spatial rule saved; Dynamic pull is settling'
+            : 'Spatial rule saved',
       );
     },
-    [restoreArrangementDisplay],
+    [instrumentation, restoreArrangementDisplay],
   );
 
   useLayoutEffect(() => {
@@ -516,12 +799,27 @@ export function GlobalGraphCanvas({
           },
           onNodeSingleClick: (key) =>
             callbacks.current.onNodeSingleClick?.(key),
-          onArrangementFolderChange: (folderKey) =>
+          onArrangementFolderChange: (folderKey) => {
+            if (
+              draftDirtyRef.current &&
+              ruleDraftRef.current?.folderKey !== folderKey
+            ) {
+              callbacks.current.folderArrangement?.onAnnouncement(
+                'Apply or cancel the current spatial rule changes before switching folders.',
+              );
+              return;
+            }
             callbacks.current.folderArrangement?.onActiveFolderChange(
               folderKey,
-            ),
+            );
+          },
           onArrangementCommit: commitArrangementAnchor,
-          onArrangementGestureChange: setArrangementGesturePhase,
+          onArrangementGestureChange: (phase) => {
+            setArrangementGesturePhase(phase);
+            callbacks.current.folderArrangement?.onTargetDraggingChange?.(
+              phase === 'dragging',
+            );
+          },
           onArrangementPointerMove: (point: SpatialPoint | undefined) => {
             const spotlight = spotlightRef.current;
             if (spotlight === null || point === undefined) return;
@@ -531,6 +829,48 @@ export function GlobalGraphCanvas({
           onArrangementError: (message) => {
             setArrangementError(message);
             callbacks.current.folderArrangement?.onAnnouncement(message);
+          },
+          onArrangementScopeFolderClick: (nodeKey, folderKey) => {
+            const draft = ruleDraftRef.current;
+            const visualization = scopeVisualizationRef.current;
+            if (draft === undefined || visualization === undefined) return;
+            if (
+              visualization.stateByNodeKey.get(nodeKey) === 'shadowed-by-child'
+            ) {
+              const childFolderKey =
+                visualization.owningRuleFolderKeyByNodeKey.get(nodeKey);
+              if (childFolderKey !== undefined) {
+                if (draftDirtyRef.current) {
+                  callbacks.current.folderArrangement?.onAnnouncement(
+                    'Apply or cancel the current spatial rule changes before editing a child rule.',
+                  );
+                  return;
+                }
+                callbacks.current.folderArrangement?.onAnnouncement(
+                  `${folderLabel(childFolderKey)} has its own spatial rule. Edit that child rule to change it.`,
+                );
+                callbacks.current.folderArrangement?.onEditChildRule?.(
+                  childFolderKey,
+                );
+              }
+              return;
+            }
+            setRuleDraft((current) => {
+              if (current === undefined) return current;
+              return folderKey === current.folderKey
+                ? setFolderSpatialDraftRootFiles(
+                    current,
+                    !current.customScope.includeRootFiles,
+                  )
+                : toggleFolderSpatialDraftSubtree(current, folderKey);
+            });
+            pulseScope(folderKey);
+          },
+          onArrangementTargetPoint: (point) => {
+            const marker = targetMarkerRef.current;
+            if (marker === null || point === undefined) return;
+            marker.style.setProperty('--arrange-target-x', `${point.x}px`);
+            marker.style.setProperty('--arrange-target-y', `${point.y}px`);
           },
           onViewportObservation: (viewport) =>
             callbacks.current.onViewportObservation(viewport),
@@ -564,6 +904,7 @@ export function GlobalGraphCanvas({
     initial,
     instrumentation,
     onTransitionAnchorApiChange,
+    pulseScope,
   ]);
 
   const arrangeableFolderKeys = useMemo(
@@ -588,7 +929,7 @@ export function GlobalGraphCanvas({
           : !folderArrangement.editable
             ? (folderArrangement.blockedReason ??
               'Folder arrangement is unavailable until saved positions are recovered')
-            : arrangeableFolderKeys.size === 0
+            : arrangeableFolderKeys.size === 0 && !folderArrangement.active
               ? 'No visible File has an arrangeable folder'
               : undefined;
   const arrangementAvailable =
@@ -613,7 +954,16 @@ export function GlobalGraphCanvas({
         : { activeFolderKey: folderArrangement.activeFolderKey }),
       anchors: spatialOverrides ?? EMPTY_FOLDER_ANCHOR_MAP,
       automaticPositions: latestAutomaticPositions.current,
-      currentPositions: latestDynamicPositions.current,
+      currentPositions: latestDisplayedPositions.current,
+      ...(scopeVisualization === undefined
+        ? {}
+        : {
+            activeMemberNodeKeys: scopeVisualization.activeMemberNodeKeys,
+            scopeStateByNodeKey: scopeVisualization.stateByNodeKey,
+          }),
+      ...(scopePulseNodeKeys === undefined ? {} : { scopePulseNodeKeys }),
+      chooseScope: folderArrangement.editorPhase === 'choosing-scope',
+      ...(ruleDraft === undefined ? {} : { targetAnchor: ruleDraft.anchor }),
       input,
     });
     const next =
@@ -637,6 +987,40 @@ export function GlobalGraphCanvas({
     layoutCommitKey,
     spatialCommitKey,
     spatialOverrides,
+    scopeVisualization,
+    scopePulseNodeKeys,
+    ruleDraft,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      const folderKey = folderArrangement?.activeFolderKey;
+      if (folderArrangement?.active !== true || folderKey === undefined) {
+        setRuleDraft(undefined);
+        setDraftBaselineRule(undefined);
+        return;
+      }
+      const defaultAnchor = sessionRef.current?.currentFolderAnchor(
+        folderKey,
+      ) ??
+        activeConfirmedRule?.anchor ?? { x: 0, y: 0 };
+      const nextDraft = createFolderSpatialRuleDraft({
+        folderKey,
+        confirmedRule: activeConfirmedRule,
+        defaultAnchor,
+      });
+      setRuleDraft(nextDraft);
+      setDraftBaselineRule(folderSpatialRuleFromDraft(nextDraft));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeConfirmedRule,
+    folderArrangement?.active,
+    folderArrangement?.activeFolderKey,
   ]);
 
   useEffect(() => {
@@ -644,13 +1028,17 @@ export function GlobalGraphCanvas({
     if (
       folderArrangement?.active !== true ||
       folderKey === undefined ||
-      arrangeableFolderKeys.has(folderKey)
+      folderArrangement.scopeTree === undefined ||
+      folderScopeTreeContains(folderArrangement.scopeTree, folderKey)
     ) {
       return;
     }
-    cancelArrangementPreview('The active folder is no longer visible.');
+    cancelArrangementPreview();
+    folderArrangement.onAnnouncement(
+      'The active folder no longer exists at its exact workspace path; its old rule remains dormant.',
+    );
     folderArrangement.onActiveFolderChange(undefined);
-  }, [arrangeableFolderKeys, cancelArrangementPreview, folderArrangement]);
+  }, [cancelArrangementPreview, folderArrangement]);
 
   useEffect(() => {
     if (folderArrangement?.active !== true) return;
@@ -663,6 +1051,7 @@ export function GlobalGraphCanvas({
       if (cancelled) return;
       setKeyboardPreview(undefined);
       setConfirmResetAll(false);
+      setScopeTreeRowLimit(SCOPE_TREE_PAGE_SIZE);
     });
     return () => {
       cancelled = true;
@@ -676,6 +1065,23 @@ export function GlobalGraphCanvas({
       event.preventDefault();
       event.stopPropagation();
       if (cancelArrangementPreview('Folder movement canceled')) return;
+      if (draftDirty && ruleDraft !== undefined) {
+        const defaultAnchor =
+          sessionRef.current?.currentFolderAnchor(ruleDraft.folderKey) ??
+          activeConfirmedRule?.anchor ??
+          ruleDraft.anchor;
+        setRuleDraft(
+          createFolderSpatialRuleDraft({
+            folderKey: ruleDraft.folderKey,
+            confirmedRule: draftBaselineRule,
+            defaultAnchor,
+          }),
+        );
+        folderArrangement.onAnnouncement(
+          'Unapplied spatial rule changes canceled',
+        );
+        return;
+      }
       folderArrangement.onActiveChange(false);
     };
     const handleBlur = () => {
@@ -698,7 +1104,14 @@ export function GlobalGraphCanvas({
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [cancelArrangementPreview, folderArrangement]);
+  }, [
+    activeConfirmedRule,
+    cancelArrangementPreview,
+    draftDirty,
+    draftBaselineRule,
+    folderArrangement,
+    ruleDraft,
+  ]);
 
   useEffect(() => {
     const session = sessionRef.current;
@@ -728,6 +1141,7 @@ export function GlobalGraphCanvas({
         anchors,
         instrumentation,
         clearingAnchors,
+        latestSpatialRules.current,
       );
       appliedSpatialOverrides.current = anchors;
       session.update(
@@ -809,6 +1223,7 @@ export function GlobalGraphCanvas({
           session.completeFolderArrangementCommit();
           setArrangementGesturePhase('idle');
           setActiveFolderPosition(incomingPendingAnchor);
+          callbacks.current.folderArrangement?.onAdopted?.();
           return;
         }
         session.cancelFolderArrangementGesture();
@@ -886,12 +1301,20 @@ export function GlobalGraphCanvas({
       setSpatialCommitKey((current) => current + 1);
       const pending = pendingArrangementCommit.current;
       if (pending === undefined) return;
-      const incoming = spatialOverrides?.get(pending.folderKey);
+      const incomingRule = spatialRules.find(
+        (rule) => rule.folderKey === pending.folderKey,
+      );
+      const incomingAnchor = spatialOverrides?.get(pending.folderKey);
       pendingArrangementCommit.current = undefined;
-      if (anchorsEqual(incoming, pending.anchor)) {
+      if (
+        pending.rule === undefined
+          ? anchorsEqual(incomingAnchor, pending.anchor)
+          : rulesEqual(incomingRule, pending.rule)
+      ) {
         session.completeFolderArrangementCommit();
         setArrangementGesturePhase('idle');
-        setActiveFolderPosition(incoming);
+        setActiveFolderPosition(incomingRule?.anchor ?? incomingAnchor);
+        callbacks.current.folderArrangement?.onAdopted?.();
         return;
       }
       session.cancelFolderArrangementGesture();
@@ -947,6 +1370,7 @@ export function GlobalGraphCanvas({
     queueMicrotask(() => {
       if (!cancelled) setLayoutStatus('Applying dynamic folder pull…');
     });
+    const settleStarted = performance.now();
     void spatialInfluenceService
       .layout(request)
       .then(async (result) => {
@@ -955,6 +1379,10 @@ export function GlobalGraphCanvas({
         instrumentation?.record('spatial-pull-worker', result.computeMs);
         instrumentation?.record('spatial-pull-forceatlas', result.forceAtlasMs);
         instrumentation?.record('spatial-pull-attractor', result.attractorMs);
+        instrumentation?.record(
+          'spatial-pull-settle',
+          performance.now() - settleStarted,
+        );
         await composeAndApply(result.positions);
         if (!cancelled) setLayoutStatus(undefined);
       })
@@ -969,6 +1397,10 @@ export function GlobalGraphCanvas({
           return;
         }
         if (cancelled) return;
+        instrumentation?.record(
+          'spatial-pull-settle',
+          performance.now() - settleStarted,
+        );
         setLayoutStatus(undefined);
         setSpatialError(
           `Dynamic folder pull failed: ${errorMessage(error)} Base layout plus fixed placements remain visible.`,
@@ -1025,6 +1457,8 @@ export function GlobalGraphCanvas({
         input,
         latestSpatialOverrides.current,
         instrumentation,
+        false,
+        latestSpatialRules.current,
       )
         .then(() => {
           if (cancelled) return;
@@ -1067,6 +1501,8 @@ export function GlobalGraphCanvas({
             input,
             anchors,
             instrumentation,
+            false,
+            latestSpatialRules.current,
           );
         const rendered =
           anchors === undefined || anchors.size === 0
@@ -1146,11 +1582,6 @@ export function GlobalGraphCanvas({
   const zoomOut = useCallback(() => sessionRef.current?.zoomBy(1.22), []);
   const fit = useCallback(() => sessionRef.current?.fit(), []);
   const activeArrangementFolderKey = folderArrangement?.activeFolderKey;
-  const displayedArrangementAnchor =
-    keyboardPreview !== undefined &&
-    keyboardPreview.folderKey === activeArrangementFolderKey
-      ? keyboardPreview.anchor
-      : activeFolderPosition;
 
   const nudgeActiveFolder = useCallback(
     (x: number, y: number) => {
@@ -1158,13 +1589,20 @@ export function GlobalGraphCanvas({
       const folderKey = folderArrangement?.activeFolderKey;
       if (session === undefined || folderKey === undefined) return;
       const base =
-        keyboardPreview?.folderKey === folderKey
-          ? keyboardPreview.anchor
-          : (session.currentFolderAnchor(folderKey) ?? { x: 0, y: 0 });
+        ruleDraft?.folderKey === folderKey
+          ? ruleDraft.anchor
+          : keyboardPreview?.folderKey === folderKey
+            ? keyboardPreview.anchor
+            : (session.currentFolderAnchor(folderKey) ?? { x: 0, y: 0 });
       try {
         const anchor = offsetNormalizedFolderAnchor(base, { x, y });
         session.previewFolderAnchor(folderKey, anchor);
         setKeyboardPreview({ folderKey, anchor });
+        setRuleDraft((current) =>
+          current?.folderKey === folderKey
+            ? setFolderSpatialDraftAnchor(current, anchor)
+            : current,
+        );
         setActiveFolderPosition(anchor);
         setArrangementError(undefined);
         callbacks.current.folderArrangement?.onAnnouncement(
@@ -1176,7 +1614,7 @@ export function GlobalGraphCanvas({
         );
       }
     },
-    [folderArrangement?.activeFolderKey, keyboardPreview],
+    [folderArrangement?.activeFolderKey, keyboardPreview, ruleDraft],
   );
 
   const handleArrangementPanelKeyDown = useCallback(
@@ -1201,20 +1639,57 @@ export function GlobalGraphCanvas({
   );
 
   const saveKeyboardPreview = useCallback(() => {
-    if (keyboardPreview === undefined) return;
+    if (ruleDraft === undefined) return;
     setArrangementGesturePhase('committing');
-    commitArrangementAnchor(keyboardPreview.folderKey, keyboardPreview.anchor);
-  }, [commitArrangementAnchor, keyboardPreview]);
+    commitArrangementAnchor(ruleDraft.folderKey, ruleDraft.anchor);
+  }, [commitArrangementAnchor, ruleDraft]);
+
+  const cancelRuleDraft = useCallback(() => {
+    const folderKey = folderArrangement?.activeFolderKey;
+    if (folderKey === undefined) return;
+    cancelArrangementPreview();
+    const defaultAnchor = sessionRef.current?.currentFolderAnchor(folderKey) ??
+      activeConfirmedRule?.anchor ?? { x: 0, y: 0 };
+    setRuleDraft(
+      createFolderSpatialRuleDraft({
+        folderKey,
+        confirmedRule: draftBaselineRule,
+        defaultAnchor,
+      }),
+    );
+    setArrangementError(undefined);
+    folderArrangement?.onAnnouncement(
+      'Unapplied spatial rule changes canceled',
+    );
+  }, [
+    activeConfirmedRule,
+    cancelArrangementPreview,
+    draftBaselineRule,
+    folderArrangement,
+  ]);
 
   const finishArrangement = useCallback(() => {
+    if (draftDirty) {
+      cancelRuleDraft();
+      folderArrangement?.onAnnouncement(
+        'Unapplied spatial rule changes were discarded; Arrange folders closed.',
+      );
+    }
     cancelArrangementPreview();
     folderArrangement?.onActiveChange(false);
-  }, [cancelArrangementPreview, folderArrangement]);
+  }, [
+    cancelArrangementPreview,
+    cancelRuleDraft,
+    draftDirty,
+    folderArrangement,
+  ]);
 
   const resetActiveFolder = useCallback(() => {
     const folderKey = folderArrangement?.activeFolderKey;
     if (folderArrangement === undefined || folderKey === undefined) return;
-    const failure = folderArrangement.onResetFolder(folderKey);
+    const failure = folderArrangement.onRemoveRule
+      ? folderArrangement.onRemoveRule(folderKey)
+      : folderArrangement.onResetFolder(folderKey);
     if (failure !== undefined) {
       setArrangementError(`Folder position was not reset: ${failure}`);
       return;
@@ -1225,13 +1700,15 @@ export function GlobalGraphCanvas({
     setArrangementGesturePhase('idle');
     setArrangementError(undefined);
     folderArrangement.onAnnouncement(
-      `${folderLabel(folderKey)} position reset`,
+      `${folderLabel(folderKey)} spatial rule removed`,
     );
   }, [folderArrangement]);
 
   const resetAllFolders = useCallback(() => {
     if (folderArrangement === undefined) return;
-    const failure = folderArrangement.onResetAll();
+    const failure = folderArrangement.onClearRules
+      ? folderArrangement.onClearRules()
+      : folderArrangement.onResetAll();
     if (failure !== undefined) {
       setArrangementError(`Folder positions were not reset: ${failure}`);
       return;
@@ -1242,7 +1719,7 @@ export function GlobalGraphCanvas({
     setArrangementGesturePhase('idle');
     setConfirmResetAll(false);
     setArrangementError(undefined);
-    folderArrangement.onAnnouncement('All custom folder positions reset');
+    folderArrangement.onAnnouncement('All spatial rules removed');
   }, [folderArrangement]);
 
   const recoverCorruptArrangement = useCallback(() => {
@@ -1259,12 +1736,51 @@ export function GlobalGraphCanvas({
     );
   }, [folderArrangement]);
 
+  const arrangementScopeTree = folderArrangement?.scopeTree;
+  const activeScopeTreeNode = useMemo(() => {
+    const folderKey = activeArrangementFolderKey;
+    const root = arrangementScopeTree;
+    if (folderKey === undefined || root === undefined) return undefined;
+    const pending = [root];
+    while (pending.length > 0) {
+      const candidate = pending.pop()!;
+      if (candidate.folderKey === folderKey) return candidate;
+      pending.push(...candidate.children);
+    }
+    return undefined;
+  }, [activeArrangementFolderKey, arrangementScopeTree]);
+  const customScopeRows = useMemo(
+    () =>
+      activeArrangementFolderKey === undefined
+        ? []
+        : flattenScopeTree(arrangementScopeTree, activeArrangementFolderKey),
+    [activeArrangementFolderKey, arrangementScopeTree],
+  );
+  const visibleCustomScopeRows = useMemo(
+    () => customScopeRows.slice(0, scopeTreeRowLimit),
+    [customScopeRows, scopeTreeRowLimit],
+  );
+  const displayedRuleCount =
+    folderArrangement?.ruleCount ?? folderArrangement?.anchorCount ?? 0;
+  const inactiveRuleCount = useMemo(
+    () =>
+      spatialRules === undefined
+        ? 0
+        : resolveGlobalFolderSpatialRules(input, spatialRules).inactiveRules
+            .length,
+    [input, spatialRules],
+  );
+
   return (
     <div
       className={`global-graph-canvas${folderArrangement?.active === true ? ' global-graph-canvas--arranging' : ''}`}
       data-arrangement-phase={arrangementGesturePhase}
     >
-      <div className="global-graph-canvas__surface" ref={containerRef} />
+      <div
+        aria-hidden="true"
+        className="global-graph-canvas__surface"
+        ref={containerRef}
+      />
       {folderArrangement?.active === true ? (
         <div
           aria-hidden="true"
@@ -1272,7 +1788,14 @@ export function GlobalGraphCanvas({
           ref={spotlightRef}
         />
       ) : null}
-      {projection.nodes.length === 0 ? (
+      {folderArrangement?.active === true && ruleDraft !== undefined ? (
+        <div
+          aria-hidden="true"
+          className={`global-graph-canvas__target-marker global-graph-canvas__target-marker--${ruleDraft.behavior}`}
+          ref={targetMarkerRef}
+        />
+      ) : null}
+      {projection.nodes.length === 0 && folderArrangement?.active !== true ? (
         <GlobalGraphEmptyState />
       ) : (
         <>
@@ -1307,7 +1830,7 @@ export function GlobalGraphCanvas({
                   }
                   type="button"
                 >
-                  {folderArrangement.active ? 'Done' : 'Arrange'}
+                  {folderArrangement.active ? 'Done' : 'Arrange folders'}
                 </button>
                 {folderArrangement.canRecoverCorrupt === true &&
                 !folderArrangement.active ? (
@@ -1343,7 +1866,10 @@ export function GlobalGraphCanvas({
               <div className="global-graph-canvas__arrangement-heading">
                 <div>
                   <strong>Arrange folders</strong>
-                  <p>Drag any File to move its folder.</p>
+                  <p>
+                    Choose a folder, define its rule, then drag its included
+                    Files.
+                  </p>
                 </div>
                 <button onClick={finishArrangement} type="button">
                   Done
@@ -1354,18 +1880,253 @@ export function GlobalGraphCanvas({
                   Choose a File on the canvas or use Arrange folder in Network
                   Explorer. Stage dragging still pans the graph.
                 </p>
+              ) : ruleDraft === undefined ? (
+                <p className="global-graph-canvas__arrangement-hint">
+                  Preparing the spatial rule editor…
+                </p>
               ) : (
                 <>
                   <p className="global-graph-canvas__arrangement-folder">
                     <span>Active folder</span>
                     <strong>{folderLabel(activeArrangementFolderKey)}</strong>
+                    {draftDirty ? <em>Unsaved changes</em> : null}
                   </p>
-                  <p className="global-graph-canvas__arrangement-position">
-                    {displayedArrangementAnchor === undefined
-                      ? 'Automatic position'
-                      : describeNormalizedFolderAnchor(
-                          displayedArrangementAnchor,
+                  <fieldset className="global-graph-canvas__rule-options">
+                    <legend>Behavior</legend>
+                    <label>
+                      <input
+                        checked={ruleDraft.behavior === 'pull'}
+                        name="folder-spatial-behavior"
+                        onChange={() =>
+                          setRuleDraft((current) =>
+                            current === undefined
+                              ? current
+                              : setFolderSpatialDraftBehavior(current, 'pull'),
+                          )
+                        }
+                        type="radio"
+                      />
+                      Dynamic pull
+                    </label>
+                    <label>
+                      <input
+                        checked={ruleDraft.behavior === 'place'}
+                        name="folder-spatial-behavior"
+                        onChange={() =>
+                          setRuleDraft((current) =>
+                            current === undefined
+                              ? current
+                              : setFolderSpatialDraftBehavior(current, 'place'),
+                          )
+                        }
+                        type="radio"
+                      />
+                      Fixed placement
+                    </label>
+                  </fieldset>
+                  {ruleDraft.behavior === 'pull' ? (
+                    <label className="global-graph-canvas__strength">
+                      <span>
+                        Pull strength <strong>{ruleDraft.strength}</strong>
+                      </span>
+                      <input
+                        aria-label="Pull strength"
+                        max="100"
+                        min="0"
+                        onChange={(event) =>
+                          setRuleDraft((current) =>
+                            current === undefined
+                              ? current
+                              : setFolderSpatialDraftStrength(
+                                  current,
+                                  Number(event.currentTarget.value),
+                                ),
+                          )
+                        }
+                        step="1"
+                        type="range"
+                        value={ruleDraft.strength}
+                      />
+                      <small>
+                        0 = no pull · 100 = strongest soft pull, not exact
+                      </small>
+                    </label>
+                  ) : null}
+                  <fieldset className="global-graph-canvas__rule-options">
+                    <legend>Scope</legend>
+                    {(['exact', 'subtree', 'custom'] as const).map((preset) => (
+                      <button
+                        aria-pressed={ruleDraft.scopePreset === preset}
+                        key={preset}
+                        onClick={() =>
+                          setRuleDraft((current) =>
+                            current === undefined
+                              ? current
+                              : setFolderSpatialDraftScopePreset(
+                                  current,
+                                  preset,
+                                ),
+                          )
+                        }
+                        type="button"
+                      >
+                        {scopePresetLabel(preset)}
+                      </button>
+                    ))}
+                  </fieldset>
+                  <p className="global-graph-canvas__scope-summary">
+                    {scopeVisualization?.activeMemberNodeKeys.length ?? 0}{' '}
+                    included ·{' '}
+                    {scopeVisualization?.excludedCandidateNodeKeys.length ?? 0}{' '}
+                    excluded ·{' '}
+                    {scopeVisualization?.shadowedByChildNodeKeys.length ?? 0}{' '}
+                    child-owned
+                  </p>
+                  {ruleDraft.scopePreset === 'custom' ? (
+                    <div className="global-graph-canvas__scope-editor">
+                      <label>
+                        <input
+                          checked={ruleDraft.customScope.includeRootFiles}
+                          onChange={(event) => {
+                            setRuleDraft((current) =>
+                              current === undefined
+                                ? current
+                                : setFolderSpatialDraftRootFiles(
+                                    current,
+                                    event.currentTarget.checked,
+                                  ),
+                            );
+                            pulseScope(ruleDraft.folderKey);
+                          }}
+                          type="checkbox"
+                        />
+                        Files directly in {folderLabel(ruleDraft.folderKey)} (
+                        {activeScopeTreeNode?.directFileCount ?? 0})
+                      </label>
+                      <div
+                        aria-label="Included subfolders"
+                        className="global-graph-canvas__scope-tree"
+                        role="group"
+                      >
+                        {customScopeRows.length === 0 ? (
+                          <p>No subfolders in this workspace.</p>
+                        ) : (
+                          <>
+                            {visibleCustomScopeRows.map((row) => {
+                              const blocking = nearestExcludedFolder(
+                                ruleDraft,
+                                row.folderKey,
+                              );
+                              const childOwnRule =
+                                row.ownRule !== undefined &&
+                                row.folderKey !== ruleDraft.folderKey;
+                              return (
+                                <div
+                                  className={
+                                    scopePulseKey === row.folderKey
+                                      ? 'global-graph-canvas__scope-row global-graph-canvas__scope-row--pulse'
+                                      : 'global-graph-canvas__scope-row'
+                                  }
+                                  key={row.folderKey}
+                                  style={{
+                                    paddingInlineStart: `${Math.max(0, row.depth - (activeScopeTreeNode?.depth ?? 0) - 1) * 0.8}rem`,
+                                  }}
+                                >
+                                  <label>
+                                    <input
+                                      checked={blocking === undefined}
+                                      disabled={
+                                        blocking !== undefined &&
+                                        blocking !== row.folderKey
+                                      }
+                                      onChange={() => {
+                                        setRuleDraft((current) =>
+                                          current === undefined
+                                            ? current
+                                            : toggleFolderSpatialDraftSubtree(
+                                                current,
+                                                row.folderKey,
+                                              ),
+                                        );
+                                        pulseScope(row.folderKey);
+                                      }}
+                                      type="checkbox"
+                                    />
+                                    <span>{row.name}</span>
+                                    <small>
+                                      {row.totalFileCount} Files
+                                      {row.visibleFileCount ===
+                                      row.totalFileCount
+                                        ? ''
+                                        : ` · ${row.visibleFileCount} visible`}
+                                    </small>
+                                  </label>
+                                  {childOwnRule ? (
+                                    <button
+                                      aria-label={`Edit child rule ${row.folderKey}`}
+                                      onClick={() =>
+                                        folderArrangement.onEditChildRule?.(
+                                          row.folderKey,
+                                        )
+                                      }
+                                      type="button"
+                                    >
+                                      {row.ownRule?.behavior === 'pull'
+                                        ? 'Pull'
+                                        : 'Place'}{' '}
+                                      · Edit child rule
+                                    </button>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                            {visibleCustomScopeRows.length <
+                            customScopeRows.length ? (
+                              <button
+                                onClick={() =>
+                                  setScopeTreeRowLimit((current) =>
+                                    Math.min(
+                                      current + SCOPE_TREE_PAGE_SIZE,
+                                      customScopeRows.length,
+                                    ),
+                                  )
+                                }
+                                type="button"
+                              >
+                                Show more folders (
+                                {customScopeRows.length -
+                                  visibleCustomScopeRows.length}{' '}
+                                remaining)
+                              </button>
+                            ) : null}
+                          </>
                         )}
+                      </div>
+                      <button
+                        aria-pressed={
+                          folderArrangement.editorPhase === 'choosing-scope'
+                        }
+                        onClick={() =>
+                          folderArrangement.onChoosingScopeChange?.(
+                            folderArrangement.editorPhase !== 'choosing-scope',
+                          )
+                        }
+                        type="button"
+                      >
+                        {folderArrangement.editorPhase === 'choosing-scope'
+                          ? 'Done selecting'
+                          : 'Choose included folders'}
+                      </button>
+                      {folderArrangement.editorPhase === 'choosing-scope' ? (
+                        <small>
+                          Click visible Files to toggle their folder subtree.
+                          Target dragging is paused.
+                        </small>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <p className="global-graph-canvas__arrangement-position">
+                    Target: {describeNormalizedFolderAnchor(ruleDraft.anchor)}
                   </p>
                   <div
                     aria-label="Nudge active folder"
@@ -1415,47 +2176,48 @@ export function GlobalGraphCanvas({
                   </div>
                   <div className="global-graph-canvas__arrangement-actions">
                     <button
-                      disabled={keyboardPreview === undefined}
+                      disabled={!draftDirty && keyboardPreview === undefined}
                       onClick={saveKeyboardPreview}
                       type="button"
                     >
-                      Save position
+                      Apply changes
                     </button>
                     <button
-                      disabled={
-                        keyboardPreview === undefined &&
-                        arrangementGesturePhase === 'idle'
-                      }
-                      onClick={() =>
-                        cancelArrangementPreview('Folder movement canceled')
-                      }
+                      disabled={!draftDirty && keyboardPreview === undefined}
+                      onClick={cancelRuleDraft}
                       type="button"
                     >
-                      Cancel movement
+                      Cancel changes
                     </button>
-                    <button onClick={resetActiveFolder} type="button">
-                      Reset folder
-                    </button>
+                    {activeConfirmedRule === undefined ? null : (
+                      <button onClick={resetActiveFolder} type="button">
+                        Remove spatial rule
+                      </button>
+                    )}
                   </div>
+                  {folderArrangement.editorPhase === 'settling-pull' ? (
+                    <p aria-live="polite">Settling Dynamic pull…</p>
+                  ) : null}
                 </>
               )}
               <p className="global-graph-canvas__arrangement-persistence">
-                {folderArrangement.persistenceStatus} ·{' '}
-                {folderArrangement.anchorCount} custom{' '}
-                {folderArrangement.anchorCount === 1 ? 'position' : 'positions'}
+                {folderArrangement.persistenceStatus} · {displayedRuleCount}{' '}
+                spatial {displayedRuleCount === 1 ? 'rule' : 'rules'}
+                {inactiveRuleCount === 0
+                  ? ''
+                  : ` · ${inactiveRuleCount} inactive in the current graph`}
               </p>
               {folderArrangement.canRecoverCorrupt === true ? (
                 <button onClick={recoverCorruptArrangement} type="button">
                   Clear invalid saved positions
                 </button>
-              ) : folderArrangement.anchorCount ===
-                0 ? null : confirmResetAll ? (
+              ) : displayedRuleCount === 0 ? null : confirmResetAll ? (
                 <div
                   className="global-graph-canvas__arrangement-confirm"
                   role="group"
-                  aria-label="Confirm reset all folder positions"
+                  aria-label="Confirm remove all spatial rules"
                 >
-                  <span>Reset every custom folder position?</span>
+                  <span>Remove all {displayedRuleCount} spatial rules?</span>
                   <button onClick={resetAllFolders} type="button">
                     Reset all
                   </button>
@@ -1463,12 +2225,12 @@ export function GlobalGraphCanvas({
                     onClick={() => setConfirmResetAll(false)}
                     type="button"
                   >
-                    Keep positions
+                    Keep rules
                   </button>
                 </div>
               ) : (
                 <button onClick={() => setConfirmResetAll(true)} type="button">
-                  Reset all positions…
+                  Reset all rules…
                 </button>
               )}
             </div>

@@ -72,6 +72,7 @@ src/
   size-canvas-regression.test.tsx  Real canvas/session layout-count and exact-coordinate regression.
   arrangement-session.test.ts  Exact-folder pointer ownership, sparse refresh, and commit contract.
   arrangement-canvas.test.tsx  Accessible nudge/save and write-failure rollback contract.
+  spatial-rule-canvas.test.tsx Pull/Place adoption, cache reuse, and zero-auto-layout regression.
   node-size-session.test.ts  Initial display, sparse indexed refresh, and topology-race contracts.
   *.test.ts                Mapping, layout, cache, LOD, settings, and precision contracts.
 ```
@@ -128,8 +129,8 @@ The resolved visual subset (base size, degree-size influence, link thickness,
 and label threshold) owns Sigma reducer/settings refreshes only. The persisted
 record and control ranges remain unchanged.
 
-SPATIAL2A evolves the All Network-only position pipeline without changing the
-current production authoring controls:
+SPATIAL2A evolves the All Network-only position pipeline, and SPATIAL2B exposes
+its complete rule model through the production authoring controls:
 
 ```text
 base automatic deterministic/cache/worker positions
@@ -191,6 +192,30 @@ change, layout change, mode change, and disposal cancel unfinished motion.
 Keyboard users can choose the exact folder in Network Explorer, nudge by 0.02
 (Shift: 0.10), save or cancel, and reset one/all positions. Root uses `.` and
 nested folders never inherit a parent action.
+
+SPATIAL2B turns that mode into one rule editor. An unruled folder opens a
+transient Pull/exact/70 draft at its current displayed center; existing rules
+load byte-for-byte semantics. Behavior, strength, preset, root-file inclusion,
+and exclusions remain draft-only until **Apply changes** or target release.
+The editor's bounded DOM tree uses the full canonical folder model supplied by
+the app, while Choose-mode graph clicks are a shortcut that toggles a subtree or
+the complete direct-root group. Child-rule-owned members receive a distinct
+style and hand off to their own editor instead of mutating the parent draft.
+
+Draft scope classification replaces only the same-root confirmed rule and then
+reuses deepest-wins resolution. Included, excluded, child-owned, and unrelated
+nodes compose after Visual Group color and exact per-File size; internal,
+boundary, child-owned, and unrelated edges remain distinguishable. A short
+highlight pulse changes no size and is disabled by reduced-motion preference.
+The target halo is pointer-transparent and presentation-only.
+
+Pointer preview stays rigid, sparse, and rAF-coalesced for both behaviors, using
+the effective resolved member set and immutable captured frame. It never starts
+the Pull worker. On Pull release, the complete rule persists before adoption and
+the rigid preview remains until the matching latest worker/cache generation
+settles or fails. Place remains exact post-dynamic composition. A Place-only edit
+with unchanged Pull resolution uses zero dynamic workers; no rule edit enters
+the automatic layout fingerprint.
 
 VISUAL1A applies only to All Network. Ordinary document nodes add a bounded
 reference-degree boost to the configured base size. At the persisted

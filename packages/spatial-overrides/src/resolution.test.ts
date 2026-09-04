@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveFolderSpatialRules } from './resolution';
+import {
+  classifyFolderSpatialDraftScope,
+  resolveFolderSpatialRules,
+} from './resolution';
 import type { FolderSpatialRule } from './types';
 
 const parent: FolderSpatialRule = {
@@ -64,5 +67,37 @@ describe('folder spatial rule resolution', () => {
     });
     expect(reverse.pullGroups).toEqual(forward.pullGroups);
     expect(reverse.placeGroups).toEqual(forward.placeGroups);
+  });
+
+  it('classifies included, excluded, child-owned, and unrelated visible nodes', () => {
+    const draft = {
+      ...parent,
+      scope: {
+        kind: 'subtree' as const,
+        includeRootFiles: false,
+        excludedSubtrees: ['Theory/Archive'],
+      },
+    };
+    const result = classifyFolderSpatialDraftScope({
+      confirmedRules: [parent, child],
+      draftRule: draft,
+      folderKeyByNodeKey: new Map([
+        ['root', 'Theory'],
+        ['included', 'Theory/Math'],
+        ['excluded', 'Theory/Archive/Old'],
+        ['child', 'Theory/Language'],
+        ['outside', 'Elsewhere'],
+      ]),
+    });
+    expect([...result.stateByNodeKey]).toEqual([
+      ['child', 'shadowed-by-child'],
+      ['excluded', 'excluded-candidate'],
+      ['included', 'active-member'],
+      ['outside', 'outside-root'],
+      ['root', 'excluded-candidate'],
+    ]);
+    expect(result.owningRuleFolderKeyByNodeKey.get('child')).toBe(
+      'Theory/Language',
+    );
   });
 });
