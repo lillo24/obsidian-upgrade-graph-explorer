@@ -212,15 +212,22 @@ reuses deepest-wins resolution. Included, excluded, child-owned, and unrelated
 nodes compose after Visual Group color and exact per-File size; internal,
 boundary, child-owned, and unrelated edges remain distinguishable. A short
 highlight pulse changes no size and is disabled by reduced-motion preference.
-The target halo is pointer-transparent and presentation-only.
+The spatial target marker owns explicit pointer capture while dragged. Only that
+capture suppresses stage pan; stage drag and wheel/trackpad zoom remain available
+otherwise.
 
-Pointer preview stays rigid, sparse, and rAF-coalesced for both behaviors, using
-the effective resolved member set and immutable captured frame. It never starts
-the Pull worker. On Pull release, the complete rule persists before adoption and
-the rigid preview remains until the matching latest worker/cache generation
-settles or fails. Place remains exact post-dynamic composition. A Place-only edit
-with unchanged Pull resolution uses zero dynamic workers; no rule edit enters
-the automatic layout fingerprint.
+Pull pointer and keyboard editing updates only the draft anchor, marker, and
+target text. It never calls rigid preview geometry or mutates a graph-node x/y.
+Release persists the complete rule, then the existing SPATIAL2A latest
+worker/cache path settles authoritative geometry. Place marker drag, or dragging
+one effective selected File, retains the sparse rigid preview and exact
+post-dynamic composition. A Place-only edit with unchanged Pull resolution uses
+zero dynamic workers; no rule edit enters the automatic layout fingerprint.
+The SPATIAL2A worker still performs its existing whole-graph ForceAtlas2
+refinement, so disconnected geometry movement is layout evidence rather than a
+camera fit. SPATIAL2B does not introduce a competing simulation lifecycle;
+PHYSICS1 owns future reheating, convergence, and reaction policy, including
+reactive neighbors around hard Place constraints.
 
 MOVE1A adds a separate, fake-backed temporary File constraint seam to both
 Network Sigma sessions without exposing a production control. One canonical

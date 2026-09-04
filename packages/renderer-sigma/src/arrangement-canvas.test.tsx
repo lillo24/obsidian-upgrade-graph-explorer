@@ -4,12 +4,18 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { globalTestProjection } from './test-fixture';
+import type { GlobalLayoutRequest } from './types';
 
 interface MockSessionApi {
   readonly applyPositions: ReturnType<typeof vi.fn>;
   readonly applySpatialPositions: ReturnType<typeof vi.fn>;
   readonly cancelFolderArrangementGesture: ReturnType<typeof vi.fn>;
+  readonly center: ReturnType<typeof vi.fn>;
+  readonly fit: ReturnType<typeof vi.fn>;
+  readonly folderTargetAnchorFromPointer: ReturnType<typeof vi.fn>;
+  readonly positionFolderTargetAnchor: ReturnType<typeof vi.fn>;
   readonly previewFolderAnchor: ReturnType<typeof vi.fn>;
+  readonly setFolderTargetPointerActive: ReturnType<typeof vi.fn>;
 }
 
 const sessionInstances = vi.hoisted(() => [] as MockSessionApi[]);
@@ -26,9 +32,12 @@ vi.mock('./session', () => ({
       return changed;
     });
     readonly completeFolderArrangementCommit = vi.fn();
+    readonly center = vi.fn(async () => undefined);
     readonly currentFolderAnchor = vi.fn(() => ({ x: 0, y: 0 }));
     readonly destroy = vi.fn();
     readonly fit = vi.fn();
+    readonly folderTargetAnchorFromPointer = vi.fn(() => ({ x: 0.4, y: 0.3 }));
+    readonly positionFolderTargetAnchor = vi.fn();
     readonly previewFolderAnchor = vi.fn(
       (
         folderKey: string,
@@ -46,6 +55,7 @@ vi.mock('./session', () => ({
     );
     readonly setControlledSelection = vi.fn();
     readonly setFolderArrangementContext = vi.fn();
+    readonly setFolderTargetPointerActive = vi.fn();
     readonly update = vi.fn();
     readonly updateSettings = vi.fn();
     readonly updateTrackpadZoomMode = vi.fn();
@@ -99,6 +109,23 @@ describe('All Network Arrange folders canvas', () => {
     const onCommitRule = vi.fn(() => options?.commitFailure);
     const onActiveChange = vi.fn();
     const onAnnouncement = vi.fn();
+    const layout = vi.fn(
+      async (request: Omit<GlobalLayoutRequest, 'requestId'>) => ({
+        schemaVersion: 1 as const,
+        kind: 'result' as const,
+        requestId: 1,
+        algorithm: 'reference-only' as const,
+        computeMs: 0,
+        folderPriorMs: 0,
+        positions: request.nodes.map(({ key, x, y }) => ({ key, x, y })),
+        metrics: {
+          meanWithinFolderDistance: 0,
+          meanCrossFolderDistance: 0,
+          meanCrossFolderReferenceLength: 0,
+          meanDisplacementFromInput: 0,
+        },
+      }),
+    );
     await perform(() =>
       root.render(
         <GlobalGraphCanvas
@@ -157,21 +184,7 @@ describe('All Network Arrange folders canvas', () => {
           layoutRequestKey={0}
           layoutService={{
             dispose: noop,
-            layout: async (request) => ({
-              schemaVersion: 1,
-              kind: 'result',
-              requestId: 1,
-              algorithm: 'reference-only',
-              computeMs: 0,
-              folderPriorMs: 0,
-              positions: request.nodes.map(({ key, x, y }) => ({ key, x, y })),
-              metrics: {
-                meanWithinFolderDistance: 0,
-                meanCrossFolderDistance: 0,
-                meanCrossFolderReferenceLength: 0,
-                meanDisplacementFromInput: 0,
-              },
-            }),
+            layout,
           }}
           onFailure={vi.fn()}
           onNodeActivate={noop}
@@ -190,10 +203,11 @@ describe('All Network Arrange folders canvas', () => {
       onAvailabilityChange,
       onCommitAnchor,
       onCommitRule,
+      layout,
     };
   }
 
-  it('exposes the mode contract only after layout and supports keyboard nudge/save', async () => {
+  it('nudges a Pull target without a rigid preview and saves it after layout', async () => {
     const callbacks = await renderArrangement();
     const session = sessionInstances[0]!;
     expect(callbacks.onAvailabilityChange).toHaveBeenLastCalledWith(
@@ -201,7 +215,7 @@ describe('All Network Arrange folders canvas', () => {
       undefined,
     );
     expect(container.textContent).toContain(
-      'Choose a folder, define its rule, then drag its included Files.',
+      'Choose a folder, define its rule, then drag its spatial target.',
     );
     expect(container.textContent).toContain('Active folderalpha');
 
@@ -209,10 +223,12 @@ describe('All Network Arrange folders canvas', () => {
       '[aria-label="Nudge folder up"]',
     )!;
     await perform(() => up.click());
-    expect(session.previewFolderAnchor).toHaveBeenCalledWith('alpha', {
+    expect(session.previewFolderAnchor).not.toHaveBeenCalled();
+    expect(session.positionFolderTargetAnchor).toHaveBeenCalledWith({
       x: 0,
       y: -0.02,
     });
+    expect(callbacks.layout).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain('2% up');
 
     const save = [...container.querySelectorAll('button')].find(
@@ -225,6 +241,130 @@ describe('All Network Arrange folders canvas', () => {
     });
     expect(callbacks.onAnnouncement).toHaveBeenCalledWith(
       'Spatial rule set for this session only',
+    );
+  });
+
+  it('drags the Pull marker under pointer capture without rigid preview or bubbling to stage pan', async () => {
+    const callbacks = await renderArrangement({ genericRules: true });
+    const session = sessionInstances[0]!;
+    const marker = container.querySelector<HTMLDivElement>(
+      '[aria-label="Spatial target for alpha"]',
+    )!;
+    const setPointerCapture = vi.fn();
+    const releasePointerCapture = vi.fn();
+    Object.assign(marker, {
+      hasPointerCapture: vi.fn(() => true),
+      releasePointerCapture,
+      setPointerCapture,
+    });
+    const pointerDown = new PointerEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: 10,
+      clientY: 12,
+      pointerId: 7,
+    });
+
+    await perform(() => {
+      marker.dispatchEvent(pointerDown);
+      marker.dispatchEvent(
+        new PointerEvent('pointermove', {
+          bubbles: true,
+          clientX: 30,
+          clientY: 36,
+          pointerId: 7,
+        }),
+      );
+      marker.dispatchEvent(
+        new PointerEvent('pointerup', {
+          bubbles: true,
+          button: 0,
+          clientX: 30,
+          clientY: 36,
+          pointerId: 7,
+        }),
+      );
+    });
+
+    expect(setPointerCapture).toHaveBeenCalledWith(7);
+    expect(releasePointerCapture).toHaveBeenCalledWith(7);
+    expect(pointerDown.defaultPrevented).toBe(true);
+    expect(session.setFolderTargetPointerActive.mock.calls).toEqual([
+      [true],
+      [false],
+    ]);
+    expect(session.positionFolderTargetAnchor).toHaveBeenCalledWith({
+      x: 0.4,
+      y: 0.3,
+    });
+    expect(session.previewFolderAnchor).not.toHaveBeenCalled();
+    expect(session.fit).not.toHaveBeenCalled();
+    expect(session.center).not.toHaveBeenCalled();
+    expect(callbacks.layout).toHaveBeenCalledTimes(1);
+    expect(callbacks.onCommitRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        behavior: 'pull',
+        anchor: { x: 0.4, y: 0.3 },
+      }),
+    );
+  });
+
+  it('keeps Fixed placement marker drag as an exact rigid preview', async () => {
+    const callbacks = await renderArrangement({ genericRules: true });
+    const session = sessionInstances[0]!;
+    await perform(() =>
+      [...container.querySelectorAll('label')]
+        .find((label) => label.textContent?.includes('Fixed placement'))!
+        .querySelector<HTMLInputElement>('input')!
+        .click(),
+    );
+    const marker = container.querySelector<HTMLDivElement>(
+      '[aria-label="Spatial target for alpha"]',
+    )!;
+    Object.assign(marker, {
+      hasPointerCapture: vi.fn(() => true),
+      releasePointerCapture: vi.fn(),
+      setPointerCapture: vi.fn(),
+    });
+    await perform(() => {
+      marker.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 8,
+          clientY: 9,
+          pointerId: 3,
+        }),
+      );
+      marker.dispatchEvent(
+        new PointerEvent('pointermove', {
+          bubbles: true,
+          clientX: 28,
+          clientY: 29,
+          pointerId: 3,
+        }),
+      );
+      marker.dispatchEvent(
+        new PointerEvent('pointerup', {
+          bubbles: true,
+          button: 0,
+          clientX: 28,
+          clientY: 29,
+          pointerId: 3,
+        }),
+      );
+    });
+
+    expect(session.previewFolderAnchor).toHaveBeenCalledWith('alpha', {
+      x: 0.4,
+      y: 0.3,
+    });
+    expect(callbacks.onCommitRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        behavior: 'place',
+        anchor: { x: 0.4, y: 0.3 },
+      }),
     );
   });
 

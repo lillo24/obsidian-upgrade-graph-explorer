@@ -68,8 +68,26 @@
   border-radius: 50%;
   background: rgb(255 255 255 / 72%);
   box-shadow: 0 0 0 0.35rem rgb(40 120 141 / 14%);
-  pointer-events: none;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
   transform: translate(-50%, -50%);
+  user-select: none;
+}
+
+.global-graph-canvas__target-marker:focus-visible {
+  outline: 3px solid rgb(40 120 141 / 38%);
+  outline-offset: 0.42rem;
+}
+
+.global-graph-canvas__target-marker[aria-disabled='true'] {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.global-graph-canvas[data-arrangement-phase='dragging']
+  .global-graph-canvas__target-marker {
+  cursor: grabbing;
 }
 
 .global-graph-canvas__target-marker--place {

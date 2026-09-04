@@ -67,12 +67,14 @@ center from the dynamic layer, then apply one shared translation to the target
 in the base frame. No parent/child rule is applied twice and no displayed output
 is fed back into either upstream layer.
 
-Production preview geometry accepts the effective deepest-wins member set. When
-a dynamic layer exists, it supplies current member positions while the target
-frame remains the base automatic frame. Every pointer/keyboard sample derives a
-sparse shared translation from captured geometry, so Pull and Place both preview
-immediately as one rigid group and a parent preview never moves child-rule-owned
-members. Graph coordinates and resolved member IDs remain memory-only.
+Production rigid-preview geometry accepts the effective deepest-wins member set.
+When a dynamic layer exists, it supplies current member positions while the
+target frame remains the base automatic frame. Fixed Place pointer/keyboard
+samples derive a sparse shared translation from captured geometry, and a parent
+preview never moves child-rule-owned members. Dynamic Pull target authoring does
+not call this geometry path: it changes normalized target intent only and leaves
+all graph coordinates untouched until authoritative settlement. Graph
+coordinates and resolved member IDs remain memory-only.
 
 MOVE1A also indexes the winning translations returned by fixed composition.
 For a displayed File target `P` and its applied Place translation `T`, the

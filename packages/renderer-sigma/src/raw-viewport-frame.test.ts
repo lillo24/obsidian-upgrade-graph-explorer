@@ -17,8 +17,77 @@ import {
   type RawViewportFrame,
   type RawViewportRenderer,
 } from './raw-viewport-frame';
+import { computeGlobalSpatialInfluence } from './spatial-influence';
+import type { GlobalSpatialInfluenceRequest } from './types';
 
 type Extent = { readonly x: [number, number]; readonly y: [number, number] };
+
+function extentOf(
+  positions: readonly { readonly x: number; readonly y: number }[],
+): Extent {
+  return {
+    x: [
+      Math.min(...positions.map(({ x }) => x)),
+      Math.max(...positions.map(({ x }) => x)),
+    ],
+    y: [
+      Math.min(...positions.map(({ y }) => y)),
+      Math.max(...positions.map(({ y }) => y)),
+    ],
+  };
+}
+
+function diagnosticPullRequest(): GlobalSpatialInfluenceRequest {
+  return {
+    schemaVersion: 1,
+    requestId: 1,
+    algorithm: 'interleaved-centroid',
+    algorithmVersion: 1,
+    baseLayoutFingerprint: 'raw-viewport-diagnostic',
+    iterations: 24,
+    globalLayoutSettings: {
+      folderClustering: false,
+      spacingPreset: 'normal',
+    },
+    nodes: [
+      { key: 'selected-a', x: -5, y: -1, size: 1 },
+      { key: 'selected-b', x: -4, y: 1, size: 1 },
+      { key: 'connected-outside', x: -1, y: 0, size: 1 },
+      { key: 'unrelated-a', x: 4, y: 2, size: 1 },
+      { key: 'unrelated-b', x: 5, y: 2, size: 1 },
+      { key: 'isolated', x: 0, y: 8, size: 1 },
+    ],
+    edges: [
+      {
+        key: 'selected',
+        source: 'selected-a',
+        target: 'selected-b',
+        weight: 1,
+      },
+      {
+        key: 'boundary',
+        source: 'selected-b',
+        target: 'connected-outside',
+        weight: 2,
+      },
+      {
+        key: 'unrelated',
+        source: 'unrelated-a',
+        target: 'unrelated-b',
+        weight: 1,
+      },
+    ],
+    attractors: [
+      {
+        ruleFolderKey: 'selected',
+        memberNodeKeys: ['selected-a', 'selected-b'],
+        targetX: 5,
+        targetY: 0,
+        strength: 70,
+      },
+    ],
+  };
+}
 
 class SyntheticSigmaTransform implements RawViewportRenderer {
   private readonly dimensions = { width: 1_200, height: 800 };
@@ -204,6 +273,81 @@ describe('raw viewport framing across Sigma normalization', () => {
         outsideAfter.y - outsideBefore.y,
       ),
     ).toBeGreaterThan(40);
+  });
+
+  it('records camera, viewport, grouped geometry, and bounds across the existing whole-graph Pull refinement', () => {
+    const request = diagnosticPullRequest();
+    const beforePositions = request.nodes.map(({ key, x, y }) => ({
+      key,
+      x,
+      y,
+    }));
+    const renderer = new SyntheticSigmaTransform(extentOf(beforePositions));
+    const beforeFrame = captureRawViewportFrame(renderer);
+    const cameraBefore = renderer.getCamera().getState();
+
+    const result = computeGlobalSpatialInfluence(request);
+    renderer.setExtent(extentOf(result.positions));
+    restoreRawViewportFrame(renderer, beforeFrame);
+
+    const positionGroup = (keys: readonly string[], after: boolean) =>
+      keys.map((key) => {
+        const positions = after ? result.positions : beforePositions;
+        return positions.find((position) => position.key === key)!;
+      });
+    const evidence = {
+      rawViewport: {
+        before: {
+          center: beforeFrame.center,
+          graphUnitsPer100px: beforeFrame.graphUnitsPerPixel * 100,
+        },
+        after: (() => {
+          const frame = captureRawViewportFrame(renderer);
+          return {
+            center: frame.center,
+            graphUnitsPer100px: frame.graphUnitsPerPixel * 100,
+          };
+        })(),
+      },
+      camera: {
+        before: cameraBefore,
+        after: renderer.getCamera().getState(),
+      },
+      selectedPullMembers: {
+        before: positionGroup(['selected-a', 'selected-b'], false),
+        after: positionGroup(['selected-a', 'selected-b'], true),
+      },
+      connectedOutside: {
+        before: positionGroup(['connected-outside'], false),
+        after: positionGroup(['connected-outside'], true),
+      },
+      unrelatedComponent: {
+        before: positionGroup(['unrelated-a', 'unrelated-b'], false),
+        after: positionGroup(['unrelated-a', 'unrelated-b'], true),
+      },
+      isolated: {
+        before: positionGroup(['isolated'], false),
+        after: positionGroup(['isolated'], true),
+      },
+      bounds: {
+        before: extentOf(beforePositions),
+        after: extentOf(result.positions),
+      },
+    };
+    expectFrameToMatch(renderer, beforeFrame);
+    expect(evidence.selectedPullMembers.after).not.toEqual(
+      evidence.selectedPullMembers.before,
+    );
+    expect(evidence.connectedOutside.after).not.toEqual(
+      evidence.connectedOutside.before,
+    );
+    // This is diagnostic evidence for PHYSICS1: SPATIAL2A currently refines
+    // the whole graph, so even disconnected/isolated geometry can move.
+    expect(evidence.unrelatedComponent.after).not.toEqual(
+      evidence.unrelatedComponent.before,
+    );
+    expect(evidence.isolated.after).not.toEqual(evidence.isolated.before);
+    expect(evidence.bounds.after).not.toEqual(evidence.bounds.before);
   });
 
   it('does not intercept later explicit Fit or Search-style camera ownership', () => {

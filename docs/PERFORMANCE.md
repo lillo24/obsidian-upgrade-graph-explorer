@@ -593,10 +593,11 @@ The medium benchmark also runs the dynamic stage over the private-safe 5,000
 node/10,000 edge stress fixture. The 2026-09-04 release-candidate run recorded
 about 82–102 ms compute for 10/100/1,000/3,000-member cases and a 750 ms cold
 single-member outlier; attractor work was 0.8–3.3 ms. This is an honest scale
-boundary, not an interactive-preview claim. SPATIAL2B therefore performs only
-rigid sparse work during pointer movement and starts Pull refinement after a
-committed release. Stress profiles remain opt-in and no new force dependency or
-persisted coordinate cache was introduced.
+boundary, not an interactive-preview claim. SPATIAL2B Pull pointer movement
+updates only the captured target marker/draft; Place pointer movement retains
+the rigid sparse preview. Pull refinement starts after a committed release.
+Stress profiles remain opt-in and no new force dependency, simulation lifecycle,
+or persisted coordinate cache was introduced.
 
 ### SPATIAL2B production rule editor
 
@@ -607,8 +608,13 @@ changes resolve source-neutral rule state and visual membership only. Tests hold
 the automatic layout service at one initial request, require zero dynamic
 requests before Apply/release, and prove a Place-only edit reuses the Pull
 fingerprint while a Pull-strength change requests exactly one later generation.
-Pointer movement remains the SPATIAL1B rAF-coalesced sparse path generalized to
-the effective deepest-wins member set; it never invokes the worker.
+Place pointer movement remains the SPATIAL1B sparse path generalized to the
+effective deepest-wins member set. Pull pointer/keyboard editing mutates no node
+coordinates. Neither invokes the worker before Apply/release. Camera/geometry
+diagnostics record raw center/scale, framed camera state, grouped node positions,
+and bounds across authoritative adoption. They preserve the existing SPATIAL2A
+whole-graph result as evidence for PHYSICS1/CONVERGENCE rather than introducing
+a component freeze or another physics lifecycle.
 
 The private-safe medium product fixture (500 nodes, 100 affected members, 24
 iterations) compares the proposed default strengths with the same base graph:

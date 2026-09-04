@@ -38,7 +38,13 @@ afterEach(() => {
 });
 
 describe('production spatial rule adoption', () => {
-  it('runs Pull once, reuses it for Place-only edits, and never requests automatic layout for rule edits', async () => {
+  it('runs Pull once, reuses Place-only edits, and emits no automatic layout/Fit/center request', async () => {
+    const fit = vi
+      .spyOn(GlobalRendererSession.prototype, 'fit')
+      .mockImplementation(noop);
+    const center = vi
+      .spyOn(GlobalRendererSession.prototype, 'center')
+      .mockResolvedValue(undefined);
     const spatialApply = vi.spyOn(
       GlobalRendererSession.prototype,
       'applySpatialPositions',
@@ -159,6 +165,8 @@ describe('production spatial rule adoption', () => {
     expect(layout).toHaveBeenCalledTimes(1);
     expect(pull).toHaveBeenCalledTimes(2);
     expect(spatialApply.mock.calls.length).toBeGreaterThan(spatialApplyCount);
+    expect(fit).not.toHaveBeenCalled();
+    expect(center).not.toHaveBeenCalled();
     harness.destroy();
   });
 

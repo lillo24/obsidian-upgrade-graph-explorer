@@ -4,6 +4,7 @@ import {
   computeAutomaticGraphFrame,
   createFolderClusterPreviewGeometry,
   createFolderSpatialRulePreviewGeometry,
+  normalizedAnchorFromTarget,
   previewFolderClusterAtAnchor,
   targetFromNormalizedAnchor,
   type FolderClusterAnchorMap,
@@ -135,6 +136,8 @@ export interface GlobalRendererSessionOptions {
 
 export interface GlobalFolderArrangementContext {
   readonly active: boolean;
+  /** Pull owns only the marker; Place may rigidly preview effective members. */
+  readonly behavior?: 'pull' | 'place';
   readonly activeFolderKey?: string;
   readonly anchors: FolderClusterAnchorMap;
   readonly automaticPositions: readonly GlobalLayoutPosition[];
@@ -198,6 +201,7 @@ export class GlobalRendererSession {
   private arrangementPreview: FolderClusterPreviewResult | undefined;
   private arrangementPreviewFrame: number | undefined;
   private lastAppliedArrangementPreview: FolderClusterPreviewResult | undefined;
+  private arrangementTargetPointerActive = false;
   private fileMoveContext: TemporaryFileMoveSessionContext | undefined;
   private fileMoveCoordinator: TemporaryFileMoveCoordinator | undefined;
   private fileMoveGestureSequence = 0;
@@ -251,6 +255,7 @@ export class GlobalRendererSession {
     if (
       this.arrangementGesture.phase === 'primed' ||
       this.arrangementGesture.phase === 'dragging' ||
+      this.arrangementTargetPointerActive ||
       this.fileMoveCoordinator?.ownsPointerSequence === true
     ) {
       preventSigmaWheelDefault(coordinates);
@@ -503,6 +508,7 @@ export class GlobalRendererSession {
     if (
       context?.active !== true ||
       context.chooseScope === true ||
+      context.behavior === 'pull' ||
       folderKey === undefined
     )
       return;
@@ -827,8 +833,18 @@ export class GlobalRendererSession {
         this.beginTemporaryFileMove(node, { x: event.x, y: event.y });
       }
       if (this.arrangementContext?.active !== true) return;
+      if (this.arrangementContext.chooseScope === true) {
+        preventSigmaDefault();
+        return;
+      }
+      if (this.arrangementContext.behavior === 'pull') return;
+      if (
+        this.arrangementContext.activeMemberNodeKeys !== undefined &&
+        !this.arrangementContext.activeMemberNodeKeys.includes(node)
+      ) {
+        return;
+      }
       preventSigmaDefault();
-      if (this.arrangementContext.chooseScope === true) return;
       this.beginArrangementDrag(node, { x: event.x, y: event.y });
     });
     this.renderer.on('moveBody', ({ event, preventSigmaDefault }) => {
@@ -942,6 +958,64 @@ export class GlobalRendererSession {
     return preview;
   }
 
+  /**
+   * Converts a captured marker-pointer delta into the normalized target frame.
+   * This method is geometry-only and never mutates graph node coordinates.
+   */
+  folderTargetAnchorFromPointer(
+    startAnchor: NormalizedFolderAnchor,
+    startViewportPoint: SpatialPoint,
+    currentViewportPoint: SpatialPoint,
+  ): NormalizedFolderAnchor {
+    const context = this.arrangementContext;
+    if (context?.active !== true) {
+      throw new Error('Arrange folders is not active.');
+    }
+    const frame = computeAutomaticGraphFrame(
+      context.automaticPositions,
+      globalFolderKeyByNodeKey(context.input).keys(),
+    );
+    const startTarget = targetFromNormalizedAnchor(
+      frame,
+      startAnchor,
+      SIGMA_VISUAL_DOWN_GRAPH_Y_SIGN,
+    );
+    const startGraphPoint = this.viewportToGraphPoint(startViewportPoint);
+    const currentGraphPoint = this.viewportToGraphPoint(currentViewportPoint);
+    return normalizedAnchorFromTarget(
+      frame,
+      {
+        x: startTarget.x + currentGraphPoint.x - startGraphPoint.x,
+        y: startTarget.y + currentGraphPoint.y - startGraphPoint.y,
+      },
+      SIGMA_VISUAL_DOWN_GRAPH_Y_SIGN,
+    );
+  }
+
+  /** Positions only the renderer-external marker; no Graphology x/y is touched. */
+  positionFolderTargetAnchor(anchor: NormalizedFolderAnchor): void {
+    const context = this.arrangementContext;
+    if (context?.active !== true) {
+      throw new Error('Arrange folders is not active.');
+    }
+    const frame = computeAutomaticGraphFrame(
+      context.automaticPositions,
+      globalFolderKeyByNodeKey(context.input).keys(),
+    );
+    const target = targetFromNormalizedAnchor(
+      frame,
+      anchor,
+      SIGMA_VISUAL_DOWN_GRAPH_Y_SIGN,
+    );
+    this.options.onArrangementTargetPoint?.(
+      this.renderer.graphToViewport(target),
+    );
+  }
+
+  setFolderTargetPointerActive(active: boolean): void {
+    this.arrangementTargetPointerActive = active;
+  }
+
   private folderPreviewGeometry(folderKey: string) {
     const context = this.arrangementContext;
     if (context?.active !== true) {
@@ -1024,6 +1098,7 @@ export class GlobalRendererSession {
     this.arrangementGesture = reduceGlobalFolderArrangementGesture(gesture, {
       type: 'cancel',
     });
+    this.arrangementTargetPointerActive = false;
     this.arrangementPreview = undefined;
     this.lastAppliedArrangementPreview = undefined;
     this.emitArrangementTargetPoint();

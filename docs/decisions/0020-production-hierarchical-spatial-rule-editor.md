@@ -32,12 +32,15 @@ semantics, persisting resolved members, or running dynamic work on pointermove.
 7. Graph-click selection is only a shortcut for toggling folder subtrees or the
    entire direct-root group. A bounded DOM folder tree is the accessible,
    keyboard-operable authoring surface.
-8. Pull and Place target dragging both use the same immediate, rigid,
-   rAF-coalesced sparse preview over effective deepest-wins members. Pointermove
-   never invokes the Pull worker.
+8. The spatial target marker is directly draggable with pointer capture. Pull
+   pointer/keyboard editing changes only draft target intent and moves zero graph
+   nodes. Place marker drag, or dragging an effective selected File, retains the
+   immediate rigid preview over deepest-wins members. Pointermove never invokes
+   the Pull worker.
 9. Behavior, scope, exclusions, and strength remain draft-only. Pull refinement
-   starts after Apply or release; a release preview remains until matching
-   authoritative adoption or failure. Stale generations cannot clear it.
+   starts after Apply or release; confirmed geometry remains visible during Pull
+   editing and changes only when matching authoritative output adopts. Stale
+   generations cannot clear it.
 10. Place remains exact post-dynamic composition. A Place-only edit with an
     unchanged Pull fingerprint requests zero dynamic workers.
 11. Complete rule writes are transactional and durable writes occur before
@@ -58,6 +61,11 @@ semantics, persisting resolved members, or running dynamic work on pointermove.
     applies to Pull, Place, cache-hit, remove, and reset adoption only. Explicit
     Fit, Search center, initial framing, pan/zoom, and later camera transitions
     keep camera ownership.
+16. SPATIAL2B retains the SPATIAL2A whole-graph settlement path. It introduces
+    no connected-component freeze, continuous simulation lifetime, reheating,
+    cooling, or hard-constraint neighbor reaction. Those policies remain owned
+    by PHYSICS1/CONVERGENCE integration; MOVE1A's temporary constraint seam is
+    not reused for spatial-rule target authoring.
 
 ## Consequences
 

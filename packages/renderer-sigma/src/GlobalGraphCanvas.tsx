@@ -29,7 +29,10 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+} from 'react';
 
 import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
 import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-groups';
@@ -203,6 +206,23 @@ function anchorsEqual(
     Math.abs(left.x - right.x) <= 1e-9 &&
     Math.abs(left.y - right.y) <= 1e-9
   );
+}
+
+interface ArrangementTargetPointerDrag {
+  readonly pointerId: number;
+  readonly element: HTMLDivElement;
+  readonly folderKey: string;
+  readonly behavior: FolderSpatialRule['behavior'];
+  readonly startAnchor: NormalizedFolderAnchor;
+  readonly startViewportPoint: SpatialPoint;
+  latestAnchor: NormalizedFolderAnchor;
+  moved: boolean;
+}
+
+function releaseTargetPointerCapture(drag: ArrangementTargetPointerDrag): void {
+  if (drag.element.hasPointerCapture?.(drag.pointerId) === true) {
+    drag.element.releasePointerCapture(drag.pointerId);
+  }
 }
 
 function rulesEqual(
@@ -552,6 +572,9 @@ export function GlobalGraphCanvas({
   const [draftBaselineRule, setDraftBaselineRule] =
     useState<FolderSpatialRule>();
   const ruleDraftRef = useRef(ruleDraft);
+  const targetPointerDragRef = useRef<ArrangementTargetPointerDrag | undefined>(
+    undefined,
+  );
   const scopeVisualizationRef = useRef<FolderScopeVisualization | undefined>(
     undefined,
   );
@@ -698,10 +721,27 @@ export function GlobalGraphCanvas({
   const cancelArrangementPreview = useCallback(
     (announcement?: string): boolean => {
       if (callbacks.current.folderArrangement === undefined) return false;
+      const targetDrag = targetPointerDragRef.current;
+      if (targetDrag !== undefined) {
+        targetPointerDragRef.current = undefined;
+        sessionRef.current?.setFolderTargetPointerActive(false);
+        releaseTargetPointerCapture(targetDrag);
+        setRuleDraft((current) =>
+          current?.folderKey === targetDrag.folderKey
+            ? setFolderSpatialDraftAnchor(current, targetDrag.startAnchor)
+            : current,
+        );
+        callbacks.current.folderArrangement?.onTargetDraggingChange?.(false);
+      }
       const cancelled =
-        sessionRef.current?.cancelFolderArrangementGesture() === true;
+        sessionRef.current?.cancelFolderArrangementGesture() === true ||
+        targetDrag !== undefined;
+      if (targetDrag !== undefined) {
+        sessionRef.current?.positionFolderTargetAnchor(targetDrag.startAnchor);
+      }
       if (!cancelled && keyboardPreviewRef.current === undefined) return false;
       pendingArrangementCommit.current = undefined;
+      keyboardPreviewRef.current = undefined;
       setKeyboardPreview(undefined);
       setArrangementGesturePhase('idle');
       restoreArrangementDisplay();
@@ -751,6 +791,7 @@ export function GlobalGraphCanvas({
       if (failure !== undefined) {
         pendingArrangementCommit.current = undefined;
         sessionRef.current?.cancelFolderArrangementGesture();
+        keyboardPreviewRef.current = undefined;
         setKeyboardPreview(undefined);
         setArrangementGesturePhase('idle');
         setArrangementError(`Folder position was not saved: ${failure}`);
@@ -759,6 +800,7 @@ export function GlobalGraphCanvas({
       }
       pendingArrangementCommit.current = { folderKey, anchor, rule };
       setRuleDraft(nextDraft);
+      keyboardPreviewRef.current = undefined;
       setKeyboardPreview(undefined);
       setArrangementError(undefined);
       callbacks.current.folderArrangement?.onCommitStarted?.(rule.behavior);
@@ -954,6 +996,7 @@ export function GlobalGraphCanvas({
     const active = folderArrangement.active && arrangementAvailable;
     session.setFolderArrangementContext({
       active,
+      ...(ruleDraft === undefined ? {} : { behavior: ruleDraft.behavior }),
       ...(folderArrangement.activeFolderKey === undefined
         ? {}
         : { activeFolderKey: folderArrangement.activeFolderKey }),
@@ -1604,7 +1647,12 @@ export function GlobalGraphCanvas({
             : (session.currentFolderAnchor(folderKey) ?? { x: 0, y: 0 });
       try {
         const anchor = offsetNormalizedFolderAnchor(base, { x, y });
-        session.previewFolderAnchor(folderKey, anchor);
+        if (ruleDraft?.behavior === 'place') {
+          session.previewFolderAnchor(folderKey, anchor);
+        } else {
+          session.positionFolderTargetAnchor(anchor);
+        }
+        keyboardPreviewRef.current = { folderKey, anchor };
         setKeyboardPreview({ folderKey, anchor });
         setRuleDraft((current) =>
           current?.folderKey === folderKey
@@ -1614,7 +1662,7 @@ export function GlobalGraphCanvas({
         setActiveFolderPosition(anchor);
         setArrangementError(undefined);
         callbacks.current.folderArrangement?.onAnnouncement(
-          `${folderLabel(folderKey)} moved to ${describeNormalizedFolderAnchor(anchor)}`,
+          `${folderLabel(folderKey)} target moved to ${describeNormalizedFolderAnchor(anchor)}`,
         );
       } catch (error: unknown) {
         setArrangementError(
@@ -1623,6 +1671,155 @@ export function GlobalGraphCanvas({
       }
     },
     [folderArrangement?.activeFolderKey, keyboardPreview, ruleDraft],
+  );
+
+  const targetPointerViewportPoint = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>): SpatialPoint => {
+      const bounds = containerRef.current?.getBoundingClientRect();
+      return {
+        x: event.clientX - (bounds?.left ?? 0),
+        y: event.clientY - (bounds?.top ?? 0),
+      };
+    },
+    [],
+  );
+
+  const beginTargetPointerDrag = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const draft = ruleDraftRef.current;
+      const arrangement = callbacks.current.folderArrangement;
+      const session = sessionRef.current;
+      if (
+        event.button !== 0 ||
+        draft === undefined ||
+        session === undefined ||
+        arrangement?.editorPhase === 'choosing-scope'
+      ) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      targetPointerDragRef.current = {
+        pointerId: event.pointerId,
+        element: event.currentTarget,
+        folderKey: draft.folderKey,
+        behavior: draft.behavior,
+        startAnchor: draft.anchor,
+        startViewportPoint: targetPointerViewportPoint(event),
+        latestAnchor: draft.anchor,
+        moved: false,
+      };
+      session.setFolderTargetPointerActive(true);
+      setArrangementGesturePhase('primed');
+    },
+    [targetPointerViewportPoint],
+  );
+
+  const moveTargetPointerDrag = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = targetPointerDragRef.current;
+      const session = sessionRef.current;
+      if (
+        drag === undefined ||
+        drag.pointerId !== event.pointerId ||
+        session === undefined
+      ) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      try {
+        const anchor = session.folderTargetAnchorFromPointer(
+          drag.startAnchor,
+          drag.startViewportPoint,
+          targetPointerViewportPoint(event),
+        );
+        if (anchorsEqual(drag.latestAnchor, anchor)) return;
+        const firstMovement = !drag.moved;
+        drag.latestAnchor = anchor;
+        drag.moved = true;
+        if (drag.behavior === 'place') {
+          session.previewFolderAnchor(drag.folderKey, anchor);
+        } else {
+          session.positionFolderTargetAnchor(anchor);
+        }
+        keyboardPreviewRef.current = {
+          folderKey: drag.folderKey,
+          anchor,
+        };
+        setKeyboardPreview({ folderKey: drag.folderKey, anchor });
+        setRuleDraft((current) =>
+          current?.folderKey === drag.folderKey
+            ? setFolderSpatialDraftAnchor(current, anchor)
+            : current,
+        );
+        setActiveFolderPosition(anchor);
+        setArrangementError(undefined);
+        if (firstMovement) {
+          setArrangementGesturePhase('dragging');
+          callbacks.current.folderArrangement?.onTargetDraggingChange?.(true);
+        }
+      } catch (error: unknown) {
+        cancelArrangementPreview('Target movement canceled');
+        setArrangementError(
+          `Could not move the spatial target: ${errorMessage(error)}`,
+        );
+      }
+    },
+    [cancelArrangementPreview, targetPointerViewportPoint],
+  );
+
+  const finishTargetPointerDrag = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = targetPointerDragRef.current;
+      if (drag === undefined || drag.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      targetPointerDragRef.current = undefined;
+      sessionRef.current?.setFolderTargetPointerActive(false);
+      releaseTargetPointerCapture(drag);
+      callbacks.current.folderArrangement?.onTargetDraggingChange?.(false);
+      if (!drag.moved) {
+        setArrangementGesturePhase('idle');
+        return;
+      }
+      setArrangementGesturePhase('committing');
+      commitArrangementAnchor(drag.folderKey, drag.latestAnchor);
+    },
+    [commitArrangementAnchor],
+  );
+
+  const cancelTargetPointerDrag = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = targetPointerDragRef.current;
+      if (drag === undefined || drag.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      cancelArrangementPreview('Target movement canceled');
+    },
+    [cancelArrangementPreview],
+  );
+
+  const handleTargetMarkerKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      const amount = event.shiftKey ? 0.1 : 0.02;
+      const offset =
+        event.key === 'ArrowLeft'
+          ? { x: -amount, y: 0 }
+          : event.key === 'ArrowRight'
+            ? { x: amount, y: 0 }
+            : event.key === 'ArrowUp'
+              ? { x: 0, y: -amount }
+              : event.key === 'ArrowDown'
+                ? { x: 0, y: amount }
+                : undefined;
+      if (offset === undefined) return;
+      event.preventDefault();
+      event.stopPropagation();
+      nudgeActiveFolder(offset.x, offset.y);
+    },
+    [nudgeActiveFolder],
   );
 
   const handleArrangementPanelKeyDown = useCallback(
@@ -1798,9 +1995,22 @@ export function GlobalGraphCanvas({
       ) : null}
       {folderArrangement?.active === true && ruleDraft !== undefined ? (
         <div
-          aria-hidden="true"
+          aria-disabled={
+            folderArrangement.editorPhase === 'choosing-scope'
+              ? 'true'
+              : undefined
+          }
+          aria-label={`Spatial target for ${folderLabel(ruleDraft.folderKey)}`}
           className={`global-graph-canvas__target-marker global-graph-canvas__target-marker--${ruleDraft.behavior}`}
+          onKeyDown={handleTargetMarkerKeyDown}
+          onLostPointerCapture={cancelTargetPointerDrag}
+          onPointerCancel={cancelTargetPointerDrag}
+          onPointerDown={beginTargetPointerDrag}
+          onPointerMove={moveTargetPointerDrag}
+          onPointerUp={finishTargetPointerDrag}
           ref={targetMarkerRef}
+          role="button"
+          tabIndex={folderArrangement.editorPhase === 'choosing-scope' ? -1 : 0}
         />
       ) : null}
       {projection.nodes.length === 0 && folderArrangement?.active !== true ? (
@@ -1875,8 +2085,9 @@ export function GlobalGraphCanvas({
                 <div>
                   <strong>Arrange folders</strong>
                   <p>
-                    Choose a folder, define its rule, then drag its included
-                    Files.
+                    Choose a folder, define its rule, then drag its spatial
+                    target. Fixed placement also supports dragging an included
+                    File.
                   </p>
                 </div>
                 <button onClick={finishArrangement} type="button">

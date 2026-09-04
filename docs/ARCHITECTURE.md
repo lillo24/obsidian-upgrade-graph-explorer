@@ -307,25 +307,29 @@ Direct arrangement preserves those boundaries. `GraphExplorer` owns the
 transient editor lifecycle, the canonical-path folder tree derived from the full
 snapshot, and the existing workspace persistence session. `GlobalGraphCanvas`
 owns the Pull/Place draft, exact/full-subtree/Custom controls, accessible DOM
-scope tree, target controls, scope visualization, and write-before-adopt display
-transaction. The imperative Global Sigma session
-owns prime/threshold/drag/commit/cancel state, pointer conversion, one
-requestAnimationFrame coalescer, and sparse coordinate application. It validates
-the complete sparse set, changes only renderer-owned x/y attributes, and asks
-Sigma 3.0.3 for one scheduled partial indexed refresh of moved nodes and incident
-edges. Required indexation may scan renderer internals; it is not application
-mapping, topology reconciliation, full anchor composition, or layout.
+scope tree, target controls, scope visualization, marker pointer capture, and
+write-before-adopt display transaction. The imperative Global Sigma session
+owns viewport/graph target conversion plus Place node prime/threshold/drag/
+commit/cancel state, one requestAnimationFrame coalescer, and sparse coordinate
+application. It validates the complete sparse set, changes only renderer-owned
+x/y attributes, and asks Sigma 3.0.3 for one scheduled partial indexed refresh
+of moved nodes and incident edges. Required indexation may scan renderer
+internals; it is not application mapping, topology reconciliation, full anchor
+composition, or layout.
 
-One click activates a visible File's folder without moving it; a 3 px threshold
-starts rigid movement of the draft's effective deepest-wins members. Choose-mode
-graph clicks toggle folder subtrees or the complete direct-root group and cannot
-drag the target; the bounded DOM tree provides the authoritative keyboard path.
-Stage drag keeps camera pan, while selection/Focus/double-click/context/wheel
-actions are suppressed on nodes for the duration of the gesture. Blur,
-visibility loss, topology/layout/scope change, Escape, and disposal cancel
-unfinished preview. Pull release persists the complete rule and retains the
-rigid preview until the matching latest dynamic generation adopts or fails;
-Place composes exactly after the current dynamic layer. Network Explorer
+One click activates a visible File's folder without moving it. Pull dragging or
+keyboard nudge moves only the spatial target marker and draft anchor; it calls no
+rigid preview path and changes zero graph coordinates. Place marker drag, or a
+Place drag begun on an effective selected File after the 3 px threshold, rigidly
+previews those deepest-wins members. Choose-mode graph clicks toggle folder
+subtrees or the complete direct-root group and cannot drag the target; the
+bounded DOM tree provides the authoritative keyboard path. Marker pointer
+capture alone suppresses stage pan; stage dragging and wheel/trackpad zoom remain
+available otherwise. Blur, lost capture, visibility loss, topology/layout/scope
+change, Escape, and disposal cancel unfinished preview. Pull release persists
+the complete rule while confirmed nodes remain stationary until the matching
+latest dynamic generation adopts or fails; Place composes exactly after the
+current dynamic layer. Network Explorer
 provides exact-root edit/remove actions and summaries without presenting
 inherited parent intent as child ownership or adding canonical folder entities.
 
@@ -344,9 +348,10 @@ imperative coordinator coalesces updates by animation frame. File movement and
 Arrange Folders cancel one another. Lifecycle invalidations end the temporary
 constraint and never write layout caches, spatial persistence, view state,
 history, or source. The app has only an unmounted transient one-tool editing
-state contract. PHYSICS1 still owns real simulation lifetime, reheating,
-cooling, and convergence; MOVE1B owns its production binding and Edit control;
-PIN1 owns any future durable individual placement.
+state contract. SPATIAL2B does not call this seam or add a second simulation
+lifecycle. PHYSICS1 still owns real simulation lifetime, reheating, cooling,
+convergence, and future hard-Place neighbor reaction; MOVE1B owns its production
+binding and Edit control; PIN1 owns any future durable individual placement.
 
 `tools/global-renderer-spike` is now a production renderer harness rather than
 an implementation fork. It retains only synthetic KG13A fixtures, browser/Tauri
@@ -871,10 +876,12 @@ rules still compose last. SPATIAL2B's completed implementation exposes Pull and
 Place plus exact, full-subtree, and declarative Custom scope in Arrange mode.
 New folders default to Pull/exact/70 at their displayed center, but selection
 alone neither moves nor persists. The draft replaces its same-root rule only for
-visualization; deepest child rules remain authoritative. The transient rigid
-preview moves effective members and relevant edges live, then commits one full
-rule or restores confirmed state on cancel/failure. Individual-node dragging is
-not part of this interaction. A
+visualization; deepest child rules remain authoritative. Pull target editing
+moves only the marker and commits one full rule before the existing SPATIAL2A
+settlement path adopts authoritative geometry. Place retains the transient rigid
+preview over effective members and relevant edges, or restores confirmed state
+on cancel/failure. This is folder-rule authoring, not MOVE1A individual-File
+movement or the final PHYSICS1 reaction lifecycle. A
 later Saved View may
 reference, copy, or selectively override an independently serializable spatial
 profile alongside query, scope, layout, hierarchy detail, settings, and

@@ -109,9 +109,11 @@ session. SPATIAL2B adds Dynamic pull/Fixed placement, exact/full-subtree/Custom
 scope, direct-root inclusion, exclusions, strength, exact-root rule summaries,
 and child-rule handoff. Its full folder tree comes from canonical snapshot paths
 instead of the filtered projection, so hidden folders remain authorable. The
-canvas adds rigid target drag, keyboard nudge, Apply/Cancel, one/all reset, and
-corrupt-recovery surfaces without adding folder entities, File-ID membership,
-raw coordinates, or graph history checkpoints.
+canvas makes the spatial target directly draggable and adds keyboard nudge,
+Apply/Cancel, one/all reset, and corrupt-recovery surfaces. Pull target editing
+changes only draft intent; Place may rigidly preview effective members. Neither
+path adds folder entities, File-ID membership, raw coordinates, or graph history
+checkpoints.
 
 MOVE1A defines, but does not mount, a future Network editing-mode reducer. It
 allows exactly one of Move File or Arrange Folder, and requires gesture cleanup
