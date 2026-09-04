@@ -112,7 +112,7 @@ import {
   explorationLayout,
   explorationScope,
   focusLayoutMode,
-  globalLayoutSettingsApplyImmediately,
+  globalLayoutSettingsRequireImmediateLayout,
   hierarchyVisualVariantForScope,
   type ExplorationLayout,
   type ExplorationScope,
@@ -2409,11 +2409,18 @@ export function GraphExplorer({
     },
     [updateGraphPreferences],
   );
-  // Settings are inert while another renderer is mounted. All Network observes
-  // the new settings directly and its worker keeps only the latest request.
+  // Settings are inert while another renderer is mounted. Active All Network
+  // refreshes visual values in Sigma and requests workers only for physics.
   const changeGlobalLayoutSettings = useCallback(
     (settings: GlobalLayoutSettings) => {
-      if (globalLayoutSettingsApplyImmediately(activeScope, activeLayout)) {
+      if (
+        globalLayoutSettingsRequireImmediateLayout(
+          activeScope,
+          activeLayout,
+          preferencesRef.current.globalLayoutSettings,
+          settings,
+        )
+      ) {
         setGlobalLayoutRequestKey((current) => current + 1);
       }
       updateGraphPreferences({ globalLayoutSettings: settings });

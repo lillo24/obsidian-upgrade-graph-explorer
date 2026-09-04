@@ -58,8 +58,13 @@ export class CanvasTestHarness {
       ref?: { current: unknown };
       children?: ReactNode;
     }>;
-    if (props.ref != null && props.ref.current === null)
-      props.ref.current = { setAttribute: () => undefined };
+    if (props.ref != null && props.ref.current === null) {
+      props.ref.current = {
+        focus: () => undefined,
+        setAttribute: () => undefined,
+        style: { setProperty: () => undefined },
+      };
+    }
     this.attach(props.children);
   }
   async flush(): Promise<void> {

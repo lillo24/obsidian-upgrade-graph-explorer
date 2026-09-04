@@ -33,6 +33,8 @@ export interface GlobalNodeStyleContext {
   readonly settings: ResolvedGlobalLayoutSettings;
   readonly visualGroup?: VisualGroupNodePresentation;
   readonly sizeScale?: number;
+  /** Current automatic display radius; Graphology keeps topology-stable size. */
+  readonly automaticSize?: number;
 }
 
 export interface GlobalEdgeStyleContext {
@@ -40,6 +42,8 @@ export interface GlobalEdgeStyleContext {
   readonly relatedToHover: boolean;
   readonly hoverActive: boolean;
   readonly lod: GlobalVisualLod;
+  /** Current automatic display width; layout edge weight remains independent. */
+  readonly automaticSize?: number;
 }
 
 /** Built-in layer; future GROUP1 may contribute before this final interaction pass. */
@@ -47,11 +51,12 @@ export function resolveGlobalNodeStyle(
   attributes: GlobalNodeAttributes,
   context: GlobalNodeStyleContext,
 ) {
-  // Per-File radius is presentation only; Graphology retains automatic size.
+  // Global visual settings and per-File scale are presentation only.
+  const automaticSize = context.automaticSize ?? attributes.size;
   const size =
     attributes.nodeKind === 'document' && attributes.entityId !== null
-      ? applyNetworkNodeSizeScale(attributes.size, context.sizeScale)
-      : attributes.size;
+      ? applyNetworkNodeSizeScale(automaticSize, context.sizeScale)
+      : automaticSize;
   const emphasized = context.selected || context.hovered;
   const arrangementFocused =
     context.arrangementActive === true &&
@@ -117,7 +122,7 @@ export function resolveGlobalEdgeStyle(
       weakFarEdge &&
       !(context.hoverActive && context.relatedToHover),
     size:
-      attributes.size *
+      (context.automaticSize ?? attributes.size) *
       (arrangementActive
         ? arrangementRelation === 'internal'
           ? 1.15

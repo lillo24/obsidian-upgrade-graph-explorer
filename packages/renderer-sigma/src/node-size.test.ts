@@ -168,7 +168,7 @@ describe('render-only per-File size composition', () => {
     ).toBe(attributes.size);
   });
 
-  it('still fingerprints legitimate automatic size changes for both layouts', () => {
+  it('excludes Global display radius but keeps Focus semantic size in layout identity', () => {
     const global = mapProjectionToGlobal(globalTestProjection());
     const local = mapProjectionToLocalTopology(localTestProjection(), 'root');
     const globalRequest = createGlobalLayoutRequest(
@@ -185,7 +185,7 @@ describe('render-only per-File size composition', () => {
           size: node.size + 1,
         })),
       }),
-    ).not.toBe(globalLayoutFingerprint(globalRequest));
+    ).toBe(globalLayoutFingerprint(globalRequest));
     expect(
       localLayoutFingerprint({
         ...localRequest,

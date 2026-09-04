@@ -15,9 +15,11 @@ import type {
   GlobalEdgeAttributes,
   GlobalLayoutSettings,
   GlobalNodeAttributes,
+  GlobalNodeKind,
   GlobalReferenceStatus,
   GlobalRendererInput,
   GlobalSpatialMetadata,
+  ResolvedGlobalVisualSettings,
 } from './types';
 import { stableUnit } from './deterministic';
 
@@ -98,7 +100,10 @@ function nodeAttributes(
   if (node.kind === 'reference-target') {
     return {
       ...position,
-      size: Math.max(2, nodeSize * 0.62),
+      size: automaticGlobalNodeSize('diagnostic', degree, {
+        nodeSize,
+        referenceDegreeSizeInfluence,
+      }),
       color: STATUS_COLORS[node.status],
       label: node.rawTarget,
       nodeKind: 'diagnostic',
@@ -116,8 +121,10 @@ function nodeAttributes(
   }
   return {
     ...position,
-    size:
-      nodeSize + referenceDegreeSizeBoost(degree, referenceDegreeSizeInfluence),
+    size: automaticGlobalNodeSize('document', degree, {
+      nodeSize,
+      referenceDegreeSizeInfluence,
+    }),
     color: '#277b95',
     label: entityLabel(node),
     nodeKind: 'document',
@@ -157,6 +164,33 @@ export function referenceDegreeSizeBoost(
   );
 }
 
+export function automaticGlobalNodeSize(
+  nodeKind: GlobalNodeKind,
+  referenceDegree: number,
+  settings: Pick<
+    ResolvedGlobalVisualSettings,
+    'nodeSize' | 'referenceDegreeSizeInfluence'
+  >,
+): number {
+  return nodeKind === 'diagnostic'
+    ? Math.max(2, settings.nodeSize * 0.62)
+    : settings.nodeSize +
+        referenceDegreeSizeBoost(
+          referenceDegree,
+          settings.referenceDegreeSizeInfluence,
+        );
+}
+
+export function automaticGlobalEdgeSize(
+  referenceCount: number,
+  settings: Pick<ResolvedGlobalVisualSettings, 'linkThickness'>,
+): number {
+  return (
+    settings.linkThickness *
+    (0.6 + Math.min(2.6, Math.log2(referenceCount + 1) * 0.5))
+  );
+}
+
 function edgeAttributes(
   edge: ViewProjection['edges'][number],
   linkThickness: number,
@@ -167,9 +201,9 @@ function edgeAttributes(
     );
   }
   return {
-    size:
-      linkThickness *
-      (0.6 + Math.min(2.6, Math.log2(edge.referenceIds.length + 1) * 0.5)),
+    size: automaticGlobalEdgeSize(edge.referenceIds.length, {
+      linkThickness,
+    }),
     color: STATUS_COLORS[edge.status],
     edgeKind: 'reference',
     status: edge.status,
@@ -224,6 +258,16 @@ export function mapProjectionToGlobal(
     };
   });
   return { nodes, edges, projectionIssues: projection.issues };
+}
+
+/**
+ * Stable topology/mapping input for the mounted canvas. Automatic visual sizes
+ * are recomputed by Sigma reducers from their current visual settings.
+ */
+export function mapProjectionToGlobalTopology(
+  projection: ViewProjection,
+): GlobalRendererInput {
+  return mapProjectionToGlobal(projection, DEFAULT_GLOBAL_LAYOUT_SETTINGS);
 }
 
 export function resetGlobalSeedPositions(
