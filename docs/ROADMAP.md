@@ -26,12 +26,12 @@ Future package names, state libraries, and implementation details are intentiona
 
 ### HIER — Focus Schematic redesign
 
-| Milestone  | Outcome                                                                      | Status        |
-| ---------- | ---------------------------------------------------------------------------- | ------------- |
-| **HIER0**  | Experimental All-Hierarchy gate and collision-safe geometry baseline.        | **Complete.** |
-| **HIER1**  | Source-neutral File-module semantic model and shared layout-quality harness. | **Complete.** |
-| **HIER2**  | Dagre/custom prototype bake-off through the HIER1 candidate contract.        | **Next.**     |
-| **HIER3+** | Production integration, folder treatment, routing, and stability policy.     | **Later.**    |
+| Milestone | Outcome                                                                                                                                                                                                                         | Status                                             |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| **HIER0** | Experimental All-Hierarchy gate and collision-safe geometry baseline.                                                                                                                                                           | **Complete.**                                      |
+| **HIER1** | Source-neutral File-module semantic model and shared layout-quality harness.                                                                                                                                                    | **Complete.**                                      |
+| **HIER2** | Dagre/custom prototype bake-off through the HIER1 candidate contract.                                                                                                                                                           | **Complete — stateless two-stage Dagre selected.** |
+| **HIER3** | Integrate modular Focus Hierarchy, connect actual cross-file File/Heading/Block endpoints, refine endpoint-facing internal lanes for two-sided and multi-hop modules, and preserve Classic Focus Hierarchy behind Experimental. | **Next.**                                          |
 
 This track composes with the active KG14 sequence; it does not replace or
 reorder KG14.
@@ -44,6 +44,11 @@ reorder KG14.
 | **SPATIAL2 — Folder spatial behavior**              | Hierarchical folder scope plus fixed placement and dynamic soft-attractor behavior in All Network.                                                               | **In progress.**                                                      |
 | **SPATIAL2A — Scope/attractor foundation**          | Schema-v2 migration, most-specific membership, three position layers, separate worker/cache, bake-off, harness, and aggregate evidence.                          | **Complete.**                                                         |
 | **SPATIAL2B — Product rule editor**                 | Production behavior/scope/exclusion/strength controls over the SPATIAL2A contracts.                                                                              | **Next for SPATIAL2; not started.**                                   |
+| **PHYSICS1 — Continuous simulation lifecycle**      | Simulation ownership, reheating, convergence/cooling, and a concrete temporary-constraint adapter.                                                               | **Parallel dependency; not delivered on main.**                       |
+| **MOVE1 — Temporary physical File movement**        | Direct manipulation that ends on release and returns the File to automatic physical behavior.                                                                    | **In progress.**                                                      |
+| **MOVE1A — Constraint/gesture foundation**          | Display-to-dynamic coordinate inverse, serializable consumer port, pure gesture/coalescing, session seams, and lifecycle/arbitration tests.                      | **Complete.**                                                         |
+| **MOVE1B — Production Edit/Move mode**              | Visible editing surface and real PHYSICS1 adapter integration with runtime cooling/RAF evidence.                                                                 | **Next after PHYSICS1.**                                              |
+| **PIN1 — Persistent individual placement**          | Explicit durable single-File placement semantics, storage, reconciliation, and authoring controls.                                                               | **Later; no schema is defined.**                                      |
 | **SAVED1 — Saved Views**                            | Later composition of query, Scope/Layout, hierarchy detail, settings, viewport, and spatial profile/reference.                                                   | **Later** — no schema is defined.                                     |
 
 ## Accepted future interaction guidance
@@ -135,8 +140,12 @@ separate LAYOUT1 idea remains paused/absorbed into KG13's Global → Regional �
 Local spatial architecture. SPATIAL1's normalized exact-folder foundation and
 Arrange Folders interaction are complete. SPATIAL2A's schema, hierarchy,
 soft-attractor worker/cache, and development evidence are complete; SPATIAL2B
-is the next product-authoring step. Named Saved Views remain later derived
-presentation work.
+is the next product-authoring step. MOVE1A independently establishes temporary
+File constraint, coordinate, gesture, and renderer-session contracts without a
+production control or real cooling adapter. PHYSICS1 owns continuous simulation
+lifecycle; MOVE1B follows it with product integration. PIN1 remains a separate
+later persistence feature rather than a side effect of Move. Named Saved Views
+remain later derived presentation work.
 
 Post-MVP analytics—typed conceptual relations, pathfinding variants,
 centrality, betweenness, communities, connected components, co-citation,

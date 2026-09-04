@@ -2,10 +2,17 @@ import Sigma from 'sigma';
 import type { WheelCoords } from 'sigma/types';
 import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-groups';
 import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
+import type { SpatialPoint } from '@icarus-graph-explorer/spatial-overrides';
 import {
   changedFileSizeNodeKeys,
   indexFileNodeKeys,
 } from './node-size-presentation';
+import {
+  isAvailableTemporaryFileMoveContext,
+  TemporaryFileMoveCoordinator,
+  type TemporaryFileMoveSessionContext,
+} from './file-move';
+import type { TemporaryNodeConstraintEndReason } from './temporary-node-constraint';
 
 import {
   buildLocalGraph,
@@ -71,6 +78,7 @@ export interface LocalRendererSessionOptions {
     key: string | undefined,
     attributes: LocalNodeAttributes | undefined,
   ) => void;
+  readonly onFileMoveError?: (message: string) => void;
   readonly onViewportObservation?: (
     viewport: SemanticLocalViewport | undefined,
   ) => void;
@@ -128,6 +136,29 @@ export class LocalRendererSession {
   private destroyed = false;
   private nodeClicks: NodeClickArbitrator | undefined;
   private readonly wheelDirection = new WheelDirectionStabilizer();
+  private fileMoveContext: TemporaryFileMoveSessionContext | undefined;
+  private fileMoveCoordinator: TemporaryFileMoveCoordinator | undefined;
+  private fileMoveGestureSequence = 0;
+  private suppressFileMoveDoubleClick = false;
+  private fileMoveLifecycleAttached = false;
+
+  private readonly fileMoveKeyDownHandler = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') this.cancelTemporaryFileMove('cancelled');
+  };
+
+  private readonly fileMoveBlurHandler = (): void => {
+    this.cancelTemporaryFileMove('pointer-lost');
+  };
+
+  private readonly fileMovePointerLossHandler = (): void => {
+    this.cancelTemporaryFileMove('pointer-lost');
+  };
+
+  private readonly fileMoveVisibilityHandler = (): void => {
+    if (document.visibilityState !== 'visible') {
+      this.cancelTemporaryFileMove('pointer-lost');
+    }
+  };
 
   private readonly mouseDragHandler = (): void => {
     if (this.renderer.getMouseCaptor().isMouseDown) {
@@ -165,6 +196,10 @@ export class LocalRendererSession {
   };
 
   private readonly precisionWheelHandler = (coordinates: WheelCoords): void => {
+    if (this.fileMoveCoordinator?.ownsPointerSequence === true) {
+      preventSigmaWheelDefault(coordinates);
+      return;
+    }
     const original = coordinates.original as WheelEvent;
     preventSigmaWheelDefault(coordinates);
     const deltaPixels = normalizeWheelDeltaPixels(
@@ -343,6 +378,107 @@ export class LocalRendererSession {
     });
   }
 
+  private eligibleFileMoveNode(key: string): boolean {
+    if (!this.graph.hasNode(key)) return false;
+    const attributes = this.graph.getNodeAttributes(key);
+    return (
+      attributes.nodeKind === 'document' &&
+      attributes.entityId !== null &&
+      attributes.sourcePath !== null
+    );
+  }
+
+  private viewportToGraphPoint(point: SpatialPoint): SpatialPoint {
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+      throw new Error('Viewport point must contain finite x/y coordinates.');
+    }
+    const result = this.renderer.viewportToGraph(point);
+    if (!Number.isFinite(result.x) || !Number.isFinite(result.y)) {
+      throw new Error('Sigma returned an invalid graph point.');
+    }
+    return result;
+  }
+
+  private beginTemporaryFileMove(key: string, point: SpatialPoint): void {
+    const context = this.fileMoveContext;
+    if (context?.active !== true || !this.eligibleFileMoveNode(key)) return;
+    if (context.capability.status !== 'available') {
+      this.options.instrumentation?.count('file-move-unavailable-attempts');
+      return;
+    }
+    const attributes = this.graph.getNodeAttributes(key);
+    const graphPoint = this.viewportToGraphPoint(point);
+    this.suppressFileMoveDoubleClick = false;
+    this.fileMoveCoordinator?.prime({
+      gestureId: `${context.sessionGeneration}:${++this.fileMoveGestureSequence}`,
+      nodeKey: key,
+      startViewportPoint: point,
+      startGraphPoint: graphPoint,
+      displayedNodePoint: { x: attributes.x, y: attributes.y },
+    });
+  }
+
+  private moveTemporaryFileMove(
+    viewportPoint: SpatialPoint,
+    preventSigmaDefault: () => void,
+  ): void {
+    const coordinator = this.fileMoveCoordinator;
+    if (coordinator?.ownsPointerSequence !== true) return;
+    preventSigmaDefault();
+    coordinator.move(viewportPoint, this.viewportToGraphPoint(viewportPoint));
+  }
+
+  private finishTemporaryFileMove(): void {
+    const coordinator = this.fileMoveCoordinator;
+    if (coordinator === undefined) return;
+    const dragged = coordinator.release();
+    if (dragged) {
+      this.nodeClicks?.cancel();
+      this.suppressFileMoveDoubleClick = true;
+    }
+  }
+
+  private cancelTemporaryFileMove(
+    reason: Exclude<TemporaryNodeConstraintEndReason, 'released'>,
+  ): boolean {
+    return this.fileMoveCoordinator?.cancel(reason) ?? false;
+  }
+
+  private attachFileMoveLifecycle(): void {
+    if (this.fileMoveLifecycleAttached) return;
+    this.fileMoveLifecycleAttached = true;
+    window.addEventListener('keydown', this.fileMoveKeyDownHandler);
+    window.addEventListener('blur', this.fileMoveBlurHandler);
+    window.addEventListener('pointercancel', this.fileMovePointerLossHandler);
+    window.addEventListener(
+      'lostpointercapture',
+      this.fileMovePointerLossHandler,
+    );
+    document.addEventListener(
+      'visibilitychange',
+      this.fileMoveVisibilityHandler,
+    );
+  }
+
+  private detachFileMoveLifecycle(): void {
+    if (!this.fileMoveLifecycleAttached) return;
+    this.fileMoveLifecycleAttached = false;
+    window.removeEventListener('keydown', this.fileMoveKeyDownHandler);
+    window.removeEventListener('blur', this.fileMoveBlurHandler);
+    window.removeEventListener(
+      'pointercancel',
+      this.fileMovePointerLossHandler,
+    );
+    window.removeEventListener(
+      'lostpointercapture',
+      this.fileMovePointerLossHandler,
+    );
+    document.removeEventListener(
+      'visibilitychange',
+      this.fileMoveVisibilityHandler,
+    );
+  }
+
   private bindEvents(): void {
     const nodeClicks = new NodeClickArbitrator();
     this.nodeClicks = nodeClicks;
@@ -362,21 +498,90 @@ export class LocalRendererSession {
       this.renderer.scheduleRender();
     });
     this.renderer.on('clickNode', ({ node }) => {
+      if (this.fileMoveCoordinator?.consumeReleasedDragClick() === true) {
+        nodeClicks.cancel();
+        return;
+      }
       this.selectNode(node);
       nodeClicks.schedule(() => this.options.onNodeSingleClick?.(node));
     });
     this.renderer.on('doubleClickNode', ({ node, preventSigmaDefault }) => {
       preventSigmaDefault();
       nodeClicks.cancel();
+      if (this.suppressFileMoveDoubleClick) {
+        this.suppressFileMoveDoubleClick = false;
+        return;
+      }
       if (!this.graph.hasNode(node)) return;
       const { entityId } = this.graph.getNodeAttributes(node);
       if (entityId !== null) this.options.onNodeActivated?.(entityId);
     });
     this.renderer.on('clickStage', () => {
       nodeClicks.cancel();
+      if (this.fileMoveCoordinator?.consumeReleasedDragClick() === true) {
+        return;
+      }
       this.selectNode(undefined);
     });
     this.renderer.on('doubleClickStage', () => nodeClicks.cancel());
+    this.renderer.on('rightClickNode', ({ preventSigmaDefault }) => {
+      if (this.fileMoveCoordinator?.ownsPointerSequence === true) {
+        preventSigmaDefault();
+      }
+    });
+    this.renderer.on('downNode', ({ node, event, preventSigmaDefault }) => {
+      if (
+        this.fileMoveContext?.capability.status === 'available' &&
+        this.eligibleFileMoveNode(node)
+      ) {
+        preventSigmaDefault();
+        this.beginTemporaryFileMove(node, { x: event.x, y: event.y });
+        return;
+      }
+      if (this.fileMoveContext?.capability.status === 'unavailable') {
+        this.beginTemporaryFileMove(node, { x: event.x, y: event.y });
+      }
+    });
+    this.renderer.on('moveBody', ({ event, preventSigmaDefault }) => {
+      this.moveTemporaryFileMove(
+        { x: event.x, y: event.y },
+        preventSigmaDefault,
+      );
+    });
+    const finishFileMove = () => this.finishTemporaryFileMove();
+    this.renderer.on('upNode', finishFileMove);
+    this.renderer.on('upStage', finishFileMove);
+    this.renderer.on('leaveStage', () => {
+      this.cancelTemporaryFileMove('pointer-lost');
+    });
+  }
+
+  /** Fake-backed MOVE1A seam; production does not activate it until PHYSICS1. */
+  setTemporaryFileMoveContext(
+    context: TemporaryFileMoveSessionContext | undefined,
+    cancellationReason: Exclude<
+      TemporaryNodeConstraintEndReason,
+      'released'
+    > = 'mode-exit',
+  ): void {
+    this.detachFileMoveLifecycle();
+    this.fileMoveCoordinator?.cancel(cancellationReason);
+    this.fileMoveCoordinator = undefined;
+    this.fileMoveContext = context;
+    this.suppressFileMoveDoubleClick = false;
+    if (context === undefined) return;
+    if (isAvailableTemporaryFileMoveContext(context)) {
+      this.fileMoveCoordinator = new TemporaryFileMoveCoordinator({
+        context,
+        count: (operation) => this.options.instrumentation?.count(operation),
+        onDragStart: (nodeKey) => {
+          this.nodeClicks?.cancel();
+          this.selectNode(nodeKey);
+        },
+        onError: (message) => this.options.onFileMoveError?.(message),
+      });
+    }
+    this.attachFileMoveLifecycle();
   }
 
   updateTrackpadZoomMode(mode: LocalTrackpadZoomMode): void {
@@ -451,6 +656,7 @@ export class LocalRendererSession {
   }
 
   update(input: LocalRendererInput): LocalGraphReconciliation {
+    this.cancelTemporaryFileMove('topology-changed');
     this.nodeClicks?.cancel();
     const anchorKey =
       this.pendingViewportAnchorNodeKey ?? this.viewportAnchorNodeKey();
@@ -598,6 +804,7 @@ export class LocalRendererSession {
   }
 
   applyPositions(positions: readonly LocalLayoutPosition[]): Promise<void> {
+    this.cancelTemporaryFileMove('layout-changed');
     const anchorKey = this.viewportAnchorNodeKey();
     const anchor = this.nodeViewportPoint(anchorKey);
     const byKey = new Map(
@@ -814,6 +1021,10 @@ export class LocalRendererSession {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.cancelTemporaryFileMove('disposed');
+    this.detachFileMoveLifecycle();
+    this.fileMoveCoordinator = undefined;
+    this.fileMoveContext = undefined;
     this.nodeClicks?.cancel();
     this.renderer.getMouseCaptor().off('wheel', this.precisionWheelHandler);
     this.renderer.getMouseCaptor().off('mousemovebody', this.mouseDragHandler);

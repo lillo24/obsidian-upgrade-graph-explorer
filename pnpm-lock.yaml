@@ -204,6 +204,25 @@ importers:
         specifier: 24.13.3
         version: 24.13.3
 
+  packages/focus-schematic-layout:
+    dependencies:
+      '@dagrejs/dagre':
+        specifier: 3.1.1
+        version: 3.1.1
+      '@icarus-graph-explorer/core':
+        specifier: workspace:*
+        version: link:../core
+      '@icarus-graph-explorer/focus-schematic':
+        specifier: workspace:*
+        version: link:../focus-schematic
+      '@icarus-graph-explorer/view-projection':
+        specifier: workspace:*
+        version: link:../view-projection
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.3
+        version: 24.13.3
+
   packages/graph-query:
     dependencies:
       '@icarus-graph-explorer/core':
@@ -429,6 +448,37 @@ importers:
       '@icarus-graph-explorer/workspace-engine-obsidian':
         specifier: workspace:*
         version: link:../workspace-engine-obsidian
+
+  tools/focus-schematic-bakeoff:
+    dependencies:
+      '@dagrejs/dagre':
+        specifier: 3.1.1
+        version: 3.1.1
+      '@icarus-graph-explorer/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@icarus-graph-explorer/dagre-layout':
+        specifier: workspace:*
+        version: link:../../packages/dagre-layout
+      '@icarus-graph-explorer/focus-schematic':
+        specifier: workspace:*
+        version: link:../../packages/focus-schematic
+      '@icarus-graph-explorer/focus-schematic-layout':
+        specifier: workspace:*
+        version: link:../../packages/focus-schematic-layout
+      '@icarus-graph-explorer/renderer-reactflow':
+        specifier: workspace:*
+        version: link:../../packages/renderer-reactflow
+      '@icarus-graph-explorer/view-projection':
+        specifier: workspace:*
+        version: link:../../packages/view-projection
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.3
+        version: 24.13.3
+      tsx:
+        specifier: 4.23.12
+        version: 4.23.12
 
   tools/global-renderer-spike:
     dependencies:

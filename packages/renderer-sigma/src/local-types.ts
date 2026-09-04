@@ -159,7 +159,8 @@ export type LocalPerformancePhase =
   | 'local-visual-lod'
   | 'local-hover'
   | 'local-selection'
-  | 'local-center';
+  | 'local-center'
+  | 'file-move';
 
 export type LocalPerformanceOperation =
   | 'local-mappings'
@@ -170,7 +171,13 @@ export type LocalPerformanceOperation =
   | 'local-style-updates'
   | 'local-hover-applications'
   | 'local-selection-applications'
-  | 'local-centers';
+  | 'local-centers'
+  | 'file-move-primes'
+  | 'file-move-begins'
+  | 'file-move-coalesced-updates'
+  | 'file-move-releases'
+  | 'file-move-cancels'
+  | 'file-move-unavailable-attempts';
 
 export interface LocalRendererInstrumentation {
   readonly count: (

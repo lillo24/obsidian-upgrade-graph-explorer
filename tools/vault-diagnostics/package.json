@@ -15,6 +15,7 @@
     "analyze:focus-spacing": "tsx src/focus-spacing-analysis.ts",
     "analyze:network-spacing": "tsx src/network-spacing-analysis.ts",
     "benchmark:focus-schematic": "tsx src/focus-schematic-benchmark.ts",
+    "benchmark:file-move": "tsx src/file-move-benchmark.ts",
     "diagnose": "tsx src/cli.ts",
     "generate:sample": "tsx src/generate-sample.ts",
     "validate:incremental-real": "tsx src/validate-incremental-real.ts",

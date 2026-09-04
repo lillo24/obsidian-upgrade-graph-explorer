@@ -15,6 +15,9 @@ density-aware without changing Global or Local ForceAtlas2 geometry. Its QA
 Sandbox keeps separate transient All and Focus strengths; renderer geometry,
 layout identity, spatial rules, and persisted workspace/preference schemas do
 not observe them.
+MOVE1A defines temporary File movement across All and Focus as an optional
+constraint contract, while PHYSICS1 retains continuous simulation ownership and
+MOVE1B/PIN1 remain future product and persistence work.
 
 ## Stable domain shape
 
@@ -166,6 +169,20 @@ neighborhood, strict construction/validation, aggregate semantic summary, and
 renderer-independent layout-candidate, quality, and stability contracts. It is
 not imported by production rendering in HIER1. See ADR 0017.
 
+`packages/focus-schematic-layout` depends inward on core, view-projection,
+focus-schematic, and pinned Dagre 3.1.1. It owns the strict explicit-dimension
+input, deterministic equal-mutual layout plan, fixed module-box policy,
+canonical sibling constraints, and selected stateless two-stage Dagre
+candidate. HIER2 production-boundary tests keep it out of apps,
+renderer-reactflow, view-state, workspace-worker, and platform code. HIER3 may
+place `model + projection + dimensions + settings → validated candidate`
+behind a new latest-result-wins worker boundary; HIER2 does not change W3. HIER3
+must attach cross-file references to their actual visible File, Heading, or
+Block endpoints and may orient relevant internal entities into incoming-facing
+and outgoing-facing lanes toward neighbouring macro ranks. That internal
+semantic refinement is layered on the selected two-stage macro architecture;
+it does not reopen the strategy decision. See ADR 0018.
+
 `packages/view-state` depends inward on core and view-projection only. It owns a
 versioned plain-data subset of KG6 disclosure, focus, user-facing filters,
 presentation mode, and separate semantic Structure/Global/Local
@@ -307,6 +324,25 @@ map is rendered; failure restores the last confirmed composition. Network
 Explorer provides exact folder actions, a root `.` fallback, markers, and
 keyboard nudge/save/reset access without adding canonical folder entities.
 
+Temporary File movement is a second direct-manipulation path rather than a
+folder-arrangement variant. The source-neutral spatial boundary derives a
+node-to-translation index from the fixed groups actually applied by composition.
+With displayed `P = D + T`, a drag sends `Ptarget - T` to the dynamic simulation
+layer; a missing Place translation is identity and dynamic Pull output is not
+removed. Ambiguous applied translations fail instead of guessing precedence.
+
+Both Sigma sessions expose a fake-backed begin/update/end port for one eligible
+canonical document. The port is plain serializable data with session/simulation
+generation, gesture ID, sequence, node key, dynamic target, and end reason. A
+pure 3 px state machine captures grab offset, rejects stale events, and the
+imperative coordinator coalesces updates by animation frame. File movement and
+Arrange Folders cancel one another. Lifecycle invalidations end the temporary
+constraint and never write layout caches, spatial persistence, view state,
+history, or source. The app has only an unmounted transient one-tool editing
+state contract. PHYSICS1 still owns real simulation lifetime, reheating,
+cooling, and convergence; MOVE1B owns its production binding and Edit control;
+PIN1 owns any future durable individual placement.
+
 `tools/global-renderer-spike` is now a production renderer harness rather than
 an implementation fork. It retains only synthetic KG13A fixtures, browser/Tauri
 stress controls, Worker transport, and aggregate evidence while consuming
@@ -324,6 +360,12 @@ zoom. Diagnostic nodes never become bookmarks. Raw x/y, renderer node IDs,
 Dagre coordinates, and per-frame movement never cross into saved view state.
 Restoration reuses the KG8 center request after layout; missing or filtered
 anchors use normal fit without widening the restored view.
+
+`tools/focus-schematic-bakeoff` is the development-only HIER2 comparison
+boundary. It owns synthetic fixtures, the renderer-dimension drift adapter,
+D0/compound prototypes, isolated benchmark workers, dynamic experiments, and
+the generated static SVG lab. It may import renderer dimensions for evidence;
+none of its code is reachable from a production app or renderer.
 
 `tools/vault-diagnostics` is the Node development filesystem boundary. It recursively
 discovers one explicitly selected vault, reads strict UTF-8 Markdown, inventories

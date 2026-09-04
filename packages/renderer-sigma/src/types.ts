@@ -311,7 +311,8 @@ export type GlobalPerformancePhase =
   | 'global-hover'
   | 'global-selection'
   | 'global-center'
-  | 'global-density';
+  | 'global-density'
+  | 'file-move';
 
 export type GlobalPerformanceOperation =
   | 'global-mappings'
@@ -328,7 +329,13 @@ export type GlobalPerformanceOperation =
   | 'global-hover-applications'
   | 'global-selection-applications'
   | 'global-centers'
-  | 'global-density-evaluations';
+  | 'global-density-evaluations'
+  | 'file-move-primes'
+  | 'file-move-begins'
+  | 'file-move-coalesced-updates'
+  | 'file-move-releases'
+  | 'file-move-cancels'
+  | 'file-move-unavailable-attempts';
 
 /** Aggregate-only optional hooks supplied by the application boundary. */
 export interface GlobalRendererInstrumentation {

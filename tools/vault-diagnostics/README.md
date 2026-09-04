@@ -42,6 +42,7 @@ src/
   focus-spacing-analysis.ts SPACING1A/SPACING1B parity runner and visual comparison generator.
   focus-spacing-metrics.test.ts Transform, bounds, 15-fixture, and production-parity contracts.
   network-spacing-analysis.ts SPACING1B-GLOBAL final-geometry matrix, scale oracle, and density benchmark.
+  file-move-benchmark.ts MOVE1A inverse/index/coalescing aggregate microbenchmark.
   performance-benchmark.ts Repeated versioned pipeline/projection/renderer/inspection results.
   query-projection-benchmark.ts PERFQ1A projection phases, operations, and repeated-query evidence.
   performance-policy.ts Class budgets plus measured KG12B worker/cache decisions.
@@ -139,6 +140,7 @@ pnpm benchmark:local-renderer -- --profile medium
 pnpm benchmark:local-renderer -- --profile stress
 pnpm analyze:focus-spacing
 pnpm analyze:network-spacing
+pnpm benchmark:file-move
 ```
 
 Profiles are deterministic and measure parse/adapt, resolution, report
@@ -246,6 +248,12 @@ query-reduced sparsity, and 100/500/1,000-node profiles. A separate 5,000-node
 profile isolates density cost. It writes aggregate synthetic JSON only to the
 ignored `output/spacing1b-global/` directory and verifies that density strength
 adds zero layout requests, Pull requests, or spatial writes.
+
+`benchmark:file-move` exercises only MOVE1A-owned pure coordinate inversion,
+prebuilt applied-Place indexing/lookup, and frame coalescing for no-Place,
+Place, and 20,000-node synthetic cases. It emits aggregate timings and command
+counts, never graph IDs or coordinates. It deliberately does not benchmark the
+fake constraint consumer as evidence of production cooling or convergence.
 
 An opt-in private check can validate one real workspace using an existing
 identity catalog:

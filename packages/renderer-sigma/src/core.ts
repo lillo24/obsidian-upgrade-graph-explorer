@@ -130,6 +130,41 @@ export type {
   GlobalFolderDragBase,
 } from './arrangement';
 export {
+  FILE_MOVE_DRAG_THRESHOLD_PX,
+  IDLE_FILE_MOVE_GESTURE,
+  TemporaryFileMoveCoordinator,
+  isAvailableTemporaryFileMoveContext,
+  reduceFileMoveGesture,
+} from './file-move';
+export type {
+  AvailableTemporaryFileMoveSessionContext,
+  FileMoveGestureEffect,
+  FileMoveGestureEvent,
+  FileMoveGestureState,
+  FileMoveGestureTransition,
+  FileMoveFrameScheduler,
+  FileMoveInstrumentationOperation,
+  PrimeFileMoveInput,
+  TemporaryFileMoveCoordinatorOptions,
+  TemporaryFileMoveSessionContext,
+} from './file-move';
+export {
+  RecordingTemporaryNodeConstraintPort,
+  TEMPORARY_NODE_CONSTRAINT_SCHEMA_VERSION,
+  TEMPORARY_NODE_CONSTRAINT_UNAVAILABLE,
+  validateTemporaryNodeConstraintCommand,
+} from './temporary-node-constraint';
+export type {
+  BeginTemporaryNodeConstraintCommand,
+  EndTemporaryNodeConstraintCommand,
+  TemporaryNodeConstraintCapability,
+  TemporaryNodeConstraintCommand,
+  TemporaryNodeConstraintCommandBase,
+  TemporaryNodeConstraintEndReason,
+  TemporaryNodeConstraintPort,
+  UpdateTemporaryNodeConstraintCommand,
+} from './temporary-node-constraint';
+export {
   resolveLocalEdgeStyle,
   resolveLocalNodeStyle,
   resolveLocalVisualLod,

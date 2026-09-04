@@ -38,6 +38,8 @@ src/
   spatial-influence.ts     Pure soft-attractor request, fingerprint, compute, validation, metrics.
   spatial-influence-cache.ts  Four-entry memory-only LRU of dynamic positions.
   arrangement.ts           Pure thresholded prime/drag/commit/cancel gesture reducer.
+  temporary-node-constraint.ts  Serializable fake-backed PHYSICS1 consumer port.
+  file-move.ts             Pure File gesture reducer and frame-coalesced coordinator.
   node-size.ts             Per-File multiplier composition and final display-only bounds.
   node-size-presentation.ts  Sparse override diff and topology-owned File-to-node key index.
   graph.ts                 Graphology construction, neighborhood index, and reconciliation.
@@ -75,6 +77,7 @@ src/
   sigma-test-renderer.ts    Test-only reducer cache and process-boundary Sigma double.
   size-canvas-regression.test.tsx  Real canvas/session layout-count and exact-coordinate regression.
   arrangement-session.test.ts  Exact-folder pointer ownership, sparse refresh, and commit contract.
+  file-move-session.test.ts  All/Focus eligibility, arbitration, lifecycle, and fake-port contract.
   arrangement-canvas.test.tsx  Accessible nudge/save and write-failure rollback contract.
   node-size-session.test.ts  Initial display, sparse indexed refresh, and topology-race contracts.
   *.test.ts                Mapping, layout, cache, LOD, settings, and precision contracts.
@@ -195,6 +198,26 @@ change, layout change, mode change, and disposal cancel unfinished motion.
 Keyboard users can choose the exact folder in Network Explorer, nudge by 0.02
 (Shift: 0.10), save or cancel, and reset one/all positions. Root uses `.` and
 nested folders never inherit a parent action.
+
+MOVE1A adds a separate, fake-backed temporary File constraint seam to both
+Network Sigma sessions without exposing a production control. One canonical
+document may own a pointer sequence after the same 3 px threshold; Focus
+headings, blocks, and diagnostics remain ineligible. The reducer captures the
+pointer-to-node offset and winning fixed Place translation, converts every live
+viewport sample through Sigma, and sends the dynamic target through a plain
+begin/update/end port. Raw updates coalesce to the latest animation frame;
+release flushes the latest update before one end command.
+
+Folder arrangement and File movement are mutually exclusive. Below threshold,
+selection, confirmed reveal, and document double-click keep their existing
+meaning. A real drag suppresses its trailing click/double-click. Escape,
+capture/stage loss, blur, visibility loss, topology/layout/scope/spatial or
+workspace invalidation, service failure, mode exit, and disposal remove the
+temporary constraint. The port carries stable node key, session/simulation
+generation, gesture ID, monotonic sequence, simulation-space target, and end
+reason only; it owns no alpha/cooling values, Graphology/Sigma instances,
+worker handles, source text, or persisted coordinates. PHYSICS1 owns the future
+real adapter and MOVE1B owns the visible Edit/Move mode.
 
 VISUAL1A applies only to All Network. Ordinary document nodes add a bounded
 reference-degree boost to the configured base size. At the persisted
