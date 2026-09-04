@@ -73,6 +73,13 @@ export const PERFORMANCE_PHASES = [
   'spatial-compose',
   'spatial-apply',
   'spatial-preview-apply',
+  'spatial-rule-resolution',
+  'spatial-pull-request',
+  'spatial-pull-worker',
+  'spatial-pull-forceatlas',
+  'spatial-pull-attractor',
+  'spatial-pull-cache-hit',
+  'spatial-fixed-compose',
   'sigma-mount-render',
   'semantic-zoom-style',
   'global-hover',
@@ -111,6 +118,10 @@ export const PERFORMANCE_OPERATIONS = [
   'spatial-compositions',
   'spatial-applies',
   'spatial-preview-applies',
+  'spatial-rule-resolutions',
+  'spatial-pull-requests',
+  'spatial-pull-cache-hits',
+  'spatial-fixed-compositions',
   'global-style-updates',
   'global-hover-applications',
   'global-selection-applications',
@@ -172,6 +183,10 @@ export interface PerformanceOperationCounts {
   readonly 'spatial-compositions': number;
   readonly 'spatial-applies': number;
   readonly 'spatial-preview-applies': number;
+  readonly 'spatial-rule-resolutions': number;
+  readonly 'spatial-pull-requests': number;
+  readonly 'spatial-pull-cache-hits': number;
+  readonly 'spatial-fixed-compositions': number;
   readonly 'global-style-updates': number;
   readonly 'global-hover-applications': number;
   readonly 'global-selection-applications': number;
@@ -293,6 +308,10 @@ export function emptyPerformanceOperationCounts(): PerformanceOperationCounts {
     'spatial-compositions': 0,
     'spatial-applies': 0,
     'spatial-preview-applies': 0,
+    'spatial-rule-resolutions': 0,
+    'spatial-pull-requests': 0,
+    'spatial-pull-cache-hits': 0,
+    'spatial-fixed-compositions': 0,
     'global-style-updates': 0,
     'global-hover-applications': 0,
     'global-selection-applications': 0,

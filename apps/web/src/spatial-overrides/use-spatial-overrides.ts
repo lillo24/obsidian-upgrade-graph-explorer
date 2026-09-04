@@ -72,6 +72,7 @@ export function useSpatialOverrides({
   return {
     session,
     anchors,
+    rules: session.registry.allNetwork.folderRules,
     setFolderAnchor,
     resetFolderAnchor,
     resetAllFolderAnchors,

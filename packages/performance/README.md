@@ -17,6 +17,11 @@ no React, renderer, filesystem, or platform dependency.
 - `src/validation.ts` fails closed on malformed or privacy-unsafe result data.
 - `src/*.test.ts` protects statistics, schema, privacy, and recorder behavior.
 
+SPATIAL2A extends the runtime vocabulary with aggregate rule-resolution,
+pull-request/worker/ForceAtlas2/attractor/cache-hit, and fixed-composition phases
+plus matching counters. These names carry no folder, node, workspace, or request
+identifier and do not change the persisted result schema version.
+
 Node, browser, and Tauri owners supply clocks and environment metadata at their
 own boundaries. Paths, source text, workspace names/IDs, hostnames, usernames,
 queries, and correlation IDs are deliberately absent from persisted results.

@@ -19,8 +19,9 @@ view contract.
 - `presentation-overrides.ts` adapts the source-neutral v1 per-File size
   registry to its own workspace storage key, with explicit failures. Session
   policy is in `../presentation-overrides/session.ts`.
-- `spatial-overrides.ts` adapts the source-neutral v1 normalized folder-anchor
-  registry to a third, independent workspace key. Session policy, including
+- `spatial-overrides.ts` adapts the source-neutral schema-v2 folder-rule
+  registry to a third, independent workspace key. It accepts v1 anchors for
+  in-memory migration without writing on read. Session policy, including
   durable write-before-adopt behavior and explicit corrupt-value recovery, is
   in `../spatial-overrides/session.ts`.
 
@@ -70,8 +71,10 @@ remapping, and a query-hidden File keeps its entry for when it becomes visible.
 
 All-Network spatial overrides use
 `icarus-graph-explorer:spatial-overrides:<encodeURIComponent(workspaceId)>`.
-They contain only the workspace ID and exact normalized folder keys with bounded
-logical X/Y anchor values. Stable identities load and save durably; transient
+They contain only the workspace ID and normalized folder rules: behavior, exact
+or subtree scope, bounded logical X/Y anchor, exclusions, and pull strength.
+V1 exact anchors load as v2 place/exact rules; every subsequent write is v2.
+Stable identities load and save durably; transient
 and legacy reports remain editable only for the current session. Missing or
 unreadable storage falls back to a visible session-only state. A corrupt record
 remains untouched and blocks edits until the explicit spatial reset deletes
@@ -81,7 +84,7 @@ Visual Groups, Saved Filters, and per-File presentation overrides do not clear
 or merge with this registry.
 
 Arrange Folders previews are never written. Pointer release or keyboard Save
-submits exactly one normalized anchor mutation; the canvas retains the transient
+submits exactly one place/exact rule mutation; the canvas retains the transient
 preview until React receives and renders the confirmed registry. A failed write
 restores the last confirmed displayed composition and moves the session into its
 existing blocked-write state. Reset folder and the explicitly confirmed Reset

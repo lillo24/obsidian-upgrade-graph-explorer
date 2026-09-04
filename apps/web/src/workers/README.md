@@ -16,6 +16,9 @@ dagre-layout-worker-client.test.ts  Supersession, stale-result, failure, and reu
 global-layout.worker.ts       Stateless production Global ForceAtlas2/folder-prior entry.
 global-layout-worker-client.ts  Latest-result-wins replacement-worker client.
 global-layout-worker-client.test.ts  Supersession, malformed output, and adoption tests.
+global-spatial-influence.worker.ts  Separate soft-folder-attractor entry over base positions.
+global-spatial-influence-worker-client.ts  Latest-result-wins replacement-worker client.
+global-spatial-influence-worker-client.test.ts  Supersession, stale, malformed, and disposal tests.
 local-layout.worker.ts        Stateless Local hierarchy/reference ForceAtlas2 entry.
 local-layout-worker-client.ts  Latest-result-wins Local replacement-worker client.
 local-layout-worker-client.test.ts  Supersession, malformed output, and failure tests.
@@ -43,6 +46,13 @@ soft folder prior never run on the UI thread. A worker error remains explicit
 while the last valid deterministic or committed positions stay visible. The
 worker dependency graph is DOM-free and is checked by the same Vite production
 boundary that protects W1.
+
+The Global spatial-influence worker is separate from automatic Global layout.
+It receives only stable node coordinates/sizes, reference endpoints/weights,
+resolved pull memberships, graph-space targets/strengths, settings, iterations,
+and a request ID. It receives no paths, labels, source content, camera, fixed
+rules, styles, or UI state. Superseded work is terminated; stale success/failure
+cannot be adopted. Failure leaves base positions plus fixed placements visible.
 
 The Local worker is a fourth independent protocol; it does not overload Global
 folder-prior settings. It receives stable node/edge roles, hierarchy/reference

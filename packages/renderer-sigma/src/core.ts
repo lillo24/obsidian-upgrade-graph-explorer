@@ -26,6 +26,13 @@ export {
   warmGlobalRendererInput,
 } from './layout';
 export { GlobalLayoutCache } from './layout-cache';
+export { GlobalSpatialInfluenceCache } from './spatial-influence-cache';
+export {
+  computeGlobalSpatialInfluence,
+  createGlobalSpatialInfluenceRequest,
+  globalSpatialInfluenceFingerprint,
+  validateGlobalSpatialInfluenceWorkerResponse,
+} from './spatial-influence';
 export { LocalLayoutCache } from './local-layout-cache';
 export {
   computeLocalLayout,
@@ -79,8 +86,10 @@ export {
   resolveGlobalVisualLod,
 } from './style';
 export {
+  composeGlobalFolderSpatialRules,
   composeGlobalSpatialOverrides,
   globalFolderKeyByNodeKey,
+  resolveGlobalFolderSpatialRules,
   SIGMA_VISUAL_DOWN_GRAPH_Y_SIGN,
 } from './spatial';
 export {

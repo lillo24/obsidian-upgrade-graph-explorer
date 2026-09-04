@@ -117,6 +117,7 @@ export interface GlobalFolderArrangementContext {
   readonly activeFolderKey?: string;
   readonly anchors: FolderClusterAnchorMap;
   readonly automaticPositions: readonly GlobalLayoutPosition[];
+  readonly currentPositions?: readonly GlobalLayoutPosition[];
   readonly input: GlobalRendererInput;
 }
 
@@ -443,6 +444,9 @@ export class GlobalRendererSession {
     try {
       const geometry = createFolderClusterPreviewGeometry({
         automaticPositions: context.automaticPositions,
+        ...(context.currentPositions === undefined
+          ? {}
+          : { currentPositions: context.currentPositions }),
         folderKeyByNodeKey: globalFolderKeyByNodeKey(context.input),
         anchors: context.anchors,
         folderKey,
@@ -658,6 +662,9 @@ export class GlobalRendererSession {
     try {
       return createFolderClusterPreviewGeometry({
         automaticPositions: context.automaticPositions,
+        ...(context.currentPositions === undefined
+          ? {}
+          : { currentPositions: context.currentPositions }),
         folderKeyByNodeKey: globalFolderKeyByNodeKey(context.input),
         anchors: context.anchors,
         folderKey,
@@ -678,6 +685,9 @@ export class GlobalRendererSession {
     }
     const geometry = createFolderClusterPreviewGeometry({
       automaticPositions: context.automaticPositions,
+      ...(context.currentPositions === undefined
+        ? {}
+        : { currentPositions: context.currentPositions }),
       folderKeyByNodeKey: globalFolderKeyByNodeKey(context.input),
       anchors: context.anchors,
       folderKey,

@@ -35,6 +35,8 @@ src/
   settings.ts              Compact/Normal/Spacious presets and bounded Custom validation.
   mapping.ts               KG6-to-Sigma mapping, deterministic seeds, and folder keys.
   spatial.ts               Sigma logical-axis adapter and All Network override composition.
+  spatial-influence.ts     Pure soft-attractor request, fingerprint, compute, validation, metrics.
+  spatial-influence-cache.ts  Four-entry memory-only LRU of dynamic positions.
   arrangement.ts           Pure thresholded prime/drag/commit/cancel gesture reducer.
   node-size.ts             Per-File multiplier composition and final display-only bounds.
   node-size-presentation.ts  Sparse override diff and topology-owned File-to-node key index.
@@ -126,30 +128,40 @@ The resolved visual subset (base size, degree-size influence, link thickness,
 and label threshold) owns Sigma reducer/settings refreshes only. The persisted
 record and control ranges remain unchanged.
 
-SPATIAL1A composes only All Network:
+SPATIAL2A evolves the All Network-only position pipeline without changing the
+current production authoring controls:
 
 ```text
-automatic deterministic/cache/worker positions
-  → normalized exact-folder anchor composition
+base automatic deterministic/cache/worker positions
+  → separate soft-attractor worker/cache
+  → fixed-placement composition in the base frame
   → displayed Sigma positions
 ```
 
-`GlobalGraphCanvas` owns `latestAutomaticPositions` separately from the live
-Graphology coordinates. Initial seeds, exact cache hits, and accepted worker
-results update that automatic set. Worker requests use the explicit automatic
-position path; cache writes occur before and independently of display
-composition. An anchor edit recomposes and applies displayed positions with zero
-KG6 projections, topology reconciliations, or ForceAtlas2 requests. A late
-worker result reads the latest anchor map. Explicit Re-layout retains anchors
-and reinterprets them against the new automatic frame.
+`GlobalGraphCanvas` owns base, dynamic, and displayed coordinates separately
+from live Graphology state. Base worker/cache output is the only dynamic-worker
+seed. The dynamic cache stores only pull output, and fixed output is never
+cached upstream. A fixed-only edit reuses the exact dynamic fingerprint; pull
+target, strength, scope, membership, edge, settings, or base changes request one
+latest soft refinement. No pull skips the worker/cache exactly. Pull failure
+falls back to base plus fixed placements with a visible warning.
 
-The source-neutral geometry computes the frame and folder centers from canonical
-document automatic positions only. Diagnostics, node radii (including VISUAL1B
-display multipliers), viewport/camera, and prior translations are excluded.
-Every member receives one rigid translation. Sigma 3.0.3 maps positive graph Y
-upward, so `spatial.ts` centralizes a `-1` visual-down sign: persisted positive
-X/Y therefore renders bottom-right. Inactive exact paths remain dormant and
-reactivate when the same folder becomes visible again. Focus Network and both
+Schema-v2 rules resolve most-specific membership per document. The deepest
+matching root wins, so parent and child pulls/placements never add together.
+The selected algorithm alternates bounded ForceAtlas2 chunks with a shared
+centroid translation. Each chunk uses gain `0.55 × strength/100` and a distance
+cap `0.60 × graph RMS scale × strength/100`; strength zero is inert and 100
+remains soft. Continued ForceAtlas2 lets connected nonmembers react. The
+move-then-relax comparison retained larger normalized target error in synthetic
+evidence and remains a benchmark candidate only.
+
+The source-neutral geometry computes the target frame from canonical document
+base positions and fixed centers from current dynamic positions. Diagnostics,
+display-only radii (including VISUAL1B multipliers), viewport, camera, and prior
+fixed translations are excluded. Every fixed member receives one rigid
+translation. Sigma 3.0.3 maps positive graph Y upward, so `spatial.ts`
+centralizes a `-1` visual-down sign. Inactive exact/subtree paths remain dormant
+and reactivate when matching folders become visible. Focus Network and both
 Hierarchy presentations receive no spatial registry.
 
 SPATIAL1B adds an explicit All Network Arrange mode over that existing seam.
@@ -238,6 +250,12 @@ spatial anchors. The worker protocol still carries node size for compatibility;
 current ForceAtlas2 does not consume it with `adjustSizes: false`. Surviving
 coordinates warm a changed layout; an exact bounded memory-cache hit skips worker
 computation and may compose with any current anchor map.
+
+Spatial rules are excluded from the automatic fingerprint. The separate dynamic fingerprint
+includes the base fingerprint and coordinates, semantic edges, resolved pull
+memberships, targets/strengths, settings, and algorithm version. It excludes
+fixed rules, camera, selection, labels, styles, display-only sizes, and sidebar
+state.
 
 ## Regional semantic zoom and lifecycle
 
