@@ -25,14 +25,22 @@ owned by HIER5. `computeFocusSchematicUniformLayout` keeps A0 available as an
 explicit development comparison seam, and historical HIER2 tools call it
 directly.
 
+For a File with at least two center structural branches, algorithm revision 2
+lays out each top-level branch independently and chooses a deterministic
+source-contiguous cut around the central File. This keeps module width equal to
+the widest branch rather than the sum of sibling widths. Side regions anchor to
+the final center-parent Y positions.
+
 After Dagre establishes exact internal endpoint positions, A1 performs four
 fixed endpoint-ordering sweeps. Each signed macro rank uses the median desired
 center from precise selected-backbone and Focus-path endpoints in its adjacent
 rank, then collision-packs the variable-height module rectangles. A bounded
 sibling-branch pass applies the same ordering evidence to disjoint left/right
 structural branches when the swap strictly improves exact-endpoint crossings
-or vertical alignment. Markdown source order breaks ties; it does not preserve
-an avoidable inversion. Secondary connections never enter either pass.
+or vertical alignment. One forward and one backward adjacent-swap pass applies
+the same rule inside each above/below center stack without crossing the File.
+Markdown source order breaks ties; it does not preserve an avoidable inversion.
+Secondary connections never enter either pass.
 
 Physical sides derive only from relative signed module ranks: a counterpart
 at a smaller rank attaches left, a counterpart at a larger rank attaches
@@ -69,8 +77,8 @@ the bakeoff evidence if changed.
 - `src/endpoint-facing.ts` composes center TB, left RL, and right LR Dagre
   regions, runs the macro and endpoint-order stages, derives exact attachments,
   and evaluates endpoint-side quality.
-- `src/endpoint-fixtures.ts` owns the synthetic EP1–EP26 and ES1–ES8 review
-  corpus used by package tests and the development lab.
+- `src/endpoint-fixtures.ts` owns the synthetic EP1–EP26, ES1–ES8, and CS1–CS6
+  review corpora used by package tests and development tools.
 - `src/source-order.ts` derives public Dagre adjacent-sibling constraints from
   canonical source order.
 - `src/settings.ts` owns the frozen spacing, reserve, clearance, and filtered

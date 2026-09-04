@@ -28,6 +28,7 @@
     "benchmark:focus-schematic": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:focus-schematic",
     "benchmark:focus-schematic-layout": "pnpm --filter @icarus-graph-explorer/focus-schematic-bakeoff benchmark",
     "benchmark:focus-schematic-endpoints": "pnpm --filter @icarus-graph-explorer/focus-schematic-bakeoff benchmark:endpoints",
+    "benchmark:focus-schematic-center-spine": "pnpm --filter @icarus-graph-explorer/focus-schematic-bakeoff benchmark:center-spine",
     "benchmark:focus-schematic-production-worker": "pnpm --filter @icarus-graph-explorer/focus-schematic-bakeoff benchmark:production-worker",
     "generate:focus-schematic-endpoint-lab": "pnpm --filter @icarus-graph-explorer/focus-schematic-bakeoff generate:endpoint-lab",
     "generate:focus-schematic-layout-lab": "pnpm --filter @icarus-graph-explorer/focus-schematic-bakeoff generate:lab",

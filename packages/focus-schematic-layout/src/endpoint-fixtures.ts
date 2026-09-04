@@ -31,7 +31,8 @@ export interface EndpointFixtureReference {
 }
 
 export interface EndpointFixtureSpec {
-  readonly id: `EP${number}` | `ES${number}-${'before' | 'after'}`;
+  readonly id:
+    `EP${number}` | `ES${number}-${'before' | 'after'}` | `CS${number}`;
   readonly label: string;
   readonly authored: string;
   readonly expectation: string;
@@ -900,4 +901,123 @@ export const ENDPOINT_STABILITY_PAIRS: readonly EndpointStabilityPair[] = [
         : entity,
     ),
   }),
+];
+
+const centerHeadings = (
+  documentId: string,
+  count: number,
+): readonly EndpointFixtureEntity[] =>
+  Array.from({ length: count }, (_, index) =>
+    section(
+      `${documentId}-center-${index + 1}`,
+      documentId,
+      documentId,
+      2 + index * 2,
+      `Center ${index + 1}`,
+    ),
+  );
+
+/** Synthetic FIX1 corpus; contains no private vault topology or content. */
+export const CENTER_SPINE_FIXTURES: readonly EndpointFixtureSpec[] = [
+  {
+    id: 'CS1',
+    label: 'Five center branches with both macro sides',
+    authored: 'Cedar.md → Atlas.md → Beacon.md with five neutral Headings.',
+    expectation: 'At least two branches sit above and below the central File.',
+    inspect: 'The former five-wide Heading row is absent.',
+    rootDocumentId: 'Atlas',
+    documents: [doc('Atlas'), doc('Beacon'), doc('Cedar')],
+    entities: centerHeadings('Atlas', 5),
+    references: [ref('Cedar', 'Atlas'), ref('Atlas', 'Beacon')],
+    hops: 1,
+  },
+  {
+    id: 'CS2',
+    label: 'Outgoing fan',
+    authored: 'Atlas.md fans out while six neutral Headings remain structural.',
+    expectation: 'The File stays central inside a narrow vertical module.',
+    inspect: 'Macro fan ranks remain unchanged.',
+    rootDocumentId: 'Atlas',
+    documents: [doc('Atlas'), doc('Birch'), doc('Cedar'), doc('Dune')],
+    entities: centerHeadings('Atlas', 6),
+    references: [
+      ref('Atlas', 'Birch'),
+      ref('Atlas', 'Cedar'),
+      ref('Atlas', 'Dune'),
+    ],
+    direction: 'outgoing',
+    hops: 1,
+  },
+  {
+    id: 'CS3',
+    label: 'Mixed two-sided center module',
+    authored:
+      'Two incoming and two outgoing Files surround a structured Atlas.',
+    expectation: 'The signed macro sides and center spine coexist.',
+    inspect:
+      'Side demand never changes the source-contiguous center partition.',
+    rootDocumentId: 'Atlas',
+    documents: [
+      doc('Atlas'),
+      doc('Birch'),
+      doc('Cedar'),
+      doc('Dune'),
+      doc('Elm'),
+    ],
+    entities: centerHeadings('Atlas', 5),
+    references: [
+      ref('Birch', 'Atlas'),
+      ref('Cedar', 'Atlas'),
+      ref('Atlas', 'Dune'),
+      ref('Atlas', 'Elm'),
+    ],
+    hops: 1,
+  },
+  {
+    id: 'CS4',
+    label: 'Nested center branches',
+    authored: 'Four top-level Headings each own one nested Heading.',
+    expectation: 'Each top-level subtree is laid out independently.',
+    inspect: 'Nested branch geometry remains contained and collision-free.',
+    rootDocumentId: 'Atlas',
+    documents: [doc('Atlas'), doc('Beacon')],
+    entities: centerHeadings('Atlas', 4).flatMap((parent, index) => [
+      parent,
+      section(
+        `Atlas-nested-${index + 1}`,
+        'Atlas',
+        parent.id,
+        parent.line + 1,
+        `Nested ${index + 1}`,
+      ),
+    ]),
+    references: [ref('Atlas', 'Beacon')],
+    direction: 'outgoing',
+  },
+  {
+    id: 'CS5',
+    label: 'Non-root center fan',
+    authored: 'Atlas.md → Beacon.md, where Beacon owns five Headings.',
+    expectation: 'The same center-spine composition applies outside the root.',
+    inspect: 'Root status must not control branch partitioning.',
+    rootDocumentId: 'Atlas',
+    documents: [doc('Atlas'), doc('Beacon'), doc('Cedar')],
+    entities: centerHeadings('Beacon', 5),
+    references: [ref('Atlas', 'Beacon'), ref('Beacon', 'Cedar')],
+    direction: 'outgoing',
+    hops: 2,
+  },
+  {
+    id: 'CS6',
+    label: 'Center spine with diagnostic reserve',
+    authored: 'Atlas owns five Headings and one unresolved reference.',
+    expectation: 'Diagnostic reserve stays valid around the center spine.',
+    inspect: 'The diagnostic does not alter branch order or containment.',
+    rootDocumentId: 'Atlas',
+    documents: [doc('Atlas'), doc('Beacon')],
+    entities: centerHeadings('Atlas', 5),
+    references: [ref('Atlas', 'Beacon')],
+    unresolvedFromEntityIds: ['Atlas'],
+    direction: 'outgoing',
+  },
 ];

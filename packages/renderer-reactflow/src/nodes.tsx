@@ -1,8 +1,9 @@
-import { memo, type KeyboardEvent, type MouseEvent } from 'react';
+import { memo, useEffect, type KeyboardEvent, type MouseEvent } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 
 import { useEntityDisclosure } from './disclosure-context';
 import { shouldToggleDisclosureForClick } from './focus-interaction';
+import { useDocumentDirectHover } from './hover-context';
 import type {
   DiagnosticFlowNode,
   EntityFlowNode,
@@ -98,6 +99,7 @@ function FilteredBridgeNodeComponent({
 
 function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
   const disclosure = useEntityDisclosure();
+  const directHover = useDocumentDirectHover();
   const disclosurePresentation = entityDisclosurePresentation(data);
   const visualGroup = useVisualGroupPresentation(data.entityId);
 
@@ -147,71 +149,108 @@ function EntityNodeComponent({ data }: NodeProps<EntityFlowNode>) {
       : data.entityKind === 'section'
         ? '◇'
         : '●';
+  useEffect(() => {
+    if (data.hasDirectFileConnectionRing !== true) return;
+    const projectionNodeId = data.projectionNodeId;
+    return () => directHover.setDocumentDirectHover(projectionNodeId, false);
+  }, [data.hasDirectFileConnectionRing, data.projectionNodeId, directHover]);
   return (
-    <article
-      className={`entity-card entity-card--${data.entityKind} entity-card--${data.role}${hasFooter ? ' entity-card--has-footer' : ''}${hasDisclosure ? ' entity-card--has-disclosure' : ''}${compact ? ' entity-card--compact-schematic' : ''}${data.root ? ' entity-card--local-root' : ''}`}
-      data-entity-id={data.entityId}
-      data-entity-kind={data.entityKind}
-      data-focus-distance={data.focusDistance ?? undefined}
-      data-projection-node-id={data.projectionNodeId}
-      data-visual-group-color={visualGroup?.color}
-      style={visualGroupAccentStyle(visualGroup)}
-      title={`${data.title} — ${sourceLocation} — Double-click to focus`}
-    >
-      <NodeHandles />
-      <div className="entity-card__title-row">
-        {compact ? (
-          <span
-            aria-hidden="true"
-            className={`compact-hierarchy-marker compact-hierarchy-marker--${data.entityKind}`}
-          >
-            {marker}
-          </span>
-        ) : null}
-        <strong className="entity-title">
-          {data.title}
-          {compact && data.entityKind === 'document' && data.detail !== null ? (
+    <div className="entity-card-frame">
+      {data.hasDirectFileConnectionRing === true ? (
+        <button
+          aria-label={`Show direct File connections for ${data.title}`}
+          className="file-direct-connection-ring nodrag nopan"
+          onBlur={() =>
+            directHover.setDocumentDirectHover(data.projectionNodeId, false)
+          }
+          onClick={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => event.stopPropagation()}
+          onFocus={() =>
+            directHover.setDocumentDirectHover(data.projectionNodeId, true)
+          }
+          onPointerDown={(event) => event.stopPropagation()}
+          onPointerEnter={() =>
+            directHover.setDocumentDirectHover(data.projectionNodeId, true)
+          }
+          onPointerLeave={() =>
+            directHover.setDocumentDirectHover(data.projectionNodeId, false)
+          }
+          title={`Show direct File connections for ${data.title}`}
+          type="button"
+        >
+          <svg aria-hidden="true" focusable="false">
+            <rect className="file-direct-connection-ring__visible" />
+            <rect className="file-direct-connection-ring__hit" />
+          </svg>
+        </button>
+      ) : null}
+      <article
+        className={`entity-card entity-card--${data.entityKind} entity-card--${data.role}${hasFooter ? ' entity-card--has-footer' : ''}${hasDisclosure ? ' entity-card--has-disclosure' : ''}${compact ? ' entity-card--compact-schematic' : ''}${data.root ? ' entity-card--local-root' : ''}`}
+        data-entity-id={data.entityId}
+        data-entity-kind={data.entityKind}
+        data-focus-distance={data.focusDistance ?? undefined}
+        data-projection-node-id={data.projectionNodeId}
+        data-visual-group-color={visualGroup?.color}
+        style={visualGroupAccentStyle(visualGroup)}
+        title={`${data.title} — ${sourceLocation} — Double-click to focus`}
+      >
+        <NodeHandles />
+        <div className="entity-card__title-row">
+          {compact ? (
             <span
-              className="compact-file-context"
-              translate="no"
-            >{` · ${data.detail}`}</span>
-          ) : null}
-        </strong>
-      </div>
-      {data.detail === null ? null : (
-        <span className="entity-detail" title={data.detail} translate="no">
-          {data.detail}
-        </span>
-      )}
-      {hasFooter ? (
-        <div className="entity-card__footer">
-          {data.internalReferenceCount > 0 ? (
-            <span
-              aria-label={`${data.internalReferenceCount} internal reference${data.internalReferenceCount === 1 ? '' : 's'}`}
-              className="internal-reference-badge"
-              title="References whose visible endpoints collapse into this node"
+              aria-hidden="true"
+              className={`compact-hierarchy-marker compact-hierarchy-marker--${data.entityKind}`}
             >
-              ↺ {data.internalReferenceCount}
+              {marker}
             </span>
           ) : null}
-          {disclosurePresentation === null ? null : (
-            <button
-              aria-label={disclosurePresentation.ariaLabel}
-              className="entity-disclosure nodrag nopan"
-              disabled={disclosure.disabled}
-              onClick={handleDisclosure}
-              onDoubleClick={keepDisclosureDoubleClickLocal}
-              onKeyDown={handleDisclosureKey}
-              onKeyUp={keepDisclosureKeyUpLocal}
-              type="button"
-            >
-              <span aria-hidden="true">{disclosurePresentation.symbol}</span>
-              <span>{disclosurePresentation.count}</span>
-            </button>
-          )}
+          <strong className="entity-title">
+            {data.title}
+            {compact &&
+            data.entityKind === 'document' &&
+            data.detail !== null ? (
+              <span
+                className="compact-file-context"
+                translate="no"
+              >{` · ${data.detail}`}</span>
+            ) : null}
+          </strong>
         </div>
-      ) : null}
-    </article>
+        {data.detail === null ? null : (
+          <span className="entity-detail" title={data.detail} translate="no">
+            {data.detail}
+          </span>
+        )}
+        {hasFooter ? (
+          <div className="entity-card__footer">
+            {data.internalReferenceCount > 0 ? (
+              <span
+                aria-label={`${data.internalReferenceCount} internal reference${data.internalReferenceCount === 1 ? '' : 's'}`}
+                className="internal-reference-badge"
+                title="References whose visible endpoints collapse into this node"
+              >
+                ↺ {data.internalReferenceCount}
+              </span>
+            ) : null}
+            {disclosurePresentation === null ? null : (
+              <button
+                aria-label={disclosurePresentation.ariaLabel}
+                className="entity-disclosure nodrag nopan"
+                disabled={disclosure.disabled}
+                onClick={handleDisclosure}
+                onDoubleClick={keepDisclosureDoubleClickLocal}
+                onKeyDown={handleDisclosureKey}
+                onKeyUp={keepDisclosureKeyUpLocal}
+                type="button"
+              >
+                <span aria-hidden="true">{disclosurePresentation.symbol}</span>
+                <span>{disclosurePresentation.count}</span>
+              </button>
+            )}
+          </div>
+        ) : null}
+      </article>
+    </div>
   );
 }
 

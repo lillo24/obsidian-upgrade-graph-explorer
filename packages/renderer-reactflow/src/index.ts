@@ -67,6 +67,7 @@ export type {
   GraphEdgeData,
   GraphFlowEdge,
   GraphFlowNode,
+  GraphHoverTarget,
   GraphLayoutMode,
   GraphLayoutMetrics,
   GraphLayoutResult,

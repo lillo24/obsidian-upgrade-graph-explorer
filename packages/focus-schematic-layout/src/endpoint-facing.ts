@@ -46,6 +46,8 @@ import type {
 } from './types';
 
 const STRATEGY_ID = 'A1-endpoint-facing-split-lanes' as const;
+/** Cache/evidence revision for the selected A1 implementation. */
+export const FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION = 2 as const;
 const now = () => Date.now();
 const compareText = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
@@ -76,6 +78,10 @@ interface RegionLayout {
   readonly nodes: readonly LocalNode[];
   readonly width: number;
   readonly height: number;
+}
+
+interface CenterRegionLayout extends RegionLayout {
+  readonly dagreCallCount: number;
 }
 
 function emptyTimings(totalMs = 0): FocusSchematicEndpointLayoutPhaseTimings {
@@ -194,6 +200,156 @@ function layoutRegion(
   };
 }
 
+function dimensionNode(
+  input: FocusSchematicLayoutInput,
+  projectionNodeId: ProjectionNodeId,
+): LocalNode {
+  const dimension = input.nodeDimensions.find(
+    (item) => item.projectionNodeId === projectionNodeId,
+  );
+  if (dimension === undefined)
+    throw new Error(
+      `Missing dimension for internal node "${projectionNodeId}".`,
+    );
+  return {
+    projectionNodeId,
+    x: 0,
+    y: 0,
+    width: dimension.width,
+    height: dimension.height,
+  };
+}
+
+function stackHeight(
+  regions: readonly RegionLayout[],
+  separation: number,
+): number {
+  return regions.reduce(
+    (height, region, index) =>
+      height + region.height + (index === 0 ? 0 : separation),
+    0,
+  );
+}
+
+/**
+ * Composes independent top-level structural branches around one central File.
+ * The contiguous source-order cut is chosen from geometry alone, before any
+ * endpoint-aware post-pass, so secondary relationships cannot affect it.
+ */
+function layoutCenterRegion(
+  input: FocusSchematicLayoutInput,
+  module: FocusSchematicModel['modules'][number],
+  centerIds: readonly ProjectionNodeId[],
+  hierarchyEdgeIds: ReadonlySet<string>,
+  parentByNodeId: ReadonlyMap<ProjectionNodeId, ProjectionNodeId>,
+  childrenByNodeId: ReadonlyMap<ProjectionNodeId, readonly ProjectionNodeId[]>,
+): CenterRegionLayout {
+  const documentId = module.documentProjectionNodeId;
+  if (documentId === null || !centerIds.includes(documentId)) {
+    const region = layoutRegion(input, centerIds, hierarchyEdgeIds, 'TB');
+    return { ...region, dagreCallCount: centerIds.length === 0 ? 0 : 1 };
+  }
+  const included = new Set(centerIds);
+  const roots = (childrenByNodeId.get(documentId) ?? []).filter((nodeId) =>
+    included.has(nodeId),
+  );
+  const branchIds = roots.map((rootId) => {
+    const ids: ProjectionNodeId[] = [];
+    const visit = (nodeId: ProjectionNodeId) => {
+      if (!included.has(nodeId)) return;
+      ids.push(nodeId);
+      for (const childId of childrenByNodeId.get(nodeId) ?? []) visit(childId);
+    };
+    visit(rootId);
+    return ids;
+  });
+  const covered = new Set(branchIds.flat());
+  const isExactFileForest = centerIds.every(
+    (nodeId) =>
+      nodeId === documentId ||
+      (covered.has(nodeId) && parentByNodeId.has(nodeId)),
+  );
+  if (roots.length < 2 || !isExactFileForest) {
+    const region = layoutRegion(input, centerIds, hierarchyEdgeIds, 'TB');
+    return { ...region, dagreCallCount: centerIds.length === 0 ? 0 : 1 };
+  }
+
+  const branches = branchIds.map((ids) =>
+    layoutRegion(input, ids, hierarchyEdgeIds, 'TB'),
+  );
+  const document = dimensionNode(input, documentId);
+  const stackSeparation = input.settings.internalNodeSeparation;
+  const fileSeparation = input.settings.internalRankSeparation;
+  let bestCut = 0;
+  let bestScore: readonly number[] | null = null;
+  for (let cut = 0; cut <= branches.length; cut += 1) {
+    const aboveHeight = stackHeight(branches.slice(0, cut), stackSeparation);
+    const belowHeight = stackHeight(branches.slice(cut), stackSeparation);
+    const aboveExtent = aboveHeight === 0 ? 0 : aboveHeight + fileSeparation;
+    const belowExtent = belowHeight === 0 ? 0 : belowHeight + fileSeparation;
+    const score = [
+      Math.max(aboveExtent, belowExtent),
+      Math.abs(aboveExtent - belowExtent),
+      aboveExtent + belowExtent,
+      cut,
+    ] as const;
+    if (
+      bestScore === null ||
+      score.some(
+        (value, index) =>
+          value < bestScore![index]! &&
+          score
+            .slice(0, index)
+            .every((item, prior) => item === bestScore![prior]),
+      )
+    ) {
+      bestCut = cut;
+      bestScore = score;
+    }
+  }
+
+  const above = branches.slice(0, bestCut);
+  const below = branches.slice(bestCut);
+  const aboveHeight = stackHeight(above, stackSeparation);
+  const belowHeight = stackHeight(below, stackSeparation);
+  const width = Math.max(
+    document.width,
+    ...branches.map((branch) => branch.width),
+  );
+  const documentY = aboveHeight === 0 ? 0 : aboveHeight + fileSeparation;
+  const nodes: LocalNode[] = [
+    { ...document, x: (width - document.width) / 2, y: documentY },
+  ];
+  let cursor = 0;
+  for (const branch of above) {
+    nodes.push(
+      ...branch.nodes.map((node) => ({
+        ...node,
+        x: node.x + (width - branch.width) / 2,
+        y: node.y + cursor,
+      })),
+    );
+    cursor += branch.height + stackSeparation;
+  }
+  cursor =
+    documentY + document.height + (below.length === 0 ? 0 : fileSeparation);
+  for (const branch of below) {
+    nodes.push(
+      ...branch.nodes.map((node) => ({
+        ...node,
+        x: node.x + (width - branch.width) / 2,
+        y: node.y + cursor,
+      })),
+    );
+    cursor += branch.height + stackSeparation;
+  }
+  const height =
+    documentY +
+    document.height +
+    (belowHeight === 0 ? 0 : fileSeparation + belowHeight);
+  return { nodes, width, height, dagreCallCount: branches.length };
+}
+
 function internalLayout(
   input: FocusSchematicLayoutInput,
   module: FocusSchematicModel['modules'][number],
@@ -246,7 +402,14 @@ function internalLayout(
     .map(([nodeId]) => nodeId)
     .sort(order);
   const centerStarted = now();
-  const centerRegion = layoutRegion(input, centerIds, hierarchyIds, 'TB');
+  const centerRegion = layoutCenterRegion(
+    input,
+    module,
+    centerIds,
+    hierarchyIds,
+    parentByNodeId,
+    childrenByNodeId,
+  );
   const centerLayoutMs = now() - centerStarted;
   const centerById = new Map(
     centerRegion.nodes.map((node) => [node.projectionNodeId, node]),
@@ -285,7 +448,7 @@ function internalLayout(
 
   let leftLayoutMs = 0;
   let rightLayoutMs = 0;
-  let dagreCallCount = centerIds.length > 0 ? 1 : 0;
+  let dagreCallCount = centerRegion.dagreCallCount;
   const positioned: LocalNode[] = [...centerRegion.nodes];
   const centerMinX = 0;
   const centerMaxX = centerRegion.width;
@@ -987,7 +1150,7 @@ export function computeFocusSchematicComputedLayoutAttempt(
   value: FocusSchematicLayoutInput,
 ): FocusSchematicComputedLayoutAttempt {
   const started = now();
-  const configId = `A1-${value.settings.ranker}-i${value.settings.internalNodeSeparation}-${value.settings.internalRankSeparation}-m${value.settings.macroNodeSeparation}-${value.settings.macroRankSeparation}`;
+  const configId = `A1v${FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION}-${value.settings.ranker}-i${value.settings.internalNodeSeparation}-${value.settings.internalRankSeparation}-m${value.settings.macroNodeSeparation}-${value.settings.macroRankSeparation}`;
   try {
     const inputStarted = now();
     assertFocusSchematicLayoutInput(value);

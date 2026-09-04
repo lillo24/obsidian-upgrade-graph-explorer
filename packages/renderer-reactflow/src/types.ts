@@ -27,6 +27,11 @@ export type GraphSelection =
   | { readonly kind: 'node'; readonly id: ProjectionNodeId }
   | { readonly kind: 'edge'; readonly id: ProjectionEdgeId };
 
+/** Transient renderer state; never persisted or exposed to Inspector history. */
+export type GraphHoverTarget =
+  | GraphSelection
+  | { readonly kind: 'document-direct'; readonly id: ProjectionNodeId };
+
 export interface GraphCenterRequest {
   readonly key: number;
   readonly nodeId: ProjectionNodeId;
@@ -77,6 +82,12 @@ export interface EntityNodeData extends Record<string, unknown> {
   readonly ariaLabel: string;
   readonly visualVariant: GraphVisualVariant;
   readonly root: boolean;
+  /** Present only on prepared modular Focus Schematic entity nodes. */
+  readonly focusSchematicModuleId?: string;
+  /** File cards aggregate their module; Heading/Block cards remain exact. */
+  readonly focusSchematicHoverBehavior?: 'exact' | 'module-aggregate';
+  /** Renderer-only decoration predicate derived from currently rendered edges. */
+  readonly hasDirectFileConnectionRing?: boolean;
 }
 
 export interface DiagnosticNodeData extends Record<string, unknown> {

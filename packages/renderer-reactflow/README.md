@@ -29,7 +29,8 @@ src/
   local-structured-layout.ts  Exact fingerprint/cache, immediate seed, and root normalization.
   local-structured.ts    DOM-free Local Structured benchmark/test exports.
   visual-group-presentation.tsx  EntityId style context and zero-work operation contract.
-  highlight.ts           Direct incident-node/edge visual emphasis.
+  highlight.ts           Exact and modular aggregate hover emphasis.
+  hover-context.tsx      Nested direct-File ring hover override.
   focus-interaction.ts   Graph-scoped Enter-to-Focus activation policy.
   center-request.ts      Keyed projected-node viewport-center resolution.
   semantic-viewport.ts   Viewport-center to canonical-entity bookmark observation.
@@ -61,6 +62,14 @@ provide symmetric hidden handles; existing Classic handle values stay unchanged.
 Synthetic module/bridge elements have no canonical identity, and a fallback edge
 has no fabricated projection-edge identity. Secondary relationships change edges
 only and cannot change node coordinates.
+
+Prepared modular entity data includes exact module ownership and a hover policy.
+File hover aggregates the module boundary/entities, displayed module reference
+edges, their opposite endpoints, and internal hierarchy edges. Heading, Block,
+edge, and every Classic hover remain exact. A direct-File ring appears only for
+a structured modular File with a displayed reference directly incident to the
+File node. Its pointer/keyboard override is transient and renderer-local; the
+ring changes neither measured card dimensions nor selection/Inspector state.
 
 ## Contract and layout
 

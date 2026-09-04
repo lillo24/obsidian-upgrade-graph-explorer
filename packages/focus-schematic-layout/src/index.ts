@@ -18,8 +18,10 @@ export {
   validateFocusSchematicEndpointPlan,
 } from './endpoint-plan';
 export {
+  FOCUS_SCHEMATIC_CENTER_STACK_ORDERING_SWEEP_COUNT,
   FOCUS_SCHEMATIC_ENDPOINT_ORDERING_SWEEP_COUNT,
   measureFocusSchematicEndpointOrder,
+  minimizeFocusSchematicCenterStackCrossings,
   minimizeFocusSchematicEndpointCrossings,
   type FocusSchematicEndpointOrderMetrics,
 } from './crossing-minimization';
@@ -32,10 +34,12 @@ export {
   computeFocusSchematicComputedLayout,
   computeFocusSchematicComputedLayoutAttempt,
   evaluateFocusSchematicEndpointLayoutQuality,
+  FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION,
   validateFocusSchematicComputedLayout,
 } from './endpoint-facing';
 export {
   buildEndpointFixture,
+  CENTER_SPINE_FIXTURES,
   ENDPOINT_FIXTURES,
   ENDPOINT_STABILITY_PAIRS,
   type EndpointFixtureSpec,

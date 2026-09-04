@@ -32,6 +32,8 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     const input = fixtureInput();
     const key = exactFocusSchematicLayoutCacheKey(input);
     expect(key).toContain('A1-endpoint-facing-split-lanes');
+    expect(key).toContain('"algorithmVersion":2');
+    expect(exactFocusSchematicLayoutCacheKey(input, 1)).not.toBe(key);
     expect(key).toContain('nodeDimensions');
     expect(key).toContain('settings');
     expect(exactFocusSchematicLayoutCacheKey(input)).toBe(key);

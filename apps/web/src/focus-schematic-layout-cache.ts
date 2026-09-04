@@ -1,4 +1,5 @@
 import {
+  FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION,
   FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
   validateFocusSchematicComputedLayout,
   type FocusSchematicComputedLayout,
@@ -22,10 +23,12 @@ interface CacheEntry {
 
 export function exactFocusSchematicLayoutCacheKey(
   input: FocusSchematicLayoutInput,
+  algorithmVersion: number = FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION,
 ): string {
   return JSON.stringify({
     protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
     algorithm: SELECTED_ALGORITHM_ID,
+    algorithmVersion,
     input,
   });
 }
