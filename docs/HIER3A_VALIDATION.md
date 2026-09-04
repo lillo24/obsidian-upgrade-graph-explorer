@@ -8,10 +8,12 @@ finalized.
 
 ## Scope and isolation
 
-HIER3A starts from `e51f52ed11ae8b3a5ff233e4e50a3c1eb268f60c`. HIER2
-Strategy A remains the macro architecture. The experiment changes only the
-per-File internal stage and adds renderer-neutral endpoint, lane, attachment,
-and quality data in `@icarus-graph-explorer/focus-schematic-layout`.
+HIER3A initially started from
+`e51f52ed11ae8b3a5ff233e4e50a3c1eb268f60c`; the final-review candidate is
+rebased onto `b10ceaa`. HIER2 Strategy A remains the macro architecture. The
+experiment changes only the per-File internal stage and adds renderer-neutral
+endpoint, lane, attachment, and quality data in
+`@icarus-graph-explorer/focus-schematic-layout`.
 
 The production-boundary test still proves that apps, React Flow mapping, W3,
 view-state, the desktop application, and other production packages do not
@@ -126,16 +128,16 @@ zero for ES1–ES8.
 
 No timing threshold was added. Representative local cold measurements:
 
-| Profile                   | Modules | Visible nodes |     A0 |     A1 | A1 Dagre calls | A1 result bytes |
-| ------------------------- | ------: | ------------: | -----: | -----: | -------------: | --------------: |
-| 120-module File hub       |     120 |           120 |  65 ms |  71 ms |            121 |         323,548 |
-| 120-Heading mixed module  |       3 |           136 |  28 ms |  52 ms |             26 |         104,777 |
-| 120 small Heading modules |     120 |           240 |  94 ms |  76 ms |            241 |         407,904 |
-| 500-module stress hub     |     500 |           500 | 481 ms | 590 ms |            501 |       1,353,271 |
+| Profile                   | Modules | Visible nodes |     A0 |     A1 | A1 order pass | A1 Dagre calls | A1 result bytes |
+| ------------------------- | ------: | ------------: | -----: | -----: | ------------: | -------------: | --------------: |
+| 120-module File hub       |     120 |           120 |  53 ms |  66 ms |          3 ms |            121 |         323,657 |
+| 120-Heading mixed module  |       3 |           136 |  24 ms |  35 ms |          1 ms |             26 |         104,885 |
+| 120 small Heading modules |     120 |           240 |  71 ms |  75 ms |          2 ms |            241 |         408,013 |
+| 500-module stress hub     |     500 |           500 | 233 ms | 361 ms |         21 ms |            501 |       1,353,380 |
 
 The three ordinary medium profiles remain below the approximate 250 ms Class B
 layout target and pass all gates. The isolated 500-module stress hub completes
-without timeout and passes all gates; its 590 ms result is evidence for HIER3B
+without timeout and passes all gates; its 361 ms result is evidence for HIER3B
 worker transport rather than an ordinary interaction target. A1 uses one
 center graph per visible module plus side-subtree graphs and the single macro
 graph, so the 500-File case has the expected 501 calls rather than an
@@ -202,8 +204,9 @@ graphical gate. Final decision documentation, ADR 0019, selected API change,
 roadmap/architecture updates, PR/CI/merge, and cleanup remain gated on explicit
 user review.
 
-The review-ready diff passed `pnpm check`: formatting, lint, every package
-typecheck, 164 test files with 1,376 tests, and the 587-module web build. The
+The final-review diff, rebased onto `b10ceaa`, passed `pnpm check`: formatting,
+lint, every package typecheck, 166 test files with 1,405 tests, and the
+588-module web build. The
 existing Vite chunk-size advisory was the only build warning. It also passed
 `pnpm desktop:check`, `pnpm desktop:build`, the small local-renderer benchmark,
 the small application performance benchmark, and `pnpm install
