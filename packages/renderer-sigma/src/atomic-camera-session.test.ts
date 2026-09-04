@@ -8,6 +8,10 @@ import { resolveGlobalDensityFit } from './global-density';
 import type { GlobalGraph } from './graph';
 import { GlobalRendererSession } from './session';
 import { LocalRendererSession } from './local-session';
+import {
+  captureRawViewportFrame,
+  type RawViewportFrame,
+} from './raw-viewport-frame';
 import { SigmaTestRenderer } from './sigma-test-renderer';
 import type { GlobalLayoutPosition, GlobalRendererInput } from './types';
 import type { LocalLayoutPosition, LocalRendererInput } from './local-types';
@@ -114,6 +118,16 @@ function pointDistance(
   return Math.hypot(left.x - right.x, left.y - right.y);
 }
 
+function expectRawFrameClose(
+  actual: RawViewportFrame,
+  expected: RawViewportFrame,
+): void {
+  expect(actual.center.x).toBeCloseTo(expected.center.x, 8);
+  expect(actual.center.y).toBeCloseTo(expected.center.y, 8);
+  expect(actual.graphUnitsPerPixel).toBeCloseTo(expected.graphUnitsPerPixel, 8);
+  expect(actual.angle).toBeCloseTo(expected.angle, 8);
+}
+
 beforeEach(() => {
   SigmaTestRenderer.instances = [];
   vi.stubGlobal('window', {
@@ -137,7 +151,7 @@ afterEach(() => {
 });
 
 describe('atomic first-visible Network frames', () => {
-  it('captures the former stale-camera displacement and the corrected first frame', async () => {
+  it('captures the former stale raw-frame displacement and the corrected first frame', async () => {
     const changed = oldPositions.map((position, index) => ({
       ...position,
       x: position.x + index * index * 120,
@@ -154,8 +168,12 @@ describe('atomic first-visible Network frames', () => {
     );
     const legacyRenderer = SigmaTestRenderer.instances.at(-1)!;
     prepare(legacyRenderer);
+    // Control: remove the presented-frame override to reproduce Sigma's former
+    // per-process auto-rescaling under unchanged framed camera numbers.
+    legacyRenderer.setCustomBBox(null);
     legacy.setControlledSelection('middle');
     legacy.zoomBy(0.82);
+    const legacyRawFrame = captureRawViewportFrame(legacyRenderer);
     const oldPoint = legacy.nodeViewportPoint('middle')!;
     legacyRenderer.deferProcess = true;
     legacyRenderer.frameSnapshots.length = 0;
@@ -171,6 +189,7 @@ describe('atomic first-visible Network frames', () => {
     const stalePoint =
       legacyRenderer.frameSnapshots[0]!.nodeViewportPoints.get('middle')!;
     const staleError = pointDistance(stalePoint, oldPoint);
+    const staleRawFrame = captureRawViewportFrame(legacyRenderer);
     legacy.destroy();
 
     const atomic = new GlobalRendererSession(
@@ -186,22 +205,26 @@ describe('atomic first-visible Network frames', () => {
     prepare(atomicRenderer);
     atomic.setControlledSelection('middle');
     atomic.zoomBy(0.82);
-    const anchoredPoint = atomic.nodeViewportPoint('middle')!;
+    const atomicRawFrame = captureRawViewportFrame(atomicRenderer);
     atomicRenderer.deferProcess = true;
     atomicRenderer.frameSnapshots.length = 0;
     const applied = atomic.applyPositions(changed);
     atomicRenderer.finishProcess();
     await applied;
-    const correctedPoint =
-      atomicRenderer.frameSnapshots[0]!.nodeViewportPoints.get('middle')!;
-    const correctedError = pointDistance(correctedPoint, anchoredPoint);
+    const correctedRawFrame = captureRawViewportFrame(atomicRenderer);
 
     expect(staleError).toBeGreaterThan(50);
-    expect(correctedError).toBeLessThan(1e-8);
+    expect(
+      Math.hypot(
+        staleRawFrame.center.x - legacyRawFrame.center.x,
+        staleRawFrame.center.y - legacyRawFrame.center.y,
+      ),
+    ).toBeGreaterThan(50);
+    expectRawFrameClose(correctedRawFrame, atomicRawFrame);
     atomic.destroy();
   });
 
-  it('arms Global position repair before Graphology and draws one anchored user frame', async () => {
+  it('arms Global position repair before Graphology and draws one raw-frame-preserving user frame', async () => {
     const session = new GlobalRendererSession(
       { setAttribute: vi.fn() } as unknown as HTMLElement,
       globalInput(),
@@ -215,8 +238,7 @@ describe('atomic first-visible Network frames', () => {
     prepare(renderer);
     session.setControlledSelection('middle');
     session.zoomBy(0.82);
-    const point = session.nodeViewportPoint('middle')!;
-    const userRatio = renderer.camera.ratio;
+    const rawFrame = captureRawViewportFrame(renderer);
     const explicitRefreshes = renderer.scheduleRefresh.mock.calls.length;
     renderer.deferProcess = true;
     renderer.eventOrder.length = 0;
@@ -235,11 +257,7 @@ describe('atomic first-visible Network frames', () => {
     renderer.finishProcess();
     await applied;
     expect(renderer.frameSnapshots).toHaveLength(1);
-    expectPointClose(
-      renderer.frameSnapshots[0]!.nodeViewportPoints.get('middle'),
-      point,
-    );
-    expect(renderer.camera.ratio).toBe(userRatio);
+    expectRawFrameClose(captureRawViewportFrame(renderer), rawFrame);
     expect(renderer.scheduleRefresh).toHaveBeenCalledTimes(explicitRefreshes);
     session.destroy();
   });
@@ -340,15 +358,18 @@ describe('atomic first-visible Network frames', () => {
       'mutation:eachNodeAttributesUpdated',
     );
     renderer.finishProcess();
+    expectPointClose(
+      renderer.frameSnapshots[0]!.nodeViewportPoints.get('right'),
+      point,
+    );
+    const topologyFrame = captureRawViewportFrame(renderer);
     await Promise.resolve();
     expect(renderer.eventOrder).toContain('mutation:eachNodeAttributesUpdated');
     renderer.finishProcess();
     await applied;
 
     expect(renderer.frameSnapshots).toHaveLength(2);
-    for (const frame of renderer.frameSnapshots) {
-      expectPointClose(frame.nodeViewportPoints.get('right'), point);
-    }
+    expectRawFrameClose(captureRawViewportFrame(renderer), topologyFrame);
     session.destroy();
   });
 
@@ -381,15 +402,18 @@ describe('atomic first-visible Network frames', () => {
       'mutation:eachNodeAttributesUpdated',
     );
     renderer.finishProcess();
+    expectPointClose(
+      renderer.frameSnapshots[0]!.nodeViewportPoints.get('right'),
+      point,
+    );
+    const topologyFrame = captureRawViewportFrame(renderer);
     await Promise.resolve();
     expect(renderer.eventOrder).toContain('mutation:eachNodeAttributesUpdated');
     renderer.finishProcess();
     await applied;
 
     expect(renderer.frameSnapshots).toHaveLength(2);
-    for (const frame of renderer.frameSnapshots) {
-      expectPointClose(frame.nodeViewportPoints.get('right'), point);
-    }
+    expectRawFrameClose(captureRawViewportFrame(renderer), topologyFrame);
     session.destroy();
   });
 

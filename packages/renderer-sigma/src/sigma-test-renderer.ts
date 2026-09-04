@@ -55,6 +55,8 @@ export class SigmaTestRenderer {
   deferProcess = false;
   synchronousGraphAutoRefresh = false;
   normalizeDisplayCoordinates = false;
+  private customBBox:
+    { readonly x: [number, number]; readonly y: [number, number] } | undefined;
   private fullRefreshPending = false;
   private graphRefreshQueued = false;
   readonly refresh = vi.fn((options?: Refresh) => {
@@ -200,10 +202,32 @@ export class SigmaTestRenderer {
     return this.displayNodes.get(key);
   }
   getGraphDimensions() {
-    return { width: 1, height: 1 };
+    if (!this.normalizeDisplayCoordinates) return { width: 1, height: 1 };
+    const extent = this.activeExtent();
+    return {
+      width: extent.maxX - extent.minX || 1,
+      height: extent.maxY - extent.minY || 1,
+    };
   }
   getDimensions() {
     return { width: 800, height: 600 };
+  }
+  getBBox() {
+    const extent = this.rawExtent();
+    return {
+      x: [extent.minX, extent.maxX] as [number, number],
+      y: [extent.minY, extent.maxY] as [number, number],
+    };
+  }
+  setCustomBBox(
+    extent: {
+      readonly x: [number, number];
+      readonly y: [number, number];
+    } | null,
+  ) {
+    this.customBBox = extent ?? undefined;
+    this.scheduleRender();
+    return this;
   }
   framedGraphToViewport(
     point: { x: number; y: number },
@@ -233,20 +257,27 @@ export class SigmaTestRenderer {
       y: ((point.y - dimensions.height / 2) * camera.ratio) / scale + camera.y,
     };
   }
-  viewportToGraph(point: { x: number; y: number }) {
-    return point;
+  viewportToGraph(
+    point: { x: number; y: number },
+    override?: { cameraState?: { x: number; y: number; ratio: number } },
+  ) {
+    if (!this.normalizeDisplayCoordinates) return point;
+    return this.denormalize(this.viewportToFramedGraph(point, override));
   }
-  graphToViewport(point: { x: number; y: number }) {
-    return point;
+  graphToViewport(
+    point: { x: number; y: number },
+    override?: { cameraState?: { x: number; y: number; ratio: number } },
+  ) {
+    return this.normalizeDisplayCoordinates
+      ? this.framedGraphToViewport(this.normalize(point), override)
+      : point;
   }
 
-  private reducedNode(key: string): Attributes {
-    const reduced = this.settings.nodeReducer(
-      key,
-      this.graph.getNodeAttributes(key),
-    );
-    if (!this.normalizeDisplayCoordinates) return reduced;
+  private rawExtent() {
     const nodes = this.graph.nodes();
+    if (nodes.length === 0) {
+      return { minX: 0, maxX: 1, minY: 0, maxY: 1, extent: 1 };
+    }
     const xs = nodes.map((node) =>
       Number(this.graph.getNodeAttribute(node, 'x')),
     );
@@ -257,11 +288,55 @@ export class SigmaTestRenderer {
     const maxX = Math.max(...xs);
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
-    const extent = Math.max(maxX - minX, maxY - minY, 1);
+    return {
+      minX,
+      maxX,
+      minY,
+      maxY,
+      extent: Math.max(maxX - minX, maxY - minY, 1),
+    };
+  }
+
+  private activeExtent() {
+    if (this.customBBox === undefined) return this.rawExtent();
+    const [minX, maxX] = this.customBBox.x;
+    const [minY, maxY] = this.customBBox.y;
+    return {
+      minX,
+      maxX,
+      minY,
+      maxY,
+      extent: Math.max(maxX - minX, maxY - minY, 1),
+    };
+  }
+
+  private normalize(point: { x: number; y: number }) {
+    const extent = this.activeExtent();
+    return {
+      x: (point.x - extent.minX) / extent.extent,
+      y: (point.y - extent.minY) / extent.extent,
+    };
+  }
+
+  private denormalize(point: { x: number; y: number }) {
+    const extent = this.activeExtent();
+    return {
+      x: point.x * extent.extent + extent.minX,
+      y: point.y * extent.extent + extent.minY,
+    };
+  }
+
+  private reducedNode(key: string): Attributes {
+    const reduced = this.settings.nodeReducer(
+      key,
+      this.graph.getNodeAttributes(key),
+    );
+    if (!this.normalizeDisplayCoordinates) return reduced;
+    const extent = this.activeExtent();
     return {
       ...reduced,
-      x: (Number(reduced.x) - minX) / extent,
-      y: (Number(reduced.y) - minY) / extent,
+      x: (Number(reduced.x) - extent.minX) / extent.extent,
+      y: (Number(reduced.y) - extent.minY) / extent.extent,
     };
   }
 

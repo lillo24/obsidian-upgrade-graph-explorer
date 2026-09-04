@@ -633,10 +633,12 @@ automatic layout, and leaves Fit/center ownership untouched for Apply Pull,
 Apply Place, remove-only Pull/Place, remove-with-survivors, and Reset all. A
 fresh exact cache-hit load retains its existing three logical adoptions (cached
 base, Pull settlement, and layout-commit re-evaluation), but all three now use
-the raw-frame path and no plain intermediate frame. Raw center/scale tests cover
-each mutation plus an Apply→Remove round-trip under a non-default pan/zoom. After
-PR #60 merged, the raw-frame restore runs inside its shared atomic Graphology
-transaction; spatial adoption adds no explicit refresh or second camera owner.
+the spatial transaction path and no plain intermediate frame. Raw center/scale
+tests cover each mutation plus an Apply→Remove round-trip under a non-default
+pan/zoom. The later camera-neutral policy retains the first accepted
+normalization extent, so these coordinate commits need no camera repair while
+still running inside PR #60's shared atomic Graphology transaction. Spatial
+adoption adds no explicit refresh or second camera owner.
 
 The private-safe medium product fixture (500 nodes, 100 affected members, 24
 iterations) compares the proposed default strengths with the same base graph:
@@ -987,6 +989,36 @@ requests, zero dynamic Pull requests, and zero spatial persistence writes. All
 and Focus strength interpolation is constant-time over the last accepted
 decision; live preview moves only the camera around a stable semantic anchor.
 
+## Camera-neutral Network geometry adoption
+
+The All Network progressive-zoom investigation separated geometry, density,
+and camera evidence in the real session policy. Five deliberately divergent
+accepted layouts kept the raw density decision at its `1.4` ceiling; the Sigma
+camera ratio also stayed at `1.4` on the former path and never approached the
+configured maximum ratio `6`. Nevertheless, freezing framed camera state at
+`(x: 0.5, y: 0.5, ratio: 1.4)` while Sigma normalization bounds changed moved
+the raw viewport center from approximately `(4.5, 114.5)` to `(262.5, 364.5)`
+and grew raw graph units per 100 px from approximately `59.5` to `185.5`.
+Mean coordinate displacement per accepted step was approximately `12.3`,
+`32.1`, `52.0`, `72.0`, and `92.0` graph units. The apparent progressive
+zoom-out was therefore a normalization/camera-policy defect, not evidence of a
+ratio marching toward Sigma's clamp; the measured geometry drift remains
+separate CONVERGENCE1C evidence.
+
+Position adoption now consumes a one-shot initial-presentation intent. That
+first presentation fixes Sigma's custom bounding box. After the grant, Global
+and Focus still run one density evaluation per accepted layout, but issue zero
+automatic density-framing commands and zero camera-state repairs: changed
+coordinates are processed in the retained normalization frame. This avoids the
+otherwise possible repair request beyond Sigma's maximum ratio `6`. Explicit
+Fit is the operation that rebases the frame to current graph bounds. The
+deterministic session regression records five density evaluations, five position
+commits, zero camera writes, zero animations, zero center requests, and one
+process/render per commit. The real canvas path covers Reference Pull, Folder
+Clustering Strength, Folder Separation, then Reference Pull again; control
+order changes geometry but not camera authority and introduces no projection,
+spatial Pull, or extra ForceAtlas2 request beyond the requested layout.
+
 ## FLICKER1 atomic Network frame evidence
 
 Sigma 3.0.3 automatically schedules refresh from node/edge add, drop, and
@@ -1001,12 +1033,14 @@ bridging the two transactions. No timer, animation, fade, extra layout, or cache
 was added.
 
 The deterministic Sigma-frame harness normalizes old and changed coordinates in
-an 800×600 viewport. Its former uncorrected control displaces the semantic node
-by more than 50 px on the first changed frame; the production transaction keeps
-the first and settled frame error below `1e-8` px. It covers Global and Local
-topology/position commits, selected and explicit-history survivors, nearest
-survivor fallback, fully replaced/empty scenes, and automatic density ratio on
-the first confirmed-position frame. One accepted coordinate commit produces
+an 800×600 viewport. Its former uncorrected control displaces both the semantic
+node and raw viewport by more than 50 units on the first changed frame. Topology
+commits retain their selected/semantic survivor rule; later position commits
+reuse the established frame and preserve raw center and scale to eight decimal
+places with zero camera writes even when nodes themselves move. It covers Global
+and Local topology/position commits, selected and
+explicit-history survivors, nearest survivor fallback, fully replaced/empty
+scenes, and automatic density ratio on the first confirmed-position frame. One accepted coordinate commit produces
 one process/render in the harness. Density preview remains camera-only over
 0/50/100/125/150%, with 100% as Auto and 101–150% as transient Sandbox-only
 amplification; it creates no ForceAtlas2, dynamic Pull, spatial write, topology,

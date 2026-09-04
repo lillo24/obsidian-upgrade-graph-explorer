@@ -918,12 +918,13 @@ that cause through `applyDisplayedPositions`/`applyComposedPositions` instead of
 inferring it only from the new compatibility anchor map. Rule changes do not
 recreate the automatic-layout cancellation callback, so Remove/Reset cannot
 start an extra cache adoption or intermediate plain `applyPositions` frame.
-The spatial session arms raw graph-space center/scale restoration before the
-Graphology coordinate mutation and applies it in `afterProcess` before drawing.
-Merged PR #60 / FLICKER1 provides that single atomic Network transaction.
-SPATIAL2B passes raw-frame restoration as its repair callback and leaves the
-Graphology-triggered process/render authoritative, so spatial adoption adds no
-second refresh path or competing camera owner.
+The Network session keeps the first accepted presentation extent as Sigma's
+normalization frame, then performs the Graphology coordinate mutation inside
+the merged PR #60 / FLICKER1 atomic transaction. Because later spatial
+coordinates reuse that extent, raw graph-space center/scale and framed camera
+x/y/ratio stay unchanged without a bounded-ratio repair. The
+Graphology-triggered process/render remains authoritative, so spatial adoption
+adds no second refresh path or competing camera owner.
 
 Tauri v2 hosts the existing frontend and provides dialog plus filesystem
 read/watch capabilities through a narrow source-provider boundary. Tauri
@@ -948,13 +949,16 @@ ratio with one final `0.7–1.4` clamp. Invalid geometry safely uses ratio 1.
 This decision returns no coordinates and is excluded from Local requests,
 fingerprints, caches, and persistence.
 
-The Local session owns framing authority imperatively. Fresh automatic cameras
-adopt the latest density ratio while preserving the existing root/selection
-screen anchor. Restored semantic `freeRatio`, explicit center, wheel/pinch,
-drag, and zoom-button actions remain exact and authoritative until manual Fit.
-Fit uses the stored density target and re-enters automatic ownership; resize
-does not recompute it. VISUAL1B and Visual Groups remain reducer-only because
-the policy consumes only automatic node sizes.
+The Local session owns framing authority imperatively. A fresh presentation may
+consume one automatic-framing grant, establish the presented normalization
+extent, and adopt the latest density ratio while preserving the existing
+root/selection screen anchor. Later accepted geometry still refreshes density
+evidence but reuses that extent and leaves camera x/y/ratio/angle unchanged,
+including when the visible camera originated from automatic Fit.
+Restored semantic `freeRatio`, explicit center, wheel/pinch, drag, zoom-button,
+and Density actions cancel any still-pending initial grant. Fit uses the stored
+density target explicitly; resize does not recompute it. VISUAL1B and Visual
+Groups remain reducer-only because the policy consumes only automatic node sizes.
 
 Global framing shares Sigma-normalization and robust-statistic primitives but
 uses a separate rootless policy over confirmed final displayed positions after
@@ -968,13 +972,18 @@ final bound. Independent graphs with two or more valid nodes are first-class;
 only empty, single-node, invalid, incomplete, duplicate, or degenerate geometry
 falls back to ratio 1.
 
-The Global session independently tracks auto- versus user-owned camera state.
-Fresh mounts without a restored viewport and explicit Fit are auto-owned;
-wheel/pinch, pan, zoom buttons, centering, arrangements, restored semantic
-viewports, and live All-density preview are user-owned. Confirmed geometry
-updates the stored density target, but worker/query/topology/Pull/fixed adoption
-cannot steal a user-owned camera. Arrangement pointer preview neither measures
-density nor reframes; confirmation refreshes the next Fit target. The All
+The two Sigma sessions share an explicit position-adoption intent boundary.
+A fresh mount without accepted positions or a restored viewport may consume one
+initial automatic-framing grant. Every later coordinate transaction is
+camera-neutral, regardless of whether its current camera originated from Auto,
+Fit, Density, navigation, or user interaction. Density measurement updates the
+stored target only; it does not confer camera authority. The first accepted
+presentation establishes a stable Sigma custom bounding box, so FLICKER1's
+existing atomic Graphology transaction processes later coordinates against the
+same normalization frame with zero camera writes. Explicit Fit deliberately
+rebases that box to current graph bounds before recentering. Arrangement pointer
+preview neither measures density nor reframes; confirmation refreshes the next
+Fit target. The All
 strength uses the same camera-only interpolation as Focus and does not enter
 Global layout settings, fingerprints, caches, worker requests, presentation
 overrides, QUERY1, spatial rules, or persistence.

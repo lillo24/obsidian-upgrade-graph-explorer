@@ -14,6 +14,8 @@ import {
 } from './file-move';
 import type { TemporaryNodeConstraintEndReason } from './temporary-node-constraint';
 import { atomicAnchoredGraphMutation } from './anchored-refresh';
+import { NetworkPositionCameraIntentPolicy } from './network-camera-intent';
+import { networkPositionExtent } from './network-position-frame';
 
 import {
   buildLocalGraph,
@@ -118,6 +120,8 @@ export class LocalRendererSession {
   private densityFramingStrength: number;
   private lastDensityQaDiagnostics: LocalDensityQaDiagnostics | undefined;
   private cameraOwnership: 'auto' | 'user';
+  private readonly positionCameraIntent: NetworkPositionCameraIntentPolicy;
+  private positionFrameEstablished = false;
   private latestDensityDecision: LocalDensityDecision = {
     ratio: 1,
     connectedEdgeSignal: 1,
@@ -175,11 +179,13 @@ export class LocalRendererSession {
   private readonly mouseDragHandler = (): void => {
     if (this.renderer.getMouseCaptor().isMouseDown) {
       this.cameraOwnership = 'user';
+      this.positionCameraIntent.claimCamera();
     }
   };
 
   private readonly touchMoveHandler = (): void => {
     this.cameraOwnership = 'user';
+    this.positionCameraIntent.claimCamera();
   };
 
   private readonly cameraUpdatedHandler = (): void => {
@@ -219,6 +225,7 @@ export class LocalRendererSession {
       this.renderer.getDimensions().height,
     );
     this.cameraOwnership = 'user';
+    this.positionCameraIntent.claimCamera();
     if (this.trackpadZoomMode === 'pinch-zoom' && !original.ctrlKey) {
       this.applyWheelPan(original);
       return;
@@ -263,6 +270,10 @@ export class LocalRendererSession {
     localDensityFramingRatio(1, this.densityFramingStrength);
     this.cameraOwnership =
       options.initialViewport === undefined ? 'auto' : 'user';
+    this.positionCameraIntent = new NetworkPositionCameraIntentPolicy(
+      options.initialViewport === undefined &&
+        options.initialAcceptedPositions === undefined,
+    );
     this.trackpadZoomMode = options.trackpadZoomMode;
     this.visualGroupStyles = options.visualGroupStyles;
     this.presentationOverrides = options.presentationOverrides;
@@ -292,11 +303,14 @@ export class LocalRendererSession {
       edgeReducer: (key, attributes) => this.reduceEdge(key, attributes),
     });
     if (options.initialAcceptedPositions !== undefined) {
+      this.establishPositionFrame(options.initialAcceptedPositions);
+    } else if (options.initialViewport !== undefined) {
+      this.establishCurrentPositionFrame();
+    }
+    if (options.initialAcceptedPositions !== undefined) {
       this.measureDensity(options.initialAcceptedPositions);
       if (this.cameraOwnership === 'auto') {
-        this.renderer.getCamera().setState({
-          ratio: this.effectiveDensityRatio(),
-        });
+        this.applyAutomaticDensityFraming();
       }
     }
     if (options.initialViewportPoint !== undefined) {
@@ -617,6 +631,7 @@ export class LocalRendererSession {
     // accepted density decision immediately, then protect that viewport from
     // later topology/layout completion exactly like wheel, pinch, or drag.
     this.cameraOwnership = 'user';
+    this.positionCameraIntent.claimCamera();
     const ratio = this.effectiveDensityRatio();
     if (anchor === undefined) {
       this.renderer.getCamera().setState({ ratio });
@@ -861,6 +876,33 @@ export class LocalRendererSession {
     );
   }
 
+  private applyAutomaticDensityFraming(): void {
+    this.renderer.getCamera().setState({
+      ratio: this.effectiveDensityRatio(),
+    });
+    this.emitDensityQaDiagnostics();
+  }
+
+  private establishPositionFrame(
+    positions: readonly LocalLayoutPosition[],
+  ): void {
+    if (this.positionFrameEstablished) return;
+    this.renderer.setCustomBBox(networkPositionExtent(positions));
+    this.positionFrameEstablished = true;
+  }
+
+  private establishCurrentPositionFrame(): void {
+    if (this.positionFrameEstablished) return;
+    this.renderer.setCustomBBox(this.renderer.getBBox());
+    this.positionFrameEstablished = true;
+  }
+
+  private rebaseCurrentPositionFrame(): void {
+    this.renderer.setCustomBBox(this.renderer.getBBox());
+    this.positionFrameEstablished = true;
+    this.renderer.refresh({ schedule: true });
+  }
+
   private emitDensityQaDiagnostics(): void {
     const diagnostics: LocalDensityQaDiagnostics = {
       rawDecisionRatio: this.latestDensityDecision.ratio,
@@ -925,21 +967,19 @@ export class LocalRendererSession {
         error instanceof Error ? error : new Error(String(error)),
       );
     }
+    const cameraIntent = this.positionCameraIntent.consumePositionAdoption();
+    if (cameraIntent === 'initial-automatic-framing') {
+      this.establishPositionFrame(positions);
+    } else this.establishCurrentPositionFrame();
     const changed = positions.some((position) => {
       const attributes = this.graph.getNodeAttributes(position.key);
       return attributes.x !== position.x || attributes.y !== position.y;
     });
     this.measureDensity(positions);
-    const targetRatio = () =>
-      this.cameraOwnership === 'auto'
-        ? this.effectiveDensityRatio()
-        : this.renderer.getCamera().ratio;
     if (!changed) {
-      if (this.cameraOwnership === 'auto') {
+      if (cameraIntent === 'initial-automatic-framing') {
         if (anchor === undefined) {
-          this.renderer.getCamera().setState({
-            ratio: this.effectiveDensityRatio(),
-          });
+          this.applyAutomaticDensityFraming();
         } else {
           this.anchorNodeAtViewport(
             anchorKey!,
@@ -961,12 +1001,16 @@ export class LocalRendererSession {
           this.renderer.off('afterRender', callback),
       },
       () => {
-        if (anchor !== undefined) {
-          this.anchorNodeAtViewport(anchorKey!, anchor, targetRatio());
-        } else if (this.cameraOwnership === 'auto') {
-          this.renderer.getCamera().setState({
-            ratio: this.effectiveDensityRatio(),
-          });
+        if (cameraIntent === 'initial-automatic-framing') {
+          if (anchor !== undefined) {
+            this.anchorNodeAtViewport(
+              anchorKey!,
+              anchor,
+              this.effectiveDensityRatio(),
+            );
+          } else {
+            this.applyAutomaticDensityFraming();
+          }
         }
       },
       () =>
@@ -1061,6 +1105,7 @@ export class LocalRendererSession {
       throw new Error(`Cannot center missing Local node ${request.nodeId}.`);
     }
     this.cameraOwnership = 'user';
+    this.positionCameraIntent.claimCamera();
     const started = performance.now();
     await this.renderer
       .getCamera()
@@ -1077,6 +1122,7 @@ export class LocalRendererSession {
 
   zoomBy(factor: number): void {
     this.cameraOwnership = 'user';
+    this.positionCameraIntent.claimCamera();
     const camera = this.renderer.getCamera();
     void camera.animate(
       { ratio: Math.max(0.02, Math.min(6, camera.ratio * factor)) },
@@ -1086,6 +1132,8 @@ export class LocalRendererSession {
 
   fit(): void {
     this.cameraOwnership = 'auto';
+    this.positionCameraIntent.claimCamera();
+    this.rebaseCurrentPositionFrame();
     void this.renderer.getCamera().animate(
       {
         x: 0.5,

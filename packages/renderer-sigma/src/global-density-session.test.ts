@@ -6,6 +6,7 @@ vi.mock('sigma', async () => ({
 
 import { resolveGlobalDensityFit } from './global-density';
 import { globalDensityFramingRatio } from './global-density-framing';
+import { captureRawViewportFrame } from './raw-viewport-frame';
 import { GlobalRendererSession } from './session';
 import { SigmaTestRenderer } from './sigma-test-renderer';
 import type {
@@ -168,32 +169,28 @@ describe('All Network density camera ownership', () => {
       { initialAcceptedPositions: basePositions },
       input,
     );
+    renderer.normalizeDisplayCoordinates = true;
+    renderer.scheduleRefresh();
     session.setControlledSelection('middle');
-    const anchor = session.nodeViewportPoint('middle')!;
     session.zoomBy(0.82);
-    const userRatio = renderer.camera.ratio;
-    const changed = [
-      ...basePositions.map((position, index) => ({
-        ...position,
-        x: position.x + index * index * 7,
-        y: position.y - index * 5,
-      })),
-      { key: 'added', x: -75, y: 80 },
-    ];
+    const changed = basePositions.map((position, index) => ({
+      ...position,
+      x: position.x + index * index * 7,
+      y: position.y - index * 5,
+    }));
     const changedInput = rendererInput(changed);
 
     session.update(changedInput);
+    const rawFrame = captureRawViewportFrame(renderer);
     await session.applyPositions(changed);
 
-    expect(renderer.camera.ratio).toBe(userRatio);
-    // The Sigma test double omits production normalization precision; the
-    // semantic anchor remains within one synthetic viewport pixel.
-    expect(
-      Math.abs(session.nodeViewportPoint('middle')!.x - anchor.x),
-    ).toBeLessThan(2);
-    expect(
-      Math.abs(session.nodeViewportPoint('middle')!.y - anchor.y),
-    ).toBeLessThan(2);
+    const adoptedFrame = captureRawViewportFrame(renderer);
+    expect(adoptedFrame.center.x).toBeCloseTo(rawFrame.center.x, 8);
+    expect(adoptedFrame.center.y).toBeCloseTo(rawFrame.center.y, 8);
+    expect(adoptedFrame.graphUnitsPerPixel).toBeCloseTo(
+      rawFrame.graphUnitsPerPixel,
+      8,
+    );
     const changedDecision = resolveGlobalDensityFit(changedInput, changed);
     session.fit();
     expect(renderer.camera).toMatchObject({

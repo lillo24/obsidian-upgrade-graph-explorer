@@ -50,7 +50,9 @@ src/
   lifecycle.ts             WebGL construction result and idempotent session lease.
   style.ts                 Far/Regional/Near LOD and GROUP1A base-accent layer.
   global-label.ts          Viewport-aware Global label/hover placement after adaptive culling.
-  raw-viewport-frame.ts    Raw graph-space center/scale preservation across Sigma normalization.
+  raw-viewport-frame.ts    Raw graph-space center/scale diagnostics and bounded repair primitive.
+  network-camera-intent.ts One-shot initial framing versus camera-neutral position-adoption policy.
+  network-position-frame.ts Validates the stable presented-position normalization extent.
   precision-wheel-zoom.ts  Fine-linear/coarse-compressed wheel curve and Sigma default guard.
   session.ts               Imperative Sigma lifecycle and high-frequency interaction ownership.
   node-click.ts            Shared 300 ms single/double-click arbitration; selection stays immediate.
@@ -340,26 +342,23 @@ state.
 
 Authoritative spatial-rule adoption (Dynamic Pull, Fixed Placement, dynamic
 cache hits, removal, and reset) preserves the raw graph point under the viewport
-center, raw graph units per pixel, and camera angle across Sigma's normalization
-recalculation. The session captures that frame, arms its `afterProcess` repair
-before replacing coordinates, and restores it before the changed geometry is
-drawn. Spatial intent is determined by the transaction cause, not only by the
-new registry contents: removing the final rule remains a spatial adoption even
-when both `folderRules` and the compatibility anchor map become empty. The
-stable preview-cancel callback cannot retrigger automatic cache adoption when a
-rule changes, so Apply, Remove, and Reset each produce one authoritative
-position application after the initial layout has settled. This is a narrow
-spatial-operation boundary: ordinary pan/zoom, initial framing, automatic layout
-outside the spatial-rule registry, Fit, Search center, and later camera
-transitions retain their existing camera ownership.
+center, raw graph units per pixel, and camera angle. After the first accepted
+presentation, the session keeps Sigma's normalization extent stable while later
+coordinates change, so the same framed camera x/y/ratio continues to represent
+the same raw viewport without a bounded-ratio repair. Spatial intent is still
+determined by the transaction cause, not only by the new registry contents:
+removing the final rule remains a spatial adoption even when both `folderRules`
+and the compatibility anchor map become empty. The stable preview-cancel
+callback cannot retrigger automatic cache adoption when a rule changes, so
+Apply, Remove, and Reset each produce one authoritative position application
+after the initial layout has settled.
 
-Merged PR #60 / FLICKER1 owns the atomic Network camera transaction and
-camera-ownership policy. SPATIAL2B does not duplicate that architecture:
-`raw-viewport-frame.ts` contains only spatial-normalization capture/restore,
-and `applySpatialPositions` supplies that restore as the repair callback to the
-shared `atomicAnchoredGraphMutation`. Graphology owns the single resulting
-process/render; there is no spatial explicit-refresh fallback or nested camera
-owner.
+Merged PR #60 / FLICKER1 remains the sole atomic Network graph-mutation
+transaction. `applySpatialPositions` uses its shared pre-mutation boundary and
+Graphology owns the single resulting process/render; spatial adoption adds no
+refresh fallback or nested camera owner. `raw-viewport-frame.ts` remains the
+diagnostic/bounded-repair primitive for tests and any topology policy that
+cannot retain a meaningful presented extent.
 
 ## Regional semantic zoom and lifecycle
 
@@ -482,12 +481,13 @@ the raw connected-edge, nearest-neighbor/node-diameter, and p90-root-radius
 signals, then clamps once to `0.7–1.4`; invalid or degenerate metrics fall back
 to ratio 1.
 
-Fresh Local sessions are auto-framed after an exact cache hit or latest worker
-result while retaining their transition anchor's screen point. A restored
+Fresh Local sessions are auto-framed once from an exact cache hit or the first
+latest worker result while retaining their transition anchor's screen point. A restored
 semantic viewport, explicit center, wheel/pinch, native drag, or zoom button
-makes the session camera user-owned, so later layout completion updates only
-the stored Fit target. Manual Fit resets x/y/angle, applies that latest target,
-and returns ownership to automatic framing. Resize never recomputes or reapplies
+makes that initial grant ineligible. Every later accepted layout measures and
+stores the latest density target but preserves raw center, scale, and angle.
+Manual Fit resets x/y/angle and applies that latest target; it does not grant
+the next geometry result permission to reframe. Resize never recomputes or reapplies
 the policy. Automatic node sizes are the only radius input: VISUAL1B display
 multipliers and Visual Groups cannot change density, camera, layout, or cache.
 
@@ -519,15 +519,15 @@ nearest-neighbor scan at Global scale. Empty, single-node, invalid, duplicate,
 or incomplete geometry falls back explicitly to ratio 1; independent graphs
 with two or more valid nodes produce a real decision.
 
-Fresh All Network sessions without a restored semantic viewport are
-auto-owned. Confirmed displayed geometry may refresh their camera target, while
-wheel/pinch, pan, zoom buttons, centering, arrangement interaction, restored
-viewports, and density-slider previews make the camera user-owned. Worker,
-query, topology, Pull, and fixed-position adoption then preserve the visual
-anchor and camera ratio. Live arrangement preview changes only displayed
-positions; confirmation updates the stored density decision without reframing.
-All Fit recenters, resets the angle, applies the current effective All ratio,
-and returns ownership to automatic. All and Focus have independent transient
+Fresh All Network sessions without a restored semantic viewport receive one
+initial automatic-framing grant. That first accepted presentation also fixes
+Sigma's presented normalization extent. After that boundary, ordinary worker,
+Re-layout, query, Pull, fixed-position, removal, reset, and cache-hit coordinate
+adoption measures the latest density evidence while leaving both the extent and
+camera x/y/ratio/angle unchanged. Explicit Fit rebases the presented extent to
+the latest graph bounds, recenters, resets the angle, and applies the current
+effective All ratio, but does not authorize a later geometry result to reframe.
+All and Focus have independent transient
 0–150% strengths, both defaulting to 100%; neither enters layout input, cache,
 fingerprint, presentation override, query, workspace state, or persistence.
 Confirmed topology and coordinate changes use Graphology-triggered Sigma
