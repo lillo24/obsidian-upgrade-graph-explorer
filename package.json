@@ -24,6 +24,7 @@
     "benchmark:visual-groups": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:visual-groups",
     "analyze:focus-spacing": "pnpm --filter @icarus-graph-explorer/vault-diagnostics analyze:focus-spacing",
     "analyze:network-spacing": "pnpm --filter @icarus-graph-explorer/vault-diagnostics analyze:network-spacing",
+    "analyze:forceatlas2-convergence": "pnpm --filter @icarus-graph-explorer/vault-diagnostics analyze:forceatlas2-convergence",
     "benchmark:focus-schematic": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:focus-schematic",
     "benchmark:focus-schematic-layout": "pnpm --filter @icarus-graph-explorer/focus-schematic-bakeoff benchmark",
     "generate:focus-schematic-layout-lab": "pnpm --filter @icarus-graph-explorer/focus-schematic-bakeoff generate:lab",

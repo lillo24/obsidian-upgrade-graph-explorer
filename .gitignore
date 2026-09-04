@@ -7,6 +7,7 @@ coverage/
 /output/spacing1b-global/
 /output/hier2-layout-lab/
 /tools/focus-schematic-bakeoff/output/
+/output/convergence1a/
 *.tsbuildinfo
 .DS_Store
 *.local

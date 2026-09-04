@@ -14,6 +14,7 @@
     "benchmark:visual-groups": "tsx src/visual-groups-benchmark.ts",
     "analyze:focus-spacing": "tsx src/focus-spacing-analysis.ts",
     "analyze:network-spacing": "tsx src/network-spacing-analysis.ts",
+    "analyze:forceatlas2-convergence": "tsx src/forceatlas2-convergence-analysis.ts",
     "benchmark:focus-schematic": "tsx src/focus-schematic-benchmark.ts",
     "benchmark:file-move": "tsx src/file-move-benchmark.ts",
     "diagnose": "tsx src/cli.ts",
@@ -42,6 +43,8 @@
     "@icarus-graph-explorer/visual-groups": "workspace:*",
     "@icarus-graph-explorer/workspace-engine-obsidian": "workspace:*",
     "@icarus-graph-explorer/workspace-worker": "workspace:*",
+    "graphology": "0.26.0",
+    "graphology-layout-forceatlas2": "0.10.1",
     "sigma": "3.0.3"
   },
   "devDependencies": {
