@@ -4,6 +4,7 @@ coverage/
 /output/diagnostics/
 /output/performance/
 /output/spacing1a/
+/output/spacing1b-global/
 *.tsbuildinfo
 .DS_Store
 *.local

@@ -41,6 +41,7 @@ src/
   focus-spacing-metrics.ts  Graph/screen diagnostics plus production B4 policy adapter.
   focus-spacing-analysis.ts SPACING1A/SPACING1B parity runner and visual comparison generator.
   focus-spacing-metrics.test.ts Transform, bounds, 15-fixture, and production-parity contracts.
+  network-spacing-analysis.ts SPACING1B-GLOBAL final-geometry matrix, scale oracle, and density benchmark.
   performance-benchmark.ts Repeated versioned pipeline/projection/renderer/inspection results.
   query-projection-benchmark.ts PERFQ1A projection phases, operations, and repeated-query evidence.
   performance-policy.ts Class budgets plus measured KG12B worker/cache decisions.
@@ -137,6 +138,7 @@ pnpm benchmark:local-renderer -- --profile small
 pnpm benchmark:local-renderer -- --profile medium
 pnpm benchmark:local-renderer -- --profile stress
 pnpm analyze:focus-spacing
+pnpm analyze:network-spacing
 ```
 
 Profiles are deterministic and measure parse/adapt, resolution, report
@@ -234,6 +236,16 @@ and a self-contained HTML comparison to `output/spacing1a/`. SPACING1B makes
 the selected B4 value call the production renderer policy while detailed
 candidate/bounds metrics remain analysis-only. The command does not alter
 layout settings, renderer state, fingerprints, positions, or node sizes.
+
+`analyze:network-spacing` traces the installed Global pipeline through
+ForceAtlas2, optional dynamic Pull, fixed-folder composition, final displayed
+positions, Sigma normalization, and camera policy. Its deterministic 29-scene
+matrix includes independent zero-edge graphs, multiple components, connected
+and dense families, folder clustering, dynamic/fixed composition,
+query-reduced sparsity, and 100/500/1,000-node profiles. A separate 5,000-node
+profile isolates density cost. It writes aggregate synthetic JSON only to the
+ignored `output/spacing1b-global/` directory and verifies that density strength
+adds zero layout requests, Pull requests, or spatial writes.
 
 An opt-in private check can validate one real workspace using an existing
 identity catalog:

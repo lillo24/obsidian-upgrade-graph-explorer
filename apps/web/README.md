@@ -407,21 +407,24 @@ view, but Hierarchy projection and W3 layout do not observe them.
 Settings use three keyboard-accessible sections: **Preferences** contains the
 ordinary Trackpad Zoom choice, **Sandbox** contains graph appearance/layout
 experiments, and **Source & Diagnostics** retains source operations and evidence.
-Sandbox also provides a transient Focus Network density-framing strength: 0%
-reproduces legacy ratio 1, 100% uses the measured SPACING1B ratio, and intermediate
-values linearly interpolate the camera target. Slider movement is a live camera
+Sandbox provides separate transient **All Network Density** and **Focus Network
+Density** framing strengths. For either scope, 0% reproduces legacy ratio 1,
+100% uses that renderer's measured SPACING1B ratio, and intermediate values
+linearly interpolate the camera target. Slider movement is a live camera
 preview under automatic or user ownership: it preserves the current semantic
 screen anchor, applies the new ratio without Fit, and leaves the viewport
-user-owned so later topology updates cannot steal it. It defaults to 100% per
-launch and is intentionally absent from the v1 preference payload. Reset Sandbox restores
-only Focus Root appearance, All Network layout, density strength, and Experimental
-exposure; Trackpad Zoom, source configuration, view/history, queries, and vault
-data remain unchanged.
+user-owned so later topology updates cannot steal it. Both default to 100% per
+launch and are intentionally absent from the v1 preference payload. Reset
+Sandbox restores only Focus Root appearance, All Network layout, both density
+strengths, and Experimental exposure; Trackpad Zoom, source configuration,
+view/history, queries, spatial folder intent, and vault data remain unchanged.
 
-For SPACING1B native QA, Sandbox temporarily shows the current raw density
-decision, effective interpolated ratio, Sigma camera ratio, and fallback reason.
-These values update from the mounted Focus Network session and are neither
-persisted nor consumed by projection, ForceAtlas2, or camera policy.
+For SPACING1B native QA, Sandbox temporarily shows each mounted renderer's raw
+density decision, effective interpolated ratio, Sigma camera ratio, and fallback
+reason. The All readout also includes node, edge, and isolate counts. These
+values are neither persisted nor consumed by projection, ForceAtlas2, Pull,
+layout identity, or camera policy. Scope labels distinguish the All-only layout
+and visual controls from Focus Root and the two camera-only density controls.
 
 **Hierarchy Depth** is hidden in All Network and visible in the other three
 combinations. In Focus it applies automatic depth only beneath the root file;

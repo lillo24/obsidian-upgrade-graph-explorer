@@ -1,4 +1,5 @@
 import { DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH } from '@icarus-graph-explorer/renderer-sigma/local-density-framing';
+import { DEFAULT_GLOBAL_DENSITY_FRAMING_STRENGTH } from '@icarus-graph-explorer/renderer-sigma/global-density-framing';
 
 import {
   DEFAULT_GRAPH_PREFERENCES,
@@ -6,7 +7,8 @@ import {
 } from './graph-preferences';
 
 export interface GraphSandboxReset {
-  readonly densityFramingStrength: number;
+  readonly allNetworkDensityFramingStrength: number;
+  readonly focusNetworkDensityFramingStrength: number;
   readonly preferences: GraphPreferences;
 }
 
@@ -15,7 +17,8 @@ export function resetGraphSandbox(
   current: GraphPreferences,
 ): GraphSandboxReset {
   return {
-    densityFramingStrength: DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH,
+    allNetworkDensityFramingStrength: DEFAULT_GLOBAL_DENSITY_FRAMING_STRENGTH,
+    focusNetworkDensityFramingStrength: DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH,
     preferences: {
       ...current,
       focusAppearance: DEFAULT_GRAPH_PREFERENCES.focusAppearance,
@@ -26,4 +29,7 @@ export function resetGraphSandbox(
   };
 }
 
-export { DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH };
+export {
+  DEFAULT_GLOBAL_DENSITY_FRAMING_STRENGTH,
+  DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH,
+};

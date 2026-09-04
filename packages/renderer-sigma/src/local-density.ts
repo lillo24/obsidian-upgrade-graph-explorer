@@ -1,17 +1,15 @@
-import {
-  createNormalizationFunction,
-  matrixFromCamera,
-  multiplyVec2,
-} from 'sigma/utils';
-
 import type { LocalLayoutPosition } from './local-types';
+import {
+  NETWORK_DENSITY_REFERENCE_FRAME,
+  canonicalScreenNodes,
+  clamp,
+  distance,
+  median,
+  percentile,
+  round,
+} from './network-density-core';
 
-export const LOCAL_DENSITY_REFERENCE_FRAME = {
-  width: 1_200,
-  height: 800,
-  stagePadding: 24,
-  baselineRatio: 1,
-} as const;
+export const LOCAL_DENSITY_REFERENCE_FRAME = NETWORK_DENSITY_REFERENCE_FRAME;
 
 export const LOCAL_DENSITY_RATIO_BOUNDS = {
   minimum: 0.7,
@@ -70,71 +68,6 @@ const FALLBACK_DECISION: LocalDensityDecision = {
 
 function fallback(reason: string): LocalDensityDecision {
   return { ...FALLBACK_DECISION, fallbackReason: reason };
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.max(minimum, Math.min(maximum, value));
-}
-
-function round(value: number, digits = 4): number {
-  return Number(value.toFixed(digits));
-}
-
-function percentile(values: readonly number[], fraction: number): number {
-  if (values.length === 0) return Number.NaN;
-  const sorted = [...values].sort((left, right) => left - right);
-  const index = (sorted.length - 1) * fraction;
-  const lower = Math.floor(index);
-  const upper = Math.ceil(index);
-  if (lower === upper) return sorted[lower]!;
-  const weight = index - lower;
-  return sorted[lower]! * (1 - weight) + sorted[upper]! * weight;
-}
-
-function distance(
-  left: { readonly x: number; readonly y: number },
-  right: { readonly x: number; readonly y: number },
-): number {
-  return Math.hypot(left.x - right.x, left.y - right.y);
-}
-
-function medianThree(left: number, middle: number, right: number): number {
-  return [left, middle, right].sort((a, b) => a - b)[1]!;
-}
-
-function canonicalScreenNodes(
-  nodes: readonly DensityNode[],
-): readonly DensityNode[] | undefined {
-  const xs = nodes.map(({ x }) => x);
-  const ys = nodes.map(({ y }) => y);
-  const extent = {
-    x: [Math.min(...xs), Math.max(...xs)] as [number, number],
-    y: [Math.min(...ys), Math.max(...ys)] as [number, number],
-  };
-  const normalization = createNormalizationFunction(extent);
-  const graphDimensions = {
-    width: extent.x[1] - extent.x[0] || 1,
-    height: extent.y[1] - extent.y[0] || 1,
-  };
-  const matrix = matrixFromCamera(
-    { x: 0.5, y: 0.5, ratio: 1, angle: 0 },
-    LOCAL_DENSITY_REFERENCE_FRAME,
-    graphDimensions,
-    LOCAL_DENSITY_REFERENCE_FRAME.stagePadding,
-  );
-  const screenNodes = nodes.map((node) => {
-    const clip = multiplyVec2(matrix, normalization(node));
-    return {
-      ...node,
-      x: ((1 + clip.x) * LOCAL_DENSITY_REFERENCE_FRAME.width) / 2,
-      y: ((1 - clip.y) * LOCAL_DENSITY_REFERENCE_FRAME.height) / 2,
-    };
-  });
-  return screenNodes.every(
-    ({ x, y }) => Number.isFinite(x) && Number.isFinite(y),
-  )
-    ? screenNodes
-    : undefined;
 }
 
 /**
@@ -260,11 +193,11 @@ export function resolveLocalDensityFit(
     2,
   );
   const rootRadiusSignal = p90RootRadius / rootRadiusTarget;
-  const rawRatio = medianThree(
+  const rawRatio = median([
     connectedEdgeSignal,
     nearestNeighborSignal,
     rootRadiusSignal,
-  );
+  ]);
   if (
     ![
       connectedEdgeSignal,

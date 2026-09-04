@@ -168,6 +168,7 @@ describe.each(['global', 'local'] as const)(
         expect(layout).toHaveBeenCalledTimes(1);
         const renderer = SigmaTestRenderer.instances[0]!;
         const cameraRatioBefore = renderer.camera.ratio;
+        const cameraSetCallsBefore = renderer.camera.setState.mock.calls.length;
         const before = coordinates(renderer);
         const distance = () =>
           Math.hypot(
@@ -242,7 +243,7 @@ describe.each(['global', 'local'] as const)(
         );
         expect(renderer.camera.ratio).toBe(cameraRatioBefore);
         expect(renderer.camera.setState.mock.calls.length).toBe(
-          mode === 'global' ? 0 : 1,
+          cameraSetCallsBefore,
         );
         // The same mounted canvas still submits work for a genuine topology edit.
         activeProjection = {

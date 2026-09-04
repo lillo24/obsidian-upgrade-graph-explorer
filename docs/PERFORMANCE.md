@@ -867,3 +867,38 @@ camera is automatic or user-owned updates one camera state around the current
 semantic screen anchor and makes the resulting viewport user-owned. Fit remains
 the explicit recentering action. The benchmark figures above therefore remain
 the complete density-evaluation cost.
+
+## SPACING1B-GLOBAL density-policy evidence
+
+All Network measures confirmed final displayed positions rather than raw
+ForceAtlas2 output, so dynamic Pull and fixed-folder composition are included.
+The diagnostic's direct Global scale experiment produced a `0 px` maximum
+screen delta between `P` and `0.5 × P`, confirming that Sigma 3.0.3 auto-rescale
+also neutralizes uniform coordinate scaling in this renderer. Camera framing is
+therefore the selected B-layer correction; ForceAtlas2, Pull, spatial rules,
+layout fingerprints, position caches, and visual settings remain unchanged.
+
+The rootless policy combines median nearest-neighbor distance per representative
+node diameter, optional median connected-edge distance, and p95 robust radius,
+then applies a 95% useful-viewport floor and one `0.7–1.4` clamp. A balanced
+deterministic k-d tree builds in `O(N log² N)` with average `O(N log N)` total
+nearest queries (quadratic worst case). Valid zero-edge graphs with two or more
+nodes do not fall back. Synthetic independent-node decisions for 2/3/5/10/20/50
+nodes were all non-fallback; the one-node case safely returned ratio 1.
+
+Local Windows/Node evidence recorded on 2026-09-04 used one warm-up and seven
+samples. Values are investigative medians/p95, not CI thresholds.
+
+| Global nodes | Density median | Density p95 |
+| -----------: | -------------: | ----------: |
+|          100 |       0.319 ms |    1.301 ms |
+|          500 |       1.367 ms |    1.695 ms |
+|        1,000 |       3.099 ms |    3.558 ms |
+|        5,000 |      18.830 ms |   20.970 ms |
+
+The 29-scene aggregate matrix includes zero-edge, multi-component, connected,
+dense, folder-clustered, dynamic Pull, fixed composition, combined spatial, and
+query-reduced scenes. Density-strength changes produced zero automatic layout
+requests, zero dynamic Pull requests, and zero spatial persistence writes. All
+and Focus strength interpolation is constant-time over the last accepted
+decision; live preview moves only the camera around a stable semantic anchor.

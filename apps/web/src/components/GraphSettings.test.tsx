@@ -13,17 +13,28 @@ describe('Graph Settings presentation', () => {
   it('separates Preferences, Sandbox, and Source into accessible transient tabs', () => {
     const markup = renderToStaticMarkup(
       <GraphSettings
-        densityQaDiagnostics={{
+        allNetworkDensityQaDiagnostics={{
+          rawDecisionRatio: 1.4,
+          effectiveRatio: 1.2,
+          cameraRatio: 1.2,
+          fallback: false,
+          nodeCount: 50,
+          edgeCount: 0,
+          isolatedNodeCount: 50,
+        }}
+        allNetworkDensityFramingStrength={50}
+        focusNetworkDensityQaDiagnostics={{
           rawDecisionRatio: 1.23456,
           effectiveRatio: 1.11728,
           cameraRatio: 1.11729,
           fallback: true,
           fallbackReason: 'Synthetic fallback reason.',
         }}
-        densityFramingStrength={100}
+        focusNetworkDensityFramingStrength={100}
         focusAppearance="outline"
         globalLayoutSettings={DEFAULT_GLOBAL_LAYOUT_SETTINGS}
-        onDensityFramingStrengthChange={() => undefined}
+        onAllNetworkDensityFramingStrengthChange={() => undefined}
+        onFocusNetworkDensityFramingStrengthChange={() => undefined}
         onFocusAppearanceChange={() => undefined}
         onGlobalLayoutSettingsChange={() => undefined}
         onOpenChange={() => undefined}
@@ -62,11 +73,14 @@ describe('Graph Settings presentation', () => {
     expect(markup).toContain('>Interaction<');
     expect(markup).toContain('>Focus Root appearance<');
     expect(markup).toContain('>All Network Layout<');
-    expect(markup).toContain('>Focus Network Density Framing<');
+    expect(markup).toContain('>Network Density<');
+    expect(markup).toContain('>All Network Density<');
+    expect(markup).toContain('id="all-density-framing-strength"');
+    expect(markup).toContain('>Focus Network Density<');
     expect(markup).toContain('id="focus-density-framing-strength"');
     expect(markup).toContain('>Legacy</span><span>Auto</span>');
     expect(markup).toContain(
-      'Previews the current Focus Network camera immediately around its semantic anchor.',
+      'Camera-only framing for Scope = Focus, Layout = Network.',
     );
     expect(markup).toContain('>Temporary QA diagnostics<');
     expect(markup).toContain('>Raw decision ratio<');
@@ -76,6 +90,8 @@ describe('Graph Settings presentation', () => {
     expect(markup).toContain('>Sigma camera ratio<');
     expect(markup).toContain('>Fallback reason<');
     expect(markup).toContain('Synthetic fallback reason.');
+    expect(markup).toContain('>Isolated nodes<');
+    expect(markup).toContain('>50</dd>');
     expect(markup).toContain(
       'Runtime only; never saved or used as layout input.',
     );
@@ -91,7 +107,7 @@ describe('Graph Settings presentation', () => {
       'aria-controls="graph-experimental-controls" aria-expanded="false"',
     );
     expect(markup.indexOf('Experimental</button>')).toBeGreaterThan(
-      markup.indexOf('>Focus Network Density Framing<'),
+      markup.indexOf('>Focus Network Density<'),
     );
     expect(markup).not.toContain('Show All Hierarchy');
   });
@@ -103,10 +119,12 @@ describe('Graph Settings presentation', () => {
     };
     const markup = renderToStaticMarkup(
       <GraphSettings
-        densityFramingStrength={65}
+        allNetworkDensityFramingStrength={35}
+        focusNetworkDensityFramingStrength={65}
         focusAppearance="outline"
         globalLayoutSettings={settings}
-        onDensityFramingStrengthChange={() => undefined}
+        onAllNetworkDensityFramingStrengthChange={() => undefined}
+        onFocusNetworkDensityFramingStrengthChange={() => undefined}
         onFocusAppearanceChange={() => undefined}
         onGlobalLayoutSettingsChange={() => undefined}
         onOpenChange={() => undefined}
@@ -120,6 +138,7 @@ describe('Graph Settings presentation', () => {
     expect(markup).toContain('aria-valuetext="75 percent" disabled=""');
     expect(markup).toContain('value="75"');
     expect(markup).toContain('aria-valuetext="65 percent"');
+    expect(markup).toContain('aria-valuetext="35 percent"');
   });
 
   it('groups advanced controls by responsibility with an accessible influence scale', () => {

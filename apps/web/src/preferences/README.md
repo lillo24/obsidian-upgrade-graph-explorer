@@ -36,11 +36,12 @@ controls, so another preference cannot drop the flag; storage failure keeps the
 session value and reports the existing warning. Disclosure open/closed state is
 not stored.
 
-SPACING1B-QA keeps Focus Network density-framing strength outside this durable
-record. It starts at 100% on every application launch and exists only to compare
-legacy ratio 1 with the production density decision during the current page
-lifetime. Changing it previews the camera ratio immediately around the current
-semantic anchor and does not request layout. Reset Sandbox restores it to 100%
-together with Focus Root, All
-Network layout, and Experimental defaults; Trackpad Zoom, source configuration,
-workspace view/history, and Local layout choice are outside that reset.
+SPACING1B-QA keeps separate All Network and Focus Network density-framing
+strengths outside this durable record. Both start at 100% on every application
+launch and exist only to compare legacy ratio 1 with each production density
+decision during the current page lifetime. Changing either previews the camera
+ratio immediately around that renderer's semantic anchor and does not request
+layout or Pull work. Reset Sandbox restores both to 100% together with Focus
+Root, All Network layout, and Experimental defaults; Trackpad Zoom, source
+configuration, workspace view/history, spatial folder intent, and Local layout
+choice are outside that reset.

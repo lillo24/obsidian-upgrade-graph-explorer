@@ -7,6 +7,7 @@ import {
 
 import { DEFAULT_GRAPH_PREFERENCES } from './graph-preferences';
 import {
+  DEFAULT_GLOBAL_DENSITY_FRAMING_STRENGTH,
   DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH,
   resetGraphSandbox,
 } from './sandbox-settings';
@@ -26,7 +27,8 @@ describe('Settings Sandbox reset', () => {
     });
 
     expect(reset).toEqual({
-      densityFramingStrength: 100,
+      allNetworkDensityFramingStrength: 100,
+      focusNetworkDensityFramingStrength: 100,
       preferences: {
         focusAppearance: DEFAULT_GRAPH_PREFERENCES.focusAppearance,
         globalLayoutSettings: DEFAULT_GLOBAL_LAYOUT_SETTINGS,
@@ -36,5 +38,6 @@ describe('Settings Sandbox reset', () => {
       },
     });
     expect(DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH).toBe(100);
+    expect(DEFAULT_GLOBAL_DENSITY_FRAMING_STRENGTH).toBe(100);
   });
 });

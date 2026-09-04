@@ -715,6 +715,19 @@ h2 {
   background: #f5f9fa;
 }
 
+.graph-settings__scope-group {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #dce5e8;
+}
+
+.graph-settings__scope-group > h4,
+.graph-settings__scope-group > p {
+  margin: 0;
+}
+
 .focus-density-qa h4,
 .focus-density-qa p,
 .focus-density-qa dl {

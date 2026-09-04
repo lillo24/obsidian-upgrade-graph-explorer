@@ -319,10 +319,12 @@ describe('graph-first explorer shell', () => {
   it('uses one shared settings UI and hydrates the global trackpad choice', () => {
     const settingsMarkup = renderToStaticMarkup(
       <GraphSettings
-        densityFramingStrength={100}
+        allNetworkDensityFramingStrength={100}
+        focusNetworkDensityFramingStrength={100}
         focusAppearance="inverted"
         globalLayoutSettings={DEFAULT_GLOBAL_LAYOUT_SETTINGS}
-        onDensityFramingStrengthChange={() => undefined}
+        onAllNetworkDensityFramingStrengthChange={() => undefined}
+        onFocusNetworkDensityFramingStrengthChange={() => undefined}
         onFocusAppearanceChange={() => undefined}
         onGlobalLayoutSettingsChange={() => undefined}
         onOpenChange={() => undefined}
@@ -376,7 +378,8 @@ describe('graph-first explorer shell', () => {
     );
     expect(settingsMarkup).toContain('role="tablist"');
     expect(settingsMarkup).toContain('>Source &amp; Diagnostics</button>');
-    expect(settingsMarkup).toContain('Focus Network Density Framing');
+    expect(settingsMarkup).toContain('All Network Density');
+    expect(settingsMarkup).toContain('Focus Network Density');
     expect(settingsMarkup).toContain('>Reset Sandbox</button>');
     expect(settingsMarkup).toContain('Open Diagnostic Evidence');
     expect(settingsMarkup).toContain(

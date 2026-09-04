@@ -59,6 +59,7 @@ import {
 } from '@icarus-graph-explorer/view-projection';
 import type {
   GlobalCenterRequest,
+  GlobalDensityQaDiagnostics,
   GlobalLayoutSettings,
   GlobalSelection,
   GlobalTransitionAnchorApi,
@@ -150,6 +151,7 @@ import {
   type GraphPreferences,
 } from '../preferences/graph-preferences';
 import {
+  DEFAULT_GLOBAL_DENSITY_FRAMING_STRENGTH,
   DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH,
   resetGraphSandbox,
 } from '../preferences/sandbox-settings';
@@ -465,12 +467,20 @@ export function GraphExplorer({
       : preferenceLoad.preferences.localLayoutMode,
   }));
   const preferencesRef = useRef(preferences);
-  const [densityFramingStrength, setDensityFramingStrength] = useState(
-    DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH,
-  );
-  const [densityQaDiagnostics, setDensityQaDiagnostics] = useState<
-    LocalDensityQaDiagnostics | undefined
-  >();
+  const [
+    allNetworkDensityFramingStrength,
+    setAllNetworkDensityFramingStrength,
+  ] = useState(DEFAULT_GLOBAL_DENSITY_FRAMING_STRENGTH);
+  const [
+    focusNetworkDensityFramingStrength,
+    setFocusNetworkDensityFramingStrength,
+  ] = useState(DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH);
+  const [allNetworkDensityQaDiagnostics, setAllNetworkDensityQaDiagnostics] =
+    useState<GlobalDensityQaDiagnostics>();
+  const [
+    focusNetworkDensityQaDiagnostics,
+    setFocusNetworkDensityQaDiagnostics,
+  ] = useState<LocalDensityQaDiagnostics | undefined>();
   const {
     focusAppearance,
     globalLayoutSettings,
@@ -2454,9 +2464,18 @@ export function GraphExplorer({
     },
     [updateGraphPreferences],
   );
-  const changeDensityFramingStrength = useCallback((strength: number) => {
-    setDensityFramingStrength(strength);
-  }, []);
+  const changeAllNetworkDensityFramingStrength = useCallback(
+    (strength: number) => {
+      setAllNetworkDensityFramingStrength(strength);
+    },
+    [],
+  );
+  const changeFocusNetworkDensityFramingStrength = useCallback(
+    (strength: number) => {
+      setFocusNetworkDensityFramingStrength(strength);
+    },
+    [],
+  );
   const changeFocusAppearance = useCallback(
     (appearance: FocusAppearance) => {
       updateGraphPreferences({ focusAppearance: appearance });
@@ -2943,7 +2962,10 @@ export function GraphExplorer({
     if (globalLayoutSettingsApplyImmediately(activeScope, activeLayout)) {
       setGlobalLayoutRequestKey((current) => current + 1);
     }
-    setDensityFramingStrength(reset.densityFramingStrength);
+    setAllNetworkDensityFramingStrength(reset.allNetworkDensityFramingStrength);
+    setFocusNetworkDensityFramingStrength(
+      reset.focusNetworkDensityFramingStrength,
+    );
     commitGraphPreferences(reset.preferences);
     applyExperimentalAllHierarchyAvailability(
       reset.preferences.showExperimentalAllHierarchy,
@@ -3477,17 +3499,28 @@ export function GraphExplorer({
             <span>Tools</span>
           </button>
           <GraphSettings
-            {...(densityQaDiagnostics === undefined
+            {...(allNetworkDensityQaDiagnostics === undefined
               ? {}
-              : { densityQaDiagnostics })}
-            densityFramingStrength={densityFramingStrength}
+              : { allNetworkDensityQaDiagnostics })}
+            allNetworkDensityFramingStrength={allNetworkDensityFramingStrength}
+            {...(focusNetworkDensityQaDiagnostics === undefined
+              ? {}
+              : { focusNetworkDensityQaDiagnostics })}
+            focusNetworkDensityFramingStrength={
+              focusNetworkDensityFramingStrength
+            }
             showExperimentalAllHierarchy={showExperimentalAllHierarchy}
             onShowExperimentalAllHierarchyChange={
               changeExperimentalAllHierarchy
             }
             focusAppearance={focusAppearance}
             globalLayoutSettings={globalLayoutSettings}
-            onDensityFramingStrengthChange={changeDensityFramingStrength}
+            onAllNetworkDensityFramingStrengthChange={
+              changeAllNetworkDensityFramingStrength
+            }
+            onFocusNetworkDensityFramingStrengthChange={
+              changeFocusNetworkDensityFramingStrength
+            }
             onFocusAppearanceChange={changeFocusAppearance}
             onGlobalLayoutSettingsChange={changeGlobalLayoutSettings}
             onOpenChange={changeSettingsOpen}
@@ -3666,17 +3699,30 @@ export function GraphExplorer({
               ) : null}
               {maximized ? null : (
                 <GraphSettings
-                  {...(densityQaDiagnostics === undefined
+                  {...(allNetworkDensityQaDiagnostics === undefined
                     ? {}
-                    : { densityQaDiagnostics })}
-                  densityFramingStrength={densityFramingStrength}
+                    : { allNetworkDensityQaDiagnostics })}
+                  allNetworkDensityFramingStrength={
+                    allNetworkDensityFramingStrength
+                  }
+                  {...(focusNetworkDensityQaDiagnostics === undefined
+                    ? {}
+                    : { focusNetworkDensityQaDiagnostics })}
+                  focusNetworkDensityFramingStrength={
+                    focusNetworkDensityFramingStrength
+                  }
                   showExperimentalAllHierarchy={showExperimentalAllHierarchy}
                   onShowExperimentalAllHierarchyChange={
                     changeExperimentalAllHierarchy
                   }
                   focusAppearance={focusAppearance}
                   globalLayoutSettings={globalLayoutSettings}
-                  onDensityFramingStrengthChange={changeDensityFramingStrength}
+                  onAllNetworkDensityFramingStrengthChange={
+                    changeAllNetworkDensityFramingStrength
+                  }
+                  onFocusNetworkDensityFramingStrengthChange={
+                    changeFocusNetworkDensityFramingStrength
+                  }
                   onFocusAppearanceChange={changeFocusAppearance}
                   onGlobalLayoutSettingsChange={changeGlobalLayoutSettings}
                   onOpenChange={changeSettingsOpen}
@@ -3792,6 +3838,7 @@ export function GraphExplorer({
               </p>
             ) : (
               <GlobalGraphView
+                densityFramingStrength={allNetworkDensityFramingStrength}
                 folderArrangement={folderArrangementViewProps}
                 {...(globalCenterRequest === undefined
                   ? {}
@@ -3809,6 +3856,7 @@ export function GraphExplorer({
                     `All Network renderer failed: ${message} All Hierarchy remains available for this session.`,
                   )
                 }
+                onDensityQaDiagnosticsChange={setAllNetworkDensityQaDiagnostics}
                 onNodeActivate={enterFocusScope}
                 onNodeSingleClick={revealGraphNode}
                 onSelectionChange={changeGlobalSelection}
@@ -3874,7 +3922,7 @@ export function GraphExplorer({
               </p>
             ) : localLayoutMode === 'free' && LocalGraphView !== undefined ? (
               <LocalGraphView
-                densityFramingStrength={densityFramingStrength}
+                densityFramingStrength={focusNetworkDensityFramingStrength}
                 {...(localCenterRequest === undefined
                   ? {}
                   : { centerRequest: localCenterRequest })}
@@ -3896,7 +3944,9 @@ export function GraphExplorer({
                     `Focus Network renderer failed: ${message} Use Focus Hierarchy or return to All.`,
                   )
                 }
-                onDensityQaDiagnosticsChange={setDensityQaDiagnostics}
+                onDensityQaDiagnosticsChange={
+                  setFocusNetworkDensityQaDiagnostics
+                }
                 onFitRequestConsumed={consumeLocalFitRequest}
                 onNodeActivate={focusLocalEntity}
                 onNodeSingleClick={revealGraphNode}

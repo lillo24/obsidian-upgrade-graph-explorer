@@ -56,6 +56,12 @@ vi.mock('sigma', () => ({
     getGraphDimensions() {
       return { width: 1, height: 1 };
     }
+    getDimensions() {
+      return { width: 1, height: 1 };
+    }
+    viewportToGraph(point: { x: number; y: number }) {
+      return point;
+    }
     framedGraphToViewport(point: { x: number; y: number }) {
       return point;
     }

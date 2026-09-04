@@ -87,12 +87,14 @@ canonical truth, or own a platform storage implementation.
   its Advanced disclosure is transient, groups Layout and Visual controls, and
   exposes the persisted 0–100 link-influence setting only for All Network;
   global focus-root and gesture preference storage remains in `../preferences/`.
-  The Focus density slider is a page-lifetime live A/B camera control: changing
-  it preserves the selected-node/root screen anchor and previews the new ratio
-  without Fit or layout, even from a user-owned viewport. Reset Sandbox deliberately
-  excludes Trackpad Zoom, source settings, and saved view state. Its temporary
-  SPACING1B QA readout mirrors renderer-session ratios and fallback evidence;
-  it is not product state and is cleared when Focus Network unmounts.
+  Separate All and Focus density sliders are page-lifetime live A/B camera
+  controls: changing either preserves that renderer's semantic screen anchor
+  and previews the new ratio without Fit, layout, or Pull work, even from a
+  user-owned viewport. All-only physics/visual controls remain grouped and
+  explicitly scoped. Reset Sandbox deliberately excludes Trackpad Zoom, source
+  settings, spatial folder intent, and saved view state. Temporary SPACING1B QA
+  readouts mirror the mounted renderer sessions' ratios and fallback evidence;
+  they are not product state and clear when their Network renderer unmounts.
 - `SourceSettingsSection.tsx` presents safe current-source metadata, browser
   report/sample switching, desktop vault/rescan actions, and exceptional local
   identity recovery from callbacks owned by `App.tsx`.

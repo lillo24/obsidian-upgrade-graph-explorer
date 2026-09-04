@@ -37,6 +37,11 @@
       "import": "./src/local-density-framing.ts",
       "default": "./src/local-density-framing.ts"
     },
+    "./global-density-framing": {
+      "types": "./src/global-density-framing.ts",
+      "import": "./src/global-density-framing.ts",
+      "default": "./src/global-density-framing.ts"
+    },
     "./settings": {
       "types": "./src/settings.ts",
       "import": "./src/settings.ts",

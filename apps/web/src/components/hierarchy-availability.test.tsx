@@ -193,6 +193,34 @@ describe('GraphExplorer experimental availability integration', () => {
     return JSON.parse(values.get(GRAPH_PREFERENCES_STORAGE_KEY)!);
   }
 
+  it('keeps All density strength transient and camera-only', async () => {
+    await mount('global');
+    expect(mode()).toBe('global');
+    expect(captured.global!.densityFramingStrength).toBe(100);
+    const layoutRequestKey = captured.global!.layoutRequestKey;
+
+    await click('Open Settings');
+    await click('Sandbox');
+    const slider = container.querySelector<HTMLInputElement>(
+      '#all-density-framing-strength',
+    )!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      )!.set!.call(slider, '0');
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+      slider.dispatchEvent(new Event('change', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(captured.global!.densityFramingStrength).toBe(0);
+    expect(captured.global!.layoutRequestKey).toBe(layoutRequestKey);
+    expect(preference()).not.toHaveProperty('allNetworkDensityFramingStrength');
+    expect(performance.snapshot().operations['global-layouts']).toBe(0);
+    expect(performance.snapshot().operations['spatial-pull-requests']).toBe(0);
+  });
+
   it('keeps density strength transient and passes it to Focus Network without a layout request', async () => {
     await mount('local', false, 'free');
     expect(mode()).toBe('local-free');

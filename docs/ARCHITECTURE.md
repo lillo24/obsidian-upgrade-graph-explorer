@@ -10,10 +10,11 @@ SPATIAL1 establishes normalized fixed-folder intent and direct arrangement.
 SPATIAL2A evolves that independent All Network domain to schema-v2 exact/subtree
 rules plus a base → dynamic soft-pull → fixed-display pipeline while leaving the
 active KG14, HIER, QUERY, GROUP, and SPACING tracks unchanged.
-SPACING1B independently makes Focus Network automatic framing density-aware
-without changing Local ForceAtlas2 geometry. Its QA Sandbox interpolates only
-that camera target and remains transient; renderer geometry and persisted
-workspace/preference schemas do not observe it.
+SPACING1B independently makes both Network renderers' automatic framing
+density-aware without changing Global or Local ForceAtlas2 geometry. Its QA
+Sandbox keeps separate transient All and Focus strengths; renderer geometry,
+layout identity, spatial rules, and persisted workspace/preference schemas do
+not observe them.
 
 ## Stable domain shape
 
@@ -859,6 +860,29 @@ drag, and zoom-button actions remain exact and authoritative until manual Fit.
 Fit uses the stored density target and re-enters automatic ownership; resize
 does not recompute it. VISUAL1B and Visual Groups remain reducer-only because
 the policy consumes only automatic node sizes.
+
+Global framing shares Sigma-normalization and robust-statistic primitives but
+uses a separate rootless policy over confirmed final displayed positions after
+automatic ForceAtlas2, dynamic Pull, and fixed-folder composition. A
+deterministic balanced k-d tree supplies exact nearest-neighbor distances at
+Global scale. Nearest-neighbor distance per representative diameter is the
+primary signal, connected-edge distance is optional, and p95 robust extent plus
+a 95% useful-viewport floor prevents a compact component from hiding ordinary
+outliers. The robust signal combination has the same conservative `0.7–1.4`
+final bound. Independent graphs with two or more valid nodes are first-class;
+only empty, single-node, invalid, incomplete, duplicate, or degenerate geometry
+falls back to ratio 1.
+
+The Global session independently tracks auto- versus user-owned camera state.
+Fresh mounts without a restored viewport and explicit Fit are auto-owned;
+wheel/pinch, pan, zoom buttons, centering, arrangements, restored semantic
+viewports, and live All-density preview are user-owned. Confirmed geometry
+updates the stored density target, but worker/query/topology/Pull/fixed adoption
+cannot steal a user-owned camera. Arrangement pointer preview neither measures
+density nor reframes; confirmation refreshes the next Fit target. The All
+strength uses the same camera-only interpolation as Focus and does not enter
+Global layout settings, fingerprints, caches, worker requests, presentation
+overrides, QUERY1, spatial rules, or persistence.
 Visual Groups add one zero-external-dependency workspace package; renderer
 packages import only its resolved presentation type and never QUERY1 rules.
 Tauri dependencies are isolated to the desktop shell and

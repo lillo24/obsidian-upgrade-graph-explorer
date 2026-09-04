@@ -1,6 +1,6 @@
 # Sigma Global/Regional and Local Free Renderer
 
-Status: **STABLE — Global, Local Free, and SPACING1B density framing are test-backed.**
+Status: **QA — Global, Local Free, and separate All/Focus SPACING1B density framing are test-backed; native acceptance remains pending.**
 
 This package owns the lazy, direct Sigma 3 renderers for file-level
 Global/Regional exploration and bounded Local Free exploration. Both consume a
@@ -57,6 +57,9 @@ src/
   local-mapping.ts         Separate Local topology and deterministic root-relative seed.
   local-graph.ts           Local Graphology construction, reconciliation, and neighborhoods.
   local-style.ts           Far/normal/near Local and GROUP1A styling without topology changes.
+  network-density-core.ts  Shared Sigma normalization, robust statistics, topology, and exact k-d-tree primitives.
+  global-density.ts        Rootless, component-safe All Network camera-ratio policy.
+  global-density-framing.ts  Transient legacy-to-density interpolation for All Network.
   local-density.ts         Pure Sigma-faithful B4 policy for accepted-layout camera Fit.
   local-layout.ts          DOM-free Local ForceAtlas2 request/result and fingerprint.
   local-layout-cache.ts    Bounded memory-only exact Local position cache.
@@ -366,8 +369,9 @@ hover through maximum zoom-out, with existing width factors 1 / 0.84 / 0.45
 for near / normal / far. Far hierarchy width stays 0.72; root/label LOD and
 hover emphasis remain intact. Native readability is a release-QA gate.
 SPACING1B leaves ForceAtlas2 settings, normalization, accepted coordinates,
-fingerprints, and caches unchanged, but replaces Local's ratio-1 automatic Fit
-with a density-aware camera target. The pure policy measures accepted positions
+fingerprints, and caches unchanged, but replaces both Network renderers'
+ratio-1 automatic Fit with scope-specific density-aware camera targets. The
+Focus policy measures accepted positions
 in a fixed 1200×800 Sigma 3.0.3 frame with 24 px padding. It takes the median of
 the raw connected-edge, nearest-neighbor/node-diameter, and p90-root-radius
 signals, then clamps once to `0.7–1.4`; invalid or degenerate metrics fall back
@@ -395,6 +399,30 @@ Temporary SPACING1B native-QA diagnostics publish the latest raw decision ratio,
 interpolated effective ratio, actual Sigma camera ratio, and fallback evidence
 through a deduplicated session callback. The callback is display-only runtime
 state and cannot alter density, camera, topology, layout, cache, or persistence.
+
+All Network uses a separate rootless policy over the confirmed final displayed
+positions after automatic ForceAtlas2, optional dynamic Pull, and fixed-folder
+composition. Sigma's installed normalization maps those positions into the
+same 1200×800 frame before measurement. The primary nearest-neighbor signal
+works for zero-edge and multi-component scenes; connected-edge distance is
+optional; a p95 robust-radius signal and 95% useful-viewport floor guard
+outlying components. Their robust combination is clamped once to `0.7–1.4`.
+A balanced deterministic k-d tree avoids the bounded Focus policy's quadratic
+nearest-neighbor scan at Global scale. Empty, single-node, invalid, duplicate,
+or incomplete geometry falls back explicitly to ratio 1; independent graphs
+with two or more valid nodes produce a real decision.
+
+Fresh All Network sessions without a restored semantic viewport are
+auto-owned. Confirmed displayed geometry may refresh their camera target, while
+wheel/pinch, pan, zoom buttons, centering, arrangement interaction, restored
+viewports, and density-slider previews make the camera user-owned. Worker,
+query, topology, Pull, and fixed-position adoption then preserve the visual
+anchor and camera ratio. Live arrangement preview changes only displayed
+positions; confirmation updates the stored density decision without reframing.
+All Fit recenters, resets the angle, applies the current effective All ratio,
+and returns ownership to automatic. All and Focus have independent transient
+0–100% strengths, both defaulting to 100%; neither enters layout input, cache,
+fingerprint, presentation override, query, workspace state, or persistence.
 Local has no folder prior or fake edges. Exact cache fingerprints include the
 root, stable topology, semantic node/edge roles, weights, iterations, and Local
 settings while excluding seed coordinates, labels, hover, selection, camera,

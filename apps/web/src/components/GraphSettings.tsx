@@ -14,7 +14,10 @@ import {
   withFolderClusteringStrength,
   withGlobalSpacingPreset,
 } from '@icarus-graph-explorer/renderer-sigma/settings';
-import type { LocalDensityQaDiagnostics } from '@icarus-graph-explorer/renderer-sigma/types';
+import type {
+  GlobalDensityQaDiagnostics,
+  LocalDensityQaDiagnostics,
+} from '@icarus-graph-explorer/renderer-sigma/types';
 
 import {
   graphSettingsTabForKey,
@@ -22,8 +25,10 @@ import {
 } from './graph-settings-tabs';
 
 interface GraphSettingsProps {
-  readonly densityQaDiagnostics?: LocalDensityQaDiagnostics;
-  readonly densityFramingStrength: number;
+  readonly allNetworkDensityQaDiagnostics?: GlobalDensityQaDiagnostics;
+  readonly allNetworkDensityFramingStrength: number;
+  readonly focusNetworkDensityQaDiagnostics?: LocalDensityQaDiagnostics;
+  readonly focusNetworkDensityFramingStrength: number;
   readonly showExperimentalAllHierarchy?: boolean;
   readonly onShowExperimentalAllHierarchyChange?: (show: boolean) => void;
   readonly children?: ReactNode;
@@ -31,7 +36,10 @@ interface GraphSettingsProps {
   readonly globalLayoutSettings: GlobalLayoutSettings;
   readonly open: boolean;
   readonly onFocusAppearanceChange: (appearance: FocusAppearance) => void;
-  readonly onDensityFramingStrengthChange: (strength: number) => void;
+  readonly onAllNetworkDensityFramingStrengthChange: (strength: number) => void;
+  readonly onFocusNetworkDensityFramingStrengthChange: (
+    strength: number,
+  ) => void;
   readonly onGlobalLayoutSettingsChange: (
     settings: GlobalLayoutSettings,
   ) => void;
@@ -56,15 +64,78 @@ function SettingsIcon() {
   );
 }
 
+function DensityQaDiagnostics({
+  diagnostics,
+  unavailableMessage,
+}: {
+  readonly diagnostics:
+    GlobalDensityQaDiagnostics | LocalDensityQaDiagnostics | undefined;
+  readonly unavailableMessage: string;
+}) {
+  return (
+    <div aria-atomic="true" aria-live="polite" className="focus-density-qa">
+      <h4>Temporary QA diagnostics</h4>
+      {diagnostics === undefined ? (
+        <p>{unavailableMessage}</p>
+      ) : (
+        <dl>
+          <div>
+            <dt>Raw decision ratio</dt>
+            <dd>{diagnostics.rawDecisionRatio.toFixed(4)}</dd>
+          </div>
+          <div>
+            <dt>Effective ratio</dt>
+            <dd>{diagnostics.effectiveRatio.toFixed(4)}</dd>
+          </div>
+          <div>
+            <dt>Sigma camera ratio</dt>
+            <dd>{diagnostics.cameraRatio.toFixed(4)}</dd>
+          </div>
+          <div>
+            <dt>Fallback</dt>
+            <dd>{diagnostics.fallback ? 'Yes' : 'No'}</dd>
+          </div>
+          {diagnostics.fallbackReason === undefined ? null : (
+            <div>
+              <dt>Fallback reason</dt>
+              <dd>{diagnostics.fallbackReason}</dd>
+            </div>
+          )}
+          {'nodeCount' in diagnostics ? (
+            <>
+              <div>
+                <dt>Nodes</dt>
+                <dd>{diagnostics.nodeCount}</dd>
+              </div>
+              <div>
+                <dt>Edges</dt>
+                <dd>{diagnostics.edgeCount}</dd>
+              </div>
+              <div>
+                <dt>Isolated nodes</dt>
+                <dd>{diagnostics.isolatedNodeCount}</dd>
+              </div>
+            </>
+          ) : null}
+        </dl>
+      )}
+      <p>Runtime only; never saved or used as layout input.</p>
+    </div>
+  );
+}
+
 export const GraphSettings = memo(function GraphSettings({
-  densityQaDiagnostics,
-  densityFramingStrength,
+  allNetworkDensityQaDiagnostics,
+  allNetworkDensityFramingStrength,
+  focusNetworkDensityQaDiagnostics,
+  focusNetworkDensityFramingStrength,
   showExperimentalAllHierarchy = false,
   onShowExperimentalAllHierarchyChange,
   children,
   focusAppearance,
   globalLayoutSettings,
-  onDensityFramingStrengthChange,
+  onAllNetworkDensityFramingStrengthChange,
+  onFocusNetworkDensityFramingStrengthChange,
   onFocusAppearanceChange,
   onGlobalLayoutSettingsChange,
   onOpenChange,
@@ -406,86 +477,87 @@ export const GraphSettings = memo(function GraphSettings({
                 ) : null}
               </section>
               <section
-                aria-labelledby="focus-density-settings-heading"
+                aria-labelledby="network-density-settings-heading"
                 className="graph-settings__section"
               >
-                <h3 id="focus-density-settings-heading">
-                  Focus Network Density Framing
-                </h3>
-                <label
-                  className="global-layout-strength"
-                  htmlFor="focus-density-framing-strength"
-                >
-                  <span>
-                    <strong>Strength</strong>
-                    <output htmlFor="focus-density-framing-strength">
-                      {densityFramingStrength}%
-                    </output>
-                  </span>
-                  <input
-                    aria-valuetext={`${densityFramingStrength} percent`}
-                    id="focus-density-framing-strength"
-                    max="100"
-                    min="0"
-                    onChange={(event) =>
-                      onDensityFramingStrengthChange(
-                        Number(event.currentTarget.value),
-                      )
-                    }
-                    step="1"
-                    type="range"
-                    value={densityFramingStrength}
+                <h3 id="network-density-settings-heading">Network Density</h3>
+                <div className="graph-settings__scope-group">
+                  <h4>All Network Density</h4>
+                  <label
+                    className="global-layout-strength"
+                    htmlFor="all-density-framing-strength"
+                  >
+                    <span>
+                      <strong>Strength</strong>
+                      <output htmlFor="all-density-framing-strength">
+                        {allNetworkDensityFramingStrength}%
+                      </output>
+                    </span>
+                    <input
+                      aria-valuetext={`${allNetworkDensityFramingStrength} percent`}
+                      id="all-density-framing-strength"
+                      max="100"
+                      min="0"
+                      onChange={(event) =>
+                        onAllNetworkDensityFramingStrengthChange(
+                          Number(event.currentTarget.value),
+                        )
+                      }
+                      step="1"
+                      type="range"
+                      value={allNetworkDensityFramingStrength}
+                    />
+                    <small>
+                      <span>Legacy</span>
+                      <span>Auto</span>
+                    </small>
+                  </label>
+                  <p className="global-layout-scope-note">
+                    Camera-only framing for Scope = All, Layout = Network.
+                  </p>
+                  <DensityQaDiagnostics
+                    diagnostics={allNetworkDensityQaDiagnostics}
+                    unavailableMessage="Open All Network to read its live density camera."
                   />
-                  <small>
-                    <span>Legacy</span>
-                    <span>Auto</span>
-                  </small>
-                </label>
-                <p className="global-layout-scope-note">
-                  Previews the current Focus Network camera immediately around
-                  its semantic anchor. Layout stays unchanged, and later graph
-                  updates preserve the preview until Fit.
-                </p>
-                <div
-                  aria-atomic="true"
-                  aria-live="polite"
-                  className="focus-density-qa"
-                >
-                  <h4>Temporary QA diagnostics</h4>
-                  {densityQaDiagnostics === undefined ? (
-                    <p>Open Focus Network to read the live density camera.</p>
-                  ) : (
-                    <dl>
-                      <div>
-                        <dt>Raw decision ratio</dt>
-                        <dd>
-                          {densityQaDiagnostics.rawDecisionRatio.toFixed(4)}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Effective ratio</dt>
-                        <dd>
-                          {densityQaDiagnostics.effectiveRatio.toFixed(4)}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Sigma camera ratio</dt>
-                        <dd>{densityQaDiagnostics.cameraRatio.toFixed(4)}</dd>
-                      </div>
-                      <div>
-                        <dt>Fallback</dt>
-                        <dd>{densityQaDiagnostics.fallback ? 'Yes' : 'No'}</dd>
-                      </div>
-                      {densityQaDiagnostics.fallbackReason ===
-                      undefined ? null : (
-                        <div>
-                          <dt>Fallback reason</dt>
-                          <dd>{densityQaDiagnostics.fallbackReason}</dd>
-                        </div>
-                      )}
-                    </dl>
-                  )}
-                  <p>Runtime only; never saved or used as layout input.</p>
+                </div>
+                <div className="graph-settings__scope-group">
+                  <h4>Focus Network Density</h4>
+                  <label
+                    className="global-layout-strength"
+                    htmlFor="focus-density-framing-strength"
+                  >
+                    <span>
+                      <strong>Strength</strong>
+                      <output htmlFor="focus-density-framing-strength">
+                        {focusNetworkDensityFramingStrength}%
+                      </output>
+                    </span>
+                    <input
+                      aria-valuetext={`${focusNetworkDensityFramingStrength} percent`}
+                      id="focus-density-framing-strength"
+                      max="100"
+                      min="0"
+                      onChange={(event) =>
+                        onFocusNetworkDensityFramingStrengthChange(
+                          Number(event.currentTarget.value),
+                        )
+                      }
+                      step="1"
+                      type="range"
+                      value={focusNetworkDensityFramingStrength}
+                    />
+                    <small>
+                      <span>Legacy</span>
+                      <span>Auto</span>
+                    </small>
+                  </label>
+                  <p className="global-layout-scope-note">
+                    Camera-only framing for Scope = Focus, Layout = Network.
+                  </p>
+                  <DensityQaDiagnostics
+                    diagnostics={focusNetworkDensityQaDiagnostics}
+                    unavailableMessage="Open Focus Network to read its live density camera."
+                  />
                 </div>
               </section>
               <section className="graph-settings__section">
