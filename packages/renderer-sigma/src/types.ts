@@ -200,6 +200,68 @@ export interface GlobalLayoutService {
   readonly dispose: () => void;
 }
 
+export type GlobalSpatialInfluenceAlgorithm =
+  'interleaved-centroid' | 'move-then-relax';
+
+export interface GlobalSpatialInfluenceAttractor {
+  readonly ruleFolderKey: string;
+  readonly memberNodeKeys: readonly string[];
+  readonly targetX: number;
+  readonly targetY: number;
+  readonly strength: number;
+}
+
+export interface GlobalSpatialInfluenceRequest {
+  readonly schemaVersion: 1;
+  readonly requestId: number;
+  readonly algorithm: GlobalSpatialInfluenceAlgorithm;
+  readonly algorithmVersion: 1;
+  readonly baseLayoutFingerprint: string;
+  readonly iterations: number;
+  readonly nodes: readonly GlobalLayoutNode[];
+  readonly edges: readonly GlobalLayoutEdge[];
+  readonly attractors: readonly GlobalSpatialInfluenceAttractor[];
+  readonly globalLayoutSettings: GlobalLayoutSettings;
+}
+
+export interface GlobalSpatialInfluenceMetrics {
+  readonly meanTargetError: number;
+  readonly maxTargetError: number;
+  readonly meanAffectedDisplacement: number;
+  readonly meanUnaffectedDisplacement: number;
+  readonly meanCrossBoundaryReferenceLength: number;
+  readonly meanReferenceLength: number;
+}
+
+export interface GlobalSpatialInfluenceResult {
+  readonly schemaVersion: 1;
+  readonly kind: 'result';
+  readonly requestId: number;
+  readonly algorithm: GlobalSpatialInfluenceAlgorithm;
+  readonly computeMs: number;
+  readonly forceAtlasMs: number;
+  readonly attractorMs: number;
+  readonly positions: readonly GlobalLayoutPosition[];
+  readonly metrics: GlobalSpatialInfluenceMetrics;
+}
+
+export interface GlobalSpatialInfluenceFailure {
+  readonly schemaVersion: 1;
+  readonly kind: 'error';
+  readonly requestId: number;
+  readonly message: string;
+}
+
+export type GlobalSpatialInfluenceWorkerResponse =
+  GlobalSpatialInfluenceResult | GlobalSpatialInfluenceFailure;
+
+export interface GlobalSpatialInfluenceService {
+  readonly layout: (
+    request: Omit<GlobalSpatialInfluenceRequest, 'requestId'>,
+  ) => Promise<GlobalSpatialInfluenceResult>;
+  readonly dispose: () => void;
+}
+
 export interface GlobalOperationCounts {
   readonly projections: number;
   readonly topologyReconciliations: number;
@@ -225,6 +287,13 @@ export type GlobalPerformancePhase =
   | 'spatial-compose'
   | 'spatial-apply'
   | 'spatial-preview-apply'
+  | 'spatial-rule-resolution'
+  | 'spatial-pull-request'
+  | 'spatial-pull-worker'
+  | 'spatial-pull-forceatlas'
+  | 'spatial-pull-attractor'
+  | 'spatial-pull-cache-hit'
+  | 'spatial-fixed-compose'
   | 'sigma-mount-render'
   | 'semantic-zoom-style'
   | 'global-hover'
@@ -238,6 +307,10 @@ export type GlobalPerformanceOperation =
   | 'spatial-compositions'
   | 'spatial-applies'
   | 'spatial-preview-applies'
+  | 'spatial-rule-resolutions'
+  | 'spatial-pull-requests'
+  | 'spatial-pull-cache-hits'
+  | 'spatial-fixed-compositions'
   | 'global-style-updates'
   | 'global-hover-applications'
   | 'global-selection-applications'

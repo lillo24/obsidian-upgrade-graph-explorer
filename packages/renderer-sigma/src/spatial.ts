@@ -1,6 +1,10 @@
 import {
+  applyResolvedFolderPlacements,
   applyFolderClusterAnchors,
+  resolveFolderSpatialRules,
   type FolderClusterAnchorMap,
+  type FolderSpatialRule,
+  type ResolvedFolderSpatialRules,
   type SpatialCompositionResult,
   type SpatialPosition,
 } from '@icarus-graph-explorer/spatial-overrides';
@@ -32,6 +36,31 @@ export function composeGlobalSpatialOverrides(
     automaticPositions,
     folderKeyByNodeKey: globalFolderKeyByNodeKey(input),
     anchors,
+    visualDownGraphYSign: SIGMA_VISUAL_DOWN_GRAPH_Y_SIGN,
+  });
+}
+
+export function resolveGlobalFolderSpatialRules(
+  input: GlobalRendererInput,
+  rules: readonly FolderSpatialRule[],
+): ResolvedFolderSpatialRules {
+  return resolveFolderSpatialRules({
+    rules,
+    folderKeyByNodeKey: globalFolderKeyByNodeKey(input),
+  });
+}
+
+export function composeGlobalFolderSpatialRules(
+  baseAutomaticPositions: readonly SpatialPosition[],
+  dynamicPositions: readonly SpatialPosition[],
+  input: GlobalRendererInput,
+  resolved: ResolvedFolderSpatialRules,
+): SpatialCompositionResult {
+  return applyResolvedFolderPlacements({
+    baseAutomaticPositions,
+    currentPositions: dynamicPositions,
+    documentNodeKeys: globalFolderKeyByNodeKey(input).keys(),
+    resolved,
     visualDownGraphYSign: SIGMA_VISUAL_DOWN_GRAPH_Y_SIGN,
   });
 }

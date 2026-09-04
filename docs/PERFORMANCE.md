@@ -558,6 +558,46 @@ edge geometry, so its internal process may still scan the graph. Production
 browser/Tauri drag evidence—not the pure Node table—is the authority for that
 library cost and RAF responsiveness.
 
+### SPATIAL2A hierarchical rules and soft pull
+
+SPATIAL2A adds aggregate phases `spatial-rule-resolution`,
+`spatial-pull-request`, `spatial-pull-worker`, `spatial-pull-forceatlas`,
+`spatial-pull-attractor`, `spatial-pull-cache-hit`, and
+`spatial-fixed-compose`. Matching operation counters distinguish fixed-only
+composition, dynamic requests, and exact dynamic cache reuse. Fixed edits do no
+projection, topology, base layout, or new dynamic work when pull intent is
+unchanged. Pull target/strength/scope edits submit one latest separate worker
+request and then one fixed composition.
+
+`benchmark:global-renderer` now measures rule resolution, request serialization,
+worker/ForceAtlas2/attractor time, normalized target error, affected and
+unaffected displacement, cross-boundary/reference length, cache hits, group
+sizes 1/10/100/1,000/large, and multiple independent rules. Small local
+Windows/Node evidence on 2026-09-04 resolved three rules in a 0.203 ms median,
+serialized 100-node requests in a 0.054 ms median, and hit the dynamic cache in
+about 0.001–0.002 ms median. At 500 product nodes, 12-iteration worker compute
+was about 9–22 ms in the recorded run. These are investigative values, not CI
+thresholds. The browser harness remains authoritative for worker wall time,
+apply cost, RAF gaps, and visual stability.
+
+Candidate A alternates bounded ForceAtlas2 chunks with centroid pulls; Candidate
+B moves once and then relaxes. Deterministic tests and the small aggregate
+bake-off show A retains lower normalized target error while ordinary ForceAtlas2
+moves connected nonmembers and changes affected-cluster internal geometry. For
+20 of 100 nodes over 24 iterations, A/B normalized target error was 4.248/5.237
+and compute was 1.886/0.851 ms. A is selected for sustained influence despite
+its small added cost. Strength zero bypasses all refinement and returns the base
+layer exactly.
+
+The medium benchmark also runs the dynamic stage over the private-safe 5,000
+node/10,000 edge stress fixture. Four-iteration compute ranged from 229 ms to a
+1.994 s cold outlier across 1/10/100/1,000/3,000-member cases; attractor work was
+1.7–10.5 ms and exact cache hits were 0.070–0.117 ms median. This is an honest
+scale boundary, not an interactive-preview claim: SPATIAL2B must keep pull
+preview debounced/worker-only and establish a scale policy before exposing the
+editor in production. Stress profiles remain opt-in and no new force dependency
+or persisted coordinate cache was introduced.
+
 ## KG13B2A bounded Local Free evidence
 
 Local profiles describe the projected neighborhood itself rather than a large

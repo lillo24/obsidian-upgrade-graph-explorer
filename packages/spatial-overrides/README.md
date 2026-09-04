@@ -1,56 +1,62 @@
 # Spatial overrides
 
-Source-neutral, workspace-scoped user presentation intent for manual spatial
-placement. This package does not own canonical knowledge, KG6 projection,
-renderer instances, ForceAtlas2 state, browser storage, or source files.
+Source-neutral, workspace-scoped folder position intent. This package owns the
+schema, hierarchical membership, fixed composition, and direct-manipulation
+geometry. It does not own canonical knowledge, projection, workers, renderer
+instances, browser storage, source files, or persisted raw coordinates.
 
 ```text
-automatic layout
-  → normalized All Network folder anchors
+base automatic positions
+  → dynamic soft-pull positions
+  → fixed-placement composition
   → displayed positions
 ```
 
 ## File map
 
 ```text
-src/types.ts       Schema-v1 registry, normalized anchors, frames, and results.
+src/types.ts       Schema-v2 rules, normalized anchors, frames, and results.
 src/folder-key.ts  Exact workspace-relative folder-key validation/derivation.
-src/registry.ts    Strict validation, deterministic serialization, pure edits.
-src/geometry.ts    Automatic document frame, inverse normalization, composition.
+src/scope.ts       Segment-safe depth, descendant, subtree, and exclusion rules.
+src/registry.ts    V1 migration, strict v2 validation, serialization, pure edits.
+src/resolution.ts  Most-specific winning rule and visible membership groups.
+src/geometry.ts    Base document frame and fixed composition over dynamic input.
 src/preview.ts     Sparse exact-folder preview geometry and bounded nudges.
 src/index.ts       Public source-neutral interface.
-*.test.ts          Registry and deterministic geometry contracts.
+*.test.ts          Migration, scope, resolution, geometry, and compatibility tests.
 ```
 
-Schema v1 stores only `workspaceId` and `allNetwork.folderAnchors`. A root file
-uses folder key `.`, while nested folders use exact normalized paths such as
-`Theory/Language`. Leading/trailing slashes, backslashes, drive prefixes, empty
-segments, and `.`/`..` segments are rejected. Folder identity is deliberately
-path-based in v1: rename creates a new identity, the old entry remains dormant,
-and exact path reuse can reactivate it. There is no fuzzy reconciliation and no
-canonical folder entity.
+Schema v2 stores `workspaceId` and `allNetwork.folderRules`. Each normalized
+root folder has at most one rule. `behavior: "place"` is fixed rigid placement;
+`behavior: "pull"` is dynamic soft attraction and requires an integer strength
+from 0 through 100. Strength is forbidden for Place. Targets remain finite
+logical anchors in `[-2, 2]`, with positive X right and positive Y visually down.
 
-Anchor X/Y values are finite and bounded to `[-2, 2]`. Positive X means right;
-positive Y means visually down. The automatic frame is the bounding box of
-visible canonical document positions before overrides. Diagnostics are excluded.
-Each half extent has a deterministic minimum of `1`, including empty, singleton,
-line, and nearly degenerate graphs. A renderer supplies the sign of graph-space Y
-that appears visually down; Sigma 3.0.3 uses `-1`.
+Scopes are either exact or subtree. A subtree independently controls direct
+files at its root and a sorted antichain of excluded strict-descendant subtrees.
+Comparisons respect path segments: `Theory/A` descends from `Theory`, while
+`Theory-Old` does not. Root `.` covers every normalized folder. Parent and child
+rules may overlap, but every document gets only its deepest matching rule; rules
+with no visible winners remain stored and inactive. Query/hide changes and exact
+folder renames therefore do not delete intent, and exact path reuse reactivates
+it without fuzzy reconciliation.
 
-Composition translates every visible document in one exact folder by the same
-delta, preserving cluster shape. Other folders and diagnostics are unchanged.
-Inactive folder entries remain stored. Overlap is accepted user intent: this
-package performs no collision solving or post-override physics. The inverse
-target helper clamps finite drag targets to the v1 bounds for SPATIAL1B.
+Schema-v1 `{folderKey, anchor}` entries are accepted only at the read boundary
+and deterministically become `place + exact` rules in memory. Serialization is
+always v2. Registries and nested values are sorted, deeply frozen, JSON and
+`structuredClone()` safe. The compatibility anchor API projects only
+`place + exact`: Arrange writes/replaces that one root rule, while compatibility
+remove/clear operations do not silently delete pull or subtree intent.
 
-Registries are deterministically ordered, deeply frozen on construction, JSON
-round-trip and `structuredClone()` safe. Absence means automatic placement; no
-explicit Auto entry or raw graph coordinate is stored. `mergeFolderClusterAnchorMaps`
-lets a temporary drag preview win over persisted anchors without reading storage
-inside geometry.
+The automatic target frame is the bounding box of visible canonical document
+positions before either override layer. Diagnostics, display-only radii,
+camera, and prior translations are excluded. Fixed groups compute their current
+center from the dynamic layer, then apply one shared translation to the target
+in the base frame. No parent/child rule is applied twice and no displayed output
+is fed back into either upstream layer.
 
-SPATIAL1B captures one folder's automatic members, automatic center, current
-displayed center, and frame at gesture start. Every live preview derives one
-rigid translation from that immutable automatic base. Pointer and keyboard
-helpers clamp only the normalized anchor, never persist graph or viewport
-coordinates, and produce positions for the exact active folder only.
+SPATIAL1B preview geometry remains the current production authoring path. When a
+dynamic layer exists, it supplies the current member positions while the target
+frame remains the base automatic frame. Every pointer/keyboard sample derives a
+sparse shared translation from captured geometry; graph coordinates remain
+memory-only.

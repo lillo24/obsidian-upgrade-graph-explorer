@@ -88,11 +88,35 @@
             </div>
           </section>
           <section>
-            <h2>Normalized folder anchor</h2>
+            <h2>Folder spatial rule</h2>
             <form id="spatial-form">
               <label>
                 Synthetic folder key
-                <input id="spatial-folder" value="folder-0" />
+                <input id="spatial-folder" value="folder-1" />
+              </label>
+              <div class="spatial-coordinate-grid">
+                <label>
+                  Behavior
+                  <select id="spatial-behavior">
+                    <option value="place">Fixed placement</option>
+                    <option value="pull">Dynamic pull</option>
+                  </select>
+                </label>
+                <label>
+                  Scope
+                  <select id="spatial-scope">
+                    <option value="exact">Exact folder</option>
+                    <option value="subtree">Folder subtree</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                <input checked id="spatial-include-root" type="checkbox" />
+                Include files directly in the scope root
+              </label>
+              <label>
+                Excluded subtrees (comma-separated)
+                <input id="spatial-exclusions" placeholder="folder-1/archive" />
               </label>
               <div class="spatial-coordinate-grid">
                 <label>
@@ -117,12 +141,23 @@
                     value="0.7"
                   />
                 </label>
+                <label>
+                  Pull strength
+                  <input
+                    id="spatial-strength"
+                    max="100"
+                    min="0"
+                    step="1"
+                    type="number"
+                    value="75"
+                  />
+                </label>
               </div>
               <div class="button-grid">
                 <button aria-pressed="false" id="arrange-folders" type="button">
                   Arrange Folders
                 </button>
-                <button type="submit">Apply Anchor</button>
+                <button type="submit">Apply Rule</button>
                 <button id="spatial-reset-folder" type="button">
                   Reset Folder
                 </button>
@@ -130,7 +165,8 @@
               </div>
               <p>
                 Arrange uses the production gesture path: drag any File to move
-                its exact synthetic folder. Drag the stage to pan.
+                its exact synthetic folder as Fixed placement. The form also
+                exercises development-only subtree and Dynamic pull rules.
               </p>
             </form>
             <dl

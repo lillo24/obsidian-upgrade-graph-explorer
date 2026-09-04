@@ -6,9 +6,10 @@ This document is the engineering source of truth for the Markdown Structure Grap
 
 The product will explore the structure of Markdown knowledge workspaces. Unlike a file-only graph, it must retain the hierarchy inside a document and attribute references to the precise section or addressable block where they occur. A renderer may collapse those relationships into file-level edges, but the canonical source-derived data must retain their original precision.
 
-SPATIAL1 establishes a parallel source-neutral, workspace-scoped normalized
-folder-anchor layer plus direct exact-folder arrangement for All Network while
-leaving the active KG14 sequence unchanged.
+SPATIAL1 establishes normalized fixed-folder intent and direct arrangement.
+SPATIAL2A evolves that independent All Network domain to schema-v2 exact/subtree
+rules plus a base → dynamic soft-pull → fixed-display pipeline while leaving the
+active KG14, HIER, QUERY, GROUP, and SPACING tracks unchanged.
 
 ## Stable domain shape
 
@@ -206,17 +207,15 @@ preferences, query membership,
 visibility, canonical snapshots, and identity catalogs are unchanged.
 
 `packages/spatial-overrides` also depends only on source-neutral core, but is a
-separate domain from per-File presentation overrides. Its strict v1 registry
-stores exact normalized workspace-relative folder keys (`.` for the root) and
-bounded logical visual X/Y target-center anchors under an explicit All-Network
-section. It computes the automatic document-only graph frame, automatic folder
-centers, inverse target normalization, and pure rigid translations from an
-explicit anchor map. SPATIAL1B adds pure sparse preview geometry that captures
-the automatic base once and emits only one exact folder's coordinates for each
-pointer/keyboard sample. It owns no React, Sigma, storage, projection, source
-adapter, query, viewport, worker, or layout policy. Exact-path folder identity
-does not survive rename in v1; missing folders remain dormant without fuzzy
-reconciliation.
+separate domain from per-File presentation overrides. Its strict v2 registry
+stores one Pull or Place rule per normalized root folder, with exact or subtree
+scope, direct-root-file inclusion, a minimal excluded-subtree antichain, bounded
+logical target, and Pull-only strength. It accepts v1 exact anchors only for
+deterministic in-memory migration. The deepest matching rule wins per document;
+missing or query-hidden membership remains dormant without fuzzy rename
+reconciliation. The package computes the base document frame and pure fixed
+composition over dynamic positions. It owns no React, Sigma, storage,
+projection, source adapter, query, viewport, worker, or force-layout policy.
 
 `packages/explorer-inspection` depends inward on core and view-projection. It
 builds canonical hierarchy/reference/search indexes once per snapshot and emits
@@ -814,8 +813,10 @@ use the compiled all-match evaluator in Inspector; diagnostics and edges opt
 out. Filters and Groups have one transient tool-panel owner while Inspector is
 independent.
 The separate LAYOUT1 idea is paused/absorbed into this Global → Regional → Local
-spatial architecture. SPATIAL1 now supplies derived normalized exact-folder
-targets after the automatic prior and a completed Arrange mode. Its transient
+spatial architecture. SPATIAL2A now supplies hierarchical folder scopes and a
+separate worker-derived soft-pull layer after the automatic prior; fixed Place
+rules still compose last. The completed Arrange mode continues to author only
+exact Place rules and exposes no SPATIAL2B selector. Its transient
 preview wins visually for one exact folder, moves members and incident edges
 live, then commits one normalized release target or restores confirmed state on
 cancel/failure. Individual-node dragging is not part of this interaction. A

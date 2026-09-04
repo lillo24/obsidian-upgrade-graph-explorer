@@ -74,12 +74,14 @@ export function folderTranslationFromAnchor({
  */
 export function createFolderClusterPreviewGeometry({
   automaticPositions,
+  currentPositions = automaticPositions,
   folderKeyByNodeKey,
   anchors,
   folderKey,
   visualDownGraphYSign,
 }: {
   readonly automaticPositions: readonly SpatialPosition[];
+  readonly currentPositions?: readonly SpatialPosition[];
   readonly folderKeyByNodeKey: ReadonlyMap<string, string>;
   readonly anchors: FolderClusterAnchorMap;
   readonly folderKey: WorkspaceFolderKey;
@@ -95,8 +97,13 @@ export function createFolderClusterPreviewGeometry({
     visualDownGraphYSign,
   });
   const automaticByKey = new Map(
-    automaticPositions.map((position) => [position.key, position] as const),
+    currentPositions.map((position) => [position.key, position] as const),
   );
+  if (automaticByKey.size !== automaticPositions.length) {
+    throw new Error(
+      'Current folder-preview positions must match the base layer.',
+    );
+  }
   const memberAutomaticPositions = [...folderKeyByNodeKey]
     .filter(([, candidateFolderKey]) => candidateFolderKey === folderKey)
     .map(([nodeKey]) => automaticByKey.get(nodeKey)!)

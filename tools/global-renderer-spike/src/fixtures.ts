@@ -44,12 +44,19 @@ function nodeId(index: number): string {
 }
 
 function documentNode(index: number): ProjectedNode {
+  const cluster = index % 12;
+  const sourcePath =
+    cluster === 0
+      ? `document-${index}.md`
+      : cluster % 3 === 0
+        ? `folder-${cluster % 4}/branch-${cluster}/document-${index}.md`
+        : `folder-${cluster % 4}/document-${index}.md`;
   return {
     id: nodeId(index),
     kind: 'entity',
     entityId: entityId(index),
     entityKind: 'document',
-    sourcePath: `folder-${index % 12}/document-${index}.md`,
+    sourcePath,
     sourceStartLine: 1,
     title: null,
     revealableDescendantCount: 1 + (index % 8),

@@ -2,6 +2,7 @@ import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/prese
 import {
   offsetNormalizedFolderAnchor,
   type FolderClusterAnchorMap,
+  type FolderSpatialRule,
   type NormalizedFolderAnchor,
   type SpatialPoint,
 } from '@icarus-graph-explorer/spatial-overrides';
@@ -19,6 +20,7 @@ import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
 import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-groups';
 
 import { GlobalLayoutCache } from './layout-cache';
+import { GlobalSpatialInfluenceCache } from './spatial-influence-cache';
 import {
   createGlobalLayoutRequest,
   createGlobalLayoutRequestFromAutomaticPositions,
@@ -38,7 +40,15 @@ import {
   globalLayoutSettingsFromPhysics,
   resolveGlobalPhysicsSettings,
 } from './settings';
-import { composeGlobalSpatialOverrides } from './spatial';
+import {
+  composeGlobalFolderSpatialRules,
+  composeGlobalSpatialOverrides,
+  resolveGlobalFolderSpatialRules,
+} from './spatial';
+import {
+  createGlobalSpatialInfluenceRequest,
+  globalSpatialInfluenceFingerprint,
+} from './spatial-influence';
 import { shouldApplyGlobalViewportRequest } from './viewport-request';
 import type {
   GlobalCenterRequest,
@@ -49,6 +59,7 @@ import type {
   GlobalSelection,
   GlobalTrackpadZoomMode,
   GlobalTransitionAnchorApi,
+  GlobalSpatialInfluenceService,
   SemanticGlobalViewport,
 } from './types';
 
@@ -89,6 +100,10 @@ export interface GlobalGraphCanvasProps {
   /** Optional session cache owner; the lazy web module keeps this across mode switches. */
   readonly layoutCache?: GlobalLayoutCache;
   readonly layoutService: GlobalLayoutService;
+  /** Separate latest-result worker for schema-v2 dynamic pull rules. */
+  readonly spatialInfluenceService?: GlobalSpatialInfluenceService;
+  readonly spatialInfluenceCache?: GlobalSpatialInfluenceCache;
+  readonly spatialSourceKey?: string;
   readonly onFailure: (message: string) => void;
   readonly onNodeActivate: (entityId: string) => void;
   readonly onNodeSingleClick?: (nodeId: string) => void;
@@ -104,6 +119,8 @@ export interface GlobalGraphCanvasProps {
   readonly settings: GlobalLayoutSettings;
   /** All Network-only position intent composed after automatic layout. */
   readonly spatialOverrides?: FolderClusterAnchorMap;
+  /** Full schema-v2 rules; current production controls still author place/exact only. */
+  readonly spatialRules?: readonly FolderSpatialRule[];
   readonly trackpadZoomMode: GlobalTrackpadZoomMode;
   /** Style-only EntityId lookup; excluded from mapping and layout inputs. */
   readonly visualGroupStyles?: VisualGroupPresentationMap;
@@ -221,6 +238,9 @@ export function GlobalGraphCanvas({
   layoutRequestKey,
   layoutCache,
   layoutService,
+  spatialInfluenceService,
+  spatialInfluenceCache,
+  spatialSourceKey,
   onFailure,
   onNodeActivate,
   onNodeSingleClick,
@@ -231,6 +251,7 @@ export function GlobalGraphCanvas({
   selection,
   settings,
   spatialOverrides,
+  spatialRules,
   trackpadZoomMode,
   visualGroupStyles,
   presentationOverrides,
@@ -240,6 +261,9 @@ export function GlobalGraphCanvas({
   const spotlightRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<GlobalRendererSession | undefined>(undefined);
   const [cache] = useState(() => layoutCache ?? new GlobalLayoutCache());
+  const [dynamicCache] = useState(
+    () => spatialInfluenceCache ?? new GlobalSpatialInfluenceCache(),
+  );
   const handledCenterRequest = useRef(0);
   const handledFitRequest = useRef(0);
   const handledLayoutRequest = useRef(layoutRequestKey);
@@ -324,6 +348,7 @@ export function GlobalGraphCanvas({
     );
     return {
       automaticPositions,
+      displayedPositions: initialDisplayedPositions,
       cached: cached !== undefined,
       initialViewport,
       input:
@@ -342,6 +367,8 @@ export function GlobalGraphCanvas({
   const appliedPresentationOverrides = useRef(initial.presentationOverrides);
   const appliedSpatialOverrides = useRef(initial.spatialOverrides);
   const latestAutomaticPositions = useRef(initial.automaticPositions);
+  const latestDynamicPositions = useRef(initial.automaticPositions);
+  const latestDisplayedPositions = useRef(initial.displayedPositions);
   const latestSpatialOverrides = useRef(spatialOverrides);
   const latestInput = useRef(input);
   const pendingArrangementCommit = useRef<
@@ -361,7 +388,10 @@ export function GlobalGraphCanvas({
     initial.cached ? undefined : 'Preparing All Network layout…',
   );
   const [layoutError, setLayoutError] = useState<string>();
+  const [spatialError, setSpatialError] = useState<string>();
   const [layoutPendingState, setLayoutPendingState] = useState(!initial.cached);
+  const [spatialCommitKey, setSpatialCommitKey] = useState(0);
+  const spatialGeneration = useRef(0);
   const [arrangementGesturePhase, setArrangementGesturePhase] = useState<
     'idle' | 'primed' | 'dragging' | 'committing'
   >('idle');
@@ -381,6 +411,16 @@ export function GlobalGraphCanvas({
   const restoreArrangementDisplay = useCallback(() => {
     const session = sessionRef.current;
     if (session === undefined) return;
+    if (spatialRules !== undefined) {
+      void session
+        .applyPositions(latestDisplayedPositions.current)
+        .catch((error: unknown) => {
+          setArrangementError(
+            `Could not restore confirmed folder positions: ${errorMessage(error)}`,
+          );
+        });
+      return;
+    }
     void applyDisplayedPositions(
       session,
       latestAutomaticPositions.current,
@@ -393,7 +433,7 @@ export function GlobalGraphCanvas({
         `Could not restore confirmed folder positions: ${errorMessage(error)}`,
       );
     });
-  }, [instrumentation]);
+  }, [instrumentation, spatialRules]);
 
   const cancelArrangementPreview = useCallback(
     (announcement?: string): boolean => {
@@ -573,6 +613,7 @@ export function GlobalGraphCanvas({
         : { activeFolderKey: folderArrangement.activeFolderKey }),
       anchors: spatialOverrides ?? EMPTY_FOLDER_ANCHOR_MAP,
       automaticPositions: latestAutomaticPositions.current,
+      currentPositions: latestDynamicPositions.current,
       input,
     });
     const next =
@@ -594,6 +635,7 @@ export function GlobalGraphCanvas({
     folderArrangement,
     input,
     layoutCommitKey,
+    spatialCommitKey,
     spatialOverrides,
   ]);
 
@@ -735,6 +777,7 @@ export function GlobalGraphCanvas({
   }, [presentationOverrides]);
 
   useEffect(() => {
+    if (spatialRules !== undefined) return;
     if (appliedSpatialOverrides.current === spatialOverrides) return;
     const previousSpatialOverrides = appliedSpatialOverrides.current;
     appliedSpatialOverrides.current = spatialOverrides;
@@ -777,7 +820,178 @@ export function GlobalGraphCanvas({
       .catch((error: unknown) => {
         callbacks.current.onFailure(errorMessage(error));
       });
-  }, [input, instrumentation, spatialOverrides]);
+  }, [input, instrumentation, spatialOverrides, spatialRules]);
+
+  useEffect(() => {
+    dynamicCache.clear();
+    latestDynamicPositions.current = latestAutomaticPositions.current;
+  }, [dynamicCache, spatialSourceKey]);
+
+  useEffect(() => {
+    if (
+      spatialRules === undefined ||
+      !ready ||
+      layoutPendingState ||
+      sessionRef.current === undefined
+    ) {
+      return;
+    }
+    const generation = ++spatialGeneration.current;
+    let cancelled = false;
+    const session = sessionRef.current;
+    const basePositions = latestAutomaticPositions.current;
+    const resolve = () => resolveGlobalFolderSpatialRules(input, spatialRules);
+    const resolved =
+      instrumentation === undefined
+        ? resolve()
+        : instrumentation.measure(
+            'spatial-rule-resolution',
+            'spatial-rule-resolutions',
+            resolve,
+          );
+    const request = createGlobalSpatialInfluenceRequest(
+      input,
+      layoutSettings,
+      Math.min(30, requestTemplate.iterations),
+      basePositions,
+      fingerprint,
+      resolved,
+    );
+
+    const composeAndApply = async (
+      dynamicPositions: readonly GlobalLayoutPosition[],
+    ): Promise<void> => {
+      if (cancelled || generation !== spatialGeneration.current) return;
+      latestDynamicPositions.current = dynamicPositions;
+      const compose = () =>
+        composeGlobalFolderSpatialRules(
+          basePositions,
+          dynamicPositions,
+          input,
+          resolved,
+        ).displayedPositions;
+      const positions =
+        instrumentation === undefined
+          ? compose()
+          : instrumentation.measure(
+              'spatial-fixed-compose',
+              'spatial-fixed-compositions',
+              compose,
+            );
+      await session.applyPositions(positions);
+      if (cancelled || generation !== spatialGeneration.current) return;
+      latestDisplayedPositions.current = positions;
+      appliedSpatialOverrides.current = spatialOverrides;
+      setSpatialError(undefined);
+      setSpatialCommitKey((current) => current + 1);
+      const pending = pendingArrangementCommit.current;
+      if (pending === undefined) return;
+      const incoming = spatialOverrides?.get(pending.folderKey);
+      pendingArrangementCommit.current = undefined;
+      if (anchorsEqual(incoming, pending.anchor)) {
+        session.completeFolderArrangementCommit();
+        setArrangementGesturePhase('idle');
+        setActiveFolderPosition(incoming);
+        return;
+      }
+      session.cancelFolderArrangementGesture();
+      setArrangementGesturePhase('idle');
+      setArrangementError(
+        'The saved folder positions changed before this movement was adopted; the confirmed positions are shown.',
+      );
+    };
+
+    const effectivePull = request.attractors.some(
+      ({ strength }) => strength > 0,
+    );
+    if (!effectivePull) {
+      void composeAndApply(basePositions).catch((error: unknown) => {
+        if (!cancelled) callbacks.current.onFailure(errorMessage(error));
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const requestFingerprint = globalSpatialInfluenceFingerprint(request);
+    const cached = dynamicCache.get(requestFingerprint);
+    if (cached !== undefined) {
+      instrumentation?.count('spatial-pull-cache-hits');
+      instrumentation?.record('spatial-pull-cache-hit', 0);
+      void composeAndApply(cached).catch((error: unknown) => {
+        if (!cancelled) callbacks.current.onFailure(errorMessage(error));
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (spatialInfluenceService === undefined) {
+      void composeAndApply(basePositions)
+        .then(() => {
+          if (!cancelled && generation === spatialGeneration.current) {
+            setSpatialError(
+              'Dynamic folder pull is unavailable; base layout plus fixed placements remain visible.',
+            );
+          }
+        })
+        .catch((error: unknown) => {
+          if (!cancelled) callbacks.current.onFailure(errorMessage(error));
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+    instrumentation?.count('spatial-pull-requests');
+    instrumentation?.record('spatial-pull-request', 0);
+    queueMicrotask(() => {
+      if (!cancelled) setLayoutStatus('Applying dynamic folder pull…');
+    });
+    void spatialInfluenceService
+      .layout(request)
+      .then(async (result) => {
+        if (cancelled || generation !== spatialGeneration.current) return;
+        dynamicCache.set(requestFingerprint, result.positions);
+        instrumentation?.record('spatial-pull-worker', result.computeMs);
+        instrumentation?.record('spatial-pull-forceatlas', result.forceAtlasMs);
+        instrumentation?.record('spatial-pull-attractor', result.attractorMs);
+        await composeAndApply(result.positions);
+        if (!cancelled) setLayoutStatus(undefined);
+      })
+      .catch(async (error: unknown) => {
+        if (cancelled || generation !== spatialGeneration.current) return;
+        try {
+          await composeAndApply(basePositions);
+        } catch (fallbackError: unknown) {
+          if (!cancelled) {
+            callbacks.current.onFailure(errorMessage(fallbackError));
+          }
+          return;
+        }
+        if (cancelled) return;
+        setLayoutStatus(undefined);
+        setSpatialError(
+          `Dynamic folder pull failed: ${errorMessage(error)} Base layout plus fixed placements remain visible.`,
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    dynamicCache,
+    fingerprint,
+    input,
+    instrumentation,
+    layoutCommitKey,
+    layoutPendingState,
+    layoutSettings,
+    ready,
+    requestTemplate.iterations,
+    spatialInfluenceService,
+    spatialOverrides,
+    spatialRules,
+    spatialSourceKey,
+  ]);
 
   useEffect(() => {
     sessionRef.current?.setControlledSelection(
@@ -1264,6 +1478,11 @@ export function GlobalGraphCanvas({
       {layoutError === undefined ? null : (
         <p className="global-graph-canvas__error" role="alert">
           {layoutError}
+        </p>
+      )}
+      {spatialError === undefined ? null : (
+        <p className="global-graph-canvas__error" role="alert">
+          {spatialError}
         </p>
       )}
       {arrangementError === undefined ? null : (

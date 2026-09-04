@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   applyFolderClusterAnchors,
+  applyResolvedFolderPlacements,
   computeAutomaticGraphFrame,
   normalizedAnchorFromTarget,
   targetFromNormalizedAnchor,
 } from './geometry';
+import { resolveFolderSpatialRules } from './resolution';
 import type { SpatialPosition } from './types';
 
 const automatic: readonly SpatialPosition[] = [
@@ -30,6 +32,47 @@ function position(
 }
 
 describe('normalized folder-anchor geometry', () => {
+  it('composes fixed groups from dynamic positions against the base frame', () => {
+    const dynamic = automatic.map((item) =>
+      item.key === 'a' || item.key === 'b' ? { ...item, x: item.x + 10 } : item,
+    );
+    const resolved = resolveFolderSpatialRules({
+      rules: [
+        {
+          folderKey: 'alpha',
+          behavior: 'place',
+          scope: { kind: 'exact' },
+          anchor: { x: 0, y: 0 },
+        },
+      ],
+      folderKeyByNodeKey: folders,
+    });
+    const result = applyResolvedFolderPlacements({
+      baseAutomaticPositions: automatic,
+      currentPositions: dynamic,
+      documentNodeKeys: folders.keys(),
+      resolved,
+      visualDownGraphYSign: -1,
+    });
+    expect(result.automaticFrame).toEqual({
+      centerX: 1,
+      centerY: 1,
+      halfWidth: 5,
+      halfHeight: 3,
+    });
+    const alpha = result.activeFolders[0]!;
+    expect(alpha.automaticCenter).toEqual({ x: 7, y: 0 });
+    expect(alpha.target).toEqual({ x: 1, y: 1 });
+    expect(position(result.displayedPositions, 'a')).toEqual({
+      key: 'a',
+      x: 0,
+      y: -1,
+    });
+    expect(position(result.displayedPositions, 'diagnostic')).toEqual(
+      position(automatic, 'diagnostic'),
+    );
+  });
+
   it('returns equivalent automatic positions for an empty anchor map', () => {
     const result = applyFolderClusterAnchors({
       automaticPositions: automatic,

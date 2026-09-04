@@ -69,7 +69,7 @@ describe('spatial override workspace session', () => {
       workspaceId: 'A',
     });
     expect(firstA.status).toBe(SPATIAL_OVERRIDE_DURABLE_STATUS);
-    expect(workspaceB.registry.allNetwork.folderAnchors).toEqual([]);
+    expect(workspaceB.registry.allNetwork.folderRules).toEqual([]);
     expect(restoredA.registry).toEqual(committedA.value.registry);
   });
 
@@ -119,7 +119,15 @@ describe('spatial override workspace session', () => {
         ok: true,
         value: {
           registry: {
-            allNetwork: { folderAnchors: [{ folderKey: 'Research' }] },
+            allNetwork: {
+              folderRules: [
+                {
+                  folderKey: 'Research',
+                  behavior: 'place',
+                  scope: { kind: 'exact' },
+                },
+              ],
+            },
           },
         },
       });

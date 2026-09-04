@@ -42,6 +42,35 @@ describe('spatial override persistence adapter', () => {
     });
   });
 
+  it('migrates v1 on read without unsolicited storage writes', () => {
+    const storage = memoryStorage();
+    const key = spatialOverrideStorageKey('workspace');
+    const legacy = JSON.stringify({
+      schemaVersion: 1,
+      workspaceId: 'workspace',
+      allNetwork: {
+        folderAnchors: [{ folderKey: '.', anchor: { x: 0.5, y: -0.5 } }],
+      },
+    });
+    storage.values.set(key, legacy);
+    expect(loadSpatialOverrides(storage, 'workspace')).toMatchObject({
+      ok: true,
+      value: {
+        schemaVersion: 2,
+        allNetwork: {
+          folderRules: [
+            {
+              folderKey: '.',
+              behavior: 'place',
+              scope: { kind: 'exact' },
+            },
+          ],
+        },
+      },
+    });
+    expect(storage.values.get(key)).toBe(legacy);
+  });
+
   it('leaves malformed, incompatible, and mismatched values untouched', () => {
     for (const value of [
       '{broken',

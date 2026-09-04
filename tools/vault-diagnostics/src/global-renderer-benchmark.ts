@@ -11,20 +11,26 @@ import {
 import {
   buildGlobalGraph,
   composeGlobalSpatialOverrides,
+  computeGlobalSpatialInfluence,
   computeGlobalLayout,
   createGlobalLayoutRequest,
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
   GlobalLayoutCache,
+  GlobalSpatialInfluenceCache,
   globalLayoutPositionsFromInput,
   globalLayoutFingerprint,
+  globalSpatialInfluenceFingerprint,
   mapProjectionToGlobal,
   reconcileGlobalGraph,
   type GlobalRendererInput,
+  type GlobalSpatialInfluenceRequest,
 } from '@icarus-graph-explorer/renderer-sigma/core';
 import { createStableIdentityCatalog } from '@icarus-graph-explorer/stable-identity';
 import {
   createFolderClusterPreviewGeometry,
   previewFolderClusterAtAnchor,
+  resolveFolderSpatialRules,
+  type FolderSpatialRule,
   type FolderClusterPreviewGeometry,
 } from '@icarus-graph-explorer/spatial-overrides';
 import {
@@ -103,6 +109,12 @@ function distribution(values: readonly number[]): Distribution {
     p95Ms: sorted[p95Index]!,
     maximumMs: sorted.at(-1)!,
   };
+}
+
+function mean(values: readonly number[]): number {
+  return values.length === 0
+    ? 0
+    : values.reduce((total, value) => total + value, 0) / values.length;
 }
 
 function measureRepeated(run: () => void, repeats: number): Distribution {
@@ -217,6 +229,181 @@ function folderDragPreviewEvidence(folderSize: number, repeats: number) {
   };
 }
 
+function spatialInfluenceEvidence(
+  input: GlobalRendererInput,
+  basePositions: ReturnType<typeof globalLayoutPositionsFromInput>,
+  repeats: number,
+) {
+  const documentKeys = input.nodes.flatMap((node) =>
+    node.attributes.nodeKind === 'document' ? [node.key] : [],
+  );
+  const requestedSizes = [
+    1,
+    10,
+    100,
+    Math.min(1_000, documentKeys.length),
+    Math.max(1, Math.floor(documentKeys.length * 0.6)),
+  ];
+  const groupSizes = [...new Set(requestedSizes)].filter(
+    (size) => size <= documentKeys.length,
+  );
+  const baseByKey = new Map(
+    basePositions.map((position) => [position.key, position] as const),
+  );
+  const nodes = input.nodes.map(({ key, attributes }) => {
+    const position = baseByKey.get(key);
+    if (position === undefined)
+      throw new Error(`Spatial benchmark omitted node ${key}.`);
+    return { key, x: position.x, y: position.y, size: attributes.size };
+  });
+  const edges = input.edges.map(({ key, source, target, attributes }) => ({
+    key,
+    source,
+    target,
+    weight: Math.max(1, attributes.referenceCount),
+  }));
+  const centerX = mean(basePositions.map(({ x }) => x));
+  const centerY = mean(basePositions.map(({ y }) => y));
+  const iterations = input.nodes.length <= 1_000 ? 12 : 4;
+  const template = (
+    groupSize: number,
+    algorithm: GlobalSpatialInfluenceRequest['algorithm'] = 'interleaved-centroid',
+    multiple = false,
+  ): Omit<GlobalSpatialInfluenceRequest, 'requestId'> => {
+    const first = documentKeys.slice(0, groupSize);
+    const second = multiple
+      ? documentKeys.slice(
+          groupSize,
+          Math.min(documentKeys.length, groupSize * 2),
+        )
+      : [];
+    return {
+      schemaVersion: 1,
+      algorithm,
+      algorithmVersion: 1,
+      baseLayoutFingerprint: `synthetic-base-${input.nodes.length}-${input.edges.length}`,
+      iterations,
+      globalLayoutSettings: DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+      nodes,
+      edges,
+      attractors: [
+        {
+          ruleFolderKey: 'synthetic-rule-0',
+          memberNodeKeys: first,
+          targetX: centerX + 20,
+          targetY: centerY,
+          strength: 75,
+        },
+        ...(second.length === 0
+          ? []
+          : [
+              {
+                ruleFolderKey: 'synthetic-rule-1',
+                memberNodeKeys: second,
+                targetX: centerX - 20,
+                targetY: centerY,
+                strength: 50,
+              },
+            ]),
+      ],
+    };
+  };
+  const cases = groupSizes.map((groupSize, index) => {
+    const request = template(
+      groupSize,
+      'interleaved-centroid',
+      index === groupSizes.length - 1,
+    );
+    const serialization = measureRepeated(() => {
+      JSON.stringify(request);
+    }, repeats);
+    const started = performance.now();
+    const result = computeGlobalSpatialInfluence({
+      ...request,
+      requestId: index + 1,
+    });
+    const workerWallMs = Number((performance.now() - started).toFixed(3));
+    const fingerprint = globalSpatialInfluenceFingerprint(request);
+    const cache = new GlobalSpatialInfluenceCache();
+    cache.set(fingerprint, result.positions);
+    const cacheHit = measureRepeated(() => {
+      if (cache.get(fingerprint) === undefined)
+        throw new Error('Dynamic cache miss.');
+    }, repeats);
+    return {
+      groupSize,
+      attractorCount: request.attractors.length,
+      iterations,
+      requestSerialization: serialization,
+      workerWallMs,
+      computeMs: result.computeMs,
+      forceAtlasMs: result.forceAtlasMs,
+      attractorMs: result.attractorMs,
+      metrics: result.metrics,
+      dynamicCacheHit: cacheHit,
+    };
+  });
+  const comparisonSize = Math.min(
+    100,
+    Math.max(1, Math.floor(documentKeys.length * 0.2)),
+  );
+  const comparisonIterations = Math.max(iterations, 24);
+  const candidateA = computeGlobalSpatialInfluence({
+    ...template(comparisonSize, 'interleaved-centroid'),
+    iterations: comparisonIterations,
+    requestId: 10_001,
+  });
+  const candidateB = computeGlobalSpatialInfluence({
+    ...template(comparisonSize, 'move-then-relax'),
+    iterations: comparisonIterations,
+    requestId: 10_002,
+  });
+
+  const distinctFolders = [
+    ...new Set(
+      input.nodes.flatMap((node) =>
+        node.attributes.folderKey === null ? [] : [node.attributes.folderKey],
+      ),
+    ),
+  ].sort();
+  const resolutionRules: FolderSpatialRule[] = distinctFolders
+    .slice(0, 3)
+    .map((folderKey, index) => ({
+      folderKey,
+      behavior: index % 2 === 0 ? 'pull' : 'place',
+      scope: { kind: 'exact' },
+      anchor: { x: index * 0.25, y: -index * 0.2 },
+      ...(index % 2 === 0 ? { strength: 50 + index * 10 } : {}),
+    }));
+  const folderKeyByNodeKey = new Map(
+    input.nodes.flatMap((node) =>
+      node.attributes.folderKey === null
+        ? []
+        : [[node.key, node.attributes.folderKey] as const],
+    ),
+  );
+  const ruleResolution = measureRepeated(() => {
+    resolveFolderSpatialRules({ rules: resolutionRules, folderKeyByNodeKey });
+  }, repeats);
+  return {
+    ruleResolution,
+    cases,
+    candidateComparison: {
+      groupSize: comparisonSize,
+      iterations: comparisonIterations,
+      selected: 'interleaved-centroid',
+      candidateA: {
+        computeMs: candidateA.computeMs,
+        metrics: candidateA.metrics,
+      },
+      candidateB: {
+        computeMs: candidateB.computeMs,
+        metrics: candidateB.metrics,
+      },
+    },
+  };
+}
+
 function stressProfile(options: BenchmarkOptions): GlobalFixtureProfile {
   if (options.include25k) return 'stress-25000';
   switch (options.profile) {
@@ -302,6 +489,11 @@ async function main(): Promise<void> {
   const directFolderDragging = [1, 10, 100, 1_000].map((folderSize) =>
     folderDragPreviewEvidence(folderSize, repeats),
   );
+  const softFolderAttractors = spatialInfluenceEvidence(
+    productInput,
+    automaticPositions,
+    repeats,
+  );
   let spatialResult:
     ReturnType<typeof composeGlobalSpatialOverrides> | undefined;
   const spatialComposition = measureRepeated(() => {
@@ -333,6 +525,11 @@ async function main(): Promise<void> {
   const stressBuild = measureRepeated(() => {
     buildGlobalGraph(measuredStressInput);
   }, repeats);
+  const stressSoftFolderAttractors = spatialInfluenceEvidence(
+    measuredStressInput,
+    globalLayoutPositionsFromInput(measuredStressInput),
+    repeats,
+  );
 
   const layoutGraph = buildGlobalGraph(productInput);
   const layoutIterations =
@@ -495,6 +692,7 @@ async function main(): Promise<void> {
           edges: measuredStressInput.edges.length,
           mapping: stressMapping,
           graphologyBuild: stressBuild,
+          softFolderAttractors: stressSoftFolderAttractors,
         },
         forceAtlas2AndFolderPrior: layout,
         normalizedSpatialOverrides: {
@@ -507,6 +705,7 @@ async function main(): Promise<void> {
           projectionRequestsPerAnchorEdit: 0,
           topologyReconciliationsPerAnchorEdit: 0,
         },
+        softFolderAttractors,
         directFolderDragging: {
           folderSizes: directFolderDragging,
           previewApplyModel:

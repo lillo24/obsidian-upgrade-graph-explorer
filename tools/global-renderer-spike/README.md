@@ -25,20 +25,22 @@ src/fixtures.ts           Private-safe product/stress KG6 projections.
 src/main.ts               Production-session browser QA and aggregate measurements.
 src/layout-worker.ts      Harness Worker transport over production layout contracts.
 src/forceatlas2.worker.ts Worker entry that calls production layout computation.
+src/spatial-influence-worker.ts  Harness transport over the production pull contract.
+src/spatial-influence.worker.ts  Separate worker entry for soft-attractor compute.
 src/core.ts               Production core re-export plus synthetic fixtures for Node benchmarks.
 src/index.ts              Production browser API re-export plus fixtures.
 src/styles.css            Diagnostic-harness presentation only.
 ```
 
-SPATIAL1 adds development-only folder-key and normalized X/Y controls with
-Apply, Reset folder, and Reset all actions. SPATIAL1B also exposes the
-production session's exact-folder drag mode through Arrange Folders; it is a
-thin synthetic QA trigger, not a duplicate gesture implementation. The evidence panel reports the
-automatic frame, automatic folder center, normalized target, displayed rigid
-translation, and automatic layout-request count. Anchor edits compose from the
-retained automatic positions and therefore leave that request count unchanged.
+SPATIAL2A adds development-only behavior, exact/subtree scope, direct-root-file,
+excluded-subtree, target, and strength controls over a generic nested fixture.
+SPATIAL1B's production exact-folder drag remains exposed through Arrange
+Folders as a thin QA trigger, not a duplicate gesture implementation. The
+evidence panel reports rule activity, base/dynamic/fixed geometry, resolved
+membership, target error, affected/unaffected movement, separate base/pull
+request counts, dynamic cache hits, and fixed-composition counts.
 All fixtures and output use generic synthetic folder keys. Production product
-chrome remains in `GlobalGraphCanvas` and Network Explorer.
+chrome remains `place + exact` only in `GlobalGraphCanvas` and Network Explorer.
 
 The harness is intentionally separate from product orchestration. It may expose
 edge-event toggles, destroy/recreate, and stress profiles for evidence, but it
