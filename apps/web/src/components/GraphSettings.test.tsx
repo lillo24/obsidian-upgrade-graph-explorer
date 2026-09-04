@@ -78,7 +78,15 @@ describe('Graph Settings presentation', () => {
     expect(markup).toContain('id="all-density-framing-strength"');
     expect(markup).toContain('>Focus Network Density<');
     expect(markup).toContain('id="focus-density-framing-strength"');
-    expect(markup).toContain('>Legacy</span><span>Auto</span>');
+    expect(markup).toContain(
+      '>Legacy</span><span>Auto</span><span>Stronger</span>',
+    );
+    expect(markup).toContain(
+      'id="all-density-framing-strength" max="150" min="0"',
+    );
+    expect(markup).toContain(
+      'id="focus-density-framing-strength" max="150" min="0"',
+    );
     expect(markup).toContain(
       'Camera-only framing for Scope = Focus, Layout = Network.',
     );

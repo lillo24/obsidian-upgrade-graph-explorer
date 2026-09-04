@@ -1,6 +1,6 @@
 # Sigma Global/Regional and Local Free Renderer
 
-Status: **QA — Global, Local Free, and separate All/Focus SPACING1B density framing are test-backed; native acceptance remains pending.**
+Status: **QA — atomic All/Focus camera commits and 0–150% density framing are test-backed; native acceptance remains pending.**
 
 This package owns the lazy, direct Sigma 3 renderers for file-level
 Global/Regional exploration and bounded Local Free exploration. Both consume a
@@ -42,7 +42,8 @@ src/
   file-move.ts             Pure File gesture reducer and frame-coalesced coordinator.
   node-size.ts             Per-File multiplier composition and final display-only bounds.
   node-size-presentation.ts  Sparse override diff and topology-owned File-to-node key index.
-  graph.ts                 Graphology construction, neighborhood index, and reconciliation.
+  graph.ts                 Graphology construction, neighborhood index, and planned reconciliation.
+  anchored-refresh.ts      Pre-mutation Sigma process/render camera transaction.
   interaction-contract.ts  Operation-count oracle for camera/UI versus layout-triggering work.
   layout.ts                Worker-safe ForceAtlas2, folder-prior candidates, metrics, fingerprint.
   layout-cache.ts          Four-entry memory-only LRU of automatic derived positions.
@@ -65,7 +66,7 @@ src/
   local-density.ts         Pure Sigma-faithful B4 policy for accepted-layout camera Fit.
   local-layout.ts          DOM-free Local ForceAtlas2 request/result and fingerprint.
   local-layout-cache.ts    Bounded memory-only exact Local position cache.
-  local-lifecycle.ts       Idempotent lease and pre-draw anchored refresh boundary.
+  local-lifecycle.ts       Idempotent Local renderer mount/session lease.
   local-session.ts         Local Sigma ownership, precision input, anchors, and viewport.
   local-interaction-contract.ts  Local operation-count oracle and Global-isolation proof.
   LocalGraphCanvas.tsx     Immediate seed mount and latest worker refinement boundary.
@@ -380,10 +381,13 @@ normalized to graph origin. A transient Global viewport point may place that
 root on entry; refinement captures and restores the root's screen position.
 Missing capture falls back to semantic centering. Exact cached positions and
 the saved semantic viewport are installed during the imperative mount, before
-the first visible draw. A topology or position reconciliation restores the
-selected node, or otherwise the Local root, during Sigma's `afterProcess`
-phase so the renderer cannot expose one frame with new normalization and an
-old camera.
+the first visible draw. A topology or position reconciliation arms its camera
+transaction before the first Graphology mutation. The first resulting Sigma
+`afterProcess` restores the selected node, or otherwise the Local root, before
+the changed graph can draw, so no stale-normalization frame is exposed. If a
+layout worker answers before that topology frame completes, coordinate adoption
+waits for the anchored topology render before capturing its own anchor; the two
+normalization changes cannot collapse into one stale-display-data transaction.
 
 Hierarchy edges are stronger than references and remain visually distinct.
 NETWORKPOLISH1 removes Local's far-reference hide rule without changing the
@@ -409,11 +413,13 @@ and returns ownership to automatic framing. Resize never recomputes or reapplies
 the policy. Automatic node sizes are the only radius input: VISUAL1B display
 multipliers and Visual Groups cannot change density, camera, layout, or cache.
 
-SPACING1B-QA adds a transient 0–100% camera-policy strength. The effective ratio
+SPACING1B-QA adds a transient 0–150% camera-policy strength. The effective ratio
 is `1 + (densityDecision - 1) * strength / 100`, so 0% reproduces the legacy
-ratio-1 Fit and 100% preserves SPACING1B. Changing strength always previews the
-new ratio around the current selected-node/root screen anchor, even when the
-camera was already user-owned, and makes the resulting camera user-owned.
+ratio-1 Fit and 100% preserves SPACING1B. Values from 101–150% are explicitly
+Sandbox-only amplification of the correction away from ratio 1, not production
+automatic behavior. Changing strength always previews the new ratio around the
+current selected-node/root screen anchor, even when the camera was already
+user-owned, and makes the resulting camera user-owned.
 Later topology or layout completion therefore cannot override the preview;
 Fit recenters with the selected strength and returns to automatic ownership.
 The value never enters ForceAtlas2
@@ -444,8 +450,15 @@ anchor and camera ratio. Live arrangement preview changes only displayed
 positions; confirmation updates the stored density decision without reframing.
 All Fit recenters, resets the angle, applies the current effective All ratio,
 and returns ownership to automatic. All and Focus have independent transient
-0–100% strengths, both defaulting to 100%; neither enters layout input, cache,
+0–150% strengths, both defaulting to 100%; neither enters layout input, cache,
 fingerprint, presentation override, query, workspace state, or persistence.
+Confirmed topology and coordinate changes use Graphology-triggered Sigma
+refresh as the single authoritative process request. Their matching
+`afterProcess` and `afterRender` callbacks are armed before mutation. Global
+query anchoring prefers a surviving selected node, then an explicit
+semantic/history anchor, then the nearest viewport-center survivor with stable
+key tie-breaking. A fully replaced or empty scene is centered deterministically
+without inventing a relationship to a removed node.
 Local has no folder prior or fake edges. Exact cache fingerprints include the
 root, stable topology, semantic node/edge roles, weights, iterations, and Local
 settings while excluding seed coordinates, labels, hover, selection, camera,

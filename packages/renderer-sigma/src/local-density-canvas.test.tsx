@@ -10,6 +10,7 @@ vi.mock('sigma', async () => ({
 
 import { CanvasTestHarness } from './canvas-test-harness';
 import { resolveLocalDensityFit } from './local-density';
+import { localDensityFramingRatio } from './local-density-framing';
 import { LocalGraphCanvas } from './LocalGraphCanvas';
 import { LocalLayoutCache } from './local-layout-cache';
 import {
@@ -134,6 +135,14 @@ it('installs an exact cache-hit density frame before first render without a work
     cameraRatio: expected.ratio,
     fallback: false,
   });
+  expect(rootViewportPoint().x).toBeCloseTo(anchor.x);
+  expect(rootViewportPoint().y).toBeCloseTo(anchor.y);
+  densityFramingStrength = 150;
+  harness.invalidate();
+  await harness.flush();
+  expect(SigmaTestRenderer.instances[0]!.camera.ratio).toBeCloseTo(
+    localDensityFramingRatio(expected.ratio, 150),
+  );
   expect(rootViewportPoint().x).toBeCloseTo(anchor.x);
   expect(rootViewportPoint().y).toBeCloseTo(anchor.y);
   expect(layout).not.toHaveBeenCalled();

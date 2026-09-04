@@ -12,6 +12,12 @@ export type LocalGraph = MultiDirectedGraph<
   LocalEdgeAttributes
 >;
 
+export interface LocalGraphReconciliationPlan {
+  readonly reconciliation: LocalGraphReconciliation;
+  readonly changed: boolean;
+  readonly apply: () => void;
+}
+
 export function buildLocalGraph(input: LocalRendererInput): LocalGraph {
   const graph = new MultiDirectedGraph<
     LocalNodeAttributes,
@@ -59,38 +65,37 @@ function sameEdge(
   );
 }
 
-export function reconcileLocalGraph(
+export function planLocalGraphReconciliation(
   graph: LocalGraph,
   input: LocalRendererInput,
-): LocalGraphReconciliation {
+): LocalGraphReconciliationPlan {
   const nextNodes = new Map(input.nodes.map((node) => [node.key, node]));
   const nextEdges = new Map(input.edges.map((edge) => [edge.key, edge]));
-  let nodesAdded = 0;
-  let nodesUpdated = 0;
-  let nodesRemoved = 0;
-  let edgesAdded = 0;
-  let edgesUpdated = 0;
-  let edgesRemoved = 0;
+  const edgeKeysToRemove = graph.edges().filter((key) => !nextEdges.has(key));
+  const nodesToAdd: LocalRendererInput['nodes'][number][] = [];
+  const nodesToUpdate: {
+    readonly key: string;
+    readonly attributes: LocalNodeAttributes;
+  }[] = [];
+  const edgesToAdd: LocalRendererInput['edges'][number][] = [];
+  const edgesToUpdate: {
+    readonly key: string;
+    readonly attributes: LocalEdgeAttributes;
+  }[] = [];
+  const replacementEdgeKeys = new Set<string>();
+  const nodeKeysToRemove = graph.nodes().filter((key) => !nextNodes.has(key));
 
-  graph.forEachEdge((key) => {
-    if (nextEdges.has(key)) return;
-    graph.dropEdge(key);
-    edgesRemoved += 1;
-  });
   for (const node of input.nodes) {
     if (!graph.hasNode(node.key)) {
-      graph.addNode(node.key, node.attributes);
-      nodesAdded += 1;
+      nodesToAdd.push(node);
       continue;
     }
     const previous = graph.getNodeAttributes(node.key);
     if (sameNode(previous, node.attributes)) continue;
-    graph.replaceNodeAttributes(node.key, {
-      ...node.attributes,
-      x: previous.x,
-      y: previous.y,
+    nodesToUpdate.push({
+      key: node.key,
+      attributes: { ...node.attributes, x: previous.x, y: previous.y },
     });
-    nodesUpdated += 1;
   }
   for (const edge of input.edges) {
     if (
@@ -99,36 +104,61 @@ export function reconcileLocalGraph(
       graph.target(edge.key) === edge.target
     ) {
       if (!sameEdge(graph.getEdgeAttributes(edge.key), edge.attributes)) {
-        graph.replaceEdgeAttributes(edge.key, edge.attributes);
-        edgesUpdated += 1;
+        edgesToUpdate.push({ key: edge.key, attributes: edge.attributes });
       }
       continue;
     }
     if (graph.hasEdge(edge.key)) {
-      graph.dropEdge(edge.key);
-      edgesRemoved += 1;
+      replacementEdgeKeys.add(edge.key);
     }
-    graph.addDirectedEdgeWithKey(
-      edge.key,
-      edge.source,
-      edge.target,
-      edge.attributes,
-    );
-    edgesAdded += 1;
+    edgesToAdd.push(edge);
   }
-  graph.forEachNode((key) => {
-    if (nextNodes.has(key)) return;
-    graph.dropNode(key);
-    nodesRemoved += 1;
-  });
-  return {
-    nodesAdded,
-    nodesUpdated,
-    nodesRemoved,
-    edgesAdded,
-    edgesUpdated,
-    edgesRemoved,
+
+  const reconciliation: LocalGraphReconciliation = {
+    nodesAdded: nodesToAdd.length,
+    nodesUpdated: nodesToUpdate.length,
+    nodesRemoved: nodeKeysToRemove.length,
+    edgesAdded: edgesToAdd.length,
+    edgesUpdated: edgesToUpdate.length,
+    edgesRemoved: edgeKeysToRemove.length + replacementEdgeKeys.size,
   };
+  const changed = Object.values(reconciliation).some((count) => count > 0);
+
+  return {
+    reconciliation,
+    changed,
+    apply: () => {
+      for (const key of edgeKeysToRemove) graph.dropEdge(key);
+      for (const { key } of edgesToAdd) {
+        if (replacementEdgeKeys.has(key)) graph.dropEdge(key);
+      }
+      for (const node of nodesToAdd) graph.addNode(node.key, node.attributes);
+      for (const node of nodesToUpdate) {
+        graph.replaceNodeAttributes(node.key, node.attributes);
+      }
+      for (const edge of edgesToAdd) {
+        graph.addDirectedEdgeWithKey(
+          edge.key,
+          edge.source,
+          edge.target,
+          edge.attributes,
+        );
+      }
+      for (const edge of edgesToUpdate) {
+        graph.replaceEdgeAttributes(edge.key, edge.attributes);
+      }
+      for (const key of nodeKeysToRemove) graph.dropNode(key);
+    },
+  };
+}
+
+export function reconcileLocalGraph(
+  graph: LocalGraph,
+  input: LocalRendererInput,
+): LocalGraphReconciliation {
+  const plan = planLocalGraphReconciliation(graph, input);
+  plan.apply();
+  return plan.reconciliation;
 }
 
 export function createLocalNeighborhoodIndex(

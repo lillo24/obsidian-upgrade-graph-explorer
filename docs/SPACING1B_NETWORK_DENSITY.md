@@ -1,12 +1,12 @@
 # SPACING1B Network density framing
 
-Status: **NATIVE QA PENDING — production All and Focus camera policies, diagnostics, and automated gates are complete on draft PR #60.**
+Status: **NATIVE QA PENDING — atomic All/Focus camera commits, diagnostics, and automated gates are complete on draft PR #60.**
 
 SPACING1B corrects Network occupancy at the camera layer. It does not change
 canonical topology, projection, Global or Local ForceAtlas2, dynamic Pull,
 fixed folder placement, presentation settings, layout identity, position
 caches, or persistence. All and Focus use separate policies and separate
-page-lifetime 0–100% Sandbox strengths because All is rootless and can have no
+page-lifetime 0–150% Sandbox strengths because All is rootless and can have no
 edges, while Focus has a semantic root and a bounded neighborhood.
 
 ## Installed All pipeline
@@ -77,7 +77,9 @@ Each renderer owns an independent transient strength that defaults to 100%:
 effectiveRatio = 1 + (rawDecisionRatio - 1) × strength / 100
 ```
 
-At 0%, Fit reproduces legacy ratio 1; at 100%, it uses that scope's decision.
+At 0%, Fit reproduces legacy ratio 1; at 100%, it uses that scope's automatic
+decision. Values from 101–150% are Sandbox-only amplification of the correction
+away from ratio 1; they do not redefine the production automatic policy.
 Changing the mounted scope's slider immediately applies the ratio around the
 current semantic/visual anchor and makes the camera user-owned, without layout,
 Pull, or persistence work. Changing the unmounted scope stores only its
@@ -89,6 +91,26 @@ viewports, folder arrangement, and slider preview are user-owned. Later query,
 topology, worker, Pull, or fixed-position completion updates the decision but
 does not replace a user-owned camera. Fit recenters, resets angle, applies the
 current effective ratio, and returns to automatic ownership.
+
+## Atomic mutation and camera order
+
+Sigma 3.0.3 listens to Graphology node, edge, and bulk-attribute events and
+calls `refresh({ schedule: true })`. Those mutation-triggered requests are the
+authoritative process/render boundary for confirmed topology and full-position
+commits; the application does not add a second explicit refresh. Before the
+first mutation, each Network session registers the matching `afterProcess`
+camera repair and `afterRender` completion. Sigma therefore computes the new
+normalization, repairs the semantic anchor and ratio, and only then draws the
+first visible changed-graph frame.
+
+All query anchoring prefers a selected survivor, then an explicitly known
+semantic/history survivor, then the nearest viewport-center survivor with a
+stable key tie-break. When no old node survives (including an empty result), the
+new scene is centered at the existing camera ratio without inventing a semantic
+relationship. Focus retains its selected-node, otherwise root, policy. Dynamic
+Pull, fixed placement, folder clustering, reference pull, folder separation,
+and accepted worker layouts all inherit the same full-position transaction;
+sparse pointer preview remains its existing single explicit partial refresh.
 
 ## Synthetic matrix and performance
 

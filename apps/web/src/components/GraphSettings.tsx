@@ -496,7 +496,7 @@ export const GraphSettings = memo(function GraphSettings({
                     <input
                       aria-valuetext={`${allNetworkDensityFramingStrength} percent`}
                       id="all-density-framing-strength"
-                      max="100"
+                      max="150"
                       min="0"
                       onChange={(event) =>
                         onAllNetworkDensityFramingStrengthChange(
@@ -510,6 +510,7 @@ export const GraphSettings = memo(function GraphSettings({
                     <small>
                       <span>Legacy</span>
                       <span>Auto</span>
+                      <span>Stronger</span>
                     </small>
                   </label>
                   <p className="global-layout-scope-note">
@@ -535,7 +536,7 @@ export const GraphSettings = memo(function GraphSettings({
                     <input
                       aria-valuetext={`${focusNetworkDensityFramingStrength} percent`}
                       id="focus-density-framing-strength"
-                      max="100"
+                      max="150"
                       min="0"
                       onChange={(event) =>
                         onFocusNetworkDensityFramingStrengthChange(
@@ -549,6 +550,7 @@ export const GraphSettings = memo(function GraphSettings({
                     <small>
                       <span>Legacy</span>
                       <span>Auto</span>
+                      <span>Stronger</span>
                     </small>
                   </label>
                   <p className="global-layout-scope-note">

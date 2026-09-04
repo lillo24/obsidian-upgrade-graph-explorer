@@ -683,8 +683,9 @@ adoption, and Local imports the shared stylesheet at its own lazy boundary.
 Follow-up QA found another one-frame ordering defect: hop changes and
 Global↔Local history could expose Sigma's new graph normalization with the old
 camera before a post-render anchor or Fit returned it. Exact cached positions
-and semantic viewports now warm the first draw, reconciliation restores its
-anchor in `afterProcess`, Local hop/direction changes do not auto-fit, and
+and semantic viewports now warm the first draw, reconciliation arms its anchor
+repair before Graphology mutation and applies it in `afterProcess`, Local
+hop/direction changes do not auto-fit, and
 one-shot transition/Fit intents are cleared after consumption. The repeated
 production run kept the graph visible without Fit and emitted no console
 warning or error.
@@ -927,3 +928,28 @@ query-reduced scenes. Density-strength changes produced zero automatic layout
 requests, zero dynamic Pull requests, and zero spatial persistence writes. All
 and Focus strength interpolation is constant-time over the last accepted
 decision; live preview moves only the camera around a stable semantic anchor.
+
+## FLICKER1 atomic Network frame evidence
+
+Sigma 3.0.3 automatically schedules refresh from node/edge add, drop, and
+attribute events, including `updateEachNodeAttributes`. FLICKER1 makes that
+Graphology-triggered request authoritative: the All/Focus camera correction and
+completion callbacks are registered before the mutation, and the former
+explicit `scheduleRefresh()` is removed. Multiple reconciliation mutations are
+planned first and still coalesce into Sigma's single next-frame process/render.
+An early layout-worker result waits for a pending anchored topology render before
+capturing its coordinate-change anchor, preventing stale Sigma display data from
+bridging the two transactions. No timer, animation, fade, extra layout, or cache
+was added.
+
+The deterministic Sigma-frame harness normalizes old and changed coordinates in
+an 800×600 viewport. Its former uncorrected control displaces the semantic node
+by more than 50 px on the first changed frame; the production transaction keeps
+the first and settled frame error below `1e-8` px. It covers Global and Local
+topology/position commits, selected and explicit-history survivors, nearest
+survivor fallback, fully replaced/empty scenes, and automatic density ratio on
+the first confirmed-position frame. One accepted coordinate commit produces
+one process/render in the harness. Density preview remains camera-only over
+0/50/100/125/150%, with 100% as Auto and 101–150% as transient Sandbox-only
+amplification; it creates no ForceAtlas2, dynamic Pull, spatial write, topology,
+fingerprint, or cache work.

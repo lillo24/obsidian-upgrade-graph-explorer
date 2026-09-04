@@ -201,6 +201,16 @@ describe('Focus density camera ownership', () => {
     });
     expect(session.nodeViewportPoint('root')!.x).toBeCloseTo(anchor.x);
     expect(session.nodeViewportPoint('root')!.y).toBeCloseTo(anchor.y);
+    session.updateDensityFramingStrength(125);
+    expect(renderer.camera.ratio).toBeCloseTo(
+      localDensityFramingRatio(decision, 125),
+    );
+    session.updateDensityFramingStrength(150);
+    expect(renderer.camera.ratio).toBeCloseTo(
+      localDensityFramingRatio(decision, 150),
+    );
+    expect(session.nodeViewportPoint('root')!.x).toBeCloseTo(anchor.x);
+    expect(session.nodeViewportPoint('root')!.y).toBeCloseTo(anchor.y);
     const cameraUpdated = renderer.camera.on.mock.calls.find(
       ([event]) => event === 'updated',
     )?.[1] as (() => void) | undefined;
@@ -209,7 +219,7 @@ describe('Focus density camera ownership', () => {
     cameraUpdated?.();
     expect(onDensityQaDiagnosticsChange).toHaveBeenLastCalledWith({
       rawDecisionRatio: decision,
-      effectiveRatio: decision,
+      effectiveRatio: localDensityFramingRatio(decision, 150),
       cameraRatio: 0.93,
       fallback: false,
     });

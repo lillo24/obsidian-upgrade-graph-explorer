@@ -28,11 +28,13 @@ import {
   type TemporaryFileMoveSessionContext,
 } from './file-move';
 import type { TemporaryNodeConstraintEndReason } from './temporary-node-constraint';
+import { atomicAnchoredGraphMutation } from './anchored-refresh';
 
 import {
   buildGlobalGraph,
   createGlobalNeighborhoodIndex,
   createGlobalReferenceDegreeIndex,
+  planGlobalGraphReconciliation,
   reconcileGlobalGraph,
   type GlobalGraph,
 } from './graph';
@@ -165,6 +167,7 @@ export class GlobalRendererSession {
   private neighborhoods: ReadonlyMap<string, ReadonlySet<string>>;
   private hoveredNode: string | undefined;
   private selectedNode: string | undefined;
+  private semanticAnchorNodeKey: string | undefined;
   private settings;
   private visualSettings: ResolvedGlobalVisualSettings;
   private trackpadZoomMode: GlobalTrackpadZoomMode;
@@ -370,6 +373,7 @@ export class GlobalRendererSession {
           attributes.entityId === options.initialViewport?.anchorEntityId,
       );
       if (initialNode !== undefined) {
+        this.semanticAnchorNodeKey = initialNode.key;
         this.centerImmediately(initialNode.key, options.initialViewport.ratio);
       }
     }
@@ -1110,15 +1114,45 @@ export class GlobalRendererSession {
     this.cancelFolderArrangementGesture();
     this.cancelTemporaryFileMove('topology-changed');
     this.nodeClicks?.cancel();
-    const anchorKey =
-      this.cameraOwnership === 'user'
-        ? this.viewportAnchorNodeKey()
-        : undefined;
+    const incomingNodeKeys = new Set(input.nodes.map(({ key }) => key));
+    const anchorKey = this.viewportAnchorNodeKey(incomingNodeKeys);
     const anchor =
       anchorKey === undefined ? undefined : this.nodeViewportPoint(anchorKey);
-    const ratio =
-      anchorKey === undefined ? undefined : this.renderer.getCamera().ratio;
-    const run = () => reconcileGlobalGraph(this.graph, input);
+    const ratio = this.renderer.getCamera().ratio;
+    let refresh: Promise<void> | undefined;
+    const run = () => {
+      const plan = planGlobalGraphReconciliation(this.graph, input);
+      if (!plan.changed) return plan.reconciliation;
+      const transaction = atomicAnchoredGraphMutation(
+        {
+          onAfterProcess: (callback) =>
+            this.renderer.on('afterProcess', callback),
+          offAfterProcess: (callback) =>
+            this.renderer.off('afterProcess', callback),
+          onAfterRender: (callback) =>
+            this.renderer.on('afterRender', callback),
+          offAfterRender: (callback) =>
+            this.renderer.off('afterRender', callback),
+        },
+        () => {
+          if (
+            anchorKey !== undefined &&
+            anchor !== undefined &&
+            this.graph.hasNode(anchorKey)
+          ) {
+            this.anchorNodeAtViewport(anchorKey, anchor, ratio);
+            return;
+          }
+          this.centerReplacedScene(ratio);
+        },
+        () => {
+          plan.apply();
+          return plan.reconciliation;
+        },
+      );
+      refresh = transaction.rendered;
+      return transaction.result;
+    };
     const reconciliation =
       this.options.instrumentation === undefined
         ? run()
@@ -1138,34 +1172,19 @@ export class GlobalRendererSession {
       this.selectedNode = undefined;
       this.options.onNodeSelected?.(undefined, undefined);
     }
-    const changed = Object.values(reconciliation).some((count) => count > 0);
-    if (changed) {
-      const refresh = new Promise<void>((resolve) => {
-        if (
-          anchorKey !== undefined &&
-          anchor !== undefined &&
-          ratio !== undefined
-        ) {
-          this.renderer.once('afterProcess', () => {
-            if (
-              this.cameraOwnership === 'user' &&
-              this.graph.hasNode(anchorKey)
-            ) {
-              this.anchorNodeAtViewport(anchorKey, anchor, ratio);
-            }
-          });
-        }
-        this.renderer.once('afterRender', () => resolve());
-        this.renderer.scheduleRefresh();
-      });
+    if (
+      this.semanticAnchorNodeKey !== undefined &&
+      !this.graph.hasNode(this.semanticAnchorNodeKey)
+    ) {
+      this.semanticAnchorNodeKey = undefined;
+    }
+    if (refresh !== undefined) {
       this.topologyRefreshPending = refresh;
       void refresh.then(() => {
         if (this.topologyRefreshPending !== refresh) return;
         this.topologyRefreshPending = undefined;
         this.refreshPendingStyles();
       });
-    } else {
-      this.renderer.scheduleRefresh();
     }
     return reconciliation;
   }
@@ -1397,14 +1416,21 @@ export class GlobalRendererSession {
   }
 
   applyPositions(positions: readonly GlobalLayoutPosition[]): Promise<void> {
+    const topologyRefresh = this.topologyRefreshPending;
+    if (topologyRefresh !== undefined) {
+      // A layout worker can answer before Sigma has processed the topology that
+      // requested it. Wait for that anchored frame so display data from the new
+      // scene exists before capturing the second, position-change anchor.
+      return topologyRefresh.then(() => this.applyPositions(positions));
+    }
     this.cancelTemporaryFileMove('layout-changed');
     const anchorKey = this.viewportAnchorNodeKey();
     const anchor =
       anchorKey === undefined ? undefined : this.nodeViewportPoint(anchorKey);
+    const byKey = new Map(
+      positions.map((position) => [position.key, position]),
+    );
     try {
-      const byKey = new Map(
-        positions.map((position) => [position.key, position]),
-      );
       if (
         byKey.size !== positions.length ||
         positions.length !== this.graph.order
@@ -1413,47 +1439,47 @@ export class GlobalRendererSession {
           'Global layout result must match every displayed node exactly.',
         );
       }
-      let changed = false;
-      this.graph.updateEachNodeAttributes(
-        (key, attributes) => {
-          const position = byKey.get(key);
-          if (position === undefined) {
-            throw new Error(`Global layout result omitted node ${key}.`);
-          }
-          if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
-            throw new Error(
-              `Global layout result has invalid position for node ${key}.`,
-            );
-          }
-          if (attributes.x === position.x && attributes.y === position.y) {
-            return attributes;
-          }
-          changed = true;
-          return { ...attributes, x: position.x, y: position.y };
-        },
-        { attributes: ['x', 'y'] },
-      );
-      this.measureDensity(positions);
-      if (!changed) {
-        if (this.cameraOwnership === 'auto') {
-          this.renderer.getCamera().setState({
-            x: 0.5,
-            y: 0.5,
-            angle: 0,
-            ratio: this.effectiveDensityRatio(),
-          });
-          this.emitDensityQaDiagnostics();
+      for (const [key, position] of byKey) {
+        if (!this.graph.hasNode(key)) {
+          throw new Error(`Global layout result contains unknown node ${key}.`);
         }
-        return Promise.resolve();
+        if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+          throw new Error(
+            `Global layout result has invalid position for node ${key}.`,
+          );
+        }
       }
     } catch (error: unknown) {
       return Promise.reject(
         error instanceof Error ? error : new Error(String(error)),
       );
     }
+    const changed = positions.some((position) => {
+      const attributes = this.graph.getNodeAttributes(position.key);
+      return attributes.x !== position.x || attributes.y !== position.y;
+    });
+    this.measureDensity(positions);
+    if (!changed) {
+      const camera = this.renderer.getCamera();
+      const densityRatio = this.effectiveDensityRatio();
+      if (this.cameraOwnership === 'auto' && camera.ratio !== densityRatio) {
+        camera.setState({ ratio: densityRatio });
+        this.emitDensityQaDiagnostics();
+      }
+      return Promise.resolve();
+    }
     const userRatio = this.renderer.getCamera().ratio;
-    return new Promise((resolve) => {
-      this.renderer.once('afterProcess', () => {
+    return atomicAnchoredGraphMutation(
+      {
+        onAfterProcess: (callback) =>
+          this.renderer.on('afterProcess', callback),
+        offAfterProcess: (callback) =>
+          this.renderer.off('afterProcess', callback),
+        onAfterRender: (callback) => this.renderer.on('afterRender', callback),
+        offAfterRender: (callback) =>
+          this.renderer.off('afterRender', callback),
+      },
+      () => {
         if (
           this.cameraOwnership === 'user' &&
           anchorKey !== undefined &&
@@ -1469,10 +1495,18 @@ export class GlobalRendererSession {
           });
         }
         this.emitDensityQaDiagnostics();
-      });
-      this.renderer.once('afterRender', () => resolve());
-      this.renderer.scheduleRefresh();
-    });
+      },
+      () =>
+        this.graph.updateEachNodeAttributes(
+          (key, attributes) => {
+            const position = byKey.get(key)!;
+            return attributes.x === position.x && attributes.y === position.y
+              ? attributes
+              : { ...attributes, x: position.x, y: position.y };
+          },
+          { attributes: ['x', 'y'] },
+        ),
+    ).rendered;
   }
 
   /**
@@ -1526,28 +1560,43 @@ export class GlobalRendererSession {
     });
   }
 
-  private viewportAnchorNodeKey(): string | undefined {
-    if (
-      this.selectedNode !== undefined &&
-      this.graph.hasNode(this.selectedNode)
-    ) {
+  private viewportAnchorNodeKey(
+    candidates?: ReadonlySet<string>,
+  ): string | undefined {
+    const survives = (key: string | undefined): key is string =>
+      key !== undefined &&
+      this.graph.hasNode(key) &&
+      (candidates === undefined || candidates.has(key));
+    if (survives(this.selectedNode)) {
       return this.selectedNode;
     }
+    if (survives(this.semanticAnchorNodeKey)) return this.semanticAnchorNodeKey;
     const dimensions = this.renderer.getDimensions();
-    const center = this.renderer.viewportToGraph({
+    const center = {
       x: dimensions.width / 2,
       y: dimensions.height / 2,
-    });
+    };
     let nearest:
       { readonly key: string; readonly distanceSquared: number } | undefined;
-    this.graph.forEachNode((key, attributes) => {
+    this.graph.forEachNode((key) => {
+      if (!survives(key)) return;
+      const point = this.nodeViewportPoint(key);
+      if (point === undefined) return;
       const distanceSquared =
-        (attributes.x - center.x) ** 2 + (attributes.y - center.y) ** 2;
-      if (nearest === undefined || distanceSquared < nearest.distanceSquared) {
+        (point.x - center.x) ** 2 + (point.y - center.y) ** 2;
+      if (
+        nearest === undefined ||
+        distanceSquared < nearest.distanceSquared ||
+        (distanceSquared === nearest.distanceSquared && key < nearest.key)
+      ) {
         nearest = { key, distanceSquared };
       }
     });
     return nearest?.key;
+  }
+
+  private centerReplacedScene(ratio: number): void {
+    this.renderer.getCamera().setState({ x: 0.5, y: 0.5, angle: 0, ratio });
   }
 
   private anchorNodeAtViewport(
@@ -1576,6 +1625,7 @@ export class GlobalRendererSession {
       throw new Error(`Cannot center missing Global node ${request.nodeId}.`);
     }
     this.cameraOwnership = 'user';
+    this.semanticAnchorNodeKey = request.nodeId;
     const started = performance.now();
     await this.renderer
       .getCamera()
@@ -1611,6 +1661,7 @@ export class GlobalRendererSession {
 
   fit(): void {
     this.cameraOwnership = 'auto';
+    this.semanticAnchorNodeKey = undefined;
     void this.renderer.getCamera().animate(
       {
         x: 0.5,

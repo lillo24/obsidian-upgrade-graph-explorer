@@ -10,6 +10,7 @@ vi.mock('sigma', async () => ({
 
 import { CanvasTestHarness } from './canvas-test-harness';
 import { resolveGlobalDensityFit } from './global-density';
+import { globalDensityFramingRatio } from './global-density-framing';
 import { GlobalGraphCanvas } from './GlobalGraphCanvas';
 import { GlobalLayoutCache } from './layout-cache';
 import { createGlobalLayoutRequest, globalLayoutFingerprint } from './layout';
@@ -117,6 +118,12 @@ it('previews cached All density without ForceAtlas2 or spatial Pull work', async
   harness.invalidate();
   await harness.flush();
   expect(SigmaTestRenderer.instances[0]!.camera.ratio).toBe(expected.ratio);
+  densityFramingStrength = 150;
+  harness.invalidate();
+  await harness.flush();
+  expect(SigmaTestRenderer.instances[0]!.camera.ratio).toBeCloseTo(
+    globalDensityFramingRatio(expected.ratio, 150),
+  );
   expect(counts.get('global-density-evaluations')).toBe(densityEvaluations);
   expect(counts.get('global-layouts')).toBeUndefined();
   expect(counts.get('spatial-pull-requests')).toBeUndefined();

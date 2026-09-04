@@ -16,10 +16,10 @@ export function localDensityFramingRatio(
   if (
     !Number.isFinite(strengthPercentage) ||
     strengthPercentage < 0 ||
-    strengthPercentage > 100
+    strengthPercentage > 150
   ) {
     throw new Error(
-      'Focus density framing strength must be a finite percentage from 0 to 100.',
+      'Focus density framing strength must be a finite percentage from 0 to 150.',
     );
   }
   return 1 + (densityDecisionRatio - 1) * (strengthPercentage / 100);

@@ -99,7 +99,7 @@ afterEach(() => {
 });
 
 describe('All Network density camera ownership', () => {
-  it('adopts confirmed geometry, previews 0/50/100 live, and emits diagnostics', () => {
+  it('adopts confirmed geometry, previews 0/50/100/125/150 live, and emits diagnostics', () => {
     const onDensityQaDiagnosticsChange = vi.fn();
     const counts = new Map<string, number>();
     const instrumentation: GlobalRendererInstrumentation = {
@@ -148,6 +148,14 @@ describe('All Network density camera ownership', () => {
     );
     session.updateDensityFramingStrength(100);
     expect(renderer.camera.ratio).toBe(decision.ratio);
+    session.updateDensityFramingStrength(125);
+    expect(renderer.camera.ratio).toBeCloseTo(
+      globalDensityFramingRatio(decision.ratio, 125),
+    );
+    session.updateDensityFramingStrength(150);
+    expect(renderer.camera.ratio).toBeCloseTo(
+      globalDensityFramingRatio(decision.ratio, 150),
+    );
     expect(counts.get('global-density-evaluations')).toBe(1);
     expect(counts.get('global-layouts')).toBeUndefined();
     expect(counts.get('spatial-pull-requests')).toBeUndefined();
