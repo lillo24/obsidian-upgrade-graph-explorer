@@ -13,6 +13,10 @@ import {
   reconcileLocalGraph,
   type LocalGraph,
 } from './local-graph';
+import {
+  resolveLocalDensityFit,
+  type LocalDensityDecision,
+} from './local-density';
 import { createLocalLayoutRequest } from './local-layout';
 import {
   NodeClickArbitrator,
@@ -51,6 +55,7 @@ export interface LocalRendererSessionOptions {
   readonly initialViewport?: SemanticLocalViewport;
   readonly initialViewportPoint?: LocalViewportPoint;
   readonly initialViewportNodeKey?: string;
+  readonly initialAcceptedPositions?: readonly LocalLayoutPosition[];
   readonly instrumentation?: LocalRendererInstrumentation;
   readonly visualGroupStyles?: VisualGroupPresentationMap;
   readonly presentationOverrides?: EntityPresentationOverrideMap;
@@ -84,6 +89,16 @@ export class LocalRendererSession {
     Parameters<typeof resolveLocalEdgeStyle>[0]
   >;
   private rootNodeKey: string;
+  private densityInput: LocalRendererInput;
+  private cameraOwnership: 'auto' | 'user';
+  private latestDensityDecision: LocalDensityDecision = {
+    ratio: 1,
+    connectedEdgeSignal: 1,
+    nearestNeighborSignal: 1,
+    rootRadiusSignal: 1,
+    fallback: true,
+    fallbackReason: 'No accepted Local layout has been measured yet.',
+  };
   private neighborhoods: ReadonlyMap<string, ReadonlySet<string>>;
   private hoveredNode: string | undefined;
   private selectedNode: string | undefined;
@@ -102,6 +117,16 @@ export class LocalRendererSession {
   private destroyed = false;
   private nodeClicks: NodeClickArbitrator | undefined;
   private readonly wheelDirection = new WheelDirectionStabilizer();
+
+  private readonly mouseDragHandler = (): void => {
+    if (this.renderer.getMouseCaptor().isMouseDown) {
+      this.cameraOwnership = 'user';
+    }
+  };
+
+  private readonly touchMoveHandler = (): void => {
+    this.cameraOwnership = 'user';
+  };
 
   private readonly cameraUpdatedHandler = (): void => {
     const started = performance.now();
@@ -134,6 +159,7 @@ export class LocalRendererSession {
       original,
       this.renderer.getDimensions().height,
     );
+    this.cameraOwnership = 'user';
     if (this.trackpadZoomMode === 'pinch-zoom' && !original.ctrlKey) {
       this.applyWheelPan(original);
       return;
@@ -170,6 +196,9 @@ export class LocalRendererSession {
   ) {
     this.options = options;
     this.rootNodeKey = options.rootNodeKey;
+    this.densityInput = input;
+    this.cameraOwnership =
+      options.initialViewport === undefined ? 'auto' : 'user';
     this.trackpadZoomMode = options.trackpadZoomMode;
     this.visualGroupStyles = options.visualGroupStyles;
     this.presentationOverrides = options.presentationOverrides;
@@ -194,6 +223,14 @@ export class LocalRendererSession {
       nodeReducer: (key, attributes) => this.reduceNode(key, attributes),
       edgeReducer: (key, attributes) => this.reduceEdge(key, attributes),
     });
+    if (options.initialAcceptedPositions !== undefined) {
+      this.measureDensity(options.initialAcceptedPositions);
+      if (this.cameraOwnership === 'auto') {
+        this.renderer.getCamera().setState({
+          ratio: this.latestDensityDecision.ratio,
+        });
+      }
+    }
     if (options.initialViewportPoint !== undefined) {
       this.anchorNodeAtViewport(
         options.initialViewportNodeKey ?? this.rootNodeKey,
@@ -215,6 +252,8 @@ export class LocalRendererSession {
     this.visualLod = resolveLocalVisualLod(this.renderer.getCamera().ratio);
     const mountMs = Number((performance.now() - mountStarted).toFixed(3));
     this.renderer.getMouseCaptor().on('wheel', this.precisionWheelHandler);
+    this.renderer.getMouseCaptor().on('mousemovebody', this.mouseDragHandler);
+    this.renderer.getTouchCaptor().on('touchmove', this.touchMoveHandler);
     this.renderer.getCamera().on('updated', this.cameraUpdatedHandler);
     this.bindEvents();
     const renderStarted = performance.now();
@@ -391,6 +430,7 @@ export class LocalRendererSession {
             run,
           );
     this.rootNodeKey = input.rootNodeKey;
+    this.densityInput = input;
     this.neighborhoods = createLocalNeighborhoodIndex(input);
     this.fileNodeKeys = indexFileNodeKeys(input.nodes);
     if (
@@ -473,10 +513,23 @@ export class LocalRendererSession {
     );
   }
 
+  private measureDensity(
+    positions: readonly LocalLayoutPosition[],
+  ): LocalDensityDecision {
+    const started = performance.now();
+    const decision = resolveLocalDensityFit(this.densityInput, positions);
+    this.latestDensityDecision = decision;
+    this.options.instrumentation?.count('local-density-evaluations');
+    this.options.instrumentation?.record(
+      'local-density',
+      performance.now() - started,
+    );
+    return decision;
+  }
+
   applyPositions(positions: readonly LocalLayoutPosition[]): Promise<void> {
     const anchorKey = this.viewportAnchorNodeKey();
     const anchor = this.nodeViewportPoint(anchorKey);
-    const ratio = this.renderer.getCamera().ratio;
     const byKey = new Map(
       positions.map((position) => [position.key, position]),
     );
@@ -506,7 +559,27 @@ export class LocalRendererSession {
         error instanceof Error ? error : new Error(String(error)),
       );
     }
-    if (!changed) return Promise.resolve();
+    this.measureDensity(positions);
+    const targetRatio = () =>
+      this.cameraOwnership === 'auto'
+        ? this.latestDensityDecision.ratio
+        : this.renderer.getCamera().ratio;
+    if (!changed) {
+      if (this.cameraOwnership === 'auto') {
+        if (anchor === undefined) {
+          this.renderer.getCamera().setState({
+            ratio: this.latestDensityDecision.ratio,
+          });
+        } else {
+          this.anchorNodeAtViewport(
+            anchorKey,
+            anchor,
+            this.latestDensityDecision.ratio,
+          );
+        }
+      }
+      return Promise.resolve();
+    }
     return refreshLocalRendererWithAnchor(
       {
         afterProcess: (callback) =>
@@ -516,7 +589,11 @@ export class LocalRendererSession {
       },
       () => {
         if (anchor !== undefined) {
-          this.anchorNodeAtViewport(anchorKey, anchor, ratio);
+          this.anchorNodeAtViewport(anchorKey, anchor, targetRatio());
+        } else if (this.cameraOwnership === 'auto') {
+          this.renderer.getCamera().setState({
+            ratio: this.latestDensityDecision.ratio,
+          });
         }
       },
     );
@@ -596,6 +673,7 @@ export class LocalRendererSession {
     if (display === undefined) {
       throw new Error(`Cannot center missing Local node ${request.nodeId}.`);
     }
+    this.cameraOwnership = 'user';
     const started = performance.now();
     await this.renderer
       .getCamera()
@@ -611,6 +689,7 @@ export class LocalRendererSession {
   }
 
   zoomBy(factor: number): void {
+    this.cameraOwnership = 'user';
     const camera = this.renderer.getCamera();
     void camera.animate(
       { ratio: Math.max(0.02, Math.min(6, camera.ratio * factor)) },
@@ -619,9 +698,16 @@ export class LocalRendererSession {
   }
 
   fit(): void {
-    void this.renderer.getCamera().animatedReset({
-      duration: preferredMotionDuration(),
-    });
+    this.cameraOwnership = 'auto';
+    void this.renderer.getCamera().animate(
+      {
+        x: 0.5,
+        y: 0.5,
+        angle: 0,
+        ratio: this.latestDensityDecision.ratio,
+      },
+      { duration: preferredMotionDuration() },
+    );
   }
 
   semanticViewport(): SemanticLocalViewport | undefined {
@@ -660,6 +746,8 @@ export class LocalRendererSession {
     this.destroyed = true;
     this.nodeClicks?.cancel();
     this.renderer.getMouseCaptor().off('wheel', this.precisionWheelHandler);
+    this.renderer.getMouseCaptor().off('mousemovebody', this.mouseDragHandler);
+    this.renderer.getTouchCaptor().off('touchmove', this.touchMoveHandler);
     this.renderer.getCamera().off('updated', this.cameraUpdatedHandler);
     if (this.precisionWheelIdleTimer !== undefined) {
       window.clearTimeout(this.precisionWheelIdleTimer);

@@ -68,6 +68,7 @@ function interactionHarness(mode: 'global' | 'local') {
     scheduleRender: vi.fn(),
     scheduleRefresh: vi.fn(),
     getMouseCaptor: () => ({ off: vi.fn() }),
+    getTouchCaptor: () => ({ off: vi.fn() }),
     getCamera: () => ({ off: vi.fn(), ratio: 1 }),
     kill: vi.fn(),
   });

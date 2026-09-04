@@ -8,7 +8,8 @@ The product will explore the structure of Markdown knowledge workspaces. Unlike 
 
 SPATIAL1 establishes a parallel source-neutral, workspace-scoped normalized
 folder-anchor layer plus direct exact-folder arrangement for All Network while
-leaving the active KG14 sequence unchanged.
+unchanged. SPACING1B independently makes Focus Network automatic framing
+density-aware without changing Local ForceAtlas2 geometry.
 
 ## Stable domain shape
 
@@ -828,6 +829,23 @@ not the main application chunk. Sigma 3.0.3, Graphology 0.26.0, and ForceAtlas2
 Sigma presentation and dedicated Global/Local Free worker chunks. Local
 Structured reuses React Flow and W3 and adds no runtime dependency. Structure startup
 does not execute them.
+
+Local Free framing is a camera-only post-layout layer. After an exact cache hit
+or latest accepted worker result, the renderer measures automatic node sizes,
+accepted positions, and Local edges using Sigma 3.0.3 normalization in a fixed
+1200×800 frame with 24 px stage padding. Raw B1 connected-edge, B2
+nearest-neighbor/diameter, and B3 p90-root-radius signals produce a median B4
+ratio with one final `0.7–1.4` clamp. Invalid geometry safely uses ratio 1.
+This decision returns no coordinates and is excluded from Local requests,
+fingerprints, caches, and persistence.
+
+The Local session owns framing authority imperatively. Fresh automatic cameras
+adopt the latest density ratio while preserving the existing root/selection
+screen anchor. Restored semantic `freeRatio`, explicit center, wheel/pinch,
+drag, and zoom-button actions remain exact and authoritative until manual Fit.
+Fit uses the stored density target and re-enters automatic ownership; resize
+does not recompute it. VISUAL1B and Visual Groups remain reducer-only because
+the policy consumes only automatic node sizes.
 Visual Groups add one zero-external-dependency workspace package; renderer
 packages import only its resolved presentation type and never QUERY1 rules.
 Tauri dependencies are isolated to the desktop shell and

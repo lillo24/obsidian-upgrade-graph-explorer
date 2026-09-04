@@ -84,6 +84,7 @@ export const PERFORMANCE_PHASES = [
   'local-sigma-mount',
   'local-layout-worker',
   'local-layout-apply',
+  'local-density',
   'local-visual-lod',
   'local-hover',
   'local-selection',
@@ -120,6 +121,7 @@ export const PERFORMANCE_OPERATIONS = [
   'local-seeds',
   'local-topology-reconciliations',
   'local-layouts',
+  'local-density-evaluations',
   'local-style-updates',
   'local-hover-applications',
   'local-selection-applications',
@@ -181,6 +183,7 @@ export interface PerformanceOperationCounts {
   readonly 'local-seeds': number;
   readonly 'local-topology-reconciliations': number;
   readonly 'local-layouts': number;
+  readonly 'local-density-evaluations': number;
   readonly 'local-style-updates': number;
   readonly 'local-hover-applications': number;
   readonly 'local-selection-applications': number;
@@ -302,6 +305,7 @@ export function emptyPerformanceOperationCounts(): PerformanceOperationCounts {
     'local-seeds': 0,
     'local-topology-reconciliations': 0,
     'local-layouts': 0,
+    'local-density-evaluations': 0,
     'local-style-updates': 0,
     'local-hover-applications': 0,
     'local-selection-applications': 0,

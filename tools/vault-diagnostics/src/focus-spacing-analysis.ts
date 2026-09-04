@@ -14,6 +14,7 @@ import {
   maximumScreenDelta,
   percentile,
   PRIMARY_VIEWPORT,
+  productionDensityRatio,
   sceneFromLayout,
   screenMetrics,
   screenPositions,
@@ -178,7 +179,11 @@ function main(): void {
     const topology = topologyMetrics(scene);
     const graph = geometryMetrics(scene);
     const baseline = screenMetrics(scene, 1, PRIMARY_VIEWPORT);
-    const ratios = candidateRatios(baseline, topology.nodes);
+    const diagnosticRatios = candidateRatios(baseline, topology.nodes);
+    const ratios = {
+      ...diagnosticRatios,
+      B4: productionDensityRatio(scene),
+    };
     const boundSensitivity = Object.fromEntries(
       Object.entries(BOUND_FAMILIES).map(([name, bounds]) => [
         name,
@@ -288,7 +293,7 @@ function main(): void {
         'Uniform coordinate scaling is canceled by Sigma autoRescale unless the product also changes autoRescale or supplies a stable custom bounding box.',
       adaptiveForceAtlas2Verdict:
         'Not justified by SPACING1A evidence; reserve option C for a later spike only if visual QA shows topology-specific overlap or geometry defects that a bounded camera policy cannot solve.',
-      productionChanged: false,
+      productionChanged: true,
     },
   };
   mkdirSync(cli.outputDirectory, { recursive: true });

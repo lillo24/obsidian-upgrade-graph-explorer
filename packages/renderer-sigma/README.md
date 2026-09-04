@@ -1,6 +1,6 @@
 # Sigma Global/Regional and Local Free Renderer
 
-Status: **STABLE — KG13B1 Global and KG13B2A Local Free contracts are test-backed.**
+Status: **STABLE — Global, Local Free, and SPACING1B density framing are test-backed.**
 
 This package owns the lazy, direct Sigma 3 renderers for file-level
 Global/Regional exploration and bounded Local Free exploration. Both consume a
@@ -55,6 +55,7 @@ src/
   local-mapping.ts         Separate Local topology and deterministic root-relative seed.
   local-graph.ts           Local Graphology construction, reconciliation, and neighborhoods.
   local-style.ts           Far/normal/near Local and GROUP1A styling without topology changes.
+  local-density.ts         Pure Sigma-faithful B4 policy for accepted-layout camera Fit.
   local-layout.ts          DOM-free Local ForceAtlas2 request/result and fingerprint.
   local-layout-cache.ts    Bounded memory-only exact Local position cache.
   local-lifecycle.ts       Idempotent lease and pre-draw anchored refresh boundary.
@@ -334,8 +335,22 @@ NETWORKPOLISH1 removes Local's far-reference hide rule without changing the
 hover through maximum zoom-out, with existing width factors 1 / 0.84 / 0.45
 for near / normal / far. Far hierarchy width stays 0.72; root/label LOD and
 hover emphasis remain intact. Native readability is a release-QA gate.
-Sparse Focus spacing, normalization, camera framing and ForceAtlas2 settings
-are intentionally unchanged.
+SPACING1B leaves ForceAtlas2 settings, normalization, accepted coordinates,
+fingerprints, and caches unchanged, but replaces Local's ratio-1 automatic Fit
+with a density-aware camera target. The pure policy measures accepted positions
+in a fixed 1200×800 Sigma 3.0.3 frame with 24 px padding. It takes the median of
+the raw connected-edge, nearest-neighbor/node-diameter, and p90-root-radius
+signals, then clamps once to `0.7–1.4`; invalid or degenerate metrics fall back
+to ratio 1.
+
+Fresh Local sessions are auto-framed after an exact cache hit or latest worker
+result while retaining their transition anchor's screen point. A restored
+semantic viewport, explicit center, wheel/pinch, native drag, or zoom button
+makes the session camera user-owned, so later layout completion updates only
+the stored Fit target. Manual Fit resets x/y/angle, applies that latest target,
+and returns ownership to automatic framing. Resize never recomputes or reapplies
+the policy. Automatic node sizes are the only radius input: VISUAL1B display
+multipliers and Visual Groups cannot change density, camera, layout, or cache.
 Local has no folder prior or fake edges. Exact cache fingerprints include the
 root, stable topology, semantic node/edge roles, weights, iterations, and Local
 settings while excluding seed coordinates, labels, hover, selection, camera,

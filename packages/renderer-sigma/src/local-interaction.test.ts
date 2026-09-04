@@ -17,6 +17,7 @@ describe('Local operation oracle', () => {
         topologyReconciliation: 0,
         layoutRequest: 0,
         globalLayoutRequest: 0,
+        densityEvaluation: 0,
       });
     },
   );
@@ -27,7 +28,27 @@ describe('Local operation oracle', () => {
       topologyReconciliation: 1,
       layoutRequest: 1,
       globalLayoutRequest: 0,
+      densityEvaluation: 0,
       visualRefresh: 1,
+    });
+  });
+
+  it('measures accepted layouts once while manual Fit stays camera-only', () => {
+    expect(
+      LOCAL_INTERACTION_OPERATION_CONTRACTS['accepted-layout'],
+    ).toMatchObject({
+      projection: 0,
+      topologyReconciliation: 0,
+      layoutRequest: 0,
+      globalLayoutRequest: 0,
+      densityEvaluation: 1,
+    });
+    expect(LOCAL_INTERACTION_OPERATION_CONTRACTS['manual-fit']).toMatchObject({
+      projection: 0,
+      topologyReconciliation: 0,
+      layoutRequest: 0,
+      globalLayoutRequest: 0,
+      densityEvaluation: 0,
     });
   });
 });

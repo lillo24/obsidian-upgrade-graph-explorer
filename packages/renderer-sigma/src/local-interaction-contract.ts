@@ -8,13 +8,16 @@ export type LocalInteraction =
   | 'disclosure-change'
   | 'focus-change'
   | 'source-topology-change'
-  | 'exact-cache-hit';
+  | 'exact-cache-hit'
+  | 'accepted-layout'
+  | 'manual-fit';
 
 export interface LocalInteractionOperationContract {
   readonly projection: 0 | 1;
   readonly topologyReconciliation: 0 | 1;
   readonly layoutRequest: 0 | 1;
   readonly globalLayoutRequest: 0;
+  readonly densityEvaluation: 0 | 1;
   readonly visualRefresh: 0 | 1;
 }
 
@@ -23,6 +26,7 @@ const VISUAL_ONLY = {
   topologyReconciliation: 0,
   layoutRequest: 0,
   globalLayoutRequest: 0,
+  densityEvaluation: 0,
   visualRefresh: 1,
 } as const;
 
@@ -31,6 +35,7 @@ const NO_RENDERER_WORK = {
   topologyReconciliation: 0,
   layoutRequest: 0,
   globalLayoutRequest: 0,
+  densityEvaluation: 0,
   visualRefresh: 0,
 } as const;
 
@@ -39,6 +44,7 @@ const LOCAL_TOPOLOGY = {
   topologyReconciliation: 1,
   layoutRequest: 1,
   globalLayoutRequest: 0,
+  densityEvaluation: 0,
   visualRefresh: 1,
 } as const;
 
@@ -60,6 +66,16 @@ export const LOCAL_INTERACTION_OPERATION_CONTRACTS: Readonly<
     topologyReconciliation: 0,
     layoutRequest: 0,
     globalLayoutRequest: 0,
+    densityEvaluation: 1,
     visualRefresh: 1,
   },
+  'accepted-layout': {
+    projection: 0,
+    topologyReconciliation: 0,
+    layoutRequest: 0,
+    globalLayoutRequest: 0,
+    densityEvaluation: 1,
+    visualRefresh: 1,
+  },
+  'manual-fit': VISUAL_ONLY,
 };

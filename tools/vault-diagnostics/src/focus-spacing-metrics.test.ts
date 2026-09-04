@@ -10,6 +10,7 @@ import {
   maximumRelativeGeometryError,
   maximumScreenDelta,
   percentile,
+  productionDensityRatio,
   sceneFromLayout,
   screenMetrics,
   SMALL_VIEWPORT,
@@ -89,5 +90,27 @@ describe('focus spacing diagnostic metrics', () => {
         0.000_001,
       );
     }
+  });
+
+  it('keeps all 15 diagnostic fixtures in parity with the production B4 policy', () => {
+    const ratios = focusSpacingFixtures().map((fixture, index) => {
+      const request = createLocalLayoutRequest(fixture.input, 20);
+      const result = computeLocalLayout(
+        { ...request, requestId: index + 1 },
+        () => 0,
+      );
+      const scene = sceneFromLayout(request, result.positions);
+      const diagnostic = candidateRatios(
+        screenMetrics(scene, 1),
+        scene.nodes.length,
+      ).B4;
+      const production = productionDensityRatio(scene);
+      // Both contracts round the final B4 ratio to four decimals.
+      expect(production).toBe(diagnostic);
+      return production;
+    });
+
+    expect(ratios).toHaveLength(15);
+    expect(ratios.every((ratio) => ratio >= 0.7 && ratio <= 1.4)).toBe(true);
   });
 });

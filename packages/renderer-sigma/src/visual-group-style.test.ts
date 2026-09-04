@@ -306,6 +306,7 @@ describe('cross-Sigma Visual Group style contract', () => {
       topologyReconciliation: 0,
       layoutRequest: 0,
       globalLayoutRequest: 0,
+      densityEvaluation: 0,
       visualRefresh: 1,
     });
   });

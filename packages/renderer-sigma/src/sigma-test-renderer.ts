@@ -18,16 +18,25 @@ export class SigmaTestRenderer {
     ratio: 1,
     x: 0.5,
     y: 0.5,
+    angle: 0,
     on: vi.fn(),
     off: vi.fn(),
     getState: () => ({
       ratio: this.camera.ratio,
       x: this.camera.x,
       y: this.camera.y,
+      angle: this.camera.angle,
     }),
     setState: vi.fn((value: object) => Object.assign(this.camera, value)),
+    animate: vi.fn(async (value: object) => {
+      Object.assign(this.camera, value);
+    }),
+    animatedReset: vi.fn(async () => {
+      Object.assign(this.camera, { ratio: 1, x: 0.5, y: 0.5, angle: 0 });
+    }),
   };
-  readonly captor = { on: vi.fn(), off: vi.fn() };
+  readonly captor = { on: vi.fn(), off: vi.fn(), isMouseDown: false };
+  readonly touchCaptor = { on: vi.fn(), off: vi.fn() };
   deferProcess = false;
   private fullRefreshPending = false;
   readonly refresh = vi.fn((options?: Refresh) => {
@@ -57,6 +66,9 @@ export class SigmaTestRenderer {
     },
   ) {
     SigmaTestRenderer.instances.push(this);
+    this.graph.forEachNode((key, attributes) =>
+      this.displayNodes.set(key, this.settings.nodeReducer(key, attributes)),
+    );
   }
   finishProcess(): void {
     if (this.fullRefreshPending) {
@@ -87,6 +99,12 @@ export class SigmaTestRenderer {
   getMouseCaptor() {
     return this.captor;
   }
+  getTouchCaptor() {
+    return this.touchCaptor;
+  }
+  getViewportZoomedState(_point: { x: number; y: number }, ratio: number) {
+    return { ...this.camera.getState(), ratio };
+  }
   getNodeDisplayData(key: string) {
     return this.displayNodes.get(key);
   }
@@ -96,11 +114,27 @@ export class SigmaTestRenderer {
   getDimensions() {
     return { width: 800, height: 600 };
   }
-  framedGraphToViewport(point: { x: number; y: number }) {
-    return point;
+  framedGraphToViewport(
+    point: { x: number; y: number },
+    override?: { cameraState?: { x: number; y: number; ratio: number } },
+  ) {
+    const camera = override?.cameraState ?? this.camera;
+    const dimensions = this.getDimensions();
+    return {
+      x: (point.x - camera.x) / camera.ratio + dimensions.width / 2,
+      y: (point.y - camera.y) / camera.ratio + dimensions.height / 2,
+    };
   }
-  viewportToFramedGraph(point: { x: number; y: number }) {
-    return point;
+  viewportToFramedGraph(
+    point: { x: number; y: number },
+    override?: { cameraState?: { x: number; y: number; ratio: number } },
+  ) {
+    const camera = override?.cameraState ?? this.camera;
+    const dimensions = this.getDimensions();
+    return {
+      x: (point.x - dimensions.width / 2) * camera.ratio + camera.x,
+      y: (point.y - dimensions.height / 2) * camera.ratio + camera.y,
+    };
   }
   viewportToGraph(point: { x: number; y: number }) {
     return point;

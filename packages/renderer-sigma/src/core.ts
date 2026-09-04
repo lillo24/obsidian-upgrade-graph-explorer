@@ -27,6 +27,13 @@ export {
 export { GlobalLayoutCache } from './layout-cache';
 export { LocalLayoutCache } from './local-layout-cache';
 export {
+  LOCAL_DENSITY_RATIO_BOUNDS,
+  LOCAL_DENSITY_REFERENCE_FRAME,
+  LOCAL_DENSITY_TARGETS,
+  resolveLocalDensityFit,
+} from './local-density';
+export type { LocalDensityDecision, LocalDensityInput } from './local-density';
+export {
   computeLocalLayout,
   createLocalLayoutRequest,
   DEFAULT_LOCAL_LAYOUT_SETTINGS,

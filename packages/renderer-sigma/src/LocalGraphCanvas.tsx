@@ -104,6 +104,7 @@ export function LocalGraphCanvas({
   const handledCenterRequest = useRef(0);
   const handledFitRequest = useRef(0);
   const handledLayoutRequest = useRef(layoutRequestKey);
+  const initialCacheAccepted = useRef(false);
   const layoutPending = useRef(true);
   const callbacks = useRef({
     onFailure,
@@ -161,6 +162,8 @@ export function LocalGraphCanvas({
     const cached = cache.get(fingerprint);
     return {
       cached: cached !== undefined,
+      cachedPositions: cached,
+      fingerprint,
       input:
         cached === undefined ? input : warmLocalRendererInput(input, cached),
       initialTransitionAnchor,
@@ -203,6 +206,9 @@ export function LocalGraphCanvas({
           ...(initial.initialViewport === undefined
             ? {}
             : { initialViewport: initial.initialViewport }),
+          ...(initial.cachedPositions === undefined
+            ? {}
+            : { initialAcceptedPositions: initial.cachedPositions }),
           ...(instrumentation === undefined ? {} : { instrumentation }),
           onNodeSelected: (key) =>
             callbacks.current.onSelectionChange(
@@ -288,6 +294,18 @@ export function LocalGraphCanvas({
     const cached = explicitRelayout ? undefined : cache.get(fingerprint);
     let cancelled = false;
     if (cached !== undefined) {
+      if (
+        !initialCacheAccepted.current &&
+        initial.cachedPositions !== undefined &&
+        fingerprint === initial.fingerprint
+      ) {
+        initialCacheAccepted.current = true;
+        layoutPending.current = false;
+        setLayoutError(undefined);
+        setLayoutStatus(undefined);
+        setLayoutCommitKey((current) => current + 1);
+        return;
+      }
       void session
         .applyPositions(cached)
         .then(() => {
@@ -348,6 +366,8 @@ export function LocalGraphCanvas({
   }, [
     cache,
     fingerprint,
+    initial.cachedPositions,
+    initial.fingerprint,
     input,
     instrumentation,
     layoutService,

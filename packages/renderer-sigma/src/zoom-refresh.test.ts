@@ -26,7 +26,8 @@ vi.mock('sigma', () => ({
         this.cameraHandlers.get('updated')?.();
       },
     };
-    readonly captor = { on: vi.fn(), off: vi.fn() };
+    readonly captor = { on: vi.fn(), off: vi.fn(), isMouseDown: false };
+    readonly touchCaptor = { on: vi.fn(), off: vi.fn() };
     readonly scheduleRender = vi.fn();
     readonly scheduleRefresh = vi.fn(() => this.refresh());
     readonly on = vi.fn();
@@ -45,6 +46,9 @@ vi.mock('sigma', () => ({
     }
     getMouseCaptor() {
       return this.captor;
+    }
+    getTouchCaptor() {
+      return this.touchCaptor;
     }
     getNodeDisplayData(key: string) {
       return this.graph.hasNode(key) ? { x: 0.5, y: 0.5 } : undefined;

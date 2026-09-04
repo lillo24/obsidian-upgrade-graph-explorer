@@ -793,3 +793,29 @@ All + Network. All + Hierarchy, Focus + Network, and Focus + Hierarchy defer the
 preference with zero KG6 projection and zero active hierarchy W3 work. Rapid
 input uses the existing Global worker client, which terminates superseded work
 and adopts only the latest response; no timer, backlog, or dependency was added.
+
+## SPACING1B Focus density-policy evidence
+
+SPACING1B measures its Sigma-faithful density policy once per accepted Local
+layout. The pass returns camera metadata only and adds zero layout requests,
+projections, or topology reconciliations. It is not run on render, camera
+updates, wheel/pinch, pan, Fit, or resize. The exact nearest-neighbor scan is
+quadratic in visible Local nodes; current bounded profiles keep it well below
+the Class A reference, so no generalized cache or approximate metric is added.
+
+Local Windows/Node measurements recorded on 2026-09-03 are investigative
+evidence, not CI thresholds. Each profile includes one warm-up; smoke/small use
+seven samples, medium three, and stress one.
+
+| Profile | Local nodes / edges | Density median | Density p95 | Extra layouts |
+| ------- | ------------------: | -------------: | ----------: | ------------: |
+| Smoke   |               4 / 5 |       0.035 ms |    0.101 ms |             0 |
+| Small   |             13 / 22 |       0.057 ms |    0.108 ms |             0 |
+| Medium  |            61 / 110 |       0.591 ms |    2.037 ms |             0 |
+| Stress  |           101 / 175 |       0.657 ms |    0.657 ms |             0 |
+
+The 15 deterministic SPACING1A scenes call the production policy directly.
+They preserve relative geometry to within `6e-8` in the diagnostic transform;
+their accepted ratios range from `0.93` to `1.4` (plus the lower-clamp unit
+case at `0.7`). ForceAtlas2 worker counts, positions, fingerprints, and cache
+values remain unchanged.

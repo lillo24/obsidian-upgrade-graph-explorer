@@ -38,9 +38,9 @@ src/
   benchmark.ts        Opt-in full-pipeline plus incremental timing entry point.
   incremental-benchmark.ts Edit/add/delete/move timings with exact rebuild oracles.
   focus-spacing-fixtures.ts Deterministic sparse, mixed, dense, and disconnected Local scenes.
-  focus-spacing-metrics.ts  Graph, screen-space, Sigma-transform, and candidate-density metrics.
-  focus-spacing-analysis.ts SPACING1A runner and self-contained visual comparison generator.
-  focus-spacing-metrics.test.ts Transform invariance, candidate bounds, and fixture contracts.
+  focus-spacing-metrics.ts  Graph/screen diagnostics plus production B4 policy adapter.
+  focus-spacing-analysis.ts SPACING1A/SPACING1B parity runner and visual comparison generator.
+  focus-spacing-metrics.test.ts Transform, bounds, 15-fixture, and production-parity contracts.
   performance-benchmark.ts Repeated versioned pipeline/projection/renderer/inspection results.
   query-projection-benchmark.ts PERFQ1A projection phases, operations, and repeated-query evidence.
   performance-policy.ts Class budgets plus measured KG12B worker/cache decisions.
@@ -226,13 +226,14 @@ visible-entity assignment, and renderer style-lookup distributions for 300 and
 outside the measured path, operation counts report zero topology/layout work,
 and the timings are evidence rather than CI gates.
 
-`analyze:focus-spacing` is the SPACING1A diagnostic-only contract. It runs the
+`analyze:focus-spacing` retains the SPACING1A diagnostic contract. It runs the
 unchanged production Local ForceAtlas2 function over deterministic sparse,
 mixed, disconnected, and dense topologies, then applies Sigma 3.0.3's actual
 normalization and camera transforms in Node. It writes ignored synthetic JSON
-and a self-contained HTML comparison to `output/spacing1a/`. The candidate
-ratios are investigative evidence only: this command does not alter production
-layout settings, camera behavior, renderer state, fingerprints, or node sizes.
+and a self-contained HTML comparison to `output/spacing1a/`. SPACING1B makes
+the selected B4 value call the production renderer policy while detailed
+candidate/bounds metrics remain analysis-only. The command does not alter
+layout settings, renderer state, fingerprints, positions, or node sizes.
 
 An opt-in private check can validate one real workspace using an existing
 identity catalog:
