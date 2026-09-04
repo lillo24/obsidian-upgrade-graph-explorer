@@ -19,8 +19,11 @@ import {
 
 function sampleScene() {
   const fixture = focusSpacingFixtures().find(({ id }) => id === 'five-star')!;
-  const request = createLocalLayoutRequest(fixture.input, 20);
-  const result = computeLocalLayout({ ...request, requestId: 1 }, () => 0);
+  const request = createLocalLayoutRequest(fixture.input);
+  const result = computeLocalLayout(
+    { ...request, requestId: 1 },
+    { maxWallTimeMs: 60_000, now: () => 0 },
+  );
   return sceneFromLayout(request, result.positions);
 }
 
@@ -94,10 +97,10 @@ describe('focus spacing diagnostic metrics', () => {
 
   it('keeps all 15 diagnostic fixtures in parity with the production B4 policy', () => {
     const ratios = focusSpacingFixtures().map((fixture, index) => {
-      const request = createLocalLayoutRequest(fixture.input, 20);
+      const request = createLocalLayoutRequest(fixture.input);
       const result = computeLocalLayout(
         { ...request, requestId: index + 1 },
-        () => 0,
+        { now: () => 0 },
       );
       const scene = sceneFromLayout(request, result.positions);
       const diagnostic = candidateRatios(

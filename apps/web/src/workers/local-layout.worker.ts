@@ -1,8 +1,10 @@
 /// <reference lib="webworker" />
 
-import { computeLocalLayout } from '@icarus-graph-explorer/renderer-sigma/local-layout';
+import {
+  computeLocalLayout,
+  createLocalLayoutFailure,
+} from '@icarus-graph-explorer/renderer-sigma/local-layout';
 import type {
-  LocalLayoutFailure,
   LocalLayoutRequest,
   LocalLayoutWorkerResponse,
 } from '@icarus-graph-explorer/renderer-sigma/types';
@@ -18,13 +20,7 @@ host.onmessage = (event) => {
   try {
     host.postMessage(computeLocalLayout(event.data));
   } catch (error: unknown) {
-    const response: LocalLayoutFailure = {
-      schemaVersion: 1,
-      kind: 'error',
-      requestId: event.data.requestId,
-      message: error instanceof Error ? error.message : String(error),
-    };
-    host.postMessage(response);
+    host.postMessage(createLocalLayoutFailure(event.data, error));
   }
 };
 

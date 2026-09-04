@@ -9,7 +9,12 @@ import { createGlobalLayoutRequest } from './layout';
 import { createLocalLayoutRequest } from './local-layout';
 import { localTestProjection } from './local-test-fixture';
 import { globalTestProjection } from './test-fixture';
-import type { GlobalLayoutResult } from './types';
+import type {
+  GlobalLayoutResult,
+  GlobalLayoutService,
+  LocalLayoutResult,
+  LocalLayoutService,
+} from './types';
 
 vi.mock('./session', () => ({
   GlobalRendererSession: class {
@@ -55,11 +60,11 @@ describe.each(['global', 'local'] as const)(
     });
 
     async function mount() {
-      let resolve!: (result: GlobalLayoutResult) => void;
+      let resolve!: (result: GlobalLayoutResult | LocalLayoutResult) => void;
       let reject!: (error: Error) => void;
       const layout = vi.fn(
         () =>
-          new Promise<GlobalLayoutResult>((yes, no) => {
+          new Promise<GlobalLayoutResult | LocalLayoutResult>((yes, no) => {
             resolve = yes;
             reject = no;
           }),
@@ -70,7 +75,10 @@ describe.each(['global', 'local'] as const)(
             <GlobalGraphCanvas
               fitRequestKey={0}
               layoutRequestKey={0}
-              layoutService={{ dispose: vi.fn(), layout }}
+              layoutService={{
+                dispose: vi.fn(),
+                layout: layout as unknown as GlobalLayoutService['layout'],
+              }}
               onFailure={vi.fn()}
               onNodeActivate={vi.fn()}
               onSelectionChange={vi.fn()}
@@ -83,7 +91,10 @@ describe.each(['global', 'local'] as const)(
           ) : (
             <LocalGraphCanvas
               layoutRequestKey={0}
-              layoutService={{ dispose: vi.fn(), layout }}
+              layoutService={{
+                dispose: vi.fn(),
+                layout: layout as unknown as LocalLayoutService['layout'],
+              }}
               onFailure={vi.fn()}
               onSelectionChange={vi.fn()}
               onViewportObservation={vi.fn()}
@@ -107,21 +118,37 @@ describe.each(['global', 'local'] as const)(
           mode === 'global' ? 'Refining All Network layout' : 'refining layout',
         );
         await act(() =>
-          pending.resolve({
-            schemaVersion: 1,
-            kind: 'result',
-            requestId: 1,
-            positions: [],
-            computeMs: 1,
-            folderPriorMs: 0,
-            algorithm,
-            metrics: {
-              meanWithinFolderDistance: 0,
-              meanCrossFolderDistance: 0,
-              meanCrossFolderReferenceLength: 0,
-              meanDisplacementFromInput: 0,
-            },
-          }),
+          pending.resolve(
+            mode === 'global'
+              ? {
+                  schemaVersion: 1,
+                  kind: 'result',
+                  requestId: 1,
+                  positions: [],
+                  computeMs: 1,
+                  folderPriorMs: 0,
+                  algorithm,
+                  metrics: {
+                    meanWithinFolderDistance: 0,
+                    meanCrossFolderDistance: 0,
+                    meanCrossFolderReferenceLength: 0,
+                    meanDisplacementFromInput: 0,
+                  },
+                }
+              : {
+                  schemaVersion: 2,
+                  kind: 'result',
+                  requestId: 1,
+                  stopReason: 'degenerate',
+                  policyVersion: 'local-fa2-convergence-v1',
+                  iterationsCompleted: 0,
+                  batchesCompleted: 0,
+                  stableBatches: 0,
+                  finalMovement: null,
+                  positions: [],
+                  computeMs: 1,
+                },
+          ),
         );
         expect(
           container.querySelector(`.${mode}-graph-canvas__status`),

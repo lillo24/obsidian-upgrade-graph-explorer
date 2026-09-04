@@ -58,20 +58,16 @@ function options(args: readonly string[]): CliOptions {
   };
 }
 
-function iterations(nodeCount: number): number {
-  return nodeCount <= 100 ? 160 : nodeCount <= 500 ? 100 : 60;
-}
-
 function layoutScene(
   fixture: ReturnType<typeof focusSpacingFixtures>[number],
   requestId: number,
-): SpacingScene {
-  const request = createLocalLayoutRequest(
-    fixture.input,
-    iterations(fixture.input.nodes.length),
+) {
+  const request = createLocalLayoutRequest(fixture.input);
+  const result = computeLocalLayout(
+    { ...request, requestId },
+    { maxWallTimeMs: 60_000, now: () => 0 },
   );
-  const result = computeLocalLayout({ ...request, requestId }, () => 0);
-  return sceneFromLayout(request, result.positions);
+  return { scene: sceneFromLayout(request, result.positions), result };
 }
 
 function candidateScreens(scene: SpacingScene, ratios: CandidateRatios) {
@@ -175,7 +171,7 @@ function main(): void {
     bounds: Record<keyof typeof BOUND_FAMILIES, number>;
   }> = [];
   const fixtures = focusSpacingFixtures().map((fixture, index) => {
-    const scene = layoutScene(fixture, index + 1);
+    const { scene, result } = layoutScene(fixture, index + 1);
     const topology = topologyMetrics(scene);
     const graph = geometryMetrics(scene);
     const baseline = screenMetrics(scene, 1, PRIMARY_VIEWPORT);
@@ -199,7 +195,9 @@ function main(): void {
     return {
       id: fixture.id,
       description: fixture.description,
-      layoutIterations: iterations(topology.nodes),
+      layoutStopReason: result.stopReason,
+      layoutIterations: result.iterationsCompleted,
+      layoutBatches: result.batchesCompleted,
       topology,
       graph,
       baseline: {

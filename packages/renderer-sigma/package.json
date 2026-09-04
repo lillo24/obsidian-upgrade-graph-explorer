@@ -42,6 +42,11 @@
       "import": "./src/global-density-framing.ts",
       "default": "./src/global-density-framing.ts"
     },
+    "./local-convergence": {
+      "types": "./src/local-convergence.ts",
+      "import": "./src/local-convergence.ts",
+      "default": "./src/local-convergence.ts"
+    },
     "./settings": {
       "types": "./src/settings.ts",
       "import": "./src/settings.ts",

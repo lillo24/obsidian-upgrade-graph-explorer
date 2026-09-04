@@ -44,7 +44,7 @@ src/
   network-spacing-analysis.ts SPACING1B-GLOBAL final-geometry matrix, scale oracle, and density benchmark.
   file-move-benchmark.ts MOVE1A inverse/index/coalescing aggregate microbenchmark.
   convergence-fixtures.ts Synthetic Local and Global topology families for CONVERGENCE1A.
-  convergence-metrics.ts Translation-aligned movement, scale, degree, and quality metrics.
+  convergence-metrics.ts Production-backed Local metrics plus Global diagnostic movement/quality.
   convergence-candidates.ts Public-batch runners and bounded stopping-policy evaluation.
   forceatlas2-convergence-analysis.ts CONVERGENCE1A evidence and self-contained SVG/HTML generator.
   convergence-*.test.ts Metric invariants, fixtures, and diagnostic lifecycle contracts.
@@ -261,15 +261,20 @@ Place, and 20,000-node synthetic cases. It emits aggregate timings and command
 counts, never graph IDs or coordinates. It deliberately does not benchmark the
 fake constraint consumer as evidence of production cooling or convergence.
 
-`analyze:forceatlas2-convergence` is the CONVERGENCE1A diagnostic-only
-contract. It reproduces fixed-budget A → B → C drift, compares one public
+`analyze:forceatlas2-convergence` retains the CONVERGENCE1A evidence contract
+and imports CONVERGENCE1B's production percentile, RMS, root-alignment,
+unique-neighbor, and movement primitives so the Local oracle cannot silently
+drift. It reproduces the legacy fixed-budget A → B → C drift, compares one public
 ForceAtlas2 call with 20/32/40-iteration batches on reused and rebuilt
 Graphology graphs, evaluates bounded displacement policies with a hidden
 post-stop probe, and compares complete Global folder-prior macro-runs with a
 pure-ForceAtlas2 settling tail. It writes deterministic synthetic JSON and a
 self-contained HTML/SVG comparison under ignored `output/convergence1a/`.
-Wall-clock values are local evidence only. The command changes no production
-worker, fingerprint, cache, iteration, camera, or spatial-influence behavior.
+Wall-clock values are local evidence only. Running the command changes no
+production worker, fingerprint, cache, convergence policy, camera, or
+spatial-influence behavior. The accepted `0.00512` policy remains fixed even
+when re-observed raw-frame quantiles differ slightly from the archived rounded
+diagnostic frames.
 
 An opt-in private check can validate one real workspace using an existing
 identity catalog:

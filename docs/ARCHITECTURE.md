@@ -1145,3 +1145,39 @@ Renderer-owned rectangle geometry now packs the immediate Focus seed and reserve
 entities/diagnostics during final diagnostic placement. Dagre topology, canonical
 semantics, Focus document membership and fixed dimensions are unchanged. This is
 a collision baseline, not the future Focus Schematic/File-module model.
+
+## CONVERGENCE1B Focus Network finite convergence
+
+Focus Network's schema-v2 layout request centralizes
+`local-fa2-convergence-v1` in `renderer-sigma`; the React canvas no longer
+chooses a fixed iteration budget. One latest-result-wins replacement worker
+builds one Graphology graph, computes an undirected unique-neighbor degree index
+once, and invokes public ForceAtlas2 in 32-iteration batches with the existing
+hierarchy/reference weights and settings. Movement compares consecutive raw
+frames after translating each Focus root to zero and divides by the previous
+frame's root RMS radius with a `1e-6` floor. Rotation and scale are deliberately
+not aligned away.
+
+A full batch is stable when all-node normalized p90 is at most `0.00512` and
+the maximum for degree-0/1 nodes, when present, is at most `0.01024`. Three
+consecutive full stable batches accept the result. Otherwise node-count caps of
+1,000 / 600 / 240 iterations apply; their final 8 / 24 / 16 iteration partial
+batches update diagnostics but cannot complete the stable sequence. One-node
+Focus is an explicit zero-iteration degenerate result. Root normalization and
+eight-decimal rounding happen only at the final result boundary.
+
+The 2,000 ms safety limit is checked only after completed batches. Crossing it
+returns a structured `max-wall-time` failure with counters and last movement,
+but no positions. The canvas therefore keeps its last accepted or deterministic
+geometry and performs no cache write. Timeout and compute timing are excluded
+from the `local-layout-v2` fingerprint; the complete deterministic convergence
+policy and computed cap are included. Exact cache hits restore exact settled
+coordinates with zero worker requests. Rearrange evicts the exact entry and
+warm-starts from current automatic coordinates; topology reconciliation keeps
+survivors and seeds only new nodes.
+
+This is finite off-main settlement, not continuous simulation or mathematical
+equilibrium. PHYSICS1 continues to own any persistent interactive simulation,
+reheating/cooling, and real temporary constraints. Global layout and SPATIAL2
+remain on their separate lifecycles; CONVERGENCE1C owns Global folder-macro
+convergence.

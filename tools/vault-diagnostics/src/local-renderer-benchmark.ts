@@ -71,10 +71,10 @@ const LOCAL_PROFILES: Readonly<
     includeBlocks: true,
   },
   stress: {
-    neighborDocuments: 75,
-    rootHeadings: 200,
-    childrenPerHeading: 3,
-    includeBlocks: true,
+    neighborDocuments: 600,
+    rootHeadings: 64,
+    childrenPerHeading: 1,
+    includeBlocks: false,
   },
 };
 
@@ -342,8 +342,7 @@ function main(): void {
   );
   const seeded = seedMeasure.value;
   const graphBuild = measureRepeated(() => buildLocalGraph(seeded), repeats);
-  const iterations = seeded.nodes.length >= 600 ? 30 : 80;
-  const request = createLocalLayoutRequest(seeded, iterations);
+  const request = createLocalLayoutRequest(seeded);
   const layoutMeasure = measureRepeated(
     () => computeLocalLayout({ ...request, requestId: 1 }),
     repeats,
@@ -508,9 +507,16 @@ function main(): void {
           graphologyBuild: graphBuild.distribution,
         },
         forceAtlas2WorkerEquivalent: {
-          iterations,
+          policyVersion: layoutMeasure.value.policyVersion,
+          stopReason: layoutMeasure.value.stopReason,
+          iterationsCompleted: layoutMeasure.value.iterationsCompleted,
+          batchesCompleted: layoutMeasure.value.batchesCompleted,
+          stableBatches: layoutMeasure.value.stableBatches,
           layout: layoutMeasure.distribution,
           reportedComputeMs: layoutMeasure.value.computeMs,
+          finalP90: layoutMeasure.value.finalMovement?.all.p90 ?? null,
+          lowDegreeMaximum:
+            layoutMeasure.value.finalMovement?.lowDegree.maximum ?? null,
           apply: applyMeasure.distribution,
           rootNormalizedToOrigin: layoutMeasure.value.positions.some(
             ({ key, x, y }) => key === seeded.rootNodeKey && x === 0 && y === 0,

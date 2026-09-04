@@ -77,10 +77,6 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function layoutIterations(nodeCount: number): number {
-  return nodeCount <= 100 ? 160 : nodeCount <= 500 ? 100 : 60;
-}
-
 export function LocalGraphCanvas({
   centerRequest,
   densityFramingStrength = DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH,
@@ -163,7 +159,7 @@ export function LocalGraphCanvas({
       : instrumentation.measure('local-seed', 'local-seeds', seed);
   }, [instrumentation, topology]);
   const requestTemplate = useMemo(
-    () => createLocalLayoutRequest(input, layoutIterations(input.nodes.length)),
+    () => createLocalLayoutRequest(input),
     [input],
   );
   const fingerprint = useMemo(
@@ -312,6 +308,7 @@ export function LocalGraphCanvas({
     layoutPending.current = true;
     const explicitRelayout = layoutRequestKey > handledLayoutRequest.current;
     handledLayoutRequest.current = layoutRequestKey;
+    if (explicitRelayout) cache.delete(fingerprint);
     const cached = explicitRelayout ? undefined : cache.get(fingerprint);
     let cancelled = false;
     if (cached !== undefined) {
@@ -349,10 +346,7 @@ export function LocalGraphCanvas({
         setLayoutStatus('Focus Network is ready; refining layout…');
       }
     });
-    const request = session.createLayoutRequest(
-      input,
-      requestTemplate.iterations,
-    );
+    const request = session.createLayoutRequest(input);
     instrumentation?.count('local-layouts');
     void layoutService
       .layout(request)
@@ -394,7 +388,6 @@ export function LocalGraphCanvas({
     layoutService,
     layoutRequestKey,
     ready,
-    requestTemplate.iterations,
   ]);
 
   useEffect(() => {

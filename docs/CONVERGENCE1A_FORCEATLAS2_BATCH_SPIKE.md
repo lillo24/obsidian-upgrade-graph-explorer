@@ -1,6 +1,6 @@
 # CONVERGENCE1A — ForceAtlas2 batch-convergence decision spike
 
-Status: **COMPLETE — implement Local first; design Global macro convergence separately.**
+Status: **COMPLETE — Local production follow-through is implemented by CONVERGENCE1B; Global macro convergence remains separate.**
 
 CONVERGENCE1A is synthetic diagnostic evidence only. It changes no production
 layout behavior, worker protocol, fingerprint, cache, iteration budget,
@@ -406,5 +406,33 @@ CONVERGENCE1B — implement Local bounded convergence
 CONVERGENCE1C — design and implement Global macro-step convergence
 ```
 
-Do not start either automatically. SPATIAL2A convergence remains a later,
-separate task after the base Global macro lifecycle is stable.
+CONVERGENCE1B is complete. Do not start CONVERGENCE1C automatically. SPATIAL2A
+convergence remains a later, separate task after the base Global macro
+lifecycle is stable.
+
+## 15. CONVERGENCE1B production validation
+
+The production implementation keeps the accepted policy unchanged and moves
+the canonical Local percentile, root RMS, unique-neighbor degree, movement,
+stability, and cap definitions into `renderer-sigma`. The diagnostic imports
+those primitives. The schema-v2 request embeds the complete deterministic
+policy and the `local-layout-v2` fingerprint includes it; timeout and observed
+compute evidence remain excluded.
+
+The regenerated matrix preserves the decision outcome: 19/19 eligible
+fixtures stabilize, zero false early stops, mean iterations are `444.63`, the
+hidden-probe p90 median/maximum remain `0.0023978` / `0.0047802`, and the
+low-degree probe-maximum p90 remains `0.00651804`. Measuring unrounded
+intermediate production frames re-observes the evidence quantiles as
+`0.000655`, `0.00201`, and `0.00505`; this implementation-validation detail does
+not retune the archived evidence or `local-fa2-convergence-v1` threshold of
+`0.00512`.
+
+Synthetic production benchmarks report stable stops for 4, 13, and 61 nodes at
+416, 224, and 192 iterations. A 609-node / 1,208-edge profile exercises the
+`>500` cap and finishes 240 iterations in eight batches (including the final
+16-iteration batch) in about 574 ms on the validation machine. Its final p90
+`0.00707` and low-degree maximum `0.01893` are explicitly labelled
+`max-iterations`, not converged. No external dependency was added and Global,
+SPATIAL2, camera-density, visual-style, and temporary-constraint behavior remain
+outside this implementation.

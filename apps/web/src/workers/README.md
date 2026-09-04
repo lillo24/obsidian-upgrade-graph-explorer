@@ -19,9 +19,9 @@ global-layout-worker-client.test.ts  Supersession, malformed output, and adoptio
 global-spatial-influence.worker.ts  Separate soft-folder-attractor entry over base positions.
 global-spatial-influence-worker-client.ts  Latest-result-wins replacement-worker client.
 global-spatial-influence-worker-client.test.ts  Supersession, stale, malformed, and disposal tests.
-local-layout.worker.ts        Stateless Local hierarchy/reference ForceAtlas2 entry.
-local-layout-worker-client.ts  Latest-result-wins Local replacement-worker client.
-local-layout-worker-client.test.ts  Supersession, malformed output, and failure tests.
+local-layout.worker.ts        Stateless bounded Local hierarchy/reference ForceAtlas2 entry.
+local-layout-worker-client.ts  Latest-result-wins Local replacement-worker client and structured failure.
+local-layout-worker-client.test.ts  Supersession, schema-v2 validation, timeout, and disposal tests.
 ```
 
 The worker is instantiated only after a local-vault open starts. Sample and
@@ -55,9 +55,14 @@ rules, styles, or UI state. Superseded work is terminated; stale success/failure
 cannot be adopted. Failure leaves base positions plus fixed placements visible.
 
 The Local worker is a fourth independent protocol; it does not overload Global
-folder-prior settings. It receives stable node/edge roles, hierarchy/reference
-weights, root key, seed positions, iterations, and bounded settings only. A new
-request terminates obsolete work, strict request IDs reject stale adoption, and
-errors leave the immediate deterministic scene visible. The Local worker is
-created only after Local Free is mounted; Structure startup and ordinary Global
-use do not load it.
+folder-prior settings. Its schema-v2 request receives stable node/edge roles,
+hierarchy/reference weights, root key, seed positions, settings, and the exact
+`local-fa2-convergence-v1` deterministic policy. One replacement worker reuses
+one Graphology graph across 32-iteration public batches and sends one final
+success or structured failure. The 2-second safety limit is runtime-only; a
+`max-wall-time` response carries completed-batch evidence but no positions. A
+new request terminates obsolete work, strict originating-request validation
+rejects stale or inconsistent policy/counter/metric/node results, and errors
+leave the last valid or immediate deterministic scene visible. The Local worker
+is created only after Local Free is mounted; Structure startup and ordinary
+Global use do not load it.

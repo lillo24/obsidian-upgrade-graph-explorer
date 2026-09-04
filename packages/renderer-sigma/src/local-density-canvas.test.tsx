@@ -44,7 +44,7 @@ it('installs an exact cache-hit density frame before first render without a work
   const input = seedLocalRendererInput(
     mapProjectionToLocalTopology(projection, 'root'),
   );
-  const request = createLocalLayoutRequest(input, 160);
+  const request = createLocalLayoutRequest(input);
   const positions = input.nodes.map((node, index) => ({
     key: node.key,
     x: index * 17,

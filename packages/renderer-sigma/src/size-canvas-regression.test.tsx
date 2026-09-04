@@ -22,9 +22,14 @@ import { globalTestProjection } from './test-fixture';
 import type {
   GlobalLayoutRequest,
   GlobalLayoutResult,
+  GlobalLayoutService,
   GlobalRendererInstrumentation,
 } from './types';
-import type { LocalRendererInstrumentation } from './local-types';
+import type {
+  LocalLayoutResult,
+  LocalLayoutService,
+  LocalRendererInstrumentation,
+} from './local-types';
 
 const sequence = [1, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 2.5];
 const noop = () => undefined;
@@ -84,26 +89,42 @@ describe.each(['global', 'local'] as const)(
           record: noop,
         };
         const layout = vi.fn(
-          async (request: { nodes: GlobalLayoutRequest['nodes'] }) =>
-            ({
-              schemaVersion: 1,
-              kind: 'result',
-              requestId: 1,
-              algorithm: 'reference-only',
-              computeMs: 0,
-              folderPriorMs: 0,
-              positions: request.nodes.map((node, i) => ({
-                key: node.key,
-                x: node.x + i + 1,
-                y: node.y - i,
-              })),
-              metrics: {
-                meanWithinFolderDistance: 0,
-                meanCrossFolderDistance: 0,
-                meanCrossFolderReferenceLength: 0,
-                meanDisplacementFromInput: 0,
-              },
-            }) as GlobalLayoutResult,
+          async (request: { nodes: GlobalLayoutRequest['nodes'] }) => {
+            const positions = request.nodes.map((node, i) => ({
+              key: node.key,
+              x: node.x + i + 1,
+              y: node.y - i,
+            }));
+            return mode === 'global'
+              ? ({
+                  schemaVersion: 1,
+                  kind: 'result',
+                  requestId: 1,
+                  algorithm: 'reference-only',
+                  computeMs: 0,
+                  folderPriorMs: 0,
+                  positions,
+                  metrics: {
+                    meanWithinFolderDistance: 0,
+                    meanCrossFolderDistance: 0,
+                    meanCrossFolderReferenceLength: 0,
+                    meanDisplacementFromInput: 0,
+                  },
+                } satisfies GlobalLayoutResult)
+              : ({
+                  schemaVersion: 2,
+                  kind: 'result',
+                  requestId: 1,
+                  stopReason: 'stable',
+                  policyVersion: 'local-fa2-convergence-v1',
+                  iterationsCompleted: 96,
+                  batchesCompleted: 3,
+                  stableBatches: 3,
+                  finalMovement: null,
+                  computeMs: 0,
+                  positions,
+                } satisfies LocalLayoutResult);
+          },
         );
         const layoutService = { layout, dispose: noop };
         const globalCache = new GlobalLayoutCache();
@@ -134,7 +155,7 @@ describe.each(['global', 'local'] as const)(
                   : { presentationOverrides: overrides }),
                 fitRequestKey: 0,
                 layoutRequestKey: 0,
-                layoutService,
+                layoutService: layoutService as unknown as GlobalLayoutService,
                 layoutCache: globalCache,
                 instrumentation:
                   instrumentation as GlobalRendererInstrumentation,
@@ -152,7 +173,7 @@ describe.each(['global', 'local'] as const)(
                   ? {}
                   : { presentationOverrides: overrides }),
                 layoutRequestKey: 0,
-                layoutService,
+                layoutService: layoutService as unknown as LocalLayoutService,
                 layoutCache: localCache,
                 instrumentation:
                   instrumentation as LocalRendererInstrumentation,

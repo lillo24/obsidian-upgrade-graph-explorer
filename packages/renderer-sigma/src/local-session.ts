@@ -767,23 +767,19 @@ export class LocalRendererSession {
 
   createLayoutRequest(
     input: LocalRendererInput,
-    iterations: number,
   ): Omit<LocalLayoutRequest, 'requestId'> {
-    return createLocalLayoutRequest(
-      {
-        ...input,
-        nodes: input.nodes.map((node) => {
-          const current = this.graph.hasNode(node.key)
-            ? this.graph.getNodeAttributes(node.key)
-            : node.attributes;
-          return {
-            ...node,
-            attributes: { ...node.attributes, x: current.x, y: current.y },
-          };
-        }),
-      },
-      iterations,
-    );
+    return createLocalLayoutRequest({
+      ...input,
+      nodes: input.nodes.map((node) => {
+        const current = this.graph.hasNode(node.key)
+          ? this.graph.getNodeAttributes(node.key)
+          : node.attributes;
+        return {
+          ...node,
+          attributes: { ...node.attributes, x: current.x, y: current.y },
+        };
+      }),
+    });
   }
 
   private measureDensity(
