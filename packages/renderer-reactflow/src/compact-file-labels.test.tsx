@@ -113,4 +113,31 @@ describe('Compact File disambiguation', () => {
       ).not.toContain('compact-file-context');
     }
   });
+
+  it('renders one accessible direct-connection ring without changing the File box', () => {
+    const node = mapProjectionToReactFlow(projection, 'structure', {
+      visualVariant: 'compact-schematic',
+    }).nodes.find((candidate) => candidate.type === 'entity') as EntityFlowNode;
+    const withRing: EntityFlowNode = {
+      ...node,
+      data: {
+        ...node.data,
+        focusSchematicModuleId: 'module-one',
+        focusSchematicHoverBehavior: 'module-aggregate',
+        hasDirectFileConnectionRing: true,
+      },
+    };
+    const markup = renderNode(withRing);
+    expect(markup).toContain(
+      'class="file-direct-connection-ring nodrag nopan"',
+    );
+    expect(markup).toContain(
+      `aria-label="Show direct File connections for ${withRing.data.title}"`,
+    );
+    expect(
+      markup.match(/file-direct-connection-ring nodrag nopan/g),
+    ).toHaveLength(1);
+    expect(withRing.width).toBe(node.width);
+    expect(withRing.height).toBe(node.height);
+  });
 });

@@ -15,6 +15,8 @@ import type {
 
 /** Two outward and two inward passes keep endpoint ordering work bounded. */
 export const FOCUS_SCHEMATIC_ENDPOINT_ORDERING_SWEEP_COUNT = 4;
+/** One forward and one backward adjacent-swap pass inside each center stack. */
+export const FOCUS_SCHEMATIC_CENTER_STACK_ORDERING_SWEEP_COUNT = 2;
 
 const EPSILON = 1e-6;
 const compareText = (left: string, right: string): number =>
@@ -252,6 +254,145 @@ function descendants(
   };
   visit(rootId);
   return result;
+}
+
+export function minimizeFocusSchematicCenterStackCrossings(
+  input: FocusSchematicLayoutInput,
+  modulePlan: FocusSchematicLayoutPlan,
+  endpointPlan: FocusSchematicEndpointPlan,
+  lanePlan: FocusSchematicInternalLanePlan,
+  initial: FocusSchematicLayoutCandidate,
+): FocusSchematicLayoutCandidate {
+  const laneByNodeId = new Map(
+    lanePlan.nodes.map(({ projectionNodeId, lane }) => [
+      projectionNodeId,
+      lane,
+    ]),
+  );
+  const moduleByNodeId = new Map(
+    input.model.modules.flatMap((module) =>
+      module.visibleEntityNodeIds.map((nodeId) => [nodeId, module.id] as const),
+    ),
+  );
+  const childrenByNodeId = new Map<ProjectionNodeId, ProjectionNodeId[]>();
+  for (const edge of input.projection.edges) {
+    if (
+      edge.kind !== 'hierarchy' ||
+      moduleByNodeId.get(edge.sourceNodeId) !==
+        moduleByNodeId.get(edge.targetNodeId)
+    )
+      continue;
+    const children = childrenByNodeId.get(edge.sourceNodeId) ?? [];
+    children.push(edge.targetNodeId);
+    childrenByNodeId.set(edge.sourceNodeId, children);
+  }
+  const sourceLineByNodeId = new Map(
+    input.projection.nodes.flatMap((node) =>
+      node.kind === 'entity' ? [[node.id, node.sourceStartLine] as const] : [],
+    ),
+  );
+  const sourceOrder = (left: ProjectionNodeId, right: ProjectionNodeId) =>
+    (sourceLineByNodeId.get(left) ?? Number.MAX_SAFE_INTEGER) -
+      (sourceLineByNodeId.get(right) ?? Number.MAX_SAFE_INTEGER) ||
+    compareText(left, right);
+  for (const children of childrenByNodeId.values()) children.sort(sourceOrder);
+
+  const modules = input.model.modules
+    .filter(
+      (module) =>
+        module.presentation !== 'filtered' &&
+        module.documentProjectionNodeId !== null,
+    )
+    .sort((left, right) => compareText(left.id, right.id));
+  let candidate = initial;
+  for (
+    let sweep = 0;
+    sweep < FOCUS_SCHEMATIC_CENTER_STACK_ORDERING_SWEEP_COUNT;
+    sweep += 1
+  ) {
+    for (const module of modules) {
+      const documentId = module.documentProjectionNodeId;
+      if (documentId === null) continue;
+      const documentNode = candidate.nodes.find(
+        ({ projectionNodeId }) => projectionNodeId === documentId,
+      );
+      if (documentNode === undefined) continue;
+      const roots = (childrenByNodeId.get(documentId) ?? []).filter(
+        (nodeId) => laneByNodeId.get(nodeId) === 'center',
+      );
+      if (roots.length < 2) continue;
+      const branchNodeIds = roots.map((rootId) => {
+        const ids: ProjectionNodeId[] = [];
+        const visit = (nodeId: ProjectionNodeId) => {
+          if (laneByNodeId.get(nodeId) !== 'center') return;
+          ids.push(nodeId);
+          for (const childId of childrenByNodeId.get(nodeId) ?? [])
+            visit(childId);
+        };
+        visit(rootId);
+        return { rootId, nodeIds: ids };
+      });
+
+      for (const side of ['above', 'below'] as const) {
+        const branches = () =>
+          branchNodeIds
+            .map((branch) => {
+              const nodes = candidate.nodes.filter(({ projectionNodeId }) =>
+                branch.nodeIds.includes(projectionNodeId),
+              );
+              if (nodes.length !== branch.nodeIds.length) return null;
+              return {
+                ...branch,
+                top: Math.min(...nodes.map(({ y }) => y)),
+                bottom: Math.max(...nodes.map(({ y, height }) => y + height)),
+              };
+            })
+            .filter((branch) => branch !== null)
+            .filter((branch) =>
+              side === 'above'
+                ? branch.bottom <= documentNode.y + EPSILON
+                : branch.top >= documentNode.y + documentNode.height - EPSILON,
+            )
+            .sort(
+              (left, right) =>
+                left.top - right.top || sourceOrder(left.rootId, right.rootId),
+            );
+        const initialBranches = branches();
+        if (initialBranches.length < 2) continue;
+        const indexes = Array.from(
+          { length: initialBranches.length - 1 },
+          (_, index) => index,
+        );
+        if (sweep % 2 === 1) indexes.reverse();
+        for (const index of indexes) {
+          const current = branches();
+          const upper = current[index];
+          const lower = current[index + 1];
+          if (upper === undefined || lower === undefined) continue;
+          const gap = lower.top - upper.bottom;
+          if (gap < -EPSILON) continue;
+          const lowerHeight = lower.bottom - lower.top;
+          const deltaByNodeId = new Map<ProjectionNodeId, number>();
+          for (const nodeId of lower.nodeIds)
+            deltaByNodeId.set(nodeId, upper.top - lower.top);
+          for (const nodeId of upper.nodeIds)
+            deltaByNodeId.set(
+              nodeId,
+              upper.top + lowerHeight + gap - upper.top,
+            );
+          const proposal = translateNodes(candidate, deltaByNodeId);
+          if (
+            improves(
+              orderingScore(modulePlan, endpointPlan, proposal),
+              orderingScore(modulePlan, endpointPlan, candidate),
+            )
+          )
+            candidate = proposal;
+        }
+      }
+    }
+  }
+  return candidate;
 }
 
 function reorderSiblingBranches(
@@ -598,7 +739,19 @@ export function minimizeFocusSchematicEndpointCrossings(
   lanePlan: FocusSchematicInternalLanePlan,
   initial: FocusSchematicLayoutCandidate,
 ): FocusSchematicLayoutCandidate {
-  const candidate = sweepMacroRanks(input, modulePlan, endpointPlan, initial);
+  const macroOrdered = sweepMacroRanks(
+    input,
+    modulePlan,
+    endpointPlan,
+    initial,
+  );
+  const candidate = minimizeFocusSchematicCenterStackCrossings(
+    input,
+    modulePlan,
+    endpointPlan,
+    lanePlan,
+    macroOrdered,
+  );
   return reorderSiblingBranches(
     input,
     modulePlan,

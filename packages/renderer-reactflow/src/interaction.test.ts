@@ -72,6 +72,13 @@ describe('renderer interaction helpers', () => {
       kind: 'node',
       id: 'projection-section',
     });
+    expect(
+      graph.nodes.some(
+        (node) =>
+          node.type === 'entity' &&
+          node.data.focusSchematicModuleId !== undefined,
+      ),
+    ).toBe(false);
 
     expect(
       highlighted.nodes.filter((node) =>

@@ -330,6 +330,13 @@ export function prepareFocusSchematicRendererGraph(
       node,
     ]),
   );
+  const moduleIdByProjectionNodeId = new Map(
+    input.model.modules.flatMap((module) =>
+      module.visibleEntityNodeIds.map(
+        (projectionNodeId) => [projectionNodeId, module.id] as const,
+      ),
+    ),
+  );
   const entityNodes = [...candidateNodeById]
     .sort(([left], [right]) => compareText(left, right))
     .map(([projectionNodeId, geometry]) => {
@@ -338,12 +345,26 @@ export function prepareFocusSchematicRendererGraph(
         throw new Error(
           `Visible entity "${projectionNodeId}" is missing from React Flow mapping.`,
         );
+      const moduleId = moduleIdByProjectionNodeId.get(projectionNodeId);
+      if (moduleId === undefined)
+        throw new Error(
+          `Visible entity "${projectionNodeId}" has no Focus module owner.`,
+        );
       return {
         ...baseNode,
         position: { x: geometry.x, y: geometry.y },
         width: geometry.width,
         height: geometry.height,
         measured: { width: geometry.width, height: geometry.height },
+        data: {
+          ...baseNode.data,
+          focusSchematicModuleId: moduleId,
+          focusSchematicHoverBehavior:
+            baseNode.data.entityKind === 'document'
+              ? ('module-aggregate' as const)
+              : ('exact' as const),
+          hasDirectFileConnectionRing: false,
+        },
         zIndex: 2,
       };
     });
@@ -536,8 +557,44 @@ export function prepareFocusSchematicRendererGraph(
     mappedProjectionEdgeIds.add(projectionEdgeId);
   }
 
+  const structuredModuleIds = new Set(
+    input.model.modules
+      .filter((module) =>
+        module.visibleEntityNodeIds.some(
+          (projectionNodeId) =>
+            projectionNodeId !== module.documentProjectionNodeId,
+        ),
+      )
+      .map(({ id }) => id),
+  );
+  const directDocumentNodeIds = new Set<string>();
+  const nodeByRendererId = new Map(nodes.map((node) => [node.id, node]));
+  for (const edge of edges) {
+    if (edge.data?.kind !== 'reference') continue;
+    for (const endpointId of [edge.source, edge.target]) {
+      const endpoint = nodeByRendererId.get(endpointId);
+      if (
+        endpoint?.type === 'entity' &&
+        endpoint.data.entityKind === 'document' &&
+        endpoint.data.focusSchematicModuleId !== undefined &&
+        structuredModuleIds.has(endpoint.data.focusSchematicModuleId)
+      )
+        directDocumentNodeIds.add(endpoint.id);
+    }
+  }
+  const decoratedNodes = nodes.map((node): GraphFlowNode =>
+    node.type === 'entity' && node.data.entityKind === 'document'
+      ? {
+          ...node,
+          data: {
+            ...node.data,
+            hasDirectFileConnectionRing: directDocumentNodeIds.has(node.id),
+          },
+        }
+      : node,
+  );
   const graph: RendererGraph = {
-    nodes,
+    nodes: decoratedNodes,
     edges: edges.sort((left, right) => compareText(left.id, right.id)),
     layoutWarning: null,
   };

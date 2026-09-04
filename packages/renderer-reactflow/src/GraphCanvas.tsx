@@ -32,6 +32,7 @@ import {
 import { EntityDisclosureProvider } from './disclosure-context';
 import { shouldActivateEntityFocus } from './focus-interaction';
 import { applyRendererInteractionState } from './highlight';
+import { DocumentDirectHoverProvider } from './hover-context';
 import {
   applyRendererLayoutPositions,
   createRendererLayoutInput,
@@ -55,6 +56,7 @@ import type {
   GraphCanvasProps,
   GraphFlowEdge,
   GraphFlowNode,
+  GraphHoverTarget,
   GraphSelection,
   GraphTransitionAnchor,
   RendererGraph,
@@ -153,6 +155,8 @@ function GraphCanvasInner({
   visualVariant = 'extended',
 }: GraphCanvasProps) {
   const [hovered, setHovered] = useState<GraphSelection | null>(null);
+  const [documentDirectHover, setDocumentDirectHoverTarget] =
+    useState<GraphHoverTarget | null>(null);
   const { fitView, getInternalNode, getViewport, setCenter, setViewport } =
     useReactFlow<GraphFlowNode, GraphFlowEdge>();
   const nodesInitialized = useNodesInitialized();
@@ -448,11 +452,15 @@ function GraphCanvasInner({
   const interactive = useMemo(() => {
     if (prepared === null) return null;
     const apply = () =>
-      applyRendererInteractionState(prepared, hovered, selection);
+      applyRendererInteractionState(
+        prepared,
+        documentDirectHover ?? hovered,
+        selection,
+      );
     return performance === undefined
       ? apply()
       : performance.measure('highlight', 'highlight-applications', apply);
-  }, [hovered, performance, prepared, selection]);
+  }, [documentDirectHover, hovered, performance, prepared, selection]);
   const nodes = useMemo(
     () => (interactive === null ? [] : [...interactive.nodes]),
     [interactive],
@@ -650,6 +658,17 @@ function GraphCanvasInner({
     [],
   );
   const clearHover = useCallback(() => setHovered(null), []);
+  const setDocumentDirectHover = useCallback(
+    (nodeId: string, active: boolean) =>
+      setDocumentDirectHoverTarget((current) =>
+        active
+          ? { kind: 'document-direct', id: nodeId }
+          : current?.kind === 'document-direct' && current.id === nodeId
+            ? null
+            : current,
+      ),
+    [],
+  );
   const clearSelection = useCallback(
     () => onSelectionChange(null),
     [onSelectionChange],
@@ -1050,85 +1069,91 @@ function GraphCanvasInner({
         disabled={layoutPending}
         onToggleEntity={toggleEntityAnchored}
       >
-        <ReactFlow<GraphFlowNode, GraphFlowEdge>
-          aria-label="Interactive projected knowledge graph"
-          colorMode="light"
-          deleteKeyCode={null}
-          edgeTypes={GRAPH_EDGE_TYPES}
-          edges={edges}
-          edgesFocusable
-          edgesReconnectable={false}
-          elementsSelectable
-          fitView={fitInitialViewport}
-          fitViewOptions={GRAPH_FIT_VIEW_OPTIONS}
-          maxZoom={GRAPH_MAX_ZOOM}
-          minZoom={GRAPH_MIN_ZOOM}
-          nodeTypes={GRAPH_NODE_TYPES}
-          nodes={nodes}
-          nodesConnectable={false}
-          nodesDraggable={false}
-          nodesFocusable
-          onEdgeClick={selectEdge}
-          onEdgeMouseEnter={hoverEdge}
-          onEdgeMouseLeave={clearHover}
-          onEdgesChange={syncEdgeChanges}
-          onInit={initializeViewport}
-          onNodeClick={selectNode}
-          onNodeDoubleClick={focusNode}
-          onNodeMouseEnter={hoverNode}
-          onNodeMouseLeave={clearHover}
-          onNodesChange={syncNodeChanges}
-          onMoveEnd={observeViewport}
-          onPaneClick={clearSelection}
-          panOnDrag
-          panOnScroll={trackpadZoomMode === 'pinch-zoom'}
-          proOptions={{ hideAttribution: false }}
-          selectionOnDrag={false}
-          zoomOnDoubleClick={false}
-          zoomOnPinch
-          zoomOnScroll={false}
+        <DocumentDirectHoverProvider
+          setDocumentDirectHover={setDocumentDirectHover}
         >
-          <Background
-            color="#cbd5da"
-            gap={24}
-            variant={BackgroundVariant.Dots}
-          />
-          <Controls
-            aria-label="Graph viewport controls"
+          <ReactFlow<GraphFlowNode, GraphFlowEdge>
+            aria-label="Interactive projected knowledge graph"
+            colorMode="light"
+            deleteKeyCode={null}
+            edgeTypes={GRAPH_EDGE_TYPES}
+            edges={edges}
+            edgesFocusable
+            edgesReconnectable={false}
+            elementsSelectable
+            fitView={fitInitialViewport}
             fitViewOptions={GRAPH_FIT_VIEW_OPTIONS}
-            onZoomIn={() => scheduleViewportObservation()}
-            onZoomOut={() => scheduleViewportObservation()}
-            showFitView={false}
-            showInteractive={false}
+            maxZoom={GRAPH_MAX_ZOOM}
+            minZoom={GRAPH_MIN_ZOOM}
+            nodeTypes={GRAPH_NODE_TYPES}
+            nodes={nodes}
+            nodesConnectable={false}
+            nodesDraggable={false}
+            nodesFocusable
+            onEdgeClick={selectEdge}
+            onEdgeMouseEnter={hoverEdge}
+            onEdgeMouseLeave={clearHover}
+            onEdgesChange={syncEdgeChanges}
+            onInit={initializeViewport}
+            onNodeClick={selectNode}
+            onNodeDoubleClick={focusNode}
+            onNodeMouseEnter={hoverNode}
+            onNodeMouseLeave={clearHover}
+            onNodesChange={syncNodeChanges}
+            onMoveEnd={observeViewport}
+            onPaneClick={clearSelection}
+            panOnDrag
+            panOnScroll={trackpadZoomMode === 'pinch-zoom'}
+            proOptions={{ hideAttribution: false }}
+            selectionOnDrag={false}
+            zoomOnDoubleClick={false}
+            zoomOnPinch
+            zoomOnScroll={false}
           >
-            <ControlButton
-              aria-label="Fit graph to view"
-              className="graph-control-button--fit"
-              disabled={layoutPending}
-              onClick={() => void fitGraph()}
-              title="Fit graph to view"
+            <Background
+              color="#cbd5da"
+              gap={24}
+              variant={BackgroundVariant.Dots}
+            />
+            <Controls
+              aria-label="Graph viewport controls"
+              fitViewOptions={GRAPH_FIT_VIEW_OPTIONS}
+              onZoomIn={() => scheduleViewportObservation()}
+              onZoomOut={() => scheduleViewportObservation()}
+              showFitView={false}
+              showInteractive={false}
             >
-              <FitGraphIcon />
-            </ControlButton>
-            {onMaximizedChange === undefined ? null : (
               <ControlButton
-                aria-label={
-                  maximized === true ? 'Restore graph' : 'Maximize graph'
-                }
-                aria-pressed={maximized === true}
-                className="graph-control-button--maximize"
-                onClick={() => onMaximizedChange(maximized !== true)}
-                title={maximized === true ? 'Restore graph' : 'Maximize graph'}
+                aria-label="Fit graph to view"
+                className="graph-control-button--fit"
+                disabled={layoutPending}
+                onClick={() => void fitGraph()}
+                title="Fit graph to view"
               >
-                {maximized === true ? (
-                  <RestoreGraphIcon />
-                ) : (
-                  <MaximizeGraphIcon />
-                )}
+                <FitGraphIcon />
               </ControlButton>
-            )}
-          </Controls>
-        </ReactFlow>
+              {onMaximizedChange === undefined ? null : (
+                <ControlButton
+                  aria-label={
+                    maximized === true ? 'Restore graph' : 'Maximize graph'
+                  }
+                  aria-pressed={maximized === true}
+                  className="graph-control-button--maximize"
+                  onClick={() => onMaximizedChange(maximized !== true)}
+                  title={
+                    maximized === true ? 'Restore graph' : 'Maximize graph'
+                  }
+                >
+                  {maximized === true ? (
+                    <RestoreGraphIcon />
+                  ) : (
+                    <MaximizeGraphIcon />
+                  )}
+                </ControlButton>
+              )}
+            </Controls>
+          </ReactFlow>
+        </DocumentDirectHoverProvider>
       </EntityDisclosureProvider>
     </div>
   );

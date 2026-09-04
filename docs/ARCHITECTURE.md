@@ -1221,14 +1221,33 @@ atomic adoption. Pending replacement preserves only still-valid identities from
 the previous graph. Failure retains a last valid modular result, or requests a
 session-only Classic fallback when no valid result exists. The global preference
 remains Modular Preview so Retry is explicit. Coordinates stay derived and
-page-local. HIER4 retains folder-band positioning, HIER5 retains complete route
-ownership, and HIER3C retains any product-default change.
+page-local.
+
+HIER3B-FIX1 revises only selected A1 internals and renderer interaction. A
+qualifying File module independently lays out each top-level center structural
+branch, composes a balanced source-contiguous above/File/below spine, then
+reanchors side subtrees before macro layout. Two bounded in-stack swap sweeps
+may use precise non-secondary endpoint evidence after macro geometry exists.
+The strategy name stays stable while cache/evidence algorithm revision 2 makes
+the geometry change explicit.
+
+The prepared modular graph now assigns exact module ownership and hover policy
+to each entity. File hover aggregates currently rendered relationships for the
+whole module; Heading, Block, and edge hover remain exact. A renderer-only
+direct-File hover target and narrow nested context own the non-geometric ring.
+`GraphSelection`, Inspector, history, projection, model, worker, and cache state
+remain unchanged by hover.
+
+HIER4 retains soft folder-band positioning, HIER5 retains Direct/Electronic
+orthogonal routing and overlapping-path hit-target separation, and HIER3C
+retains any product-default change.
 
 Optimized desktop graphical QA approved the preview with visible module
 boundaries and confirmed exact endpoints, root/rank positioning, multi-hop
 orientation, disclosure, implementation switching, secondary-edge geometry
 invariance, Inspector behavior, and current touchpad navigation. This completes
-HIER3B. HIER3C is the next milestone and remains unstarted.
+HIER3B. HIER3B-FIX1 is the current release candidate; HIER4 is next after
+approval, HIER5 follows HIER4, and HIER3C follows HIER5.
 
 ## HIER0 product exposure and geometry
 

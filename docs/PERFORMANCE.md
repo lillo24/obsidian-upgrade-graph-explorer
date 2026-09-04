@@ -1101,3 +1101,23 @@ worker, 0.99 kB for the Classic component, 50.02 kB for W3, and 720.76 kB for
 the main application. Content hashes and exact byte counts may change; chunk
 separation is the architectural gate. Native responsiveness remains a graphical
 release observation and must not be recorded as passed before user approval.
+
+## HIER3B-FIX1 center-spine and hover evidence
+
+The selected A1 algorithm revision 2 replaces one wide center Dagre region in
+qualifying modules with independent top-level branch calls plus deterministic
+above/File/below composition. The existing `centerLayoutMs`, `compositionMs`,
+`crossingMinimizationMs`, and `dagreCallCount` fields cover branch layout,
+partition/composition, and the two bounded center-stack reorder sweeps. The new
+center-spine benchmark reports geometry and endpoint metrics for 5, 20, and 100
+branches plus nested and CS1–CS6 cases. Local 100-branch evidence remained 256
+px wide, used 102 Dagre calls, and completed in about 35 ms; timing is
+investigative rather than a CI threshold.
+
+Modular hover scans only the already prepared renderer nodes and displayed
+edges. The File aggregate, exact Heading/Block, exact edge, and direct-File ring
+paths perform zero projection, HIER1 construction, worker, layout, and cache
+operations. Secondary visibility changes edge/ring presentation only and keeps
+all node positions and measured dimensions byte-identical. The immutable
+prepared graph remains the performance boundary; no new dependency or
+serialized interaction index was needed for the bounded Focus workloads.

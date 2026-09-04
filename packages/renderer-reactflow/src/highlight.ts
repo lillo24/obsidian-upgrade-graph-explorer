@@ -1,6 +1,7 @@
 import type {
   GraphFlowEdge,
   GraphFlowNode,
+  GraphHoverTarget,
   GraphSelection,
   RendererGraph,
 } from './types';
@@ -12,7 +13,7 @@ export interface HighlightedRendererGraph extends RendererGraph {
 
 export function applyRendererHighlight(
   graph: RendererGraph,
-  active: GraphSelection | null,
+  active: GraphHoverTarget | null,
 ): HighlightedRendererGraph {
   if (active === null) return graph;
 
@@ -33,8 +34,45 @@ export function applyRendererHighlight(
     );
     if (node !== undefined) {
       highlightedNodeIds.add(node.id);
+      const directDocumentOnly = active.kind === 'document-direct';
+      const aggregateModuleId =
+        !directDocumentOnly &&
+        node.type === 'entity' &&
+        node.data.focusSchematicHoverBehavior === 'module-aggregate'
+          ? node.data.focusSchematicModuleId
+          : undefined;
+      const moduleNodeIds = new Set(
+        aggregateModuleId === undefined
+          ? []
+          : graph.nodes
+              .filter(
+                (candidate) =>
+                  (candidate.type === 'entity' &&
+                    candidate.data.focusSchematicModuleId ===
+                      aggregateModuleId) ||
+                  (candidate.type === 'module' &&
+                    candidate.data.moduleId === aggregateModuleId),
+              )
+              .map(({ id }) => id),
+      );
+      for (const moduleNodeId of moduleNodeIds)
+        highlightedNodeIds.add(moduleNodeId);
       for (const edge of graph.edges) {
-        if (edge.source === node.id || edge.target === node.id) {
+        const incidentToExact =
+          edge.source === node.id || edge.target === node.id;
+        const incidentToModule =
+          moduleNodeIds.has(edge.source) || moduleNodeIds.has(edge.target);
+        const hierarchyInsideModule =
+          edge.data?.kind === 'hierarchy' &&
+          moduleNodeIds.has(edge.source) &&
+          moduleNodeIds.has(edge.target);
+        const include = directDocumentOnly
+          ? edge.data?.kind === 'reference' && incidentToExact
+          : aggregateModuleId === undefined
+            ? incidentToExact
+            : hierarchyInsideModule ||
+              (edge.data?.kind === 'reference' && incidentToModule);
+        if (include) {
           highlightedEdgeIds.add(edge.id);
           highlightedNodeIds.add(edge.source);
           highlightedNodeIds.add(edge.target);
@@ -66,7 +104,7 @@ export function applyRendererHighlight(
  */
 export function applyRendererInteractionState(
   graph: RendererGraph,
-  hovered: GraphSelection | null,
+  hovered: GraphHoverTarget | null,
   selection: GraphSelection | null,
 ): HighlightedRendererGraph {
   const highlighted = applyRendererHighlight(graph, hovered);

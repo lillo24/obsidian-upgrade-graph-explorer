@@ -12,11 +12,16 @@ import {
 } from './endpoint-facing';
 import {
   buildEndpointFixture,
+  CENTER_SPINE_FIXTURES,
   ENDPOINT_FIXTURES,
   ENDPOINT_STABILITY_PAIRS,
   type EndpointFixtureSpec,
 } from './endpoint-fixtures';
 import { validateFocusSchematicInternalLanePlan } from './lane-plan';
+import {
+  measureFocusSchematicEndpointOrder,
+  minimizeFocusSchematicCenterStackCrossings,
+} from './crossing-minimization';
 import { validateFocusSchematicLayoutInput } from './input';
 import { createFocusSchematicLayoutPlan } from './plan';
 import { layoutInput } from './test-helpers';
@@ -611,5 +616,180 @@ describe('HIER3A endpoint plan and endpoint-facing layout', () => {
         nodeDimensions: [...input.nodeDimensions].reverse(),
       }).valid,
     ).toBe(false);
+  });
+});
+
+describe('HIER3B-FIX1 center-spine layout', () => {
+  it('covers CS1–CS6 with deterministic, valid geometry', () => {
+    expect(CENTER_SPINE_FIXTURES.map(({ id }) => id)).toEqual(
+      Array.from({ length: 6 }, (_, index) => `CS${index + 1}`),
+    );
+    for (const fixtureSpec of CENTER_SPINE_FIXTURES) {
+      const fixture = buildEndpointFixture(fixtureSpec);
+      const input = layoutInput(fixture);
+      const first = computeFocusSchematicComputedLayoutAttempt(input);
+      const second = computeFocusSchematicComputedLayoutAttempt(input);
+      expect(first.status, fixtureSpec.id).toBe('success');
+      expect(second.status, fixtureSpec.id).toBe('success');
+      if (first.status !== 'success' || second.status !== 'success') continue;
+      expect(first.configId, fixtureSpec.id).toContain('A1v2-');
+      expect(second.result, fixtureSpec.id).toEqual(first.result);
+      expect(first.result.quality, fixtureSpec.id).toMatchObject({
+        moduleOverlapPairs: [],
+        nodeOverlapPairs: [],
+        nodeOutsideModuleIds: [],
+        invalidLaneTransitionEdgeIds: [],
+        obstructedSourceAttachmentConnectionIds: [],
+        obstructedTargetAttachmentConnectionIds: [],
+      });
+    }
+  });
+
+  it('CS1 replaces the five-wide row with a source-contiguous spine around the File', () => {
+    const fixture = buildEndpointFixture(CENTER_SPINE_FIXTURES[0]!);
+    const input = layoutInput(fixture);
+    const attempt = computeFocusSchematicComputedLayoutAttempt(input);
+    if (attempt.status !== 'success') throw new Error(attempt.reason);
+    const fileId = projectionNodeId(fixture, 'Atlas');
+    const file = attempt.result.candidate.nodes.find(
+      ({ projectionNodeId: id }) => id === fileId,
+    )!;
+    const headingIds = Array.from({ length: 5 }, (_, index) =>
+      projectionNodeId(fixture, `Atlas-center-${index + 1}`),
+    );
+    const headings = headingIds.map((id) =>
+      attempt.result.candidate.nodes.find(
+        ({ projectionNodeId }) => projectionNodeId === id,
+      ),
+    );
+    expect(new Set(headings.map((node) => node?.y)).size).toBe(5);
+    expect(
+      headings.filter((node) => node !== undefined && node.y < file.y),
+    ).toHaveLength(2);
+    expect(
+      headings.filter(
+        (node) => node !== undefined && node.y > file.y + file.height,
+      ),
+    ).toHaveLength(3);
+
+    const atlasModule = attempt.result.candidate.modules.find(
+      ({ moduleId }) => moduleId === 'Atlas',
+    )!;
+    const headingDimensions = input.nodeDimensions.filter(
+      ({ projectionNodeId }) => headingIds.includes(projectionNodeId),
+    );
+    const oldFiveWideWidth =
+      headingDimensions.reduce((sum, item) => sum + item.width, 0) +
+      input.settings.internalNodeSeparation * (headingDimensions.length - 1) +
+      input.settings.modulePaddingX * 2;
+    expect(atlasModule.width).toBeLessThanOrEqual(oldFiveWideWidth);
+    expect(attempt.result.quality.exactEndpointCrossingCount).toBe(0);
+    expect(attempt.result.quality.adjacentRankOrderInversionCount).toBe(0);
+  });
+
+  it('CS5 applies the same center-spine rule to a non-root module', () => {
+    const fixture = buildEndpointFixture(CENTER_SPINE_FIXTURES[4]!);
+    const attempt = computeFocusSchematicComputedLayoutAttempt(
+      layoutInput(fixture),
+    );
+    if (attempt.status !== 'success') throw new Error(attempt.reason);
+    const beacon = attempt.result.candidate.modules.find(
+      ({ moduleId }) => moduleId === 'Beacon',
+    )!;
+    const beaconNodeYs = attempt.result.candidate.nodes
+      .filter(({ moduleId }) => moduleId === 'Beacon')
+      .map(({ y }) => y);
+    expect(new Set(beaconNodeYs).size).toBe(6);
+    expect(beacon.width).toBeLessThan(300);
+  });
+
+  it('accepts a within-stack swap only when exact endpoint crossings improve', () => {
+    const entities = Array.from({ length: 4 }, (_, index) => ({
+      id: `Atlas-center-${index + 1}`,
+      kind: 'section' as const,
+      documentId: 'Atlas',
+      parentId: 'Atlas',
+      line: 2 + index * 2,
+    }));
+    const fixture = buildEndpointFixture({
+      id: 'CS7',
+      label: 'Endpoint-driven center swap',
+      authored: 'Four dual-demand branches connect matching left/right Files.',
+      expectation: 'A crossing pair swaps only inside its existing stack.',
+      inspect: 'The File remains between the above and below stacks.',
+      rootDocumentId: 'Atlas',
+      documents: [
+        { id: 'Atlas' },
+        ...Array.from({ length: 4 }, (_, index) => ({
+          id: `Left-${index + 1}`,
+        })),
+        ...Array.from({ length: 4 }, (_, index) => ({
+          id: `Right-${index + 1}`,
+        })),
+      ],
+      entities,
+      references: entities.flatMap((entity, index) => [
+        {
+          sourceEntityId: `Left-${index + 1}`,
+          targetEntityId: entity.id,
+        },
+        {
+          sourceEntityId: entity.id,
+          targetEntityId: `Right-${index + 1}`,
+        },
+      ]),
+      hops: 1,
+    });
+    const input = layoutInput(fixture);
+    const attempt = computeFocusSchematicComputedLayoutAttempt(input);
+    if (attempt.status !== 'success') throw new Error(attempt.reason);
+    const ids = entities.map(({ id }) => projectionNodeId(fixture, id));
+    const fileId = projectionNodeId(fixture, 'Atlas');
+    const file = attempt.result.candidate.nodes.find(
+      ({ projectionNodeId: id }) => id === fileId,
+    )!;
+    const above = attempt.result.candidate.nodes
+      .filter(({ projectionNodeId: id, y }) => ids.includes(id) && y < file.y)
+      .sort((left, right) => left.y - right.y);
+    expect(above).toHaveLength(2);
+    const [first, second] = above;
+    const crossed = {
+      ...attempt.result.candidate,
+      nodes: attempt.result.candidate.nodes.map((node) =>
+        node.projectionNodeId === first!.projectionNodeId
+          ? { ...node, y: second!.y }
+          : node.projectionNodeId === second!.projectionNodeId
+            ? { ...node, y: first!.y }
+            : node,
+      ),
+    };
+    const before = measureFocusSchematicEndpointOrder(
+      attempt.result.modulePlan,
+      attempt.result.endpointPlan,
+      crossed,
+    );
+    const repaired = minimizeFocusSchematicCenterStackCrossings(
+      input,
+      attempt.result.modulePlan,
+      attempt.result.endpointPlan,
+      attempt.result.internalLanePlan,
+      crossed,
+    );
+    const after = measureFocusSchematicEndpointOrder(
+      attempt.result.modulePlan,
+      attempt.result.endpointPlan,
+      repaired,
+    );
+    expect(before.exactEndpointCrossingCount).toBeGreaterThan(
+      after.exactEndpointCrossingCount,
+    );
+    expect(
+      repaired.nodes
+        .filter(({ projectionNodeId: id }) => ids.includes(id))
+        .every(
+          (node) =>
+            node.y + node.height <= file.y || node.y >= file.y + file.height,
+        ),
+    ).toBe(true);
   });
 });

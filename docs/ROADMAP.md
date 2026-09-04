@@ -26,16 +26,17 @@ Future package names, state libraries, and implementation details are intentiona
 
 ### HIER — Focus Schematic redesign
 
-| Milestone  | Outcome                                                                                                                                               | Status                                                            |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| **HIER0**  | Experimental All-Hierarchy gate and collision-safe geometry baseline.                                                                                 | **Complete.**                                                     |
-| **HIER1**  | Source-neutral File-module semantic model and shared layout-quality harness.                                                                          | **Complete.**                                                     |
-| **HIER2**  | Dagre/custom prototype bake-off through the HIER1 candidate contract.                                                                                 | **Complete — stateless two-stage Dagre selected.**                |
-| **HIER3A** | Precise File/Heading/Block endpoint plan, endpoint-facing internal lanes, bounded endpoint-aware ordering, and validated non-production A1 selection. | **Complete — `ADOPT_ENDPOINT_FACING_SPLIT_LANES`.**               |
-| **HIER3B** | Production modular worker and renderer preview with latest-result-wins adoption, caching/failure policy, and unchanged Classic fallback.              | **Complete — modular production preview approved.**               |
-| **HIER3C** | Product adoption of modular Focus Hierarchy and Experimental exposure of the preserved Classic Focus Hierarchy.                                       | **Next — modular default and Classic Experimental preservation.** |
-| **HIER4**  | Folder-band positioning for modular Focus Schematic geometry.                                                                                         | **Later.**                                                        |
-| **HIER5**  | Complete explicit cross-file obstacle/channel routing over exact endpoint attachments.                                                                | **Later.**                                                        |
+| Milestone       | Outcome                                                                                                                                               | Status                                                                |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| **HIER0**       | Experimental All-Hierarchy gate and collision-safe geometry baseline.                                                                                 | **Complete.**                                                         |
+| **HIER1**       | Source-neutral File-module semantic model and shared layout-quality harness.                                                                          | **Complete.**                                                         |
+| **HIER2**       | Dagre/custom prototype bake-off through the HIER1 candidate contract.                                                                                 | **Complete — stateless two-stage Dagre selected.**                    |
+| **HIER3A**      | Precise File/Heading/Block endpoint plan, endpoint-facing internal lanes, bounded endpoint-aware ordering, and validated non-production A1 selection. | **Complete — `ADOPT_ENDPOINT_FACING_SPLIT_LANES`.**                   |
+| **HIER3B**      | Production modular worker and renderer preview with latest-result-wins adoption, caching/failure policy, and unchanged Classic fallback.              | **Complete — modular production preview approved.**                   |
+| **HIER3B-FIX1** | Center-spine module composition plus module-aware File hover and a direct-File connection ring.                                                       | **Release candidate — optimized desktop graphical approval pending.** |
+| **HIER4**       | Soft folder-band positioning after signed-rank and endpoint-readability constraints.                                                                  | **Next after HIER3B-FIX1.**                                           |
+| **HIER5**       | Direct/Electronic orthogonal routing, Rounded route styling, channels, and distinct hit targets over exact endpoints.                                 | **After HIER4.**                                                      |
+| **HIER3C**      | Product adoption of modular Focus Hierarchy and Experimental exposure of the preserved Classic Focus Hierarchy.                                       | **After HIER5.**                                                      |
 
 This track composes with the active KG14 sequence; it does not replace or
 reorder KG14.

@@ -25,6 +25,7 @@ pnpm benchmark:focus-schematic-endpoints -- --profile small
 pnpm benchmark:focus-schematic-endpoints -- --profile medium
 pnpm benchmark:focus-schematic-endpoints -- --profile hub
 pnpm benchmark:focus-schematic-endpoints -- --profile stability
+pnpm benchmark:focus-schematic-center-spine
 pnpm generate:focus-schematic-endpoint-lab -- --out output/hier3a-endpoint-lab
 
 pnpm benchmark:focus-schematic-production-worker -- --profile small
@@ -63,6 +64,8 @@ adjacent keyboard-accessible list. Generated output is gitignored.
 - `src/endpoint-benchmark.ts` compares A0/A1 endpoint quality, determinism,
   exact crossing/rank-order metrics, phase timings, Dagre-call counts, payload
   sizes, and ES1–ES8 stability.
+- `src/center-spine-benchmark.ts` reports revision-2 width/height, Dagre calls,
+  crossings, inversions, and timing for CS1–CS6 plus 5/20/100-branch stress.
 - `src/endpoint-attempt-worker.ts` bounds the 500-module A1 hub attempt.
 - `src/endpoint-lab.ts` generates the focused self-contained HIER3A review
   surface with EP1–EP26 and ES1–ES8.
