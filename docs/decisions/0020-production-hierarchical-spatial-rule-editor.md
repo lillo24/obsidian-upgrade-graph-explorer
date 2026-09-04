@@ -56,10 +56,9 @@ semantics, persisting resolved members, or running dynamic work on pointermove.
 14. Release remains gated on native mouse/precision-touchpad interaction in the
     optimized Tauri executable; browser and startup smoke are not substitutes.
 15. Applying authoritative spatial coordinates preserves the user's raw
-    graph-space viewport center, scale, and angle while Sigma recomputes its
-    normalization. Repair is armed before coordinate mutation and occurs after
-    processing but before drawing. It applies to Pull, Place, cache-hit, remove,
-    and reset adoption, including the final-rule transition to an empty registry.
+    graph-space viewport center, scale, and angle. It applies to Pull, Place,
+    cache-hit, remove, and reset adoption, including the final-rule transition
+    to an empty registry.
     The mutation cause, not only the new anchor/rule count, selects this path.
     Explicit Fit, Search center, initial framing, pan/zoom, and later camera
     transitions keep camera ownership.
@@ -68,11 +67,11 @@ semantics, persisting resolved members, or running dynamic work on pointermove.
     cooling, or hard-constraint neighbor reaction. Those policies remain owned
     by PHYSICS1/CONVERGENCE integration; MOVE1A's temporary constraint seam is
     not reused for spatial-rule target authoring.
-17. Merged PR #60 / FLICKER1 owns atomic Network camera transactions. SPATIAL2B
-    keeps only the raw-frame capture/restore needed for spatial normalization
-    and supplies it to FLICKER1's shared pre-mutation transaction. Graphology's
-    refresh remains authoritative; no nested refresh or competing camera owner
-    is introduced.
+17. Merged PR #60 / FLICKER1 owns atomic Network camera transactions. ADR 0021
+    later replaces SPATIAL2B's bounded raw-frame repair with a stable presented
+    normalization extent for ordinary coordinate adoption. It still uses
+    FLICKER1's shared pre-mutation transaction; Graphology's refresh remains
+    authoritative, with no nested refresh or competing camera owner.
 
 ## Consequences
 

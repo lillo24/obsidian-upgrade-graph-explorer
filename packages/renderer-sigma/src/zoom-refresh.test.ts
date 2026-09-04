@@ -31,6 +31,7 @@ vi.mock('sigma', () => ({
     readonly touchCaptor = { on: vi.fn(), off: vi.fn() };
     readonly scheduleRender = vi.fn();
     readonly scheduleRefresh = vi.fn(() => this.refresh());
+    readonly setCustomBBox = vi.fn();
     readonly kill = vi.fn();
 
     constructor(
@@ -65,6 +66,9 @@ vi.mock('sigma', () => ({
     }
     getGraphDimensions() {
       return { width: 1, height: 1 };
+    }
+    getBBox() {
+      return { x: [0, 1] as [number, number], y: [0, 1] as [number, number] };
     }
     getDimensions() {
       return { width: 1, height: 1 };

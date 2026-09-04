@@ -7,6 +7,7 @@ vi.mock('sigma', async () => ({
 import { resolveLocalDensityFit } from './local-density';
 import { localDensityFramingRatio } from './local-density-framing';
 import { LocalRendererSession } from './local-session';
+import { captureRawViewportFrame } from './raw-viewport-frame';
 import { SigmaTestRenderer } from './sigma-test-renderer';
 import type {
   LocalLayoutPosition,
@@ -111,6 +112,25 @@ describe('Focus density camera ownership', () => {
     const cached = mount({ initialAcceptedPositions: sparsePositions }, input);
     expect(cached.renderer.camera.ratio).toBe(expected);
     cached.session.destroy();
+  });
+
+  it('keeps later accepted Focus geometry camera-neutral after cached presentation', async () => {
+    const input = rendererInput();
+    const { session, renderer } = mount(
+      { initialAcceptedPositions: sparsePositions },
+      input,
+    );
+    renderer.normalizeDisplayCoordinates = true;
+    renderer.scheduleRefresh();
+    const frame = captureRawViewportFrame(renderer);
+
+    await session.applyPositions(compactPositions);
+
+    const adopted = captureRawViewportFrame(renderer);
+    expect(adopted.center.x).toBeCloseTo(frame.center.x, 8);
+    expect(adopted.center.y).toBeCloseTo(frame.center.y, 8);
+    expect(adopted.graphUnitsPerPixel).toBeCloseTo(frame.graphUnitsPerPixel, 8);
+    session.destroy();
   });
 
   it('interpolates automatic framing below and above ratio 1', async () => {

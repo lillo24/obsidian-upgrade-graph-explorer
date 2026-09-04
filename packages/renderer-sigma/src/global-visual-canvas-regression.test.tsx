@@ -21,6 +21,7 @@ import {
   mapProjectionToGlobalTopology,
 } from './mapping';
 import { createGlobalReferenceDegreeIndex } from './graph';
+import { captureRawViewportFrame } from './raw-viewport-frame';
 import { customGlobalLayoutSettings } from './settings';
 import { SigmaTestRenderer } from './sigma-test-renderer';
 import { globalTestProjection } from './test-fixture';
@@ -304,19 +305,73 @@ describe('All Network global visual settings ownership', () => {
       ...currentSettings.custom,
       linkForce: 1.2,
     });
+    renderer.normalizeDisplayCoordinates = true;
+    renderer.scheduleRefresh();
+    let rawFrame = captureRawViewportFrame(renderer);
     layoutRequestKey += 1;
     harness.invalidate();
     await harness.flush();
     expect(layout).toHaveBeenCalledTimes(2);
+    let adoptedFrame = captureRawViewportFrame(renderer);
+    expect(adoptedFrame.center.x).toBeCloseTo(rawFrame.center.x, 8);
+    expect(adoptedFrame.center.y).toBeCloseTo(rawFrame.center.y, 8);
+    expect(adoptedFrame.graphUnitsPerPixel).toBeCloseTo(
+      rawFrame.graphUnitsPerPixel,
+      8,
+    );
+
+    currentSettings = settings({
+      ...currentSettings.custom,
+      folderCohesion: 0.14,
+    });
+    rawFrame = captureRawViewportFrame(renderer);
+    layoutRequestKey += 1;
+    harness.invalidate();
+    await harness.flush();
+    expect(layout).toHaveBeenCalledTimes(3);
+    adoptedFrame = captureRawViewportFrame(renderer);
+    expect(adoptedFrame.center.x).toBeCloseTo(rawFrame.center.x, 8);
+    expect(adoptedFrame.center.y).toBeCloseTo(rawFrame.center.y, 8);
+    expect(adoptedFrame.graphUnitsPerPixel).toBeCloseTo(
+      rawFrame.graphUnitsPerPixel,
+      8,
+    );
 
     currentSettings = settings({
       ...currentSettings.custom,
       betweenFolderSpacing: 5,
     });
+    rawFrame = captureRawViewportFrame(renderer);
     layoutRequestKey += 1;
     harness.invalidate();
     await harness.flush();
-    expect(layout).toHaveBeenCalledTimes(3);
+    expect(layout).toHaveBeenCalledTimes(4);
+    adoptedFrame = captureRawViewportFrame(renderer);
+    expect(adoptedFrame.center.x).toBeCloseTo(rawFrame.center.x, 8);
+    expect(adoptedFrame.center.y).toBeCloseTo(rawFrame.center.y, 8);
+    expect(adoptedFrame.graphUnitsPerPixel).toBeCloseTo(
+      rawFrame.graphUnitsPerPixel,
+      8,
+    );
+
+    // Repeating Reference Pull after Folder Strength and Separation proves
+    // control order cannot grant a later worker result camera authority.
+    currentSettings = settings({
+      ...currentSettings.custom,
+      linkForce: 0.7,
+    });
+    rawFrame = captureRawViewportFrame(renderer);
+    layoutRequestKey += 1;
+    harness.invalidate();
+    await harness.flush();
+    expect(layout).toHaveBeenCalledTimes(5);
+    adoptedFrame = captureRawViewportFrame(renderer);
+    expect(adoptedFrame.center.x).toBeCloseTo(rawFrame.center.x, 8);
+    expect(adoptedFrame.center.y).toBeCloseTo(rawFrame.center.y, 8);
+    expect(adoptedFrame.graphUnitsPerPixel).toBeCloseTo(
+      rawFrame.graphUnitsPerPixel,
+      8,
+    );
     harness.destroy();
   });
 

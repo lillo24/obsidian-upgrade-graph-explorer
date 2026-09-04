@@ -34,6 +34,8 @@ import {
 } from './file-move';
 import type { TemporaryNodeConstraintEndReason } from './temporary-node-constraint';
 import { atomicAnchoredGraphMutation } from './anchored-refresh';
+import { NetworkPositionCameraIntentPolicy } from './network-camera-intent';
+import { networkPositionExtent } from './network-position-frame';
 
 import {
   buildGlobalGraph,
@@ -54,10 +56,6 @@ import {
 } from './global-label';
 import { createGlobalLayoutRequestFromAutomaticPositions } from './layout';
 import { automaticGlobalEdgeSize, automaticGlobalNodeSize } from './mapping';
-import {
-  captureRawViewportFrame,
-  restoreRawViewportFrame,
-} from './raw-viewport-frame';
 import {
   NodeClickArbitrator,
   NODE_DOUBLE_CLICK_TIMEOUT_MS,
@@ -198,6 +196,8 @@ export class GlobalRendererSession {
   private densityInput: GlobalRendererInput;
   private densityFramingStrength: number;
   private cameraOwnership: 'auto' | 'user';
+  private readonly positionCameraIntent: NetworkPositionCameraIntentPolicy;
+  private positionFrameEstablished = false;
   private latestDensityDecision: GlobalDensityDecision = {
     ratio: 1,
     nearestNeighborSignal: 1,
@@ -266,11 +266,13 @@ export class GlobalRendererSession {
   private readonly mouseDragHandler = (): void => {
     if (this.renderer.getMouseCaptor().isMouseDown) {
       this.cameraOwnership = 'user';
+      this.positionCameraIntent.claimCamera();
     }
   };
 
   private readonly touchMoveHandler = (): void => {
     this.cameraOwnership = 'user';
+    this.positionCameraIntent.claimCamera();
   };
 
   private readonly cameraUpdatedHandler = (): void => {
@@ -312,6 +314,7 @@ export class GlobalRendererSession {
     const original = coordinates.original as WheelEvent;
     preventSigmaWheelDefault(coordinates);
     this.cameraOwnership = 'user';
+    this.positionCameraIntent.claimCamera();
     const deltaPixels = normalizeWheelDeltaPixels(
       original,
       this.renderer.getDimensions().height,
@@ -359,6 +362,10 @@ export class GlobalRendererSession {
     globalDensityFramingRatio(1, this.densityFramingStrength);
     this.cameraOwnership =
       options.initialViewport === undefined ? 'auto' : 'user';
+    this.positionCameraIntent = new NetworkPositionCameraIntentPolicy(
+      options.initialViewport === undefined &&
+        options.initialAcceptedPositions === undefined,
+    );
     this.visualGroupStyles = options.visualGroupStyles;
     this.presentationOverrides = options.presentationOverrides;
     this.fileNodeKeys = indexFileNodeKeys(input.nodes);
@@ -387,11 +394,14 @@ export class GlobalRendererSession {
       edgeReducer: (key, attributes) => this.reduceEdge(key, attributes),
     });
     if (options.initialAcceptedPositions !== undefined) {
+      this.establishPositionFrame(options.initialAcceptedPositions);
+    } else if (options.initialViewport !== undefined) {
+      this.establishCurrentPositionFrame();
+    }
+    if (options.initialAcceptedPositions !== undefined) {
       this.measureDensity(options.initialAcceptedPositions);
       if (this.cameraOwnership === 'auto') {
-        this.renderer.getCamera().setState({
-          ratio: this.effectiveDensityRatio(),
-        });
+        this.applyAutomaticDensityFraming();
       }
     }
     if (options.initialViewport !== undefined) {
@@ -1014,6 +1024,7 @@ export class GlobalRendererSession {
     // Pointer and keyboard arrangement are explicit navigation. Confirmed
     // geometry may update density later, but it must not steal this viewport.
     this.cameraOwnership = 'user';
+    this.positionCameraIntent.claimCamera();
     const geometry = this.folderPreviewGeometry(folderKey);
     const preview = previewFolderClusterAtAnchor({
       geometry,
@@ -1069,6 +1080,7 @@ export class GlobalRendererSession {
       throw new Error('Arrange folders is not active.');
     }
     this.cameraOwnership = 'user';
+    this.positionCameraIntent.claimCamera();
     const frame = computeAutomaticGraphFrame(
       context.automaticPositions,
       globalFolderKeyByNodeKey(context.input).keys(),
@@ -1228,6 +1240,7 @@ export class GlobalRendererSession {
       anchorKey === undefined ? undefined : this.nodeViewportPoint(anchorKey);
     this.densityFramingStrength = strengthPercentage;
     this.cameraOwnership = 'user';
+    this.positionCameraIntent.claimCamera();
     const ratio = this.effectiveDensityRatio();
     if (anchorKey === undefined || anchor === undefined) {
       this.renderer.getCamera().setState({ ratio });
@@ -1589,6 +1602,36 @@ export class GlobalRendererSession {
     this.emitDensityQaDiagnostics();
   }
 
+  private applyAutomaticDensityFraming(): void {
+    this.renderer.getCamera().setState({
+      x: 0.5,
+      y: 0.5,
+      angle: 0,
+      ratio: this.effectiveDensityRatio(),
+    });
+    this.emitDensityQaDiagnostics();
+  }
+
+  private establishPositionFrame(
+    positions: readonly GlobalLayoutPosition[],
+  ): void {
+    if (this.positionFrameEstablished) return;
+    this.renderer.setCustomBBox(networkPositionExtent(positions));
+    this.positionFrameEstablished = true;
+  }
+
+  private establishCurrentPositionFrame(): void {
+    if (this.positionFrameEstablished) return;
+    this.renderer.setCustomBBox(this.renderer.getBBox());
+    this.positionFrameEstablished = true;
+  }
+
+  private rebaseCurrentPositionFrame(): void {
+    this.renderer.setCustomBBox(this.renderer.getBBox());
+    this.positionFrameEstablished = true;
+    this.renderer.refresh({ schedule: true });
+  }
+
   private emitDensityQaDiagnostics(): void {
     const diagnostics: GlobalDensityQaDiagnostics = {
       rawDecisionRatio: this.latestDensityDecision.ratio,
@@ -1629,9 +1672,6 @@ export class GlobalRendererSession {
       return topologyRefresh.then(() => this.applyPositions(positions));
     }
     this.cancelTemporaryFileMove('layout-changed');
-    const anchorKey = this.viewportAnchorNodeKey();
-    const anchor =
-      anchorKey === undefined ? undefined : this.nodeViewportPoint(anchorKey);
     const byKey = new Map(
       positions.map((position) => [position.key, position]),
     );
@@ -1659,21 +1699,21 @@ export class GlobalRendererSession {
         error instanceof Error ? error : new Error(String(error)),
       );
     }
+    const cameraIntent = this.positionCameraIntent.consumePositionAdoption();
+    if (cameraIntent === 'initial-automatic-framing') {
+      this.establishPositionFrame(positions);
+    } else this.establishCurrentPositionFrame();
     const changed = positions.some((position) => {
       const attributes = this.graph.getNodeAttributes(position.key);
       return attributes.x !== position.x || attributes.y !== position.y;
     });
     this.measureDensity(positions);
     if (!changed) {
-      const camera = this.renderer.getCamera();
-      const densityRatio = this.effectiveDensityRatio();
-      if (this.cameraOwnership === 'auto' && camera.ratio !== densityRatio) {
-        camera.setState({ ratio: densityRatio });
-        this.emitDensityQaDiagnostics();
+      if (cameraIntent === 'initial-automatic-framing') {
+        this.applyAutomaticDensityFraming();
       }
       return Promise.resolve();
     }
-    const userRatio = this.renderer.getCamera().ratio;
     return atomicAnchoredGraphMutation(
       {
         onAfterProcess: (callback) =>
@@ -1685,19 +1725,8 @@ export class GlobalRendererSession {
           this.renderer.off('afterRender', callback),
       },
       () => {
-        if (
-          this.cameraOwnership === 'user' &&
-          anchorKey !== undefined &&
-          anchor !== undefined
-        ) {
-          this.anchorNodeAtViewport(anchorKey, anchor, userRatio);
-        } else if (this.cameraOwnership === 'auto') {
-          this.renderer.getCamera().setState({
-            x: 0.5,
-            y: 0.5,
-            angle: 0,
-            ratio: this.effectiveDensityRatio(),
-          });
+        if (cameraIntent === 'initial-automatic-framing') {
+          this.applyAutomaticDensityFraming();
         }
         this.emitDensityQaDiagnostics();
       },
@@ -1722,7 +1751,11 @@ export class GlobalRendererSession {
     positions: readonly GlobalLayoutPosition[],
   ): Promise<void> {
     try {
-      const frame = captureRawViewportFrame(this.renderer);
+      const cameraIntent = this.positionCameraIntent.consumePositionAdoption();
+      if (cameraIntent === 'initial-automatic-framing') {
+        this.establishPositionFrame(positions);
+      } else this.establishCurrentPositionFrame();
+      this.measureDensity(positions);
       const transaction = atomicAnchoredGraphMutation(
         {
           onAfterProcess: (callback) =>
@@ -1734,7 +1767,11 @@ export class GlobalRendererSession {
           offAfterRender: (callback) =>
             this.renderer.off('afterRender', callback),
         },
-        () => restoreRawViewportFrame(this.renderer, frame),
+        () => {
+          if (cameraIntent === 'initial-automatic-framing') {
+            this.applyAutomaticDensityFraming();
+          } else this.emitDensityQaDiagnostics();
+        },
         () => this.updatePositions(positions),
       );
       return transaction.rendered.then(() => this.emitArrangementTargetPoint());
@@ -1861,6 +1898,7 @@ export class GlobalRendererSession {
       throw new Error(`Cannot center missing Global node ${request.nodeId}.`);
     }
     this.cameraOwnership = 'user';
+    this.positionCameraIntent.claimCamera();
     this.semanticAnchorNodeKey = request.nodeId;
     const started = performance.now();
     await this.renderer
@@ -1888,6 +1926,7 @@ export class GlobalRendererSession {
 
   zoomBy(factor: number): void {
     this.cameraOwnership = 'user';
+    this.positionCameraIntent.claimCamera();
     const camera = this.renderer.getCamera();
     camera.animate(
       { ratio: Math.max(0.02, Math.min(6, camera.ratio * factor)) },
@@ -1897,7 +1936,9 @@ export class GlobalRendererSession {
 
   fit(): void {
     this.cameraOwnership = 'auto';
+    this.positionCameraIntent.claimCamera();
     this.semanticAnchorNodeKey = undefined;
+    this.rebaseCurrentPositionFrame();
     void this.renderer.getCamera().animate(
       {
         x: 0.5,

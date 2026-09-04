@@ -326,7 +326,7 @@ describe('Global sparse folder arrangement session', () => {
     expect(onArrangementCommit).not.toHaveBeenCalled();
   });
 
-  it('re-emits the target marker after raw viewport correction uses the processed frame', async () => {
+  it('re-emits the target marker without reframing after the initial spatial presentation', async () => {
     const { input, onArrangementTargetPoint, renderer, session } =
       createSession();
     session.setFolderArrangementContext({
@@ -350,6 +350,24 @@ describe('Global sparse folder arrangement session', () => {
         y: expect.any(Number),
       }),
     );
+    expect(onArrangementTargetPoint).toHaveBeenCalledWith({
+      x: expect.any(Number),
+      y: expect.any(Number),
+    });
+
+    const cameraWrites = renderer.camera.setState.mock.calls.length;
+    const shifted = globalLayoutPositionsFromInput(input).map(
+      (position, index) => ({
+        ...position,
+        x: position.x + index * 11,
+        y: position.y - index * 7,
+      }),
+    );
+    onArrangementTargetPoint.mockClear();
+
+    await session.applySpatialPositions(shifted);
+
+    expect(renderer.camera.setState).toHaveBeenCalledTimes(cameraWrites);
     expect(onArrangementTargetPoint).toHaveBeenCalledWith({
       x: expect.any(Number),
       y: expect.any(Number),
