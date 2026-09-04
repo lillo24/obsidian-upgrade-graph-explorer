@@ -1,5 +1,13 @@
 import Sigma from 'sigma';
 import type { WheelCoords } from 'sigma/types';
+import {
+  createFolderClusterPreviewGeometry,
+  previewFolderClusterAtAnchor,
+  type FolderClusterAnchorMap,
+  type FolderClusterPreviewResult,
+  type NormalizedFolderAnchor,
+  type SpatialPoint,
+} from '@icarus-graph-explorer/spatial-overrides';
 import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-groups';
 import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
 import {
@@ -13,6 +21,11 @@ import {
   reconcileGlobalGraph,
   type GlobalGraph,
 } from './graph';
+import {
+  IDLE_GLOBAL_FOLDER_ARRANGEMENT_GESTURE,
+  reduceGlobalFolderArrangementGesture,
+  type GlobalFolderArrangementGestureState,
+} from './arrangement';
 import {
   drawViewportAwareGlobalNodeHover,
   drawViewportAwareGlobalNodeLabel,
@@ -30,6 +43,10 @@ import {
   WheelDirectionStabilizer,
 } from './precision-wheel-zoom';
 import { resolveGlobalLayoutSettings } from './settings';
+import {
+  globalFolderKeyByNodeKey,
+  SIGMA_VISUAL_DOWN_GRAPH_Y_SIGN,
+} from './spatial';
 import {
   resolveGlobalEdgeStyle,
   resolveGlobalNodeStyle,
@@ -74,9 +91,27 @@ export interface GlobalRendererSessionOptions {
   readonly onNodeHovered?: (key: string | undefined) => void;
   /** Confirmed pointer click; independent of controlled selection echoes. */
   readonly onNodeSingleClick?: (key: string) => void;
+  readonly onArrangementFolderChange?: (folderKey: string) => void;
+  readonly onArrangementCommit?: (
+    folderKey: string,
+    anchor: NormalizedFolderAnchor,
+  ) => void;
+  readonly onArrangementGestureChange?: (
+    phase: GlobalFolderArrangementGestureState['phase'],
+  ) => void;
+  readonly onArrangementPointerMove?: (point: SpatialPoint | undefined) => void;
+  readonly onArrangementError?: (message: string) => void;
   readonly onViewportObservation?: (
     viewport: SemanticGlobalViewport | undefined,
   ) => void;
+}
+
+export interface GlobalFolderArrangementContext {
+  readonly active: boolean;
+  readonly activeFolderKey?: string;
+  readonly anchors: FolderClusterAnchorMap;
+  readonly automaticPositions: readonly GlobalLayoutPosition[];
+  readonly input: GlobalRendererInput;
 }
 
 export interface GlobalRendererReady {
@@ -115,6 +150,13 @@ export class GlobalRendererSession {
   private destroyed = false;
   private nodeClicks: NodeClickArbitrator | undefined;
   private readonly wheelDirection = new WheelDirectionStabilizer();
+  private arrangementContext: GlobalFolderArrangementContext | undefined;
+  private arrangementHoveredFolder: string | undefined;
+  private arrangementGesture: GlobalFolderArrangementGestureState =
+    IDLE_GLOBAL_FOLDER_ARRANGEMENT_GESTURE;
+  private arrangementPreview: FolderClusterPreviewResult | undefined;
+  private arrangementPreviewFrame: number | undefined;
+  private lastAppliedArrangementPreview: FolderClusterPreviewResult | undefined;
 
   private readonly cameraUpdatedHandler = (): void => {
     const started = performance.now();
@@ -141,6 +183,13 @@ export class GlobalRendererSession {
   };
 
   private readonly precisionWheelHandler = (coordinates: WheelCoords): void => {
+    if (
+      this.arrangementGesture.phase === 'primed' ||
+      this.arrangementGesture.phase === 'dragging'
+    ) {
+      preventSigmaWheelDefault(coordinates);
+      return;
+    }
     const original = coordinates.original as WheelEvent;
     preventSigmaWheelDefault(coordinates);
     const deltaPixels = normalizeWheelDeltaPixels(
@@ -279,7 +328,12 @@ export class GlobalRendererSession {
       this.hoveredNode === undefined ||
       hovered ||
       this.neighborhoods.get(this.hoveredNode)?.has(key) === true;
+    const arrangementFolderKey = this.activeArrangementFolderKey();
     return resolveGlobalNodeStyle(attributes, {
+      arrangementActive: this.arrangementContext?.active === true,
+      ...(arrangementFolderKey === undefined
+        ? {}
+        : { arrangementMember: attributes.folderKey === arrangementFolderKey }),
       alwaysShowLabel: shouldAlwaysShowGlobalLabels(this.graph.order),
       hovered,
       relatedToHover,
@@ -300,11 +354,180 @@ export class GlobalRendererSession {
       !hoverActive ||
       this.graph.source(key) === this.hoveredNode ||
       this.graph.target(key) === this.hoveredNode;
+    const arrangementFolderKey = this.activeArrangementFolderKey();
+    const sourceFolder = this.graph.getNodeAttribute(
+      this.graph.source(key),
+      'folderKey',
+    );
+    const targetFolder = this.graph.getNodeAttribute(
+      this.graph.target(key),
+      'folderKey',
+    );
+    const arrangementRelation =
+      arrangementFolderKey === undefined
+        ? undefined
+        : sourceFolder === arrangementFolderKey &&
+            targetFolder === arrangementFolderKey
+          ? ('internal' as const)
+          : sourceFolder === arrangementFolderKey ||
+              targetFolder === arrangementFolderKey
+            ? ('incident' as const)
+            : ('unrelated' as const);
     return resolveGlobalEdgeStyle(attributes, {
+      ...(arrangementRelation === undefined ? {} : { arrangementRelation }),
       relatedToHover,
       hoverActive,
       lod: this.visualLod,
     });
+  }
+
+  private activeArrangementFolderKey(): string | undefined {
+    if (this.arrangementContext?.active !== true) return undefined;
+    if (this.arrangementGesture.phase !== 'idle') {
+      return this.arrangementGesture.folderKey;
+    }
+    return (
+      this.arrangementHoveredFolder ?? this.arrangementContext.activeFolderKey
+    );
+  }
+
+  private folderKeyForArrangementNode(key: string): string | undefined {
+    if (!this.graph.hasNode(key)) return undefined;
+    const attributes = this.graph.getNodeAttributes(key);
+    return attributes.nodeKind === 'document' &&
+      attributes.entityId !== null &&
+      attributes.folderKey !== null
+      ? attributes.folderKey
+      : undefined;
+  }
+
+  private refreshArrangementStyles(): void {
+    this.options.instrumentation?.count('global-style-updates');
+    this.renderer.scheduleRefresh();
+  }
+
+  private activateArrangementFolder(folderKey: string): void {
+    if (folderKey === this.activeArrangementFolderKey()) return;
+    this.arrangementHoveredFolder = folderKey;
+    this.options.onArrangementFolderChange?.(folderKey);
+    this.refreshArrangementStyles();
+  }
+
+  private beginArrangementDrag(key: string, point: SpatialPoint): void {
+    const context = this.arrangementContext;
+    const folderKey = this.folderKeyForArrangementNode(key);
+    if (context?.active !== true || folderKey === undefined) return;
+    try {
+      const geometry = createFolderClusterPreviewGeometry({
+        automaticPositions: context.automaticPositions,
+        folderKeyByNodeKey: globalFolderKeyByNodeKey(context.input),
+        anchors: context.anchors,
+        folderKey,
+        visualDownGraphYSign: SIGMA_VISUAL_DOWN_GRAPH_Y_SIGN,
+      });
+      this.activateArrangementFolder(folderKey);
+      this.arrangementGesture = reduceGlobalFolderArrangementGesture(
+        IDLE_GLOBAL_FOLDER_ARRANGEMENT_GESTURE,
+        {
+          type: 'prime',
+          folderKey,
+          geometry,
+          startGraphPoint: this.viewportToGraphPoint(point),
+          startViewportPoint: point,
+        },
+      );
+      this.options.onArrangementGestureChange?.('primed');
+    } catch (error: unknown) {
+      this.options.onArrangementError?.(
+        `Could not start folder arrangement: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  private moveArrangementDrag(
+    viewportPoint: SpatialPoint,
+    preventSigmaDefault: () => void,
+  ): void {
+    if (
+      this.arrangementGesture.phase !== 'primed' &&
+      this.arrangementGesture.phase !== 'dragging'
+    ) {
+      return;
+    }
+    preventSigmaDefault();
+    try {
+      const previousPhase = this.arrangementGesture.phase;
+      const next = reduceGlobalFolderArrangementGesture(
+        this.arrangementGesture,
+        {
+          type: 'move',
+          graphPoint: this.viewportToGraphPoint(viewportPoint),
+          viewportPoint,
+          visualDownGraphYSign: SIGMA_VISUAL_DOWN_GRAPH_Y_SIGN,
+        },
+      );
+      this.arrangementGesture = next;
+      if (next.phase !== 'dragging') return;
+      this.arrangementPreview = next.preview;
+      if (previousPhase !== 'dragging') {
+        this.options.onArrangementGestureChange?.('dragging');
+      }
+      this.scheduleArrangementPreview();
+    } catch (error: unknown) {
+      this.cancelFolderArrangementGesture();
+      this.options.onArrangementError?.(
+        `Folder drag was canceled: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  private scheduleArrangementPreview(): void {
+    if (this.arrangementPreviewFrame !== undefined) return;
+    this.arrangementPreviewFrame = requestAnimationFrame(() => {
+      this.arrangementPreviewFrame = undefined;
+      const preview = this.arrangementPreview;
+      if (preview === undefined) return;
+      this.applyArrangementPreview(preview);
+    });
+  }
+
+  private applyArrangementPreview(preview: FolderClusterPreviewResult): void {
+    const apply = () => this.applyPartialPositions(preview.positions);
+    if (this.options.instrumentation === undefined) apply();
+    else {
+      this.options.instrumentation.measure(
+        'spatial-preview-apply',
+        'spatial-preview-applies',
+        apply,
+      );
+    }
+    this.lastAppliedArrangementPreview = preview;
+  }
+
+  private finishArrangementDrag(): void {
+    const previous = this.arrangementGesture;
+    if (previous.phase !== 'primed' && previous.phase !== 'dragging') return;
+    const next = reduceGlobalFolderArrangementGesture(previous, {
+      type: 'release',
+    });
+    this.arrangementGesture = next;
+    if (next.phase !== 'committing') {
+      this.options.onArrangementGestureChange?.('idle');
+      return;
+    }
+    if (this.arrangementPreviewFrame !== undefined) {
+      cancelAnimationFrame(this.arrangementPreviewFrame);
+      this.arrangementPreviewFrame = undefined;
+    }
+    if (this.lastAppliedArrangementPreview !== next.preview) {
+      this.applyArrangementPreview(next.preview);
+    }
+    this.options.onArrangementGestureChange?.('committing');
+    this.options.onArrangementCommit?.(next.folderKey, next.preview.anchor);
   }
 
   private bindEvents(): void {
@@ -314,6 +537,10 @@ export class GlobalRendererSession {
       const started = performance.now();
       const previous = this.hoveredNode;
       this.hoveredNode = node;
+      if (this.arrangementContext?.active === true) {
+        const folderKey = this.folderKeyForArrangementNode(node);
+        if (folderKey !== undefined) this.activateArrangementFolder(folderKey);
+      }
       this.options.onNodeHovered?.(node);
       this.options.instrumentation?.count('global-hover-applications');
       this.refreshNodeStyles(previous, node);
@@ -325,11 +552,20 @@ export class GlobalRendererSession {
     this.renderer.on('leaveNode', () => {
       const previous = this.hoveredNode;
       this.hoveredNode = undefined;
+      const arrangementActive = this.arrangementContext?.active === true;
+      if (arrangementActive) this.arrangementHoveredFolder = undefined;
       this.options.onNodeHovered?.(undefined);
       this.options.instrumentation?.count('global-hover-applications');
-      this.refreshNodeStyles(previous);
+      if (arrangementActive) this.refreshArrangementStyles();
+      else this.refreshNodeStyles(previous);
     });
     this.renderer.on('clickNode', ({ node }) => {
+      if (this.arrangementContext?.active === true) {
+        nodeClicks.cancel();
+        const folderKey = this.folderKeyForArrangementNode(node);
+        if (folderKey !== undefined) this.activateArrangementFolder(folderKey);
+        return;
+      }
       this.selectNode(node);
       nodeClicks.schedule(() => this.options.onNodeSingleClick?.(node));
     });
@@ -338,6 +574,7 @@ export class GlobalRendererSession {
       // Every node double-click is consumed; only canonical documents activate.
       preventSigmaDefault();
       nodeClicks.cancel();
+      if (this.arrangementContext?.active === true) return;
       if (!this.graph.hasNode(node)) return;
       const attributes = this.graph.getNodeAttributes(node);
       if (attributes.nodeKind !== 'document' || attributes.entityId === null) {
@@ -347,9 +584,129 @@ export class GlobalRendererSession {
     });
     this.renderer.on('clickStage', () => {
       nodeClicks.cancel();
+      if (this.arrangementContext?.active === true) return;
       this.selectNode(undefined);
     });
     this.renderer.on('doubleClickStage', () => nodeClicks.cancel());
+    this.renderer.on('rightClickNode', ({ preventSigmaDefault }) => {
+      if (this.arrangementContext?.active === true) preventSigmaDefault();
+    });
+    this.renderer.on('downNode', ({ node, event, preventSigmaDefault }) => {
+      if (this.arrangementContext?.active !== true) return;
+      preventSigmaDefault();
+      this.beginArrangementDrag(node, { x: event.x, y: event.y });
+    });
+    this.renderer.on('moveBody', ({ event, preventSigmaDefault }) => {
+      if (this.arrangementContext?.active === true) {
+        this.options.onArrangementPointerMove?.({ x: event.x, y: event.y });
+      }
+      this.moveArrangementDrag({ x: event.x, y: event.y }, preventSigmaDefault);
+    });
+    const finishArrangement = () => this.finishArrangementDrag();
+    this.renderer.on('upNode', finishArrangement);
+    this.renderer.on('upStage', finishArrangement);
+    this.renderer.on('leaveStage', () =>
+      this.options.onArrangementPointerMove?.(undefined),
+    );
+  }
+
+  setFolderArrangementContext(
+    context: GlobalFolderArrangementContext | undefined,
+  ): void {
+    const previousActive = this.arrangementContext?.active === true;
+    const previousFolderKey = this.activeArrangementFolderKey();
+    this.arrangementContext = context;
+    if (context?.active !== true) {
+      this.arrangementHoveredFolder = undefined;
+      this.cancelFolderArrangementGesture();
+    }
+    const nextFolderKey = this.activeArrangementFolderKey();
+    if (
+      previousActive !== (context?.active === true) ||
+      previousFolderKey !== nextFolderKey
+    ) {
+      this.refreshArrangementStyles();
+    }
+  }
+
+  currentFolderAnchor(folderKey: string): NormalizedFolderAnchor | undefined {
+    const context = this.arrangementContext;
+    if (context?.active !== true) return undefined;
+    try {
+      return createFolderClusterPreviewGeometry({
+        automaticPositions: context.automaticPositions,
+        folderKeyByNodeKey: globalFolderKeyByNodeKey(context.input),
+        anchors: context.anchors,
+        folderKey,
+        visualDownGraphYSign: SIGMA_VISUAL_DOWN_GRAPH_Y_SIGN,
+      }).displayedAnchor;
+    } catch {
+      return undefined;
+    }
+  }
+
+  previewFolderAnchor(
+    folderKey: string,
+    anchor: NormalizedFolderAnchor,
+  ): FolderClusterPreviewResult {
+    const context = this.arrangementContext;
+    if (context?.active !== true) {
+      throw new Error('Arrange folders is not active.');
+    }
+    const geometry = createFolderClusterPreviewGeometry({
+      automaticPositions: context.automaticPositions,
+      folderKeyByNodeKey: globalFolderKeyByNodeKey(context.input),
+      anchors: context.anchors,
+      folderKey,
+      visualDownGraphYSign: SIGMA_VISUAL_DOWN_GRAPH_Y_SIGN,
+    });
+    const preview = previewFolderClusterAtAnchor({
+      geometry,
+      anchor,
+      visualDownGraphYSign: SIGMA_VISUAL_DOWN_GRAPH_Y_SIGN,
+    });
+    this.arrangementPreview = preview;
+    this.applyArrangementPreview(preview);
+    return preview;
+  }
+
+  completeFolderArrangementCommit(): void {
+    this.arrangementGesture = reduceGlobalFolderArrangementGesture(
+      this.arrangementGesture,
+      { type: 'commit-finished' },
+    );
+    this.arrangementPreview = undefined;
+    this.lastAppliedArrangementPreview = undefined;
+    this.options.onArrangementGestureChange?.('idle');
+  }
+
+  cancelFolderArrangementGesture(): boolean {
+    const gesture =
+      this.arrangementGesture ?? IDLE_GLOBAL_FOLDER_ARRANGEMENT_GESTURE;
+    const changed =
+      gesture.phase !== 'idle' || this.arrangementPreview !== undefined;
+    if (this.arrangementPreviewFrame !== undefined) {
+      cancelAnimationFrame(this.arrangementPreviewFrame);
+      this.arrangementPreviewFrame = undefined;
+    }
+    this.arrangementGesture = reduceGlobalFolderArrangementGesture(gesture, {
+      type: 'cancel',
+    });
+    this.arrangementPreview = undefined;
+    this.lastAppliedArrangementPreview = undefined;
+    if (changed) this.options.onArrangementGestureChange?.('idle');
+    return changed;
+  }
+
+  viewportToGraphPoint(point: SpatialPoint): SpatialPoint {
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+      throw new Error('Viewport point must contain finite x/y coordinates.');
+    }
+    const result = this.renderer.viewportToGraph(point);
+    if (!Number.isFinite(result.x) || !Number.isFinite(result.y)) {
+      throw new Error('Sigma returned an invalid graph point.');
+    }
+    return result;
   }
 
   updateSettings(settings: GlobalLayoutSettings): void {
@@ -414,6 +771,7 @@ export class GlobalRendererSession {
   }
 
   update(input: GlobalRendererInput): GlobalGraphReconciliation {
+    this.cancelFolderArrangementGesture();
     this.nodeClicks?.cancel();
     const run = () => reconcileGlobalGraph(this.graph, input);
     const reconciliation =
@@ -453,6 +811,7 @@ export class GlobalRendererSession {
 
   /** Development harness baseline; product live updates use in-place update(). */
   replace(input: GlobalRendererInput): void {
+    this.cancelFolderArrangementGesture();
     this.nodeClicks?.cancel();
     this.graph = buildGlobalGraph(input);
     this.fileNodeKeys = indexFileNodeKeys(input.nodes);
@@ -470,6 +829,7 @@ export class GlobalRendererSession {
   }
 
   resetPositions(input: GlobalRendererInput): void {
+    this.cancelFolderArrangementGesture();
     reconcileGlobalGraph(this.graph, input, { preservePositions: false });
     this.fileNodeKeys = indexFileNodeKeys(input.nodes);
     this.renderer.scheduleRefresh();
@@ -648,6 +1008,57 @@ export class GlobalRendererSession {
     });
   }
 
+  /**
+   * Mutates only supplied renderer-owned coordinates. Sigma 3.0.3 still needs
+   * indexation enabled so moved-node picking, labels, and incident edges use
+   * the new geometry on the scheduled frame.
+   */
+  applyPartialPositions(positions: readonly GlobalLayoutPosition[]): void {
+    const seen = new Set<string>();
+    const validated = positions.map((position) => {
+      if (
+        position.key.length === 0 ||
+        seen.has(position.key) ||
+        !this.graph.hasNode(position.key)
+      ) {
+        throw new Error(
+          `Sparse Global positions contain an unknown or duplicate node ${JSON.stringify(position.key)}.`,
+        );
+      }
+      if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+        throw new Error(
+          `Sparse Global position has invalid coordinates for node ${position.key}.`,
+        );
+      }
+      seen.add(position.key);
+      return position;
+    });
+    if (validated.length === 0) return;
+    const incidentEdges = new Set<string>();
+    for (const position of validated) {
+      const attributes = this.graph.getNodeAttributes(position.key) as {
+        x: number;
+        y: number;
+      };
+      // This renderer owns its Graphology attributes. Mutating the exact
+      // coordinate fields avoids one Graphology event/refresh per member; the
+      // single explicit Sigma refresh below is the authoritative notification.
+      attributes.x = position.x;
+      attributes.y = position.y;
+      for (const edge of this.graph.edges(position.key)) {
+        incidentEdges.add(edge);
+      }
+    }
+    this.renderer.refresh({
+      partialGraph: {
+        nodes: validated.map(({ key }) => key),
+        edges: [...incidentEdges],
+      },
+      skipIndexation: false,
+      schedule: true,
+    });
+  }
+
   async center(request: GlobalCenterRequest): Promise<void> {
     const display = this.renderer.getNodeDisplayData(request.nodeId);
     if (display === undefined) {
@@ -734,6 +1145,7 @@ export class GlobalRendererSession {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.cancelFolderArrangementGesture();
     this.nodeClicks?.cancel();
     this.renderer.getMouseCaptor().off('wheel', this.precisionWheelHandler);
     this.renderer.getCamera().off('updated', this.cameraUpdatedHandler);

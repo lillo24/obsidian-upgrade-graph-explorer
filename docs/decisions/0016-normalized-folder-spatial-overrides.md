@@ -34,9 +34,8 @@ identity deliberately does not survive a rename in v1: the old entry stays
 dormant, and only the exact folder's return reactivates it. No fuzzy remapping is
 attempted.
 
-SPATIAL1B will provide the drag and temporary-preview interaction, using the
-same pure explicit anchor-map composition with the preview winning for the
-active folder. Saved Views remain later composition work and may eventually
+SPATIAL1B, specified by ADR 0017, provides direct exact-folder drag and sparse
+temporary previews over this registry. Saved Views remain later composition work and may eventually
 reference, copy, or override an independently serializable spatial profile;
 this decision defines no Saved View schema.
 
@@ -45,5 +44,5 @@ this decision defines no Saved View schema.
 Empty registries preserve the existing renderer path. Automatic layouts remain
 reusable across different anchor maps and cannot accumulate translated drift.
 Focus Network and both Hierarchy presentations remain unchanged. Folder renames
-need explicit future identity design, and users receive no production editing UI
-until SPATIAL1B.
+need explicit future identity design. Production editing is defined separately
+by ADR 0017.

@@ -79,3 +79,11 @@ only this key. Durable mutations write before adoption, and a failed write
 retains the last confirmed registry. Reset saved view, Graph Preferences,
 Visual Groups, Saved Filters, and per-File presentation overrides do not clear
 or merge with this registry.
+
+Arrange Folders previews are never written. Pointer release or keyboard Save
+submits exactly one normalized anchor mutation; the canvas retains the transient
+preview until React receives and renders the confirmed registry. A failed write
+restores the last confirmed displayed composition and moves the session into its
+existing blocked-write state. Reset folder and the explicitly confirmed Reset
+all use the same transaction. Corrupt recovery deletes only this spatial key and
+is exposed outside the otherwise-disabled Arrange mode.

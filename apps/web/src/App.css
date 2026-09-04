@@ -1042,6 +1042,51 @@ h2 {
   overscroll-behavior: contain;
 }
 
+.network-explorer__root-arrangement {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.75rem 0.6rem;
+  border-top: 1px solid #e3e9ec;
+  color: #395966;
+  font-size: 0.75rem;
+}
+
+.network-explorer__root-arrangement > span:first-child {
+  flex: 1;
+  font-weight: 700;
+}
+
+.network-explorer__arrange-folder {
+  min-height: 1.75rem;
+  flex: 0 0 auto;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid #b7cdd1;
+  border-radius: 0.35rem;
+  background: #f7fbfb;
+  color: #245b68;
+  font-size: 0.66rem;
+  cursor: pointer;
+}
+
+.network-explorer__arrange-folder:hover,
+.network-explorer__arrange-folder:focus-visible,
+.network-explorer__arrange-folder[aria-pressed='true'] {
+  border-color: #6e929e;
+  background: #dceff0;
+}
+
+.network-explorer__arrange-folder:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.network-explorer__arranged-marker {
+  flex: 0 0 auto;
+  color: #167985;
+  font-size: 0.62rem;
+}
+
 .network-explorer__query {
   position: relative;
   padding: 0.55rem 0.75rem;

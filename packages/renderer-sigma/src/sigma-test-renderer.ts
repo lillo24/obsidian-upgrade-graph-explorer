@@ -3,7 +3,7 @@ import { vi } from 'vitest';
 
 type Attributes = Record<string, unknown>;
 type Refresh = {
-  partialGraph?: { nodes?: string[] };
+  partialGraph?: { nodes?: string[]; edges?: string[] };
   skipIndexation?: boolean;
   schedule?: boolean;
 };
@@ -13,7 +13,7 @@ export class SigmaTestRenderer {
   static instances: SigmaTestRenderer[] = [];
   readonly displayNodes = new Map<string, Attributes>();
   private onceHandlers = new Map<string, (() => void)[]>();
-  readonly handlers = new Map<string, (event: { node: string }) => void>();
+  readonly handlers = new Map<string, (event: unknown) => void>();
   readonly camera = {
     ratio: 1,
     x: 0.5,
@@ -78,7 +78,7 @@ export class SigmaTestRenderer {
       callback,
     ]);
   }
-  on(event: string, callback: (event: { node: string }) => void): void {
+  on(event: string, callback: (event: unknown) => void): void {
     this.handlers.set(event, callback);
   }
   getCamera() {
@@ -93,10 +93,16 @@ export class SigmaTestRenderer {
   getGraphDimensions() {
     return { width: 1, height: 1 };
   }
+  getDimensions() {
+    return { width: 800, height: 600 };
+  }
   framedGraphToViewport(point: { x: number; y: number }) {
     return point;
   }
   viewportToFramedGraph(point: { x: number; y: number }) {
+    return point;
+  }
+  viewportToGraph(point: { x: number; y: number }) {
     return point;
   }
 }

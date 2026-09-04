@@ -35,6 +35,7 @@ src/
   settings.ts              Compact/Normal/Spacious presets and bounded Custom validation.
   mapping.ts               KG6-to-Sigma mapping, deterministic seeds, and folder keys.
   spatial.ts               Sigma logical-axis adapter and All Network override composition.
+  arrangement.ts           Pure thresholded prime/drag/commit/cancel gesture reducer.
   node-size.ts             Per-File multiplier composition and final display-only bounds.
   node-size-presentation.ts  Sparse override diff and topology-owned File-to-node key index.
   graph.ts                 Graphology construction, neighborhood index, and reconciliation.
@@ -49,7 +50,7 @@ src/
   node-click.ts            Shared 300 ms single/double-click arbitration; selection stays immediate.
   viewport-request.ts      Layout-commit gate for semantic center and Fit requests.
   GlobalGraphEmptyState.tsx  Explicit zero-match state shared by Global mount decisions.
-  GlobalGraphCanvas.tsx    Thin React mount/update boundary and background-layout adoption.
+  GlobalGraphCanvas.tsx    React mount/update boundary, background layout, and Arrange panel.
   local-types.ts           Local mapper, viewport, interaction, and worker contracts.
   local-mapping.ts         Separate Local topology and deterministic root-relative seed.
   local-graph.ts           Local Graphology construction, reconciliation, and neighborhoods.
@@ -67,6 +68,8 @@ src/
   canvas-test-harness.ts    Test-only hook/effect driver for the real canvas dependency paths.
   sigma-test-renderer.ts    Test-only reducer cache and process-boundary Sigma double.
   size-canvas-regression.test.tsx  Real canvas/session layout-count and exact-coordinate regression.
+  arrangement-session.test.ts  Exact-folder pointer ownership, sparse refresh, and commit contract.
+  arrangement-canvas.test.tsx  Accessible nudge/save and write-failure rollback contract.
   node-size-session.test.ts  Initial display, sparse indexed refresh, and topology-race contracts.
   *.test.ts                Mapping, layout, cache, LOD, settings, and precision contracts.
 ```
@@ -112,10 +115,9 @@ Advanced separates spatial controls (reference pull and folder separation)
 from visual controls (base node size, link influence on node size, link
 thickness, and label threshold). Settings are user preferences, not canonical
 truth. Changing a spacing preset adopts its spatial baseline while preserving
-folder strength and the current advanced visual values. SPATIAL1A adds persisted
-normalized folder target centers, but manual dragging remains intentionally
-absent until SPATIAL1B; raw node, folder, and ForceAtlas2 coordinates never
-persist.
+folder strength and the current advanced visual values. SPATIAL1 stores only
+normalized folder target centers; raw node, folder, and ForceAtlas2 coordinates
+never persist.
 
 SPATIAL1A composes only All Network:
 
@@ -142,6 +144,34 @@ upward, so `spatial.ts` centralizes a `-1` visual-down sign: persisted positive
 X/Y therefore renders bottom-right. Inactive exact paths remain dormant and
 reactivate when the same folder becomes visible again. Focus Network and both
 Hierarchy presentations receive no spatial registry.
+
+SPATIAL1B adds an explicit All Network Arrange mode over that existing seam.
+Pressing a canonical File primes its exact folder at the current displayed
+center; movement crosses a 3 px viewport threshold before a drag begins, so a
+click never moves geometry. Each pointer sample recomputes from the immutable
+automatic positions captured at gesture start. One animation frame applies only
+the folder's visible document coordinates and incident edges. Stage drag keeps
+Sigma camera pan; selection, Focus activation, context click, wheel zoom, and
+node double-click are suppressed while Arrange owns node input.
+
+Sigma 3.0.3 requires indexation for moved-node picking, labels, and incident
+edge geometry. The session therefore mutates its renderer-owned Graphology x/y
+fields only after validating the entire sparse set, then requests one scheduled
+partial refresh with `skipIndexation: false`. This can still make Sigma's
+internal processing graph-scale even though the application performs no KG6
+projection, mapping, topology reconciliation, full spatial composition, or
+layout per pointer frame. The browser/Tauri harness is the runtime evidence
+boundary for that remaining library cost.
+
+Release commits one normalized anchor through the web write-before-adopt
+transaction. The transient preview remains visible until the confirmed map is
+rendered; a write failure or mismatched authoritative map restores the last
+confirmed composition. Escape cancels a primed/dragging/keyboard preview and
+stays in Arrange; a second idle Escape exits. Blur, visibility loss, topology
+change, layout change, mode change, and disposal cancel unfinished motion.
+Keyboard users can choose the exact folder in Network Explorer, nudge by 0.02
+(Shift: 0.10), save or cancel, and reset one/all positions. Root uses `.` and
+nested folders never inherit a parent action.
 
 VISUAL1A applies only to All Network. Ordinary document nodes add a bounded
 reference-degree boost to the configured base size. At the persisted

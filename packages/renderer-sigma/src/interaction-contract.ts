@@ -3,6 +3,11 @@ export type GlobalInteraction =
   | 'pan'
   | 'hover'
   | 'selection'
+  | 'arrange-enter'
+  | 'arrange-hover'
+  | 'arrange-preview'
+  | 'arrange-commit'
+  | 'arrange-reset'
   | 'visual-group-style-change'
   | 'inspector'
   | 'projection-change'
@@ -44,6 +49,11 @@ export const GLOBAL_INTERACTION_OPERATION_CONTRACTS: Readonly<
   pan: VISUAL_ONLY,
   hover: VISUAL_ONLY,
   selection: VISUAL_ONLY,
+  'arrange-enter': VISUAL_ONLY,
+  'arrange-hover': VISUAL_ONLY,
+  'arrange-preview': VISUAL_ONLY,
+  'arrange-commit': VISUAL_ONLY,
+  'arrange-reset': VISUAL_ONLY,
   'visual-group-style-change': VISUAL_ONLY,
   inspector: NO_RENDERER_WORK,
   'projection-change': {

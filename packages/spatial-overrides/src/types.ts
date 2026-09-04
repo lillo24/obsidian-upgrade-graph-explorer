@@ -70,3 +70,22 @@ export interface SpatialCompositionResult {
   readonly inactiveFolderKeys: readonly WorkspaceFolderKey[];
   readonly issues: readonly [];
 }
+
+/** Automatic, committed-display geometry captured once for one exact folder. */
+export interface FolderClusterPreviewGeometry {
+  readonly folderKey: WorkspaceFolderKey;
+  readonly automaticFrame: AutomaticGraphFrame;
+  readonly automaticCenter: SpatialPoint;
+  readonly displayedCenter: SpatialPoint;
+  readonly displayedAnchor: NormalizedFolderAnchor;
+  readonly memberAutomaticPositions: readonly SpatialPosition[];
+}
+
+/** One sparse preview derived from an immutable automatic-position base. */
+export interface FolderClusterPreviewResult {
+  readonly folderKey: WorkspaceFolderKey;
+  readonly anchor: NormalizedFolderAnchor;
+  readonly target: SpatialPoint;
+  readonly translation: SpatialPoint;
+  readonly positions: readonly SpatialPosition[];
+}

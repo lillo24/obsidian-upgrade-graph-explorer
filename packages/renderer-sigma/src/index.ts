@@ -1,5 +1,8 @@
 export { GlobalGraphCanvas } from './GlobalGraphCanvas';
-export type { GlobalGraphCanvasProps } from './GlobalGraphCanvas';
+export type {
+  GlobalFolderArrangementProps,
+  GlobalGraphCanvasProps,
+} from './GlobalGraphCanvas';
 export { GlobalRendererSession } from './session';
 export type {
   GlobalRendererReady,

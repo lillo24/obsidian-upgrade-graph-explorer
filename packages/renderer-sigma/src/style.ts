@@ -23,6 +23,8 @@ export function resolveGlobalVisualLod(cameraRatio: number): GlobalVisualLod {
 }
 
 export interface GlobalNodeStyleContext {
+  readonly arrangementActive?: boolean;
+  readonly arrangementMember?: boolean;
   readonly alwaysShowLabel?: boolean;
   readonly hovered: boolean;
   readonly relatedToHover: boolean;
@@ -34,6 +36,7 @@ export interface GlobalNodeStyleContext {
 }
 
 export interface GlobalEdgeStyleContext {
+  readonly arrangementRelation?: 'internal' | 'incident' | 'unrelated';
   readonly relatedToHover: boolean;
   readonly hoverActive: boolean;
   readonly lod: GlobalVisualLod;
@@ -50,7 +53,12 @@ export function resolveGlobalNodeStyle(
       ? applyNetworkNodeSizeScale(attributes.size, context.sizeScale)
       : attributes.size;
   const emphasized = context.selected || context.hovered;
-  const forceLabel = emphasized || context.alwaysShowLabel === true;
+  const arrangementFocused =
+    context.arrangementActive === true &&
+    context.arrangementMember !== undefined;
+  const arrangementMember = context.arrangementMember === true;
+  const forceLabel =
+    emphasized || arrangementMember || context.alwaysShowLabel === true;
   const baseColor =
     attributes.nodeKind === 'document' && attributes.entityId !== null
       ? (context.visualGroup?.accent ?? attributes.color)
@@ -60,19 +68,27 @@ export function resolveGlobalNodeStyle(
     (context.lod === 'regional'
       ? size >= context.settings.labelThreshold * 0.68
       : size >= context.settings.labelThreshold);
-  const color = context.selected
-    ? '#d7a126'
-    : context.hovered
-      ? '#55a8c2'
-      : context.relatedToHover
-        ? baseColor
-        : '#d8e0e3';
+  const color = arrangementFocused
+    ? arrangementMember
+      ? context.selected
+        ? '#d7a126'
+        : context.hovered
+          ? '#55a8c2'
+          : baseColor
+      : '#e1e6e7'
+    : context.selected
+      ? '#d7a126'
+      : context.hovered
+        ? '#55a8c2'
+        : context.relatedToHover
+          ? baseColor
+          : '#d8e0e3';
   return {
     ...attributes,
     size,
     color,
     forceLabel,
-    highlighted: emphasized,
+    highlighted: emphasized || arrangementMember,
     label: visibleByScale || forceLabel ? attributes.label : '',
     zIndex: emphasized ? 2 : 0,
   };
@@ -82,14 +98,42 @@ export function resolveGlobalEdgeStyle(
   attributes: GlobalEdgeAttributes,
   context: GlobalEdgeStyleContext,
 ) {
+  const arrangementRelation = context.arrangementRelation;
+  const arrangementActive = arrangementRelation !== undefined;
   const weakFarEdge = context.lod === 'far' && attributes.referenceCount === 1;
   return {
     ...attributes,
-    color: context.relatedToHover ? attributes.color : '#e3e9eb',
-    hidden: weakFarEdge && !(context.hoverActive && context.relatedToHover),
+    color: arrangementActive
+      ? arrangementRelation === 'internal'
+        ? attributes.color
+        : arrangementRelation === 'incident'
+          ? '#aebdc1'
+          : '#edf0f1'
+      : context.relatedToHover
+        ? attributes.color
+        : '#e3e9eb',
+    hidden:
+      !arrangementActive &&
+      weakFarEdge &&
+      !(context.hoverActive && context.relatedToHover),
     size:
       attributes.size *
-      (context.lod === 'far' ? 0.55 : context.lod === 'regional' ? 0.78 : 1),
-    zIndex: context.hoverActive && context.relatedToHover ? 1 : 0,
+      (arrangementActive
+        ? arrangementRelation === 'internal'
+          ? 1.15
+          : arrangementRelation === 'incident'
+            ? 0.82
+            : 0.45
+        : context.lod === 'far'
+          ? 0.55
+          : context.lod === 'regional'
+            ? 0.78
+            : 1),
+    zIndex:
+      arrangementRelation === 'internal' ||
+      arrangementRelation === 'incident' ||
+      (context.hoverActive && context.relatedToHover)
+        ? 1
+        : 0,
   };
 }

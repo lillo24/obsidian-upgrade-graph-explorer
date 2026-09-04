@@ -17,6 +17,7 @@ src/types.ts       Schema-v1 registry, normalized anchors, frames, and results.
 src/folder-key.ts  Exact workspace-relative folder-key validation/derivation.
 src/registry.ts    Strict validation, deterministic serialization, pure edits.
 src/geometry.ts    Automatic document frame, inverse normalization, composition.
+src/preview.ts     Sparse exact-folder preview geometry and bounded nudges.
 src/index.ts       Public source-neutral interface.
 *.test.ts          Registry and deterministic geometry contracts.
 ```
@@ -45,5 +46,11 @@ target helper clamps finite drag targets to the v1 bounds for SPATIAL1B.
 Registries are deterministically ordered, deeply frozen on construction, JSON
 round-trip and `structuredClone()` safe. Absence means automatic placement; no
 explicit Auto entry or raw graph coordinate is stored. `mergeFolderClusterAnchorMaps`
-lets a future temporary drag preview win over persisted anchors without reading
-storage inside geometry.
+lets a temporary drag preview win over persisted anchors without reading storage
+inside geometry.
+
+SPATIAL1B captures one folder's automatic members, automatic center, current
+displayed center, and frame at gesture start. Every live preview derives one
+rigid translation from that immutable automatic base. Pointer and keyboard
+helpers clamp only the normalized anchor, never persist graph or viewport
+coordinates, and produce positions for the exact active folder only.

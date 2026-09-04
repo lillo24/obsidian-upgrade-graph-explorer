@@ -13,6 +13,10 @@ import type { GraphSelection } from '@icarus-graph-explorer/renderer-reactflow';
 import type { EntityId } from '@icarus-graph-explorer/core';
 import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
 import type { ProjectionNodeId } from '@icarus-graph-explorer/view-projection';
+import {
+  workspaceFolderKeyFromPath,
+  type WorkspaceFolderKey,
+} from '@icarus-graph-explorer/spatial-overrides';
 
 import {
   networkExplorerContextTarget,
@@ -49,7 +53,17 @@ import {
   type NetworkExplorerRevealRequest,
 } from '../network-explorer-model';
 
+export interface NetworkExplorerArrangementProps {
+  readonly active: boolean;
+  readonly activeFolderKey?: WorkspaceFolderKey;
+  readonly anchoredFolderKeys: ReadonlySet<WorkspaceFolderKey>;
+  readonly available: boolean;
+  readonly unavailableReason?: string;
+  readonly onArrangeFolder: (folderKey: WorkspaceFolderKey) => void;
+}
+
 interface NetworkExplorerProps {
+  readonly arrangement?: NetworkExplorerArrangementProps;
   readonly presentationOverrides: EntityPresentationOverrideMap;
   readonly sizePersistenceStatus: string;
   readonly sizeEditingDisabled: boolean;
@@ -107,6 +121,7 @@ function nodeAccessibleName(
 }
 
 export const NetworkExplorer = memo(function NetworkExplorer({
+  arrangement,
   presentationOverrides,
   sizePersistenceStatus,
   sizeEditingDisabled,
@@ -148,6 +163,17 @@ export const NetworkExplorer = memo(function NetworkExplorer({
   const [context, setContext] = useState<NetworkExplorerContext | null>(null);
   const [sizeError, setSizeError] = useState<string>();
   const hiddenPathSet = useMemo(() => new Set(hiddenPaths), [hiddenPaths]);
+  const rootFileCount = useMemo(
+    () =>
+      model.roots.filter(
+        (entry) =>
+          entry.kind === 'node' &&
+          entry.node.kindLabel === 'File' &&
+          entry.node.sourcePath !== undefined &&
+          workspaceFolderKeyFromPath(entry.node.sourcePath) === '.',
+      ).length,
+    [model.roots],
+  );
   const focusPending = useRef(false);
   const pendingSelectionReveal = useRef<ProjectionNodeId | undefined>(
     undefined,
@@ -497,6 +523,35 @@ export const NetworkExplorer = memo(function NetworkExplorer({
             onRestoreFile={onRestoreFile}
           />
         )}
+        {arrangement === undefined || rootFileCount === 0 ? null : (
+          <div className="network-explorer__root-arrangement">
+            <span>Root folder</span>
+            {arrangement.anchoredFolderKeys.has('.') ? (
+              <span
+                aria-label="Custom folder position"
+                className="network-explorer__arranged-marker"
+                title="Custom folder position"
+              >
+                ◆
+              </span>
+            ) : null}
+            <button
+              aria-pressed={
+                arrangement.active && arrangement.activeFolderKey === '.'
+              }
+              disabled={!arrangement.available}
+              onClick={() => arrangement.onArrangeFolder('.')}
+              title={
+                arrangement.available
+                  ? 'Arrange root folder'
+                  : arrangement.unavailableReason
+              }
+              type="button"
+            >
+              Arrange folder
+            </button>
+          </div>
+        )}
       </div>
       {treeEmpty ? (
         <p className="network-explorer__empty">
@@ -540,6 +595,22 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                   ? undefined
                   : presentationOverrides.get(fileEntityId)?.sizeScale;
               const selected = node !== undefined && selectedNodeId === node.id;
+              const folderKey = folder?.folder.path as
+                WorkspaceFolderKey | undefined;
+              const directFileCount =
+                folder === undefined
+                  ? 0
+                  : folder.folder.entries.filter(
+                      (entry) =>
+                        entry.kind === 'node' &&
+                        entry.node.kindLabel === 'File',
+                    ).length;
+              const folderArrangementDisabledReason =
+                directFileCount === 0
+                  ? 'This folder has no directly visible File in the current All Network view'
+                  : arrangement?.available === false
+                    ? arrangement.unavailableReason
+                    : undefined;
               return (
                 <div
                   className="network-explorer__virtual-row"
@@ -627,6 +698,44 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                       >
                         {sizeScale.toFixed(2)}×
                       </span>
+                    )}
+                    {folderKey === undefined ||
+                    arrangement === undefined ? null : (
+                      <>
+                        {arrangement.anchoredFolderKeys.has(folderKey) ? (
+                          <span
+                            aria-label="Custom folder position"
+                            className="network-explorer__arranged-marker"
+                            title="Custom folder position"
+                          >
+                            ◆
+                          </span>
+                        ) : null}
+                        <button
+                          aria-label={`Arrange folder ${folder?.folder.name ?? folderKey}`}
+                          aria-pressed={
+                            arrangement.active &&
+                            arrangement.activeFolderKey === folderKey
+                          }
+                          className="network-explorer__arrange-folder"
+                          disabled={
+                            folderArrangementDisabledReason !== undefined
+                          }
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            arrangement.onArrangeFolder(folderKey);
+                          }}
+                          onKeyDown={(event) => event.stopPropagation()}
+                          tabIndex={row.id === activeRowId ? 0 : -1}
+                          title={
+                            folderArrangementDisabledReason ??
+                            `Arrange folder ${folder?.folder.name ?? folderKey}`
+                          }
+                          type="button"
+                        >
+                          Arrange folder
+                        </button>
+                      </>
                     )}
                     {node === undefined ? null : (
                       <button

@@ -5,6 +5,8 @@ the source-neutral spatial registry.
 
 - `session.ts` distinguishes durable, session-only, corrupt, and failed-write
   states. Durable candidates are validated and written before adoption.
+- `arrangement.ts` owns the small All Network Arrange mode state machine; raw
+  pointer gesture state remains renderer-owned.
 - `use-spatial-overrides.ts` keys sessions by eligibility/workspace, resolves the
   All Network anchor map, and exposes the narrow set/reset/corrupt-recovery seam
   for SPATIAL1B.

@@ -34,6 +34,7 @@
     "@icarus-graph-explorer/resolver-obsidian": "workspace:*",
     "@icarus-graph-explorer/snapshot-delta": "workspace:*",
     "@icarus-graph-explorer/stable-identity": "workspace:*",
+    "@icarus-graph-explorer/spatial-overrides": "workspace:*",
     "@icarus-graph-explorer/vault-discovery-policy": "workspace:*",
     "@icarus-graph-explorer/view-projection": "workspace:*",
     "@icarus-graph-explorer/visual-groups": "workspace:*",
