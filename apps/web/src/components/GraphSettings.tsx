@@ -439,8 +439,9 @@ export const GraphSettings = memo(function GraphSettings({
                   </small>
                 </label>
                 <p className="global-layout-scope-note">
-                  Changes automatic Focus Network framing only. Manual pan and
-                  zoom remain authoritative until Fit.
+                  Previews the current Focus Network camera immediately around
+                  its semantic anchor. Layout stays unchanged, and later graph
+                  updates preserve the preview until Fit.
                 </p>
               </section>
               <section className="graph-settings__section">

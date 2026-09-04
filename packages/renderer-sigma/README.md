@@ -354,9 +354,12 @@ multipliers and Visual Groups cannot change density, camera, layout, or cache.
 
 SPACING1B-QA adds a transient 0–100% camera-policy strength. The effective ratio
 is `1 + (densityDecision - 1) * strength / 100`, so 0% reproduces the legacy
-ratio-1 Fit and 100% preserves SPACING1B. Automatic ownership responds to a
-strength change while retaining the current semantic screen anchor; user-owned
-cameras keep their exact state until Fit. The value never enters ForceAtlas2
+ratio-1 Fit and 100% preserves SPACING1B. Changing strength always previews the
+new ratio around the current selected-node/root screen anchor, even when the
+camera was already user-owned, and makes the resulting camera user-owned.
+Later topology or layout completion therefore cannot override the preview;
+Fit recenters with the selected strength and returns to automatic ownership.
+The value never enters ForceAtlas2
 requests, accepted positions, fingerprints, caches, projection, or persistence.
 Local has no folder prior or fake edges. Exact cache fingerprints include the
 root, stable topology, semantic node/edge roles, weights, iterations, and Local

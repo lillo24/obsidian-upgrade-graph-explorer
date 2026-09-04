@@ -379,10 +379,13 @@ export class LocalRendererSession {
   updateDensityFramingStrength(strengthPercentage: number): void {
     localDensityFramingRatio(1, strengthPercentage);
     if (this.densityFramingStrength === strengthPercentage) return;
-    this.densityFramingStrength = strengthPercentage;
-    if (this.cameraOwnership === 'user') return;
     const anchorKey = this.viewportAnchorNodeKey();
     const anchor = this.nodeViewportPoint(anchorKey);
+    this.densityFramingStrength = strengthPercentage;
+    // Moving the Sandbox slider is an explicit camera action. Preview the
+    // accepted density decision immediately, then protect that viewport from
+    // later topology/layout completion exactly like wheel, pinch, or drag.
+    this.cameraOwnership = 'user';
     const ratio = this.effectiveDensityRatio();
     if (anchor === undefined) {
       this.renderer.getCamera().setState({ ratio });

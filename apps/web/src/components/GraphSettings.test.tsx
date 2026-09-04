@@ -58,6 +58,9 @@ describe('Graph Settings presentation', () => {
     expect(markup).toContain('>Focus Network Density Framing<');
     expect(markup).toContain('id="focus-density-framing-strength"');
     expect(markup).toContain('>Legacy</span><span>Auto</span>');
+    expect(markup).toContain(
+      'Previews the current Focus Network camera immediately around its semantic anchor.',
+    );
     expect(markup).toContain('>Reset Sandbox</button>');
     expect(markup).toContain('>Current Source<');
     expect(markup).toContain('Applies to Scope = All, Layout = Network.');

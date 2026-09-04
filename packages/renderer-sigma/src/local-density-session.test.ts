@@ -140,7 +140,7 @@ describe('Focus density camera ownership', () => {
     compact.session.destroy();
   });
 
-  it('updates an automatic camera immediately without measuring or laying out', async () => {
+  it('previews strength immediately without measuring or laying out', async () => {
     const counts = new Map<string, number>();
     const instrumentation: LocalRendererInstrumentation = {
       count: (operation, amount = 1) =>
@@ -161,11 +161,16 @@ describe('Focus density camera ownership', () => {
     );
     await session.applyPositions(compactPositions);
     counts.clear();
+    const anchor = session.nodeViewportPoint('root')!;
 
     session.updateDensityFramingStrength(50);
     expect(renderer.camera.ratio).toBe(localDensityFramingRatio(decision, 50));
+    expect(session.nodeViewportPoint('root')!.x).toBeCloseTo(anchor.x);
+    expect(session.nodeViewportPoint('root')!.y).toBeCloseTo(anchor.y);
     session.updateDensityFramingStrength(100);
     expect(renderer.camera.ratio).toBe(decision);
+    expect(session.nodeViewportPoint('root')!.x).toBeCloseTo(anchor.x);
+    expect(session.nodeViewportPoint('root')!.y).toBeCloseTo(anchor.y);
     expect(counts.get('local-density-evaluations')).toBeUndefined();
     expect(counts.get('local-layouts')).toBeUndefined();
     session.destroy();
@@ -248,26 +253,63 @@ describe('Focus density camera ownership', () => {
     dragged.session.destroy();
   });
 
-  it('preserves user ownership and uses the selected strength on Fit', async () => {
+  it('live-previews a user-owned camera and keeps later layouts from stealing it', async () => {
     const input = rendererInput();
-    const expected = resolveLocalDensityFit(input, compactPositions).ratio;
+    const topologyInput: LocalRendererInput = {
+      ...input,
+      edges: [
+        ...input.edges,
+        {
+          key: 'near-isolate',
+          source: 'near',
+          target: 'isolate',
+          attributes: {
+            size: 1,
+            color: '#91aab2',
+            edgeKind: 'reference',
+            weight: 1,
+            referenceCount: 1,
+          },
+        },
+      ],
+    };
+    const sparseRatio = resolveLocalDensityFit(input, sparsePositions).ratio;
+    const compactRatio = resolveLocalDensityFit(
+      topologyInput,
+      compactPositions,
+    ).ratio;
     const { session, renderer } = mount({}, input);
+    await session.applyPositions(sparsePositions);
     session.zoomBy(0.82);
+    const anchor = session.nodeViewportPoint('root')!;
+
+    session.updateDensityFramingStrength(0);
+    expect(renderer.camera.ratio).toBe(1);
+    expect(session.nodeViewportPoint('root')!.x).toBeCloseTo(anchor.x);
+    expect(session.nodeViewportPoint('root')!.y).toBeCloseTo(anchor.y);
+
+    session.updateDensityFramingStrength(100);
+    expect(renderer.camera.ratio).toBe(sparseRatio);
+    expect(session.nodeViewportPoint('root')!.x).toBeCloseTo(anchor.x);
+    expect(session.nodeViewportPoint('root')!.y).toBeCloseTo(anchor.y);
+
+    session.update(topologyInput);
+    expect(renderer.camera.ratio).toBe(sparseRatio);
+    expect(session.nodeViewportPoint('root')!.x).toBeCloseTo(anchor.x);
+    expect(session.nodeViewportPoint('root')!.y).toBeCloseTo(anchor.y);
 
     await session.applyPositions(compactPositions);
-    expect(renderer.camera.ratio).toBe(0.82);
-    session.updateDensityFramingStrength(0);
-    expect(renderer.camera.ratio).toBe(0.82);
-    session.fit();
+    expect(renderer.camera.ratio).toBe(sparseRatio);
+    expect(session.nodeViewportPoint('root')!.x).toBeCloseTo(anchor.x);
+    expect(session.nodeViewportPoint('root')!.y).toBeCloseTo(anchor.y);
 
+    session.fit();
     expect(renderer.camera).toMatchObject({
       x: 0.5,
       y: 0.5,
       angle: 0,
-      ratio: 1,
+      ratio: compactRatio,
     });
-    session.updateDensityFramingStrength(100);
-    expect(renderer.camera.ratio).toBe(expected);
     expect(renderer.camera.animatedReset).not.toHaveBeenCalled();
     session.destroy();
   });

@@ -400,8 +400,11 @@ ordinary Trackpad Zoom choice, **Sandbox** contains graph appearance/layout
 experiments, and **Source & Diagnostics** retains source operations and evidence.
 Sandbox also provides a transient Focus Network density-framing strength: 0%
 reproduces legacy ratio 1, 100% uses the measured SPACING1B ratio, and intermediate
-values linearly interpolate the camera target. It defaults to 100% per launch and
-is intentionally absent from the v1 preference payload. Reset Sandbox restores
+values linearly interpolate the camera target. Slider movement is a live camera
+preview under automatic or user ownership: it preserves the current semantic
+screen anchor, applies the new ratio without Fit, and leaves the viewport
+user-owned so later topology updates cannot steal it. It defaults to 100% per
+launch and is intentionally absent from the v1 preference payload. Reset Sandbox restores
 only Focus Root appearance, All Network layout, density strength, and Experimental
 exposure; Trackpad Zoom, source configuration, view/history, queries, and vault
 data remain unchanged.

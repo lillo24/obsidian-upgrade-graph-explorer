@@ -95,10 +95,27 @@ it('installs an exact cache-hit density frame before first render without a work
   expect(counts.get('local-density-evaluations')).toBe(1);
   expect(counts.get('local-layouts')).toBeUndefined();
 
+  const renderer = SigmaTestRenderer.instances[0]!;
+  const rootViewportPoint = () => {
+    const node = renderer.getNodeDisplayData(input.rootNodeKey)! as {
+      x: number;
+      y: number;
+    };
+    return renderer.framedGraphToViewport(node);
+  };
+  const anchor = rootViewportPoint();
   densityFramingStrength = 0;
   harness.invalidate();
   await harness.flush();
   expect(SigmaTestRenderer.instances[0]!.camera.ratio).toBe(1);
+  expect(rootViewportPoint().x).toBeCloseTo(anchor.x);
+  expect(rootViewportPoint().y).toBeCloseTo(anchor.y);
+  densityFramingStrength = 100;
+  harness.invalidate();
+  await harness.flush();
+  expect(SigmaTestRenderer.instances[0]!.camera.ratio).toBe(expected.ratio);
+  expect(rootViewportPoint().x).toBeCloseTo(anchor.x);
+  expect(rootViewportPoint().y).toBeCloseTo(anchor.y);
   expect(layout).not.toHaveBeenCalled();
   expect(counts.get('local-density-evaluations')).toBe(1);
   expect(counts.get('local-layouts')).toBeUndefined();

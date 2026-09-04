@@ -823,6 +823,7 @@ values remain unchanged.
 The SPACING1B-QA strength control performs only constant-time interpolation of
 the last accepted decision. It does not rerun density measurement, projection,
 mapping, topology reconciliation, or Local ForceAtlas2. Changing it while the
-camera is automatic updates one camera state; under user ownership it records
-policy only until Fit. The benchmark figures above therefore remain the complete
-density-evaluation cost.
+camera is automatic or user-owned updates one camera state around the current
+semantic screen anchor and makes the resulting viewport user-owned. Fit remains
+the explicit recentering action. The benchmark figures above therefore remain
+the complete density-evaluation cost.
