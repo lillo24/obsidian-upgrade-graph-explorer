@@ -38,6 +38,11 @@ import {
 import { createGlobalLayoutRequestFromAutomaticPositions } from './layout';
 import { automaticGlobalEdgeSize, automaticGlobalNodeSize } from './mapping';
 import {
+  captureRawViewportFrame,
+  refreshPreservingRawViewportFrame,
+  restoreRawViewportFrame,
+} from './raw-viewport-frame';
+import {
   NodeClickArbitrator,
   NODE_DOUBLE_CLICK_TIMEOUT_MS,
 } from './node-click';
@@ -1145,26 +1150,30 @@ export class GlobalRendererSession {
     });
   }
 
+  private updatePositions(positions: readonly GlobalLayoutPosition[]): void {
+    const byKey = new Map(
+      positions.map((position) => [position.key, position]),
+    );
+    this.graph.updateEachNodeAttributes(
+      (key, attributes) => {
+        const position = byKey.get(key);
+        if (position === undefined) {
+          throw new Error(`Global layout result omitted node ${key}.`);
+        }
+        if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+          throw new Error(
+            `Global layout result has invalid position for node ${key}.`,
+          );
+        }
+        return { ...attributes, x: position.x, y: position.y };
+      },
+      { attributes: ['x', 'y'] },
+    );
+  }
+
   applyPositions(positions: readonly GlobalLayoutPosition[]): Promise<void> {
     try {
-      const byKey = new Map(
-        positions.map((position) => [position.key, position]),
-      );
-      this.graph.updateEachNodeAttributes(
-        (key, attributes) => {
-          const position = byKey.get(key);
-          if (position === undefined) {
-            throw new Error(`Global layout result omitted node ${key}.`);
-          }
-          if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
-            throw new Error(
-              `Global layout result has invalid position for node ${key}.`,
-            );
-          }
-          return { ...attributes, x: position.x, y: position.y };
-        },
-        { attributes: ['x', 'y'] },
-      );
+      this.updatePositions(positions);
     } catch (error: unknown) {
       return Promise.reject(
         error instanceof Error ? error : new Error(String(error)),
@@ -1174,6 +1183,33 @@ export class GlobalRendererSession {
       this.renderer.once('afterRender', resolve);
       this.renderer.scheduleRefresh();
     });
+  }
+
+  /**
+   * Applies authoritative spatial coordinates without letting Sigma's changed
+   * graph normalization steal the user's raw graph-space viewport framing.
+   */
+  applySpatialPositions(
+    positions: readonly GlobalLayoutPosition[],
+  ): Promise<void> {
+    let frame: ReturnType<typeof captureRawViewportFrame>;
+    try {
+      frame = captureRawViewportFrame(this.renderer);
+      this.updatePositions(positions);
+    } catch (error: unknown) {
+      return Promise.reject(
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    }
+    return refreshPreservingRawViewportFrame(
+      {
+        afterProcess: (callback) =>
+          this.renderer.once('afterProcess', callback),
+        afterRender: (callback) => this.renderer.once('afterRender', callback),
+        scheduleRefresh: () => void this.renderer.scheduleRefresh(),
+      },
+      () => restoreRawViewportFrame(this.renderer, frame),
+    ).then(() => this.emitArrangementTargetPoint());
   }
 
   /**

@@ -11,6 +11,7 @@ vi.mock('sigma', async () => ({
 
 import { CanvasTestHarness } from './canvas-test-harness';
 import { GlobalGraphCanvas } from './GlobalGraphCanvas';
+import { GlobalRendererSession } from './session';
 import { SigmaTestRenderer } from './sigma-test-renderer';
 import { globalTestProjection } from './test-fixture';
 import type {
@@ -38,6 +39,10 @@ afterEach(() => {
 
 describe('production spatial rule adoption', () => {
   it('runs Pull once, reuses it for Place-only edits, and never requests automatic layout for rule edits', async () => {
+    const spatialApply = vi.spyOn(
+      GlobalRendererSession.prototype,
+      'applySpatialPositions',
+    );
     const projection = globalTestProjection();
     let rules: readonly FolderSpatialRule[] = [
       {
@@ -110,6 +115,8 @@ describe('production spatial rule adoption', () => {
     await harness.flush();
     expect(layout).toHaveBeenCalledTimes(1);
     expect(pull).toHaveBeenCalledTimes(1);
+    expect(spatialApply).toHaveBeenCalledTimes(1);
+    let spatialApplyCount = spatialApply.mock.calls.length;
 
     rules = [
       rules[0]!,
@@ -124,6 +131,8 @@ describe('production spatial rule adoption', () => {
     await harness.flush();
     expect(layout).toHaveBeenCalledTimes(1);
     expect(pull).toHaveBeenCalledTimes(1);
+    expect(spatialApply.mock.calls.length).toBeGreaterThan(spatialApplyCount);
+    spatialApplyCount = spatialApply.mock.calls.length;
 
     rules = [
       { ...rules[0]!, strength: 80 },
@@ -133,6 +142,91 @@ describe('production spatial rule adoption', () => {
     await harness.flush();
     expect(layout).toHaveBeenCalledTimes(1);
     expect(pull).toHaveBeenCalledTimes(2);
+    expect(spatialApply.mock.calls.length).toBeGreaterThan(spatialApplyCount);
+    spatialApplyCount = spatialApply.mock.calls.length;
+
+    rules = [rules[1]!];
+    harness.invalidate();
+    await harness.flush();
+    expect(layout).toHaveBeenCalledTimes(1);
+    expect(pull).toHaveBeenCalledTimes(2);
+    expect(spatialApply.mock.calls.length).toBeGreaterThan(spatialApplyCount);
+    spatialApplyCount = spatialApply.mock.calls.length;
+
+    rules = [];
+    harness.invalidate();
+    await harness.flush();
+    expect(layout).toHaveBeenCalledTimes(1);
+    expect(pull).toHaveBeenCalledTimes(2);
+    expect(spatialApply.mock.calls.length).toBeGreaterThan(spatialApplyCount);
+    harness.destroy();
+  });
+
+  it('leaves explicit Fit and Search center requests as camera-owning actions', async () => {
+    const projection = globalTestProjection();
+    let fitRequestKey = 0;
+    let centerRequest:
+      | {
+          readonly key: number;
+          readonly nodeId: string;
+          readonly ratio: number;
+        }
+      | undefined = undefined;
+    const fit = vi
+      .spyOn(GlobalRendererSession.prototype, 'fit')
+      .mockImplementation(noop);
+    const center = vi
+      .spyOn(GlobalRendererSession.prototype, 'center')
+      .mockResolvedValue(undefined);
+    const layoutService = {
+      dispose: noop,
+      layout: vi.fn(
+        async (request: Omit<GlobalLayoutRequest, 'requestId'>) =>
+          ({
+            schemaVersion: 1,
+            kind: 'result',
+            requestId: 1,
+            algorithm: 'reference-only',
+            computeMs: 0,
+            folderPriorMs: 0,
+            positions: request.nodes.map(({ key, x, y }) => ({ key, x, y })),
+            metrics: {
+              meanWithinFolderDistance: 0,
+              meanCrossFolderDistance: 0,
+              meanCrossFolderReferenceLength: 0,
+              meanDisplacementFromInput: 0,
+            },
+          }) as GlobalLayoutResult,
+      ),
+    };
+    const onFailure = vi.fn();
+    const harness = new CanvasTestHarness(() =>
+      GlobalGraphCanvas({
+        ...(centerRequest === undefined ? {} : { centerRequest }),
+        projection,
+        settings,
+        fitRequestKey,
+        layoutRequestKey: 0,
+        layoutService,
+        onFailure,
+        onNodeActivate: noop,
+        onSelectionChange: noop,
+        onViewportObservation: noop,
+        selection: null,
+        trackpadZoomMode: 'pinch-zoom',
+      }),
+    );
+    await harness.flush();
+
+    fitRequestKey = 1;
+    harness.invalidate();
+    await harness.flush();
+    expect(fit).toHaveBeenCalledTimes(1);
+
+    centerRequest = { key: 1, nodeId: 'entity:doc-a', ratio: 0.3 };
+    harness.invalidate();
+    await harness.flush();
+    expect(center).toHaveBeenCalledWith(centerRequest);
     harness.destroy();
   });
 });

@@ -354,8 +354,13 @@ function applyComposedPositions(
   instrumentation: GlobalRendererInstrumentation | undefined,
   forceSpatialOperation = false,
 ): Promise<void> {
-  const apply = () => session.applyPositions(positions);
-  return (anchors === undefined || anchors.size === 0) && !forceSpatialOperation
+  const spatialOperation =
+    (anchors !== undefined && anchors.size > 0) || forceSpatialOperation;
+  const apply = () =>
+    spatialOperation
+      ? session.applySpatialPositions(positions)
+      : session.applyPositions(positions);
+  return !spatialOperation
     ? apply()
     : instrumentation === undefined
       ? apply()
@@ -668,7 +673,7 @@ export function GlobalGraphCanvas({
     if (session === undefined) return;
     if (spatialRules !== undefined) {
       void session
-        .applyPositions(latestDisplayedPositions.current)
+        .applySpatialPositions(latestDisplayedPositions.current)
         .catch((error: unknown) => {
           setArrangementError(
             `Could not restore confirmed folder positions: ${errorMessage(error)}`,
@@ -1293,7 +1298,7 @@ export function GlobalGraphCanvas({
               'spatial-fixed-compositions',
               compose,
             );
-      await session.applyPositions(positions);
+      await session.applySpatialPositions(positions);
       if (cancelled || generation !== spatialGeneration.current) return;
       latestDisplayedPositions.current = positions;
       appliedSpatialOverrides.current = spatialOverrides;

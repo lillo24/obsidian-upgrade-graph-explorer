@@ -52,6 +52,12 @@ semantics, persisting resolved members, or running dynamic work on pointermove.
     dependency is introduced.
 14. Release remains gated on native mouse/precision-touchpad interaction in the
     optimized Tauri executable; browser and startup smoke are not substitutes.
+15. Applying authoritative spatial coordinates preserves the user's raw
+    graph-space viewport center, scale, and angle while Sigma recomputes its
+    normalization. Restoration occurs after processing and before drawing; it
+    applies to Pull, Place, cache-hit, remove, and reset adoption only. Explicit
+    Fit, Search center, initial framing, pan/zoom, and later camera transitions
+    keep camera ownership.
 
 ## Consequences
 

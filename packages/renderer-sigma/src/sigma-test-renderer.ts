@@ -16,6 +16,7 @@ export class SigmaTestRenderer {
   private onceHandlers = new Map<string, (() => void)[]>();
   readonly handlers = new Map<string, (event: unknown) => void>();
   readonly camera = {
+    angle: 0,
     ratio: 1,
     x: 0.5,
     y: 0.5,
@@ -23,9 +24,11 @@ export class SigmaTestRenderer {
     off: vi.fn(),
     getState: () => ({
       ratio: this.camera.ratio,
+      angle: this.camera.angle,
       x: this.camera.x,
       y: this.camera.y,
     }),
+    getBoundedRatio: (ratio: number) => ratio,
     setState: vi.fn((value: object) => Object.assign(this.camera, value)),
   };
   readonly captor = { on: vi.fn(), off: vi.fn() };
@@ -128,6 +131,9 @@ export class SigmaTestRenderer {
     return point;
   }
   viewportToGraph(point: { x: number; y: number }) {
+    return point;
+  }
+  graphToViewport(point: { x: number; y: number }) {
     return point;
   }
 }

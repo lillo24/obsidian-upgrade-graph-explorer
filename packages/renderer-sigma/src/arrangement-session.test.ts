@@ -42,6 +42,7 @@ describe('Global sparse folder arrangement session', () => {
     const onNodeSelected = vi.fn();
     const onNodeSingleClick = vi.fn();
     const onArrangementScopeFolderClick = vi.fn();
+    const onArrangementTargetPoint = vi.fn();
     const session = new GlobalRendererSession(
       { setAttribute: vi.fn() } as unknown as HTMLElement,
       input,
@@ -50,6 +51,7 @@ describe('Global sparse folder arrangement session', () => {
         trackpadZoomMode: 'pinch-zoom',
         onArrangementCommit,
         onArrangementScopeFolderClick,
+        onArrangementTargetPoint,
         onNodeActivated,
         onNodeSelected,
         onNodeSingleClick,
@@ -65,6 +67,7 @@ describe('Global sparse folder arrangement session', () => {
       input,
       onArrangementCommit,
       onArrangementScopeFolderClick,
+      onArrangementTargetPoint,
       onNodeActivated,
       onNodeSelected,
       onNodeSingleClick,
@@ -240,5 +243,35 @@ describe('Global sparse folder arrangement session', () => {
     expect(preventSigmaDefault).not.toHaveBeenCalled();
     expect(frames).toHaveLength(0);
     expect(onArrangementCommit).not.toHaveBeenCalled();
+  });
+
+  it('re-emits the target marker after raw viewport correction uses the processed frame', async () => {
+    const { input, onArrangementTargetPoint, renderer, session } =
+      createSession();
+    session.setFolderArrangementContext({
+      active: true,
+      activeFolderKey: 'alpha',
+      activeMemberNodeKeys: ['entity:doc-a', 'entity:doc-b'],
+      anchors: new Map(),
+      automaticPositions: globalLayoutPositionsFromInput(input),
+      input,
+      targetAnchor: { x: 0.4, y: -0.3 },
+    });
+    onArrangementTargetPoint.mockClear();
+
+    await session.applySpatialPositions(globalLayoutPositionsFromInput(input));
+
+    expect(renderer.camera.setState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        angle: 0,
+        ratio: 1,
+        x: expect.any(Number),
+        y: expect.any(Number),
+      }),
+    );
+    expect(onArrangementTargetPoint).toHaveBeenCalledWith({
+      x: expect.any(Number),
+      y: expect.any(Number),
+    });
   });
 });

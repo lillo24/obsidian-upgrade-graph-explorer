@@ -47,6 +47,7 @@ src/
   lifecycle.ts             WebGL construction result and idempotent session lease.
   style.ts                 Far/Regional/Near LOD and GROUP1A base-accent layer.
   global-label.ts          Viewport-aware Global label/hover placement after adaptive culling.
+  raw-viewport-frame.ts    Raw graph-space center/scale preservation across Sigma normalization.
   precision-wheel-zoom.ts  Fine-linear/coarse-compressed wheel curve and Sigma default guard.
   session.ts               Imperative Sigma lifecycle and high-frequency interaction ownership.
   node-click.ts            Shared 300 ms single/double-click arbitration; selection stays immediate.
@@ -73,6 +74,7 @@ src/
   arrangement-session.test.ts  Exact-folder pointer ownership, sparse refresh, and commit contract.
   arrangement-canvas.test.tsx  Accessible nudge/save and write-failure rollback contract.
   spatial-rule-canvas.test.tsx Pull/Place adoption, cache reuse, and zero-auto-layout regression.
+  raw-viewport-frame.test.ts Sigma-transform camera preservation and ownership regression.
   node-size-session.test.ts  Initial display, sparse indexed refresh, and topology-race contracts.
   *.test.ts                Mapping, layout, cache, LOD, settings, and precision contracts.
 ```
@@ -281,6 +283,15 @@ includes the base fingerprint and coordinates, semantic edges, resolved pull
 memberships, targets/strengths, settings, and algorithm version. It excludes
 fixed rules, camera, selection, labels, styles, display-only sizes, and sidebar
 state.
+
+Authoritative spatial-rule adoption (Dynamic Pull, Fixed Placement, dynamic
+cache hits, removal, and reset) preserves the raw graph point under the viewport
+center, raw graph units per pixel, and camera angle across Sigma's normalization
+recalculation. The session captures that frame before replacing coordinates and
+restores it during `afterProcess`, before the changed geometry is drawn. This is
+a narrow spatial-operation boundary: ordinary pan/zoom, initial framing,
+automatic layout, Fit, Search center, and later camera transitions retain their
+existing camera ownership.
 
 ## Regional semantic zoom and lifecycle
 

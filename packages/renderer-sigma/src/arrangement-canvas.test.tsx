@@ -7,6 +7,7 @@ import { globalTestProjection } from './test-fixture';
 
 interface MockSessionApi {
   readonly applyPositions: ReturnType<typeof vi.fn>;
+  readonly applySpatialPositions: ReturnType<typeof vi.fn>;
   readonly cancelFolderArrangementGesture: ReturnType<typeof vi.fn>;
   readonly previewFolderAnchor: ReturnType<typeof vi.fn>;
 }
@@ -17,6 +18,7 @@ vi.mock('./session', () => ({
   GlobalRendererSession: class {
     readonly ready = Promise.resolve();
     readonly applyPositions = vi.fn(async () => undefined);
+    readonly applySpatialPositions = vi.fn(async () => undefined);
     readonly applyPartialPositions = vi.fn();
     readonly cancelFolderArrangementGesture = vi.fn(() => {
       const changed = this.previewActive;
@@ -245,7 +247,7 @@ describe('All Network Arrange folders canvas', () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toContain(
       'Folder position was not saved: disk full',
     );
-    expect(session.applyPositions).toHaveBeenCalled();
+    expect(session.applySpatialPositions).toHaveBeenCalled();
   });
 
   it('keeps the toolbar action visible and explains an inactive transition', async () => {

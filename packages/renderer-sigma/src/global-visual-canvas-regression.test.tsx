@@ -179,6 +179,7 @@ describe('All Network global visual settings ownership', () => {
     const renderer = SigmaTestRenderer.instances[0]!;
     const positionsBefore = coordinates(renderer);
     const cameraBefore = renderer.camera.getState();
+    renderer.camera.setState.mockClear();
     const graphSizesBefore = renderer.graph
       .nodes()
       .map((key) => renderer.graph.getNodeAttribute(key, 'size'));
