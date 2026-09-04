@@ -18,8 +18,11 @@ import {
 
 function sampleScene() {
   const fixture = focusSpacingFixtures().find(({ id }) => id === 'five-star')!;
-  const request = createLocalLayoutRequest(fixture.input, 20);
-  const result = computeLocalLayout({ ...request, requestId: 1 }, () => 0);
+  const request = createLocalLayoutRequest(fixture.input);
+  const result = computeLocalLayout(
+    { ...request, requestId: 1 },
+    { maxWallTimeMs: 60_000, now: () => 0 },
+  );
   return sceneFromLayout(request, result.positions);
 }
 

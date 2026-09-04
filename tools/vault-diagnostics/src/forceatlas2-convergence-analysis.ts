@@ -2,6 +2,12 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import {
+  LOCAL_CONVERGENCE_ALL_P90_THRESHOLD,
+  LOCAL_CONVERGENCE_BATCH_ITERATIONS,
+  LOCAL_CONVERGENCE_STABLE_BATCHES_REQUIRED,
+} from '@icarus-graph-explorer/renderer-sigma/local-convergence';
+
+import {
   convergenceFixtures,
   type ConvergenceFixture,
 } from './convergence-fixtures';
@@ -36,6 +42,7 @@ const GUARDS = [
   'bounded-low-degree-maximum',
 ] as const satisfies readonly CandidateGuard[];
 const LONG_RUN_ITERATIONS = 1_000;
+const ACCEPTED_EVIDENCE_THRESHOLDS = [0.000672, 0.00204, 0.00512] as const;
 
 interface CandidateWithReference {
   readonly evaluation: CandidateEvaluation;
@@ -360,7 +367,8 @@ function main(): void {
       curve: movementCurve(fixture, batchSize),
     })),
   );
-  const thresholds = evidenceDerivedThresholds(curves);
+  const observedThresholds = evidenceDerivedThresholds(curves);
+  const thresholds = ACCEPTED_EVIDENCE_THRESHOLDS;
   const longReferences = new Map(
     eligible.map((fixture) => [
       fixture.id,
@@ -406,11 +414,10 @@ function main(): void {
       }
     }
   }
-  const selectedThreshold = thresholds[thresholds.length - 1]!;
   const selectedPolicy = {
-    batchSize: 32,
-    threshold: selectedThreshold,
-    stableBatchesRequired: 3,
+    batchSize: LOCAL_CONVERGENCE_BATCH_ITERATIONS,
+    threshold: LOCAL_CONVERGENCE_ALL_P90_THRESHOLD,
+    stableBatchesRequired: LOCAL_CONVERGENCE_STABLE_BATCHES_REQUIRED,
     guard: 'bounded-low-degree-maximum' as const,
   };
   const selectedEvaluations = new Map(
@@ -603,7 +610,7 @@ function main(): void {
       graphology: '0.26.0',
       graphologyForceAtlas2: '0.10.1',
     },
-    productionChanged: false,
+    productionChanged: true,
     fixtures: fixtures.map((fixture) => ({
       id: fixture.id,
       mode: fixture.mode,
@@ -644,6 +651,8 @@ function main(): void {
       source:
         'p25/p50/p75 of all endpoint normalized p90 movements at or beyond each fixture current budget and before its deterministic cap',
       candidates: thresholds,
+      observedWithProductionRawFrameParity: observedThresholds,
+      note: 'The accepted CONVERGENCE1A thresholds stay fixed; removing intermediate rounding changes the re-observed quantiles but does not retune local-fa2-convergence-v1.',
     },
     candidateGrid: evaluated.map(({ evaluation, referenceP90 }) => ({
       ...stripCandidatePositions(evaluation),
@@ -653,7 +662,7 @@ function main(): void {
     selectedDiagnosticPolicy: {
       ...selectedPolicy,
       aggregate: selectedAggregate,
-      note: 'Selection is a decision-spike candidate only; production remains unchanged.',
+      note: 'CONVERGENCE1B uses this accepted policy in production; diagnostics import the production metric and policy primitives.',
     },
     globalFolderMacroSteps: folderMacros,
     hardLimits: {
@@ -689,6 +698,7 @@ function main(): void {
         comparisons: comparisons.length,
         candidatePolicies: aggregate.length,
         evidenceDerivedThresholds: thresholds,
+        observedRawFrameThresholds: observedThresholds,
         selectedDiagnosticPolicy: selectedPolicy,
         selectedAggregate: {
           stable: selectedAggregate.stable,

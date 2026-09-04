@@ -1,6 +1,6 @@
 import {
   computeGlobalLayout,
-  computeLocalLayout,
+  localConvergenceMaxIterations,
   resolveGlobalPhysicsSettings,
 } from '@icarus-graph-explorer/renderer-sigma/core';
 import type {
@@ -254,8 +254,8 @@ function acceptedPositions(
   }
   return positions.map((position) => ({
     key: position.key,
-    x: Number((position.x - root.x).toFixed(8)),
-    y: Number((position.y - root.y).toFixed(8)),
+    x: position.key === fixture.request.rootKey ? 0 : position.x - root.x,
+    y: position.key === fixture.request.rootKey ? 0 : position.y - root.y,
   }));
 }
 
@@ -327,18 +327,27 @@ function productionPass(
 ): readonly ConvergencePosition[] {
   const byKey = positionsByKey(start);
   if (fixture.mode === 'focus') {
-    const result = computeLocalLayout({
-      ...fixture.request,
-      requestId,
-      nodes: fixture.request.nodes.map((node) => {
-        const position = byKey.get(node.key);
-        if (position === undefined) {
-          throw new Error(`Production drift omitted Local node ${node.key}.`);
-        }
-        return { ...node, x: position.x, y: position.y };
-      }),
-    });
-    return result.positions;
+    return runPublicBatches({
+      fixture: {
+        ...fixture,
+        request: {
+          ...fixture.request,
+          nodes: fixture.request.nodes.map((node) => {
+            const position = byKey.get(node.key);
+            if (position === undefined) {
+              throw new Error(
+                `Production drift omitted Local node ${node.key}.`,
+              );
+            }
+            return { ...node, x: position.x, y: position.y };
+          }),
+        },
+      },
+      start,
+      totalIterations: fixture.currentBudget,
+      batchSize: fixture.currentBudget,
+      form: 'reuse',
+    }).positions;
   }
   const result = computeGlobalLayout({
     ...fixture.request,
@@ -459,7 +468,7 @@ export function deterministicIterationCap(
   nodeCount: number,
 ): number {
   if (mode === 'focus') {
-    return nodeCount <= 100 ? 1_000 : nodeCount <= 500 ? 600 : 240;
+    return localConvergenceMaxIterations(nodeCount);
   }
   return nodeCount <= 1_000 ? 640 : nodeCount <= 5_000 ? 120 : 80;
 }
@@ -546,14 +555,16 @@ export function evaluateCandidate(input: {
       stopReason = 'max-wall-time';
       break;
     }
-    stableBatches = batchStable(
-      input.fixture,
-      snapshot.movement,
-      input.threshold,
-      input.guard,
-    )
-      ? stableBatches + 1
-      : 0;
+    if (snapshot.batchIterations === input.curve.batchSize) {
+      stableBatches = batchStable(
+        input.fixture,
+        snapshot.movement,
+        input.threshold,
+        input.guard,
+      )
+        ? stableBatches + 1
+        : 0;
+    }
     stopIndex = index;
     if (stableBatches >= input.stableBatchesRequired) {
       stopReason = 'stable';
@@ -596,13 +607,34 @@ export function movementCurve(
     fixture.mode,
     fixture.request.nodes.length,
   );
-  return runPublicBatches({
+  const capped = runPublicBatches({
     fixture,
     start: fixturePositions(fixture),
-    totalIterations: maxIterations + batchSize,
+    totalIterations: maxIterations,
     batchSize,
     form: 'reuse',
   });
+  const probe = runPublicBatches({
+    fixture,
+    start: capped.positions,
+    totalIterations: batchSize,
+    batchSize,
+    form: 'reuse',
+  });
+  return {
+    ...capped,
+    requestedIterations: maxIterations + batchSize,
+    iterationsCompleted: maxIterations + batchSize,
+    computeMs: capped.computeMs + probe.computeMs,
+    positions: probe.positions,
+    snapshots: [
+      ...capped.snapshots,
+      ...probe.snapshots.map((snapshot) => ({
+        ...snapshot,
+        iterationsCompleted: maxIterations + snapshot.iterationsCompleted,
+      })),
+    ],
+  };
 }
 
 export function evidenceDerivedThresholds(

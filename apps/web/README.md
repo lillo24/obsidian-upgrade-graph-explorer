@@ -394,6 +394,12 @@ remains selection-only and diagnostic double-click is inert. Entry captures the
 focused document's runtime viewport point, normalizes the KG6 root to that
 document, and keeps neighboring files collapsed. Network renders a
 deterministic Sigma seed and refines it in its latest-only ForceAtlas2 Worker.
+That one worker request now owns the finite `local-fa2-convergence-v1`
+lifecycle: reused-graph 32-iteration batches stop after three guarded stable
+batches or the deterministic node-class cap, then adopt once. A between-batch
+2-second safety abort is an explicit non-cacheable failure, so no partial frame
+replaces the last valid display. Exact cache hits still submit zero work and
+explicit Rearrange still warm-starts from current automatic coordinates.
 All Hierarchy uses compact schematic File/Heading/Block/diagnostic cards over
 the existing Structure projection and Dagre mode; Focus Hierarchy uses extended
 detailed cards over the same bounded Focus projection and keeps its

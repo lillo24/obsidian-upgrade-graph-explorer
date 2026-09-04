@@ -176,7 +176,7 @@ describe('render-only per-File size composition', () => {
       DEFAULT_GLOBAL_LAYOUT_SETTINGS,
       1,
     );
-    const localRequest = createLocalLayoutRequest(local, 1);
+    const localRequest = createLocalLayoutRequest(local);
     expect(
       globalLayoutFingerprint({
         ...globalRequest,
