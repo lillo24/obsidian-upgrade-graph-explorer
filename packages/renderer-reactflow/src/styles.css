@@ -507,6 +507,17 @@
   stroke-width: 3;
 }
 
+.react-flow__edge.graph-edge--focus-fallback .graph-edge-path {
+  stroke: #7b6f8f;
+  stroke-dasharray: 6 5;
+  stroke-width: 1.8;
+}
+
+.react-flow__edge.graph-edge--secondary .graph-edge-path {
+  opacity: 0.46;
+  stroke-width: 1.35;
+}
+
 .react-flow__edge.selected .graph-edge-path,
 .react-flow__edge.is-highlighted .graph-edge-path {
   stroke-width: 4;
@@ -664,4 +675,38 @@
   .graph-canvas .react-flow__edge {
     transition: none;
   }
+}
+.react-flow__node-module {
+  z-index: -1 !important;
+  pointer-events: none !important;
+}
+
+.focus-module-boundary {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(73, 103, 116, 0.28);
+  border-radius: 14px;
+  background: rgba(244, 248, 249, 0.54);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+}
+
+.focus-module-boundary--root {
+  border-color: rgba(28, 82, 103, 0.58);
+  background: rgba(226, 239, 243, 0.64);
+  box-shadow: inset 0 0 0 1px rgba(28, 82, 103, 0.12);
+}
+
+.focus-filtered-bridge {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  box-sizing: border-box;
+  border: 1px dashed #879ca5;
+  border-radius: 10px;
+  color: #526b77;
+  background: rgba(247, 250, 251, 0.92);
+  font-size: 1.05rem;
+  font-weight: 800;
 }

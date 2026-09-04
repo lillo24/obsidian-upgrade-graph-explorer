@@ -3740,3 +3740,43 @@ a:focus-visible {
       max(0.75rem, env(safe-area-inset-left));
   }
 }
+.modular-focus-hierarchy {
+  position: absolute;
+  inset: 0;
+}
+
+.modular-focus-hierarchy__controls {
+  position: absolute;
+  z-index: 8;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  max-width: min(28rem, calc(100% - 1.5rem));
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid #b9c7cd;
+  border-radius: 0.55rem;
+  color: #294957;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 0.25rem 0.8rem rgba(35, 61, 72, 0.12);
+  font-size: 0.72rem;
+}
+
+.modular-focus-hierarchy__controls label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.modular-focus-hierarchy__controls span {
+  overflow: hidden;
+  color: #8a4b16;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modular-focus-hierarchy__controls button {
+  white-space: nowrap;
+}

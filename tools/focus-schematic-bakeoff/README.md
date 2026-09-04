@@ -26,6 +26,11 @@ pnpm benchmark:focus-schematic-endpoints -- --profile medium
 pnpm benchmark:focus-schematic-endpoints -- --profile hub
 pnpm benchmark:focus-schematic-endpoints -- --profile stability
 pnpm generate:focus-schematic-endpoint-lab -- --out output/hier3a-endpoint-lab
+
+pnpm benchmark:focus-schematic-production-worker -- --profile small
+pnpm benchmark:focus-schematic-production-worker -- --profile medium
+pnpm benchmark:focus-schematic-production-worker -- --profile hub
+pnpm benchmark:focus-schematic-production-worker -- --profile supersession
 ```
 
 Medium and hub attempts run in disposable worker threads with hard timeouts.
@@ -61,6 +66,11 @@ adjacent keyboard-accessible list. Generated output is gitignored.
 - `src/endpoint-attempt-worker.ts` bounds the 500-module A1 hub attempt.
 - `src/endpoint-lab.ts` generates the focused self-contained HIER3A review
   surface with EP1–EP26 and ES1–ES8.
+- `src/production-worker-benchmark.ts` measures the production HIER3B protocol
+  through real Node worker threads for small, medium, hub, and supersession
+  profiles without defining a timing gate.
+- `src/production-worker-thread.ts` hosts the production runtime for that
+  worker-thread benchmark.
 - `src/endpoint-*.test.ts` covers the inherited HIER2 corpus and review-lab
   defaults/accessibility.
 - `src/strategies.test.ts` covers D0, compound output, dimensions, source order,

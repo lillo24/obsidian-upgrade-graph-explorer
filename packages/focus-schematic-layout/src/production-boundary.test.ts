@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { extname, join } from 'node:path';
+import { extname, join, relative, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const productionExtensions = new Set(['.ts', '.tsx']);
@@ -19,7 +19,7 @@ function sourceFiles(root: string): string[] {
   });
 }
 
-describe('HIER3A production boundary', () => {
+describe('HIER3B production boundary', () => {
   it('keeps the reusable package free of renderer, app, worker, view-state, and platform imports', () => {
     const root = fileURLToPath(new URL('.', import.meta.url));
     const source = sourceFiles(root)
@@ -30,16 +30,28 @@ describe('HIER3A production boundary', () => {
     );
   });
 
-  it('is absent from production packages and apps during HIER3A', () => {
+  it('is imported only by the approved lazy renderer and web integration seams', () => {
     const repository = fileURLToPath(new URL('../../..', import.meta.url));
+    const packageRoot = join(repository, 'packages', 'focus-schematic-layout');
     const roots = ['apps', 'packages']
       .flatMap((folder) => sourceFiles(join(repository, folder)))
-      .filter((path) => !path.includes('focus-schematic-layout'));
-    const imports = roots.filter((path) =>
-      readFileSync(path, 'utf8').includes(
-        '@icarus-graph-explorer/focus-schematic-layout',
-      ),
+      .filter((path) => !path.startsWith(`${packageRoot}${sep}`));
+    const imports = roots
+      .filter((path) =>
+        readFileSync(path, 'utf8').includes(
+          '@icarus-graph-explorer/focus-schematic-layout',
+        ),
+      )
+      .map((path) => relative(repository, path).replaceAll('\\', '/'))
+      .sort();
+    expect(imports).toEqual(
+      [
+        'apps/web/src/components/ModularStructuredGraphView.tsx',
+        'apps/web/src/focus-schematic-layout-cache.ts',
+        'apps/web/src/workers/focus-schematic-layout-worker-client.ts',
+        'apps/web/src/workers/focus-schematic-layout.worker.ts',
+        'packages/renderer-reactflow/src/focus-schematic/index.ts',
+      ].sort(),
     );
-    expect(imports).toEqual([]);
   });
 });

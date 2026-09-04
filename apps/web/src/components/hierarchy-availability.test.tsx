@@ -16,6 +16,7 @@ import type { GraphCanvasProps } from '@icarus-graph-explorer/renderer-reactflow
 import type { GlobalGraphViewProps } from './GlobalGraphView';
 import type { LocalGraphViewProps } from './LocalGraphView';
 import type { LocalStructuredGraphViewProps } from './LocalStructuredGraphView';
+import type { ModularStructuredGraphViewProps } from './ModularStructuredGraphView';
 import { GraphExplorer } from './GraphExplorer';
 import { GRAPH_PREFERENCES_STORAGE_KEY } from '../preferences/graph-preferences';
 import { workspaceViewStorageKey } from '../persistence/storage';
@@ -25,6 +26,7 @@ const captured = vi.hoisted(() => ({
   global: undefined as GlobalGraphViewProps | undefined,
   local: undefined as LocalGraphViewProps | undefined,
   hierarchy: undefined as LocalStructuredGraphViewProps | undefined,
+  modular: undefined as ModularStructuredGraphViewProps | undefined,
   structure: undefined as GraphCanvasProps | undefined,
   navigate: undefined as ((id: string, origin: string) => void) | undefined,
 }));
@@ -44,6 +46,12 @@ vi.mock('./LocalStructuredGraphView', () => ({
   default: (props: LocalStructuredGraphViewProps) => {
     captured.hierarchy = props;
     return <div data-mode="local-structured" />;
+  },
+}));
+vi.mock('./ModularStructuredGraphView', () => ({
+  default: (props: ModularStructuredGraphViewProps) => {
+    captured.modular = props;
+    return <div data-mode="local-modular" />;
   },
 }));
 vi.mock(
@@ -107,6 +115,7 @@ describe('GraphExplorer experimental availability integration', () => {
     captured.global = undefined;
     captured.local = undefined;
     captured.hierarchy = undefined;
+    captured.modular = undefined;
     captured.structure = undefined;
   });
   afterEach(async () => {
@@ -119,12 +128,14 @@ describe('GraphExplorer experimental availability integration', () => {
     show = false,
     initialViewport?: 'fit' | 'restore',
     localLayoutMode: 'free' | 'structured' = 'structured',
+    focusHierarchyImplementation: 'classic' | 'modular-preview' = 'classic',
   ) {
     values.set(
       GRAPH_PREFERENCES_STORAGE_KEY,
       JSON.stringify({
         showExperimentalAllHierarchy: show,
         localLayoutMode,
+        focusHierarchyImplementation,
       }),
     );
     values.set(
@@ -184,9 +195,27 @@ describe('GraphExplorer experimental availability integration', () => {
     if (!container.querySelector('#graph-experimental-controls'))
       await click('Experimental');
     const input = container.querySelector<HTMLInputElement>(
-      '#graph-experimental-controls input',
+      '#graph-experimental-controls input[type="checkbox"]',
     )!;
     if (input.checked !== show) await act(() => input.click());
+  }
+  async function focusImplementation(
+    implementation: 'classic' | 'modular-preview',
+  ) {
+    if (!container.querySelector('#graph-settings-popover'))
+      await click('Open Settings');
+    if (!container.querySelector('#graph-experimental-controls'))
+      await click('Experimental');
+    const input = container.querySelector<HTMLInputElement>(
+      `#graph-experimental-controls input[value="${implementation}"]`,
+    );
+    if (input === null) throw new Error(`Missing ${implementation} radio.`);
+    if (!input.checked)
+      await act(async () => {
+        input.click();
+        await Promise.resolve();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
   }
   function mode() {
     return container.querySelector('[data-mode]')?.getAttribute('data-mode');
@@ -327,6 +356,46 @@ describe('GraphExplorer experimental availability integration', () => {
     await click('Close Settings');
     await click('All');
     expect(mode()).toBe('global');
+  });
+  it('keeps Classic as the default and switches Modular Preview without graph history', async () => {
+    await mount('local');
+    expect(mode()).toBe('local-structured');
+    const classicProjection = captured.hierarchy!.projection;
+    await act(() =>
+      captured.hierarchy!.onTransitionAnchorApiChange?.({
+        nodeViewportPoint: () => ({ x: 120, y: 80 }),
+        stageNodeAnchor: () => true,
+      }),
+    );
+    await focusImplementation('modular-preview');
+    expect(preference().focusHierarchyImplementation).toBe('modular-preview');
+    expect(mode()).toBe('local-modular');
+    expect(captured.modular!.projection).toBe(classicProjection);
+    expect(captured.modular!.projectionState.focus?.rootEntityId).toBe(
+      source.id,
+    );
+    expect(captured.modular!.initialTransitionAnchor).toMatchObject({
+      point: { x: 120, y: 80 },
+    });
+    expect(button('Back in graph history').disabled).toBe(true);
+    expect(preference().focusHierarchyImplementation).toBe('modular-preview');
+
+    await focusImplementation('classic');
+    expect(mode()).toBe('local-structured');
+    expect(button('Back in graph history').disabled).toBe(true);
+  });
+
+  it('falls back to Classic for the session without rewriting the preview preference', async () => {
+    await mount('local', false, undefined, 'structured', 'modular-preview');
+    expect(mode()).toBe('local-modular');
+    await act(() =>
+      captured.modular!.onFatalFailure('synthetic worker failure'),
+    );
+    expect(mode()).toBe('local-structured');
+    expect(preference().focusHierarchyImplementation).toBe('modular-preview');
+    expect(container.textContent).toContain(
+      'Classic Focus Hierarchy is active',
+    );
   });
   it('normalizes the All Network → All Hierarchy → Focus history without duplicate Back steps', async () => {
     await mount();

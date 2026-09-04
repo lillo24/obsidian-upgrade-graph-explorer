@@ -22,6 +22,8 @@ export function resetGraphSandbox(
     preferences: {
       ...current,
       focusAppearance: DEFAULT_GRAPH_PREFERENCES.focusAppearance,
+      focusHierarchyImplementation:
+        DEFAULT_GRAPH_PREFERENCES.focusHierarchyImplementation,
       globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
       showExperimentalAllHierarchy:
         DEFAULT_GRAPH_PREFERENCES.showExperimentalAllHierarchy,

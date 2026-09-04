@@ -59,6 +59,7 @@ describe('graph preferences', () => {
     const storage = memoryStorage('{"trackpadZoomMode":"pinch-zoom"}');
     expect(loadGraphPreferences(storage).preferences).toEqual({
       focusAppearance: 'inverted',
+      focusHierarchyImplementation: 'classic',
       globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
       localLayoutMode: 'free',
       showExperimentalAllHierarchy: false,
@@ -68,6 +69,7 @@ describe('graph preferences', () => {
     expect(
       saveGraphPreferences(storage, {
         focusAppearance: 'minimal',
+        focusHierarchyImplementation: 'modular-preview',
         globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
         localLayoutMode: 'free',
         showExperimentalAllHierarchy: false,
@@ -75,7 +77,7 @@ describe('graph preferences', () => {
       }),
     ).toEqual({ ok: true });
     expect(storage.value).toBe(
-      '{"focusAppearance":"minimal","globalLayoutSettings":{"folderClustering":true,"spacingPreset":"normal"},"localLayoutMode":"free","showExperimentalAllHierarchy":false,"trackpadZoomMode":"scroll-zoom"}',
+      '{"focusAppearance":"minimal","focusHierarchyImplementation":"modular-preview","globalLayoutSettings":{"folderClustering":true,"spacingPreset":"normal"},"localLayoutMode":"free","showExperimentalAllHierarchy":false,"trackpadZoomMode":"scroll-zoom"}',
     );
   });
 
@@ -106,6 +108,7 @@ describe('graph preferences', () => {
       ).preferences,
     ).toEqual({
       focusAppearance: 'inverted',
+      focusHierarchyImplementation: 'classic',
       globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
       localLayoutMode: 'free',
       showExperimentalAllHierarchy: false,
@@ -119,6 +122,7 @@ describe('graph preferences', () => {
       ).preferences,
     ).toEqual({
       focusAppearance: 'inverted',
+      focusHierarchyImplementation: 'classic',
       globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
       localLayoutMode: 'free',
       showExperimentalAllHierarchy: false,
@@ -265,6 +269,7 @@ describe('graph preferences', () => {
     expect(
       saveGraphPreferences(storage, {
         focusAppearance: 'inverted',
+        focusHierarchyImplementation: 'classic',
         globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
         localLayoutMode: 'free',
         showExperimentalAllHierarchy: false,
@@ -286,6 +291,55 @@ describe('graph preferences', () => {
       preferences: DEFAULT_GRAPH_PREFERENCES,
       warning:
         'Could not read saved graph settings; defaults are active for this session.',
+    });
+  });
+});
+
+describe('Modular Focus Hierarchy preview preference compatibility', () => {
+  it.each([undefined, null, false, true, 1, 'modular', {}, []])(
+    'defaults malformed/absent field %j to Classic',
+    (field) => {
+      const storage = memoryStorage(
+        JSON.stringify({
+          focusHierarchyImplementation: field,
+          focusAppearance: 'minimal',
+        }),
+      );
+      expect(loadGraphPreferences(storage).preferences).toMatchObject({
+        focusHierarchyImplementation: 'classic',
+        focusAppearance: 'minimal',
+      });
+    },
+  );
+
+  it.each(['classic', 'modular-preview'] as const)(
+    'round trips %s under the unchanged v1 key',
+    (implementation) => {
+      const storage = memoryStorage();
+      expect(
+        saveGraphPreferences(storage, {
+          ...DEFAULT_GRAPH_PREFERENCES,
+          focusHierarchyImplementation: implementation,
+        }).ok,
+      ).toBe(true);
+      expect(
+        loadGraphPreferences(storage).preferences.focusHierarchyImplementation,
+      ).toBe(implementation);
+    },
+  );
+
+  it('retains the implementation when another preference is saved', () => {
+    const storage = memoryStorage(
+      '{"focusHierarchyImplementation":"modular-preview"}',
+    );
+    const current = loadGraphPreferences(storage).preferences;
+    saveGraphPreferences(storage, {
+      ...current,
+      trackpadZoomMode: 'pinch-zoom',
+    });
+    expect(loadGraphPreferences(storage).preferences).toMatchObject({
+      focusHierarchyImplementation: 'modular-preview',
+      trackpadZoomMode: 'pinch-zoom',
     });
   });
 });

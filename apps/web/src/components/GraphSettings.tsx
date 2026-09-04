@@ -19,6 +19,8 @@ import type {
   LocalDensityQaDiagnostics,
 } from '@icarus-graph-explorer/renderer-sigma/types';
 
+import type { FocusHierarchyImplementation } from '../preferences/graph-preferences';
+
 import {
   graphSettingsTabForKey,
   type GraphSettingsTab,
@@ -29,6 +31,10 @@ interface GraphSettingsProps {
   readonly allNetworkDensityFramingStrength: number;
   readonly focusNetworkDensityQaDiagnostics?: LocalDensityQaDiagnostics;
   readonly focusNetworkDensityFramingStrength: number;
+  readonly focusHierarchyImplementation?: FocusHierarchyImplementation;
+  readonly onFocusHierarchyImplementationChange?: (
+    implementation: FocusHierarchyImplementation,
+  ) => void;
   readonly showExperimentalAllHierarchy?: boolean;
   readonly onShowExperimentalAllHierarchyChange?: (show: boolean) => void;
   readonly children?: ReactNode;
@@ -129,6 +135,8 @@ export const GraphSettings = memo(function GraphSettings({
   allNetworkDensityFramingStrength,
   focusNetworkDensityQaDiagnostics,
   focusNetworkDensityFramingStrength,
+  focusHierarchyImplementation = 'classic',
+  onFocusHierarchyImplementationChange,
   showExperimentalAllHierarchy = false,
   onShowExperimentalAllHierarchyChange,
   children,
@@ -586,6 +594,46 @@ export const GraphSettings = memo(function GraphSettings({
                 </button>
                 {experimentalOpen ? (
                   <div id="graph-experimental-controls">
+                    <fieldset className="graph-settings__choice-group">
+                      <legend>Focus Hierarchy implementation</legend>
+                      <label>
+                        <input
+                          checked={focusHierarchyImplementation === 'classic'}
+                          name="focus-hierarchy-implementation"
+                          onChange={() =>
+                            onFocusHierarchyImplementationChange?.('classic')
+                          }
+                          type="radio"
+                          value="classic"
+                        />
+                        <span>
+                          <strong>Classic</strong>
+                          <small>Current Focus Hierarchy renderer.</small>
+                        </span>
+                      </label>
+                      <label>
+                        <input
+                          checked={
+                            focusHierarchyImplementation === 'modular-preview'
+                          }
+                          name="focus-hierarchy-implementation"
+                          onChange={() =>
+                            onFocusHierarchyImplementationChange?.(
+                              'modular-preview',
+                            )
+                          }
+                          type="radio"
+                          value="modular-preview"
+                        />
+                        <span>
+                          <strong>Modular preview</strong>
+                          <small>
+                            New File-module layout with exact File/Heading/Block
+                            endpoints. Experimental until HIER3C.
+                          </small>
+                        </span>
+                      </label>
+                    </fieldset>
                     <label className="graph-settings__check">
                       <input
                         checked={showExperimentalAllHierarchy}

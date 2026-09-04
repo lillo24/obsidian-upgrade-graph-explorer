@@ -91,7 +91,8 @@ export interface DiagnosticNodeData extends Record<string, unknown> {
 }
 
 export interface GraphEdgeData extends Record<string, unknown> {
-  readonly projectionEdgeId: ProjectionEdgeId;
+  /** Null only for truthful synthetic fallback connections. */
+  readonly projectionEdgeId: ProjectionEdgeId | null;
   readonly kind: 'hierarchy' | 'reference';
   readonly status: ReferenceResolutionStatus | null;
   readonly referenceCount: number;
@@ -99,9 +100,30 @@ export interface GraphEdgeData extends Record<string, unknown> {
   readonly visualVariant: GraphVisualVariant;
 }
 
+export interface ModuleBoundaryNodeData extends Record<string, unknown> {
+  readonly projectionNodeId: null;
+  readonly moduleId: string;
+  readonly root: boolean;
+}
+
+export interface FilteredBridgeNodeData extends Record<string, unknown> {
+  readonly projectionNodeId: null;
+  readonly moduleId: string;
+  readonly ariaLabel: 'Filtered File bridge';
+}
+
 export type EntityFlowNode = Node<EntityNodeData, 'entity'>;
 export type DiagnosticFlowNode = Node<DiagnosticNodeData, 'diagnostic'>;
-export type GraphFlowNode = EntityFlowNode | DiagnosticFlowNode;
+export type ModuleBoundaryFlowNode = Node<ModuleBoundaryNodeData, 'module'>;
+export type FilteredBridgeFlowNode = Node<
+  FilteredBridgeNodeData,
+  'filtered-bridge'
+>;
+export type GraphFlowNode =
+  | EntityFlowNode
+  | DiagnosticFlowNode
+  | ModuleBoundaryFlowNode
+  | FilteredBridgeFlowNode;
 export type GraphFlowEdge = Edge<GraphEdgeData, 'graph'>;
 
 export interface RendererGraph {
@@ -149,9 +171,13 @@ export interface GraphLayoutService {
 
 export interface GraphCanvasProps {
   readonly projection: ViewProjection;
-  readonly layoutService: GraphLayoutService;
+  /** Omitted only when a validated prepared graph is supplied by a lazy renderer. */
+  readonly layoutService?: GraphLayoutService;
   readonly layoutMode: GraphLayoutMode;
   readonly layoutRequestKey?: number;
+  readonly preparedGraph?: RendererGraph;
+  readonly preparedGraphPending?: boolean;
+  readonly preparedGraphStatus?: string;
   readonly visualVariant?: GraphVisualVariant;
   /** Required by Local Structured for root normalization and emphasis. */
   readonly rootEntityId?: string;

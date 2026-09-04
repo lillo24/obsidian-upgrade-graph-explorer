@@ -27,6 +27,11 @@
       "import": "./src/local-structured.ts",
       "default": "./src/local-structured.ts"
     },
+    "./focus-schematic": {
+      "types": "./src/focus-schematic/index.ts",
+      "import": "./src/focus-schematic/index.ts",
+      "default": "./src/focus-schematic/index.ts"
+    },
     "./types": {
       "types": "./src/types.ts",
       "import": "./src/types.ts",
@@ -39,6 +44,8 @@
   },
   "dependencies": {
     "@icarus-graph-explorer/dagre-layout": "workspace:*",
+    "@icarus-graph-explorer/focus-schematic": "workspace:*",
+    "@icarus-graph-explorer/focus-schematic-layout": "workspace:*",
     "@icarus-graph-explorer/performance": "workspace:*",
     "@icarus-graph-explorer/view-projection": "workspace:*",
     "@icarus-graph-explorer/visual-groups": "workspace:*",

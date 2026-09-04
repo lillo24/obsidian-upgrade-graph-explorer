@@ -90,7 +90,8 @@ describe('renderer interaction helpers', () => {
       layoutMode: 'structure',
     });
     const edge = graph.edges[0];
-    if (edge?.data === undefined) throw new Error('Fixture edge is missing.');
+    if (edge?.data?.projectionEdgeId == null)
+      throw new Error('Fixture edge is missing.');
     const highlighted = applyRendererHighlight(graph, {
       kind: 'edge',
       id: edge.data.projectionEdgeId,
@@ -153,7 +154,8 @@ describe('renderer interaction helpers', () => {
       layoutMode: 'structure',
     });
     const edge = graph.edges[0];
-    if (edge?.data === undefined) throw new Error('Fixture edge is missing.');
+    if (edge?.data?.projectionEdgeId == null)
+      throw new Error('Fixture edge is missing.');
     const selected = applyRendererInteractionState(graph, null, {
       kind: 'edge',
       id: edge.data.projectionEdgeId,
@@ -179,7 +181,7 @@ describe('renderer interaction helpers', () => {
     );
     const firstId = projectionNodeIds[0];
     const secondId = projectionNodeIds[1];
-    if (firstId === undefined || secondId === undefined) {
+    if (firstId == null || secondId == null) {
       throw new Error('Fixture needs two projected nodes.');
     }
     const first = applyRendererInteractionState(graph, null, {
@@ -215,6 +217,8 @@ describe('renderer interaction helpers', () => {
     expect(Object.keys(GRAPH_NODE_TYPES).sort()).toEqual([
       'diagnostic',
       'entity',
+      'filtered-bridge',
+      'module',
     ]);
     expect(Object.keys(GRAPH_EDGE_TYPES)).toEqual(['graph']);
   });
