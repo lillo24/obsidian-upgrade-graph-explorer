@@ -558,6 +558,12 @@ importers:
       '@icarus-graph-explorer/workspace-worker':
         specifier: workspace:*
         version: link:../../packages/workspace-worker
+      graphology:
+        specifier: 0.26.0
+        version: 0.26.0(graphology-types@0.24.8)
+      graphology-layout-forceatlas2:
+        specifier: 0.10.1
+        version: 0.10.1(graphology-types@0.24.8)
       sigma:
         specifier: 3.0.3
         version: 3.0.3(graphology-types@0.24.8)

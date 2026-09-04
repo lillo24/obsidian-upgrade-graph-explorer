@@ -21,7 +21,7 @@ src/scope.ts       Segment-safe depth, descendant, subtree, and exclusion rules.
 src/registry.ts    V1 migration, strict v2 validation, serialization, pure edits.
 src/draft.ts       Production editor defaults, presets, validation, and exclusions.
 src/resolution.ts  Most-specific winners plus transient-draft scope visualization.
-src/geometry.ts    Base document frame and fixed composition over dynamic input.
+src/geometry.ts    Base frame, fixed composition, and displayed-to-dynamic inverse.
 src/preview.ts     Sparse resolved-member preview geometry and bounded nudges.
 src/index.ts       Public source-neutral interface.
 *.test.ts          Migration, scope, resolution, geometry, and compatibility tests.
@@ -73,3 +73,10 @@ frame remains the base automatic frame. Every pointer/keyboard sample derives a
 sparse shared translation from captured geometry, so Pull and Place both preview
 immediately as one rigid group and a parent preview never moves child-rule-owned
 members. Graph coordinates and resolved member IDs remain memory-only.
+
+MOVE1A also indexes the winning translations returned by fixed composition.
+For a displayed File target `P` and its applied Place translation `T`, the
+temporary simulation target is `C = P - T`; a node without Place uses identity.
+The index rejects duplicate folders and nodes shared by more than one applied
+group rather than guessing a winner. Pull output already belongs to the dynamic
+layer and is never inverted. This geometry remains pure and source-neutral.

@@ -11,6 +11,9 @@ SPATIAL2A evolves that independent All Network domain to schema-v2 exact/subtree
 rules plus a base → dynamic soft-pull → fixed-display pipeline. SPATIAL2B adds
 one production Pull/Place hierarchical rule editor over those contracts while
 leaving the active KG14, HIER, QUERY, GROUP, and SPACING tracks unchanged.
+MOVE1A defines temporary File movement across All and Focus as an optional
+constraint contract, while PHYSICS1 retains continuous simulation ownership and
+MOVE1B/PIN1 remain future product and persistence work.
 
 ## Stable domain shape
 
@@ -325,6 +328,25 @@ rigid preview until the matching latest dynamic generation adopts or fails;
 Place composes exactly after the current dynamic layer. Network Explorer
 provides exact-root edit/remove actions and summaries without presenting
 inherited parent intent as child ownership or adding canonical folder entities.
+
+Temporary File movement is a second direct-manipulation path rather than a
+folder-arrangement variant. The source-neutral spatial boundary derives a
+node-to-translation index from the fixed groups actually applied by composition.
+With displayed `P = D + T`, a drag sends `Ptarget - T` to the dynamic simulation
+layer; a missing Place translation is identity and dynamic Pull output is not
+removed. Ambiguous applied translations fail instead of guessing precedence.
+
+Both Sigma sessions expose a fake-backed begin/update/end port for one eligible
+canonical document. The port is plain serializable data with session/simulation
+generation, gesture ID, sequence, node key, dynamic target, and end reason. A
+pure 3 px state machine captures grab offset, rejects stale events, and the
+imperative coordinator coalesces updates by animation frame. File movement and
+Arrange Folders cancel one another. Lifecycle invalidations end the temporary
+constraint and never write layout caches, spatial persistence, view state,
+history, or source. The app has only an unmounted transient one-tool editing
+state contract. PHYSICS1 still owns real simulation lifetime, reheating,
+cooling, and convergence; MOVE1B owns its production binding and Edit control;
+PIN1 owns any future durable individual placement.
 
 `tools/global-renderer-spike` is now a production renderer harness rather than
 an implementation fork. It retains only synthetic KG13A fixtures, browser/Tauri

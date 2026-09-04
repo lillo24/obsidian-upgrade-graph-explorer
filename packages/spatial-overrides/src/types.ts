@@ -116,6 +116,12 @@ export interface AppliedFolderTranslation {
   readonly translation: SpatialPoint;
 }
 
+/** Winning fixed Place translation for each displayed node, if any. */
+export type AppliedFixedTranslationByNodeKey = ReadonlyMap<
+  string,
+  SpatialPoint
+>;
+
 export interface SpatialCompositionResult {
   readonly displayedPositions: readonly SpatialPosition[];
   readonly automaticFrame: AutomaticGraphFrame;

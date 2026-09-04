@@ -42,6 +42,7 @@ apps/web/
     workers/          Separate Vite W1, W3, Global, and Local entries/clients.
     performance.ts    Query-gated browser recorder and local inspection API.
     graph-state.ts    Pure disclosure/focus/filter interaction reducer.
+    network-editing.ts Pure transient one-tool-at-a-time editing-mode contract.
     exploration-model.ts Pure Scope/Layout mapping onto schema-v3 internal modes.
     navigation.ts     Shared reveal/filter-widening/navigation planner.
     local-view.ts     Local entry/reroot/minimum-reveal planner over KG6 state.
@@ -111,6 +112,12 @@ instead of the filtered projection, so hidden folders remain authorable. The
 canvas adds rigid target drag, keyboard nudge, Apply/Cancel, one/all reset, and
 corrupt-recovery surfaces without adding folder entities, File-ID membership,
 raw coordinates, or graph history checkpoints.
+
+MOVE1A defines, but does not mount, a future Network editing-mode reducer. It
+allows exactly one of Move File or Arrange Folder, and requires gesture cleanup
+when tools switch, Network is left, or the workspace changes. It has no storage
+adapter or history checkpoint. The visible pencil/Edit surface and real physics
+service connection remain MOVE1B.
 
 Graph history remains a web-layer session concern above KG9 view state.
 Each checkpoint contains one immutable KG6 `ViewProjectionState` reference and

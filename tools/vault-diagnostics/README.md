@@ -41,6 +41,12 @@ src/
   focus-spacing-metrics.ts  Graph, screen-space, Sigma-transform, and candidate-density metrics.
   focus-spacing-analysis.ts SPACING1A runner and self-contained visual comparison generator.
   focus-spacing-metrics.test.ts Transform invariance, candidate bounds, and fixture contracts.
+  file-move-benchmark.ts MOVE1A inverse/index/coalescing aggregate microbenchmark.
+  convergence-fixtures.ts Synthetic Local and Global topology families for CONVERGENCE1A.
+  convergence-metrics.ts Translation-aligned movement, scale, degree, and quality metrics.
+  convergence-candidates.ts Public-batch runners and bounded stopping-policy evaluation.
+  forceatlas2-convergence-analysis.ts CONVERGENCE1A evidence and self-contained SVG/HTML generator.
+  convergence-*.test.ts Metric invariants, fixtures, and diagnostic lifecycle contracts.
   performance-benchmark.ts Repeated versioned pipeline/projection/renderer/inspection results.
   query-projection-benchmark.ts PERFQ1A projection phases, operations, and repeated-query evidence.
   performance-policy.ts Class budgets plus measured KG12B worker/cache decisions.
@@ -137,6 +143,8 @@ pnpm benchmark:local-renderer -- --profile small
 pnpm benchmark:local-renderer -- --profile medium
 pnpm benchmark:local-renderer -- --profile stress
 pnpm analyze:focus-spacing
+pnpm benchmark:file-move
+pnpm analyze:forceatlas2-convergence
 ```
 
 Profiles are deterministic and measure parse/adapt, resolution, report
@@ -233,6 +241,22 @@ normalization and camera transforms in Node. It writes ignored synthetic JSON
 and a self-contained HTML comparison to `output/spacing1a/`. The candidate
 ratios are investigative evidence only: this command does not alter production
 layout settings, camera behavior, renderer state, fingerprints, or node sizes.
+
+`benchmark:file-move` exercises only MOVE1A-owned pure coordinate inversion,
+prebuilt applied-Place indexing/lookup, and frame coalescing for no-Place,
+Place, and 20,000-node synthetic cases. It emits aggregate timings and command
+counts, never graph IDs or coordinates. It deliberately does not benchmark the
+fake constraint consumer as evidence of production cooling or convergence.
+
+`analyze:forceatlas2-convergence` is the CONVERGENCE1A diagnostic-only
+contract. It reproduces fixed-budget A → B → C drift, compares one public
+ForceAtlas2 call with 20/32/40-iteration batches on reused and rebuilt
+Graphology graphs, evaluates bounded displacement policies with a hidden
+post-stop probe, and compares complete Global folder-prior macro-runs with a
+pure-ForceAtlas2 settling tail. It writes deterministic synthetic JSON and a
+self-contained HTML/SVG comparison under ignored `output/convergence1a/`.
+Wall-clock values are local evidence only. The command changes no production
+worker, fingerprint, cache, iteration, camera, or spatial-influence behavior.
 
 An opt-in private check can validate one real workspace using an existing
 identity catalog:

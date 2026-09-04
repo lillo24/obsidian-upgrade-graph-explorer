@@ -1,4 +1,4 @@
-# ADR 0019: Production hierarchical spatial-rule editor
+# ADR 0020: Production hierarchical spatial-rule editor
 
 **Status:** Proposed — implementation complete; mandatory native interaction QA pending.
 

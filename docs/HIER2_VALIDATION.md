@@ -1,7 +1,7 @@
 # HIER2 validation
 
-Status: **local evidence and required user graphical review complete; PR CI,
-merge, and post-merge CI remain pending.**
+Status: **complete. Local evidence, required user graphical review, PR CI,
+merge, and post-merge CI passed.**
 
 ## Scope and production isolation
 
@@ -95,7 +95,16 @@ The full check covered formatting, lint, recursive typechecks, 154 Vitest files
 with 1,309 tests, and the 585-module web production build. The desktop check and
 no-bundle release build completed successfully. An ordinary production-browser
 smoke loaded the unchanged app and exercised Focus + Hierarchy without a
-console or rendering blocker. Repository CI remains a post-PR gate.
+console or rendering blocker.
+
+## Repository integration evidence
+
+[PR #64](https://github.com/lillo24/icarus-graph-explorer/pull/64) validated the
+reviewed `3f99805919efd7ff8c1089bf41d59bff122fcf51` commit. Its `validate` and
+`desktop` jobs passed before merge. The PR merged into `main` as
+`ea54dfbd90374b7fee62bd3db1ed29d44c305cf6`, and post-merge CI run
+[33862677158](https://github.com/lillo24/icarus-graph-explorer/actions/runs/33862677158)
+passed both jobs on that exact merge commit.
 
 ## Privacy
 
