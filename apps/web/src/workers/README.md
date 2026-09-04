@@ -1,6 +1,6 @@
 # Desktop Workers
 
-Status: **STABLE — stateful W1 and stateless Structure/Global/Local layout workers remain separate.**
+Status: **STABLE — stateful W1 and stateless Structure/Global/Local/Modular layout workers remain separate.**
 
 This folder owns browser Worker transport code. Domain state, geometry, and
 protocol behavior live in platform-independent packages; the web application
@@ -22,6 +22,9 @@ global-spatial-influence-worker-client.test.ts  Supersession, stale, malformed, 
 local-layout.worker.ts        Stateless bounded Local hierarchy/reference ForceAtlas2 entry.
 local-layout-worker-client.ts  Latest-result-wins Local replacement-worker client and structured failure.
 local-layout-worker-client.test.ts  Supersession, schema-v2 validation, timeout, and disposal tests.
+focus-schematic-layout.worker.ts  Stateless HIER3B A1 production entry.
+focus-schematic-layout-worker-client.ts  Strict latest-result-wins Modular Preview client.
+focus-schematic-layout-worker-client.test.ts  Supersession, stale, failure, responsiveness, and disposal tests.
 ```
 
 The worker is instantiated only after a local-vault open starts. Sample and
@@ -66,3 +69,13 @@ rejects stale or inconsistent policy/counter/metric/node results, and errors
 leave the last valid or immediate deterministic scene visible. The Local worker
 is created only after Local Free is mounted; Structure startup and ordinary
 Global use do not load it.
+
+The Focus Schematic worker is a fifth independent protocol and loads only after
+Focus + Hierarchy + Modular Preview mounts. Its version-1 request carries the
+plain HIER1 model, Local projection, exact renderer dimensions, and frozen A1
+settings. Both sides validate exact message shape; success is revalidated
+against the originating input. A new request terminates obsolete compute,
+generation/request guards reject stale messages, and unmount or presentation
+change disposes the worker. Startup, clone, transport, runtime, malformed, and
+computed-result failures remain explicit so the component can retain its last
+valid graph or request session-only Classic fallback.

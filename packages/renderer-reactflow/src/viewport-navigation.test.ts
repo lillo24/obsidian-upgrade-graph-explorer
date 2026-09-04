@@ -13,6 +13,7 @@ import {
   wheelActionForMode,
   viewportAfterWheelZoom,
   viewportForDisclosureAnchor,
+  viewportForPreservedPoint,
   viewportPointForNode,
 } from './viewport-navigation';
 
@@ -67,6 +68,25 @@ describe('viewport navigation', () => {
     expect(after.zoom).toBeGreaterThan(before.zoom);
     expect(graphPoint.x * after.zoom + after.x).toBeCloseTo(pointer.x);
     expect(graphPoint.y * after.zoom + after.y).toBeCloseTo(pointer.y);
+  });
+
+  it('preserves a measured runtime point while changing zoom', () => {
+    const viewport = viewportForPreservedPoint(
+      { x: 100, y: 80, zoom: 0.5 },
+      { x: 150, y: 130 },
+      { x: 420, y: 260 },
+      1.25,
+    );
+
+    expect(viewport).toEqual({ x: 295, y: 135, zoom: 1.25 });
+    expect(
+      viewportForPreservedPoint(
+        { x: 0, y: 0, zoom: 0 },
+        { x: 0, y: 0 },
+        { x: 0, y: 0 },
+        1,
+      ),
+    ).toBeNull();
   });
 
   it('clamps zoom to the shared renderer bounds', () => {

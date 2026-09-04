@@ -59,6 +59,12 @@ importers:
       '@icarus-graph-explorer/explorer-inspection':
         specifier: workspace:*
         version: link:../../packages/explorer-inspection
+      '@icarus-graph-explorer/focus-schematic':
+        specifier: workspace:*
+        version: link:../../packages/focus-schematic
+      '@icarus-graph-explorer/focus-schematic-layout':
+        specifier: workspace:*
+        version: link:../../packages/focus-schematic-layout
       '@icarus-graph-explorer/graph-query':
         specifier: workspace:*
         version: link:../../packages/graph-query
@@ -267,6 +273,12 @@ importers:
       '@icarus-graph-explorer/dagre-layout':
         specifier: workspace:*
         version: link:../dagre-layout
+      '@icarus-graph-explorer/focus-schematic':
+        specifier: workspace:*
+        version: link:../focus-schematic
+      '@icarus-graph-explorer/focus-schematic-layout':
+        specifier: workspace:*
+        version: link:../focus-schematic-layout
       '@icarus-graph-explorer/performance':
         specifier: workspace:*
         version: link:../performance

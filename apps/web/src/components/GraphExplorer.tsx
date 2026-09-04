@@ -149,6 +149,7 @@ import {
 import {
   loadGraphPreferences,
   saveGraphPreferences,
+  type FocusHierarchyImplementation,
   type GraphPreferences,
 } from '../preferences/graph-preferences';
 import {
@@ -194,6 +195,7 @@ import type {
   LocalStructuredGraphViewProps,
   SemanticLocalStructuredViewport,
 } from './LocalStructuredGraphView';
+import type { ModularStructuredGraphViewProps } from './ModularStructuredGraphView';
 import { useWorkerServiceDisposal } from './use-worker-service-disposal';
 import { useGraphQueryDraft } from './use-graph-query-draft';
 
@@ -490,6 +492,7 @@ export function GraphExplorer({
   ] = useState<LocalDensityQaDiagnostics | undefined>();
   const {
     focusAppearance,
+    focusHierarchyImplementation,
     globalLayoutSettings,
     localLayoutMode,
     trackpadZoomMode,
@@ -531,14 +534,38 @@ export function GraphExplorer({
   const [localFreeUnavailable, setLocalFreeUnavailable] = useState<string>();
   const [localStructuredUnavailable, setLocalStructuredUnavailable] =
     useState<string>();
+  const [modularLoadFailure, setModularLoadFailure] = useState<{
+    workspaceId: string;
+    message: string;
+  }>();
+  const [modularSessionFailureState, setModularSessionFailureState] = useState<{
+    workspaceId: string;
+    message: string;
+  }>();
   const [LocalGraphView, setLocalGraphView] =
     useState<ComponentType<LocalGraphViewProps>>();
   const [LocalStructuredGraphView, setLocalStructuredGraphView] =
     useState<ComponentType<LocalStructuredGraphViewProps>>();
+  const [ModularStructuredGraphView, setModularStructuredGraphView] =
+    useState<ComponentType<ModularStructuredGraphViewProps>>();
+  const modularPreviewRequested =
+    focusHierarchyImplementation === 'modular-preview';
+  const modularLoadUnavailable =
+    modularLoadFailure?.workspaceId === workspaceId
+      ? modularLoadFailure.message
+      : undefined;
+  const modularSessionFailure =
+    modularSessionFailureState?.workspaceId === workspaceId
+      ? modularSessionFailureState.message
+      : undefined;
+  const modularPreviewActive =
+    modularPreviewRequested && modularSessionFailure === undefined;
   const localUnavailable =
     localLayoutMode === 'free'
       ? localFreeUnavailable
-      : localStructuredUnavailable;
+      : modularPreviewActive
+        ? undefined
+        : localStructuredUnavailable;
   const legacyBlockFilterNormalized = initialViewState !== hydration.state;
   const [viewState, dispatch] = useReducer(graphStateReducer, initialViewState);
   const visualGroupCompilation = useMemo<VisualGroupCompilation>(() => {
@@ -1829,6 +1856,7 @@ export function GraphExplorer({
     if (
       rendererMode !== 'local' ||
       localLayoutMode !== 'structured' ||
+      modularPreviewActive ||
       LocalStructuredGraphView !== undefined ||
       localStructuredUnavailable !== undefined
     ) {
@@ -1853,7 +1881,47 @@ export function GraphExplorer({
     LocalStructuredGraphView,
     localLayoutMode,
     localStructuredUnavailable,
+    modularPreviewActive,
     rendererMode,
+  ]);
+
+  useEffect(() => {
+    if (
+      rendererMode !== 'local' ||
+      localLayoutMode !== 'structured' ||
+      !modularPreviewActive ||
+      ModularStructuredGraphView !== undefined ||
+      modularLoadUnavailable !== undefined
+    ) {
+      return;
+    }
+    let cancelled = false;
+    void import('./ModularStructuredGraphView')
+      .then((module) => {
+        if (!cancelled) setModularStructuredGraphView(() => module.default);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : String(error);
+        setModularLoadFailure({
+          workspaceId,
+          message: `Modular Preview could not be loaded: ${message}`,
+        });
+        setModularSessionFailureState({
+          workspaceId,
+          message: `Modular Preview could not be loaded: ${message} Classic Focus Hierarchy is active for this session.`,
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    ModularStructuredGraphView,
+    localLayoutMode,
+    modularLoadUnavailable,
+    modularPreviewActive,
+    rendererMode,
+    workspaceId,
   ]);
 
   useLayoutEffect(() => {
@@ -2586,6 +2654,70 @@ export function GraphExplorer({
     },
     [updateGraphPreferences],
   );
+  const changeFocusHierarchyImplementation = useCallback(
+    (implementation: FocusHierarchyImplementation) => {
+      if (
+        implementation ===
+          preferencesRef.current.focusHierarchyImplementation &&
+        !(
+          implementation === 'modular-preview' &&
+          modularSessionFailure !== undefined
+        )
+      )
+        return;
+      if (
+        rendererModeRef.current === 'local' &&
+        localLayoutModeRef.current === 'structured'
+      ) {
+        const currentProjection = projection;
+        const selectedNode =
+          selection?.kind === 'node'
+            ? currentProjection?.nodes.find(
+                (node) => node.kind === 'entity' && node.id === selection.id,
+              )
+            : undefined;
+        const rootEntityId = activeViewStateRef.current.focus?.rootEntityId;
+        const rootNode = currentProjection?.nodes.find(
+          (node) => node.kind === 'entity' && node.entityId === rootEntityId,
+        );
+        const bookmarkNode = currentProjection?.nodes.find(
+          (node) =>
+            node.kind === 'entity' &&
+            node.entityId === localViewportBookmarkRef.current?.anchorEntityId,
+        );
+        const anchorNode = selectedNode ?? rootNode ?? bookmarkNode;
+        const point =
+          anchorNode === undefined
+            ? undefined
+            : localStructuredTransitionAnchorApiRef.current?.nodeViewportPoint(
+                anchorNode.id,
+              );
+        if (anchorNode !== undefined && point !== undefined) {
+          const key = nextGraphViewportRequestKey(
+            localTransitionGeneration.current,
+          );
+          localTransitionGeneration.current = key;
+          setLocalTransitionAnchor({
+            key,
+            nodeId: anchorNode.id,
+            point,
+            zoom:
+              localViewportBookmarkRef.current?.structuredZoom ??
+              LOCAL_STRUCTURED_NAVIGATION_ZOOM,
+          });
+        }
+      }
+      setModularSessionFailureState(undefined);
+      setModularLoadFailure(undefined);
+      updateGraphPreferences({ focusHierarchyImplementation: implementation });
+      setNavigationAnnouncement(
+        implementation === 'modular-preview'
+          ? 'Modular Preview opened with the same Focus hierarchy and viewport context.'
+          : 'Classic Focus Hierarchy opened with the same Focus hierarchy and viewport context.',
+      );
+    },
+    [modularSessionFailure, projection, selection, updateGraphPreferences],
+  );
   // Network controls stay inert in Hierarchy. All explicitly requests physics;
   // Focus keys its own worker/cache lifecycle only by shared Reference Pull.
   const changeGlobalLayoutSettings = useCallback(
@@ -3063,6 +3195,14 @@ export function GraphExplorer({
   );
   const resetSandbox = useCallback(() => {
     const reset = resetGraphSandbox(preferencesRef.current);
+    if (
+      preferencesRef.current.focusHierarchyImplementation !==
+      reset.preferences.focusHierarchyImplementation
+    ) {
+      changeFocusHierarchyImplementation(
+        reset.preferences.focusHierarchyImplementation,
+      );
+    }
     if (globalLayoutSettingsApplyImmediately(activeScope, activeLayout)) {
       setGlobalLayoutRequestKey((current) => current + 1);
     }
@@ -3078,6 +3218,7 @@ export function GraphExplorer({
     activeLayout,
     activeScope,
     applyExperimentalAllHierarchyAvailability,
+    changeFocusHierarchyImplementation,
     commitGraphPreferences,
   ]);
   const enterFocusScope = useCallback(
@@ -3613,6 +3754,7 @@ export function GraphExplorer({
             focusNetworkDensityFramingStrength={
               focusNetworkDensityFramingStrength
             }
+            focusHierarchyImplementation={focusHierarchyImplementation}
             showExperimentalAllHierarchy={showExperimentalAllHierarchy}
             onShowExperimentalAllHierarchyChange={
               changeExperimentalAllHierarchy
@@ -3626,6 +3768,9 @@ export function GraphExplorer({
               changeFocusNetworkDensityFramingStrength
             }
             onFocusAppearanceChange={changeFocusAppearance}
+            onFocusHierarchyImplementationChange={
+              changeFocusHierarchyImplementation
+            }
             onGlobalLayoutSettingsChange={changeGlobalLayoutSettings}
             onOpenChange={changeSettingsOpen}
             onTrackpadZoomModeChange={changeTrackpadZoomMode}
@@ -3815,6 +3960,7 @@ export function GraphExplorer({
                   focusNetworkDensityFramingStrength={
                     focusNetworkDensityFramingStrength
                   }
+                  focusHierarchyImplementation={focusHierarchyImplementation}
                   showExperimentalAllHierarchy={showExperimentalAllHierarchy}
                   onShowExperimentalAllHierarchyChange={
                     changeExperimentalAllHierarchy
@@ -3828,6 +3974,9 @@ export function GraphExplorer({
                     changeFocusNetworkDensityFramingStrength
                   }
                   onFocusAppearanceChange={changeFocusAppearance}
+                  onFocusHierarchyImplementationChange={
+                    changeFocusHierarchyImplementation
+                  }
                   onGlobalLayoutSettingsChange={changeGlobalLayoutSettings}
                   onOpenChange={changeSettingsOpen}
                   onTrackpadZoomModeChange={changeTrackpadZoomMode}
@@ -3927,6 +4076,20 @@ export function GraphExplorer({
             {localUnavailable}
           </p>
         )}
+        {modularSessionFailure === undefined ? null : (
+          <div className="graph-alert" role="alert">
+            <span>{modularSessionFailure}</span>{' '}
+            <button
+              onClick={() => {
+                setModularLoadFailure(undefined);
+                setModularSessionFailureState(undefined);
+              }}
+              type="button"
+            >
+              Retry Modular Preview
+            </button>
+          </div>
+        )}
       </div>
 
       {result.ok ? (
@@ -4020,6 +4183,13 @@ export function GraphExplorer({
                 Loading Focus Network…
               </p>
             ) : localLayoutMode === 'structured' &&
+              modularPreviewActive &&
+              ModularStructuredGraphView === undefined ? (
+              <p className="graph-loading" role="status">
+                Loading Modular Focus Hierarchy…
+              </p>
+            ) : localLayoutMode === 'structured' &&
+              !modularPreviewActive &&
               LocalStructuredGraphView === undefined ? (
               <p className="graph-loading" role="status">
                 Loading Focus Hierarchy…
@@ -4064,6 +4234,44 @@ export function GraphExplorer({
                 selection={activeSelection}
                 trackpadZoomMode={trackpadZoomMode}
                 presentationOverrides={nodePresentation.overrides}
+                visualGroupStyles={visualGroupPresentation.styles}
+              />
+            ) : modularPreviewActive &&
+              ModularStructuredGraphView !== undefined ? (
+              <ModularStructuredGraphView
+                key={workspaceId}
+                {...(localStructuredCenterRequest === undefined
+                  ? {}
+                  : { centerRequest: localStructuredCenterRequest })}
+                fitRequestKey={localFitRequestKey ?? 0}
+                focusAppearance={focusAppearance}
+                {...(localTransitionAnchor === undefined
+                  ? {}
+                  : { initialTransitionAnchor: localTransitionAnchor })}
+                {...(performance === undefined
+                  ? {}
+                  : { instrumentation: performance })}
+                onFatalFailure={(message) =>
+                  setModularSessionFailureState({
+                    workspaceId,
+                    message: `${message} Classic Focus Hierarchy is active for this session. The Modular Preview preference was retained.`,
+                  })
+                }
+                onFitRequestConsumed={consumeLocalFitRequest}
+                onFocusEntity={focusLocalEntity}
+                onSelectionChange={changeSelection}
+                onToggleEntity={toggleEntity}
+                onTransitionAnchorApiChange={
+                  changeLocalStructuredTransitionAnchorApi
+                }
+                onTransitionAnchorConsumed={consumeLocalTransitionAnchor}
+                onViewportObservation={observeLocalStructuredViewport}
+                projection={result.projection}
+                projectionState={activeViewState}
+                projectionWorkspace={projectionWorkspace}
+                rootEntityId={localRootEntityId}
+                selection={activeSelection}
+                trackpadZoomMode={trackpadZoomMode}
                 visualGroupStyles={visualGroupPresentation.styles}
               />
             ) : LocalStructuredGraphView !== undefined ? (

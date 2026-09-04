@@ -16,6 +16,7 @@ describe('Settings Sandbox reset', () => {
   it('resets only Sandbox-owned presentation controls', () => {
     const reset = resetGraphSandbox({
       focusAppearance: 'minimal',
+      focusHierarchyImplementation: 'modular-preview',
       globalLayoutSettings: {
         folderClustering: false,
         spacingPreset: 'spacious',
@@ -31,6 +32,7 @@ describe('Settings Sandbox reset', () => {
       focusNetworkDensityFramingStrength: 100,
       preferences: {
         focusAppearance: DEFAULT_GRAPH_PREFERENCES.focusAppearance,
+        focusHierarchyImplementation: 'classic',
         globalLayoutSettings: DEFAULT_GLOBAL_LAYOUT_SETTINGS,
         localLayoutMode: 'structured',
         showExperimentalAllHierarchy: false,

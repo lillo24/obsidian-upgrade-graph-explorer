@@ -1188,6 +1188,33 @@ touchpad behavior.
 
 Change an expensive decision through a focused ADR that supplies evidence: a product requirement, compatibility constraint, measurement, or demonstrated failure of the current boundary. Roadmap speculation alone is not evidence. Keep documentation clear about what is implemented now, what is an invariant, and what is only planned.
 
+## HIER3B modular Focus Hierarchy preview
+
+HIER3B integrates the accepted HIER3A A1 geometry as an explicit preview while
+Classic Focus Hierarchy remains the default. The application dynamically loads
+the modular component only for Focus + Hierarchy + Modular Preview. That
+component owns HIER1 construction, renderer-dimension adaptation, an exact
+24-entry page cache, and a dedicated latest-result-wins worker. The layout
+package owns the strict version-1 plain-data protocol/runtime; the renderer owns
+the lazy computed-layout mapper; neither layer reads workspace persistence or
+source-provider state.
+
+The modular mapper supplies a complete validated prepared graph to the existing
+React Flow canvas. The prepared seam retains the canvas interaction, disclosure,
+camera, semantic-anchor, and accessibility contracts while bypassing Classic
+mapping, seed, and W3 work. Module rectangles and filtered bridges are
+noncanonical presentation nodes. Precise references keep exact projected edge
+identity; fallback connections visibly retain their approximate status with no
+invented provenance. Secondary relationships affect edge presentation only.
+
+Every worker/cache result is validated against its originating input before
+atomic adoption. Pending replacement preserves only still-valid identities from
+the previous graph. Failure retains a last valid modular result, or requests a
+session-only Classic fallback when no valid result exists. The global preference
+remains Modular Preview so Retry is explicit. Coordinates stay derived and
+page-local. HIER4 retains folder-band positioning, HIER5 retains complete route
+ownership, and HIER3C retains any product-default change.
+
 ## HIER0 product exposure and geometry
 
 All Hierarchy is retained as an experimental whole-vault presentation, hidden by

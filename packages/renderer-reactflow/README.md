@@ -1,6 +1,6 @@
 # React Flow Structural Renderer
 
-Status: **STABLE — Structure, Local Structured, and scope-neutral density contracts are test-backed.**
+Status: **STABLE — Structure, Classic Local Structured, and the HIER3B modular preview contracts are test-backed.**
 
 This renderer package turns one KG6 `ViewProjection` into a deterministic,
 read-only React Flow scene. It owns renderer IDs, fixed node geometry, Dagre
@@ -40,9 +40,27 @@ src/
   edges.tsx              Memoized hierarchy/reference custom edge.
   component-maps.ts      Module-scope stable React Flow type maps.
   GraphCanvas.tsx        Read-only viewport, selection, hover, disclosure, and controls.
+  focus-schematic/       Lazy A1 computed-layout to React Flow production mapper.
   styles.css             Node, edge, control, and reduced-motion presentation.
   *.test.ts              Mapping, layout failure, determinism, and highlight tests.
 ```
+
+## HIER3B modular prepared graph
+
+`GraphCanvas` accepts an optional validated prepared graph. That seam bypasses
+Classic mapping, deterministic seed, and W3 requests while retaining the same
+selection, hover, disclosure, keyboard, viewport, fit/center, transition-anchor,
+and accessibility surface. Without a prepared graph, the existing Classic path
+is unchanged.
+
+The lazy `./focus-schematic` subpath derives A1 dimensions from the renderer's
+fixed card grammar and maps a validated computed layout into module backgrounds,
+anonymous filtered bridges, exact entity positions, precise or truthful fallback
+connections, and collision-safe diagnostics. All entity and diagnostic cards
+provide symmetric hidden handles; existing Classic handle values stay unchanged.
+Synthetic module/bridge elements have no canonical identity, and a fallback edge
+has no fabricated projection-edge identity. Secondary relationships change edges
+only and cannot change node coordinates.
 
 ## Contract and layout
 
@@ -105,8 +123,10 @@ point. It preserves the selected node, or Focus root, across the product's
 Network/Hierarchy switch (the internal Free/Structured mounts) and during
 structured topology/refinement adoption. The point comes from the visible DOM
 card center when available, with measured React Flow bounds as the fallback;
-same-instance depth changes stage that anchor before the new topology arrives.
-Renderer instances,
+the replacement waits for its visible card, measures that runtime center, and
+keeps React Flow's initial fit disabled after the parent consumes the one-shot
+anchor so a later fit cannot overwrite the preserved point. Same-instance depth
+changes stage that anchor before the new topology arrives. Renderer instances,
 graph coordinates, and screen points never enter persisted state. Structured
 semantic observation reports only canonical entity anchor plus React Flow zoom.
 

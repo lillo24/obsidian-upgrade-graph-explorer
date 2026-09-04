@@ -3,7 +3,12 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 
 import { useEntityDisclosure } from './disclosure-context';
 import { shouldToggleDisclosureForClick } from './focus-interaction';
-import type { DiagnosticFlowNode, EntityFlowNode } from './types';
+import type {
+  DiagnosticFlowNode,
+  EntityFlowNode,
+  FilteredBridgeFlowNode,
+  ModuleBoundaryFlowNode,
+} from './types';
 import {
   useVisualGroupPresentation,
   visualGroupAccentStyle,
@@ -52,10 +57,42 @@ function NodeHandles() {
   return (
     <>
       <Handle id="target-top" position={Position.Top} type="target" />
+      <Handle id="source-top" position={Position.Top} type="source" />
       <Handle id="source-bottom" position={Position.Bottom} type="source" />
+      <Handle id="target-bottom" position={Position.Bottom} type="target" />
       <Handle id="target-left" position={Position.Left} type="target" />
+      <Handle id="source-left" position={Position.Left} type="source" />
       <Handle id="source-right" position={Position.Right} type="source" />
+      <Handle id="target-right" position={Position.Right} type="target" />
     </>
+  );
+}
+
+function ModuleBoundaryNodeComponent({
+  data,
+}: NodeProps<ModuleBoundaryFlowNode>) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`focus-module-boundary${data.root ? ' focus-module-boundary--root' : ''}`}
+    >
+      <NodeHandles />
+    </div>
+  );
+}
+
+function FilteredBridgeNodeComponent({
+  data,
+}: NodeProps<FilteredBridgeFlowNode>) {
+  return (
+    <div
+      aria-label={data.ariaLabel}
+      className="focus-filtered-bridge"
+      role="img"
+    >
+      <NodeHandles />
+      <span aria-hidden="true">⋯</span>
+    </div>
   );
 }
 
@@ -232,3 +269,5 @@ function DiagnosticNodeComponent({ data }: NodeProps<DiagnosticFlowNode>) {
 
 export const EntityNode = memo(EntityNodeComponent);
 export const DiagnosticNode = memo(DiagnosticNodeComponent);
+export const ModuleBoundaryNode = memo(ModuleBoundaryNodeComponent);
+export const FilteredBridgeNode = memo(FilteredBridgeNodeComponent);

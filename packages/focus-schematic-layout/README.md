@@ -3,7 +3,9 @@
 This package owns the renderer-neutral HIER2/HIER3A layout input,
 deterministic module and endpoint plans, internal File-module lanes, common
 module-box policy, public sibling-order constraints, and the two-stage Dagre
-implementations. It remains absent from production imports until HIER3B.
+implementations. HIER3B exposes the selected A1 computation through a strict,
+versioned production worker boundary while keeping the package renderer- and
+application-neutral.
 
 `computeFocusSchematicLayout(input)` selects the accepted HIER3A A1 layout. The input
 contains a HIER1 model, its KG6 projection, one strictly ordered positive
@@ -75,6 +77,11 @@ the bakeoff evidence if changed.
   placeholder policy.
 - `src/selected.ts` maps the accepted A1 computed result to the compatible
   selected candidate/attempt API.
+- `src/worker-protocol.ts` owns the version-1 exact-shape production messages
+  and originating-input result validation.
+- `src/worker-runtime.ts` validates requests, computes A1, records phase
+  timings, and returns either a complete validated result or an explicit
+  failure.
 - `src/two-stage.ts` preserves A0 by laying out each File hierarchy uniformly
   and then running the shared module backbone with fresh stateless Dagre
   graphs.
@@ -86,7 +93,7 @@ The package depends inward on core, view-projection, focus-schematic, and the
 already pinned `@dagrejs/dagre` 3.1.1 only. It must not import React, renderers,
 apps, W3, view-state, Tauri, source adapters, or filesystem APIs.
 
-The accepted A1 result is the intended HIER3B worker payload. HIER3B owns
-transport, latest-result-wins behavior, caching, stale-result rejection,
-renderer mapping, and production fallback. Complete explicit route ownership
-remains HIER5.
+The accepted A1 result is the HIER3B worker payload. The web application owns
+transport, latest-result-wins behavior, caching, stale-result rejection, and
+production fallback; renderer-reactflow owns production mapping. Complete
+explicit route ownership remains HIER5.

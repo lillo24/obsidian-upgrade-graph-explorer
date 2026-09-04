@@ -49,3 +49,4 @@ export {
   computeFocusSchematicLayout as computeFocusSchematicUniformLayout,
   computeFocusSchematicLayoutAttempt as computeFocusSchematicUniformLayoutAttempt,
 } from './two-stage';
+export * from './worker-protocol';

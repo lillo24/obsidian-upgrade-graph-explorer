@@ -14,8 +14,12 @@ import type { StorageLike } from '../persistence/storage';
 export const GRAPH_PREFERENCES_STORAGE_KEY =
   'icarus.graph-explorer.preferences.v1';
 
+export type FocusHierarchyImplementation = 'classic' | 'modular-preview';
+
 export interface GraphPreferences {
   readonly focusAppearance: FocusAppearance;
+  /** Experimental renderer selection; absent/malformed v1 fields stay Classic. */
+  readonly focusHierarchyImplementation: FocusHierarchyImplementation;
   readonly globalLayoutSettings: GlobalLayoutSettings;
   readonly localLayoutMode: LocalLayoutMode;
   /** Product exposure only; absent/malformed v1 fields default to false. */
@@ -25,6 +29,7 @@ export interface GraphPreferences {
 
 export const DEFAULT_GRAPH_PREFERENCES: GraphPreferences = {
   focusAppearance: 'inverted',
+  focusHierarchyImplementation: 'classic',
   globalLayoutSettings: DEFAULT_GLOBAL_LAYOUT_SETTINGS,
   localLayoutMode: 'free',
   showExperimentalAllHierarchy: false,
@@ -48,6 +53,12 @@ function isTrackpadZoomMode(value: unknown): value is TrackpadZoomMode {
 
 function isFocusAppearance(value: unknown): value is FocusAppearance {
   return value === 'outline' || value === 'inverted' || value === 'minimal';
+}
+
+function isFocusHierarchyImplementation(
+  value: unknown,
+): value is FocusHierarchyImplementation {
+  return value === 'classic' || value === 'modular-preview';
 }
 
 function isLocalLayoutMode(value: unknown): value is LocalLayoutMode {
@@ -80,6 +91,7 @@ export function loadGraphPreferences(
     if (typeof parsed === 'object' && parsed !== null) {
       const stored = parsed as {
         readonly focusAppearance?: unknown;
+        readonly focusHierarchyImplementation?: unknown;
         readonly globalLayoutSettings?: unknown;
         readonly localLayoutMode?: unknown;
         readonly showExperimentalAllHierarchy?: unknown;
@@ -100,6 +112,11 @@ export function loadGraphPreferences(
           focusAppearance: isFocusAppearance(stored.focusAppearance)
             ? stored.focusAppearance
             : DEFAULT_GRAPH_PREFERENCES.focusAppearance,
+          focusHierarchyImplementation: isFocusHierarchyImplementation(
+            stored.focusHierarchyImplementation,
+          )
+            ? stored.focusHierarchyImplementation
+            : DEFAULT_GRAPH_PREFERENCES.focusHierarchyImplementation,
           globalLayoutSettings,
           showExperimentalAllHierarchy:
             stored.showExperimentalAllHierarchy === true,

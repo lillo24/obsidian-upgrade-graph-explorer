@@ -1042,3 +1042,28 @@ metric primitives. Removing intermediate diagnostic rounding re-observed the
 p25/p50/p75 candidates as `0.000655` / `0.00201` / `0.00505`; the accepted
 `0.000672` / `0.00204` / `0.00512` evidence and v1 production policy remain
 fixed rather than being retuned.
+
+## HIER3B production worker instrumentation
+
+The Modular Preview records HIER1 model construction, dimension derivation,
+request preparation, cache-key work, cache hit/miss/invalidation/bytes, worker
+startup/compute/round-trip, main-thread gap, renderer mapping, request adoption,
+and the HIER3A input/module/endpoint/internal/macro/crossing/attachment/
+validation/serialization phases through the existing in-memory performance
+recorder. The recorder does not define a release threshold.
+
+The production benchmark runs the exact version-1 runtime through Node worker
+threads for EP12, EP22, a synthetic 120-module hub, and a supersession case. It
+reports payload size, worker compute, round trip, and main-thread responsiveness;
+the browser remains authoritative for Vite Worker startup and render behavior.
+The exact page cache is capped at 24 complete results and has no persistence.
+Secondary-edge visibility is excluded from its key because it cannot influence
+geometry.
+
+The optimized Vite build keeps the Modular component and its A1 worker in
+separate lazy chunks from Classic and W3. The recorded release-candidate build
+emitted approximately 77.80 kB for the Modular component, 97.77 kB for its
+worker, 0.99 kB for the Classic component, 50.02 kB for W3, and 720.76 kB for
+the main application. Content hashes and exact byte counts may change; chunk
+separation is the architectural gate. Native responsiveness remains a graphical
+release observation and must not be recorded as passed before user approval.

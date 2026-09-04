@@ -14,6 +14,7 @@ import {
   Controls,
   ReactFlow,
   ReactFlowProvider,
+  useNodesInitialized,
   useReactFlow,
   type EdgeMouseHandler,
   type NodeMouseHandler,
@@ -66,6 +67,7 @@ import {
   GRAPH_VIEWPORT_OBSERVATION_DELAY_MS,
   viewportAfterWheelZoom,
   viewportForDisclosureAnchor,
+  viewportForPreservedPoint,
   viewportPointForNode,
   wheelActionForMode,
   type DisclosureAnchor,
@@ -79,28 +81,6 @@ const GRAPH_FIT_VIEW_OPTIONS = {
 
 const GRAPH_WHEEL_IGNORE_SELECTOR =
   '.react-flow__controls, .nowheel, [data-graph-wheel-ignore], [data-graph-scroll-container]';
-
-function transitionViewport(
-  graph: RendererGraph,
-  anchor: GraphTransitionAnchor,
-  fallbackZoom: number,
-) {
-  const node = graph.nodes.find(
-    (candidate) => candidate.data.projectionNodeId === anchor.nodeId,
-  );
-  if (node === undefined) return null;
-  const width = node.width ?? node.measured?.width ?? 0;
-  const height = node.height ?? node.measured?.height ?? 0;
-  const zoom = Math.min(
-    GRAPH_MAX_ZOOM,
-    Math.max(GRAPH_MIN_ZOOM, anchor.zoom ?? fallbackZoom),
-  );
-  return {
-    x: anchor.point.x - (node.position.x + width / 2) * zoom,
-    y: anchor.point.y - (node.position.y + height / 2) * zoom,
-    zoom,
-  };
-}
 
 function FitGraphIcon() {
   return (
@@ -163,6 +143,9 @@ function GraphCanvasInner({
   onToggleEntity,
   onViewportObservation,
   performance,
+  preparedGraph,
+  preparedGraphPending = false,
+  preparedGraphStatus,
   projection,
   rootEntityId,
   selection,
@@ -172,11 +155,15 @@ function GraphCanvasInner({
   const [hovered, setHovered] = useState<GraphSelection | null>(null);
   const { fitView, getInternalNode, getViewport, setCenter, setViewport } =
     useReactFlow<GraphFlowNode, GraphFlowEdge>();
+  const nodesInitialized = useNodesInitialized();
   const previousFitRequest = useRef(fitRequestKey);
   const previousCenterRequest = useRef<number | null>(null);
   const handledTransitionRequest = useRef<number | null>(null);
   const initialTransitionRef = useRef(initialTransitionAnchor);
   const initialTransitionRefinementApplied = useRef(false);
+  const [fitInitialViewport] = useState(
+    () => centerRequest === undefined && initialTransitionAnchor === undefined,
+  );
   const viewportInitialized = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const nextDisclosureAnchor = useRef<DisclosureAnchor | null>(null);
@@ -192,6 +179,7 @@ function GraphCanvasInner({
     INITIAL_RENDERER_LAYOUT_STATE,
   );
   const mapped = useMemo(() => {
+    if (preparedGraph !== undefined) return { nodes: [], edges: [] };
     const map = () =>
       mapProjectionToReactFlow(projection, layoutMode, {
         visualVariant,
@@ -200,13 +188,21 @@ function GraphCanvasInner({
     return performance === undefined
       ? map()
       : performance.measure('renderer-mapping', 'renderer-mappings', map);
-  }, [layoutMode, performance, projection, rootEntityId, visualVariant]);
+  }, [
+    layoutMode,
+    performance,
+    preparedGraph,
+    projection,
+    rootEntityId,
+    visualVariant,
+  ]);
   const layoutInput = useMemo(
     () => createRendererLayoutInput(mapped.nodes, mapped.edges, layoutMode),
     [layoutMode, mapped.edges, mapped.nodes],
   );
   const structuredBaseline = useMemo(() => {
-    if (layoutMode !== 'local-structured') return undefined;
+    if (preparedGraph !== undefined || layoutMode !== 'local-structured')
+      return undefined;
     const rootNode = mapped.nodes.find(
       (node) => node.type === 'entity' && node.data.root,
     );
@@ -234,18 +230,32 @@ function GraphCanvasInner({
             ),
       rootNodeId: rootNode.id,
     };
-  }, [layoutCache, layoutMode, mapped.edges, mapped.nodes, rootEntityId]);
+  }, [
+    layoutCache,
+    layoutMode,
+    mapped.edges,
+    mapped.nodes,
+    preparedGraph,
+    rootEntityId,
+  ]);
   const committedMatchesInput = rendererLayout.committed?.input === layoutInput;
-  const prepared = committedMatchesInput
+  const classicPrepared = committedMatchesInput
     ? (rendererLayout.committed?.graph ?? null)
     : (structuredBaseline?.graph ?? rendererLayout.committed?.graph ?? null);
+  const prepared = preparedGraph ?? classicPrepared;
   const layoutPending =
-    projection.nodes.length > 0 &&
-    !committedMatchesInput &&
-    structuredBaseline?.cached !== true;
+    preparedGraph === undefined
+      ? projection.nodes.length > 0 &&
+        !committedMatchesInput &&
+        structuredBaseline?.cached !== true
+      : preparedGraphPending;
 
   useLayoutEffect(() => {
-    if (structuredBaseline === undefined || committedMatchesInput) {
+    if (
+      preparedGraph !== undefined ||
+      structuredBaseline === undefined ||
+      committedMatchesInput
+    ) {
       return;
     }
     const oldGraph = rendererLayout.committed?.graph;
@@ -258,6 +268,7 @@ function GraphCanvasInner({
         : structuredBaseline.graph.nodes.find(
             (node) => node.type === 'entity' && node.data.root,
           )?.data.projectionNodeId;
+    if (preferredNodeId === null) return;
     const anchor =
       nextDisclosureAnchor.current ??
       (oldGraph === undefined || preferredNodeId === undefined
@@ -276,12 +287,20 @@ function GraphCanvasInner({
     committedMatchesInput,
     getViewport,
     rendererLayout.committed?.graph,
+    preparedGraph,
     selection,
     setViewport,
     structuredBaseline,
   ]);
 
   useEffect(() => {
+    if (preparedGraph !== undefined) {
+      layoutService?.cancelPending();
+      return;
+    }
+    if (layoutService === undefined) {
+      throw new Error('Classic GraphCanvas requires a layout service.');
+    }
     if (projection.nodes.length === 0) {
       layoutService.cancelPending();
       return;
@@ -421,6 +440,7 @@ function GraphCanvasInner({
     mapped.edges,
     mapped.nodes,
     performance,
+    preparedGraph,
     projection.nodes.length,
     layoutCache,
     structuredBaseline,
@@ -571,43 +591,29 @@ function GraphCanvasInner({
       viewportInitialized.current = true;
       if (
         initialTransitionAnchor !== undefined &&
-        handledTransitionRequest.current !== initialTransitionAnchor.key &&
-        prepared !== null
-      ) {
-        handledTransitionRequest.current = initialTransitionAnchor.key;
-        const viewport = transitionViewport(
-          prepared,
-          initialTransitionAnchor,
-          instance.getViewport().zoom,
-        );
-        if (viewport !== null) {
-          if (centerRequest !== undefined) {
-            previousCenterRequest.current = centerRequest.key;
-          }
-          void instance.setViewport(viewport, { duration: 0 });
-          onTransitionAnchorConsumed?.(initialTransitionAnchor.key);
-          return;
-        }
-      }
+        handledTransitionRequest.current !== initialTransitionAnchor.key
+      )
+        return;
       applyCenterRequest(centerRequest, instance.setCenter);
     },
-    [
-      applyCenterRequest,
-      centerRequest,
-      initialTransitionAnchor,
-      onTransitionAnchorConsumed,
-      prepared,
-    ],
+    [applyCenterRequest, centerRequest, initialTransitionAnchor],
   );
 
   useEffect(() => {
     if (!viewportInitialized.current) return;
+    if (
+      initialTransitionAnchor !== undefined &&
+      handledTransitionRequest.current !== initialTransitionAnchor.key
+    )
+      return;
     applyCenterRequest(centerRequest);
-  }, [applyCenterRequest, centerRequest]);
+  }, [applyCenterRequest, centerRequest, initialTransitionAnchor]);
 
   const selectNode = useCallback<NodeMouseHandler<GraphFlowNode>>(
-    (_event, node) =>
-      onSelectionChange({ kind: 'node', id: node.data.projectionNodeId }),
+    (_event, node) => {
+      if (node.data.projectionNodeId !== null)
+        onSelectionChange({ kind: 'node', id: node.data.projectionNodeId });
+    },
     [onSelectionChange],
   );
   const focusNode = useCallback<NodeMouseHandler<GraphFlowNode>>(
@@ -621,21 +627,23 @@ function GraphCanvasInner({
   const selectEdge = useCallback<EdgeMouseHandler<GraphFlowEdge>>(
     (_event, edge) => {
       const projectionEdgeId = edge.data?.projectionEdgeId;
-      if (projectionEdgeId !== undefined) {
+      if (projectionEdgeId !== undefined && projectionEdgeId !== null) {
         onSelectionChange({ kind: 'edge', id: projectionEdgeId });
       }
     },
     [onSelectionChange],
   );
   const hoverNode = useCallback<NodeMouseHandler<GraphFlowNode>>(
-    (_event, node) =>
-      setHovered({ kind: 'node', id: node.data.projectionNodeId }),
+    (_event, node) => {
+      if (node.data.projectionNodeId !== null)
+        setHovered({ kind: 'node', id: node.data.projectionNodeId });
+    },
     [],
   );
   const hoverEdge = useCallback<EdgeMouseHandler<GraphFlowEdge>>(
     (_event, edge) => {
       const projectionEdgeId = edge.data?.projectionEdgeId;
-      if (projectionEdgeId !== undefined) {
+      if (projectionEdgeId !== undefined && projectionEdgeId !== null) {
         setHovered({ kind: 'edge', id: projectionEdgeId });
       }
     },
@@ -655,7 +663,10 @@ function GraphCanvasInner({
         const selectedNode = nodes.find(
           (candidate) => candidate.id === selectedChange.id,
         );
-        if (selectedNode !== undefined) {
+        if (
+          selectedNode !== undefined &&
+          selectedNode.data.projectionNodeId !== null
+        ) {
           onSelectionChange({
             kind: 'node',
             id: selectedNode.data.projectionNodeId,
@@ -674,7 +685,7 @@ function GraphCanvasInner({
         const projectionEdgeId = edges.find(
           (candidate) => candidate.id === selectedChange.id,
         )?.data?.projectionEdgeId;
-        if (projectionEdgeId !== undefined) {
+        if (projectionEdgeId !== undefined && projectionEdgeId !== null) {
           onSelectionChange({ kind: 'edge', id: projectionEdgeId });
         }
       }
@@ -805,6 +816,17 @@ function GraphCanvasInner({
   );
 
   useLayoutEffect(() => {
+    if (preparedGraph !== undefined) {
+      if (preparedGraphPending) return;
+      const anchor = nextDisclosureAnchor.current;
+      if (anchor === null) return;
+      nextDisclosureAnchor.current = null;
+      const nextViewport = viewportForDisclosureAnchor(preparedGraph, anchor);
+      if (nextViewport === null) return;
+      void setViewport(nextViewport, { duration: 0 });
+      reportViewport(nextViewport);
+      return;
+    }
     const committed = rendererLayout.committed;
     if (
       committed === null ||
@@ -818,28 +840,99 @@ function GraphCanvasInner({
     if (nextViewport === null) return;
     void setViewport(nextViewport, { duration: 0 });
     reportViewport(nextViewport);
-  }, [prepared, rendererLayout.committed, reportViewport, setViewport]);
+  }, [
+    prepared,
+    preparedGraph,
+    preparedGraphPending,
+    rendererLayout.committed,
+    reportViewport,
+    setViewport,
+  ]);
 
-  useLayoutEffect(() => {
-    const committed = rendererLayout.committed;
+  useEffect(() => {
+    const committedGraph = preparedGraph ?? rendererLayout.committed?.graph;
     const anchor = initialTransitionRef.current;
     if (
-      committed === null ||
+      committedGraph === undefined ||
       anchor === undefined ||
+      (preparedGraph !== undefined && preparedGraphPending) ||
+      !nodesInitialized ||
       initialTransitionRefinementApplied.current
     ) {
       return;
     }
-    initialTransitionRefinementApplied.current = true;
-    const viewport = transitionViewport(
-      committed.graph,
-      anchor,
-      getViewport().zoom,
-    );
-    if (viewport === null) return;
-    void setViewport(viewport, { duration: 0 });
-    reportViewport(viewport);
-  }, [getViewport, rendererLayout.committed, reportViewport, setViewport]);
+    let frame = 0;
+    let attemptsRemaining = 4;
+    const refine = () => {
+      if (initialTransitionRefinementApplied.current) return;
+      const node = committedGraph.nodes.find(
+        (candidate) => candidate.data.projectionNodeId === anchor.nodeId,
+      );
+      const nodeElement = [
+        ...(containerRef.current?.querySelectorAll<HTMLElement>(
+          '.react-flow__node',
+        ) ?? []),
+      ].find((candidate) => candidate.dataset.id === node?.id);
+      const flowElement = nodeElement?.closest<HTMLElement>('.react-flow');
+      if (
+        node === undefined ||
+        nodeElement === undefined ||
+        flowElement === null ||
+        flowElement === undefined
+      ) {
+        attemptsRemaining -= 1;
+        if (attemptsRemaining > 0) frame = requestAnimationFrame(refine);
+        return;
+      }
+      const nodeRect = nodeElement.getBoundingClientRect();
+      const flowRect = flowElement.getBoundingClientRect();
+      if (
+        nodeRect.width <= 0 ||
+        nodeRect.height <= 0 ||
+        flowRect.width <= 0 ||
+        flowRect.height <= 0
+      ) {
+        attemptsRemaining -= 1;
+        if (attemptsRemaining > 0) frame = requestAnimationFrame(refine);
+        return;
+      }
+      const currentViewport = getViewport();
+      const targetZoom = Math.min(
+        GRAPH_MAX_ZOOM,
+        Math.max(GRAPH_MIN_ZOOM, anchor.zoom ?? currentViewport.zoom),
+      );
+      const viewport = viewportForPreservedPoint(
+        currentViewport,
+        {
+          x: nodeRect.left - flowRect.left + nodeRect.width / 2,
+          y: nodeRect.top - flowRect.top + nodeRect.height / 2,
+        },
+        anchor.point,
+        targetZoom,
+      );
+      if (viewport === null) return;
+      initialTransitionRefinementApplied.current = true;
+      handledTransitionRequest.current = anchor.key;
+      if (centerRequest !== undefined) {
+        previousCenterRequest.current = centerRequest.key;
+      }
+      void setViewport(viewport, { duration: 0 });
+      onTransitionAnchorConsumed?.(anchor.key);
+      reportViewport(viewport);
+    };
+    frame = requestAnimationFrame(refine);
+    return () => cancelAnimationFrame(frame);
+  }, [
+    centerRequest,
+    getViewport,
+    nodesInitialized,
+    onTransitionAnchorConsumed,
+    preparedGraph,
+    preparedGraphPending,
+    rendererLayout.committed,
+    reportViewport,
+    setViewport,
+  ]);
 
   useLayoutEffect(() => {
     if (performance === undefined) return;
@@ -910,7 +1003,7 @@ function GraphCanvasInner({
         data-visual-variant={visualVariant}
       >
         <div role="status" aria-live="polite">
-          <strong>Laying out graph…</strong>
+          <strong>{preparedGraphStatus ?? 'Laying out graph…'}</strong>
           <span>
             The graph will remain interactive after positions are ready.
           </span>
@@ -950,7 +1043,7 @@ function GraphCanvasInner({
       )}
       {layoutPending ? (
         <p className="graph-layout-status" role="status" aria-live="polite">
-          Updating layout…
+          {preparedGraphStatus ?? 'Updating layout…'}
         </p>
       ) : null}
       <EntityDisclosureProvider
@@ -966,9 +1059,7 @@ function GraphCanvasInner({
           edgesFocusable
           edgesReconnectable={false}
           elementsSelectable
-          fitView={
-            centerRequest === undefined && initialTransitionAnchor === undefined
-          }
+          fitView={fitInitialViewport}
           fitViewOptions={GRAPH_FIT_VIEW_OPTIONS}
           maxZoom={GRAPH_MAX_ZOOM}
           minZoom={GRAPH_MIN_ZOOM}

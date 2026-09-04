@@ -13,6 +13,8 @@
     "@icarus-graph-explorer/dagre-layout": "workspace:*",
     "@icarus-graph-explorer/diagnostics-obsidian": "workspace:*",
     "@icarus-graph-explorer/explorer-inspection": "workspace:*",
+    "@icarus-graph-explorer/focus-schematic": "workspace:*",
+    "@icarus-graph-explorer/focus-schematic-layout": "workspace:*",
     "@icarus-graph-explorer/graph-query": "workspace:*",
     "@icarus-graph-explorer/performance": "workspace:*",
     "@icarus-graph-explorer/presentation-overrides": "workspace:*",

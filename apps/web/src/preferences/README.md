@@ -44,6 +44,12 @@ controls, so another preference cannot drop the flag; storage failure keeps the
 session value and reports the existing warning. Disclosure open/closed state is
 not stored.
 
+HIER3B adds `focusHierarchyImplementation` to the same v1 record. The supported
+values are `classic` and `modular-preview`; missing or malformed values resolve
+to Classic. Reset Sandbox restores Classic while leaving Trackpad Zoom and the
+Local Free/Structured choice intact. This is product exposure only: it does not
+enter workspace state, history, projection, or persisted coordinates.
+
 SPACING1B-QA keeps separate All Network and Focus Network density-framing
 strengths outside this durable record. Both start at 100% on every application
 launch and exist only to compare legacy ratio 1 with each production density

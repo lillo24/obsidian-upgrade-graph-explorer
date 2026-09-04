@@ -9,6 +9,11 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./worker-runtime": {
+      "types": "./src/worker-runtime.ts",
+      "import": "./src/worker-runtime.ts",
+      "default": "./src/worker-runtime.ts"
     }
   },
   "scripts": {

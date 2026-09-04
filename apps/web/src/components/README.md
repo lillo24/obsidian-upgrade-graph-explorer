@@ -300,3 +300,13 @@ collapsed, keyboard-accessible Experimental disclosure in Sandbox.
 availability policy at every activation boundary, including exact navigation,
 history, live reconciliation, reset, and renderer failures. Both normal and
 maximized Settings instances receive the same preference callbacks.
+
+HIER3B: `ModularStructuredGraphView.tsx` is the lazy Focus + Hierarchy preview
+boundary. It builds HIER1 only while mounted, derives renderer dimensions,
+checks the bounded page cache, requests the dedicated A1 worker, validates and
+maps one complete graph, and exposes explicit pending/cache/ready/warning/fatal
+states. A replacement keeps the last valid graph after filtering identities no
+longer in the current projection. A fatal first result asks GraphExplorer for a
+session-only Classic fallback without changing the persisted preview choice.
+`GraphExplorer.tsx` owns the presentation switch and semantic transition anchor;
+switching implementations creates no navigation-history entry.

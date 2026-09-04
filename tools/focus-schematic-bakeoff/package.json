@@ -6,6 +6,7 @@
   "scripts": {
     "benchmark": "tsx src/benchmark.ts",
     "benchmark:endpoints": "tsx src/endpoint-benchmark.ts",
+    "benchmark:production-worker": "tsx src/production-worker-benchmark.ts",
     "generate:endpoint-lab": "tsx src/endpoint-lab.ts",
     "generate:lab": "tsx src/lab.ts",
     "typecheck": "tsc --noEmit"

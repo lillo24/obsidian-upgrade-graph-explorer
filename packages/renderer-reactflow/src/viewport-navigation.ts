@@ -35,6 +35,38 @@ export interface RuntimeNodeBounds {
 
 export type WheelNavigationAction = 'pan' | 'zoom';
 
+/** Reframe around a measured node point when model and runtime positions differ. */
+export function viewportForPreservedPoint(
+  currentViewport: RendererViewport,
+  currentPoint: { readonly x: number; readonly y: number },
+  targetPoint: { readonly x: number; readonly y: number },
+  targetZoom: number,
+): RendererViewport | null {
+  if (
+    !Number.isFinite(currentViewport.x) ||
+    !Number.isFinite(currentViewport.y) ||
+    !Number.isFinite(currentViewport.zoom) ||
+    currentViewport.zoom <= 0 ||
+    !Number.isFinite(currentPoint.x) ||
+    !Number.isFinite(currentPoint.y) ||
+    !Number.isFinite(targetPoint.x) ||
+    !Number.isFinite(targetPoint.y) ||
+    !Number.isFinite(targetZoom) ||
+    targetZoom <= 0
+  ) {
+    return null;
+  }
+  const graphPoint = {
+    x: (currentPoint.x - currentViewport.x) / currentViewport.zoom,
+    y: (currentPoint.y - currentViewport.y) / currentViewport.zoom,
+  };
+  return {
+    x: targetPoint.x - graphPoint.x * targetZoom,
+    y: targetPoint.y - graphPoint.y * targetZoom,
+    zoom: targetZoom,
+  };
+}
+
 /** Decide gesture ownership before React Flow handles an ordinary wheel event. */
 export function wheelActionForMode(
   mode: TrackpadZoomMode,
@@ -160,7 +192,7 @@ export function captureDisclosureAnchor(
   const center = nodeCenter(graph, (candidate) => candidate.id === node.id);
   if (center === null) return null;
   return {
-    projectionNodeId: node.data.projectionNodeId,
+    projectionNodeId: node.data.projectionNodeId!,
     entityId,
     screenPoint: {
       x: center.x * viewport.zoom + viewport.x,
