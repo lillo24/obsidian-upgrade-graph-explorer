@@ -226,8 +226,11 @@ reviews.
 ## Repository integration
 
 Pull request [#70](https://github.com/lillo24/icarus-graph-explorer/pull/70)
-ran the complete hosted CI workflow on the accepted candidate. Workflow run
-[33876815593](https://github.com/lillo24/icarus-graph-explorer/actions/runs/33876815593)
-passed `validate` in 2m05s and `desktop` in 9m01s. Merge and post-merge `main`
-evidence are recorded after integration so this document names the exact
-commits and runs.
+merged the accepted candidate as
+`71216f79b1f14d687961698649532bdc26466a6f`. The exact PR head passed workflow
+run
+[33877699608](https://github.com/lillo24/icarus-graph-explorer/actions/runs/33877699608):
+`validate` in 2m22s and `desktop` in 7m58s. The merge commit then passed the
+post-merge `main` workflow run
+[33878469651](https://github.com/lillo24/icarus-graph-explorer/actions/runs/33878469651):
+`validate` in 2m27s and `desktop` in 8m54s.
