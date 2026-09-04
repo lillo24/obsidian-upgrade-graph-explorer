@@ -50,6 +50,7 @@ src/
   lifecycle.ts             WebGL construction result and idempotent session lease.
   style.ts                 Far/Regional/Near LOD and GROUP1A base-accent layer.
   global-label.ts          Viewport-aware Global label/hover placement after adaptive culling.
+  raw-viewport-frame.ts    Raw graph-space center/scale preservation across Sigma normalization.
   precision-wheel-zoom.ts  Fine-linear/coarse-compressed wheel curve and Sigma default guard.
   session.ts               Imperative Sigma lifecycle and high-frequency interaction ownership.
   node-click.ts            Shared 300 ms single/double-click arbitration; selection stays immediate.
@@ -81,6 +82,8 @@ src/
   arrangement-session.test.ts  Exact-folder pointer ownership, sparse refresh, and commit contract.
   file-move-session.test.ts  All/Focus eligibility, arbitration, lifecycle, and fake-port contract.
   arrangement-canvas.test.tsx  Accessible nudge/save and write-failure rollback contract.
+  spatial-rule-canvas.test.tsx Pull/Place adoption, cache reuse, and zero-auto-layout regression.
+  raw-viewport-frame.test.ts Sigma-transform camera preservation and ownership regression.
   node-size-session.test.ts  Initial display, sparse indexed refresh, and topology-race contracts.
   *.test.ts                Mapping, layout, cache, LOD, settings, and precision contracts.
 ```
@@ -137,8 +140,8 @@ The resolved visual subset (base size, degree-size influence, link thickness,
 and label threshold) owns Sigma reducer/settings refreshes only. The persisted
 record and control ranges remain unchanged.
 
-SPATIAL2A evolves the All Network-only position pipeline without changing the
-current production authoring controls:
+SPATIAL2A evolves the All Network-only position pipeline, and SPATIAL2B exposes
+its complete rule model through the production authoring controls:
 
 ```text
 base automatic deterministic/cache/worker positions
@@ -200,6 +203,37 @@ change, layout change, mode change, and disposal cancel unfinished motion.
 Keyboard users can choose the exact folder in Network Explorer, nudge by 0.02
 (Shift: 0.10), save or cancel, and reset one/all positions. Root uses `.` and
 nested folders never inherit a parent action.
+
+SPATIAL2B turns that mode into one rule editor. An unruled folder opens a
+transient Pull/exact/70 draft at its current displayed center; existing rules
+load byte-for-byte semantics. Behavior, strength, preset, root-file inclusion,
+and exclusions remain draft-only until **Apply changes** or target release.
+The editor's bounded DOM tree uses the full canonical folder model supplied by
+the app, while Choose-mode graph clicks are a shortcut that toggles a subtree or
+the complete direct-root group. Child-rule-owned members receive a distinct
+style and hand off to their own editor instead of mutating the parent draft.
+
+Draft scope classification replaces only the same-root confirmed rule and then
+reuses deepest-wins resolution. Included, excluded, child-owned, and unrelated
+nodes compose after Visual Group color and exact per-File size; internal,
+boundary, child-owned, and unrelated edges remain distinguishable. A short
+highlight pulse changes no size and is disabled by reduced-motion preference.
+The spatial target marker owns explicit pointer capture while dragged. Only that
+capture suppresses stage pan; stage drag and wheel/trackpad zoom remain available
+otherwise.
+
+Pull pointer and keyboard editing updates only the draft anchor, marker, and
+target text. It never calls rigid preview geometry or mutates a graph-node x/y.
+Release persists the complete rule, then the existing SPATIAL2A latest
+worker/cache path settles authoritative geometry. Place marker drag, or dragging
+one effective selected File, retains the sparse rigid preview and exact
+post-dynamic composition. A Place-only edit with unchanged Pull resolution uses
+zero dynamic workers; no rule edit enters the automatic layout fingerprint.
+The SPATIAL2A worker still performs its existing whole-graph ForceAtlas2
+refinement, so disconnected geometry movement is layout evidence rather than a
+camera fit. SPATIAL2B does not introduce a competing simulation lifecycle;
+PHYSICS1 owns future reheating, convergence, and reaction policy, including
+reactive neighbors around hard Place constraints.
 
 MOVE1A adds a separate, fake-backed temporary File constraint seam to both
 Network Sigma sessions without exposing a production control. One canonical
@@ -286,6 +320,29 @@ memberships, targets/strengths, settings, and algorithm version. It excludes
 fixed rules, camera, selection, labels, styles, display-only sizes, and sidebar
 state.
 
+Authoritative spatial-rule adoption (Dynamic Pull, Fixed Placement, dynamic
+cache hits, removal, and reset) preserves the raw graph point under the viewport
+center, raw graph units per pixel, and camera angle across Sigma's normalization
+recalculation. The session captures that frame, arms its `afterProcess` repair
+before replacing coordinates, and restores it before the changed geometry is
+drawn. Spatial intent is determined by the transaction cause, not only by the
+new registry contents: removing the final rule remains a spatial adoption even
+when both `folderRules` and the compatibility anchor map become empty. The
+stable preview-cancel callback cannot retrigger automatic cache adoption when a
+rule changes, so Apply, Remove, and Reset each produce one authoritative
+position application after the initial layout has settled. This is a narrow
+spatial-operation boundary: ordinary pan/zoom, initial framing, automatic layout
+outside the spatial-rule registry, Fit, Search center, and later camera
+transitions retain their existing camera ownership.
+
+Merged PR #60 / FLICKER1 owns the atomic Network camera transaction and
+camera-ownership policy. SPATIAL2B does not duplicate that architecture:
+`raw-viewport-frame.ts` contains only spatial-normalization capture/restore,
+and `applySpatialPositions` supplies that restore as the repair callback to the
+shared `atomicAnchoredGraphMutation`. Graphology owns the single resulting
+process/render; there is no spatial explicit-refresh fallback or nested camera
+owner.
+
 ## Regional semantic zoom and lifecycle
 
 Sigma camera ratio resolves to `far`, `regional`, or `near`. Camera movement
@@ -363,9 +420,11 @@ canonical identity or synthesizing relationships.
 
 An entry/search center or Fit request waits until Sigma has rendered its
 matching background-layout coordinates, so seed or stale display coordinates
-cannot be centered and then replaced out from under the camera. Once consumed,
-that semantic request is not replayed by later live refinements; ordinary user
-pan and zoom therefore remain intact.
+cannot be centered and then replaced out from under the camera. Source-load Fit
+also waits for the first authoritative spatial-rule composition, including a
+Dynamic Pull result or fallback, so the camera encloses the geometry the user
+actually sees. Once consumed, that semantic request is not replayed by later
+live refinements; ordinary user pan and zoom therefore remain intact.
 
 The WebGL canvas is visual-only and `aria-hidden`. Product search, Inspector,
 and Structure remain the accessible semantic surfaces. Sigma construction or

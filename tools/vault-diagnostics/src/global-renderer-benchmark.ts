@@ -358,6 +358,19 @@ function spatialInfluenceEvidence(
     iterations: comparisonIterations,
     requestId: 10_002,
   });
+  const defaultStrengthCandidates = [60, 70, 80].map((strength, index) => {
+    const candidate = template(comparisonSize, 'interleaved-centroid');
+    const result = computeGlobalSpatialInfluence({
+      ...candidate,
+      iterations: comparisonIterations,
+      attractors: candidate.attractors.map((attractor) => ({
+        ...attractor,
+        strength,
+      })),
+      requestId: 10_100 + index,
+    });
+    return { strength, metrics: result.metrics };
+  });
 
   const distinctFolders = [
     ...new Set(
@@ -400,6 +413,12 @@ function spatialInfluenceEvidence(
         computeMs: candidateB.computeMs,
         metrics: candidateB.metrics,
       },
+    },
+    defaultStrengthComparison: {
+      groupSize: comparisonSize,
+      iterations: comparisonIterations,
+      selected: 70,
+      candidates: defaultStrengthCandidates,
     },
   };
 }

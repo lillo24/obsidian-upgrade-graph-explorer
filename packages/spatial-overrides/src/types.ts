@@ -11,6 +11,8 @@ export const NORMALIZED_FOLDER_ANCHOR_RANGE = {
   max: 2,
 } as const;
 export const MINIMUM_AUTOMATIC_FRAME_HALF_EXTENT = 1;
+/** Evidence-backed production authoring default; 100 remains a soft constraint. */
+export const DEFAULT_FOLDER_PULL_STRENGTH = 70;
 
 /** User-facing semantics: positive X is right and positive Y is down. */
 export interface NormalizedFolderAnchor {
@@ -25,6 +27,8 @@ export interface FolderClusterAnchorEntry {
 }
 
 export type FolderSpatialBehavior = 'pull' | 'place';
+
+export type FolderSpatialScopePreset = 'exact' | 'subtree' | 'custom';
 
 export type FolderSpatialScope =
   | { readonly kind: 'exact' }
@@ -41,6 +45,35 @@ export interface FolderSpatialRule {
   readonly anchor: NormalizedFolderAnchor;
   /** Required for pull and forbidden for place. */
   readonly strength?: number;
+}
+
+/** Transient editor state. `customScope` preserves Custom choices across presets. */
+export interface FolderSpatialRuleDraft {
+  readonly folderKey: WorkspaceFolderKey;
+  readonly behavior: FolderSpatialBehavior;
+  readonly scopePreset: FolderSpatialScopePreset;
+  readonly customScope: Extract<
+    FolderSpatialScope,
+    { readonly kind: 'subtree' }
+  >;
+  readonly anchor: NormalizedFolderAnchor;
+  readonly strength: number;
+  readonly lastPullStrength: number;
+}
+
+export type FolderScopeVisualizationState =
+  'active-member' | 'excluded-candidate' | 'shadowed-by-child' | 'outside-root';
+
+export interface FolderScopeVisualization {
+  readonly stateByNodeKey: ReadonlyMap<string, FolderScopeVisualizationState>;
+  readonly owningRuleFolderKeyByNodeKey: ReadonlyMap<
+    string,
+    WorkspaceFolderKey
+  >;
+  readonly activeMemberNodeKeys: readonly string[];
+  readonly excludedCandidateNodeKeys: readonly string[];
+  readonly shadowedByChildNodeKeys: readonly string[];
+  readonly outsideRootNodeKeys: readonly string[];
 }
 
 export interface SpatialOverrideRegistry {

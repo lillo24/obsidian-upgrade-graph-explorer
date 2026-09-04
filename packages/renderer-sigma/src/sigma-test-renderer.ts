@@ -29,18 +29,19 @@ export class SigmaTestRenderer {
     >;
   }[] = [];
   readonly camera = {
+    angle: 0,
     ratio: 1,
     x: 0.5,
     y: 0.5,
-    angle: 0,
     on: vi.fn(),
     off: vi.fn(),
     getState: () => ({
       ratio: this.camera.ratio,
+      angle: this.camera.angle,
       x: this.camera.x,
       y: this.camera.y,
-      angle: this.camera.angle,
     }),
+    getBoundedRatio: (ratio: number) => ratio,
     setState: vi.fn((value: object) => Object.assign(this.camera, value)),
     animate: vi.fn(async (value: object) => {
       Object.assign(this.camera, value);
@@ -233,6 +234,9 @@ export class SigmaTestRenderer {
     };
   }
   viewportToGraph(point: { x: number; y: number }) {
+    return point;
+  }
+  graphToViewport(point: { x: number; y: number }) {
     return point;
   }
 

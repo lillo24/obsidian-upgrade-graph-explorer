@@ -47,7 +47,7 @@ apps/web/
     navigation.ts     Shared reveal/filter-widening/navigation planner.
     local-view.ts     Local entry/reroot/minimum-reveal planner over KG6 state.
     visual-groups/    Visible-entity GROUP1A presentation-map derivation; no projection calls.
-    spatial-overrides/ Workspace persistence plus All-Network Arrange mode state.
+    spatial-overrides/ Workspace persistence, canonical folder tree, and All-Network rule-editor state.
     navigation-history.ts Bounded session history over semantic graph checkpoints.
     graph-history-shortcuts.ts Exact graph-context Back/Forward shortcut policy.
     network-explorer-model.ts Projection-only source ordering, keyboard plans, and virtual ranges.
@@ -95,7 +95,7 @@ string, fixed palette token, and enabled boolean. It is not graph-view state,
 does not bump schema v3, and is not wired into GraphExplorer, NAV1 history,
 DISC1 counts, active QUERY1 filtering, or Saved Filters.
 
-SPATIAL1 wires a separate source-neutral normalized folder-anchor registry and
+SPATIAL1 wires a separate source-neutral normalized folder-rule registry and
 production Arrange Folders controls into All Network. Its stable-workspace
 session uses declared identity provenance and an encoded workspace key;
 transient/legacy or storage-unavailable sources stay session-only. The renderer
@@ -104,11 +104,16 @@ presentations, KG6 projection, navigation history, Graph Preferences, saved view
 schema v3, and the per-File size registry do not observe it. Automatic layout
 positions remain distinct from displayed translated positions, so anchor edits
 neither submit layout work nor contaminate the automatic cache. GraphExplorer
-owns a transient active/exact-folder reducer and delegates raw pointer state to
-the Sigma session. Network Explorer exposes exact folder and root entry points,
-saved-position markers, and disabled explanations. The canvas adds the drag,
-keyboard nudge, save/cancel, reset, and corrupt-recovery surfaces without adding
-folder entities or graph history checkpoints.
+owns a transient editor lifecycle and delegates raw pointer state to the Sigma
+session. SPATIAL2B adds Dynamic pull/Fixed placement, exact/full-subtree/Custom
+scope, direct-root inclusion, exclusions, strength, exact-root rule summaries,
+and child-rule handoff. Its full folder tree comes from canonical snapshot paths
+instead of the filtered projection, so hidden folders remain authorable. The
+canvas makes the spatial target directly draggable and adds keyboard nudge,
+Apply/Cancel, one/all reset, and corrupt-recovery surfaces. Pull target editing
+changes only draft intent; Place may rigidly preview effective members. Neither
+path adds folder entities, File-ID membership, raw coordinates, or graph history
+checkpoints.
 
 MOVE1A defines, but does not mount, a future Network editing-mode reducer. It
 allows exactly one of Move File or Arrange Folder, and requires gesture cleanup

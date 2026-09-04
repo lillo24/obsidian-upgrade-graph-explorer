@@ -230,11 +230,21 @@ describe('Network Explorer drawer', () => {
     expect(markup).not.toContain('class="network-explorer__badge"');
   });
 
-  it('offers exact arrangeable folders, disables container-only folders, and marks anchors', () => {
+  it('offers canonical folders, keeps container folders authorable, and marks exact-root rules', () => {
     const arrangement: NetworkExplorerArrangementProps = {
       active: true,
       activeFolderKey: 'Notes/Deep',
-      anchoredFolderKeys: new Set(['Notes/Deep']),
+      ruleByFolderKey: new Map([
+        [
+          'Notes/Deep',
+          {
+            folderKey: 'Notes/Deep',
+            behavior: 'place',
+            scope: { kind: 'exact' },
+            anchor: { x: 0, y: 0 },
+          },
+        ],
+      ]),
       available: true,
       onArrangeFolder: () => undefined,
     };
@@ -248,20 +258,16 @@ describe('Network Explorer drawer', () => {
     expect(markup).toContain('>Root folder</span>');
     expect(markup).toContain('>Arrange folder</button>');
     expect(markup).toContain('aria-label="Arrange folder Notes"');
-    expect(markup).toContain(
-      'title="This folder has no directly visible File in the current All Network view"',
-    );
+    expect(markup).not.toContain('no directly visible File');
     expect(markup).toContain('aria-label="Arrange folder Deep"');
     expect(markup).toContain('aria-pressed="true"');
-    expect(markup.match(/aria-label="Custom folder position"/gu)).toHaveLength(
-      1,
-    );
+    expect(markup).toContain('aria-label="Place, This folder"');
   });
 
   it('explains when arrangement is unavailable instead of hiding the action', () => {
     const markup = renderExplorer(model([node('root')]), null, new Map(), {
       active: false,
-      anchoredFolderKeys: new Set(),
+      ruleByFolderKey: new Map(),
       available: false,
       unavailableReason: 'Wait for layout',
       onArrangeFolder: () => undefined,

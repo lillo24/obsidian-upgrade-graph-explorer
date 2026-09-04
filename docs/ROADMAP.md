@@ -45,9 +45,9 @@ reorder KG14.
 | **SPATIAL1**                                        | Durable, normalized workspace spatial intent layered after automatic layout.                                                                                     | **Complete** — foundation and direct exact-folder arrangement passed. |
 | **SPATIAL1A — Normalized folder-anchor foundation** | Source-neutral exact-folder registry, automatic/display position separation, stable-workspace persistence, renderer composition, tests, and development harness. | **Complete.**                                                         |
 | **SPATIAL1B — Arrange Folders interaction**         | Spotlight/torch mode, temporary drag preview, commit/cancel, and accessible production controls over the SPATIAL1A seam.                                         | **Complete.**                                                         |
-| **SPATIAL2 — Folder spatial behavior**              | Hierarchical folder scope plus fixed placement and dynamic soft-attractor behavior in All Network.                                                               | **In progress.**                                                      |
+| **SPATIAL2 — Folder spatial behavior**              | Hierarchical folder scope plus fixed placement and dynamic soft-attractor behavior in All Network.                                                               | **Release candidate — native SPATIAL2B interaction QA pending.**      |
 | **SPATIAL2A — Scope/attractor foundation**          | Schema-v2 migration, most-specific membership, three position layers, separate worker/cache, bake-off, harness, and aggregate evidence.                          | **Complete.**                                                         |
-| **SPATIAL2B — Product rule editor**                 | Production behavior/scope/exclusion/strength controls over the SPATIAL2A contracts.                                                                              | **Next for SPATIAL2; not started.**                                   |
+| **SPATIAL2B — Product rule editor**                 | Production behavior/scope/exclusion/strength controls over the SPATIAL2A contracts.                                                                              | **Implemented — draft PR remains gated on native pointer QA.**        |
 | **PHYSICS1 — Continuous simulation lifecycle**      | Simulation ownership, reheating, convergence/cooling, and a concrete temporary-constraint adapter.                                                               | **Parallel dependency; not delivered on main.**                       |
 | **MOVE1 — Temporary physical File movement**        | Direct manipulation that ends on release and returns the File to automatic physical behavior.                                                                    | **In progress.**                                                      |
 | **MOVE1A — Constraint/gesture foundation**          | Display-to-dynamic coordinate inverse, serializable consumer port, pure gesture/coalescing, session seams, and lifecycle/arbitration tests.                      | **Complete.**                                                         |
@@ -155,8 +155,9 @@ layout semantics unchanged. The
 separate LAYOUT1 idea remains paused/absorbed into KG13's Global → Regional →
 Local spatial architecture. SPATIAL1's normalized exact-folder foundation and
 Arrange Folders interaction are complete. SPATIAL2A's schema, hierarchy,
-soft-attractor worker/cache, and development evidence are complete; SPATIAL2B
-is the next product-authoring step. MOVE1A independently establishes temporary
+soft-attractor worker/cache, and development evidence are complete. SPATIAL2B's
+product rule editor is implemented but remains a release candidate until the
+mandatory native pointer/touchpad gate passes. MOVE1A independently establishes temporary
 File constraint, coordinate, gesture, and renderer-session contracts without a
 production control or real cooling adapter. PHYSICS1 owns continuous simulation
 lifecycle; MOVE1B follows it with product integration. PIN1 remains a separate

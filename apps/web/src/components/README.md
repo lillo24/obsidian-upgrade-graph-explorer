@@ -22,15 +22,23 @@ canonical truth, or own a platform storage implementation.
   semantic viewports and cross-mode history/context. Local uses the KG6 Focus
   root, captures a transient Global screen anchor, keeps Global topology/cache
   isolated from Local disclosure, and exits explicitly if its stable root is
-  lost. Exact in-memory layout coordinates and the saved semantic viewport are
-  applied before the first visible mode-switch draw; Local hop/direction changes
-  preserve that camera. Transition anchors and Local Fit requests are consumed
-  once, preventing remount or Back/Forward from replaying stale camera work.
+  lost. Exact in-memory layout coordinates and saved semantic viewports remain
+  available for within-session mode/history restoration. The app marks each
+  fresh source-session mount as `initialViewport="fit"`, so startup, report
+  upload, vault open, and sample restoration issue one Fit after authoritative
+  layout and spatial-rule adoption instead of reopening onto a stale camera.
+  Live revisions do not remount the source session and therefore do not refit.
+  Local hop/direction changes preserve that camera. Transition anchors and Local
+  Fit requests are consumed once, preventing remount or Back/Forward from
+  replaying stale camera work.
   Graphology, worker positions, and transition points are never persisted.
   SPATIAL1 also owns the independent workspace spatial-override session and
-  passes its resolved map only to All Network. SPATIAL1B adds a small web-owned
-  Arrange mode reducer, write-before-adopt callbacks, and exact-folder Network
-  Explorer entry points; per-pointer gesture state remains inside Sigma.
+  passes its resolved map only to All Network. SPATIAL2B expands the web-owned
+  Arrange lifecycle and write-before-adopt callbacks to complete Pull/Place
+  rules. It derives one full canonical folder tree from snapshot document paths,
+  separately annotates current query visibility, and passes that tree to the
+  editor without adding folder entities to KG6. Per-pointer gesture state remains
+  inside Sigma.
   GLOBALVIS1 compares the canonical resolved physics subset before incrementing
   the explicit All Network layout generation. Visual-only preference edits are
   still saved immediately but reach only Sigma's presentation refresh path;
@@ -43,11 +51,12 @@ canonical truth, or own a platform storage implementation.
   screens both side drawers may coexist; at the existing 900 px breakpoint the
   most recently opened drawer owns the overlay and the other closes without
   stealing focus.
-  In All Network it also exposes `Arrange folder` only for an exact folder with
-  a directly visible File, a root-folder fallback, and one marker per persisted
-  exact folder. These controls select/focus the canvas arrangement panel but do
-  not change graph selection, projection, topology, navigation history, or
-  layout. Parent actions never move nested-folder members.
+  In All Network it exposes `Arrange folder` for canonical folders including
+  container-only folders, a root-folder fallback, and exact-root badges that
+  summarize Pull/Place, scope, and strength. Exact-root rules can be edited or
+  removed without changing child rules. These controls focus the canvas rule
+  editor but do not change graph selection, projection, topology, navigation
+  history, or automatic layout.
   `ExplorationControls.tsx` presents accessible All/Focus and Network/Hierarchy
   choices derived from schema-v3 state. Both Focus layouts share the same
   memoized projection. The selected visible node, or root fallback, crosses the
@@ -184,6 +193,10 @@ canonical truth, or own a platform storage implementation.
   Visual indent is capped at 12 levels to retain usable labels on deep paths;
   logical ARIA depth is exact. Diagnostics trail at root, never grouped by target.
   Neither module reads edges or reconstructs hidden canonical topology.
+  The SPATIAL2B rule badges and actions are exact-root annotations supplied by
+  `GraphExplorer`; inherited parent rules are not presented as owned by a child.
+  The canvas editor's separate full-workspace DOM scope tree supplies accessible
+  parity for Custom inclusion/exclusion, while graph clicks are only a shortcut.
   Graph selection highlights immediately but defers that automatic reveal;
   confirmed canvas single-clicks carry a fresh, projection-scoped transient request
   through `GraphExplorer.tsx`, even for the same selected node. Those requests align

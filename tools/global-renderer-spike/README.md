@@ -34,13 +34,17 @@ src/styles.css            Diagnostic-harness presentation only.
 
 SPATIAL2A adds development-only behavior, exact/subtree scope, direct-root-file,
 excluded-subtree, target, and strength controls over a generic nested fixture.
-SPATIAL1B's production exact-folder drag remains exposed through Arrange
-Folders as a thin QA trigger, not a duplicate gesture implementation. The
+SPATIAL2B keeps those controls as an evidence surface but now reuses the
+production draft defaults, preset mapping, behavior switching, and complete-rule
+conversion instead of constructing a second semantic rule model. Production
+Arrange Folders remains exposed as a thin QA trigger, not a duplicate gesture
+implementation. The
 evidence panel reports rule activity, base/dynamic/fixed geometry, resolved
 membership, target error, affected/unaffected movement, separate base/pull
 request counts, dynamic cache hits, and fixed-composition counts.
 All fixtures and output use generic synthetic folder keys. Production product
-chrome remains `place + exact` only in `GlobalGraphCanvas` and Network Explorer.
+chrome now owns Pull/Place and exact/full-subtree/Custom authoring in
+`GlobalGraphCanvas` and Network Explorer.
 
 The harness is intentionally separate from product orchestration. It may expose
 edge-event toggles, destroy/recreate, and stress profiles for evidence, but it

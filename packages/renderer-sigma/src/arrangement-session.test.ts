@@ -41,6 +41,8 @@ describe('Global sparse folder arrangement session', () => {
     const onNodeActivated = vi.fn();
     const onNodeSelected = vi.fn();
     const onNodeSingleClick = vi.fn();
+    const onArrangementScopeFolderClick = vi.fn();
+    const onArrangementTargetPoint = vi.fn();
     const session = new GlobalRendererSession(
       { setAttribute: vi.fn() } as unknown as HTMLElement,
       input,
@@ -48,6 +50,8 @@ describe('Global sparse folder arrangement session', () => {
         settings,
         trackpadZoomMode: 'pinch-zoom',
         onArrangementCommit,
+        onArrangementScopeFolderClick,
+        onArrangementTargetPoint,
         onNodeActivated,
         onNodeSelected,
         onNodeSingleClick,
@@ -62,6 +66,8 @@ describe('Global sparse folder arrangement session', () => {
     return {
       input,
       onArrangementCommit,
+      onArrangementScopeFolderClick,
+      onArrangementTargetPoint,
       onNodeActivated,
       onNodeSelected,
       onNodeSingleClick,
@@ -117,7 +123,22 @@ describe('Global sparse folder arrangement session', () => {
   });
 
   it('coalesces node drag preview to one frame, preserves stage pan, and commits once', () => {
-    const { onArrangementCommit, renderer, session } = createSession();
+    const { input, onArrangementCommit, renderer, session } = createSession();
+    const positions = globalLayoutPositionsFromInput(input);
+    session.setFolderArrangementContext({
+      active: true,
+      activeFolderKey: 'alpha',
+      activeMemberNodeKeys: ['entity:doc-a', 'entity:doc-b'],
+      behavior: 'place',
+      anchors: new Map(),
+      automaticPositions: positions,
+      currentPositions: positions,
+      scopeStateByNodeKey: new Map([
+        ['entity:doc-a', 'active-member'],
+        ['entity:doc-b', 'active-member'],
+      ]),
+      input,
+    });
     const down = renderer.handlers.get('downNode')!;
     const move = renderer.handlers.get('moveBody')!;
     const up = renderer.handlers.get('upStage')!;
@@ -165,6 +186,72 @@ describe('Global sparse folder arrangement session', () => {
     expect(stageMoveDefault).not.toHaveBeenCalled();
   });
 
+  it('keeps every node coordinate exact while a Pull target moves and leaves stage pan available', () => {
+    const {
+      input,
+      onArrangementCommit,
+      onArrangementTargetPoint,
+      renderer,
+      session,
+    } = createSession();
+    const positions = globalLayoutPositionsFromInput(input);
+    session.setFolderArrangementContext({
+      active: true,
+      activeFolderKey: 'alpha',
+      activeMemberNodeKeys: ['entity:doc-a', 'entity:doc-b'],
+      behavior: 'pull',
+      anchors: new Map(),
+      automaticPositions: positions,
+      currentPositions: positions,
+      input,
+      targetAnchor: { x: 0, y: 0 },
+    });
+    const before = renderer.graph.nodes().map((key) => ({
+      key,
+      x: renderer.graph.getNodeAttribute(key, 'x'),
+      y: renderer.graph.getNodeAttribute(key, 'y'),
+    }));
+    const cameraBefore = renderer.camera.getState();
+
+    const anchor = session.folderTargetAnchorFromPointer(
+      { x: 0, y: 0 },
+      { x: 10, y: 10 },
+      { x: 40, y: 32 },
+    );
+    session.positionFolderTargetAnchor(anchor);
+    const preventNodeDefault = vi.fn();
+    renderer.handlers.get('downNode')!({
+      node: 'entity:doc-a',
+      event: { x: 10, y: 10 },
+      preventSigmaDefault: preventNodeDefault,
+    });
+    const preventStageDefault = vi.fn();
+    renderer.handlers.get('moveBody')!({
+      event: { x: 40, y: 32 },
+      preventSigmaDefault: preventStageDefault,
+    });
+
+    expect(anchor).toEqual({
+      x: expect.any(Number),
+      y: expect.any(Number),
+    });
+    expect(onArrangementTargetPoint).toHaveBeenCalledWith({
+      x: expect.any(Number),
+      y: expect.any(Number),
+    });
+    expect(preventNodeDefault).not.toHaveBeenCalled();
+    expect(preventStageDefault).not.toHaveBeenCalled();
+    expect(onArrangementCommit).not.toHaveBeenCalled();
+    expect(renderer.camera.getState()).toEqual(cameraBefore);
+    expect(
+      renderer.graph.nodes().map((key) => ({
+        key,
+        x: renderer.graph.getNodeAttribute(key, 'x'),
+        y: renderer.graph.getNodeAttribute(key, 'y'),
+      })),
+    ).toEqual(before);
+  });
+
   it('suppresses ordinary click and double-click actions only while Arrange is active', () => {
     const {
       onNodeActivated,
@@ -199,5 +286,73 @@ describe('Global sparse folder arrangement session', () => {
     );
     expect(session.cancelFolderArrangementGesture()).toBe(true);
     expect(onArrangementCommit).not.toHaveBeenCalled();
+  });
+
+  it('uses graph clicks as folder-scope shortcuts and disables target dragging while choosing', () => {
+    const {
+      input,
+      onArrangementCommit,
+      onArrangementScopeFolderClick,
+      renderer,
+      session,
+    } = createSession();
+    session.setFolderArrangementContext({
+      active: true,
+      activeFolderKey: 'alpha',
+      activeMemberNodeKeys: ['entity:doc-a', 'entity:doc-b'],
+      anchors: new Map(),
+      automaticPositions: globalLayoutPositionsFromInput(input),
+      chooseScope: true,
+      input,
+    });
+    renderer.handlers.get('clickNode')!({ node: 'entity:doc-a' });
+    expect(onArrangementScopeFolderClick).toHaveBeenCalledWith(
+      'entity:doc-a',
+      'alpha',
+    );
+
+    renderer.handlers.get('downNode')!({
+      node: 'entity:doc-a',
+      event: { x: 10, y: 10 },
+      preventSigmaDefault: vi.fn(),
+    });
+    const preventSigmaDefault = vi.fn();
+    renderer.handlers.get('moveBody')!({
+      event: { x: 30, y: 30 },
+      preventSigmaDefault,
+    });
+    expect(preventSigmaDefault).not.toHaveBeenCalled();
+    expect(frames).toHaveLength(0);
+    expect(onArrangementCommit).not.toHaveBeenCalled();
+  });
+
+  it('re-emits the target marker after raw viewport correction uses the processed frame', async () => {
+    const { input, onArrangementTargetPoint, renderer, session } =
+      createSession();
+    session.setFolderArrangementContext({
+      active: true,
+      activeFolderKey: 'alpha',
+      activeMemberNodeKeys: ['entity:doc-a', 'entity:doc-b'],
+      anchors: new Map(),
+      automaticPositions: globalLayoutPositionsFromInput(input),
+      input,
+      targetAnchor: { x: 0.4, y: -0.3 },
+    });
+    onArrangementTargetPoint.mockClear();
+
+    await session.applySpatialPositions(globalLayoutPositionsFromInput(input));
+
+    expect(renderer.camera.setState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        angle: 0,
+        ratio: 1,
+        x: expect.any(Number),
+        y: expect.any(Number),
+      }),
+    );
+    expect(onArrangementTargetPoint).toHaveBeenCalledWith({
+      x: expect.any(Number),
+      y: expect.any(Number),
+    });
   });
 });

@@ -19,9 +19,10 @@ src/types.ts       Schema-v2 rules, normalized anchors, frames, and results.
 src/folder-key.ts  Exact workspace-relative folder-key validation/derivation.
 src/scope.ts       Segment-safe depth, descendant, subtree, and exclusion rules.
 src/registry.ts    V1 migration, strict v2 validation, serialization, pure edits.
-src/resolution.ts  Most-specific winning rule and visible membership groups.
+src/draft.ts       Production editor defaults, presets, validation, and exclusions.
+src/resolution.ts  Most-specific winners plus transient-draft scope visualization.
 src/geometry.ts    Base frame, fixed composition, and displayed-to-dynamic inverse.
-src/preview.ts     Sparse exact-folder preview geometry and bounded nudges.
+src/preview.ts     Sparse resolved-member preview geometry and bounded nudges.
 src/index.ts       Public source-neutral interface.
 *.test.ts          Migration, scope, resolution, geometry, and compatibility tests.
 ```
@@ -41,6 +42,17 @@ with no visible winners remain stored and inactive. Query/hide changes and exact
 folder renames therefore do not delete intent, and exact path reuse reactivates
 it without fuzzy reconciliation.
 
+The production draft model names these contracts **This folder** (exact),
+**Folder + subfolders** (full subtree), and **Custom** (root-file inclusion plus
+excluded subtrees). New unruled folders start as Pull/exact at strength 70 and
+the caller-supplied current displayed center; merely selecting a folder does not
+persist that default. Drafts preserve the last Pull strength and Custom choices
+while inspecting another behavior or preset. Exclusions remain a minimal
+antichain: descendants below an excluded ancestor cannot be independently
+re-included, so the editor re-enables the nearest blocking ancestor instead of
+inventing unsupported semantics. Custom scope stores folder keys, never resolved
+File IDs.
+
 Schema-v1 `{folderKey, anchor}` entries are accepted only at the read boundary
 and deterministically become `place + exact` rules in memory. Serialization is
 always v2. Registries and nested values are sorted, deeply frozen, JSON and
@@ -55,11 +67,14 @@ center from the dynamic layer, then apply one shared translation to the target
 in the base frame. No parent/child rule is applied twice and no displayed output
 is fed back into either upstream layer.
 
-SPATIAL1B preview geometry remains the current production authoring path. When a
-dynamic layer exists, it supplies the current member positions while the target
-frame remains the base automatic frame. Every pointer/keyboard sample derives a
-sparse shared translation from captured geometry; graph coordinates remain
-memory-only.
+Production rigid-preview geometry accepts the effective deepest-wins member set.
+When a dynamic layer exists, it supplies current member positions while the
+target frame remains the base automatic frame. Fixed Place pointer/keyboard
+samples derive a sparse shared translation from captured geometry, and a parent
+preview never moves child-rule-owned members. Dynamic Pull target authoring does
+not call this geometry path: it changes normalized target intent only and leaves
+all graph coordinates untouched until authoritative settlement. Graph
+coordinates and resolved member IDs remain memory-only.
 
 MOVE1A also indexes the winning translations returned by fixed composition.
 For a displayed File target `P` and its applied Place translation `T`, the

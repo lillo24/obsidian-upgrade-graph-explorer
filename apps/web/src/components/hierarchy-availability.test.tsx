@@ -117,6 +117,7 @@ describe('GraphExplorer experimental availability integration', () => {
   async function mount(
     mode: 'global' | 'structure' | 'local' = 'global',
     show = false,
+    initialViewport?: 'fit' | 'restore',
     localLayoutMode: 'free' | 'structured' = 'structured',
   ) {
     values.set(
@@ -157,6 +158,7 @@ describe('GraphExplorer experimental availability integration', () => {
           snapshot={snapshot}
           storage={storage}
           identityStability="stable"
+          {...(initialViewport === undefined ? {} : { initialViewport })}
           maximized={false}
           onMaximizedChange={() => undefined}
           performance={performance}
@@ -193,6 +195,28 @@ describe('GraphExplorer experimental availability integration', () => {
     return JSON.parse(values.get(GRAPH_PREFERENCES_STORAGE_KEY)!);
   }
 
+  it.each(['global', 'structure', 'local'] as const)(
+    'fits a fresh %s source session instead of restoring its stored camera',
+    async (mode) => {
+      await mount(mode, mode === 'structure', 'fit');
+      const props =
+        mode === 'global'
+          ? captured.global
+          : mode === 'structure'
+            ? captured.structure
+            : captured.hierarchy;
+
+      expect(props?.fitRequestKey).toBe(1);
+      expect(props?.centerRequest).toBeUndefined();
+      expect(
+        values.get(workspaceViewStorageKey(snapshot.workspace.id)),
+      ).toContain('anchorEntityId');
+      if (mode === 'global') {
+        expect(captured.global?.initialViewport).toBeUndefined();
+      }
+    },
+  );
+
   it('keeps All density strength transient and camera-only', async () => {
     await mount('global');
     expect(mode()).toBe('global');
@@ -222,7 +246,7 @@ describe('GraphExplorer experimental availability integration', () => {
   });
 
   it('keeps density strength transient and passes it to Focus Network without a layout request', async () => {
-    await mount('local', false, 'free');
+    await mount('local', false, undefined, 'free');
     expect(mode()).toBe('local-free');
     expect(captured.local!.densityFramingStrength).toBe(100);
     const layoutRequestKey = captured.local!.layoutRequestKey;

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { applyFolderClusterAnchors } from './geometry';
 import {
   createFolderClusterPreviewGeometry,
+  createFolderSpatialRulePreviewGeometry,
   offsetNormalizedFolderAnchor,
   previewFolderClusterAtAnchor,
   previewFolderClusterFromPointer,
@@ -150,5 +151,36 @@ describe('sparse folder preview geometry', () => {
     expect(() =>
       offsetNormalizedFolderAnchor({ x: 0, y: 0 }, { x: Number.NaN, y: 0 }),
     ).toThrow('finite');
+  });
+
+  it('previews an arbitrary deepest-wins member set from current displayed geometry', () => {
+    const current = automatic.map((position) => ({
+      ...position,
+      x: position.x + (position.key === 'nested' ? 10 : 1),
+    }));
+    const geometry = createFolderSpatialRulePreviewGeometry({
+      baseAutomaticPositions: automatic,
+      currentPositions: current,
+      documentNodeKeys: folders.keys(),
+      memberNodeKeys: ['a', 'nested'],
+      folderKey: 'Theory',
+      visualDownGraphYSign: -1,
+    });
+    expect(geometry.memberAutomaticPositions.map(({ key }) => key)).toEqual([
+      'a',
+      'nested',
+    ]);
+    const preview = previewFolderClusterFromPointer({
+      geometry,
+      startPointer: { x: 0, y: 0 },
+      currentPointer: { x: 3, y: -2 },
+      visualDownGraphYSign: -1,
+    });
+    const currentByKey = new Map(current.map((point) => [point.key, point]));
+    for (const point of preview.positions) {
+      expect(point.x - currentByKey.get(point.key)!.x).toBeCloseTo(3);
+      expect(point.y - currentByKey.get(point.key)!.y).toBeCloseTo(-2);
+    }
+    expect(preview.positions.map(({ key }) => key)).not.toContain('b');
   });
 });
