@@ -27,6 +27,11 @@
       "import": "./src/local-layout.ts",
       "default": "./src/local-layout.ts"
     },
+    "./local-density-framing": {
+      "types": "./src/local-density-framing.ts",
+      "import": "./src/local-density-framing.ts",
+      "default": "./src/local-density-framing.ts"
+    },
     "./settings": {
       "types": "./src/settings.ts",
       "import": "./src/settings.ts",

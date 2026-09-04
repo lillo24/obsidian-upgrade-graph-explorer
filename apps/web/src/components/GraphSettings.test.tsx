@@ -10,14 +10,17 @@ import {
 import { GlobalCustomLayoutControls, GraphSettings } from './GraphSettings';
 
 describe('Graph Settings presentation', () => {
-  it('groups Graph and Source controls into accessible transient tabs', () => {
+  it('separates Preferences, Sandbox, and Source into accessible transient tabs', () => {
     const markup = renderToStaticMarkup(
       <GraphSettings
+        densityFramingStrength={100}
         focusAppearance="outline"
         globalLayoutSettings={DEFAULT_GLOBAL_LAYOUT_SETTINGS}
+        onDensityFramingStrengthChange={() => undefined}
         onFocusAppearanceChange={() => undefined}
         onGlobalLayoutSettingsChange={() => undefined}
         onOpenChange={() => undefined}
+        onResetSandbox={() => undefined}
         onTrackpadZoomModeChange={() => undefined}
         open
         trackpadZoomMode="pinch-zoom"
@@ -30,18 +33,32 @@ describe('Graph Settings presentation', () => {
 
     expect(markup).toContain('role="tablist"');
     expect(markup).toContain(
-      'aria-controls="graph-settings-graph-panel" aria-selected="true"',
+      'aria-controls="graph-settings-preferences-panel" aria-selected="true"',
+    );
+    expect(markup).toContain(
+      'aria-controls="graph-settings-sandbox-panel" aria-selected="false"',
     );
     expect(markup).toContain(
       'aria-controls="graph-settings-source-panel" aria-selected="false"',
     );
-    expect(markup).toContain('id="graph-settings-graph-panel" role="tabpanel"');
+    expect(markup).toContain(
+      'id="graph-settings-preferences-panel" role="tabpanel"',
+    );
+    expect(markup).toContain(
+      'hidden="" id="graph-settings-sandbox-panel" role="tabpanel"',
+    );
     expect(markup).toContain(
       'hidden="" id="graph-settings-source-panel" role="tabpanel"',
     );
-    expect(markup).toContain('>Graph Appearance<');
+    expect(markup).toContain('>Preferences</button>');
+    expect(markup).toContain('>Sandbox</button>');
+    expect(markup).toContain('>Interaction<');
+    expect(markup).toContain('>Focus Root appearance<');
     expect(markup).toContain('>All Network Layout<');
-    expect(markup).toContain('>Graph Interaction<');
+    expect(markup).toContain('>Focus Network Density Framing<');
+    expect(markup).toContain('id="focus-density-framing-strength"');
+    expect(markup).toContain('>Legacy</span><span>Auto</span>');
+    expect(markup).toContain('>Reset Sandbox</button>');
     expect(markup).toContain('>Current Source<');
     expect(markup).toContain('Applies to Scope = All, Layout = Network.');
     expect(markup).toContain('>Folder clustering strength<');
@@ -53,7 +70,7 @@ describe('Graph Settings presentation', () => {
       'aria-controls="graph-experimental-controls" aria-expanded="false"',
     );
     expect(markup.indexOf('Experimental</button>')).toBeGreaterThan(
-      markup.indexOf('>Graph Interaction<'),
+      markup.indexOf('>Focus Network Density Framing<'),
     );
     expect(markup).not.toContain('Show All Hierarchy');
   });
@@ -65,11 +82,14 @@ describe('Graph Settings presentation', () => {
     };
     const markup = renderToStaticMarkup(
       <GraphSettings
+        densityFramingStrength={65}
         focusAppearance="outline"
         globalLayoutSettings={settings}
+        onDensityFramingStrengthChange={() => undefined}
         onFocusAppearanceChange={() => undefined}
         onGlobalLayoutSettingsChange={() => undefined}
         onOpenChange={() => undefined}
+        onResetSandbox={() => undefined}
         onTrackpadZoomModeChange={() => undefined}
         open
         trackpadZoomMode="pinch-zoom"
@@ -78,6 +98,7 @@ describe('Graph Settings presentation', () => {
 
     expect(markup).toContain('aria-valuetext="75 percent" disabled=""');
     expect(markup).toContain('value="75"');
+    expect(markup).toContain('aria-valuetext="65 percent"');
   });
 
   it('groups advanced controls by responsibility with an accessible influence scale', () => {

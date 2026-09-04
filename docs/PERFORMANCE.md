@@ -819,3 +819,10 @@ They preserve relative geometry to within `6e-8` in the diagnostic transform;
 their accepted ratios range from `0.93` to `1.4` (plus the lower-clamp unit
 case at `0.7`). ForceAtlas2 worker counts, positions, fingerprints, and cache
 values remain unchanged.
+
+The SPACING1B-QA strength control performs only constant-time interpolation of
+the last accepted decision. It does not rerun density measurement, projection,
+mapping, topology reconciliation, or Local ForceAtlas2. Changing it while the
+camera is automatic updates one camera state; under user ownership it records
+policy only until Fit. The benchmark figures above therefore remain the complete
+density-evaluation cost.

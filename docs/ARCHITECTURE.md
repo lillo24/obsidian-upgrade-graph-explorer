@@ -8,8 +8,11 @@ The product will explore the structure of Markdown knowledge workspaces. Unlike 
 
 SPATIAL1 establishes a parallel source-neutral, workspace-scoped normalized
 folder-anchor layer plus direct exact-folder arrangement for All Network while
-unchanged. SPACING1B independently makes Focus Network automatic framing
-density-aware without changing Local ForceAtlas2 geometry.
+leaving the active KG14 sequence unchanged. SPACING1B independently makes Focus
+Network automatic framing density-aware without changing Local ForceAtlas2
+geometry. Its QA Sandbox interpolates only that camera target and remains
+transient; renderer geometry and persisted workspace/preference schemas do not
+observe it.
 
 ## Stable domain shape
 

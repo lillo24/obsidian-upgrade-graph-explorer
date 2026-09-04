@@ -12,6 +12,7 @@ import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
 import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-groups';
 
 import { LocalLayoutCache } from './local-layout-cache';
+import { DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH } from './local-density-framing';
 import {
   createLocalLayoutRequest,
   localLayoutFingerprint,
@@ -44,6 +45,8 @@ export interface LocalGraphCanvasProps {
   readonly layoutCache?: LocalLayoutCache;
   readonly layoutRequestKey: number;
   readonly layoutService: LocalLayoutService;
+  /** Transient Sandbox policy; excluded from layout input and fingerprinting. */
+  readonly densityFramingStrength?: number;
   readonly onFailure: (message: string) => void;
   readonly onFitRequestConsumed?: (key: number) => void;
   readonly onSelectionChange: (selection: LocalSelection | null) => void;
@@ -76,6 +79,7 @@ function layoutIterations(nodeCount: number): number {
 
 export function LocalGraphCanvas({
   centerRequest,
+  densityFramingStrength = DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH,
   fitRequestKey,
   initialTransitionAnchor,
   initialViewport,
@@ -163,6 +167,7 @@ export function LocalGraphCanvas({
     return {
       cached: cached !== undefined,
       cachedPositions: cached,
+      densityFramingStrength,
       fingerprint,
       input:
         cached === undefined ? input : warmLocalRendererInput(input, cached),
@@ -190,6 +195,7 @@ export function LocalGraphCanvas({
       () =>
         new LocalRendererSession(container, initial.input, {
           rootNodeKey: initial.input.rootNodeKey,
+          densityFramingStrength: initial.densityFramingStrength,
           trackpadZoomMode: initial.trackpadZoomMode,
           ...(initial.presentationOverrides === undefined
             ? {}
@@ -265,6 +271,10 @@ export function LocalGraphCanvas({
   useEffect(() => {
     sessionRef.current?.updateTrackpadZoomMode(trackpadZoomMode);
   }, [trackpadZoomMode]);
+
+  useEffect(() => {
+    sessionRef.current?.updateDensityFramingStrength(densityFramingStrength);
+  }, [densityFramingStrength]);
 
   useEffect(() => {
     if (appliedVisualGroupStyles.current === visualGroupStyles) return;

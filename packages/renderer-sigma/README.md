@@ -351,6 +351,13 @@ the stored Fit target. Manual Fit resets x/y/angle, applies that latest target,
 and returns ownership to automatic framing. Resize never recomputes or reapplies
 the policy. Automatic node sizes are the only radius input: VISUAL1B display
 multipliers and Visual Groups cannot change density, camera, layout, or cache.
+
+SPACING1B-QA adds a transient 0–100% camera-policy strength. The effective ratio
+is `1 + (densityDecision - 1) * strength / 100`, so 0% reproduces the legacy
+ratio-1 Fit and 100% preserves SPACING1B. Automatic ownership responds to a
+strength change while retaining the current semantic screen anchor; user-owned
+cameras keep their exact state until Fit. The value never enters ForceAtlas2
+requests, accepted positions, fingerprints, caches, projection, or persistence.
 Local has no folder prior or fake edges. Exact cache fingerprints include the
 root, stable topology, semantic node/edge roles, weights, iterations, and Local
 settings while excluding seed coordinates, labels, hover, selection, camera,

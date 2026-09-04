@@ -117,12 +117,13 @@ describe('GraphExplorer experimental availability integration', () => {
   async function mount(
     mode: 'global' | 'structure' | 'local' = 'global',
     show = false,
+    localLayoutMode: 'free' | 'structured' = 'structured',
   ) {
     values.set(
       GRAPH_PREFERENCES_STORAGE_KEY,
       JSON.stringify({
         showExperimentalAllHierarchy: show,
-        localLayoutMode: 'structured',
+        localLayoutMode,
       }),
     );
     values.set(
@@ -191,6 +192,37 @@ describe('GraphExplorer experimental availability integration', () => {
   function preference() {
     return JSON.parse(values.get(GRAPH_PREFERENCES_STORAGE_KEY)!);
   }
+
+  it('keeps density strength transient and passes it to Focus Network without a layout request', async () => {
+    await mount('local', false, 'free');
+    expect(mode()).toBe('local-free');
+    expect(captured.local!.densityFramingStrength).toBe(100);
+    const layoutRequestKey = captured.local!.layoutRequestKey;
+
+    await click('Open Settings');
+    await click('Sandbox');
+    const slider = container.querySelector<HTMLInputElement>(
+      '#focus-density-framing-strength',
+    )!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      )!.set!.call(slider, '0');
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+      slider.dispatchEvent(new Event('change', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(captured.local!.densityFramingStrength).toBe(0);
+    expect(captured.local!.layoutRequestKey).toBe(layoutRequestKey);
+    expect(preference()).not.toHaveProperty('densityFramingStrength');
+
+    await click('Reset Sandbox');
+    expect(captured.local!.densityFramingStrength).toBe(100);
+    expect(captured.local!.layoutRequestKey).toBe(layoutRequestKey);
+    expect(preference()).not.toHaveProperty('densityFramingStrength');
+  });
 
   it('reveals controls without projection work and preserves the flag when another preference changes', async () => {
     await mount();

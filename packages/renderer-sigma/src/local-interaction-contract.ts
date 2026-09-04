@@ -10,6 +10,7 @@ export type LocalInteraction =
   | 'source-topology-change'
   | 'exact-cache-hit'
   | 'accepted-layout'
+  | 'density-strength-change'
   | 'manual-fit';
 
 export interface LocalInteractionOperationContract {
@@ -77,5 +78,6 @@ export const LOCAL_INTERACTION_OPERATION_CONTRACTS: Readonly<
     densityEvaluation: 1,
     visualRefresh: 1,
   },
+  'density-strength-change': VISUAL_ONLY,
   'manual-fit': VISUAL_ONLY,
 };

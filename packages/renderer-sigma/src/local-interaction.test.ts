@@ -9,6 +9,7 @@ describe('Local operation oracle', () => {
     'hover',
     'selection',
     'visual-group-style-change',
+    'density-strength-change',
   ] as const)(
     '%s never projects, reconciles topology, or requests layout',
     (interaction) => {

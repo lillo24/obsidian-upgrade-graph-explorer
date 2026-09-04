@@ -17,6 +17,10 @@ import {
   resolveLocalDensityFit,
   type LocalDensityDecision,
 } from './local-density';
+import {
+  DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH,
+  localDensityFramingRatio,
+} from './local-density-framing';
 import { createLocalLayoutRequest } from './local-layout';
 import {
   NodeClickArbitrator,
@@ -52,6 +56,7 @@ import type {
 export interface LocalRendererSessionOptions {
   readonly rootNodeKey: string;
   readonly trackpadZoomMode: LocalTrackpadZoomMode;
+  readonly densityFramingStrength?: number;
   readonly initialViewport?: SemanticLocalViewport;
   readonly initialViewportPoint?: LocalViewportPoint;
   readonly initialViewportNodeKey?: string;
@@ -90,6 +95,7 @@ export class LocalRendererSession {
   >;
   private rootNodeKey: string;
   private densityInput: LocalRendererInput;
+  private densityFramingStrength: number;
   private cameraOwnership: 'auto' | 'user';
   private latestDensityDecision: LocalDensityDecision = {
     ratio: 1,
@@ -197,6 +203,11 @@ export class LocalRendererSession {
     this.options = options;
     this.rootNodeKey = options.rootNodeKey;
     this.densityInput = input;
+    this.densityFramingStrength =
+      options.densityFramingStrength ?? DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH;
+    // Validate the transient QA input before mounting Sigma so failure remains
+    // actionable instead of producing a success-shaped invalid camera.
+    localDensityFramingRatio(1, this.densityFramingStrength);
     this.cameraOwnership =
       options.initialViewport === undefined ? 'auto' : 'user';
     this.trackpadZoomMode = options.trackpadZoomMode;
@@ -227,7 +238,7 @@ export class LocalRendererSession {
       this.measureDensity(options.initialAcceptedPositions);
       if (this.cameraOwnership === 'auto') {
         this.renderer.getCamera().setState({
-          ratio: this.latestDensityDecision.ratio,
+          ratio: this.effectiveDensityRatio(),
         });
       }
     }
@@ -363,6 +374,21 @@ export class LocalRendererSession {
 
   updateTrackpadZoomMode(mode: LocalTrackpadZoomMode): void {
     this.trackpadZoomMode = mode;
+  }
+
+  updateDensityFramingStrength(strengthPercentage: number): void {
+    localDensityFramingRatio(1, strengthPercentage);
+    if (this.densityFramingStrength === strengthPercentage) return;
+    this.densityFramingStrength = strengthPercentage;
+    if (this.cameraOwnership === 'user') return;
+    const anchorKey = this.viewportAnchorNodeKey();
+    const anchor = this.nodeViewportPoint(anchorKey);
+    const ratio = this.effectiveDensityRatio();
+    if (anchor === undefined) {
+      this.renderer.getCamera().setState({ ratio });
+    } else {
+      this.anchorNodeAtViewport(anchorKey, anchor, ratio);
+    }
   }
 
   setVisualGroupStyles(styles?: VisualGroupPresentationMap): void {
@@ -527,6 +553,13 @@ export class LocalRendererSession {
     return decision;
   }
 
+  private effectiveDensityRatio(): number {
+    return localDensityFramingRatio(
+      this.latestDensityDecision.ratio,
+      this.densityFramingStrength,
+    );
+  }
+
   applyPositions(positions: readonly LocalLayoutPosition[]): Promise<void> {
     const anchorKey = this.viewportAnchorNodeKey();
     const anchor = this.nodeViewportPoint(anchorKey);
@@ -562,19 +595,19 @@ export class LocalRendererSession {
     this.measureDensity(positions);
     const targetRatio = () =>
       this.cameraOwnership === 'auto'
-        ? this.latestDensityDecision.ratio
+        ? this.effectiveDensityRatio()
         : this.renderer.getCamera().ratio;
     if (!changed) {
       if (this.cameraOwnership === 'auto') {
         if (anchor === undefined) {
           this.renderer.getCamera().setState({
-            ratio: this.latestDensityDecision.ratio,
+            ratio: this.effectiveDensityRatio(),
           });
         } else {
           this.anchorNodeAtViewport(
             anchorKey,
             anchor,
-            this.latestDensityDecision.ratio,
+            this.effectiveDensityRatio(),
           );
         }
       }
@@ -592,7 +625,7 @@ export class LocalRendererSession {
           this.anchorNodeAtViewport(anchorKey, anchor, targetRatio());
         } else if (this.cameraOwnership === 'auto') {
           this.renderer.getCamera().setState({
-            ratio: this.latestDensityDecision.ratio,
+            ratio: this.effectiveDensityRatio(),
           });
         }
       },
@@ -704,7 +737,7 @@ export class LocalRendererSession {
         x: 0.5,
         y: 0.5,
         angle: 0,
-        ratio: this.latestDensityDecision.ratio,
+        ratio: this.effectiveDensityRatio(),
       },
       { duration: preferredMotionDuration() },
     );

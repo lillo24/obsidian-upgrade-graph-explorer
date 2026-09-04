@@ -480,7 +480,7 @@ h2 {
 
 .graph-settings__tabs {
   display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.45fr);
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 0.75fr) minmax(0, 1.4fr);
   gap: 0.35rem;
   margin-bottom: 0.7rem;
   padding: 0.25rem;
@@ -527,6 +527,14 @@ h2 {
 
 .graph-settings__section + .graph-settings__section {
   border-top: 1px solid #dce4e8;
+}
+
+.graph-settings__sandbox-note {
+  margin: 0;
+  padding: 0 0 0.8rem;
+  color: #647983;
+  font-size: 0.7rem;
+  line-height: 1.45;
 }
 
 .graph-settings__section h3,
@@ -708,6 +716,30 @@ h2 {
   font-size: 0.74rem;
   font-weight: 800;
   cursor: pointer;
+}
+
+.graph-settings__reset {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.graph-settings__reset button {
+  min-height: 2.75rem;
+  justify-self: start;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid #99acb6;
+  border-radius: 0.55rem;
+  color: #294957;
+  background: #ffffff;
+  font-size: 0.74rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.graph-settings__reset small {
+  color: #647983;
+  font-size: 0.68rem;
+  line-height: 1.4;
 }
 
 .global-layout-custom-controls {

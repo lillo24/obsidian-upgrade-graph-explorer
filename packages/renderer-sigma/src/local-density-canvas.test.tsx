@@ -70,8 +70,10 @@ it('installs an exact cache-hit density frame before first render without a work
     },
     record: vi.fn(),
   };
+  let densityFramingStrength = 100;
   const harness = new CanvasTestHarness(() =>
     LocalGraphCanvas({
+      densityFramingStrength,
       instrumentation,
       layoutCache: cache,
       layoutRequestKey: 0,
@@ -90,6 +92,14 @@ it('installs an exact cache-hit density frame before first render without a work
 
   expect(layout).not.toHaveBeenCalled();
   expect(SigmaTestRenderer.instances[0]!.camera.ratio).toBe(expected.ratio);
+  expect(counts.get('local-density-evaluations')).toBe(1);
+  expect(counts.get('local-layouts')).toBeUndefined();
+
+  densityFramingStrength = 0;
+  harness.invalidate();
+  await harness.flush();
+  expect(SigmaTestRenderer.instances[0]!.camera.ratio).toBe(1);
+  expect(layout).not.toHaveBeenCalled();
   expect(counts.get('local-density-evaluations')).toBe(1);
   expect(counts.get('local-layouts')).toBeUndefined();
   harness.destroy();

@@ -32,6 +32,7 @@ vi.mock('./local-session', () => ({
     destroy = vi.fn();
     setControlledSelection = vi.fn();
     update = vi.fn();
+    updateDensityFramingStrength = vi.fn();
     updateTrackpadZoomMode = vi.fn();
   },
 }));

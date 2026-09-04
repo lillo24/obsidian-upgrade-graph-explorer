@@ -5,6 +5,7 @@ vi.mock('sigma', async () => ({
 }));
 
 import { resolveLocalDensityFit } from './local-density';
+import { localDensityFramingRatio } from './local-density-framing';
 import { LocalRendererSession } from './local-session';
 import { SigmaTestRenderer } from './sigma-test-renderer';
 import type {
@@ -112,6 +113,64 @@ describe('Focus density camera ownership', () => {
     cached.session.destroy();
   });
 
+  it('interpolates automatic framing below and above ratio 1', async () => {
+    const sparseInput = rendererInput();
+    const sparseDecision = resolveLocalDensityFit(
+      sparseInput,
+      sparsePositions,
+    ).ratio;
+    const sparse = mount({ densityFramingStrength: 50 }, sparseInput);
+    await sparse.session.applyPositions(sparsePositions);
+    expect(sparse.renderer.camera.ratio).toBe(
+      localDensityFramingRatio(sparseDecision, 50),
+    );
+    sparse.session.destroy();
+
+    const compactInput = rendererInput(compactPositions);
+    const compactDecision = resolveLocalDensityFit(
+      compactInput,
+      compactPositions,
+    ).ratio;
+    expect(compactDecision).toBeGreaterThan(1);
+    const compact = mount({ densityFramingStrength: 50 }, compactInput);
+    await compact.session.applyPositions(compactPositions);
+    expect(compact.renderer.camera.ratio).toBe(
+      localDensityFramingRatio(compactDecision, 50),
+    );
+    compact.session.destroy();
+  });
+
+  it('updates an automatic camera immediately without measuring or laying out', async () => {
+    const counts = new Map<string, number>();
+    const instrumentation: LocalRendererInstrumentation = {
+      count: (operation, amount = 1) =>
+        counts.set(operation, (counts.get(operation) ?? 0) + amount),
+      measure: (_phase, operation, run) => {
+        if (operation !== undefined) {
+          counts.set(operation, (counts.get(operation) ?? 0) + 1);
+        }
+        return run();
+      },
+      record: vi.fn(),
+    };
+    const input = rendererInput(compactPositions);
+    const decision = resolveLocalDensityFit(input, compactPositions).ratio;
+    const { session, renderer } = mount(
+      { densityFramingStrength: 0, instrumentation },
+      input,
+    );
+    await session.applyPositions(compactPositions);
+    counts.clear();
+
+    session.updateDensityFramingStrength(50);
+    expect(renderer.camera.ratio).toBe(localDensityFramingRatio(decision, 50));
+    session.updateDensityFramingStrength(100);
+    expect(renderer.camera.ratio).toBe(decision);
+    expect(counts.get('local-density-evaluations')).toBeUndefined();
+    expect(counts.get('local-layouts')).toBeUndefined();
+    session.destroy();
+  });
+
   it('preserves a fresh transition point while adopting automatic density', async () => {
     const point = { x: 240, y: 180 };
     const input = rendererInput();
@@ -189,7 +248,7 @@ describe('Focus density camera ownership', () => {
     dragged.session.destroy();
   });
 
-  it('stores changed-layout density while user-owned and uses it on Fit', async () => {
+  it('preserves user ownership and uses the selected strength on Fit', async () => {
     const input = rendererInput();
     const expected = resolveLocalDensityFit(input, compactPositions).ratio;
     const { session, renderer } = mount({}, input);
@@ -197,14 +256,18 @@ describe('Focus density camera ownership', () => {
 
     await session.applyPositions(compactPositions);
     expect(renderer.camera.ratio).toBe(0.82);
+    session.updateDensityFramingStrength(0);
+    expect(renderer.camera.ratio).toBe(0.82);
     session.fit();
 
     expect(renderer.camera).toMatchObject({
       x: 0.5,
       y: 0.5,
       angle: 0,
-      ratio: expected,
+      ratio: 1,
     });
+    session.updateDensityFramingStrength(100);
+    expect(renderer.camera.ratio).toBe(expected);
     expect(renderer.camera.animatedReset).not.toHaveBeenCalled();
     session.destroy();
   });

@@ -34,6 +34,10 @@ export {
 } from './local-density';
 export type { LocalDensityDecision, LocalDensityInput } from './local-density';
 export {
+  DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH,
+  localDensityFramingRatio,
+} from './local-density-framing';
+export {
   computeLocalLayout,
   createLocalLayoutRequest,
   DEFAULT_LOCAL_LAYOUT_SETTINGS,
