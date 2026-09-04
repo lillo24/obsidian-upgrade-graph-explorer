@@ -395,3 +395,26 @@ double-click reroot callback. The final release artifact then passed physical
 desktop vault opening, Free/Structured navigation, live heading and root-file
 changes, Rescan, restart restoration, and precision-touchpad validation without
 worker/module/CSP errors. ADR 0015 records the closed architecture.
+
+## 23. SPATIAL2A soft folder influence follow-through
+
+SPATIAL2A preserves the selected Sigma/Graphology renderer and adds no runtime
+dependency. Folder intent migrates to schema-v2 Pull/Place rules with exact or
+hierarchical scope. A most-specific resolver assigns every visible document to
+at most one rule. The Global position pipeline is now base automatic layout,
+then a separate memory-cached soft-attractor worker, then fixed rigid
+composition against the base frame.
+
+The selected dynamic candidate alternates ForceAtlas2 chunks with bounded
+shared centroid translations. The move-then-relax candidate had materially
+larger normalized target error in deterministic synthetic comparison. Continued
+ForceAtlas2 produces the required connected-nonmember reaction and avoids a
+mere rigid post-layout offset. Strength zero preserves the base layer exactly.
+The new worker receives only stable graph geometry, semantic edge weights,
+resolved membership, target/strength, settings, iterations, and request ID.
+
+Current Arrange Folders remains the production authoring surface and writes
+only `place + exact`; the development harness supplies the full SPATIAL2A
+matrix. SPATIAL2B may expose those rule controls after separate product design.
+Focus/Hierarchy, QUERY1, GROUP1, presentation sizes, semantic viewport, and the
+automatic folder prior retain their existing ownership.

@@ -3819,6 +3819,8 @@ export function GraphExplorer({
                 settings={globalLayoutSettings}
                 presentationOverrides={nodePresentation.overrides}
                 spatialOverrides={spatialOverrides.anchors}
+                spatialRules={spatialOverrides.rules}
+                spatialSourceKey={workspaceId}
                 trackpadZoomMode={trackpadZoomMode}
                 visualGroupStyles={visualGroupPresentation.styles}
               />

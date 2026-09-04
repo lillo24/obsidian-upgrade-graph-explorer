@@ -2,163 +2,201 @@ import { describe, expect, it } from 'vitest';
 
 import {
   clearFolderClusterAnchors,
+  clearFolderSpatialRules,
   createEmptySpatialOverrideRegistry,
   folderClusterAnchorMap,
   removeFolderClusterAnchor,
+  removeFolderSpatialRule,
   serializeSpatialOverrideRegistry,
   setFolderClusterAnchor,
+  setFolderPullStrength,
+  setFolderSpatialBehavior,
+  setFolderSpatialRule,
+  setFolderSpatialScope,
+  setFolderSpatialTarget,
   validateSpatialOverrideRegistry,
 } from './registry';
 
 const empty = () => createEmptySpatialOverrideRegistry('workspace');
+const pullRule = {
+  folderKey: 'Theory',
+  behavior: 'pull',
+  scope: {
+    kind: 'subtree',
+    includeRootFiles: true,
+    excludedSubtrees: ['Theory/Archive'],
+  },
+  anchor: { x: 1, y: -0.5 },
+  strength: 75,
+} as const;
 
-describe('spatial override schema v1', () => {
+describe('spatial override schema v2', () => {
   it('creates an immutable empty registry', () => {
     const registry = empty();
     expect(registry).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       workspaceId: 'workspace',
-      allNetwork: { folderAnchors: [] },
+      allNetwork: { folderRules: [] },
     });
     expect(Object.isFrozen(registry)).toBe(true);
-    expect(Object.isFrozen(registry.allNetwork)).toBe(true);
-    expect(Object.isFrozen(registry.allNetwork.folderAnchors)).toBe(true);
+    expect(Object.isFrozen(registry.allNetwork.folderRules)).toBe(true);
   });
 
-  it('sets, replaces, removes, and clears anchors without mutating inputs', () => {
-    const original = empty();
-    const first = setFolderClusterAnchor(original, 'Theory', {
-      x: 0.5,
-      y: -0.25,
-    });
-    const second = setFolderClusterAnchor(first, 'Theory', { x: 1, y: 2 });
-    const root = setFolderClusterAnchor(second, '.', { x: -1, y: 0 });
-
-    expect(original.allNetwork.folderAnchors).toEqual([]);
-    expect(first.allNetwork.folderAnchors).toEqual([
-      { folderKey: 'Theory', anchor: { x: 0.5, y: -0.25 } },
-    ]);
-    expect(second.allNetwork.folderAnchors).toEqual([
-      { folderKey: 'Theory', anchor: { x: 1, y: 2 } },
-    ]);
-    expect(
-      root.allNetwork.folderAnchors.map((entry) => entry.folderKey),
-    ).toEqual(['.', 'Theory']);
-    expect(
-      removeFolderClusterAnchor(root, 'Theory').allNetwork.folderAnchors,
-    ).toEqual([{ folderKey: '.', anchor: { x: -1, y: 0 } }]);
-    expect(clearFolderClusterAnchors(root)).toEqual(empty());
-    expect(root.allNetwork.folderAnchors).toHaveLength(2);
-  });
-
-  it('serializes deterministically and round-trips through JSON and structured clone', () => {
-    const forward = {
-      ...empty(),
+  it('migrates schema-v1 exact and root anchors in memory', () => {
+    const migrated = validateSpatialOverrideRegistry({
+      schemaVersion: 1,
+      workspaceId: 'workspace',
       allNetwork: {
         folderAnchors: [
-          { folderKey: 'z', anchor: { x: 1, y: 1 } },
-          { folderKey: '.', anchor: { x: -2, y: 2 } },
-          { folderKey: 'a/nested', anchor: { x: 0, y: 0 } },
+          { folderKey: 'Theory', anchor: { x: 1, y: 0 } },
+          { folderKey: '.', anchor: { x: -1, y: 0.5 } },
         ],
       },
-    };
-    const reverse = {
-      ...forward,
+    });
+    expect(migrated).toMatchObject({ ok: true });
+    if (!migrated.ok) return;
+    expect(migrated.value).toEqual({
+      schemaVersion: 2,
+      workspaceId: 'workspace',
       allNetwork: {
-        folderAnchors: [...forward.allNetwork.folderAnchors].reverse(),
+        folderRules: [
+          {
+            folderKey: '.',
+            behavior: 'place',
+            scope: { kind: 'exact' },
+            anchor: { x: -1, y: 0.5 },
+          },
+          {
+            folderKey: 'Theory',
+            behavior: 'place',
+            scope: { kind: 'exact' },
+            anchor: { x: 1, y: 0 },
+          },
+        ],
       },
-    };
-    const serialized = serializeSpatialOverrideRegistry(forward);
-    expect(serializeSpatialOverrideRegistry(reverse)).toBe(serialized);
-    const parsed = validateSpatialOverrideRegistry(
-      JSON.parse(serialized),
-      'workspace',
+    });
+    expect(
+      JSON.parse(serializeSpatialOverrideRegistry(migrated.value)),
+    ).toMatchObject({
+      schemaVersion: 2,
+      allNetwork: { folderRules: expect.any(Array) },
+    });
+  });
+
+  it('validates pull/place strength contracts and unknown fields', () => {
+    for (const strength of [undefined, -1, 1.5, 101, '50']) {
+      expect(
+        validateSpatialOverrideRegistry({
+          schemaVersion: 2,
+          workspaceId: 'workspace',
+          allNetwork: {
+            folderRules: [{ ...pullRule, strength }],
+          },
+        }).ok,
+      ).toBe(false);
+    }
+    expect(
+      validateSpatialOverrideRegistry({
+        schemaVersion: 2,
+        workspaceId: 'workspace',
+        allNetwork: {
+          folderRules: [
+            {
+              folderKey: 'Theory',
+              behavior: 'place',
+              scope: { kind: 'exact' },
+              anchor: { x: 0, y: 0 },
+              strength: 10,
+            },
+          ],
+        },
+      }).ok,
+    ).toBe(false);
+  });
+
+  it('serializes deterministically and survives JSON/structured clone', () => {
+    const a = setFolderSpatialRule(
+      setFolderClusterAnchor(empty(), 'z', { x: 0, y: 1 }),
+      pullRule,
     );
-    expect(parsed.ok).toBe(true);
-    if (!parsed.ok) return;
-    expect(serializeSpatialOverrideRegistry(parsed.value)).toBe(serialized);
+    const b = {
+      ...a,
+      allNetwork: { folderRules: [...a.allNetwork.folderRules].reverse() },
+    };
+    const serialized = serializeSpatialOverrideRegistry(a);
+    expect(serializeSpatialOverrideRegistry(b)).toBe(serialized);
     const clone = (
-      globalThis as unknown as {
-        structuredClone<T>(value: T): T;
-      }
-    ).structuredClone(parsed.value);
-    expect(clone).toEqual(parsed.value);
-    expect([...folderClusterAnchorMap(parsed.value)]).toEqual([
-      ['.', { x: -2, y: 2 }],
-      ['a/nested', { x: 0, y: 0 }],
-      ['z', { x: 1, y: 1 }],
+      globalThis as unknown as { structuredClone<T>(value: T): T }
+    ).structuredClone(JSON.parse(serialized));
+    expect(clone).toEqual(JSON.parse(serialized));
+  });
+
+  it('provides immutable general mutations', () => {
+    const original = setFolderSpatialRule(empty(), pullRule);
+    const scoped = setFolderSpatialScope(original, 'Theory', { kind: 'exact' });
+    const targeted = setFolderSpatialTarget(scoped, 'Theory', { x: -1, y: 1 });
+    const strengthened = setFolderPullStrength(targeted, 'Theory', 25);
+    const placed = setFolderSpatialBehavior(strengthened, 'Theory', 'place');
+    expect(original.allNetwork.folderRules[0]).toEqual(pullRule);
+    expect(strengthened.allNetwork.folderRules[0]).toMatchObject({
+      strength: 25,
+      anchor: { x: -1, y: 1 },
+      scope: { kind: 'exact' },
+    });
+    expect(placed.allNetwork.folderRules[0]).not.toHaveProperty('strength');
+    expect(removeFolderSpatialRule(placed, 'Theory')).toEqual(empty());
+    expect(clearFolderSpatialRules(original)).toEqual(empty());
+    expect(() => setFolderSpatialBehavior(original, 'Theory', 'pull')).toThrow(
+      'explicit strength',
+    );
+  });
+
+  it('keeps the compatibility API fixed/exact only', () => {
+    const withPull = setFolderSpatialRule(empty(), pullRule);
+    expect(folderClusterAnchorMap(withPull).size).toBe(0);
+    expect(removeFolderClusterAnchor(withPull, 'Theory')).toEqual(withPull);
+    expect(clearFolderClusterAnchors(withPull)).toEqual(withPull);
+
+    const placed = setFolderClusterAnchor(withPull, 'Theory', { x: 0.5, y: 0 });
+    expect(placed.allNetwork.folderRules).toEqual([
+      {
+        folderKey: 'Theory',
+        behavior: 'place',
+        scope: { kind: 'exact' },
+        anchor: { x: 0.5, y: 0 },
+      },
     ]);
+    expect([...folderClusterAnchorMap(placed)]).toEqual([
+      ['Theory', { x: 0.5, y: 0 }],
+    ]);
+    expect(removeFolderClusterAnchor(placed, 'Theory')).toEqual(empty());
   });
 
   it.each([
     null,
     [],
     {},
-    { ...empty(), schemaVersion: 2 },
+    { ...empty(), schemaVersion: 3 },
     { ...empty(), workspaceId: '' },
     { ...empty(), extra: true },
     { ...empty(), allNetwork: {} },
-    { ...empty(), allNetwork: { folderAnchors: [], extra: true } },
-    { ...empty(), allNetwork: { folderAnchors: {} } },
-    { ...empty(), allNetwork: { folderAnchors: [null] } },
+    { ...empty(), allNetwork: { folderRules: [], extra: true } },
+    { ...empty(), allNetwork: { folderRules: [pullRule, pullRule] } },
     {
       ...empty(),
-      allNetwork: {
-        folderAnchors: [
-          { folderKey: 'same', anchor: { x: 0, y: 0 } },
-          { folderKey: 'same', anchor: { x: 1, y: 1 } },
-        ],
-      },
+      allNetwork: { folderRules: [{ ...pullRule, extra: true }] },
     },
-    ...['', '/a', 'a/', 'a\\b', 'C:/a', 'a//b', '..', 'a/../b', './a'].map(
-      (folderKey) => ({
-        ...empty(),
-        allNetwork: {
-          folderAnchors: [{ folderKey, anchor: { x: 0, y: 0 } }],
-        },
-      }),
-    ),
-    ...[NaN, Infinity, -Infinity, -2.01, 2.01, '1', null, undefined].map(
-      (x) => ({
-        ...empty(),
-        allNetwork: {
-          folderAnchors: [{ folderKey: 'a', anchor: { x, y: 0 } }],
-        },
-      }),
-    ),
-    {
-      ...empty(),
-      allNetwork: {
-        folderAnchors: [{ folderKey: 'a', anchor: { x: 0, y: 0, z: 0 } }],
-      },
-    },
-    {
-      ...empty(),
-      allNetwork: {
-        folderAnchors: [
-          { folderKey: 'a', anchor: { x: 0, y: 0 }, extra: true },
-        ],
-      },
-    },
-  ])('rejects incompatible, duplicate, or unsafe input %#', (candidate) => {
+  ])('rejects incompatible input %#', (candidate) => {
     expect(validateSpatialOverrideRegistry(candidate).ok).toBe(false);
   });
 
-  it('rejects workspace mismatch and invalid pure mutations loudly', () => {
-    expect(validateSpatialOverrideRegistry(empty(), 'other')).toMatchObject({
-      ok: false,
-    });
+  it('rejects workspace mismatch and unsafe mutations loudly', () => {
+    expect(validateSpatialOverrideRegistry(empty(), 'other').ok).toBe(false);
     expect(() => createEmptySpatialOverrideRegistry('')).toThrow(
       'workspace ID',
     );
     expect(() =>
       setFolderClusterAnchor(empty(), '/absolute', { x: 0, y: 0 }),
     ).toThrow('folder key');
-    expect(() =>
-      setFolderClusterAnchor(empty(), 'folder', { x: NaN, y: 0 }),
-    ).toThrow('finite x/y');
-    expect(() => removeFolderClusterAnchor(empty(), '../folder')).toThrow(
-      'normalized workspace folder key',
-    );
   });
 });

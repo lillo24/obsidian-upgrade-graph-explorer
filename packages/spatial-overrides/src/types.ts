@@ -5,7 +5,7 @@ import type {
 
 export type { WorkspaceFolderKey } from '@icarus-graph-explorer/core';
 
-export const SPATIAL_OVERRIDE_SCHEMA_VERSION = 1 as const;
+export const SPATIAL_OVERRIDE_SCHEMA_VERSION = 2 as const;
 export const NORMALIZED_FOLDER_ANCHOR_RANGE = {
   min: -2,
   max: 2,
@@ -18,16 +18,36 @@ export interface NormalizedFolderAnchor {
   readonly y: number;
 }
 
+/** Legacy schema-v1 entry retained only for deterministic read migration. */
 export interface FolderClusterAnchorEntry {
   readonly folderKey: WorkspaceFolderKey;
   readonly anchor: NormalizedFolderAnchor;
+}
+
+export type FolderSpatialBehavior = 'pull' | 'place';
+
+export type FolderSpatialScope =
+  | { readonly kind: 'exact' }
+  | {
+      readonly kind: 'subtree';
+      readonly includeRootFiles: boolean;
+      readonly excludedSubtrees: readonly WorkspaceFolderKey[];
+    };
+
+export interface FolderSpatialRule {
+  readonly folderKey: WorkspaceFolderKey;
+  readonly behavior: FolderSpatialBehavior;
+  readonly scope: FolderSpatialScope;
+  readonly anchor: NormalizedFolderAnchor;
+  /** Required for pull and forbidden for place. */
+  readonly strength?: number;
 }
 
 export interface SpatialOverrideRegistry {
   readonly schemaVersion: typeof SPATIAL_OVERRIDE_SCHEMA_VERSION;
   readonly workspaceId: WorkspaceId;
   readonly allNetwork: {
-    readonly folderAnchors: readonly FolderClusterAnchorEntry[];
+    readonly folderRules: readonly FolderSpatialRule[];
   };
 }
 
@@ -71,7 +91,28 @@ export interface SpatialCompositionResult {
   readonly issues: readonly [];
 }
 
-/** Automatic, committed-display geometry captured once for one exact folder. */
+export interface ResolvedFolderSpatialGroup {
+  readonly rule: FolderSpatialRule;
+  readonly memberNodeKeys: readonly string[];
+}
+
+export interface InactiveFolderSpatialRule {
+  readonly rule: FolderSpatialRule;
+  readonly reason: 'no-visible-members';
+}
+
+export interface ResolvedFolderSpatialRules {
+  readonly pullGroups: readonly ResolvedFolderSpatialGroup[];
+  readonly placeGroups: readonly ResolvedFolderSpatialGroup[];
+  readonly inactiveRules: readonly InactiveFolderSpatialRule[];
+  readonly winningRuleByNodeKey: ReadonlyMap<string, FolderSpatialRule>;
+  readonly membershipCountByRuleFolderKey: ReadonlyMap<
+    WorkspaceFolderKey,
+    number
+  >;
+}
+
+/** Base-frame plus current dynamic geometry captured once for one exact folder. */
 export interface FolderClusterPreviewGeometry {
   readonly folderKey: WorkspaceFolderKey;
   readonly automaticFrame: AutomaticGraphFrame;

@@ -7,6 +7,7 @@ import {
   type AutomaticGraphFrame,
   type FolderClusterAnchorMap,
   type NormalizedFolderAnchor,
+  type ResolvedFolderSpatialRules,
   type SpatialCompositionResult,
   type SpatialPoint,
   type SpatialPosition,
@@ -238,6 +239,96 @@ export function applyFolderClusterAnchors({
     automaticFrame,
     activeFolders,
     inactiveFolderKeys,
+    issues: [],
+  };
+}
+
+/**
+ * Composes resolved place groups over the current dynamic layer while deriving
+ * normalized targets exclusively from the immutable base automatic frame.
+ */
+export function applyResolvedFolderPlacements({
+  baseAutomaticPositions,
+  currentPositions,
+  documentNodeKeys,
+  resolved,
+  visualDownGraphYSign,
+}: {
+  readonly baseAutomaticPositions: readonly SpatialPosition[];
+  readonly currentPositions: readonly SpatialPosition[];
+  readonly documentNodeKeys: Iterable<string>;
+  readonly resolved: ResolvedFolderSpatialRules;
+  readonly visualDownGraphYSign: VisualDownGraphYSign;
+}): SpatialCompositionResult {
+  validVisualDownGraphYSign(visualDownGraphYSign);
+  const baseByKey = positionIndex(baseAutomaticPositions);
+  const currentByKey = positionIndex(currentPositions);
+  if (baseByKey.size !== currentByKey.size) {
+    throw new Error('Base and dynamic spatial layers need the same node keys.');
+  }
+  for (const key of baseByKey.keys()) {
+    if (!currentByKey.has(key)) {
+      throw new Error(
+        `Dynamic spatial layer omitted node ${JSON.stringify(key)}.`,
+      );
+    }
+  }
+  const automaticFrame = computeAutomaticGraphFrame(
+    baseAutomaticPositions,
+    documentNodeKeys,
+  );
+  const displayedByKey = new Map(currentByKey);
+  const activeFolders: AppliedFolderTranslation[] = [];
+  for (const group of resolved.placeGroups) {
+    let centerX = 0;
+    let centerY = 0;
+    for (const nodeKey of group.memberNodeKeys) {
+      const point = currentByKey.get(nodeKey);
+      if (point === undefined) {
+        throw new Error(
+          `Resolved place group references missing node ${JSON.stringify(nodeKey)}.`,
+        );
+      }
+      centerX += point.x;
+      centerY += point.y;
+    }
+    const currentCenter = {
+      x: centerX / group.memberNodeKeys.length,
+      y: centerY / group.memberNodeKeys.length,
+    };
+    const target = targetFromNormalizedAnchor(
+      automaticFrame,
+      group.rule.anchor,
+      visualDownGraphYSign,
+    );
+    const translation = {
+      x: target.x - currentCenter.x,
+      y: target.y - currentCenter.y,
+    };
+    for (const nodeKey of group.memberNodeKeys) {
+      const point = currentByKey.get(nodeKey)!;
+      displayedByKey.set(nodeKey, {
+        x: point.x + translation.x,
+        y: point.y + translation.y,
+      });
+    }
+    activeFolders.push({
+      folderKey: group.rule.folderKey,
+      memberNodeKeys: group.memberNodeKeys,
+      automaticCenter: currentCenter,
+      target,
+      translation,
+    });
+  }
+  return {
+    displayedPositions: currentPositions
+      .map(({ key }) => ({ key, ...displayedByKey.get(key)! }))
+      .sort((left, right) => left.key.localeCompare(right.key)),
+    automaticFrame,
+    activeFolders,
+    inactiveFolderKeys: resolved.inactiveRules
+      .filter(({ rule }) => rule.behavior === 'place')
+      .map(({ rule }) => rule.folderKey),
     issues: [],
   };
 }

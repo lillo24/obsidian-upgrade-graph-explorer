@@ -4,13 +4,18 @@ import {
   type GlobalFixtureProfile,
 } from './fixtures';
 import { createHarnessGlobalLayoutService } from './layout-worker';
+import { createHarnessSpatialInfluenceService } from './spatial-influence-worker';
 import {
-  composeGlobalSpatialOverrides,
+  composeGlobalFolderSpatialRules,
+  createGlobalSpatialInfluenceRequest,
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+  globalSpatialInfluenceFingerprint,
   globalLayoutPositionsFromInput,
+  GlobalSpatialInfluenceCache,
   GlobalRendererSession,
   mapProjectionToGlobal,
   reconcileGlobalAutomaticPositions,
+  resolveGlobalFolderSpatialRules,
   resetGlobalSeedPositions,
   warmGlobalRendererInput,
   type GlobalLayoutPosition,
@@ -19,14 +24,19 @@ import {
   type GlobalRendererMeasurement,
 } from '@icarus-graph-explorer/renderer-sigma';
 import {
-  clearFolderClusterAnchors,
+  clearFolderSpatialRules,
   createEmptySpatialOverrideRegistry,
   folderClusterAnchorMap,
-  removeFolderClusterAnchor,
+  removeFolderSpatialRule,
   setFolderClusterAnchor,
+  setFolderSpatialRule,
   type SpatialCompositionResult,
 } from '@icarus-graph-explorer/spatial-overrides';
-import type { GlobalLayoutService } from '@icarus-graph-explorer/renderer-sigma/types';
+import type {
+  GlobalLayoutService,
+  GlobalSpatialInfluenceMetrics,
+  GlobalSpatialInfluenceService,
+} from '@icarus-graph-explorer/renderer-sigma/types';
 import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
 
 import './styles.css';
@@ -46,10 +56,14 @@ interface SpikeSnapshot {
   readonly measurements: readonly GlobalRendererMeasurement[];
   readonly viewport: ReturnType<GlobalRendererSession['semanticViewport']>;
   readonly spatial: {
-    readonly anchorCount: number;
+    readonly ruleCount: number;
     readonly activeFolderCount: number;
     readonly inactiveFolderCount: number;
     readonly layoutRequests: number;
+    readonly pullRequests: number;
+    readonly pullCacheHits: number;
+    readonly fixedCompositions: number;
+    readonly pullMetrics?: GlobalSpatialInfluenceMetrics;
     readonly arrangementActive: boolean;
   };
 }
@@ -85,8 +99,18 @@ const spatialForm = requiredElement<HTMLFormElement>('spatial-form');
 const arrangeFoldersButton =
   requiredElement<HTMLButtonElement>('arrange-folders');
 const spatialFolderInput = requiredElement<HTMLInputElement>('spatial-folder');
+const spatialBehaviorInput =
+  requiredElement<HTMLSelectElement>('spatial-behavior');
+const spatialScopeInput = requiredElement<HTMLSelectElement>('spatial-scope');
+const spatialIncludeRootInput = requiredElement<HTMLInputElement>(
+  'spatial-include-root',
+);
+const spatialExclusionsInput =
+  requiredElement<HTMLInputElement>('spatial-exclusions');
 const spatialXInput = requiredElement<HTMLInputElement>('spatial-x');
 const spatialYInput = requiredElement<HTMLInputElement>('spatial-y');
+const spatialStrengthInput =
+  requiredElement<HTMLInputElement>('spatial-strength');
 const spatialResetFolderButton = requiredElement<HTMLButtonElement>(
   'spatial-reset-folder',
 );
@@ -107,17 +131,31 @@ let projection: ViewProjection = createGlobalFixtureProjection(profile);
 let input: GlobalRendererInput = mapProjectionToGlobal(projection);
 let automaticPositions: readonly GlobalLayoutPosition[] =
   globalLayoutPositionsFromInput(input);
+let dynamicPositions: readonly GlobalLayoutPosition[] = automaticPositions;
 let spatialRegistry = createEmptySpatialOverrideRegistry('synthetic-spike');
 let spatialComposition: SpatialCompositionResult =
-  composeGlobalSpatialOverrides(
+  composeGlobalFolderSpatialRules(
     automaticPositions,
+    dynamicPositions,
     input,
-    folderClusterAnchorMap(spatialRegistry),
+    resolveGlobalFolderSpatialRules(
+      input,
+      spatialRegistry.allNetwork.folderRules,
+    ),
   );
 let layoutRequests = 0;
+let pullRequests = 0;
+let pullCacheHits = 0;
+let fixedCompositions = 0;
+let pullMetrics: GlobalSpatialInfluenceMetrics | undefined;
+let lastPullFingerprint: string | undefined;
+let pullStatus = 'Inactive';
 let arrangementActive = false;
 let session: GlobalRendererSession | undefined;
 const layoutService: GlobalLayoutService = createHarnessGlobalLayoutService();
+const spatialInfluenceService: GlobalSpatialInfluenceService =
+  createHarnessSpatialInfluenceService();
+const spatialInfluenceCache = new GlobalSpatialInfluenceCache(8);
 const measurements: GlobalRendererMeasurement[] = [];
 const numberFormatter = new Intl.NumberFormat();
 
@@ -162,10 +200,14 @@ function selectionInspector(
 }
 
 function createSession(): GlobalRendererSession {
-  spatialComposition = composeGlobalSpatialOverrides(
+  spatialComposition = composeGlobalFolderSpatialRules(
     automaticPositions,
+    dynamicPositions,
     input,
-    folderClusterAnchorMap(spatialRegistry),
+    resolveGlobalFolderSpatialRules(
+      input,
+      spatialRegistry.allNetwork.folderRules,
+    ),
   );
   const created = new GlobalRendererSession(
     container,
@@ -227,8 +269,44 @@ function pointText(point: { readonly x: number; readonly y: number }): string {
   return `${point.x.toFixed(2)}, ${point.y.toFixed(2)}`;
 }
 
+function memberCenter(
+  positions: readonly GlobalLayoutPosition[],
+  memberNodeKeys: readonly string[],
+): { readonly x: number; readonly y: number } | undefined {
+  if (memberNodeKeys.length === 0) return undefined;
+  const members = new Set(memberNodeKeys);
+  let x = 0;
+  let y = 0;
+  let count = 0;
+  for (const position of positions) {
+    if (!members.has(position.key)) continue;
+    x += position.x;
+    y += position.y;
+    count += 1;
+  }
+  return count === 0 ? undefined : { x: x / count, y: y / count };
+}
+
 function renderSpatialSummary(): void {
   const folderKey = spatialFolderInput.value.trim();
+  const resolved = resolveGlobalFolderSpatialRules(
+    input,
+    spatialRegistry.allNetwork.folderRules,
+  );
+  const group = [...resolved.pullGroups, ...resolved.placeGroups].find(
+    ({ rule }) => rule.folderKey === folderKey,
+  );
+  const inactive = resolved.inactiveRules.find(
+    ({ rule }) => rule.folderKey === folderKey,
+  );
+  const baseCenter =
+    group === undefined
+      ? undefined
+      : memberCenter(automaticPositions, group.memberNodeKeys);
+  const dynamicCenter =
+    group === undefined
+      ? undefined
+      : memberCenter(dynamicPositions, group.memberNodeKeys);
   const active = spatialComposition.activeFolders.find(
     (folder) => folder.folderKey === folderKey,
   );
@@ -238,8 +316,20 @@ function renderSpatialSummary(): void {
       `center ${spatialComposition.automaticFrame.centerX.toFixed(2)}, ${spatialComposition.automaticFrame.centerY.toFixed(2)} · half ${spatialComposition.automaticFrame.halfWidth.toFixed(2)} × ${spatialComposition.automaticFrame.halfHeight.toFixed(2)}`,
     ],
     [
-      'Automatic folder center',
-      active === undefined ? 'Inactive' : pointText(active.automaticCenter),
+      'Rule status',
+      group !== undefined
+        ? `Active ${group.rule.behavior}/${group.rule.scope.kind}`
+        : inactive === undefined
+          ? 'No rule'
+          : `Inactive: ${inactive.reason}`,
+    ],
+    [
+      'Base centroid',
+      baseCenter === undefined ? 'Inactive' : pointText(baseCenter),
+    ],
+    [
+      'Dynamic centroid',
+      dynamicCenter === undefined ? 'Inactive' : pointText(dynamicCenter),
     ],
     [
       'Target anchor',
@@ -250,6 +340,22 @@ function renderSpatialSummary(): void {
       active === undefined ? '0.00, 0.00' : pointText(active.translation),
     ],
     ['Automatic layout requests', String(layoutRequests)],
+    ['Dynamic pull requests', String(pullRequests)],
+    ['Dynamic cache', `${pullStatus} · ${pullCacheHits} hits`],
+    ['Fixed compositions', String(fixedCompositions)],
+    ['Visible rule members', String(group?.memberNodeKeys.length ?? 0)],
+    [
+      'Mean pull target error',
+      pullMetrics === undefined
+        ? 'Not active'
+        : pullMetrics.meanTargetError.toFixed(3),
+    ],
+    [
+      'Affected / unaffected movement',
+      pullMetrics === undefined
+        ? 'Not active'
+        : `${pullMetrics.meanAffectedDisplacement.toFixed(3)} / ${pullMetrics.meanUnaffectedDisplacement.toFixed(3)}`,
+    ],
   ];
   const fragment = document.createDocumentFragment();
   for (const [label, value] of rows) {
@@ -271,6 +377,7 @@ function refreshArrangementContext(): void {
     ...(folderKey === '' ? {} : { activeFolderKey: folderKey }),
     anchors: folderClusterAnchorMap(spatialRegistry),
     automaticPositions,
+    currentPositions: dynamicPositions,
     input,
   });
   arrangeFoldersButton.setAttribute('aria-pressed', String(arrangementActive));
@@ -281,11 +388,70 @@ function refreshArrangementContext(): void {
 
 async function applySpatialDisplay(operation: string): Promise<void> {
   const started = performance.now();
-  spatialComposition = composeGlobalSpatialOverrides(
-    automaticPositions,
+  const resolved = resolveGlobalFolderSpatialRules(
     input,
-    folderClusterAnchorMap(spatialRegistry),
+    spatialRegistry.allNetwork.folderRules,
   );
+  const effectivePull = resolved.pullGroups.some(
+    ({ rule }) => (rule.strength ?? 0) > 0,
+  );
+  if (effectivePull) {
+    const request = createGlobalSpatialInfluenceRequest(
+      input,
+      DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+      input.nodes.length <= 1_000 ? 24 : 12,
+      automaticPositions,
+      `spike-base-${profile}-${layoutRequests}-${automaticPositions.length}`,
+      resolved,
+    );
+    const requestFingerprint = globalSpatialInfluenceFingerprint(request);
+    const cached = spatialInfluenceCache.get(requestFingerprint);
+    if (cached !== undefined) {
+      dynamicPositions = cached;
+      pullCacheHits += 1;
+      pullStatus = `Cache hit (${spatialInfluenceCache.size} entries)`;
+      if (requestFingerprint !== lastPullFingerprint) pullMetrics = undefined;
+      lastPullFingerprint = requestFingerprint;
+      record({ operation: 'spatial-pull-cache-hit', durationMs: 0 });
+    } else {
+      pullRequests += 1;
+      const result = await spatialInfluenceService.layout(request);
+      dynamicPositions = result.positions;
+      spatialInfluenceCache.set(requestFingerprint, result.positions);
+      pullMetrics = result.metrics;
+      lastPullFingerprint = requestFingerprint;
+      pullStatus = `Worker result (${spatialInfluenceCache.size} entries)`;
+      record({
+        operation: 'spatial-pull-worker',
+        durationMs: result.computeMs,
+      });
+      record({
+        operation: 'spatial-pull-forceatlas',
+        durationMs: result.forceAtlasMs,
+      });
+      record({
+        operation: 'spatial-pull-attractor',
+        durationMs: result.attractorMs,
+      });
+    }
+  } else {
+    dynamicPositions = automaticPositions;
+    pullMetrics = undefined;
+    lastPullFingerprint = undefined;
+    pullStatus = 'Skipped (no effective pull)';
+  }
+  const fixedStarted = performance.now();
+  spatialComposition = composeGlobalFolderSpatialRules(
+    automaticPositions,
+    dynamicPositions,
+    input,
+    resolved,
+  );
+  fixedCompositions += 1;
+  record({
+    operation: 'spatial-fixed-compose',
+    durationMs: Number((performance.now() - fixedStarted).toFixed(3)),
+  });
   await activeSession().applyPositions(spatialComposition.displayedPositions);
   refreshArrangementContext();
   record({
@@ -482,10 +648,17 @@ function snapshot(): SpikeSnapshot {
     measurements: [...measurements],
     viewport: currentSession.semanticViewport(),
     spatial: {
-      anchorCount: spatialRegistry.allNetwork.folderAnchors.length,
+      ruleCount: spatialRegistry.allNetwork.folderRules.length,
       activeFolderCount: spatialComposition.activeFolders.length,
-      inactiveFolderCount: spatialComposition.inactiveFolderKeys.length,
+      inactiveFolderCount: resolveGlobalFolderSpatialRules(
+        input,
+        spatialRegistry.allNetwork.folderRules,
+      ).inactiveRules.length,
       layoutRequests,
+      pullRequests,
+      pullCacheHits,
+      fixedCompositions,
+      ...(pullMetrics === undefined ? {} : { pullMetrics }),
       arrangementActive,
     },
   };
@@ -497,10 +670,19 @@ profileSelect.addEventListener('change', () => {
   projection = createGlobalFixtureProjection(profile);
   input = mapProjectionToGlobal(projection);
   automaticPositions = globalLayoutPositionsFromInput(input);
-  spatialComposition = composeGlobalSpatialOverrides(
+  dynamicPositions = automaticPositions;
+  pullMetrics = undefined;
+  lastPullFingerprint = undefined;
+  pullStatus = 'Inactive';
+  spatialInfluenceCache.clear();
+  spatialComposition = composeGlobalFolderSpatialRules(
     automaticPositions,
+    dynamicPositions,
     input,
-    folderClusterAnchorMap(spatialRegistry),
+    resolveGlobalFolderSpatialRules(
+      input,
+      spatialRegistry.allNetwork.folderRules,
+    ),
   );
   measurements.length = 0;
   inspector.textContent = 'Select a file in the graph or search results.';
@@ -609,15 +791,37 @@ bookmarkButton.addEventListener('click', () => {
 spatialForm.addEventListener('submit', (event) => {
   event.preventDefault();
   try {
-    spatialRegistry = setFolderClusterAnchor(
-      spatialRegistry,
-      spatialFolderInput.value.trim(),
-      { x: spatialXInput.valueAsNumber, y: spatialYInput.valueAsNumber },
-    );
+    const folderKey = spatialFolderInput.value.trim();
+    const behavior = spatialBehaviorInput.value === 'pull' ? 'pull' : 'place';
+    const scope =
+      spatialScopeInput.value === 'subtree'
+        ? {
+            kind: 'subtree' as const,
+            includeRootFiles: spatialIncludeRootInput.checked,
+            excludedSubtrees: spatialExclusionsInput.value
+              .split(',')
+              .map((value) => value.trim())
+              .filter((value) => value.length > 0),
+          }
+        : ({ kind: 'exact' } as const);
+    spatialRegistry = setFolderSpatialRule(spatialRegistry, {
+      folderKey,
+      behavior,
+      scope,
+      anchor: {
+        x: spatialXInput.valueAsNumber,
+        y: spatialYInput.valueAsNumber,
+      },
+      ...(behavior === 'pull'
+        ? { strength: spatialStrengthInput.valueAsNumber }
+        : {}),
+    });
     const before = layoutRequests;
-    void applySpatialDisplay('spatial-anchor-edit')
+    const beforePull = pullRequests;
+    const beforeCacheHits = pullCacheHits;
+    void applySpatialDisplay('spatial-rule-edit')
       .then(() => {
-        status.textContent = `Applied a normalized synthetic folder anchor with ${layoutRequests - before} automatic layout requests.`;
+        status.textContent = `Applied a synthetic ${behavior} rule with ${layoutRequests - before} automatic layouts, ${pullRequests - beforePull} dynamic workers, and ${pullCacheHits - beforeCacheHits} dynamic cache hits.`;
       })
       .catch(showFailure);
   } catch (error: unknown) {
@@ -636,13 +840,13 @@ arrangeFoldersButton.addEventListener('click', () => {
 
 spatialResetFolderButton.addEventListener('click', () => {
   try {
-    spatialRegistry = removeFolderClusterAnchor(
+    spatialRegistry = removeFolderSpatialRule(
       spatialRegistry,
       spatialFolderInput.value.trim(),
     );
     void applySpatialDisplay('spatial-reset-folder')
       .then(() => {
-        status.textContent = 'Reset the selected synthetic folder anchor.';
+        status.textContent = 'Reset the selected synthetic folder rule.';
       })
       .catch(showFailure);
   } catch (error: unknown) {
@@ -651,10 +855,10 @@ spatialResetFolderButton.addEventListener('click', () => {
 });
 
 spatialResetAllButton.addEventListener('click', () => {
-  spatialRegistry = clearFolderClusterAnchors(spatialRegistry);
+  spatialRegistry = clearFolderSpatialRules(spatialRegistry);
   void applySpatialDisplay('spatial-reset-all')
     .then(() => {
-      status.textContent = 'Reset all synthetic folder anchors.';
+      status.textContent = 'Reset all synthetic folder rules.';
     })
     .catch(showFailure);
 });
@@ -663,6 +867,20 @@ spatialFolderInput.addEventListener('input', () => {
   renderSpatialSummary();
   refreshArrangementContext();
 });
+
+function refreshSpatialControlAvailability(): void {
+  const subtree = spatialScopeInput.value === 'subtree';
+  spatialIncludeRootInput.disabled = !subtree;
+  spatialExclusionsInput.disabled = !subtree;
+  spatialStrengthInput.disabled = spatialBehaviorInput.value !== 'pull';
+}
+
+spatialBehaviorInput.addEventListener(
+  'change',
+  refreshSpatialControlAvailability,
+);
+spatialScopeInput.addEventListener('change', refreshSpatialControlAvailability);
+refreshSpatialControlAvailability();
 
 searchInput.addEventListener('input', renderSearchResults);
 

@@ -22,6 +22,11 @@
       "import": "./src/layout.ts",
       "default": "./src/layout.ts"
     },
+    "./spatial-influence": {
+      "types": "./src/spatial-influence.ts",
+      "import": "./src/spatial-influence.ts",
+      "default": "./src/spatial-influence.ts"
+    },
     "./local-layout": {
       "types": "./src/local-layout.ts",
       "import": "./src/local-layout.ts",
