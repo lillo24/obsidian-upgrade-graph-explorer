@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { computeLocalLayout } from '@icarus-graph-explorer/renderer-sigma/core';
+
 import {
   convergenceFixtures,
   focusConvergenceFixtures,
@@ -113,6 +115,56 @@ describe('CONVERGENCE1A fixtures and diagnostic lifecycle', () => {
     expect(candidate.iterationsCompleted).toBe(96);
     expect(candidate.probeMovement).not.toBeNull();
     expect(candidate.probePositions).not.toEqual(candidate.finalPositions);
+  });
+
+  it('keeps the selected production stop below its hidden Focus probe guards', () => {
+    const fixture = focusConvergenceFixtures().find(
+      ({ id }) => id === 'focus-five-star',
+    )!;
+    const production = computeLocalLayout(
+      { ...fixture.request, requestId: 91 },
+      { maxWallTimeMs: 60_000 },
+    );
+    expect(production.stopReason).toBe('stable');
+    const probe = runPublicBatches({
+      fixture,
+      start: production.positions,
+      totalIterations: 32,
+      batchSize: 32,
+      form: 'reuse',
+    });
+    const movement = measureDisplacement({
+      before: production.positions,
+      after: probe.positions,
+      edges: fixture.request.edges,
+      alignment: { kind: 'root', rootKey: fixture.request.rootKey },
+    });
+    expect(movement.all.p90).toBeLessThanOrEqual(0.00512);
+    expect(movement.lowDegree.maximum).toBeLessThanOrEqual(0.01024);
+  });
+
+  it('ends a cap case on its deterministic partial batch without counting it stable', () => {
+    const fixture = focusConvergenceFixtures().find(
+      ({ id }) => id === 'focus-long-chain',
+    )!;
+    const curve = movementCurve(fixture, 32);
+    const candidate = evaluateCandidate({
+      fixture,
+      curve,
+      threshold: Number.MIN_VALUE,
+      stableBatchesRequired: 3,
+      guard: 'bounded-low-degree-maximum',
+      maxIterations: 1_000,
+      maxWallTimeMs: 60_000,
+    });
+    expect(candidate.stopReason).toBe('max-iterations');
+    expect(candidate.iterationsCompleted).toBe(1_000);
+    expect(
+      curve.snapshots.find(
+        ({ iterationsCompleted }) => iterationsCompleted === 1_000,
+      )?.batchIterations,
+    ).toBe(8);
+    expect(candidate.stableBatches).toBeLessThan(3);
   });
 
   it('measures complete folder-prior macro alternatives without folding workers', () => {

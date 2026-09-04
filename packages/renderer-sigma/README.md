@@ -59,7 +59,8 @@ src/
   local-mapping.ts         Separate Local topology and deterministic root-relative seed.
   local-graph.ts           Local Graphology construction, reconciliation, and neighborhoods.
   local-style.ts           Far/normal/near Local and GROUP1A styling without topology changes.
-  local-layout.ts          DOM-free Local ForceAtlas2 request/result and fingerprint.
+  local-convergence.ts     Canonical bounded policy, root-aligned metrics, degree guard, and caps.
+  local-layout.ts          Schema-v2 Local ForceAtlas2 lifecycle, result validation, and fingerprint.
   local-layout-cache.ts    Bounded memory-only exact Local position cache.
   local-lifecycle.ts       Idempotent lease and pre-draw anchored refresh boundary.
   local-session.ts         Local Sigma ownership, precision input, anchors, and viewport.
@@ -388,12 +389,32 @@ hover through maximum zoom-out, with existing width factors 1 / 0.84 / 0.45
 for near / normal / far. Far hierarchy width stays 0.72; root/label LOD and
 hover emphasis remain intact. Native readability is a release-QA gate.
 Sparse Focus spacing, normalization, camera framing and ForceAtlas2 settings
-are intentionally unchanged.
-Local has no folder prior or fake edges. Exact cache fingerprints include the
-root, stable topology, semantic node/edge roles, weights, iterations, and Local
-settings while excluding seed coordinates, labels, hover, selection, camera,
-and source text. Ordinary zoom/pan/hover/selection changes reducer or camera
-state only; it never maps, reconciles, or lays out topology.
+are intentionally unchanged. CONVERGENCE1B replaces the old one-shot budget
+with `local-fa2-convergence-v1`: one Graphology graph receives public
+ForceAtlas2 calls in 32-iteration batches until three consecutive full batches
+have root-aligned normalized all-node p90 at or below `0.00512` and any
+degree-0/1 maximum at or below `0.01024`, or the node-class cap is reached.
+Caps are 1,000 iterations through 100 nodes, 600 through 500, and 240 above 500. The previous frame's RMS radius about the root, floored at `1e-6`, is the
+scale. A 2,000 ms limit is checked only between completed batches; exceeding it
+is a schema-v2 `max-wall-time` failure with no accepted positions or cache
+write. The clock and observed timing are not geometry identity.
+
+Local has no folder prior or fake edges. Exact cache fingerprints use the
+`local-layout-v2` prefix and include the complete deterministic convergence
+policy and computed cap alongside the root, stable topology, semantic node/edge
+roles, weights, and Local settings. They exclude seed coordinates, timeout,
+compute diagnostics, labels, hover, selection, camera, and source text. Exact
+hits restore settled coordinates with no worker request. Explicit Rearrange
+evicts the exact entry and warm-starts the full lifecycle from current automatic
+coordinates; topology updates retain surviving coordinates and seed only new
+nodes. Ordinary zoom/pan/hover/selection changes reducer or camera state only;
+it never maps, reconciles, or lays out topology.
+
+This convergence is a finite replacement-worker computation that adopts one
+final result. It does not stream batches, maintain a persistent simulation, or
+claim mathematical equilibrium. PHYSICS1 still owns any future continuous
+interactive lifecycle, reheating/cooling, and real temporary-constraint
+adapter.
 
 The same GROUP1A map feeds Local Free. File, Heading, and Block base fills may
 use the accent; diagnostic colors and all edges remain unchanged. Root/LOD,

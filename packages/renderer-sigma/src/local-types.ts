@@ -84,6 +84,36 @@ export interface LocalLayoutSettings {
   readonly scalingRatio: number;
 }
 
+export type LocalConvergencePolicyVersion = 'local-fa2-convergence-v1';
+
+export interface LocalConvergencePolicy {
+  readonly version: LocalConvergencePolicyVersion;
+  readonly batchIterations: 32;
+  readonly allP90Threshold: 0.00512;
+  readonly lowDegreeMaximumThreshold: 0.01024;
+  readonly stableBatchesRequired: 3;
+  readonly maxIterations: number;
+  readonly rootAlignment: 'root-translation-v1';
+  readonly scaleNormalization: 'previous-root-rms-v1';
+  readonly scaleFloor: 0.000001;
+}
+
+export interface LocalConvergenceDistribution {
+  readonly count: number;
+  readonly p50: number | null;
+  readonly p90: number | null;
+  readonly maximum: number | null;
+}
+
+export interface LocalConvergenceMovement {
+  readonly scale: number;
+  readonly all: LocalConvergenceDistribution;
+  readonly degree0: LocalConvergenceDistribution;
+  readonly degree1: LocalConvergenceDistribution;
+  readonly degree2Plus: LocalConvergenceDistribution;
+  readonly lowDegree: LocalConvergenceDistribution;
+}
+
 export interface LocalLayoutNode {
   readonly key: string;
   readonly kind: LocalNodeKind;
@@ -101,10 +131,10 @@ export interface LocalLayoutEdge {
 }
 
 export interface LocalLayoutRequest {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly requestId: number;
   readonly rootKey: string;
-  readonly iterations: number;
+  readonly policy: LocalConvergencePolicy;
   readonly settings: LocalLayoutSettings;
   readonly nodes: readonly LocalLayoutNode[];
   readonly edges: readonly LocalLayoutEdge[];
@@ -117,17 +147,29 @@ export interface LocalLayoutPosition {
 }
 
 export interface LocalLayoutResult {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly kind: 'result';
   readonly requestId: number;
+  readonly stopReason: 'stable' | 'max-iterations' | 'degenerate';
+  readonly policyVersion: LocalConvergencePolicyVersion;
+  readonly iterationsCompleted: number;
+  readonly batchesCompleted: number;
+  readonly stableBatches: number;
+  readonly finalMovement: LocalConvergenceMovement | null;
   readonly computeMs: number;
   readonly positions: readonly LocalLayoutPosition[];
 }
 
 export interface LocalLayoutFailure {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly kind: 'error';
   readonly requestId: number;
+  readonly code: 'max-wall-time' | 'layout-error';
+  readonly policyVersion: LocalConvergencePolicyVersion;
+  readonly iterationsCompleted: number;
+  readonly batchesCompleted: number;
+  readonly finalMovement: LocalConvergenceMovement | null;
+  readonly computeMs: number;
   readonly message: string;
 }
 
