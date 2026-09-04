@@ -2,7 +2,7 @@ import { MultiDirectedGraph } from 'graphology';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 
 import {
-  resolveGlobalLayoutSettings,
+  resolveGlobalPhysicsSettings,
   validateGlobalLayoutSettings,
 } from './settings';
 import type {
@@ -287,7 +287,7 @@ function assignForceAtlas2(
   iterations: number,
   request: GlobalLayoutRequest,
 ): void {
-  const settings = resolveGlobalLayoutSettings(request.settings);
+  const settings = resolveGlobalPhysicsSettings(request.settings);
   forceAtlas2.assign(graph, {
     iterations,
     getEdgeWeight: 'weight',
@@ -309,7 +309,7 @@ export function computeGlobalLayout(
   const inputPositions = new Map(
     request.nodes.map((node) => [node.key, { x: node.x, y: node.y }]),
   );
-  const settings = resolveGlobalLayoutSettings(request.settings);
+  const settings = resolveGlobalPhysicsSettings(request.settings);
   const started = now();
   let folderPriorMs = 0;
 
@@ -465,6 +465,8 @@ export function createGlobalLayoutRequest(
       key,
       x: attributes.x,
       y: attributes.y,
+      // Schema-v1 compatibility only. Current ForceAtlas2 keeps
+      // adjustSizes=false, so display radius is excluded from layout identity.
       size: attributes.size,
       ...(attributes.folderKey === null
         ? {}
@@ -560,8 +562,8 @@ export function warmGlobalRendererInput(
   };
 }
 
-function stableNode(node: GlobalLayoutNode): readonly (string | number)[] {
-  return [node.key, node.size, node.folderKey ?? ''];
+function stableNode(node: GlobalLayoutNode): readonly string[] {
+  return [node.key, node.folderKey ?? ''];
 }
 
 function stableEdge(edge: GlobalLayoutEdge): readonly (string | number)[] {
@@ -575,7 +577,7 @@ export function globalLayoutFingerprint(
     schemaVersion: request.schemaVersion,
     algorithm: request.algorithm,
     iterations: request.iterations,
-    settings: validateGlobalLayoutSettings(request.settings),
+    settings: resolveGlobalPhysicsSettings(request.settings),
     nodes: [...request.nodes]
       .sort((left, right) => left.key.localeCompare(right.key))
       .map(stableNode),

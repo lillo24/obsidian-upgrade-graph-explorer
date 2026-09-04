@@ -344,6 +344,22 @@ describe('projected filters', () => {
     ).toEqual(['a-deep', 'b-target']);
   });
 
+  it('applies exact folder-subtree QUERY1 semantics in canonical projection', () => {
+    const projection = projectSnapshot(projectionFixture(), {
+      disclosure: {
+        defaultDepth: 3,
+        expandedEntityIds: [],
+        collapsedEntityIds: [],
+        includeBlocks: true,
+      },
+      filters: { query: 'folder="folder"' },
+    });
+    expect(entityNodes(projection).map(({ sourcePath }) => sourcePath)).toEqual(
+      ['folder/B.md', 'folder/B.md', 'folder/B.md'],
+    );
+    expect(entityIds(projection)).toEqual(['b-leaf', 'b-target', 'doc-b']);
+  });
+
   it('combines QUERY1 with simple filters and applies it after Focus', () => {
     const projection = projectSnapshot(projectionFixture(), {
       ...focusState('doc-a', 1),

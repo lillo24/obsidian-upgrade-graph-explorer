@@ -181,7 +181,10 @@ code are mechanically excluded from production source. Browser localStorage is
 an outer adapter, not the durable domain contract.
 
 `packages/graph-query` depends inward on core and owns QUERY1 parsing,
-canonical formatting, and canonical-entity evaluation. `packages/visual-groups`
+canonical formatting, and canonical-entity evaluation. Its distinct exact
+`folder="..."` predicate uses core `WorkspaceFolderKey` identity and source-path
+segment ancestry; it neither creates folder entities nor reads a folder tree.
+`packages/visual-groups`
 depends only on core plus graph-query. It validates at most 24 ordered
 name/query/palette/enabled definitions, compiles QUERY1 expressions once, and
 resolves first-match plus all-match results into query-free
@@ -737,20 +740,26 @@ state. Compact Network omits visible dirty/reset clutter, not the draft controll
 or atomic mutation safety. `SavedGraphQueries` shares the existing registry UI
 between Hierarchy Filters and Network's local Saved queries popover; Network
 Filters duplicates neither query nor Saved queries. Apply still uses semantic
-QUERY1/history. There is no new persisted hidden-files array or schema version.
+QUERY1/history. There is no new persisted hidden-file/folder array or schema version.
 
-Hidden chips are the KG14B1 global exact-path exclusion list, not source-inventory
-state. A pure planner applies add/remove independently to the active query and a
+Hidden recovery is derived from global exact-path and exact-folder exclusion
+lists, not source-inventory state. A pure planner applies add/remove independently to the active query and a
 valid dirty draft before either is adopted. Parse/limit failures block both;
 each successful semantic mutation uses one normal set-query history checkpoint.
 No chip operation centers or fits the returning graph. One contextual menu
-accepts only graph-node rows through the current model, uses canonical entity/path
-metadata, and is invalidated by virtual scrolling or projection replacement.
+accepts discriminated graph-node or real source-folder rows through the current
+model, uses canonical entity/path/folder metadata, and is invalidated by virtual
+scrolling or projection replacement. Folder targets never fabricate graph IDs.
+A folder action emits one `NOT folder="..."` term, so collapsed and future
+descendants share the same path-semantic filtering behavior.
 Focus calls the existing All entry or Local navigation pipeline. Inspect changes
 controlled selection and opens the existing responsive Inspector without layout
 or history work. Hide file is unavailable for diagnostics, the focused source
 file (including its headings/blocks), and already-excluded paths. Menu open/close
 does not project, inspect canonical workspaces, or call Sigma.
+Hide folder is disabled when its subtree contains the focused source file or the
+same managed folder exclusion already exists. File and Folder recovery remove
+only the selected top-level QUERY1 clause.
 
 Focus is a source-neutral two-pass projection. A documents-only,
 prefiltered hop traversal first fixes file membership from the containing

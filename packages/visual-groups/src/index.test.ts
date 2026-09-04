@@ -231,6 +231,34 @@ describe('compiled Visual Group matching', () => {
     );
   });
 
+  it('inherits exact folder-subtree matching for documents, sections, and blocks', () => {
+    const groups = compiled([
+      {
+        name: 'Research subtree',
+        query: 'folder="Research"',
+        color: 'blue',
+        enabled: true,
+      },
+    ]);
+    for (const entity of [document, section, block]) {
+      expect(resolvePrimaryVisualGroup(entity, groups)?.definition.name).toBe(
+        'Research subtree',
+      );
+    }
+    const nested: AddressableEntity = {
+      id: 'nested',
+      kind: 'document',
+      source: source('Research/Nested/Notes.md'),
+    };
+    const siblingPrefix: AddressableEntity = {
+      id: 'sibling-prefix',
+      kind: 'document',
+      source: source('Research-old/Notes.md'),
+    };
+    expect(resolvePrimaryVisualGroup(nested, groups)).toBeDefined();
+    expect(resolvePrimaryVisualGroup(siblingPrefix, groups)).toBeUndefined();
+  });
+
   it.each([document, section, block])(
     'reuses QUERY1 semantics for $kind entities',
     (entity) => {

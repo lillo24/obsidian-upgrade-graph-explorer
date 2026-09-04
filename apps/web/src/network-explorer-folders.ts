@@ -1,11 +1,14 @@
-import type { WorkspacePath } from '@icarus-graph-explorer/core';
+import type { WorkspaceFolderKey } from '@icarus-graph-explorer/core';
 import type { ProjectionNodeId } from '@icarus-graph-explorer/view-projection';
 import type { NetworkExplorerNode } from './network-explorer-model';
 
-export type NetworkExplorerFolderState = ReadonlyMap<WorkspacePath, boolean>;
+export type NetworkExplorerFolderState = ReadonlyMap<
+  WorkspaceFolderKey,
+  boolean
+>;
 
 export interface NetworkExplorerFolder {
-  readonly path: WorkspacePath;
+  readonly path: WorkspaceFolderKey;
   readonly name: string;
   readonly depth: number;
   readonly entries: readonly NetworkExplorerEntry[];
@@ -21,7 +24,7 @@ export type NetworkExplorerEntry =
 
 export interface NetworkExplorerFolders {
   readonly roots: readonly NetworkExplorerEntry[];
-  readonly folderByPath: ReadonlyMap<WorkspacePath, NetworkExplorerFolder>;
+  readonly folderByPath: ReadonlyMap<WorkspaceFolderKey, NetworkExplorerFolder>;
 }
 
 interface RowPosition {
@@ -60,7 +63,7 @@ export function createNetworkExplorerFolders(
 ): NetworkExplorerFolders {
   const roots: NetworkExplorerEntry[] = [];
   const folders = new Map<
-    WorkspacePath,
+    WorkspaceFolderKey,
     NetworkExplorerFolder & { entries: NetworkExplorerEntry[] }
   >();
   const documentPaths = new Set(
@@ -168,7 +171,7 @@ export function revealNetworkExplorerNode(
 ): NetworkExplorerFolderState {
   const path = model.nodeById.get(nodeId)?.sourcePath;
   if (path === undefined) return state;
-  let next: Map<WorkspacePath, boolean> | undefined;
+  let next: Map<WorkspaceFolderKey, boolean> | undefined;
   let parent = '';
   for (const part of path.split('/').slice(0, -1)) {
     parent = parent === '' ? part : `${parent}/${part}`;

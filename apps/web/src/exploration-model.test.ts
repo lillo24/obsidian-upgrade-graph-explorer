@@ -6,6 +6,7 @@ import {
   explorationScope,
   focusLayoutMode,
   globalLayoutSettingsApplyImmediately,
+  globalLayoutSettingsRequireImmediateLayout,
   hierarchyVisualVariantForScope,
 } from './exploration-model';
 
@@ -48,4 +49,47 @@ describe('Scope and Layout mapping', () => {
       );
     },
   );
+
+  it('requests active All Network layout only for resolved physics changes', () => {
+    const current = {
+      folderClustering: true,
+      spacingPreset: 'normal' as const,
+    };
+    expect(
+      globalLayoutSettingsRequireImmediateLayout('all', 'network', current, {
+        ...current,
+        custom: {
+          linkForce: 1,
+          folderCohesion: 0.08,
+          withinFolderSpacing: 1.15,
+          betweenFolderSpacing: 3.2,
+          nodeSize: 8,
+          referenceDegreeSizeInfluence: 50,
+          linkThickness: 0.7,
+          labelThreshold: 7,
+        },
+      }),
+    ).toBe(false);
+    expect(
+      globalLayoutSettingsRequireImmediateLayout('all', 'network', current, {
+        ...current,
+        custom: {
+          linkForce: 1.25,
+          folderCohesion: 0.08,
+          withinFolderSpacing: 1.15,
+          betweenFolderSpacing: 3.2,
+          nodeSize: 4.5,
+          referenceDegreeSizeInfluence: 50,
+          linkThickness: 0.7,
+          labelThreshold: 7,
+        },
+      }),
+    ).toBe(true);
+    expect(
+      globalLayoutSettingsRequireImmediateLayout('focus', 'network', current, {
+        ...current,
+        folderClustering: false,
+      }),
+    ).toBe(false);
+  });
 });

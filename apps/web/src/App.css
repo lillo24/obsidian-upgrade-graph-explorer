@@ -1184,6 +1184,8 @@ h2 {
 }
 
 .network-explorer__hidden {
+  display: grid;
+  gap: 0.4rem;
   padding: 0 0.75rem 0.55rem;
 }
 
@@ -1193,6 +1195,12 @@ h2 {
   min-width: 0;
   flex-wrap: wrap;
   gap: 0.3rem;
+}
+
+.network-explorer__hidden-chips > strong {
+  flex-basis: 100%;
+  color: #536976;
+  font-size: 0.7rem;
 }
 
 .network-explorer__hidden-chips button {

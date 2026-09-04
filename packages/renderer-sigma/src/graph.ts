@@ -164,3 +164,16 @@ export function createGlobalNeighborhoodIndex(
   }
   return mutable;
 }
+
+/** Weighted reference degree used only by the automatic display-size reducer. */
+export function createGlobalReferenceDegreeIndex(
+  input: GlobalRendererInput,
+): ReadonlyMap<string, number> {
+  const degrees = new Map(input.nodes.map(({ key }) => [key, 0]));
+  for (const edge of input.edges) {
+    const weight = Math.max(1, edge.attributes.referenceCount);
+    degrees.set(edge.source, (degrees.get(edge.source) ?? 0) + weight);
+    degrees.set(edge.target, (degrees.get(edge.target) ?? 0) + weight);
+  }
+  return degrees;
+}

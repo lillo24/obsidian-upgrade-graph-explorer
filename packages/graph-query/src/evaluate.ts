@@ -1,4 +1,9 @@
-import type { AddressableEntity } from '@icarus-graph-explorer/core';
+import {
+  workspaceFolderKeyContainsFolder,
+  workspaceFolderKeyFromPath,
+  type AddressableEntity,
+  type WorkspaceFolderKey,
+} from '@icarus-graph-explorer/core';
 
 import type { GraphQueryExpression } from './types';
 
@@ -6,6 +11,7 @@ interface EntityQueryFacts {
   readonly kind: AddressableEntity['kind'];
   readonly path: string;
   readonly exactPath: string;
+  readonly folderKey: WorkspaceFolderKey;
   readonly title: string;
   readonly level: number | undefined;
 }
@@ -15,6 +21,7 @@ function factsFor(entity: AddressableEntity): EntityQueryFacts {
     kind: entity.kind,
     path: entity.source.path.toLowerCase(),
     exactPath: entity.source.path,
+    folderKey: workspaceFolderKeyFromPath(entity.source.path),
     title: entity.kind === 'section' ? entity.title.toLowerCase() : '',
     level: entity.kind === 'section' ? entity.level : undefined,
   };
@@ -46,6 +53,9 @@ function evaluate(
   }
   if (expression.kind === 'exact-path-predicate') {
     return facts.exactPath === expression.value;
+  }
+  if (expression.kind === 'folder-predicate') {
+    return workspaceFolderKeyContainsFolder(expression.value, facts.folderKey);
   }
   const needle = expression.value.toLowerCase();
   if (expression.field === 'path') return facts.path.includes(needle);

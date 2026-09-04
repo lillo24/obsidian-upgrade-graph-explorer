@@ -61,11 +61,14 @@ function renderExplorer(
         onResetDraft: () => undefined,
       }}
       hiddenPaths={['old/Note.md', 'other/Note.md', 'gone.md']}
+      hiddenFolderKeys={['Archive']}
       focusedSourcePath={undefined}
       onRestoreFile={() => undefined}
+      onRestoreFolder={() => undefined}
       onFocusNode={() => undefined}
       onInspectNode={() => undefined}
       onHideFile={() => undefined}
+      onHideFolder={() => undefined}
       folderState={new Map()}
       savedQueries={{
         activeQuery: '',
@@ -204,6 +207,11 @@ describe('Network Explorer drawer', () => {
     expect(markup).toContain('id="network-query-input"');
     expect(markup).toContain('Show gone.md again');
     expect(markup).toContain('>old/Note.md</span>');
+    expect(markup).toContain('aria-label="Hidden files"');
+    expect(markup).toContain('aria-label="Hidden folders"');
+    expect(markup).toContain('Show Archive again');
+    expect(markup).toContain('>Files</strong>');
+    expect(markup).toContain('>Folders</strong>');
     expect(markup).toContain('>more</button>');
     expect(markup).toContain('aria-expanded="false"');
     expect(markup).toContain(

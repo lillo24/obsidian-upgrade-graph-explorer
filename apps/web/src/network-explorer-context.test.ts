@@ -1,14 +1,16 @@
-import { createNetworkExplorerFolders } from './network-explorer-folders';
 import { describe, expect, it } from 'vitest';
+import { createNetworkExplorerFolders } from './network-explorer-folders';
 import {
+  currentNetworkExplorerContextTarget,
   networkExplorerContextTarget,
   networkExplorerMenuActions,
   networkExplorerMenuIndex,
   networkExplorerSizeEntityId,
-  currentNetworkExplorerContextTarget,
   type NetworkExplorerContext,
+  type NetworkExplorerContextTarget,
 } from './network-explorer-context';
 import type {
+  NetworkExplorerModel,
   NetworkExplorerNode,
   NetworkExplorerRow,
 } from './network-explorer-model';
@@ -34,15 +36,35 @@ const diagnostic: NetworkExplorerNode = {
   focusDistance: null,
 };
 
-describe('Network Explorer context contract', () => {
-  it('targets only current graph nodes; folders and stale rows have no actions', () => {
-    const folders = createNetworkExplorerFolders([entity]);
-    const model = {
-      nodes: [entity],
-      nodeById: new Map([[entity.id, entity]]),
-      ...folders,
-    };
-    const row: NetworkExplorerRow = {
+const nodeTarget = (
+  node: NetworkExplorerNode,
+): NetworkExplorerContextTarget => ({ kind: 'node', node });
+
+function fixture(): {
+  readonly model: NetworkExplorerModel;
+  readonly folderRow: Extract<NetworkExplorerRow, { kind: 'folder' }>;
+  readonly nodeRow: Extract<NetworkExplorerRow, { kind: 'node' }>;
+} {
+  const folders = createNetworkExplorerFolders([entity]);
+  const model = {
+    nodes: [entity],
+    nodeById: new Map([[entity.id, entity]]),
+    ...folders,
+  };
+  const folder = folders.folderByPath.get('Notes')!;
+  return {
+    model,
+    folderRow: {
+      kind: 'folder',
+      id: 'folder:Notes',
+      folder,
+      expanded: true,
+      level: 1,
+      parentFolderId: undefined,
+      position: 1,
+      setSize: 1,
+    },
+    nodeRow: {
       kind: 'node',
       id: 'node:node',
       node: entity,
@@ -51,56 +73,108 @@ describe('Network Explorer context contract', () => {
       parentFolderId: 'folder:Notes',
       position: 1,
       setSize: 1,
-    };
-    expect(networkExplorerContextTarget(row, model)).toBe(entity);
+    },
+  };
+}
+
+describe('Network Explorer context contract', () => {
+  it('resolves current node and real-folder targets without fake graph IDs', () => {
+    const { folderRow, model, nodeRow } = fixture();
+    expect(networkExplorerContextTarget(nodeRow, model)).toEqual(
+      nodeTarget(entity),
+    );
+    expect(networkExplorerContextTarget(folderRow, model)).toEqual({
+      kind: 'folder',
+      folder: folderRow.folder,
+    });
     expect(
-      networkExplorerContextTarget(row, {
+      networkExplorerContextTarget(nodeRow, {
         ...model,
         nodes: [],
         nodeById: new Map(),
       }),
     ).toBeUndefined();
-    const folder = folders.folderByPath.get('Notes')!;
     expect(
-      networkExplorerContextTarget(
-        {
-          kind: 'folder',
-          id: 'folder:Notes',
-          folder,
-          expanded: true,
-          level: 1,
-          parentFolderId: undefined,
-          position: 1,
-          setSize: 1,
-        },
-        model,
-      ),
+      networkExplorerContextTarget(folderRow, {
+        ...model,
+        folderByPath: new Map(),
+      }),
     ).toBeUndefined();
   });
-  it('enables entity actions, guards the entire focused file, and guards already-hidden paths', () => {
+
+  it('keeps File actions and their focused/already-hidden guards unchanged', () => {
     expect(
-      networkExplorerMenuActions(entity, undefined, new Set()).every(
-        (action) => action.disabledReason === undefined,
-      ),
+      networkExplorerMenuActions(
+        nodeTarget(entity),
+        undefined,
+        new Set(),
+        new Set(),
+      ).every((action) => action.disabledReason === undefined),
     ).toBe(true);
     for (const kindLabel of ['File', 'Heading', 'Block'] as const) {
       expect(
         networkExplorerMenuActions(
-          { ...entity, kindLabel },
+          nodeTarget({ ...entity, kindLabel }),
           entity.sourcePath,
+          new Set(),
           new Set(),
         )[2]?.disabledReason,
       ).toContain('Change Focus');
     }
     expect(
-      networkExplorerMenuActions(entity, undefined, new Set(['Notes/A.md']))[2]
-        ?.disabledReason,
+      networkExplorerMenuActions(
+        nodeTarget(entity),
+        undefined,
+        new Set(['Notes/A.md']),
+        new Set(),
+      )[2]?.disabledReason,
     ).toContain('already hidden');
   });
+
+  it('offers one exact Hide folder action and protects the focused subtree by segments', () => {
+    const { folderRow, model } = fixture();
+    const target = networkExplorerContextTarget(folderRow, model)!;
+    expect(
+      networkExplorerMenuActions(target, undefined, new Set(), new Set()),
+    ).toEqual([{ id: 'hide-folder', label: 'Hide folder' }]);
+    expect(
+      networkExplorerMenuActions(
+        target,
+        'Notes/Sub/Focused.md',
+        new Set(),
+        new Set(),
+      ),
+    ).toEqual([
+      {
+        id: 'hide-folder',
+        label: 'Hide folder',
+        disabledReason:
+          'Change Focus before hiding the folder that contains the focused file.',
+      },
+    ]);
+    expect(
+      networkExplorerMenuActions(
+        target,
+        'Notes-old/Focused.md',
+        new Set(),
+        new Set(),
+      )[0]?.disabledReason,
+    ).toBeUndefined();
+    expect(
+      networkExplorerMenuActions(
+        target,
+        undefined,
+        new Set(),
+        new Set(['Notes']),
+      )[0]?.disabledReason,
+    ).toContain('already hidden');
+  });
+
   it('allows diagnostic inspection without inventing a source path or Focus entity', () => {
     const actions = networkExplorerMenuActions(
-      diagnostic,
+      nodeTarget(diagnostic),
       undefined,
+      new Set(),
       new Set(),
     );
     expect(actions[0]?.disabledReason).toBeDefined();
@@ -109,10 +183,12 @@ describe('Network Explorer context contract', () => {
     expect(networkExplorerMenuIndex(actions, -1, 'Home')).toBe(1);
     expect(networkExplorerMenuIndex(actions, 1, 'ArrowDown')).toBe(1);
   });
+
   it('navigates and wraps only enabled menu items with arrows, Home and End', () => {
     const actions = networkExplorerMenuActions(
-      entity,
+      nodeTarget(entity),
       entity.sourcePath,
+      new Set(),
       new Set(),
     );
     expect(networkExplorerMenuIndex(actions, 0, 'ArrowUp')).toBe(3);
@@ -121,12 +197,16 @@ describe('Network Explorer context contract', () => {
     expect(networkExplorerMenuIndex(actions, 1, 'Home')).toBe(0);
     expect(networkExplorerMenuIndex(actions, 0, 'End')).toBe(3);
   });
-  it('offers Size only for canonical Files and uses EntityId rather than row key/path/name', () => {
+
+  it('offers Size only for canonical Files and uses EntityId', () => {
     expect(networkExplorerSizeEntityId(entity)).toBe('entity');
     expect(
-      networkExplorerMenuActions(entity, undefined, new Set()).map(
-        (action) => action.id,
-      ),
+      networkExplorerMenuActions(
+        nodeTarget(entity),
+        undefined,
+        new Set(),
+        new Set(),
+      ).map((action) => action.id),
     ).toEqual(['focus', 'inspect', 'hide', 'size']);
     for (const node of [
       diagnostic,
@@ -136,49 +216,38 @@ describe('Network Explorer context contract', () => {
     ]) {
       expect(networkExplorerSizeEntityId(node)).toBeUndefined();
       expect(
-        networkExplorerMenuActions(node, undefined, new Set()).some(
-          (action) => action.id === 'size',
-        ),
+        networkExplorerMenuActions(
+          nodeTarget(node),
+          undefined,
+          new Set(),
+          new Set(),
+        ).some((action) => action.id === 'size'),
       ).toBe(false);
     }
   });
-  it('keeps editor targets independent of DOM mounting and closes on changed projection/logical row removal', () => {
-    const model = {
-      nodes: [entity],
-      nodeById: new Map([[entity.id, entity]]),
-      ...createNetworkExplorerFolders([entity]),
-    };
+
+  it('keeps logical virtual targets and fails closed after row/projection removal', () => {
+    const { folderRow, model, nodeRow } = fixture();
+    const rows = [folderRow, nodeRow];
+    const indexes = new Map(rows.map((row, index) => [row.id, index]));
     const context: NetworkExplorerContext = {
-      rowId: 'node:node',
-      targetId: entity.id,
+      rowId: folderRow.id,
       model,
-      screen: 'size',
+      screen: 'actions',
       x: 10,
       y: 20,
     };
-    const rows = new Map([[context.rowId, 9000]]);
-    expect(currentNetworkExplorerContextTarget(context, model, rows)).toBe(
-      entity,
-    );
     expect(
-      currentNetworkExplorerContextTarget(context, model, new Map()),
+      currentNetworkExplorerContextTarget(context, model, rows, indexes),
+    ).toEqual({ kind: 'folder', folder: folderRow.folder });
+    expect(
+      currentNetworkExplorerContextTarget(context, model, [], new Map()),
     ).toBeUndefined();
     expect(
-      currentNetworkExplorerContextTarget(
-        context,
-        {
-          nodes: [],
-          nodeById: new Map(),
-          ...createNetworkExplorerFolders([]),
-        },
-        rows,
-      ),
+      currentNetworkExplorerContextTarget(context, { ...model }, rows, indexes),
     ).toBeUndefined();
     expect(
-      currentNetworkExplorerContextTarget(context, { ...model }, rows),
-    ).toBeUndefined();
-    expect(
-      currentNetworkExplorerContextTarget(null, model, rows),
+      currentNetworkExplorerContextTarget(null, model, rows, indexes),
     ).toBeUndefined();
   });
 });

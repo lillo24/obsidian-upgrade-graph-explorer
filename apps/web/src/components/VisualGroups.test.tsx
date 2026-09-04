@@ -140,7 +140,10 @@ describe('Visual Groups product controls', () => {
     expect(markup).toContain('aria-invalid="true"');
     expect(markup).toContain('same QUERY1 syntax as Advanced query');
     expect(markup).toContain(
-      'AND, OR, NOT, path, title, text, kind, and level',
+      'AND, OR, NOT, path, folder, title, text, kind, and level',
+    );
+    expect(markup).toContain(
+      'folder=&quot;Notes&quot; matches that folder and all descendants',
     );
     expect(markup).toContain('>Use active query</button>');
     expect(markup).toContain('<legend>Color</legend>');

@@ -141,6 +141,77 @@ describe('Global folder-aware layout', () => {
     );
   });
 
+  it('fingerprints only settings and topology consumed by current physics', () => {
+    const baselineSettings = {
+      folderClustering: true,
+      spacingPreset: 'normal' as const,
+      custom: customGlobalLayoutSettings('normal'),
+    };
+    const makeRequest = (settings: typeof baselineSettings) =>
+      createGlobalLayoutRequest(
+        mapProjectionToGlobal(globalTestProjection(), settings),
+        settings,
+        20,
+      );
+    const baseline = makeRequest(baselineSettings);
+    for (const [key, value] of [
+      ['nodeSize', 8],
+      ['referenceDegreeSizeInfluence', 90],
+      ['linkThickness', 1.8],
+      ['labelThreshold', 13],
+    ] as const) {
+      const visual = makeRequest({
+        ...baselineSettings,
+        custom: { ...baselineSettings.custom, [key]: value },
+      });
+      expect(globalLayoutFingerprint(visual), key).toBe(
+        globalLayoutFingerprint(baseline),
+      );
+      expect(visual.edges.map(({ weight }) => weight)).toEqual(
+        baseline.edges.map(({ weight }) => weight),
+      );
+    }
+    for (const [key, value] of [
+      ['linkForce', 1.4],
+      ['folderCohesion', 0.12],
+      ['withinFolderSpacing', 1.8],
+      ['betweenFolderSpacing', 5],
+    ] as const) {
+      const physics = makeRequest({
+        ...baselineSettings,
+        custom: { ...baselineSettings.custom, [key]: value },
+      });
+      expect(globalLayoutFingerprint(physics), key).not.toBe(
+        globalLayoutFingerprint(baseline),
+      );
+    }
+    expect(
+      globalLayoutFingerprint({
+        ...baseline,
+        settings: { ...baselineSettings, folderClustering: false },
+        algorithm: 'reference-only',
+      }),
+    ).not.toBe(globalLayoutFingerprint(baseline));
+  });
+
+  it('keeps transported node size inert while ForceAtlas2 adjustSizes is disabled', () => {
+    const baseline = request('chunked-prior');
+    const resized = {
+      ...baseline,
+      nodes: baseline.nodes.map((node, index) => ({
+        ...node,
+        size: node.size + index + 100,
+      })),
+    };
+
+    expect(computeGlobalLayout(resized).positions).toEqual(
+      computeGlobalLayout(baseline).positions,
+    );
+    expect(globalLayoutFingerprint(resized)).toBe(
+      globalLayoutFingerprint(baseline),
+    );
+  });
+
   it('provides exact memory-only LRU hits and bounded eviction', () => {
     const cache = new GlobalLayoutCache(2);
     const positions = [{ key: 'a', x: 1, y: 2 }] as const;

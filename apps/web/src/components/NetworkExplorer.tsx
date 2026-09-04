@@ -10,13 +10,13 @@ import {
 } from 'react';
 
 import type { GraphSelection } from '@icarus-graph-explorer/renderer-reactflow';
-import type { EntityId } from '@icarus-graph-explorer/core';
-import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
-import type { ProjectionNodeId } from '@icarus-graph-explorer/view-projection';
 import {
   workspaceFolderKeyFromPath,
+  type EntityId,
   type WorkspaceFolderKey,
-} from '@icarus-graph-explorer/spatial-overrides';
+} from '@icarus-graph-explorer/core';
+import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
+import type { ProjectionNodeId } from '@icarus-graph-explorer/view-projection';
 
 import {
   networkExplorerContextTarget,
@@ -32,7 +32,7 @@ import {
 } from './GraphQueryEditor';
 import { NetworkExplorerMenu } from './NetworkExplorerMenu';
 import { NodeSizeControl } from './NodeSizeControl';
-import { NetworkExplorerHiddenFiles } from './NetworkExplorerHiddenFiles';
+import { NetworkExplorerHiddenItems } from './NetworkExplorerHiddenItems';
 import { SavedQueriesPopover } from './SavedQueriesPopover';
 import type { SavedGraphQueriesState } from './SavedGraphQueries';
 
@@ -74,14 +74,17 @@ interface NetworkExplorerProps {
   readonly queryEditor: GraphQueryEditorState;
   readonly savedQueries: SavedGraphQueriesState;
   readonly hiddenPaths: readonly string[];
+  readonly hiddenFolderKeys: readonly WorkspaceFolderKey[];
   readonly focusedSourcePath: string | undefined;
   readonly onRestoreFile: (path: string) => void;
+  readonly onRestoreFolder: (folderKey: WorkspaceFolderKey) => void;
   readonly onFocusNode: (nodeId: ProjectionNodeId) => void;
   readonly onInspectNode: (
     nodeId: ProjectionNodeId,
     origin: HTMLElement | null,
   ) => void;
   readonly onHideFile: (path: string) => void;
+  readonly onHideFolder: (folderKey: WorkspaceFolderKey) => void;
   readonly folderState: NetworkExplorerFolderState;
   readonly model: NetworkExplorerModel;
   readonly onClose: () => void;
@@ -129,11 +132,14 @@ export const NetworkExplorer = memo(function NetworkExplorer({
   queryEditor,
   savedQueries,
   hiddenPaths,
+  hiddenFolderKeys,
   focusedSourcePath,
   onRestoreFile,
+  onRestoreFolder,
   onFocusNode,
   onInspectNode,
   onHideFile,
+  onHideFolder,
   folderState,
   model,
   onClose,
@@ -163,6 +169,10 @@ export const NetworkExplorer = memo(function NetworkExplorer({
   const [context, setContext] = useState<NetworkExplorerContext | null>(null);
   const [sizeError, setSizeError] = useState<string>();
   const hiddenPathSet = useMemo(() => new Set(hiddenPaths), [hiddenPaths]);
+  const hiddenFolderKeySet = useMemo(
+    () => new Set(hiddenFolderKeys),
+    [hiddenFolderKeys],
+  );
   const rootFileCount = useMemo(
     () =>
       model.roots.filter(
@@ -186,12 +196,13 @@ export const NetworkExplorer = memo(function NetworkExplorer({
   const contextTarget = currentNetworkExplorerContextTarget(
     context,
     model,
+    rows,
     rowIndexById,
   );
   const sizeEntityId =
-    contextTarget === undefined
+    contextTarget?.kind !== 'node'
       ? undefined
-      : networkExplorerSizeEntityId(contextTarget);
+      : networkExplorerSizeEntityId(contextTarget.node);
   const menuActions = useMemo(
     () =>
       contextTarget === undefined
@@ -200,8 +211,9 @@ export const NetworkExplorer = memo(function NetworkExplorer({
             contextTarget,
             focusedSourcePath,
             hiddenPathSet,
+            hiddenFolderKeySet,
           ),
-    [contextTarget, focusedSourcePath, hiddenPathSet],
+    [contextTarget, focusedSourcePath, hiddenFolderKeySet, hiddenPathSet],
   );
   const closeContextMenu = useCallback(
     (restoreFocus: boolean) => {
@@ -228,7 +240,6 @@ export const NetworkExplorer = memo(function NetworkExplorer({
       // Opening actions changes only keyboard activity, not graph selection/center.
       setContext({
         rowId: row.id,
-        targetId: target.id,
         model,
         x,
         y,
@@ -256,10 +267,15 @@ export const NetworkExplorer = memo(function NetworkExplorer({
         ? context.origin
         : (rowRefs.current.get(context.rowId) ?? null);
       closeContextMenu(action !== 'inspect');
-      if (action === 'focus') onFocusNode(contextTarget.id);
-      else if (action === 'inspect') onInspectNode(contextTarget.id, origin);
-      else if (contextTarget.sourcePath !== undefined)
-        onHideFile(contextTarget.sourcePath);
+      if (contextTarget.kind === 'folder') {
+        if (action === 'hide-folder') onHideFolder(contextTarget.folder.path);
+        return;
+      }
+      if (action === 'focus') onFocusNode(contextTarget.node.id);
+      else if (action === 'inspect')
+        onInspectNode(contextTarget.node.id, origin);
+      else if (contextTarget.node.sourcePath !== undefined)
+        onHideFile(contextTarget.node.sourcePath);
     },
     [
       closeContextMenu,
@@ -268,6 +284,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
       menuActions,
       onFocusNode,
       onHideFile,
+      onHideFolder,
       onInspectNode,
     ],
   );
@@ -438,7 +455,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
   }, [activeRowId, virtualWindow.endIndex, virtualWindow.startIndex]);
 
   const toggleFolder = useCallback(
-    (path: string, expanded: boolean) => {
+    (path: WorkspaceFolderKey, expanded: boolean) => {
       const next = new Map(folderState);
       next.set(path, expanded);
       onFolderStateChange(next);
@@ -455,7 +472,6 @@ export const NetworkExplorer = memo(function NetworkExplorer({
       ) {
         event.preventDefault();
         event.stopPropagation();
-        if (row.kind === 'folder') return;
         const rect = event.currentTarget.getBoundingClientRect();
         openContextMenu(row, rect.left + 24, rect.bottom);
         return;
@@ -517,10 +533,12 @@ export const NetworkExplorer = memo(function NetworkExplorer({
           <GraphQueryEditor {...queryEditor} compact idPrefix="network-query" />
           <SavedQueriesPopover {...savedQueries} />
         </div>
-        {hiddenPaths.length === 0 ? null : (
-          <NetworkExplorerHiddenFiles
+        {hiddenPaths.length === 0 && hiddenFolderKeys.length === 0 ? null : (
+          <NetworkExplorerHiddenItems
+            folderKeys={hiddenFolderKeys}
             paths={hiddenPaths}
             onRestoreFile={onRestoreFile}
+            onRestoreFolder={onRestoreFolder}
           />
         )}
         {arrangement === undefined || rootFileCount === 0 ? null : (
@@ -595,8 +613,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                   ? undefined
                   : presentationOverrides.get(fileEntityId)?.sizeScale;
               const selected = node !== undefined && selectedNodeId === node.id;
-              const folderKey = folder?.folder.path as
-                WorkspaceFolderKey | undefined;
+              const folderKey = folder?.folder.path;
               const directFileCount =
                 folder === undefined
                   ? 0
@@ -645,8 +662,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
                     onContextMenu={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
-                      if (node !== undefined)
-                        openContextMenu(row, event.clientX, event.clientY);
+                      openContextMenu(row, event.clientX, event.clientY);
                     }}
                     onKeyDown={(event) => {
                       if (event.target !== event.currentTarget) return;
@@ -771,7 +787,11 @@ export const NetworkExplorer = memo(function NetworkExplorer({
       {context === null || contextTarget === undefined ? null : (
         <NetworkExplorerMenu
           actions={menuActions}
-          name={contextTarget.name}
+          name={
+            contextTarget.kind === 'node'
+              ? contextTarget.node.name
+              : contextTarget.folder.path
+          }
           onAction={runContextAction}
           onCancel={closeContextMenu}
           x={context.x}

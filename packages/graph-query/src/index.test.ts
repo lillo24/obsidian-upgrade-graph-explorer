@@ -3,14 +3,17 @@ import { describe, expect, it } from 'vitest';
 
 import {
   addExactPathExclusion,
+  addFolderExclusion,
   formatGraphQuery,
   listExactPathExclusions,
+  listFolderExclusions,
   matchesGraphQuery,
   MAX_GRAPH_QUERY_AST_NODES,
   MAX_GRAPH_QUERY_LENGTH,
   MAX_GRAPH_QUERY_NESTING,
   parseGraphQuery,
   removeExactPathExclusion,
+  removeFolderExclusion,
 } from './index';
 
 const source = (path: string) => ({
@@ -93,6 +96,21 @@ describe('graph query parsing and formatting', () => {
     ).toBe('(path:"notes" OR title:"Foo") AND NOT path="Notes/Foo.md"');
   });
 
+  it('parses exact folder subtrees as a distinct, quoted predicate', () => {
+    expect(parsed('FOLDER=Theory/Sub').expression).toEqual({
+      kind: 'folder-predicate',
+      value: 'Theory/Sub',
+    });
+    expect(parsed('folder=Theory/Sub').canonical).toBe('folder="Theory/Sub"');
+    expect(parsed('folder="folder with spaces"').canonical).toBe(
+      'folder="folder with spaces"',
+    );
+    expect(parsed('folder=.').canonical).toBe('folder="."');
+    expect(
+      parsed('(folder=Theory OR folder=Archive) AND sections').canonical,
+    ).toBe('(folder="Theory" OR folder="Archive") AND kind:section');
+  });
+
   it('is parse-format-parse idempotent', () => {
     const first = parsed('NOT sections OR path:Notes AND title:"Plan"');
     const second = parsed(first.canonical);
@@ -132,6 +150,28 @@ describe('graph query parsing and formatting', () => {
     expect(parseGraphQuery(query)).toMatchObject({
       valid: false,
       issues: [{ code: 'invalid-predicate-value' }],
+    });
+  });
+
+  it.each([
+    'folder=""',
+    'folder="/Theory"',
+    'folder="C:/Theory"',
+    'folder="Theory\\\\Drafts"',
+    'folder="Theory//Drafts"',
+    'folder="Theory/./Drafts"',
+    'folder="Theory/../Drafts"',
+  ])('rejects non-canonical folder key in %s', (query) => {
+    expect(parseGraphQuery(query)).toMatchObject({
+      valid: false,
+      issues: [{ code: 'invalid-predicate-value' }],
+    });
+  });
+
+  it('does not add folder substring syntax', () => {
+    expect(parseGraphQuery('folder:"Theory"')).toMatchObject({
+      valid: false,
+      issues: [{ code: 'unexpected-token' }],
     });
   });
 
@@ -207,6 +247,72 @@ describe('graph query evaluation', () => {
         ),
       ).toBe(true);
     }
+  });
+
+  it('matches exact folder segments, descendants, root, and every entity kind', () => {
+    const entities: AddressableEntity[] = [
+      {
+        id: 'theory-document',
+        kind: 'document',
+        source: source('Theory/A.md'),
+      },
+      {
+        id: 'theory-section',
+        kind: 'section',
+        parentId: 'theory-document',
+        title: 'Theory section',
+        level: 2,
+        source: source('Theory/Sub/B.md'),
+      },
+      {
+        id: 'theory-block',
+        kind: 'block',
+        parentId: 'theory-section',
+        source: source('Theory/Sub/B.md'),
+      },
+      {
+        id: 'sibling-prefix',
+        kind: 'document',
+        source: source('Theory-old/C.md'),
+      },
+      {
+        id: 'other-parent',
+        kind: 'document',
+        source: source('Archive/Theory/D.md'),
+      },
+      {
+        id: 'root',
+        kind: 'document',
+        source: source('Root.md'),
+      },
+    ];
+    const theory = parsed('folder="Theory"').expression;
+    expect(entities.map((entity) => matchesGraphQuery(entity, theory))).toEqual(
+      [true, true, true, false, false, false],
+    );
+    const root = parsed('folder="."').expression;
+    expect(entities.every((entity) => matchesGraphQuery(entity, root))).toBe(
+      true,
+    );
+    expect(
+      matchesGraphQuery(entities[0]!, parsed('folder="theory"').expression),
+    ).toBe(false);
+  });
+
+  it('keeps folder queries path-semantic as files are added or moved', () => {
+    const query = parsed('folder="Theory"');
+    const added: AddressableEntity = {
+      id: 'new',
+      kind: 'document',
+      source: source('Theory/New.md'),
+    };
+    const moved: AddressableEntity = {
+      ...added,
+      source: source('Archive/New.md'),
+    };
+    expect(matchesGraphQuery(added, query.expression)).toBe(true);
+    expect(matchesGraphQuery(moved, query.expression)).toBe(false);
+    expect(query.canonical).toBe('folder="Theory"');
   });
 
   it('evaluates kind, level, Boolean grouping, and section-only levels', () => {
@@ -360,6 +466,111 @@ describe('global exact-path exclusion operations', () => {
     addExactPathExclusion(original.canonical, 'B.md');
     listExactPathExclusions(original.canonical);
     removeExactPathExclusion(original.canonical, 'A.md');
+    expect(JSON.stringify(original.expression)).toBe(before);
+  });
+});
+
+function successfulFolderQuery(
+  result: ReturnType<typeof addFolderExclusion>,
+): string | undefined {
+  expect(result.ok, JSON.stringify(result)).toBe(true);
+  if (!result.ok) throw new Error(result.issues[0]?.message);
+  return result.query;
+}
+
+describe('global folder exclusion operations', () => {
+  it('adds to empty, AND, and OR queries with deterministic formatting', () => {
+    expect(successfulFolderQuery(addFolderExclusion(undefined, 'Theory'))).toBe(
+      'NOT folder="Theory"',
+    );
+    expect(
+      successfulFolderQuery(
+        addFolderExclusion('kind:document AND NOT path="Private.md"', 'Theory'),
+      ),
+    ).toBe('kind:document AND NOT path="Private.md" AND NOT folder="Theory"');
+    expect(
+      successfulFolderQuery(
+        addFolderExclusion('documents OR sections', 'Theory'),
+      ),
+    ).toBe('(kind:document OR kind:section) AND NOT folder="Theory"');
+  });
+
+  it('is idempotent and avoids a descendant term covered by an ancestor', () => {
+    const query = successfulFolderQuery(
+      addFolderExclusion('NOT folder="Theory"', 'Theory/Drafts'),
+    );
+    expect(query).toBe('NOT folder="Theory"');
+    expect(successfulFolderQuery(addFolderExclusion(query, 'Theory'))).toBe(
+      query,
+    );
+    expect(
+      successfulFolderQuery(
+        addFolderExclusion('NOT folder="."', 'Any/Descendant'),
+      ),
+    ).toBe('NOT folder="."');
+  });
+
+  it('lists only unique top-level AND terms and ignores nested Boolean terms', () => {
+    expect(
+      listFolderExclusions(
+        'NOT folder="Theory" AND kind:document AND NOT folder="Archive" AND NOT folder="Theory"',
+      ),
+    ).toEqual({ ok: true, folderKeys: ['Theory', 'Archive'] });
+    for (const query of [
+      'folder="Theory" OR kind:document',
+      'NOT (folder="Theory" OR folder="Archive")',
+      'kind:document OR NOT folder="Theory"',
+    ]) {
+      expect(listFolderExclusions(query)).toEqual({
+        ok: true,
+        folderKeys: [],
+      });
+      expect(removeFolderExclusion(query, 'Theory')).toEqual({
+        ok: true,
+        query: parsed(query).canonical,
+      });
+    }
+  });
+
+  it('restores only the selected folder and leaves file/nested exclusions intact', () => {
+    expect(
+      removeFolderExclusion(
+        'NOT folder="Theory" AND NOT path="Theory/Special.md" AND NOT folder="Theory/Drafts"',
+        'Theory',
+      ),
+    ).toEqual({
+      ok: true,
+      query: 'NOT path="Theory/Special.md" AND NOT folder="Theory/Drafts"',
+    });
+    expect(removeFolderExclusion('NOT folder="Theory"', 'Theory')).toEqual({
+      ok: true,
+      query: undefined,
+    });
+  });
+
+  it('rejects invalid keys/current queries and generated limit overflows', () => {
+    expect(addFolderExclusion(undefined, '../Theory')).toMatchObject({
+      ok: false,
+      issues: [{ code: 'invalid-predicate-value' }],
+    });
+    expect(removeFolderExclusion('sections documents', 'Theory')).toMatchObject(
+      { ok: false, issues: [{ code: 'missing-operator' }] },
+    );
+    const maximumLengthQuery = `path:"${'x'.repeat(MAX_GRAPH_QUERY_LENGTH - 7)}"`;
+    expect(addFolderExclusion(maximumLengthQuery, 'Theory')).toMatchObject({
+      ok: false,
+      issues: [{ code: 'query-too-long' }],
+    });
+  });
+
+  it('does not mutate parsed expressions while deriving operations', () => {
+    const original = parsed(
+      '(kind:document OR kind:section) AND NOT folder="Theory"',
+    );
+    const before = JSON.stringify(original.expression);
+    addFolderExclusion(original.canonical, 'Archive');
+    listFolderExclusions(original.canonical);
+    removeFolderExclusion(original.canonical, 'Theory');
     expect(JSON.stringify(original.expression)).toBe(before);
   });
 });

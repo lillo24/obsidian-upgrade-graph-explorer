@@ -120,6 +120,13 @@ folder strength and the current advanced visual values. SPATIAL1 stores only
 normalized folder target centers; raw node, folder, and ForceAtlas2 coordinates
 never persist.
 
+That product split is also the runtime ownership boundary. The resolved physics
+subset (`folderClustering`, cohesion, reference pull, and within/between-folder
+spacing) owns automatic layout requests, worker settings, and cache identity.
+The resolved visual subset (base size, degree-size influence, link thickness,
+and label threshold) owns Sigma reducer/settings refreshes only. The persisted
+record and control ranges remain unchanged.
+
 SPATIAL1A composes only All Network:
 
 ```text
@@ -183,11 +190,14 @@ count represented canonical reference occurrences. Diagnostic targets keep
 their separate subordinate size formula, and Focus Network keeps its existing
 root/entity-kind sizing contract.
 
-Node size participates in ForceAtlas2 input and layout fingerprints, so a
-change to base size or link influence intentionally remaps attributes and
-requests layout without asking KG6 for a new projection. The existing settings
-update boundary also remaps the other advanced presentation values; optimizing
-those independent refresh paths remains outside this narrow settings change.
+GLOBALVIS1 makes all four Visual controls render-only. The mounted canvas maps a
+topology-stable baseline once per projection. Sigma recomputes automatic node
+radius from that topology's weighted degree plus current visual settings, then
+applies the VISUAL1B File multiplier and the existing Group/interaction/LOD
+layers. Edge reducers likewise recompute displayed thickness from reference
+count without changing layout edge weight. Radius refreshes retain Sigma's
+indexed processing for labels/programs/picking; thickness and label changes do
+not submit ForceAtlas2 or reapply coordinates.
 
 VISUAL1B accepts a separate resolved `EntityId` presentation-override map in
 both Network canvases. The mount options and an independent effect deliver it
@@ -198,7 +208,7 @@ results are bounded to 2–24 display units; a Focus root keeps at least its
 automatic 8.4 size (and root styling). No entry is exactly unchanged. Headings,
 blocks, and diagnostics ignore the map. Global label LOD uses that same final
 displayed size; thresholds are unchanged. Group color composes independently.
-Graphology retains automatic size and exact coordinates. The renderer never
+Graphology retains topology-stable size and exact coordinates. The renderer never
 loads storage or changes projection/query membership.
 
 `setPresentationOverrides()` diffs the sparse maps and resolves changed File
@@ -216,17 +226,19 @@ The flicker correction removes accidental layout-cache invalidation, not
 physical radius coupling: resolved ForceAtlas2 **0.10.1** defaults to
 `adjustSizes: false`, and neither Global nor Local enables it. Per-File display
 changes must submit zero layouts and preserve exact x/y coordinates, including
-the distance between unrelated connected Files. Normal automatic sizes still
-participate in layout fingerprints. Workers, latest-wins handling, and bounded
-position caches are unchanged; no new layout cache or persisted geometry exists.
+the distance between unrelated connected Files. Global automatic display sizes
+also stay outside layout fingerprints; Focus semantic sizes retain their existing
+layout contract. Workers, latest-wins handling, and bounded position caches are
+unchanged; no new layout cache or persisted geometry exists.
 
-The automatic layout fingerprint includes schema, algorithm, iterations, stable node
-keys/sizes, reference endpoints/weights, folder assignment, and validated
-settings. It excludes seed coordinates, labels, search, hover, selection, and
-source text. Surviving coordinates warm a changed layout; an exact cache hit
-skips worker computation. The cache is bounded and memory-only. Normalized
-spatial anchors are excluded, so one automatic cache hit may compose with any
-current anchor map.
+The automatic layout fingerprint includes schema, algorithm, iterations, stable
+node keys, reference endpoints/weights, folder assignment, and the resolved
+physics subset. It excludes transported schema-v1 node size, all visual settings,
+seed coordinates, labels, search, hover, selection, source text, and normalized
+spatial anchors. The worker protocol still carries node size for compatibility;
+current ForceAtlas2 does not consume it with `adjustSizes: false`. Surviving
+coordinates warm a changed layout; an exact bounded memory-cache hit skips worker
+computation and may compose with any current anchor map.
 
 ## Regional semantic zoom and lifecycle
 

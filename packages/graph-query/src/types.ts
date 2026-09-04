@@ -1,4 +1,8 @@
-import type { EntityKind, WorkspacePath } from '@icarus-graph-explorer/core';
+import type {
+  EntityKind,
+  WorkspaceFolderKey,
+  WorkspacePath,
+} from '@icarus-graph-explorer/core';
 
 export const MAX_GRAPH_QUERY_LENGTH = 4_096;
 export const MAX_GRAPH_QUERY_AST_NODES = 256;
@@ -21,6 +25,10 @@ export type GraphQueryPredicate =
   | {
       readonly kind: 'exact-path-predicate';
       readonly value: WorkspacePath;
+    }
+  | {
+      readonly kind: 'folder-predicate';
+      readonly value: WorkspaceFolderKey;
     }
   | {
       readonly kind: 'level-predicate';
@@ -92,6 +100,26 @@ export type ExactPathExclusionListResult =
   | {
       readonly ok: true;
       readonly paths: readonly WorkspacePath[];
+    }
+  | {
+      readonly ok: false;
+      readonly issues: readonly GraphQueryIssue[];
+    };
+
+export type FolderExclusionMutationResult =
+  | {
+      readonly ok: true;
+      readonly query: string | undefined;
+    }
+  | {
+      readonly ok: false;
+      readonly issues: readonly GraphQueryIssue[];
+    };
+
+export type FolderExclusionListResult =
+  | {
+      readonly ok: true;
+      readonly folderKeys: readonly WorkspaceFolderKey[];
     }
   | {
       readonly ok: false;

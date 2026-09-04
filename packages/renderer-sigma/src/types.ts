@@ -35,6 +35,23 @@ export interface ResolvedGlobalLayoutSettings extends GlobalLayoutCustomSettings
   readonly spacingPreset: GlobalSpacingPreset;
 }
 
+/** Resolved values currently consumed by Global automatic coordinate physics. */
+export interface ResolvedGlobalPhysicsSettings {
+  readonly folderClustering: boolean;
+  readonly folderCohesion: number;
+  readonly linkForce: number;
+  readonly withinFolderSpacing: number;
+  readonly betweenFolderSpacing: number;
+}
+
+/** Resolved values consumed only by Sigma presentation reducers/settings. */
+export interface ResolvedGlobalVisualSettings {
+  readonly nodeSize: number;
+  readonly referenceDegreeSizeInfluence: number;
+  readonly linkThickness: number;
+  readonly labelThreshold: number;
+}
+
 export interface GlobalNodeAttributes {
   readonly x: number;
   readonly y: number;

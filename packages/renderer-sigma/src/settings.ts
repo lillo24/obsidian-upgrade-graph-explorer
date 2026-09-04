@@ -3,6 +3,8 @@ import type {
   GlobalLayoutSettings,
   GlobalSpacingPreset,
   ResolvedGlobalLayoutSettings,
+  ResolvedGlobalPhysicsSettings,
+  ResolvedGlobalVisualSettings,
 } from './types';
 
 export type {
@@ -185,6 +187,83 @@ export function resolveGlobalLayoutSettings(
     folderClustering: validated.folderClustering,
     spacingPreset: validated.spacingPreset,
     ...(validated.custom ?? PRESETS[validated.spacingPreset]),
+  };
+}
+
+/** Canonical runtime boundary for values that can change automatic x/y. */
+export function resolveGlobalPhysicsSettings(
+  settings: GlobalLayoutSettings,
+): ResolvedGlobalPhysicsSettings {
+  const resolved = resolveGlobalLayoutSettings(settings);
+  return {
+    folderClustering: resolved.folderClustering,
+    folderCohesion: resolved.folderCohesion,
+    linkForce: resolved.linkForce,
+    withinFolderSpacing: resolved.withinFolderSpacing,
+    betweenFolderSpacing: resolved.betweenFolderSpacing,
+  };
+}
+
+/** Canonical runtime boundary for values that affect Sigma presentation only. */
+export function resolveGlobalVisualSettings(
+  settings: GlobalLayoutSettings,
+): ResolvedGlobalVisualSettings {
+  const resolved = resolveGlobalLayoutSettings(settings);
+  return {
+    nodeSize: resolved.nodeSize,
+    referenceDegreeSizeInfluence: resolved.referenceDegreeSizeInfluence,
+    linkThickness: resolved.linkThickness,
+    labelThreshold: resolved.labelThreshold,
+  };
+}
+
+export function sameGlobalPhysicsSettings(
+  left: GlobalLayoutSettings,
+  right: GlobalLayoutSettings,
+): boolean {
+  const a = resolveGlobalPhysicsSettings(left);
+  const b = resolveGlobalPhysicsSettings(right);
+  return (
+    a.folderClustering === b.folderClustering &&
+    a.folderCohesion === b.folderCohesion &&
+    a.linkForce === b.linkForce &&
+    a.withinFolderSpacing === b.withinFolderSpacing &&
+    a.betweenFolderSpacing === b.betweenFolderSpacing
+  );
+}
+
+export function sameGlobalVisualSettings(
+  left: GlobalLayoutSettings,
+  right: GlobalLayoutSettings,
+): boolean {
+  const a = resolveGlobalVisualSettings(left);
+  const b = resolveGlobalVisualSettings(right);
+  return (
+    a.nodeSize === b.nodeSize &&
+    a.referenceDegreeSizeInfluence === b.referenceDegreeSizeInfluence &&
+    a.linkThickness === b.linkThickness &&
+    a.labelThreshold === b.labelThreshold
+  );
+}
+
+/**
+ * Adapts the physics subset to the existing schema-v1 worker protocol. Visual
+ * fields use a fixed baseline because current ForceAtlas2 runs with
+ * `adjustSizes: false` and must not derive layout identity from presentation.
+ */
+export function globalLayoutSettingsFromPhysics(
+  physics: ResolvedGlobalPhysicsSettings,
+): GlobalLayoutSettings {
+  return {
+    folderClustering: physics.folderClustering,
+    spacingPreset: 'normal',
+    custom: {
+      ...PRESETS.normal,
+      folderCohesion: physics.folderCohesion,
+      linkForce: physics.linkForce,
+      withinFolderSpacing: physics.withinFolderSpacing,
+      betweenFolderSpacing: physics.betweenFolderSpacing,
+    },
   };
 }
 

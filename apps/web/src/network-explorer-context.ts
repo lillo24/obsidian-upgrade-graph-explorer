@@ -1,12 +1,19 @@
-import type { EntityId } from '@icarus-graph-explorer/core';
-import type { ProjectionNodeId } from '@icarus-graph-explorer/view-projection';
+import {
+  isNormalizedWorkspaceFolderKey,
+  workspaceFolderKeyContainsFolder,
+  workspaceFolderKeyFromPath,
+  type EntityId,
+  type WorkspaceFolderKey,
+} from '@icarus-graph-explorer/core';
+import type { NetworkExplorerFolder } from './network-explorer-folders';
 import type {
   NetworkExplorerModel,
   NetworkExplorerNode,
   NetworkExplorerRow,
 } from './network-explorer-model';
 
-export type NetworkExplorerAction = 'focus' | 'inspect' | 'hide' | 'size';
+export type NetworkExplorerAction =
+  'focus' | 'inspect' | 'hide' | 'hide-folder' | 'size';
 export interface NetworkExplorerMenuAction {
   readonly id: NetworkExplorerAction;
   readonly label: string;
@@ -15,13 +22,16 @@ export interface NetworkExplorerMenuAction {
 
 export interface NetworkExplorerContext {
   readonly rowId: string;
-  readonly targetId: ProjectionNodeId;
   readonly model: NetworkExplorerModel;
   readonly x: number;
   readonly y: number;
   readonly origin?: HTMLElement | null;
   readonly screen: 'actions' | 'size';
 }
+
+export type NetworkExplorerContextTarget =
+  | { readonly kind: 'node'; readonly node: NetworkExplorerNode }
+  | { readonly kind: 'folder'; readonly folder: NetworkExplorerFolder };
 
 /** Canonical File identity, never a row key, source path, or displayed name. */
 export function networkExplorerSizeEntityId(
@@ -34,27 +44,67 @@ export function networkExplorerSizeEntityId(
 export function currentNetworkExplorerContextTarget(
   context: NetworkExplorerContext | null,
   model: NetworkExplorerModel,
+  rows: readonly NetworkExplorerRow[],
   rowIndexById: ReadonlyMap<string, number>,
-): NetworkExplorerNode | undefined {
-  return context === null ||
-    context.model !== model ||
-    !rowIndexById.has(context.rowId)
+): NetworkExplorerContextTarget | undefined {
+  if (context === null || context.model !== model) return undefined;
+  const index = rowIndexById.get(context.rowId);
+  const row = index === undefined ? undefined : rows[index];
+  return row === undefined || row.id !== context.rowId
     ? undefined
-    : model.nodeById.get(context.targetId);
+    : networkExplorerContextTarget(row, model);
 }
 
 export function networkExplorerContextTarget(
   row: NetworkExplorerRow,
   model: NetworkExplorerModel,
-): NetworkExplorerNode | undefined {
-  return row.kind === 'node' ? model.nodeById.get(row.node.id) : undefined;
+): NetworkExplorerContextTarget | undefined {
+  if (row.kind === 'node') {
+    const node = model.nodeById.get(row.node.id);
+    return node === undefined || row.id !== `node:${node.id}`
+      ? undefined
+      : { kind: 'node', node };
+  }
+  if (
+    !isNormalizedWorkspaceFolderKey(row.folder.path) ||
+    row.id !== `folder:${row.folder.path}`
+  )
+    return undefined;
+  const folder = model.folderByPath.get(row.folder.path);
+  return folder === undefined || folder !== row.folder
+    ? undefined
+    : { kind: 'folder', folder };
 }
 
 export function networkExplorerMenuActions(
-  node: NetworkExplorerNode,
+  target: NetworkExplorerContextTarget,
   focusedSourcePath: string | undefined,
   hiddenPaths: ReadonlySet<string>,
+  hiddenFolderKeys: ReadonlySet<WorkspaceFolderKey>,
 ): readonly NetworkExplorerMenuAction[] {
+  if (target.kind === 'folder') {
+    const folderKey = target.folder.path;
+    const focusedFolderKey =
+      focusedSourcePath === undefined
+        ? undefined
+        : workspaceFolderKeyFromPath(focusedSourcePath);
+    const containsFocusedFile =
+      focusedFolderKey !== undefined &&
+      workspaceFolderKeyContainsFolder(folderKey, focusedFolderKey);
+    const hideReason = containsFocusedFile
+      ? 'Change Focus before hiding the folder that contains the focused file.'
+      : hiddenFolderKeys.has(folderKey)
+        ? 'This folder is already hidden by the applied query.'
+        : undefined;
+    return [
+      {
+        id: 'hide-folder',
+        label: 'Hide folder',
+        ...(hideReason === undefined ? {} : { disabledReason: hideReason }),
+      },
+    ];
+  }
+  const node = target.node;
   const hideReason =
     node.sourcePath === undefined
       ? 'Only source files can be hidden.'
