@@ -2,9 +2,9 @@
 
 ## Status
 
-Release candidate. Automated and production-browser validation pass; final
-optimized desktop graphical approval is still required before merge. Classic
-Focus Hierarchy remains the default.
+Complete. Automated, production-browser, optimized desktop, and user graphical
+validation pass. Classic Focus Hierarchy remains the default. HIER3C is next
+and has not started.
 
 ## Product exposure
 

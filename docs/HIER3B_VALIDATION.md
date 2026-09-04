@@ -2,9 +2,9 @@
 
 ## Gate status
 
-Automated and production-browser gates pass. The optimized desktop artifact and
-user graphical/native review remain the final pre-merge gate. HIER3B therefore
-remains a release candidate and HIER3C has not started.
+Automated, production-browser, optimized desktop build, and user graphical/native
+gates pass. The user approved the release candidate on September 4, 2026.
+HIER3B is complete; HIER3C is next and has not started.
 
 ## Automated coverage
 
@@ -88,10 +88,10 @@ Names contain content hashes and may change. The important result is that both
 the modular component and modular worker are separate lazy chunks; Classic
 startup does not import the Focus Schematic model/layout/mapper path.
 
-## Native graphical checklist
+## Native graphical evidence
 
-The final optimized executable should be reviewed with ordinary content rather
-than fixture IDs:
+The user reviewed the final optimized executable with ordinary content rather
+than fixture IDs and approved all of the following:
 
 - one Heading linking to a Heading in another File;
 - incoming Files on the left, Focus File centered, outgoing Files on the right;
@@ -104,4 +104,4 @@ than fixture IDs:
 - Secondary links adding context without node movement;
 - current touchpad pan/zoom behavior.
 
-Do not record this native gate as passed until the user confirms it.
+The user confirmed that all native graphical checks passed on September 4, 2026.

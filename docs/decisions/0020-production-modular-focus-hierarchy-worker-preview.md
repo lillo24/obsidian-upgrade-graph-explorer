@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Product merge remains gated on optimized desktop graphical approval.
+Accepted. Optimized desktop graphical approval passed on September 4, 2026.
 
 ## Context
 

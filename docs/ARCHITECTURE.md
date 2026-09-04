@@ -1215,6 +1215,12 @@ remains Modular Preview so Retry is explicit. Coordinates stay derived and
 page-local. HIER4 retains folder-band positioning, HIER5 retains complete route
 ownership, and HIER3C retains any product-default change.
 
+Optimized desktop graphical QA approved the preview with visible module
+boundaries and confirmed exact endpoints, root/rank positioning, multi-hop
+orientation, disclosure, implementation switching, secondary-edge geometry
+invariance, Inspector behavior, and current touchpad navigation. This completes
+HIER3B. HIER3C is the next milestone and remains unstarted.
+
 ## HIER0 product exposure and geometry
 
 All Hierarchy is retained as an experimental whole-vault presentation, hidden by
