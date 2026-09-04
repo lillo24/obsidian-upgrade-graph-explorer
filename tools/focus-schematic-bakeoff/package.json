@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "benchmark": "tsx src/benchmark.ts",
+    "benchmark:endpoints": "tsx src/endpoint-benchmark.ts",
+    "generate:endpoint-lab": "tsx src/endpoint-lab.ts",
     "generate:lab": "tsx src/lab.ts",
     "typecheck": "tsc --noEmit"
   },

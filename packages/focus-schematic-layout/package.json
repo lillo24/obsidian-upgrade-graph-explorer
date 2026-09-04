@@ -21,6 +21,8 @@
     "@icarus-graph-explorer/view-projection": "workspace:*"
   },
   "devDependencies": {
+    "@icarus-graph-explorer/adapter-obsidian": "workspace:*",
+    "@icarus-graph-explorer/resolver-obsidian": "workspace:*",
     "@types/node": "24.13.3"
   }
 }

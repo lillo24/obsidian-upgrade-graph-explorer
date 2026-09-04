@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeFocusSchematicLayoutAttempt } from '@icarus-graph-explorer/focus-schematic-layout';
+import { computeFocusSchematicUniformLayoutAttempt as computeFocusSchematicLayoutAttempt } from '@icarus-graph-explorer/focus-schematic-layout';
 
 import {
   createLayoutInput,

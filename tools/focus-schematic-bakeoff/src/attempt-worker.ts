@@ -1,6 +1,6 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import {
-  computeFocusSchematicLayoutAttempt,
+  computeFocusSchematicUniformLayoutAttempt as computeFocusSchematicLayoutAttempt,
   type FocusSchematicLayoutInput,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 
