@@ -142,6 +142,7 @@ describe('Focus density camera ownership', () => {
 
   it('previews strength immediately without measuring or laying out', async () => {
     const counts = new Map<string, number>();
+    const onDensityQaDiagnosticsChange = vi.fn();
     const instrumentation: LocalRendererInstrumentation = {
       count: (operation, amount = 1) =>
         counts.set(operation, (counts.get(operation) ?? 0) + amount),
@@ -156,21 +157,62 @@ describe('Focus density camera ownership', () => {
     const input = rendererInput(compactPositions);
     const decision = resolveLocalDensityFit(input, compactPositions).ratio;
     const { session, renderer } = mount(
-      { densityFramingStrength: 0, instrumentation },
+      {
+        densityFramingStrength: 0,
+        instrumentation,
+        onDensityQaDiagnosticsChange,
+      },
       input,
     );
+    expect(onDensityQaDiagnosticsChange).toHaveBeenLastCalledWith({
+      rawDecisionRatio: 1,
+      effectiveRatio: 1,
+      cameraRatio: 1,
+      fallback: true,
+      fallbackReason: 'No accepted Local layout has been measured yet.',
+    });
     await session.applyPositions(compactPositions);
+    expect(onDensityQaDiagnosticsChange).toHaveBeenLastCalledWith({
+      rawDecisionRatio: decision,
+      effectiveRatio: 1,
+      cameraRatio: 1,
+      fallback: false,
+    });
     counts.clear();
     const anchor = session.nodeViewportPoint('root')!;
 
     session.updateDensityFramingStrength(50);
     expect(renderer.camera.ratio).toBe(localDensityFramingRatio(decision, 50));
+    expect(onDensityQaDiagnosticsChange).toHaveBeenLastCalledWith({
+      rawDecisionRatio: decision,
+      effectiveRatio: localDensityFramingRatio(decision, 50),
+      cameraRatio: localDensityFramingRatio(decision, 50),
+      fallback: false,
+    });
     expect(session.nodeViewportPoint('root')!.x).toBeCloseTo(anchor.x);
     expect(session.nodeViewportPoint('root')!.y).toBeCloseTo(anchor.y);
     session.updateDensityFramingStrength(100);
     expect(renderer.camera.ratio).toBe(decision);
+    expect(onDensityQaDiagnosticsChange).toHaveBeenLastCalledWith({
+      rawDecisionRatio: decision,
+      effectiveRatio: decision,
+      cameraRatio: decision,
+      fallback: false,
+    });
     expect(session.nodeViewportPoint('root')!.x).toBeCloseTo(anchor.x);
     expect(session.nodeViewportPoint('root')!.y).toBeCloseTo(anchor.y);
+    const cameraUpdated = renderer.camera.on.mock.calls.find(
+      ([event]) => event === 'updated',
+    )?.[1] as (() => void) | undefined;
+    expect(cameraUpdated).toBeDefined();
+    renderer.camera.setState({ ratio: 0.93 });
+    cameraUpdated?.();
+    expect(onDensityQaDiagnosticsChange).toHaveBeenLastCalledWith({
+      rawDecisionRatio: decision,
+      effectiveRatio: decision,
+      cameraRatio: 0.93,
+      fallback: false,
+    });
     expect(counts.get('local-density-evaluations')).toBeUndefined();
     expect(counts.get('local-layouts')).toBeUndefined();
     session.destroy();

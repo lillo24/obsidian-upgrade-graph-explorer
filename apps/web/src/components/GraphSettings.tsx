@@ -14,6 +14,7 @@ import {
   withFolderClusteringStrength,
   withGlobalSpacingPreset,
 } from '@icarus-graph-explorer/renderer-sigma/settings';
+import type { LocalDensityQaDiagnostics } from '@icarus-graph-explorer/renderer-sigma/types';
 
 import {
   graphSettingsTabForKey,
@@ -21,6 +22,7 @@ import {
 } from './graph-settings-tabs';
 
 interface GraphSettingsProps {
+  readonly densityQaDiagnostics?: LocalDensityQaDiagnostics;
   readonly densityFramingStrength: number;
   readonly showExperimentalAllHierarchy?: boolean;
   readonly onShowExperimentalAllHierarchyChange?: (show: boolean) => void;
@@ -55,6 +57,7 @@ function SettingsIcon() {
 }
 
 export const GraphSettings = memo(function GraphSettings({
+  densityQaDiagnostics,
   densityFramingStrength,
   showExperimentalAllHierarchy = false,
   onShowExperimentalAllHierarchyChange,
@@ -443,6 +446,47 @@ export const GraphSettings = memo(function GraphSettings({
                   its semantic anchor. Layout stays unchanged, and later graph
                   updates preserve the preview until Fit.
                 </p>
+                <div
+                  aria-atomic="true"
+                  aria-live="polite"
+                  className="focus-density-qa"
+                >
+                  <h4>Temporary QA diagnostics</h4>
+                  {densityQaDiagnostics === undefined ? (
+                    <p>Open Focus Network to read the live density camera.</p>
+                  ) : (
+                    <dl>
+                      <div>
+                        <dt>Raw decision ratio</dt>
+                        <dd>
+                          {densityQaDiagnostics.rawDecisionRatio.toFixed(4)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Effective ratio</dt>
+                        <dd>
+                          {densityQaDiagnostics.effectiveRatio.toFixed(4)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Sigma camera ratio</dt>
+                        <dd>{densityQaDiagnostics.cameraRatio.toFixed(4)}</dd>
+                      </div>
+                      <div>
+                        <dt>Fallback</dt>
+                        <dd>{densityQaDiagnostics.fallback ? 'Yes' : 'No'}</dd>
+                      </div>
+                      {densityQaDiagnostics.fallbackReason ===
+                      undefined ? null : (
+                        <div>
+                          <dt>Fallback reason</dt>
+                          <dd>{densityQaDiagnostics.fallbackReason}</dd>
+                        </div>
+                      )}
+                    </dl>
+                  )}
+                  <p>Runtime only; never saved or used as layout input.</p>
+                </div>
               </section>
               <section className="graph-settings__section">
                 <button

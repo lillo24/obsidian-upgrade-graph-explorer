@@ -13,6 +13,13 @@ describe('Graph Settings presentation', () => {
   it('separates Preferences, Sandbox, and Source into accessible transient tabs', () => {
     const markup = renderToStaticMarkup(
       <GraphSettings
+        densityQaDiagnostics={{
+          rawDecisionRatio: 1.23456,
+          effectiveRatio: 1.11728,
+          cameraRatio: 1.11729,
+          fallback: true,
+          fallbackReason: 'Synthetic fallback reason.',
+        }}
         densityFramingStrength={100}
         focusAppearance="outline"
         globalLayoutSettings={DEFAULT_GLOBAL_LAYOUT_SETTINGS}
@@ -60,6 +67,17 @@ describe('Graph Settings presentation', () => {
     expect(markup).toContain('>Legacy</span><span>Auto</span>');
     expect(markup).toContain(
       'Previews the current Focus Network camera immediately around its semantic anchor.',
+    );
+    expect(markup).toContain('>Temporary QA diagnostics<');
+    expect(markup).toContain('>Raw decision ratio<');
+    expect(markup).toContain('>1.2346<');
+    expect(markup).toContain('>Effective ratio<');
+    expect(markup).toContain('>1.1173<');
+    expect(markup).toContain('>Sigma camera ratio<');
+    expect(markup).toContain('>Fallback reason<');
+    expect(markup).toContain('Synthetic fallback reason.');
+    expect(markup).toContain(
+      'Runtime only; never saved or used as layout input.',
     );
     expect(markup).toContain('>Reset Sandbox</button>');
     expect(markup).toContain('>Current Source<');

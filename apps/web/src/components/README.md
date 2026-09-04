@@ -90,7 +90,9 @@ canonical truth, or own a platform storage implementation.
   The Focus density slider is a page-lifetime live A/B camera control: changing
   it preserves the selected-node/root screen anchor and previews the new ratio
   without Fit or layout, even from a user-owned viewport. Reset Sandbox deliberately
-  excludes Trackpad Zoom, source settings, and saved view state.
+  excludes Trackpad Zoom, source settings, and saved view state. Its temporary
+  SPACING1B QA readout mirrors renderer-session ratios and fallback evidence;
+  it is not product state and is cleared when Focus Network unmounts.
 - `SourceSettingsSection.tsx` presents safe current-source metadata, browser
   report/sample switching, desktop vault/rescan actions, and exceptional local
   identity recovery from callbacks owned by `App.tsx`.

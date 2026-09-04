@@ -26,6 +26,7 @@ import {
 import { LocalRendererSession } from './local-session';
 import type {
   LocalCenterRequest,
+  LocalDensityQaDiagnostics,
   LocalLayoutService,
   LocalRendererInstrumentation,
   LocalSelection,
@@ -48,6 +49,9 @@ export interface LocalGraphCanvasProps {
   /** Transient Sandbox policy; excluded from layout input and fingerprinting. */
   readonly densityFramingStrength?: number;
   readonly onFailure: (message: string) => void;
+  readonly onDensityQaDiagnosticsChange?: (
+    diagnostics: LocalDensityQaDiagnostics | undefined,
+  ) => void;
   readonly onFitRequestConsumed?: (key: number) => void;
   readonly onSelectionChange: (selection: LocalSelection | null) => void;
   readonly onNodeSingleClick?: (nodeId: string) => void;
@@ -88,6 +92,7 @@ export function LocalGraphCanvas({
   layoutRequestKey,
   layoutService,
   onFailure,
+  onDensityQaDiagnosticsChange,
   onFitRequestConsumed,
   onSelectionChange,
   onNodeSingleClick,
@@ -112,6 +117,7 @@ export function LocalGraphCanvas({
   const layoutPending = useRef(true);
   const callbacks = useRef({
     onFailure,
+    onDensityQaDiagnosticsChange,
     onFitRequestConsumed,
     onSelectionChange,
     onNodeSingleClick,
@@ -123,6 +129,7 @@ export function LocalGraphCanvas({
   useEffect(() => {
     callbacks.current = {
       onFailure,
+      onDensityQaDiagnosticsChange,
       onFitRequestConsumed,
       onSelectionChange,
       onNodeSingleClick,
@@ -133,6 +140,7 @@ export function LocalGraphCanvas({
     };
   }, [
     onFailure,
+    onDensityQaDiagnosticsChange,
     onFitRequestConsumed,
     onSelectionChange,
     onNodeSingleClick,
@@ -224,6 +232,8 @@ export function LocalGraphCanvas({
             callbacks.current.onNodeSingleClick?.(key),
           onNodeActivated: (entityId) =>
             callbacks.current.onNodeActivate?.(entityId),
+          onDensityQaDiagnosticsChange: (diagnostics) =>
+            callbacks.current.onDensityQaDiagnosticsChange?.(diagnostics),
           onViewportObservation: (viewport) =>
             callbacks.current.onViewportObservation(viewport),
         }),
@@ -252,6 +262,7 @@ export function LocalGraphCanvas({
     return () => {
       cancelled = true;
       mounted.dispose();
+      callbacks.current.onDensityQaDiagnosticsChange?.(undefined);
       callbacks.current.onTransitionAnchorApiChange?.(undefined);
       if (sessionRef.current === mounted.session)
         sessionRef.current = undefined;

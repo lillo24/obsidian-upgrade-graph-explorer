@@ -705,6 +705,50 @@ h2 {
   opacity: 0.5;
 }
 
+.focus-density-qa {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.7rem 0.75rem;
+  border: 1px dashed #9eb0bc;
+  border-radius: 0.6rem;
+  background: #f5f9fa;
+}
+
+.focus-density-qa h4,
+.focus-density-qa p,
+.focus-density-qa dl {
+  margin: 0;
+}
+
+.focus-density-qa dl {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.focus-density-qa dl > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.7rem;
+}
+
+.focus-density-qa dt,
+.focus-density-qa p {
+  color: #647983;
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.focus-density-qa dd {
+  margin: 0;
+  color: #294957;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.7rem;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
 .graph-settings__disclosure {
   min-height: 2.75rem;
   margin-top: 0.7rem;

@@ -373,6 +373,10 @@ Later topology or layout completion therefore cannot override the preview;
 Fit recenters with the selected strength and returns to automatic ownership.
 The value never enters ForceAtlas2
 requests, accepted positions, fingerprints, caches, projection, or persistence.
+Temporary SPACING1B native-QA diagnostics publish the latest raw decision ratio,
+interpolated effective ratio, actual Sigma camera ratio, and fallback evidence
+through a deduplicated session callback. The callback is display-only runtime
+state and cannot alter density, camera, topology, layout, cache, or persistence.
 Local has no folder prior or fake edges. Exact cache fingerprints include the
 root, stable topology, semantic node/edge roles, weights, iterations, and Local
 settings while excluding seed coordinates, labels, hover, selection, camera,

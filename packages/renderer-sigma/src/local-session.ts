@@ -41,6 +41,7 @@ import {
 } from './local-style';
 import type {
   LocalCenterRequest,
+  LocalDensityQaDiagnostics,
   LocalGraphReconciliation,
   LocalLayoutPosition,
   LocalLayoutRequest,
@@ -73,6 +74,9 @@ export interface LocalRendererSessionOptions {
   readonly onViewportObservation?: (
     viewport: SemanticLocalViewport | undefined,
   ) => void;
+  readonly onDensityQaDiagnosticsChange?: (
+    diagnostics: LocalDensityQaDiagnostics,
+  ) => void;
 }
 
 export interface LocalRendererReady {
@@ -96,6 +100,7 @@ export class LocalRendererSession {
   private rootNodeKey: string;
   private densityInput: LocalRendererInput;
   private densityFramingStrength: number;
+  private lastDensityQaDiagnostics: LocalDensityQaDiagnostics | undefined;
   private cameraOwnership: 'auto' | 'user';
   private latestDensityDecision: LocalDensityDecision = {
     ratio: 1,
@@ -156,6 +161,7 @@ export class LocalRendererSession {
       this.viewportObservationTimer = undefined;
       this.options.onViewportObservation?.(this.semanticViewport());
     }, 120);
+    this.emitDensityQaDiagnostics();
   };
 
   private readonly precisionWheelHandler = (coordinates: WheelCoords): void => {
@@ -267,6 +273,7 @@ export class LocalRendererSession {
     this.renderer.getTouchCaptor().on('touchmove', this.touchMoveHandler);
     this.renderer.getCamera().on('updated', this.cameraUpdatedHandler);
     this.bindEvents();
+    this.emitDensityQaDiagnostics();
     const renderStarted = performance.now();
     this.ready = new Promise((resolve) => {
       this.renderer.once('afterRender', () => {
@@ -392,6 +399,7 @@ export class LocalRendererSession {
     } else {
       this.anchorNodeAtViewport(anchorKey, anchor, ratio);
     }
+    this.emitDensityQaDiagnostics();
   }
 
   setVisualGroupStyles(styles?: VisualGroupPresentationMap): void {
@@ -548,6 +556,7 @@ export class LocalRendererSession {
     const started = performance.now();
     const decision = resolveLocalDensityFit(this.densityInput, positions);
     this.latestDensityDecision = decision;
+    this.emitDensityQaDiagnostics();
     this.options.instrumentation?.count('local-density-evaluations');
     this.options.instrumentation?.record(
       'local-density',
@@ -561,6 +570,31 @@ export class LocalRendererSession {
       this.latestDensityDecision.ratio,
       this.densityFramingStrength,
     );
+  }
+
+  private emitDensityQaDiagnostics(): void {
+    const diagnostics: LocalDensityQaDiagnostics = {
+      rawDecisionRatio: this.latestDensityDecision.ratio,
+      effectiveRatio: this.effectiveDensityRatio(),
+      cameraRatio: this.renderer.getCamera().ratio,
+      fallback: this.latestDensityDecision.fallback,
+      ...(this.latestDensityDecision.fallbackReason === undefined
+        ? {}
+        : { fallbackReason: this.latestDensityDecision.fallbackReason }),
+    };
+    const previous = this.lastDensityQaDiagnostics;
+    if (
+      previous !== undefined &&
+      previous.rawDecisionRatio === diagnostics.rawDecisionRatio &&
+      previous.effectiveRatio === diagnostics.effectiveRatio &&
+      previous.cameraRatio === diagnostics.cameraRatio &&
+      previous.fallback === diagnostics.fallback &&
+      previous.fallbackReason === diagnostics.fallbackReason
+    ) {
+      return;
+    }
+    this.lastDensityQaDiagnostics = diagnostics;
+    this.options.onDensityQaDiagnosticsChange?.(diagnostics);
   }
 
   applyPositions(positions: readonly LocalLayoutPosition[]): Promise<void> {

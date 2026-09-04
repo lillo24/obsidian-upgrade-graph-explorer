@@ -56,6 +56,7 @@ it('installs an exact cache-hit density frame before first render without a work
   const layout = vi.fn();
   const layoutService = { layout, dispose: vi.fn() };
   const onFailure = vi.fn();
+  const onDensityQaDiagnosticsChange = vi.fn();
   const onSelectionChange = vi.fn();
   const onViewportObservation = vi.fn();
   const counts = new Map<string, number>();
@@ -79,6 +80,7 @@ it('installs an exact cache-hit density frame before first render without a work
       layoutRequestKey: 0,
       layoutService,
       onFailure,
+      onDensityQaDiagnosticsChange,
       onSelectionChange,
       onViewportObservation,
       projection,
@@ -94,6 +96,12 @@ it('installs an exact cache-hit density frame before first render without a work
   expect(SigmaTestRenderer.instances[0]!.camera.ratio).toBe(expected.ratio);
   expect(counts.get('local-density-evaluations')).toBe(1);
   expect(counts.get('local-layouts')).toBeUndefined();
+  expect(onDensityQaDiagnosticsChange).toHaveBeenLastCalledWith({
+    rawDecisionRatio: expected.ratio,
+    effectiveRatio: expected.ratio,
+    cameraRatio: expected.ratio,
+    fallback: false,
+  });
 
   const renderer = SigmaTestRenderer.instances[0]!;
   const rootViewportPoint = () => {
@@ -108,16 +116,29 @@ it('installs an exact cache-hit density frame before first render without a work
   harness.invalidate();
   await harness.flush();
   expect(SigmaTestRenderer.instances[0]!.camera.ratio).toBe(1);
+  expect(onDensityQaDiagnosticsChange).toHaveBeenLastCalledWith({
+    rawDecisionRatio: expected.ratio,
+    effectiveRatio: 1,
+    cameraRatio: 1,
+    fallback: false,
+  });
   expect(rootViewportPoint().x).toBeCloseTo(anchor.x);
   expect(rootViewportPoint().y).toBeCloseTo(anchor.y);
   densityFramingStrength = 100;
   harness.invalidate();
   await harness.flush();
   expect(SigmaTestRenderer.instances[0]!.camera.ratio).toBe(expected.ratio);
+  expect(onDensityQaDiagnosticsChange).toHaveBeenLastCalledWith({
+    rawDecisionRatio: expected.ratio,
+    effectiveRatio: expected.ratio,
+    cameraRatio: expected.ratio,
+    fallback: false,
+  });
   expect(rootViewportPoint().x).toBeCloseTo(anchor.x);
   expect(rootViewportPoint().y).toBeCloseTo(anchor.y);
   expect(layout).not.toHaveBeenCalled();
   expect(counts.get('local-density-evaluations')).toBe(1);
   expect(counts.get('local-layouts')).toBeUndefined();
   harness.destroy();
+  expect(onDensityQaDiagnosticsChange).toHaveBeenLastCalledWith(undefined);
 });

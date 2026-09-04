@@ -67,6 +67,15 @@ export interface LocalViewportPoint {
   readonly y: number;
 }
 
+/** Temporary, runtime-only SPACING1B native-QA evidence. */
+export interface LocalDensityQaDiagnostics {
+  readonly rawDecisionRatio: number;
+  readonly effectiveRatio: number;
+  readonly cameraRatio: number;
+  readonly fallback: boolean;
+  readonly fallbackReason?: string;
+}
+
 export interface LocalCenterRequest {
   readonly key: number;
   readonly nodeId: ProjectionNodeId;

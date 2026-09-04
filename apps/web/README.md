@@ -418,6 +418,11 @@ only Focus Root appearance, All Network layout, density strength, and Experiment
 exposure; Trackpad Zoom, source configuration, view/history, queries, and vault
 data remain unchanged.
 
+For SPACING1B native QA, Sandbox temporarily shows the current raw density
+decision, effective interpolated ratio, Sigma camera ratio, and fallback reason.
+These values update from the mounted Focus Network session and are neither
+persisted nor consumed by projection, ForceAtlas2, or camera policy.
+
 **Hierarchy Depth** is hidden in All Network and visible in the other three
 combinations. In Focus it applies automatic depth only beneath the root file;
 depth 0 has no automatic headings, while depths 1–3 reveal the corresponding

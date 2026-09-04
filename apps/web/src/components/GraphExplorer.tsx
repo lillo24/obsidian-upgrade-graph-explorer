@@ -63,6 +63,7 @@ import type {
   GlobalSelection,
   GlobalTransitionAnchorApi,
   LocalCenterRequest,
+  LocalDensityQaDiagnostics,
   LocalSelection,
   LocalTransitionAnchorApi as LocalFreeTransitionAnchorApi,
   SemanticGlobalViewport,
@@ -467,6 +468,9 @@ export function GraphExplorer({
   const [densityFramingStrength, setDensityFramingStrength] = useState(
     DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH,
   );
+  const [densityQaDiagnostics, setDensityQaDiagnostics] = useState<
+    LocalDensityQaDiagnostics | undefined
+  >();
   const {
     focusAppearance,
     globalLayoutSettings,
@@ -3473,6 +3477,9 @@ export function GraphExplorer({
             <span>Tools</span>
           </button>
           <GraphSettings
+            {...(densityQaDiagnostics === undefined
+              ? {}
+              : { densityQaDiagnostics })}
             densityFramingStrength={densityFramingStrength}
             showExperimentalAllHierarchy={showExperimentalAllHierarchy}
             onShowExperimentalAllHierarchyChange={
@@ -3659,6 +3666,9 @@ export function GraphExplorer({
               ) : null}
               {maximized ? null : (
                 <GraphSettings
+                  {...(densityQaDiagnostics === undefined
+                    ? {}
+                    : { densityQaDiagnostics })}
                   densityFramingStrength={densityFramingStrength}
                   showExperimentalAllHierarchy={showExperimentalAllHierarchy}
                   onShowExperimentalAllHierarchyChange={
@@ -3884,6 +3894,7 @@ export function GraphExplorer({
                     `Focus Network renderer failed: ${message} Use Focus Hierarchy or return to All.`,
                   )
                 }
+                onDensityQaDiagnosticsChange={setDensityQaDiagnostics}
                 onFitRequestConsumed={consumeLocalFitRequest}
                 onNodeActivate={focusLocalEntity}
                 onNodeSingleClick={revealGraphNode}
