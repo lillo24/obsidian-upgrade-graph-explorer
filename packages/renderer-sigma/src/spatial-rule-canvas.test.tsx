@@ -162,6 +162,105 @@ describe('production spatial rule adoption', () => {
     harness.destroy();
   });
 
+  it('waits to fit a fresh source until spatial-rule positions are authoritative', async () => {
+    const projection = globalTestProjection();
+    const fit = vi
+      .spyOn(GlobalRendererSession.prototype, 'fit')
+      .mockImplementation(noop);
+    let pendingRequest:
+      Omit<GlobalSpatialInfluenceRequest, 'requestId'> | undefined;
+    let resolvePull:
+      ((result: GlobalSpatialInfluenceResult) => void) | undefined;
+    const spatialInfluenceService = {
+      dispose: noop,
+      layout: vi.fn(
+        (request: Omit<GlobalSpatialInfluenceRequest, 'requestId'>) =>
+          new Promise<GlobalSpatialInfluenceResult>((resolve) => {
+            pendingRequest = request;
+            resolvePull = resolve;
+          }),
+      ),
+    };
+    const layout = vi.fn(
+      async (request: Omit<GlobalLayoutRequest, 'requestId'>) =>
+        ({
+          schemaVersion: 1,
+          kind: 'result',
+          requestId: 1,
+          algorithm: 'reference-only',
+          computeMs: 0,
+          folderPriorMs: 0,
+          positions: request.nodes.map(({ key, x, y }) => ({ key, x, y })),
+          metrics: {
+            meanWithinFolderDistance: 0,
+            meanCrossFolderDistance: 0,
+            meanCrossFolderReferenceLength: 0,
+            meanDisplacementFromInput: 0,
+          },
+        }) as GlobalLayoutResult,
+    );
+    const layoutService = { layout, dispose: noop };
+    const spatialRules: readonly FolderSpatialRule[] = [
+      {
+        folderKey: 'alpha',
+        behavior: 'pull',
+        scope: { kind: 'exact' },
+        anchor: { x: -0.5, y: 0 },
+        strength: 70,
+      },
+    ];
+    const onFailure = vi.fn();
+    const harness = new CanvasTestHarness(() =>
+      GlobalGraphCanvas({
+        projection,
+        settings,
+        spatialRules,
+        fitRequestKey: 1,
+        layoutRequestKey: 0,
+        layoutService,
+        spatialInfluenceService,
+        onFailure,
+        onNodeActivate: noop,
+        onSelectionChange: noop,
+        onViewportObservation: noop,
+        selection: null,
+        trackpadZoomMode: 'pinch-zoom',
+      }),
+    );
+
+    await harness.flush();
+    expect(layout).toHaveBeenCalledTimes(1);
+    expect(spatialInfluenceService.layout).toHaveBeenCalledTimes(1);
+    expect(fit).not.toHaveBeenCalled();
+    if (pendingRequest === undefined || resolvePull === undefined) {
+      throw new Error('Expected a pending Dynamic Pull request.');
+    }
+
+    resolvePull({
+      schemaVersion: 1,
+      kind: 'result',
+      requestId: 1,
+      algorithm: pendingRequest.algorithm,
+      computeMs: 0,
+      forceAtlasMs: 0,
+      attractorMs: 0,
+      positions: pendingRequest.nodes.map(({ key, x, y }) => ({ key, x, y })),
+      metrics: {
+        meanTargetError: 0,
+        maxTargetError: 0,
+        meanAffectedDisplacement: 0,
+        meanUnaffectedDisplacement: 0,
+        meanCrossBoundaryReferenceLength: 0,
+        meanReferenceLength: 0,
+      },
+    });
+    await harness.flush();
+
+    expect(fit).toHaveBeenCalledTimes(1);
+    expect(layout).toHaveBeenCalledTimes(1);
+    harness.destroy();
+  });
+
   it('leaves explicit Fit and Search center requests as camera-owning actions', async () => {
     const projection = globalTestProjection();
     let fitRequestKey = 0;

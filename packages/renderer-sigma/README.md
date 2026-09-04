@@ -370,9 +370,11 @@ canonical identity or synthesizing relationships.
 
 An entry/search center or Fit request waits until Sigma has rendered its
 matching background-layout coordinates, so seed or stale display coordinates
-cannot be centered and then replaced out from under the camera. Once consumed,
-that semantic request is not replayed by later live refinements; ordinary user
-pan and zoom therefore remain intact.
+cannot be centered and then replaced out from under the camera. Source-load Fit
+also waits for the first authoritative spatial-rule composition, including a
+Dynamic Pull result or fallback, so the camera encloses the geometry the user
+actually sees. Once consumed, that semantic request is not replayed by later
+live refinements; ordinary user pan and zoom therefore remain intact.
 
 The WebGL canvas is visual-only and `aria-hidden`. Product search, Inspector,
 and Structure remain the accessible semantic surfaces. Sigma construction or

@@ -1569,7 +1569,10 @@ export function GlobalGraphCanvas({
   }, [centerRequest, layoutCommitKey, ready]);
 
   useEffect(() => {
+    const spatialViewportReady =
+      spatialRules === undefined || spatialCommitKey > 0;
     if (
+      !spatialViewportReady ||
       !shouldApplyGlobalViewportRequest({
         handledKey: handledFitRequest.current,
         layoutPending: layoutPending.current,
@@ -1581,7 +1584,7 @@ export function GlobalGraphCanvas({
     }
     handledFitRequest.current = fitRequestKey;
     sessionRef.current?.fit();
-  }, [fitRequestKey, layoutCommitKey, ready]);
+  }, [fitRequestKey, layoutCommitKey, ready, spatialCommitKey, spatialRules]);
 
   const zoomIn = useCallback(() => sessionRef.current?.zoomBy(0.82), []);
   const zoomOut = useCallback(() => sessionRef.current?.zoomBy(1.22), []);

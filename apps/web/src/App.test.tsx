@@ -105,6 +105,7 @@ describe('graph-first explorer shell', () => {
     expect(markup).toContain('aria-label="Open Inspector"');
     expect(markup).not.toContain('>Inspector</button>');
     expect(markup).toContain('Loading All Network');
+    expect(markup).toContain('The graph was fitted for this source load.');
     expect(markup).not.toContain('aria-label="Fit graph to view"');
     expect(markup).not.toContain('>Maximize Graph</button>');
     expect(markup).not.toContain('diagnostic-evidence');

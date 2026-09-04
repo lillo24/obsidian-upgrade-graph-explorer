@@ -38,6 +38,14 @@ and writes occur only after discrete graph state changes or user-ended viewport
 movement. One read/write failure disables further automatic writes for that
 mounted report until an explicit successful reset.
 
+The app still hydrates persisted presentation, query, disclosure, focus, and
+semantic viewport bookmarks, but a fresh source session deliberately starts
+with a one-shot Fit. The saved viewport remains available to within-session
+state until the fitted viewport is observed normally for later persistence;
+mounting alone does not rewrite storage. Subsequent within-session history and
+mode restoration use that fitted semantic viewport. Live revisions preserve the
+current camera and never replay the source-load Fit.
+
 Saved Filters use the separate key
 `icarus-graph-explorer:saved-filters:<encodeURIComponent(workspaceId)>` and are
 available cross-session only for stable identities with writable browser

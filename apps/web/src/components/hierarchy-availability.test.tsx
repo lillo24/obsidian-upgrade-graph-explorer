@@ -117,6 +117,7 @@ describe('GraphExplorer experimental availability integration', () => {
   async function mount(
     mode: 'global' | 'structure' | 'local' = 'global',
     show = false,
+    initialViewport?: 'fit' | 'restore',
   ) {
     values.set(
       GRAPH_PREFERENCES_STORAGE_KEY,
@@ -156,6 +157,7 @@ describe('GraphExplorer experimental availability integration', () => {
           snapshot={snapshot}
           storage={storage}
           identityStability="stable"
+          {...(initialViewport === undefined ? {} : { initialViewport })}
           maximized={false}
           onMaximizedChange={() => undefined}
           performance={performance}
@@ -191,6 +193,28 @@ describe('GraphExplorer experimental availability integration', () => {
   function preference() {
     return JSON.parse(values.get(GRAPH_PREFERENCES_STORAGE_KEY)!);
   }
+
+  it.each(['global', 'structure', 'local'] as const)(
+    'fits a fresh %s source session instead of restoring its stored camera',
+    async (mode) => {
+      await mount(mode, mode === 'structure', 'fit');
+      const props =
+        mode === 'global'
+          ? captured.global
+          : mode === 'structure'
+            ? captured.structure
+            : captured.hierarchy;
+
+      expect(props?.fitRequestKey).toBe(1);
+      expect(props?.centerRequest).toBeUndefined();
+      expect(
+        values.get(workspaceViewStorageKey(snapshot.workspace.id)),
+      ).toContain('anchorEntityId');
+      if (mode === 'global') {
+        expect(captured.global?.initialViewport).toBeUndefined();
+      }
+    },
+  );
 
   it('reveals controls without projection work and preserves the flag when another preference changes', async () => {
     await mount();

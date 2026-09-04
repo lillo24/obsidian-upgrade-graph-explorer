@@ -500,6 +500,7 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
         </h1>
         <GraphExplorer
           applicationOverlayOpen={diagnosticEvidenceOpen}
+          initialViewport="fit"
           key={sourceSessionKey}
           maximized={graphMaximized}
           onMaximizedChange={setGraphMaximized}

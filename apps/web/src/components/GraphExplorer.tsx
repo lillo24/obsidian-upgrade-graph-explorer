@@ -330,6 +330,7 @@ function ProjectionIssues({
 export function GraphExplorer({
   applicationOverlayOpen = false,
   identityStability,
+  initialViewport = 'restore',
   maximized,
   onMaximizedChange,
   performance,
@@ -340,6 +341,8 @@ export function GraphExplorer({
 }: {
   readonly applicationOverlayOpen?: boolean;
   readonly identityStability?: DiagnosticIdentityStability;
+  /** Source-session camera policy; later navigation and live updates are unaffected. */
+  readonly initialViewport?: 'fit' | 'restore';
   readonly maximized: boolean;
   readonly onMaximizedChange: (maximized: boolean) => void;
   /** Optional memory-only KG12 instrumentation, enabled by the app boundary. */
@@ -713,7 +716,10 @@ export function GraphExplorer({
       : effectiveRendererMode === 'local' && localResult !== undefined
         ? localResult
         : (structureResult ?? unavailableProjection);
-  const restoredStructureViewport = hydration.viewports.structure;
+  const fitInitialViewport = initialViewport === 'fit';
+  const restoredStructureViewport = fitInitialViewport
+    ? undefined
+    : hydration.viewports.structure;
   const restoredAnchor =
     structureResult?.ok === true && restoredStructureViewport !== undefined
       ? structureResult.projection.nodes.find(
@@ -724,7 +730,9 @@ export function GraphExplorer({
       : undefined;
   const restoredViewportHidden =
     restoredStructureViewport !== undefined && restoredAnchor === undefined;
-  const restoredGlobalViewport = hydration.viewports.global;
+  const restoredGlobalViewport = fitInitialViewport
+    ? undefined
+    : hydration.viewports.global;
   const restoredGlobalAnchor =
     globalResult?.ok === true && restoredGlobalViewport !== undefined
       ? globalResult.projection.nodes.find(
@@ -733,7 +741,9 @@ export function GraphExplorer({
             candidate.entityId === restoredGlobalViewport.anchorEntityId,
         )
       : undefined;
-  const restoredLocalViewport = hydration.viewports.local;
+  const restoredLocalViewport = fitInitialViewport
+    ? undefined
+    : hydration.viewports.local;
   const restoredLocalAnchor =
     localResult?.ok === true && restoredLocalViewport !== undefined
       ? localResult.projection.nodes.find(
@@ -744,7 +754,7 @@ export function GraphExplorer({
       : undefined;
   const [selection, setSelection] = useState<GraphSelection | null>(null);
   const [fitRequestKey, setFitRequestKey] = useState(
-    restoredViewportHidden ? 1 : 0,
+    fitInitialViewport || restoredViewportHidden ? 1 : 0,
   );
   const [centerRequest, setCenterRequest] = useState<
     GraphCenterRequest | undefined
@@ -807,8 +817,9 @@ export function GraphExplorer({
   );
   const [globalFitRequestKey, setGlobalFitRequestKey] = useState(
     rendererMode === 'global' &&
-      restoredGlobalViewport !== undefined &&
-      restoredGlobalAnchor === undefined
+      (fitInitialViewport ||
+        (restoredGlobalViewport !== undefined &&
+          restoredGlobalAnchor === undefined))
       ? 1
       : 0,
   );
@@ -816,8 +827,9 @@ export function GraphExplorer({
   const [localLayoutRequestKey, setLocalLayoutRequestKey] = useState(0);
   const initialLocalFitRequestKey =
     rendererMode === 'local' &&
-    restoredLocalViewport !== undefined &&
-    restoredLocalAnchor === undefined
+    (fitInitialViewport ||
+      (restoredLocalViewport !== undefined &&
+        restoredLocalAnchor === undefined))
       ? 1
       : undefined;
   const [localFitRequestKey, setLocalFitRequestKey] = useState<
@@ -867,7 +879,9 @@ export function GraphExplorer({
     `${
       restoredViewportHidden
         ? `${hydration.status} The saved viewport anchor is hidden by the restored view, so the graph was fitted.`
-        : hydration.status
+        : fitInitialViewport
+          ? `${hydration.status} The graph was fitted for this source load.`
+          : hydration.status
     }${
       legacyBlockFilterNormalized
         ? ' Legacy Blocks filtering was normalized to the current view controls.'
@@ -1119,7 +1133,7 @@ export function GraphExplorer({
             workspace: projectionWorkspace,
             state: initialViewState,
             presentationMode: rendererMode,
-            viewports: hydration.viewports,
+            viewports: fitInitialViewport ? {} : hydration.viewports,
           }),
         )
       : undefined,
