@@ -1,4 +1,7 @@
-import { isNormalizedWorkspacePath } from '@icarus-graph-explorer/core';
+import {
+  isNormalizedWorkspaceFolderKey,
+  isNormalizedWorkspacePath,
+} from '@icarus-graph-explorer/core';
 
 import { formatGraphQuery } from './format';
 import {
@@ -394,6 +397,50 @@ class Parser {
       }
       return this.addNode({
         kind: 'exact-path-predicate',
+        value: valueToken.value,
+      });
+    }
+
+    if (name === 'folder') {
+      const separator = this.current();
+      if (separator.kind !== 'equals') {
+        this.issues.push(
+          issue(
+            'unexpected-token',
+            separator.start,
+            Math.max(1, separator.end - separator.start),
+            'folder requires = followed by a normalized folder key.',
+          ),
+        );
+        return undefined;
+      }
+      this.advance();
+      const valueToken = this.current();
+      if (valueToken.kind !== 'word' && valueToken.kind !== 'string') {
+        this.issues.push(
+          issue(
+            'invalid-predicate-value',
+            valueToken.start,
+            Math.max(1, valueToken.end - valueToken.start),
+            'folder= requires a normalized workspace folder key.',
+          ),
+        );
+        return undefined;
+      }
+      this.advance();
+      if (!isNormalizedWorkspaceFolderKey(valueToken.value)) {
+        this.issues.push(
+          issue(
+            'invalid-predicate-value',
+            valueToken.start,
+            Math.max(1, valueToken.end - valueToken.start),
+            'folder= requires a normalized workspace folder key using forward slashes, or "." for the workspace root.',
+          ),
+        );
+        return undefined;
+      }
+      return this.addNode({
+        kind: 'folder-predicate',
         value: valueToken.value,
       });
     }

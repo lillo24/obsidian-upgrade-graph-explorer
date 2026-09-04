@@ -4,6 +4,11 @@ export {
   listExactPathExclusions,
   removeExactPathExclusion,
 } from './exact-path-exclusions';
+export {
+  addFolderExclusion,
+  listFolderExclusions,
+  removeFolderExclusion,
+} from './folder-exclusions';
 export { formatGraphQuery } from './format';
 export { parseGraphQuery } from './parser';
 export {
@@ -14,6 +19,8 @@ export {
 export type {
   ExactPathExclusionListResult,
   ExactPathExclusionMutationResult,
+  FolderExclusionListResult,
+  FolderExclusionMutationResult,
   GraphQueryExpression,
   GraphQueryIssue,
   GraphQueryIssueCode,

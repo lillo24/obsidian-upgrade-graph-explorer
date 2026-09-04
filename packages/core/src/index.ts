@@ -8,6 +8,7 @@ export type {
 export type { EntityId, ReferenceId, WorkspaceId } from './model/ids';
 export {
   isNormalizedWorkspaceFolderKey,
+  workspaceFolderKeyContainsFolder,
   workspaceFolderKeyFromPath,
   type WorkspaceFolderKey,
 } from './model/folder-key';

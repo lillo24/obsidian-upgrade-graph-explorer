@@ -1,9 +1,11 @@
 import { useCallback, useState } from 'react';
 
+import type { WorkspaceFolderKey } from '@icarus-graph-explorer/core';
 import { parseGraphQuery } from '@icarus-graph-explorer/graph-query';
 
 import {
   planExactPathQueryMutation,
+  planFolderQueryMutation,
   reconcileGraphQueryDraft,
   type GraphQueryDraftState,
 } from '../network-explorer-query-actions';
@@ -17,6 +19,10 @@ export function useGraphQueryDraft(
   readonly adoptQuery: (query: string) => void;
   readonly mutateExactPath: (
     path: string,
+    operation: 'add' | 'remove',
+  ) => boolean;
+  readonly mutateFolder: (
+    folderKey: WorkspaceFolderKey,
     operation: 'add' | 'remove',
   ) => boolean;
 } {
@@ -87,6 +93,28 @@ export function useGraphQueryDraft(
     },
     [activeQuery, onCommit, state],
   );
+  const mutateFolder = useCallback(
+    (folderKey: WorkspaceFolderKey, operation: 'add' | 'remove') => {
+      const plan = planFolderQueryMutation({
+        activeQuery,
+        queryDraft: state.draft,
+        folderKey,
+        operation,
+      });
+      if (!plan.ok) {
+        setStored({ ...state, issue: plan.issue });
+        return false;
+      }
+      onCommit(plan.query);
+      setStored({
+        activeQuery: plan.query ?? '',
+        draft: plan.draft,
+        issue: undefined,
+      });
+      return true;
+    },
+    [activeQuery, onCommit, state],
+  );
   return {
     activeQuery: active,
     queryDraft: state.draft,
@@ -97,5 +125,6 @@ export function useGraphQueryDraft(
     onResetDraft,
     adoptQuery,
     mutateExactPath,
+    mutateFolder,
   };
 }

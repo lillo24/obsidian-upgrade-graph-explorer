@@ -58,7 +58,7 @@ export const GraphQueryEditor = memo(function GraphQueryEditor({
           id={`${idPrefix}-input`}
           name={`${idPrefix}-query`}
           onChange={(event) => onDraftChange(event.currentTarget.value)}
-          placeholder={'path:"notes" AND (sections OR level<=3)'}
+          placeholder={'folder="Notes" AND (sections OR level<=3)'}
           rows={compact ? 2 : 3}
           spellCheck={false}
           value={queryDraft}
@@ -108,7 +108,7 @@ export const GraphQueryEditor = memo(function GraphQueryEditor({
       {compact ? null : (
         <p id={`${idPrefix}-help`}>
           {
-            'Use path, title, text, kind, or level with explicit AND, OR, NOT, and parentheses. path:"notes" contains text; path="Notes/Foo.md" matches one exact, case-sensitive source path. Text searches paths and section titles, not Markdown body content.'
+            'Use path, folder, title, text, kind, or level with explicit AND, OR, NOT, and parentheses. path:"memory" contains path text case-insensitively; path="Notes/Memory.md" matches one exact File path; folder="Notes" matches that exact folder and all descendants. Exact identities are case-sensitive. Text searches paths and section titles, not Markdown body content.'
           }
         </p>
       )}

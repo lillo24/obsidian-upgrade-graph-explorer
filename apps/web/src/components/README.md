@@ -201,13 +201,14 @@ canonical truth, or own a platform storage implementation.
   The latter owns only local open/position state: a viewport-bounded nonmodal
   portal, initial input focus, Escape/Close trigger restoration, and outside
   dismissal without stealing focus. Opening it never changes graph state.
-- `NetworkExplorerHiddenFiles.tsx` presents exact-path exclusions directly below
-  the Network query as one row of restore chips. `../network-explorer-chip-layout.ts`
+- `NetworkExplorerHiddenItems.tsx` presents exact-path File exclusions and
+  exact-folder subtree exclusions as separately labelled recovery-chip rows below
+  the Network query. `../network-explorer-chip-layout.ts`
   fits measured chip widths plus a more disclosure; expansion wraps all chips
   inside the existing height-bounded controls area. Overflow chips remain
   measurable but are invisible, untabbable, and excluded from the accessible
   tree. This disclosure is local presentation state, not another hidden-file list
-  or query source of truth.
+  or query source of truth; restoring one identity never removes the other type.
 - `NetworkExplorerMenu.tsx` renders one accessible portal for the current logical
   row target, switching from its action menu to a multiplier/Reset Size editor for
   canonical Files without introducing a second menu. It owns enabled-item

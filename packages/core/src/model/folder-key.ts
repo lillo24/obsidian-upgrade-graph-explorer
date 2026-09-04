@@ -30,3 +30,15 @@ export function workspaceFolderKeyFromPath(
   }
   return folderKey;
 }
+
+/** Segment-aware exact subtree membership; root contains every folder. */
+export function workspaceFolderKeyContainsFolder(
+  ancestorFolderKey: WorkspaceFolderKey,
+  candidateFolderKey: WorkspaceFolderKey,
+): boolean {
+  return (
+    ancestorFolderKey === '.' ||
+    ancestorFolderKey === candidateFolderKey ||
+    candidateFolderKey.startsWith(`${ancestorFolderKey}/`)
+  );
+}
