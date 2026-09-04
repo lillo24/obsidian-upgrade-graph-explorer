@@ -1,16 +1,36 @@
 # Focus Schematic layout
 
-This package owns the renderer-neutral HIER2 layout input, deterministic
-layout plan, common module-box policy, public sibling-order constraints, and
-the selected two-stage Dagre implementation. It is deliberately absent from
-production imports until HIER3.
+This package owns the renderer-neutral HIER2/HIER3A layout input,
+deterministic module and endpoint plans, internal File-module lanes, common
+module-box policy, public sibling-order constraints, and the two-stage Dagre
+implementations. It remains absent from production imports until HIER3B.
 
-`computeFocusSchematicLayout(input)` is the narrow adoption API. The input
+`computeFocusSchematicLayout(input)` remains the HIER2 A0 selection while the
+HIER3A graphical decision is pending. The input
 contains a HIER1 model, its KG6 projection, one strictly ordered positive
 dimension record for every visible entity node, and explicit settings. The
 function returns a strictly validated HIER1 layout candidate or throws an
 actionable error. `computeFocusSchematicLayoutAttempt` adds benchmark timings,
 native-route evidence, and explicit failure status for the development tool.
+
+`computeFocusSchematicComputedLayout(input)` is the explicit HIER3A A1
+candidate. It returns a strictly validated plain-data result containing the
+unchanged HIER2 module plan, exact visible endpoint/fallback connections,
+per-node demands, the left/center/right lane plan, endpoint-facing geometry,
+boundary attachments, and endpoint quality. Attachments are simple endpoint
+suggestions; candidate routes remain empty because channel/obstacle routing is
+owned by HIER5. `computeFocusSchematicUniformLayout` keeps A0 available as an
+explicit development comparison seam.
+
+Physical sides derive only from relative signed module ranks: a counterpart
+at a smaller rank attaches left, a counterpart at a larger rank attaches
+right, and same-rank secondary display uses `auto`. Authored source and target
+never swap. Secondary connections retain exact provenance but create no lane
+demand or coordinate change. A document stays central even when it exposes
+attachments; left-only and right-only subtrees use their respective lanes,
+mixed ancestors stay central, and neutral descendants inherit a side only
+when their parent already owns that side. One dual-demand entity remains one
+central node with two attachments.
 
 The frozen comparison profile uses Dagre 3.1.1, LR internal and macro graphs,
 24/48 px internal node/rank separation, 36/80 px macro separation, 28 px
@@ -26,23 +46,32 @@ the bakeoff evidence if changed.
   settings.
 - `src/plan.ts` resolves HIER1 equal-mutual ambiguity once for every strategy
   and validates the monotonic acyclic backbone.
+- `src/endpoint-plan.ts` maps every visible endpoint group once, accounts for
+  fallback provenance, classifies presentation roles, derives physical sides,
+  and collects direct node demands.
+- `src/lane-plan.ts` validates each module hierarchy forest, propagates subtree
+  demand, assigns internal lanes, and suggests quiet hierarchy attachments.
+- `src/endpoint-facing.ts` composes center TB, left RL, and right LR Dagre
+  regions, runs the unchanged macro stage, derives exact attachments, and
+  evaluates endpoint-side quality.
+- `src/endpoint-fixtures.ts` owns the synthetic EP1–EP24 and ES1–ES8 review
+  corpus used by package tests and the development lab.
 - `src/source-order.ts` derives public Dagre adjacent-sibling constraints from
   canonical source order.
 - `src/settings.ts` owns the frozen spacing, reserve, clearance, and filtered
   placeholder policy.
-- `src/two-stage.ts` lays out each File hierarchy and then the shared module
-  backbone with fresh stateless Dagre graphs.
+- `src/two-stage.ts` preserves A0 by laying out each File hierarchy uniformly
+  and then running the shared module backbone with fresh stateless Dagre
+  graphs.
 - `src/*.test.ts` covers input rejection, planning, deterministic geometry,
+  exact endpoints, lane propagation, EP1–EP24, ES1–ES8, Markdown integration,
   filtered modules, containment, clearance, and the production boundary.
 
 The package depends inward on core, view-projection, focus-schematic, and the
 already pinned `@dagrejs/dagre` 3.1.1 only. It must not import React, renderers,
 apps, W3, view-state, Tauri, source adapters, or filesystem APIs.
 
-HIER3 production integration must connect cross-file relationships to the
-actual visible File, Heading, or Block endpoints carried by the HIER1 model.
-Relevant internal entities should face the neighbouring macro rank where
-sensible; a multi-hop module may need separate incoming-facing and
-outgoing-facing lanes instead of a fixed `File → Heading` orientation. This may
-refine Strategy A's per-module internal stage but must retain its selected
-two-stage macro architecture. Complete explicit route ownership remains HIER5.
+The A1 result is the intended HIER3B worker payload if graphical review adopts
+it. HIER3B owns transport, latest-result-wins behavior, caching, stale-result
+rejection, renderer mapping, and production fallback. Complete explicit route
+ownership remains HIER5.

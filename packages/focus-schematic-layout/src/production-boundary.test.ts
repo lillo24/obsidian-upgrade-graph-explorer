@@ -19,7 +19,7 @@ function sourceFiles(root: string): string[] {
   });
 }
 
-describe('HIER2 production boundary', () => {
+describe('HIER3A production boundary', () => {
   it('keeps the reusable package free of renderer, app, worker, view-state, and platform imports', () => {
     const root = fileURLToPath(new URL('.', import.meta.url));
     const source = sourceFiles(root)
@@ -30,7 +30,7 @@ describe('HIER2 production boundary', () => {
     );
   });
 
-  it('is absent from production packages and apps during HIER2', () => {
+  it('is absent from production packages and apps during HIER3A', () => {
     const repository = fileURLToPath(new URL('../../..', import.meta.url));
     const roots = ['apps', 'packages']
       .flatMap((folder) => sourceFiles(join(repository, folder)))

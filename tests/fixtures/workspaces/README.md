@@ -4,6 +4,13 @@
 covers direct incoming/outgoing references, an outgoing two-hop path, precise
 Heading resolution, two folders, and one unresolved target.
 
+`focus-schematic-endpoints` is the HIER3A Markdown-to-layout fixture. It covers
+document, Heading, alias-aggregated, and Block targets through the parser,
+Obsidian adapter, resolver, KG6 projection, HIER1 model, and endpoint-facing
+layout. Its README records the current resolver rule that outgoing references
+belong to a document or deepest containing Heading; Blocks remain addressable
+targets but do not own Markdown references.
+
 Parser and adapter work uses this convention:
 
 ```text

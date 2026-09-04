@@ -24,7 +24,7 @@ export function assertRendererDimensionBaseline(): void {
 }
 
 export function createLayoutInput(
-  fixture: BuiltFixture,
+  fixture: Pick<BuiltFixture, 'model' | 'projection'>,
   settings: FocusSchematicLayoutInput['settings'] = FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
 ): FocusSchematicLayoutInput {
   assertRendererDimensionBaseline();

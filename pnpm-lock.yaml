@@ -219,6 +219,12 @@ importers:
         specifier: workspace:*
         version: link:../view-projection
     devDependencies:
+      '@icarus-graph-explorer/adapter-obsidian':
+        specifier: workspace:*
+        version: link:../adapter-obsidian
+      '@icarus-graph-explorer/resolver-obsidian':
+        specifier: workspace:*
+        version: link:../resolver-obsidian
       '@types/node':
         specifier: 24.13.3
         version: 24.13.3
