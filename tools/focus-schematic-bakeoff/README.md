@@ -9,6 +9,8 @@ graphical review lab.
 The accepted outcome is stateless Strategy A. D0 remains the Classic baseline,
 B is retained as rejected evidence, and C remains honestly unbuilt because A
 did not expose a defect meeting its material-improvement prerequisite.
+Historical HIER2 commands import the explicit A0 uniform-layout alias, so the
+accepted HIER3A A1 package selection cannot rewrite the original bakeoff.
 
 ```bash
 pnpm benchmark:focus-schematic-layout -- --profile fixtures

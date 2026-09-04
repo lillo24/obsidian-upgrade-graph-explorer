@@ -5,7 +5,7 @@ import {
   type FocusSchematicLayoutCandidate,
 } from '@icarus-graph-explorer/focus-schematic';
 import {
-  computeFocusSchematicLayoutAttempt,
+  computeFocusSchematicUniformLayoutAttempt as computeFocusSchematicLayoutAttempt,
   FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 

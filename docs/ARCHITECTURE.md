@@ -172,16 +172,22 @@ not imported by production rendering in HIER1. See ADR 0017.
 `packages/focus-schematic-layout` depends inward on core, view-projection,
 focus-schematic, and pinned Dagre 3.1.1. It owns the strict explicit-dimension
 input, deterministic equal-mutual layout plan, fixed module-box policy,
-canonical sibling constraints, and selected stateless two-stage Dagre
-candidate. HIER2 production-boundary tests keep it out of apps,
-renderer-reactflow, view-state, workspace-worker, and platform code. HIER3 may
-place `model + projection + dimensions + settings → validated candidate`
-behind a new latest-result-wins worker boundary; HIER2 does not change W3. HIER3
-must attach cross-file references to their actual visible File, Heading, or
-Block endpoints and may orient relevant internal entities into incoming-facing
-and outgoing-facing lanes toward neighbouring macro ranks. That internal
-semantic refinement is layered on the selected two-stage macro architecture;
-it does not reopen the strategy decision. See ADR 0018.
+canonical sibling constraints, exact visible endpoint/fallback plan,
+left/center/right internal lanes, endpoint-aware ordering, boundary attachments,
+and selected stateless A1 candidate. Physical attachment side derives from
+relative signed module rank. Mixed ancestors and dual endpoints remain one
+center node; secondary links do not influence geometry. Four fixed
+forward/backward sweeps may reorder adjacent-rank modules and disjoint sibling
+branches from exact selected/Focus-path endpoint positions, then collision-pack
+variable rectangles. This refines the HIER2 Strategy A macro architecture
+without reopening it. A0 remains an explicit development comparison.
+
+Production-boundary tests keep the package out of apps, renderer-reactflow,
+view-state, workspace-worker, and platform code. HIER3B may place
+`model + projection + dimensions + settings → validated computed layout`
+behind a new latest-result-wins worker boundary. Complete routing remains
+HIER5, and the current D0 implementation remains Classic Focus Hierarchy. See
+ADR 0018 and ADR 0019.
 
 `packages/view-state` depends inward on core and view-projection only. It owns a
 versioned plain-data subset of KG6 disclosure, focus, user-facing filters,
@@ -361,11 +367,13 @@ Dagre coordinates, and per-frame movement never cross into saved view state.
 Restoration reuses the KG8 center request after layout; missing or filtered
 anchors use normal fit without widening the restored view.
 
-`tools/focus-schematic-bakeoff` is the development-only HIER2 comparison
+`tools/focus-schematic-bakeoff` is the development-only HIER2/HIER3A comparison
 boundary. It owns synthetic fixtures, the renderer-dimension drift adapter,
-D0/compound prototypes, isolated benchmark workers, dynamic experiments, and
-the generated static SVG lab. It may import renderer dimensions for evidence;
-none of its code is reachable from a production app or renderer.
+D0/compound/A0 prototypes, endpoint/lane/crossing benchmarks, isolated workers,
+dynamic experiments, and generated static SVG labs. Historical HIER2 evidence
+uses the explicit A0 alias; HIER3A evidence compares A0 with selected A1. It may
+import renderer dimensions for evidence; none of its code is reachable from a
+production app or renderer.
 
 `tools/vault-diagnostics` is the Node development filesystem boundary. It recursively
 discovers one explicitly selected vault, reads strict UTF-8 Markdown, inventories

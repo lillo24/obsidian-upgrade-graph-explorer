@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  computeFocusSchematicLayoutAttempt,
+  computeFocusSchematicUniformLayoutAttempt as computeFocusSchematicLayoutAttempt,
   FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 

@@ -21,6 +21,7 @@ import { validateFocusSchematicLayoutInput } from './input';
 import { createFocusSchematicLayoutPlan } from './plan';
 import { layoutInput } from './test-helpers';
 import {
+  computeFocusSchematicLayout,
   computeFocusSchematicLayoutAttempt,
   computeFocusSchematicUniformLayoutAttempt,
 } from './index';
@@ -492,16 +493,29 @@ describe('HIER3A endpoint plan and endpoint-facing layout', () => {
     ).toBe(false);
   });
 
-  it('preserves A0 as an explicit byte-identical development baseline', () => {
+  it('selects A1 while preserving A0 as explicit development evidence', () => {
     const fixture = buildEndpointFixture(spec('EP7'));
     const input = layoutInput(fixture);
     const selected = computeFocusSchematicLayoutAttempt(input);
+    const computed = computeFocusSchematicComputedLayoutAttempt(input);
     const uniform = computeFocusSchematicUniformLayoutAttempt(input);
     expect(selected.status).toBe('success');
+    expect(computed.status).toBe('success');
     expect(uniform.status).toBe('success');
-    if (selected.status !== 'success' || uniform.status !== 'success') return;
-    expect(selected.candidate).toEqual(uniform.candidate);
-    expect(selected.plan).toEqual(uniform.plan);
+    if (
+      selected.status !== 'success' ||
+      computed.status !== 'success' ||
+      uniform.status !== 'success'
+    )
+      return;
+    expect(selected.strategyId).toBe('A1-endpoint-facing-split-lanes');
+    expect(selected.candidate).toEqual(computed.result.candidate);
+    expect(selected.plan).toEqual(computed.result.modulePlan);
+    expect(computeFocusSchematicLayout(input)).toEqual(
+      computed.result.candidate,
+    );
+    expect(selected.candidate).not.toEqual(uniform.candidate);
+    expect(uniform.strategyId).toBe('A-two-stage-dagre');
   });
 
   it('builds and measures all ES1–ES8 stability pairs with stable shared IDs', () => {

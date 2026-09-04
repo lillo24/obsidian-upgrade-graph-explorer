@@ -44,6 +44,8 @@ export {
 export {
   computeFocusSchematicLayout,
   computeFocusSchematicLayoutAttempt,
+} from './selected';
+export {
   computeFocusSchematicLayout as computeFocusSchematicUniformLayout,
   computeFocusSchematicLayoutAttempt as computeFocusSchematicUniformLayoutAttempt,
 } from './two-stage';

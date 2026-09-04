@@ -5,13 +5,13 @@ deterministic module and endpoint plans, internal File-module lanes, common
 module-box policy, public sibling-order constraints, and the two-stage Dagre
 implementations. It remains absent from production imports until HIER3B.
 
-`computeFocusSchematicLayout(input)` remains the HIER2 A0 selection while the
-HIER3A graphical decision is pending. The input
+`computeFocusSchematicLayout(input)` selects the accepted HIER3A A1 layout. The input
 contains a HIER1 model, its KG6 projection, one strictly ordered positive
 dimension record for every visible entity node, and explicit settings. The
 function returns a strictly validated HIER1 layout candidate or throws an
-actionable error. `computeFocusSchematicLayoutAttempt` adds benchmark timings,
-native-route evidence, and explicit failure status for the development tool.
+actionable error. `computeFocusSchematicLayoutAttempt` retains the established
+candidate/plan attempt shape with A1 geometry, benchmark timings, native-route
+evidence, and explicit failure status.
 
 `computeFocusSchematicComputedLayout(input)` is the explicit HIER3A A1
 candidate. It returns a strictly validated plain-data result containing the
@@ -20,7 +20,8 @@ per-node demands, the left/center/right lane plan, endpoint-facing geometry,
 boundary attachments, and endpoint quality. Attachments are simple endpoint
 suggestions; candidate routes remain empty because channel/obstacle routing is
 owned by HIER5. `computeFocusSchematicUniformLayout` keeps A0 available as an
-explicit development comparison seam.
+explicit development comparison seam, and historical HIER2 tools call it
+directly.
 
 After Dagre establishes exact internal endpoint positions, A1 performs four
 fixed endpoint-ordering sweeps. Each signed macro rank uses the median desired
@@ -72,6 +73,8 @@ the bakeoff evidence if changed.
   canonical source order.
 - `src/settings.ts` owns the frozen spacing, reserve, clearance, and filtered
   placeholder policy.
+- `src/selected.ts` maps the accepted A1 computed result to the compatible
+  selected candidate/attempt API.
 - `src/two-stage.ts` preserves A0 by laying out each File hierarchy uniformly
   and then running the shared module backbone with fresh stateless Dagre
   graphs.
@@ -83,7 +86,7 @@ The package depends inward on core, view-projection, focus-schematic, and the
 already pinned `@dagrejs/dagre` 3.1.1 only. It must not import React, renderers,
 apps, W3, view-state, Tauri, source adapters, or filesystem APIs.
 
-The A1 result is the intended HIER3B worker payload if graphical review adopts
-it. HIER3B owns transport, latest-result-wins behavior, caching, stale-result
-rejection, renderer mapping, and production fallback. Complete explicit route
-ownership remains HIER5.
+The accepted A1 result is the intended HIER3B worker payload. HIER3B owns
+transport, latest-result-wins behavior, caching, stale-result rejection,
+renderer mapping, and production fallback. Complete explicit route ownership
+remains HIER5.

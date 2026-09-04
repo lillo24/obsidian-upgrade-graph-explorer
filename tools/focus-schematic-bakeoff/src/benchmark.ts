@@ -5,7 +5,7 @@ import {
   type FocusSchematicStabilityQuality,
 } from '@icarus-graph-explorer/focus-schematic';
 import {
-  computeFocusSchematicLayoutAttempt,
+  computeFocusSchematicUniformLayoutAttempt as computeFocusSchematicLayoutAttempt,
   FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
   type FocusSchematicLayoutAttempt,
   type FocusSchematicLayoutInput,

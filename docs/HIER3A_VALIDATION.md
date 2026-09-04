@@ -1,18 +1,21 @@
 # HIER3A validation
 
-Status: **A1 internal orientation is graphically preferred; endpoint-aware
-ordering evidence is complete and final graphical approval is pending.** The
-first review explicitly kept the A1 orientation decision closed while asking
-for crossing reduction. No ADR, production selection, PR, or merge has been
-finalized.
+Status: **accepted — `ADOPT_ENDPOINT_FACING_SPLIT_LANES`.** The first
+graphical review selected A1 internal orientation and requested the bounded
+endpoint-aware ordering refinement. The final graphical review approved A1
+with that pass after EP12, EP25, and EP26 reached crossing-free order while the
+multi-hop, fan, determinism, collision, and secondary-edge invariants remained
+intact. A1 is now the selected non-production Focus Schematic layout; the
+production application remains unchanged.
 
 ## Scope and isolation
 
 HIER3A initially started from
-`e51f52ed11ae8b3a5ff233e4e50a3c1eb268f60c`; the final-review candidate is
-rebased onto `b10ceaa`. HIER2 Strategy A remains the macro architecture. The
-experiment changes only the per-File internal stage and adds renderer-neutral
-endpoint, lane, attachment, and quality data in
+`e51f52ed11ae8b3a5ff233e4e50a3c1eb268f60c`; the final-review candidate was
+rebased onto `b10ceaa`, and the accepted candidate is rebased onto `b4ea17e`.
+HIER2 Strategy A remains the macro architecture. The experiment changes only
+the per-File internal stage and adds renderer-neutral endpoint, lane,
+attachment, and quality data in
 `@icarus-graph-explorer/focus-schematic-layout`.
 
 The production-boundary test still proves that apps, React Flow mapping, W3,
@@ -20,11 +23,12 @@ view-state, the desktop application, and other production packages do not
 import this package. Current Classic Focus Hierarchy and All + Hierarchy
 experimental gating are unchanged. Draft PRs #60 and #67 are untouched.
 
-`computeFocusSchematicLayout` still selects the preserved A0 uniform-internal
-candidate while graphical review is pending. The explicit
-`computeFocusSchematicComputedLayout` API exposes A1 for tests, benchmarks, and
-the review lab. A decision may change the non-production selection only after
-user review.
+`computeFocusSchematicLayout` now selects A1 and returns only its candidate.
+`computeFocusSchematicLayoutAttempt` preserves its established result shape
+while returning A1 geometry. The explicit
+`computeFocusSchematicComputedLayout` API exposes A0, A1, endpoint/lane plans,
+and per-phase timing for HIER3B. Explicit uniform-layout aliases preserve A0
+for development comparison and historical HIER2 bakeoff evidence.
 
 ## Endpoint and lane contracts
 
@@ -176,11 +180,11 @@ The generated-output test verifies EP1–EP26, ES3/ES4/ES5 revisions, defaults,
 plain-language explanations, keyboard hooks, Advanced placement, and absence
 of HIER2 B/C/configuration controls. Desktop browser automation could not open
 the local `file://` artifact because its browser security policy blocked that
-scheme and prohibited retrying through another browser route. The artifact is
-therefore ready for the required user graphical review, but no automated
-browser-render claim is made.
+scheme and prohibited retrying through another browser route. The user viewed
+the generated artifact directly and gave final graphical approval after both
+review rounds; no automated browser-render claim is made.
 
-## Validation completed before graphical review
+## Validation
 
 ```bash
 pnpm install --frozen-lockfile                         # baseline
@@ -199,18 +203,22 @@ pnpm benchmark:focus-schematic-endpoints -- --profile stability
 pnpm generate:focus-schematic-endpoint-lab -- --out output/hier3a-endpoint-lab
 ```
 
-Full repository and desktop checks are run on the review-ready diff before the
-graphical gate. Final decision documentation, ADR 0019, selected API change,
-roadmap/architecture updates, PR/CI/merge, and cleanup remain gated on explicit
-user review.
+After graphical approval, the selected API, final decision record, ADR 0019,
+architecture, roadmap, and validation record were updated together. The
+production boundary and Classic Focus Hierarchy remain unchanged; HIER3B was
+not started.
 
-The final-review diff, rebased onto `b10ceaa`, passed `pnpm check`: formatting,
-lint, every package typecheck, 166 test files with 1,405 tests, and the
-588-module web build. The
-existing Vite chunk-size advisory was the only build warning. It also passed
-`pnpm desktop:check`, `pnpm desktop:build`, the small local-renderer benchmark,
-the small application performance benchmark, and `pnpm install
---frozen-lockfile` after the lockfile update. A localhost production-app smoke
-loaded the workspace title, graph controls, saved graph summary, and accessible
-control labels successfully. This production smoke does not replace the
-blocked local-file lab render or the required user review.
+The accepted selection diff, rebased onto `b4ea17e`, passed `pnpm check`:
+formatting, lint, every package typecheck, 177 test files with 1,461 tests, and
+the 596-module web build. The existing Vite chunk-size advisory was the only
+build warning. It also passed `pnpm desktop:check`, `pnpm desktop:build`, the
+historical HIER2 fixture corpus through the explicit A0 alias, endpoint
+fixtures, small/medium/hub/stability endpoint profiles, the regenerated lab,
+the small local-renderer benchmark, the small application performance
+benchmark, and `pnpm install --frozen-lockfile`. The archived prompt SHA-256 is
+`DF9AA3F3A9D77E002183676E37089F194611DAD130FCBAC37000C3DEF76EE711`.
+
+The earlier localhost production-app smoke loaded the workspace title, graph
+controls, saved graph summary, and accessible control labels successfully.
+This production smoke is separate from the user-completed local-file lab
+reviews.
