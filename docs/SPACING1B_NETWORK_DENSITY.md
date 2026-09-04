@@ -102,10 +102,10 @@ isolates density cost.
 
 | Nodes |    Median |       p95 |
 | ----: | --------: | --------: |
-|   100 |  0.319 ms |  1.301 ms |
-|   500 |  1.367 ms |  1.695 ms |
-| 1,000 |  3.099 ms |  3.558 ms |
-| 5,000 | 18.830 ms | 20.970 ms |
+|   100 |  0.395 ms |  1.385 ms |
+|   500 |  1.656 ms |  1.710 ms |
+| 1,000 |  3.066 ms |  3.856 ms |
+| 5,000 | 19.655 ms | 23.088 ms |
 
 The operation oracle records zero Global ForceAtlas2 requests, zero dynamic
 Pull requests, and zero spatial persistence writes for strength-only changes.
