@@ -6,6 +6,7 @@ coverage/
 /output/spacing1a/
 /output/hier2-layout-lab/
 /tools/focus-schematic-bakeoff/output/
+/output/convergence1a/
 *.tsbuildinfo
 .DS_Store
 *.local
