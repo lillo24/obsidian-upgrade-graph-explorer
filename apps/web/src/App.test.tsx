@@ -357,7 +357,12 @@ describe('graph-first explorer shell', () => {
     expect(settingsMarkup).toContain('>Preferences</button>');
     expect(settingsMarkup).toContain('>Sandbox</button>');
     expect(settingsMarkup).toContain('>Focus Root appearance</h3>');
-    expect(settingsMarkup).toContain('>All Network Layout</h3>');
+    expect(settingsMarkup).toContain('>Network</h3>');
+    expect(settingsMarkup).toContain('>All Network</h3>');
+    expect(settingsMarkup).toContain('Reference Pull');
+    expect(settingsMarkup).toContain('Base node size');
+    expect(settingsMarkup).toContain('Link thickness');
+    expect(settingsMarkup).toContain('Label threshold');
     expect(settingsMarkup).toContain('>Folder clustering</strong>');
     expect(settingsMarkup).toContain('<legend>Spacing</legend>');
     expect(settingsMarkup).toContain('data-graph-history-shortcuts="off"');

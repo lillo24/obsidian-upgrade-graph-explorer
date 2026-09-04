@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   customGlobalLayoutSettings,
   DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE,
+  resolveNetworkSettings,
 } from '@icarus-graph-explorer/renderer-sigma/settings';
 
 import type { StorageLike } from '../persistence/storage';
@@ -198,14 +199,18 @@ describe('graph preferences', () => {
     });
   });
 
-  it('round-trips new custom v1 settings including link influence', () => {
+  it('round-trips shared Network settings through the unchanged v1 record', () => {
     const storage = memoryStorage();
     const globalLayoutSettings = {
       folderClustering: true,
       spacingPreset: 'compact' as const,
       custom: {
         ...customGlobalLayoutSettings('compact'),
+        linkForce: 1.6,
+        nodeSize: 7.5,
         referenceDegreeSizeInfluence: 82,
+        linkThickness: 1.35,
+        labelThreshold: 10.5,
       },
     };
 
@@ -215,10 +220,17 @@ describe('graph preferences', () => {
         globalLayoutSettings,
       }),
     ).toEqual({ ok: true });
-    expect(
-      loadGraphPreferences(storage).preferences.globalLayoutSettings,
-    ).toEqual(globalLayoutSettings);
+    const restored =
+      loadGraphPreferences(storage).preferences.globalLayoutSettings;
+    expect(restored).toEqual(globalLayoutSettings);
+    expect(resolveNetworkSettings(restored)).toEqual({
+      referencePull: 1.6,
+      nodeSize: 7.5,
+      linkThickness: 1.35,
+      labelThreshold: 10.5,
+    });
     expect(storage.value).toContain('"referenceDegreeSizeInfluence":82');
+    expect(storage.value).toContain('"linkForce":1.6');
   });
 
   it('falls back only Global settings when persisted influence is malformed', () => {

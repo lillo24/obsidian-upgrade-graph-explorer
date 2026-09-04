@@ -149,6 +149,9 @@ export const GraphSettings = memo(function GraphSettings({
   const [advancedLayoutOpen, setAdvancedLayoutOpen] = useState(false);
   const [experimentalOpen, setExperimentalOpen] = useState(false);
   const folderStrength = folderClusteringStrength(globalLayoutSettings);
+  const customSettings =
+    globalLayoutSettings.custom ??
+    customGlobalLayoutSettings(globalLayoutSettings.spacingPreset);
   const preferencesTabRef = useRef<HTMLButtonElement>(null);
   const sandboxTabRef = useRef<HTMLButtonElement>(null);
   const sourceTabRef = useRef<HTMLButtonElement>(null);
@@ -372,13 +375,26 @@ export const GraphSettings = memo(function GraphSettings({
                 </fieldset>
               </section>
               <section
+                aria-labelledby="network-settings-heading"
+                className="graph-settings__section"
+              >
+                <h3 id="network-settings-heading">Network</h3>
+                <p className="global-layout-scope-note">
+                  Shared by Scope = All and Scope = Focus when Layout = Network.
+                  Hierarchy layouts are unchanged.
+                </p>
+                <NetworkSharedControls
+                  onChange={changeCustom}
+                  settings={customSettings}
+                />
+              </section>
+              <section
                 aria-labelledby="global-layout-settings-heading"
                 className="graph-settings__section"
               >
-                <h3 id="global-layout-settings-heading">All Network Layout</h3>
+                <h3 id="global-layout-settings-heading">All Network</h3>
                 <p className="global-layout-scope-note">
-                  Applies to Scope = All, Layout = Network. Changes appear when
-                  you return to All + Network.
+                  Folder physics apply only to Scope = All, Layout = Network.
                 </p>
                 <label className="graph-settings__check">
                   <input
@@ -462,17 +478,12 @@ export const GraphSettings = memo(function GraphSettings({
                   <span aria-hidden="true">
                     {advancedLayoutOpen ? '▾' : '▸'}
                   </span>{' '}
-                  Advanced controls
+                  Advanced All Network controls
                 </button>
                 {advancedLayoutOpen ? (
                   <GlobalCustomLayoutControls
                     onChange={changeCustom}
-                    settings={
-                      globalLayoutSettings.custom ??
-                      customGlobalLayoutSettings(
-                        globalLayoutSettings.spacingPreset,
-                      )
-                    }
+                    settings={customSettings}
                   />
                 ) : null}
               </section>
@@ -642,14 +653,7 @@ export function GlobalCustomLayoutControls({
       id="global-layout-advanced-controls"
     >
       <section aria-labelledby="global-layout-advanced-layout-heading">
-        <h4 id="global-layout-advanced-layout-heading">Layout</h4>
-        <GlobalCustomRange
-          controlKey="linkForce"
-          label="Reference pull"
-          onChange={onChange}
-          settings={settings}
-          step={0.05}
-        />
+        <h4 id="global-layout-advanced-layout-heading">All-only controls</h4>
         <GlobalCustomRange
           controlKey="betweenFolderSpacing"
           label="Folder separation"
@@ -659,14 +663,7 @@ export function GlobalCustomLayoutControls({
         />
       </section>
       <section aria-labelledby="global-layout-advanced-visual-heading">
-        <h4 id="global-layout-advanced-visual-heading">Visual</h4>
-        <GlobalCustomRange
-          controlKey="nodeSize"
-          label="Base node size"
-          onChange={onChange}
-          settings={settings}
-          step={0.25}
-        />
+        <h4 id="global-layout-advanced-visual-heading">All-only visual</h4>
         <GlobalCustomRange
           controlKey="referenceDegreeSizeInfluence"
           label="Link influence on node size"
@@ -681,21 +678,60 @@ export function GlobalCustomLayoutControls({
             <span>Strong</span>
           </small>
         </GlobalCustomRange>
-        <GlobalCustomRange
-          controlKey="linkThickness"
-          label="Link thickness"
-          onChange={onChange}
-          settings={settings}
-          step={0.05}
-        />
-        <GlobalCustomRange
-          controlKey="labelThreshold"
-          label="Label threshold"
-          onChange={onChange}
-          settings={settings}
-          step={0.25}
-        />
       </section>
+    </div>
+  );
+}
+
+export function NetworkSharedControls({
+  onChange,
+  settings,
+}: {
+  readonly onChange: (
+    key: keyof GlobalLayoutCustomSettings,
+    value: number,
+  ) => void;
+  readonly settings: GlobalLayoutCustomSettings;
+}) {
+  return (
+    <div className="global-layout-custom-controls" id="network-shared-controls">
+      <GlobalCustomRange
+        controlKey="linkForce"
+        idPrefix="network-setting"
+        label="Reference Pull"
+        onChange={onChange}
+        settings={settings}
+        step={0.05}
+      >
+        <small>
+          <span>Weak</span>
+          <span>Strong</span>
+        </small>
+      </GlobalCustomRange>
+      <GlobalCustomRange
+        controlKey="nodeSize"
+        idPrefix="network-setting"
+        label="Base node size"
+        onChange={onChange}
+        settings={settings}
+        step={0.25}
+      />
+      <GlobalCustomRange
+        controlKey="linkThickness"
+        idPrefix="network-setting"
+        label="Link thickness"
+        onChange={onChange}
+        settings={settings}
+        step={0.05}
+      />
+      <GlobalCustomRange
+        controlKey="labelThreshold"
+        idPrefix="network-setting"
+        label="Label threshold"
+        onChange={onChange}
+        settings={settings}
+        step={0.25}
+      />
     </div>
   );
 }
@@ -703,6 +739,7 @@ export function GlobalCustomLayoutControls({
 function GlobalCustomRange({
   children,
   controlKey,
+  idPrefix = 'global-layout',
   label,
   onChange,
   output,
@@ -712,6 +749,7 @@ function GlobalCustomRange({
 }: {
   readonly children?: ReactNode;
   readonly controlKey: keyof GlobalLayoutCustomSettings;
+  readonly idPrefix?: string;
   readonly label: string;
   readonly onChange: (
     key: keyof GlobalLayoutCustomSettings,
@@ -722,7 +760,7 @@ function GlobalCustomRange({
   readonly step: number;
   readonly valueText?: string;
 }) {
-  const id = `global-layout-${controlKey}`;
+  const id = `${idPrefix}-${controlKey}`;
   return (
     <label htmlFor={id}>
       <span>

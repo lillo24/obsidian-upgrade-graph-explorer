@@ -18,6 +18,10 @@ import {
   localLayoutFingerprint,
   warmLocalRendererInput,
 } from './local-layout';
+import {
+  DEFAULT_RESOLVED_NETWORK_SETTINGS,
+  localLayoutSettingsFromNetworkSettings,
+} from './local-network-settings';
 import { mountLocalRendererSession } from './local-lifecycle';
 import {
   mapProjectionToLocalTopology,
@@ -35,6 +39,7 @@ import type {
   LocalTransitionAnchorApi,
   SemanticLocalViewport,
 } from './local-types';
+import type { ResolvedNetworkSettings } from './types';
 import { shouldApplyGlobalViewportRequest } from './viewport-request';
 
 export interface LocalGraphCanvasProps {
@@ -46,6 +51,8 @@ export interface LocalGraphCanvasProps {
   readonly layoutCache?: LocalLayoutCache;
   readonly layoutRequestKey: number;
   readonly layoutService: LocalLayoutService;
+  /** Shared Network preferences; only Reference Pull enters Local layout identity. */
+  readonly networkSettings?: ResolvedNetworkSettings;
   /** Transient Sandbox policy; excluded from layout input and fingerprinting. */
   readonly densityFramingStrength?: number;
   readonly onFailure: (message: string) => void;
@@ -87,6 +94,7 @@ export function LocalGraphCanvas({
   layoutCache,
   layoutRequestKey,
   layoutService,
+  networkSettings = DEFAULT_RESOLVED_NETWORK_SETTINGS,
   onFailure,
   onDensityQaDiagnosticsChange,
   onFitRequestConsumed,
@@ -158,9 +166,14 @@ export function LocalGraphCanvas({
       ? seed()
       : instrumentation.measure('local-seed', 'local-seeds', seed);
   }, [instrumentation, topology]);
+  const referencePull = networkSettings.referencePull;
   const requestTemplate = useMemo(
-    () => createLocalLayoutRequest(input),
-    [input],
+    () =>
+      createLocalLayoutRequest(
+        input,
+        localLayoutSettingsFromNetworkSettings({ referencePull }),
+      ),
+    [input, referencePull],
   );
   const fingerprint = useMemo(
     () => localLayoutFingerprint(requestTemplate),
@@ -177,6 +190,7 @@ export function LocalGraphCanvas({
         cached === undefined ? input : warmLocalRendererInput(input, cached),
       initialTransitionAnchor,
       initialViewport,
+      networkSettings,
       trackpadZoomMode,
       visualGroupStyles,
       presentationOverrides,
@@ -200,6 +214,7 @@ export function LocalGraphCanvas({
         new LocalRendererSession(container, initial.input, {
           rootNodeKey: initial.input.rootNodeKey,
           densityFramingStrength: initial.densityFramingStrength,
+          networkSettings: initial.networkSettings,
           trackpadZoomMode: initial.trackpadZoomMode,
           ...(initial.presentationOverrides === undefined
             ? {}
@@ -284,6 +299,10 @@ export function LocalGraphCanvas({
   }, [densityFramingStrength]);
 
   useEffect(() => {
+    sessionRef.current?.updateNetworkSettings(networkSettings);
+  }, [networkSettings]);
+
+  useEffect(() => {
     if (appliedVisualGroupStyles.current === visualGroupStyles) return;
     appliedVisualGroupStyles.current = visualGroupStyles;
     sessionRef.current?.setVisualGroupStyles(visualGroupStyles);
@@ -346,7 +365,7 @@ export function LocalGraphCanvas({
         setLayoutStatus('Focus Network is ready; refining layout…');
       }
     });
-    const request = session.createLayoutRequest(input);
+    const request = session.createLayoutRequest(input, { referencePull });
     instrumentation?.count('local-layouts');
     void layoutService
       .layout(request)
@@ -388,6 +407,7 @@ export function LocalGraphCanvas({
     layoutService,
     layoutRequestKey,
     ready,
+    referencePull,
   ]);
 
   useEffect(() => {
