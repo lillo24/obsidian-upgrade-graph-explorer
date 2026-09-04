@@ -45,8 +45,10 @@ enabled match in the same order for a later Inspector. Disabled definitions are
 validated and retained but excluded from the active evaluator path.
 
 `compileVisualGroups()` parses every definition once. Per-entity matching calls
-QUERY1's `matchesGraphQuery()` over canonical `AddressableEntity` values; it
-does not reimplement path, title, kind, level, or Boolean behavior. A successful
+QUERY1's `matchesGraphQuery()` over canonical `AddressableEntity` values; exact
+`folder="..."` subtree rules therefore work for Documents, Sections, and Blocks
+without another group language. It does not reimplement path, folder, title,
+kind, level, or Boolean behavior. A successful
 match resolves to `{groupName, color, accent}`. Renderers receive only a
 `ReadonlyMap<EntityId, VisualGroupNodePresentation>` and never receive queries,
 ASTs, registries, or parsers.

@@ -217,8 +217,9 @@ node/edge objects; it does not reconstruct or resort graph topology:
   remain as `context`.
 - `query` stores canonical QUERY1 text. `projectView` parses it once and reuses
   that expression for the visible and DISC1 candidate passes. Predicates use
-  canonical paths and section titles; invalid external strings fail closed with
-  an `invalid-query` issue.
+  canonical paths and section titles; exact `folder="..."` predicates match
+  source-file folder subtrees for every canonical entity. Invalid external
+  strings fail closed with an `invalid-query` issue.
 - `referenceStatuses` removes nonmatching edges, clears excluded resolved
   internal provenance, and removes orphan synthetic targets.
 

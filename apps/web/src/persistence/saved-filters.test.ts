@@ -107,6 +107,40 @@ describe('saved graph filter registry', () => {
     });
   });
 
+  it('round-trips canonical folder queries without changing schema v1', () => {
+    const storage = memoryStorage();
+    const added = addSavedGraphFilter(
+      {
+        schemaVersion: 1,
+        workspaceId: 'workspace',
+        filters: [],
+      },
+      'Theory folders',
+      'folder=Theory OR folder="Archive/Old"',
+    );
+    expect(added).toEqual({
+      ok: true,
+      value: {
+        schemaVersion: 1,
+        workspaceId: 'workspace',
+        filters: [
+          {
+            name: 'Theory folders',
+            query: 'folder="Theory" OR folder="Archive/Old"',
+          },
+        ],
+      },
+    });
+    if (!added.ok) return;
+    expect(saveSavedGraphFilterRegistry(storage, added.value)).toEqual({
+      ok: true,
+    });
+    expect(loadSavedGraphFilters(storage, 'workspace')).toEqual({
+      status: 'loaded',
+      value: added.value,
+    });
+  });
+
   it('leaves corrupt values untouched and reports read/write failures', () => {
     const storage = memoryStorage();
     const key = savedGraphFilterStorageKey('workspace');

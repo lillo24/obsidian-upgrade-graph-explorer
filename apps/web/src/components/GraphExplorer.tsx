@@ -12,14 +12,20 @@ import {
   type ReactNode,
 } from 'react';
 
-import type {
-  AddressableEntity,
-  EntityId,
-  KnowledgeSnapshot,
+import {
+  workspaceFolderKeyContainsFolder,
+  workspaceFolderKeyFromPath,
+  type AddressableEntity,
+  type EntityId,
+  type KnowledgeSnapshot,
+  type WorkspaceFolderKey,
 } from '@icarus-graph-explorer/core';
 import type { DiagnosticIdentityStability } from '@icarus-graph-explorer/diagnostics-obsidian';
 import { createInspectionWorkspace } from '@icarus-graph-explorer/explorer-inspection';
-import { listExactPathExclusions } from '@icarus-graph-explorer/graph-query';
+import {
+  listExactPathExclusions,
+  listFolderExclusions,
+} from '@icarus-graph-explorer/graph-query';
 import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performance';
 import {
   GraphCanvas,
@@ -2136,9 +2142,13 @@ export function GraphExplorer({
     activeViewState.filters?.query,
     commitQuery,
   );
-  const { adoptQuery, mutateExactPath } = queryEditor;
+  const { adoptQuery, mutateExactPath, mutateFolder } = queryEditor;
   const hiddenFileResult = useMemo(
     () => listExactPathExclusions(activeViewState.filters?.query),
+    [activeViewState.filters?.query],
+  );
+  const hiddenFolderResult = useMemo(
+    () => listFolderExclusions(activeViewState.filters?.query),
     [activeViewState.filters?.query],
   );
   const focusedSourcePath =
@@ -2151,6 +2161,12 @@ export function GraphExplorer({
       mutateExactPath(path, 'remove');
     },
     [mutateExactPath],
+  );
+  const restoreNetworkFolder = useCallback(
+    (folderKey: WorkspaceFolderKey) => {
+      mutateFolder(folderKey, 'remove');
+    },
+    [mutateFolder],
   );
   const hideNetworkFile = useCallback(
     (path: string) => {
@@ -2169,6 +2185,24 @@ export function GraphExplorer({
       mutateExactPath,
       networkExplorerModel,
     ],
+  );
+  const hideNetworkFolder = useCallback(
+    (folderKey: WorkspaceFolderKey) => {
+      const focusedFolderKey =
+        focusedSourcePath === undefined
+          ? undefined
+          : workspaceFolderKeyFromPath(focusedSourcePath);
+      if (
+        !hiddenFolderResult.ok ||
+        hiddenFolderResult.folderKeys.includes(folderKey) ||
+        !networkExplorerModel?.folderByPath.has(folderKey) ||
+        (focusedFolderKey !== undefined &&
+          workspaceFolderKeyContainsFolder(folderKey, focusedFolderKey))
+      )
+        return;
+      mutateFolder(folderKey, 'add');
+    },
+    [focusedSourcePath, hiddenFolderResult, mutateFolder, networkExplorerModel],
   );
   const applySavedFilter = useCallback(
     (query: string) => {
@@ -3921,16 +3955,21 @@ export function GraphExplorer({
                 ...queryEditor,
                 queryIssue:
                   queryEditor.queryIssue ??
-                  (hiddenFileResult.ok
+                  (hiddenFileResult.ok && hiddenFolderResult.ok
                     ? undefined
-                    : 'Hidden files could not be read from the applied QUERY1 expression.'),
+                    : 'Hidden files or folders could not be read from the applied QUERY1 expression.'),
               }}
               hiddenPaths={hiddenFileResult.ok ? hiddenFileResult.paths : []}
+              hiddenFolderKeys={
+                hiddenFolderResult.ok ? hiddenFolderResult.folderKeys : []
+              }
               focusedSourcePath={focusedSourcePath}
               onRestoreFile={restoreNetworkFile}
+              onRestoreFolder={restoreNetworkFolder}
               onFocusNode={focusNetworkExplorerNode}
               onInspectNode={inspectNetworkExplorerNode}
               onHideFile={hideNetworkFile}
+              onHideFolder={hideNetworkFolder}
               folderState={networkExplorerFolderState}
               savedQueries={savedQueries}
               model={networkExplorerModel}

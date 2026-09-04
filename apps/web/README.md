@@ -52,7 +52,7 @@ apps/web/
     network-explorer-model.ts Projection-only source ordering, keyboard plans, and virtual ranges.
     network-explorer-folders.ts Canonical source folders, transient depth defaults/overrides, and iterative row flattening.
     network-explorer-context.ts Logical context targets, action eligibility, and menu keyboard planning.
-    network-explorer-query-actions.ts Atomic applied/draft QUERY1 exclusion planning and hidden-path labels.
+    network-explorer-query-actions.ts Atomic applied/draft QUERY1 File/Folder exclusion planning and hidden-file labels.
     persistence/      Stable-report eligibility, hydration, and localStorage adapter.
     report-view.ts    Pure reference/hierarchy presentation transformations.
     sample-report.json Deterministic private-safe report generated from fixtures.
@@ -222,20 +222,29 @@ Network hides dirty/reset copy but retains errors and Apply/Clear icons;
 Hierarchy's Reset draft abandons only the draft. The sole semantic query remains
 `ViewProjectionState.filters.query`.
 
-Hidden-file chips derive from QUERY1 global exact-path exclusions, including
-manually authored clauses and paths no longer present in the source. Hide and
-chip restore use the KG14B1 helpers, preserving the rest of the Boolean query.
+Hidden recovery groups Files and Folders derived from QUERY1 global exact-path
+and exact-folder exclusions, including manually authored clauses and identities
+no longer present in the source. Hide and chip restore use source-neutral AST
+helpers, preserving the rest of the Boolean query and restoring each type
+independently.
 Valid dirty drafts receive the same operation independently; invalid drafts or
 query-limit failures block both changes atomically. Each successful semantic
 change uses the existing set-query history path, with no extra Fit or centering.
 
-Right-click, Shift+F10, the ContextMenu key, or the visible Actions button opens
-one shared menu for a graph-node row. Folders have no node actions. Focus reuses existing
+Right-click, Shift+F10, or the ContextMenu key opens the same shared menu for a
+real folder row, with **Hide folder** backed by one `NOT folder="..."` subtree
+term rather than visible-child enumeration. The visible Actions button retains
+the graph-node menu. Targets are discriminated node/folder values; folders never
+receive fake graph IDs. Focus reuses existing
 All-entry/Local-navigation pipelines; Inspect selects and opens the existing
 Inspector without graph history. Hide file applies to the whole canonical source
 file, including when invoked on a heading/block; diagnostics, the active Focus
 root file, and already-hidden files are ineligible. Menu state is transient,
 closes on scrolling/projection invalidation, and restores mounted row focus safely.
+Hide folder is likewise disabled when the exact folder is already managed-hidden
+or contains the focused source file. Folder queries are case-sensitive and
+path-semantic: new descendants match automatically, moves out stop matching,
+and source-folder renames do not rewrite saved query text.
 
 The drawer starts closed, persists nothing, overlays rather than resizes the
 canvas, and closes when Layout leaves Network. Inspector and Network Explorer

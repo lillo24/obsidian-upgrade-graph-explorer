@@ -12,7 +12,7 @@ renderer, platform, or UI behavior.
 model/
   ids.ts          Opaque workspace, entity, and reference ID aliases.
   source.ts       Workspace path and half-open source-position semantics.
-  folder-key.ts   Exact normalized folder identity derived from workspace paths.
+  folder-key.ts   Exact normalized folder identity, derivation, and segment-aware subtree membership.
   entities.ts     Document/section/block hierarchy contracts.
   references.ts   Reference provenance and resolution discriminated union.
   snapshot.ts     Versioned workspace snapshot envelope.

@@ -15,12 +15,16 @@ own React state.
 - `src/format.ts` emits deterministic canonical query strings.
 - `src/evaluate.ts` evaluates one parsed expression using one fact extraction
   per canonical entity.
-- `src/exact-path-exclusions.ts` purely composes, lists, and removes global
-  exact-path exclusion terms while revalidating every generated query.
+- `src/managed-exclusions.ts` owns shared top-level `AND` traversal and bounded
+  canonical regeneration for UI-managed exclusions.
+- `src/exact-path-exclusions.ts` composes, lists, and removes global exact-path
+  exclusion terms.
+- `src/folder-exclusions.ts` does the same for exact folder-subtree terms and
+  avoids adding descendants already covered by a managed ancestor.
 - `src/index.ts` exposes the public package contract.
 
 The v1 grammar requires explicit `AND` / `OR` / `NOT`, with precedence
-`NOT` > `AND` > `OR`. Predicates are `path`, `title`, `text`, `kind`, and
+`NOT` > `AND` > `OR`. Predicates are `path`, `folder`, `title`, `text`, `kind`, and
 section-only `level`; entity-kind shorthands are also accepted. Query length,
 AST size, and nesting are bounded by exported constants. String search is
 case-insensitive. `text` means canonical source path or section title, not
@@ -32,8 +36,15 @@ path exactly and case-sensitively. Exact paths must use forward slashes, cannot
 be absolute, and cannot contain empty, `.` or `..` segments. Canonical formatting
 always quotes them.
 
+`folder="Notes"` compares exact, case-sensitive canonical folder identity and
+matches entities sourced directly in `Notes` or any path-segment descendant.
+It does not match `Notes-old` or `Archive/Notes`. `folder="."` matches every
+source-backed canonical entity. Folder queries remain path-semantic as files
+move or folders are renamed; the query text is never rewritten automatically.
+
 The exclusion helpers accept a current query or no query and manage only exact
-path clauses shaped as `NOT path="..."` in the expression's top-level `AND`
-chain. They preserve other terms and their order, ignore clauses nested in
-arbitrary Boolean branches, and return explicit issues instead of emitting a
-query that violates the normal QUERY1 bounds.
+clauses shaped as `NOT path="..."` or `NOT folder="..."` in the expression's
+top-level `AND` chain. File and folder operations preserve each other and all
+other terms in order, ignore clauses nested in arbitrary Boolean branches, and
+return explicit issues instead of emitting a query that violates normal QUERY1
+bounds.

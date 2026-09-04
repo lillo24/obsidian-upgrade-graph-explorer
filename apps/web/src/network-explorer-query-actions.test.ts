@@ -8,6 +8,7 @@ import {
 } from '@icarus-graph-explorer/view-projection';
 import {
   listExactPathExclusions,
+  listFolderExclusions,
   MAX_GRAPH_QUERY_LENGTH,
   parseGraphQuery,
 } from '@icarus-graph-explorer/graph-query';
@@ -15,6 +16,7 @@ import {
 import {
   hiddenFileLabels,
   planExactPathQueryMutation,
+  planFolderQueryMutation,
   reconcileGraphQueryDraft,
 } from './network-explorer-query-actions';
 import { graphStateReducer, initialGraphState } from './graph-state';
@@ -279,5 +281,70 @@ describe('atomic exact-path UI query planning', () => {
       goForwardInGraphHistory(back.history, back.target)?.target.state.filters
         ?.query,
     ).toBeUndefined();
+  });
+});
+
+describe('atomic folder UI query planning', () => {
+  it('adds one folder term to active and valid dirty drafts', () => {
+    const plan = planFolderQueryMutation({
+      activeQuery: 'kind:document AND NOT path="Private.md"',
+      queryDraft: 'title:"todo" OR title:"notes"',
+      folderKey: 'Theory',
+      operation: 'add',
+    });
+    if (!plan.ok) throw new Error(plan.issue);
+    expect(plan.query).toBe(
+      'kind:document AND NOT path="Private.md" AND NOT folder="Theory"',
+    );
+    expect(plan.draft).toBe(
+      '(title:"todo" OR title:"notes") AND NOT folder="Theory"',
+    );
+    expect(listExactPathExclusions(plan.query)).toEqual({
+      ok: true,
+      paths: ['Private.md'],
+    });
+    expect(listFolderExclusions(plan.query)).toEqual({
+      ok: true,
+      folderKeys: ['Theory'],
+    });
+  });
+
+  it('restores only the requested folder while retaining File and nested Folder terms', () => {
+    const plan = planFolderQueryMutation({
+      activeQuery:
+        'NOT folder="Theory" AND NOT path="Theory/Special.md" AND NOT folder="Theory/Drafts"',
+      queryDraft:
+        'NOT folder="Theory" AND NOT path="Theory/Special.md" AND NOT folder="Theory/Drafts"',
+      folderKey: 'Theory',
+      operation: 'remove',
+    });
+    expect(plan).toEqual({
+      ok: true,
+      query: 'NOT path="Theory/Special.md" AND NOT folder="Theory/Drafts"',
+      draft: 'NOT path="Theory/Special.md" AND NOT folder="Theory/Drafts"',
+    });
+  });
+
+  it('fails atomically for an invalid dirty draft or generated limit overflow', () => {
+    expect(
+      planFolderQueryMutation({
+        activeQuery: undefined,
+        queryDraft: 'title:',
+        folderKey: 'Theory',
+        operation: 'add',
+      }),
+    ).toMatchObject({
+      ok: false,
+      issue: expect.stringContaining('Fix or reset'),
+    });
+    const tooLong = `title:"${'x'.repeat(MAX_GRAPH_QUERY_LENGTH)}"`;
+    expect(
+      planFolderQueryMutation({
+        activeQuery: tooLong,
+        queryDraft: tooLong,
+        folderKey: 'Theory',
+        operation: 'add',
+      }).ok,
+    ).toBe(false);
   });
 });

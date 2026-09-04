@@ -55,11 +55,14 @@ describe('Network Explorer graph reveal and keyboard scrolling', () => {
         onResetDraft: vi.fn(),
       },
       hiddenPaths: [],
+      hiddenFolderKeys: [],
       focusedSourcePath: undefined,
       onRestoreFile: vi.fn(),
+      onRestoreFolder: vi.fn(),
       onFocusNode: vi.fn(),
       onInspectNode: vi.fn(),
       onHideFile: vi.fn(),
+      onHideFolder: vi.fn(),
       folderState: new Map(),
       savedQueries: {
         activeQuery: '',
@@ -255,5 +258,91 @@ describe('Network Explorer graph reveal and keyboard scrolling', () => {
     await render({ folderState: new Map([['One', false]]) });
     expect(container.querySelectorAll('[role="treeitem"]')).toHaveLength(1);
     expect(onFolderStateChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the folder menu by right-click and sends the exact folder key', async () => {
+    const nestedNode = { ...nodes[0]!, sourcePath: 'Theory/Sub/A.md' };
+    const nestedModel = {
+      nodes: [nestedNode],
+      nodeById: new Map([[nestedNode.id, nestedNode]]),
+      ...createNetworkExplorerFolders([nestedNode]),
+    };
+    const onHideFolder = vi.fn();
+    await render({ model: nestedModel, onHideFolder });
+    const folder = container.querySelector<HTMLElement>(
+      '[role="treeitem"][aria-label="Folder, Theory"]',
+    )!;
+    await act(() =>
+      folder.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          clientX: 24,
+          clientY: 36,
+        }),
+      ),
+    );
+    const menu = document.body.querySelector<HTMLElement>('[role="menu"]');
+    expect(menu?.getAttribute('aria-label')).toBe('Actions for Theory');
+    const hide = menu?.querySelector<HTMLButtonElement>('[role="menuitem"]');
+    expect(hide?.textContent).toBe('Hide folder');
+    await act(() => hide?.click());
+    expect(onHideFolder).toHaveBeenCalledWith('Theory');
+    expect(props.onSelectNode).not.toHaveBeenCalled();
+  });
+
+  it('opens the same protected folder menu with Shift+F10 and closes when the row disappears', async () => {
+    const nestedNode = { ...nodes[0]!, sourcePath: 'Theory/Sub/A.md' };
+    const nestedModel = {
+      nodes: [nestedNode],
+      nodeById: new Map([[nestedNode.id, nestedNode]]),
+      ...createNetworkExplorerFolders([nestedNode]),
+    };
+    await render({
+      model: nestedModel,
+      focusedSourcePath: 'Theory/Sub/A.md',
+    });
+    const folder = container.querySelector<HTMLElement>(
+      '[role="treeitem"][aria-label="Folder, Theory"]',
+    )!;
+    await act(() =>
+      folder.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          key: 'F10',
+          shiftKey: true,
+        }),
+      ),
+    );
+    const hide =
+      document.body.querySelector<HTMLButtonElement>('[role="menuitem"]');
+    expect(hide?.disabled).toBe(true);
+    expect(hide?.textContent).toContain(
+      'Change Focus before hiding the folder that contains the focused file.',
+    );
+    await render({ model, focusedSourcePath: undefined });
+    expect(document.body.querySelector('[role="menu"]')).toBeNull();
+  });
+
+  it('restores File and Folder recovery identities independently', async () => {
+    const onRestoreFile = vi.fn();
+    const onRestoreFolder = vi.fn();
+    await render({
+      hiddenPaths: ['Theory/Special.md'],
+      hiddenFolderKeys: ['Theory'],
+      onRestoreFile,
+      onRestoreFolder,
+    });
+    const file = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Show Theory/Special.md again"]',
+    );
+    const folder = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Hidden folders"] [aria-label="Show Theory again"]',
+    );
+    await act(() => file?.click());
+    expect(onRestoreFile).toHaveBeenCalledWith('Theory/Special.md');
+    expect(onRestoreFolder).not.toHaveBeenCalled();
+    await act(() => folder?.click());
+    expect(onRestoreFolder).toHaveBeenCalledWith('Theory');
+    expect(onRestoreFile).toHaveBeenCalledTimes(1);
   });
 });
