@@ -1246,8 +1246,8 @@ Optimized desktop graphical QA approved the preview with visible module
 boundaries and confirmed exact endpoints, root/rank positioning, multi-hop
 orientation, disclosure, implementation switching, secondary-edge geometry
 invariance, Inspector behavior, and current touchpad navigation. This completes
-HIER3B. HIER3B-FIX1 is the current release candidate; HIER4 is next after
-approval, HIER5 follows HIER4, and HIER3C follows HIER5.
+HIER3B. Optimized desktop graphical approval on September 4, 2026, completes
+HIER3B-FIX1; HIER4 is next, HIER5 follows HIER4, and HIER3C follows HIER5.
 
 ## HIER0 product exposure and geometry
 

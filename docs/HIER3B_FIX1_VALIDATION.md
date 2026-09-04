@@ -2,10 +2,9 @@
 
 ## Gate status
 
-The center-spine and module-aware hover implementation is a release candidate.
-Focused and complete repository checks, browser interaction QA, and the optimized
-desktop build pass. Explicit user graphical approval of the optimized desktop
-build remains required before the PR and merge steps.
+The center-spine and module-aware hover implementation is complete. Focused and
+complete repository checks, browser interaction QA, and the optimized desktop
+build pass. The user gave final graphical approval on September 4, 2026.
 
 Baseline main commit: `764754220d62f1a18ee8cd3672f914a2c4c2564e`.
 
@@ -124,6 +123,13 @@ Browser hit-testing resolved the ring's border gap to its SVG stroke and the car
 interior to the File article. The Secondary Links toggle left every rendered node
 transform byte-identical. Switching to Classic removed the ring and preserved
 the existing Classic hover behavior.
+
+## Optimized desktop QA
+
+The final release build preserved the approved center-spine geometry, aggregate
+File hover, exact Heading/Block hover, direct-File ring interaction, Secondary
+Links geometry invariance, and Classic behavior. The user approved the optimized
+desktop result on September 4, 2026.
 
 ## Deferred boundaries
 
