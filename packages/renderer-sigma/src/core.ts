@@ -1,6 +1,7 @@
 export {
   buildGlobalGraph,
   createGlobalNeighborhoodIndex,
+  createGlobalReferenceDegreeIndex,
   reconcileGlobalGraph,
 } from './graph';
 export type { GlobalGraph } from './graph';
@@ -38,7 +39,10 @@ export {
   deriveGlobalSpatialMetadata,
   deterministicGlobalPosition,
   folderKeyFromWorkspacePath,
+  automaticGlobalEdgeSize,
+  automaticGlobalNodeSize,
   mapProjectionToGlobal,
+  mapProjectionToGlobalTopology,
   resetGlobalSeedPositions,
 } from './mapping';
 export {
@@ -59,7 +63,12 @@ export {
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
   folderClusteringStrength,
   GLOBAL_LAYOUT_CUSTOM_RANGES,
+  globalLayoutSettingsFromPhysics,
+  resolveGlobalPhysicsSettings,
   resolveGlobalLayoutSettings,
+  resolveGlobalVisualSettings,
+  sameGlobalPhysicsSettings,
+  sameGlobalVisualSettings,
   validateGlobalLayoutSettings,
   withFolderClusteringStrength,
   withGlobalSpacingPreset,

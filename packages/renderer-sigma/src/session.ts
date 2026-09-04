@@ -18,6 +18,7 @@ import {
 import {
   buildGlobalGraph,
   createGlobalNeighborhoodIndex,
+  createGlobalReferenceDegreeIndex,
   reconcileGlobalGraph,
   type GlobalGraph,
 } from './graph';
@@ -31,6 +32,7 @@ import {
   drawViewportAwareGlobalNodeLabel,
 } from './global-label';
 import { createGlobalLayoutRequestFromAutomaticPositions } from './layout';
+import { automaticGlobalEdgeSize, automaticGlobalNodeSize } from './mapping';
 import {
   NodeClickArbitrator,
   NODE_DOUBLE_CLICK_TIMEOUT_MS,
@@ -42,7 +44,10 @@ import {
   ratioAfterWheelDelta,
   WheelDirectionStabilizer,
 } from './precision-wheel-zoom';
-import { resolveGlobalLayoutSettings } from './settings';
+import {
+  resolveGlobalLayoutSettings,
+  resolveGlobalVisualSettings,
+} from './settings';
 import {
   globalFolderKeyByNodeKey,
   SIGMA_VISUAL_DOWN_GRAPH_Y_SIGN,
@@ -65,6 +70,7 @@ import type {
   GlobalRendererMeasurement,
   GlobalTrackpadZoomMode,
   GlobalVisualLod,
+  ResolvedGlobalVisualSettings,
   SemanticGlobalViewport,
   GlobalViewportPoint,
 } from './types';
@@ -136,17 +142,22 @@ export class GlobalRendererSession {
   private hoveredNode: string | undefined;
   private selectedNode: string | undefined;
   private settings;
+  private visualSettings: ResolvedGlobalVisualSettings;
   private trackpadZoomMode: GlobalTrackpadZoomMode;
   private readonly options: GlobalRendererSessionOptions;
   private visualLod: GlobalVisualLod;
   private visualGroupStyles: VisualGroupPresentationMap | undefined;
   private presentationOverrides: EntityPresentationOverrideMap | undefined;
   private fileNodeKeys: ReturnType<typeof indexFileNodeKeys>;
+  private referenceDegrees: ReadonlyMap<string, number>;
   private sizeStyleRefreshPending: Set<string> | undefined;
   private precisionWheelIdleTimer: number | undefined;
   private viewportObservationTimer: number | undefined;
   private topologyRefreshPending: Promise<void> | undefined;
   private visualStyleRefreshPending = false;
+  private globalNodeStyleRefreshPending = false;
+  private globalNodeIndexationPending = false;
+  private globalEdgeStyleRefreshPending = false;
   private destroyed = false;
   private nodeClicks: NodeClickArbitrator | undefined;
   private readonly wheelDirection = new WheelDirectionStabilizer();
@@ -231,10 +242,12 @@ export class GlobalRendererSession {
   ) {
     this.options = options;
     this.settings = resolveGlobalLayoutSettings(options.settings);
+    this.visualSettings = resolveGlobalVisualSettings(options.settings);
     this.trackpadZoomMode = options.trackpadZoomMode;
     this.visualGroupStyles = options.visualGroupStyles;
     this.presentationOverrides = options.presentationOverrides;
     this.fileNodeKeys = indexFileNodeKeys(input.nodes);
+    this.referenceDegrees = createGlobalReferenceDegreeIndex(input);
     this.graph = buildGlobalGraph(input);
     this.neighborhoods = createGlobalNeighborhoodIndex(input);
     const mountStart = performance.now();
@@ -329,6 +342,11 @@ export class GlobalRendererSession {
       hovered ||
       this.neighborhoods.get(this.hoveredNode)?.has(key) === true;
     const arrangementFolderKey = this.activeArrangementFolderKey();
+    const automaticSize = automaticGlobalNodeSize(
+      attributes.nodeKind,
+      this.referenceDegrees.get(key) ?? 0,
+      this.settings,
+    );
     return resolveGlobalNodeStyle(attributes, {
       arrangementActive: this.arrangementContext?.active === true,
       ...(arrangementFolderKey === undefined
@@ -340,6 +358,7 @@ export class GlobalRendererSession {
       selected: key === this.selectedNode,
       lod: this.visualLod,
       settings: this.settings,
+      automaticSize,
       ...(visualGroup === undefined ? {} : { visualGroup }),
       ...(sizeScale === undefined ? {} : { sizeScale }),
     });
@@ -374,6 +393,10 @@ export class GlobalRendererSession {
             ? ('incident' as const)
             : ('unrelated' as const);
     return resolveGlobalEdgeStyle(attributes, {
+      automaticSize: automaticGlobalEdgeSize(
+        attributes.referenceCount,
+        this.settings,
+      ),
       ...(arrangementRelation === undefined ? {} : { arrangementRelation }),
       relatedToHover,
       hoverActive,
@@ -710,12 +733,31 @@ export class GlobalRendererSession {
   }
 
   updateSettings(settings: GlobalLayoutSettings): void {
-    this.settings = resolveGlobalLayoutSettings(settings);
-    this.renderer.setSetting(
-      'labelRenderedSizeThreshold',
-      this.settings.labelThreshold,
-    );
-    this.renderer.scheduleRefresh();
+    const previousVisual = this.visualSettings;
+    const next = resolveGlobalLayoutSettings(settings);
+    const nextVisual = resolveGlobalVisualSettings(settings);
+    const nodeSizeChanged =
+      previousVisual.nodeSize !== nextVisual.nodeSize ||
+      previousVisual.referenceDegreeSizeInfluence !==
+        nextVisual.referenceDegreeSizeInfluence;
+    const edgeSizeChanged =
+      previousVisual.linkThickness !== nextVisual.linkThickness;
+    const labelChanged =
+      previousVisual.labelThreshold !== nextVisual.labelThreshold;
+    this.settings = next;
+    this.visualSettings = nextVisual;
+    if (labelChanged) {
+      this.renderer.setSetting(
+        'labelRenderedSizeThreshold',
+        nextVisual.labelThreshold,
+      );
+    }
+    if (!nodeSizeChanged && !edgeSizeChanged && !labelChanged) return;
+    this.options.instrumentation?.count('global-style-updates');
+    this.globalNodeStyleRefreshPending ||= nodeSizeChanged || labelChanged;
+    this.globalNodeIndexationPending ||= nodeSizeChanged;
+    this.globalEdgeStyleRefreshPending ||= edgeSizeChanged;
+    if (this.topologyRefreshPending === undefined) this.refreshPendingStyles();
   }
 
   updateTrackpadZoomMode(mode: GlobalTrackpadZoomMode): void {
@@ -754,18 +796,27 @@ export class GlobalRendererSession {
     const sizeKeys = [...(this.sizeStyleRefreshPending ?? [])].filter((key) =>
       this.graph.hasNode(key),
     );
-    const nodes = this.visualStyleRefreshPending
-      ? this.graph.nodes()
-      : sizeKeys;
+    const refreshAllNodes =
+      this.visualStyleRefreshPending || this.globalNodeStyleRefreshPending;
+    const nodes = refreshAllNodes ? this.graph.nodes() : sizeKeys;
+    const edges = this.globalEdgeStyleRefreshPending ? this.graph.edges() : [];
+    const needsNodeIndexation =
+      this.globalNodeIndexationPending || sizeKeys.length > 0;
     this.visualStyleRefreshPending = false;
+    this.globalNodeStyleRefreshPending = false;
+    this.globalNodeIndexationPending = false;
+    this.globalEdgeStyleRefreshPending = false;
     this.sizeStyleRefreshPending = undefined;
-    if (nodes.length === 0) return;
+    if (nodes.length === 0 && edges.length === 0) return;
     // Sigma 3.0.3 refresh reruns only these reducers. Radius changes must also
     // process label/program/picking indices (skipIndexation=false), but never
     // submit a layout or change Graphology coordinates. Color-only stays fast.
     this.renderer.refresh({
-      partialGraph: { nodes },
-      skipIndexation: sizeKeys.length === 0,
+      partialGraph: {
+        ...(nodes.length === 0 ? {} : { nodes }),
+        ...(edges.length === 0 ? {} : { edges }),
+      },
+      skipIndexation: !needsNodeIndexation,
       schedule: true,
     });
   }
@@ -784,6 +835,7 @@ export class GlobalRendererSession {
           );
     this.neighborhoods = createGlobalNeighborhoodIndex(input);
     this.fileNodeKeys = indexFileNodeKeys(input.nodes);
+    this.referenceDegrees = createGlobalReferenceDegreeIndex(input);
     if (
       this.selectedNode !== undefined &&
       !this.graph.hasNode(this.selectedNode)
@@ -816,6 +868,7 @@ export class GlobalRendererSession {
     this.graph = buildGlobalGraph(input);
     this.fileNodeKeys = indexFileNodeKeys(input.nodes);
     this.neighborhoods = createGlobalNeighborhoodIndex(input);
+    this.referenceDegrees = createGlobalReferenceDegreeIndex(input);
     this.hoveredNode = undefined;
     if (
       this.selectedNode !== undefined &&
@@ -832,6 +885,7 @@ export class GlobalRendererSession {
     this.cancelFolderArrangementGesture();
     reconcileGlobalGraph(this.graph, input, { preservePositions: false });
     this.fileNodeKeys = indexFileNodeKeys(input.nodes);
+    this.referenceDegrees = createGlobalReferenceDegreeIndex(input);
     this.renderer.scheduleRefresh();
   }
 

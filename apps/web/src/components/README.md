@@ -31,6 +31,10 @@ canonical truth, or own a platform storage implementation.
   passes its resolved map only to All Network. SPATIAL1B adds a small web-owned
   Arrange mode reducer, write-before-adopt callbacks, and exact-folder Network
   Explorer entry points; per-pointer gesture state remains inside Sigma.
+  GLOBALVIS1 compares the canonical resolved physics subset before incrementing
+  the explicit All Network layout generation. Visual-only preference edits are
+  still saved immediately but reach only Sigma's presentation refresh path;
+  true reference/folder/spacing changes retain the latest-wins worker path.
   Network Explorer consumes the same already-completed All/Focus Network
   projection and resolved Visual Group presentation map as the canvas. Its
   selection callback updates the single controlled graph selection and issues a

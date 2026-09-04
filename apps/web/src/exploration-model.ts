@@ -3,6 +3,10 @@ import type {
   LocalLayoutMode,
 } from '@icarus-graph-explorer/view-state';
 import type { GraphVisualVariant } from '@icarus-graph-explorer/renderer-reactflow';
+import {
+  sameGlobalPhysicsSettings,
+  type GlobalLayoutSettings,
+} from '@icarus-graph-explorer/renderer-sigma/settings';
 import type { ViewProjectionState } from '@icarus-graph-explorer/view-projection';
 
 export type ExplorationScope = 'all' | 'focus';
@@ -75,4 +79,17 @@ export function globalLayoutSettingsApplyImmediately(
   layout: ExplorationLayout,
 ): boolean {
   return scope === 'all' && layout === 'network';
+}
+
+/** Explicit relayout policy: active All Network plus a real physics change. */
+export function globalLayoutSettingsRequireImmediateLayout(
+  scope: ExplorationScope,
+  layout: ExplorationLayout,
+  previous: GlobalLayoutSettings,
+  next: GlobalLayoutSettings,
+): boolean {
+  return (
+    globalLayoutSettingsApplyImmediately(scope, layout) &&
+    !sameGlobalPhysicsSettings(previous, next)
+  );
 }

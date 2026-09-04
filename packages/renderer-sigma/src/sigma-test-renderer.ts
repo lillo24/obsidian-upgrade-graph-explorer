@@ -12,6 +12,7 @@ type Refresh = {
 export class SigmaTestRenderer {
   static instances: SigmaTestRenderer[] = [];
   readonly displayNodes = new Map<string, Attributes>();
+  readonly displayEdges = new Map<string, Attributes>();
   private onceHandlers = new Map<string, (() => void)[]>();
   readonly handlers = new Map<string, (event: unknown) => void>();
   readonly camera = {
@@ -31,13 +32,29 @@ export class SigmaTestRenderer {
   deferProcess = false;
   private fullRefreshPending = false;
   readonly refresh = vi.fn((options?: Refresh) => {
-    const keys = options?.partialGraph?.nodes ?? this.graph.nodes();
+    const keys =
+      options?.partialGraph === undefined
+        ? this.graph.nodes()
+        : (options.partialGraph.nodes ?? []);
     for (const key of keys) {
       if (!this.graph.hasNode(key))
         throw new Error(`Stale Sigma refresh: ${key}`);
       this.displayNodes.set(
         key,
         this.settings.nodeReducer(key, this.graph.getNodeAttributes(key)),
+      );
+    }
+    const edgeKeys =
+      options?.partialGraph === undefined
+        ? this.graph.edges()
+        : (options.partialGraph.edges ?? []);
+    for (const key of edgeKeys) {
+      if (!this.graph.hasEdge(key))
+        throw new Error(`Stale Sigma edge refresh: ${key}`);
+      this.displayEdges.set(
+        key,
+        this.settings.edgeReducer?.(key, this.graph.getEdgeAttributes(key)) ??
+          this.graph.getEdgeAttributes(key),
       );
     }
     if (!this.deferProcess) this.finishProcess();
@@ -54,6 +71,7 @@ export class SigmaTestRenderer {
     _container: HTMLElement,
     readonly settings: {
       nodeReducer: (key: string, attributes: Attributes) => Attributes;
+      edgeReducer?: (key: string, attributes: Attributes) => Attributes;
     },
   ) {
     SigmaTestRenderer.instances.push(this);
@@ -62,8 +80,15 @@ export class SigmaTestRenderer {
     if (this.fullRefreshPending) {
       this.fullRefreshPending = false;
       this.displayNodes.clear();
+      this.displayEdges.clear();
       this.graph.forEachNode((key, attributes) =>
         this.displayNodes.set(key, this.settings.nodeReducer(key, attributes)),
+      );
+      this.graph.forEachEdge((key, attributes) =>
+        this.displayEdges.set(
+          key,
+          this.settings.edgeReducer?.(key, attributes) ?? attributes,
+        ),
       );
     }
     for (const event of ['afterProcess', 'afterRender']) {

@@ -29,8 +29,15 @@ import {
 } from './layout';
 import { GlobalGraphEmptyState } from './GlobalGraphEmptyState';
 import { mountGlobalRendererSession } from './lifecycle';
-import { mapProjectionToGlobal } from './mapping';
+import {
+  mapProjectionToGlobal,
+  mapProjectionToGlobalTopology,
+} from './mapping';
 import { GlobalRendererSession } from './session';
+import {
+  globalLayoutSettingsFromPhysics,
+  resolveGlobalPhysicsSettings,
+} from './settings';
 import { composeGlobalSpatialOverrides } from './spatial';
 import { shouldApplyGlobalViewportRequest } from './viewport-request';
 import type {
@@ -262,20 +269,45 @@ export function GlobalGraphCanvas({
     onSelectionChange,
     onViewportObservation,
   ]);
+  const resolvedPhysics = resolveGlobalPhysicsSettings(settings);
+  const {
+    folderClustering,
+    folderCohesion,
+    linkForce,
+    withinFolderSpacing,
+    betweenFolderSpacing,
+  } = resolvedPhysics;
+  const layoutSettings = useMemo(
+    () =>
+      globalLayoutSettingsFromPhysics({
+        folderClustering,
+        folderCohesion,
+        linkForce,
+        withinFolderSpacing,
+        betweenFolderSpacing,
+      }),
+    [
+      betweenFolderSpacing,
+      folderClustering,
+      folderCohesion,
+      linkForce,
+      withinFolderSpacing,
+    ],
+  );
   const input = useMemo(() => {
-    const map = () => mapProjectionToGlobal(projection, settings);
+    const map = () => mapProjectionToGlobalTopology(projection);
     return instrumentation === undefined
       ? map()
       : instrumentation.measure('global-map', 'global-mappings', map);
-  }, [instrumentation, projection, settings]);
+  }, [instrumentation, projection]);
   const requestTemplate = useMemo(
     () =>
       createGlobalLayoutRequest(
         input,
-        settings,
+        layoutSettings,
         layoutIterations(input.nodes.length),
       ),
-    [input, settings],
+    [input, layoutSettings],
   );
   const fingerprint = useMemo(
     () => globalLayoutFingerprint(requestTemplate),
@@ -803,7 +835,7 @@ export function GlobalGraphCanvas({
     });
     const request = createGlobalLayoutRequestFromAutomaticPositions(
       input,
-      settings,
+      layoutSettings,
       requestTemplate.iterations,
       latestAutomaticPositions.current,
     );
@@ -860,7 +892,7 @@ export function GlobalGraphCanvas({
     layoutService,
     ready,
     requestTemplate.iterations,
-    settings,
+    layoutSettings,
   ]);
 
   useEffect(() => {

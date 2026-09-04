@@ -5,7 +5,12 @@ import {
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
   DEFAULT_REFERENCE_DEGREE_SIZE_INFLUENCE,
   folderClusteringStrength,
+  globalLayoutSettingsFromPhysics,
+  resolveGlobalPhysicsSettings,
   resolveGlobalLayoutSettings,
+  resolveGlobalVisualSettings,
+  sameGlobalPhysicsSettings,
+  sameGlobalVisualSettings,
   validateGlobalLayoutSettings,
   withFolderClusteringStrength,
   withGlobalSpacingPreset,
@@ -147,4 +152,87 @@ describe('Global folder clustering strength', () => {
       ).toThrow('referenceDegreeSizeInfluence');
     },
   );
+});
+
+describe('Global physics and visual settings boundary', () => {
+  const baseline = {
+    folderClustering: true,
+    spacingPreset: 'normal' as const,
+    custom: customGlobalLayoutSettings('normal'),
+  };
+
+  it('classifies the resolved subsets from one persisted settings record', () => {
+    expect(resolveGlobalPhysicsSettings(baseline)).toEqual({
+      folderClustering: true,
+      folderCohesion: 0.08,
+      linkForce: 1,
+      withinFolderSpacing: 1.15,
+      betweenFolderSpacing: 3.2,
+    });
+    expect(resolveGlobalVisualSettings(baseline)).toEqual({
+      nodeSize: 4.5,
+      referenceDegreeSizeInfluence: 50,
+      linkThickness: 0.7,
+      labelThreshold: 7,
+    });
+  });
+
+  it.each([
+    ['nodeSize', 7],
+    ['referenceDegreeSizeInfluence', 90],
+    ['linkThickness', 1.6],
+    ['labelThreshold', 12],
+  ] as const)('keeps %s out of physics identity', (key, value) => {
+    const changed = {
+      ...baseline,
+      custom: { ...baseline.custom, [key]: value },
+    };
+    expect(sameGlobalPhysicsSettings(baseline, changed)).toBe(true);
+    expect(sameGlobalVisualSettings(baseline, changed)).toBe(false);
+  });
+
+  it.each([
+    ['folderCohesion', 0.12],
+    ['linkForce', 1.5],
+    ['withinFolderSpacing', 1.8],
+    ['betweenFolderSpacing', 5],
+  ] as const)('keeps %s in physics identity', (key, value) => {
+    const changed = {
+      ...baseline,
+      custom: { ...baseline.custom, [key]: value },
+    };
+    expect(sameGlobalPhysicsSettings(baseline, changed)).toBe(false);
+    expect(sameGlobalVisualSettings(baseline, changed)).toBe(true);
+  });
+
+  it('classifies clustering and resolved preset spatial changes as physics', () => {
+    expect(
+      sameGlobalPhysicsSettings(baseline, {
+        ...baseline,
+        folderClustering: false,
+      }),
+    ).toBe(false);
+    expect(
+      sameGlobalPhysicsSettings(
+        baseline,
+        withGlobalSpacingPreset(baseline, 'spacious'),
+      ),
+    ).toBe(false);
+  });
+
+  it('adapts physics to schema-v1 worker settings with a fixed visual baseline', () => {
+    const physics = resolveGlobalPhysicsSettings({
+      ...baseline,
+      custom: {
+        ...baseline.custom,
+        linkForce: 1.4,
+        nodeSize: 8,
+      },
+    });
+    const workerSettings = globalLayoutSettingsFromPhysics(physics);
+    expect(resolveGlobalPhysicsSettings(workerSettings)).toEqual(physics);
+    expect(resolveGlobalVisualSettings(workerSettings)).toEqual(
+      resolveGlobalVisualSettings(DEFAULT_GLOBAL_LAYOUT_SETTINGS),
+    );
+  });
 });
