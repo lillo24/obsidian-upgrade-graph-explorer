@@ -118,6 +118,7 @@ import {
   explorationLayout,
   explorationScope,
   focusLayoutMode,
+  globalLayoutSettingsApplyImmediately,
   globalLayoutSettingsRequireImmediateLayout,
   hierarchyVisualVariantForScope,
   type ExplorationLayout,
