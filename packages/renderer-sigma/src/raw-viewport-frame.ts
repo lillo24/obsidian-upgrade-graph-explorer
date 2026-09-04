@@ -40,6 +40,8 @@ export interface RawViewportFrame {
 export interface RawViewportRefreshHooks {
   readonly afterProcess: (callback: () => void) => void;
   readonly afterRender: (callback: () => void) => void;
+  readonly removeAfterProcess: (callback: () => void) => void;
+  readonly removeAfterRender: (callback: () => void) => void;
   readonly scheduleRefresh: () => void;
 }
 
@@ -125,21 +127,28 @@ export function restoreRawViewportFrame(
   });
 }
 
-/** Restores before drawing so no stale-normalization frame reaches the user. */
+/**
+ * Arms raw-frame repair before the position mutation can request Sigma's next
+ * process/render pass. The explicit refresh is the current SPATIAL2B fallback;
+ * a synchronous Graphology-owned frame suppresses that redundant request.
+ */
 export function refreshPreservingRawViewportFrame(
   hooks: RawViewportRefreshHooks,
+  mutate: () => void,
   restore: () => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     let restorationError: unknown;
-    hooks.afterProcess(() => {
+    let rendered = false;
+    const afterProcess = () => {
       try {
         restore();
       } catch (error: unknown) {
         restorationError = error;
       }
-    });
-    hooks.afterRender(() => {
+    };
+    const afterRender = () => {
+      rendered = true;
       if (restorationError !== undefined) {
         reject(
           restorationError instanceof Error
@@ -149,7 +158,19 @@ export function refreshPreservingRawViewportFrame(
         return;
       }
       resolve();
-    });
-    hooks.scheduleRefresh();
+    };
+    const cleanup = () => {
+      hooks.removeAfterProcess(afterProcess);
+      hooks.removeAfterRender(afterRender);
+    };
+    hooks.afterProcess(afterProcess);
+    hooks.afterRender(afterRender);
+    try {
+      mutate();
+      if (!rendered) hooks.scheduleRefresh();
+    } catch (error: unknown) {
+      cleanup();
+      reject(error instanceof Error ? error : new Error(String(error)));
+    }
   });
 }

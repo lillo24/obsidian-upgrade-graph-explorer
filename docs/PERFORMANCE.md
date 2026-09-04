@@ -616,6 +616,26 @@ and bounds across authoritative adoption. They preserve the existing SPATIAL2A
 whole-graph result as evidence for PHYSICS1/CONVERGENCE rather than introducing
 a component freeze or another physics lifecycle.
 
+Remove QA isolated a routing defect rather than a Fit request. Before the fix,
+removing the sole Place or Pull rule recreated the preview-cancel callback,
+reran exact-cache automatic adoption, and produced three coordinate
+applications: two `applySpatialPositions` transactions plus one plain
+`applyPositions` transaction after the new registry and anchor map were empty.
+The plain transaction exposed the changed graph bounds with stale framed-camera
+meaning. `fitRequestKey` remained unchanged, no Fit/center ran, and the final
+coordinates were correct; the intermediate camera frame was the visible jump.
+Apply/change followed the same redundant effect route even when it did not lose
+the last anchor.
+
+The corrected settled mutation performs one `applySpatialPositions`, advances
+`spatialCommitKey` once, performs zero plain position applications, requests no
+automatic layout, and leaves Fit/center ownership untouched for Apply Pull,
+Apply Place, remove-only Pull/Place, remove-with-survivors, and Reset all. A
+fresh exact cache-hit load retains its existing three logical adoptions (cached
+base, Pull settlement, and layout-commit re-evaluation), but all three now use
+the raw-frame path and no plain intermediate frame. Raw center/scale tests cover
+each mutation plus an Apply→Remove round-trip under a non-default pan/zoom.
+
 The private-safe medium product fixture (500 nodes, 100 affected members, 24
 iterations) compares the proposed default strengths with the same base graph:
 

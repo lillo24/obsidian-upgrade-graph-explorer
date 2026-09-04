@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type {
   CameraState,
   CoordinateConversionOverride,
@@ -228,8 +228,10 @@ describe('raw viewport framing across Sigma normalization', () => {
     ['Dynamic Pull', { x: [-42, 16], y: [-9, 49] }],
     ['Fixed Placement', { x: [-13, 31], y: [-25, 14] }],
     ['dynamic cache hit', { x: [-35, 22], y: [-17, 39] }],
-    ['Remove rule', { x: [-8, 12], y: [-7, 10] }],
-    ['Reset rules', { x: [-4, 5], y: [-3, 6] }],
+    ['Remove the only Place rule', { x: [-8, 12], y: [-7, 10] }],
+    ['Remove the only Pull rule', { x: [-7, 13], y: [-5, 11] }],
+    ['Remove one rule while another remains', { x: [-9, 18], y: [-4, 15] }],
+    ['Reset all rules', { x: [-4, 5], y: [-3, 6] }],
   ] satisfies readonly (readonly [string, Extent])[])(
     'preserves raw center, scale, and angle for %s adoption',
     (_label, nextExtent) => {
@@ -245,6 +247,22 @@ describe('raw viewport framing across Sigma normalization', () => {
       expectFrameToMatch(renderer, before);
     },
   );
+
+  it('keeps a manually owned raw frame across an Apply then Remove round-trip', () => {
+    const baseExtent: Extent = { x: [-4, 5], y: [-3, 6] };
+    const appliedExtent: Extent = { x: [-37, 24], y: [-18, 45] };
+    const renderer = new SyntheticSigmaTransform(baseExtent);
+    const userFrame = captureRawViewportFrame(renderer);
+
+    renderer.setExtent(appliedExtent);
+    restoreRawViewportFrame(renderer, userFrame);
+    expectFrameToMatch(renderer, userFrame);
+
+    renderer.setExtent(baseExtent);
+    restoreRawViewportFrame(renderer, userFrame);
+    expectFrameToMatch(renderer, userFrame);
+    expect(appliedExtent).not.toEqual(baseExtent);
+  });
 
   it('keeps the viewport stable while the dynamic cluster and connected outside node still move visibly', () => {
     const renderer = new SyntheticSigmaTransform({
@@ -377,11 +395,15 @@ describe('raw viewport framing across Sigma normalization', () => {
     const promise = refreshPreservingRawViewportFrame(
       {
         afterProcess: (callback) => {
+          order.push('arm-process');
           afterProcess = callback;
         },
         afterRender: (callback) => {
+          order.push('arm-render');
           afterRender = callback;
         },
+        removeAfterProcess: vi.fn(),
+        removeAfterRender: vi.fn(),
         scheduleRefresh: () => {
           order.push('process');
           afterProcess();
@@ -389,10 +411,59 @@ describe('raw viewport framing across Sigma normalization', () => {
           afterRender();
         },
       },
+      () => order.push('mutate'),
       () => order.push('restore'),
     );
 
     await promise;
-    expect(order).toEqual(['process', 'restore', 'render']);
+    expect(order).toEqual([
+      'arm-process',
+      'arm-render',
+      'mutate',
+      'process',
+      'restore',
+      'render',
+    ]);
+  });
+
+  it('repairs the raw frame when Graphology processes synchronously during mutation', async () => {
+    const order: string[] = [];
+    let afterProcess: () => void = () => undefined;
+    let afterRender: () => void = () => undefined;
+    const scheduleRefresh = vi.fn();
+    const promise = refreshPreservingRawViewportFrame(
+      {
+        afterProcess: (callback) => {
+          order.push('arm-process');
+          afterProcess = callback;
+        },
+        afterRender: (callback) => {
+          order.push('arm-render');
+          afterRender = callback;
+        },
+        removeAfterProcess: vi.fn(),
+        removeAfterRender: vi.fn(),
+        scheduleRefresh,
+      },
+      () => {
+        order.push('mutate');
+        order.push('process');
+        afterProcess();
+        order.push('render');
+        afterRender();
+      },
+      () => order.push('restore'),
+    );
+
+    await promise;
+    expect(order).toEqual([
+      'arm-process',
+      'arm-render',
+      'mutate',
+      'process',
+      'restore',
+      'render',
+    ]);
+    expect(scheduleRefresh).not.toHaveBeenCalled();
   });
 });

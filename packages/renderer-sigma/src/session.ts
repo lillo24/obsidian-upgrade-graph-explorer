@@ -1465,7 +1465,6 @@ export class GlobalRendererSession {
     let frame: ReturnType<typeof captureRawViewportFrame>;
     try {
       frame = captureRawViewportFrame(this.renderer);
-      this.updatePositions(positions);
     } catch (error: unknown) {
       return Promise.reject(
         error instanceof Error ? error : new Error(String(error)),
@@ -1476,8 +1475,13 @@ export class GlobalRendererSession {
         afterProcess: (callback) =>
           this.renderer.once('afterProcess', callback),
         afterRender: (callback) => this.renderer.once('afterRender', callback),
+        removeAfterProcess: (callback) =>
+          this.renderer.off('afterProcess', callback),
+        removeAfterRender: (callback) =>
+          this.renderer.off('afterRender', callback),
         scheduleRefresh: () => void this.renderer.scheduleRefresh(),
       },
+      () => this.updatePositions(positions),
       () => restoreRawViewportFrame(this.renderer, frame),
     ).then(() => this.emitArrangementTargetPoint());
   }

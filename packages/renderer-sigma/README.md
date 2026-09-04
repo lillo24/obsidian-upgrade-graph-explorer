@@ -318,11 +318,25 @@ state.
 Authoritative spatial-rule adoption (Dynamic Pull, Fixed Placement, dynamic
 cache hits, removal, and reset) preserves the raw graph point under the viewport
 center, raw graph units per pixel, and camera angle across Sigma's normalization
-recalculation. The session captures that frame before replacing coordinates and
-restores it during `afterProcess`, before the changed geometry is drawn. This is
-a narrow spatial-operation boundary: ordinary pan/zoom, initial framing,
-automatic layout, Fit, Search center, and later camera transitions retain their
-existing camera ownership.
+recalculation. The session captures that frame, arms its `afterProcess` repair
+before replacing coordinates, and restores it before the changed geometry is
+drawn. Spatial intent is determined by the transaction cause, not only by the
+new registry contents: removing the final rule remains a spatial adoption even
+when both `folderRules` and the compatibility anchor map become empty. The
+stable preview-cancel callback cannot retrigger automatic cache adoption when a
+rule changes, so Apply, Remove, and Reset each produce one authoritative
+position application after the initial layout has settled. This is a narrow
+spatial-operation boundary: ordinary pan/zoom, initial framing, automatic layout
+outside the spatial-rule registry, Fit, Search center, and later camera
+transitions retain their existing camera ownership.
+
+Draft PR #60 / FLICKER1 separately owns the long-term atomic Network camera
+transaction and camera-ownership policy. SPATIAL2B does not duplicate that
+architecture: `raw-viewport-frame.ts` is the temporary spatial-normalization
+specialization. When FLICKER1 integrates, its pre-mutation transaction should
+run this raw-frame restore as the spatial adoption repair callback, retain one
+Graphology-owned process/render, and replace rather than nest SPATIAL2B's
+explicit-refresh fallback.
 
 ## Regional semantic zoom and lifecycle
 

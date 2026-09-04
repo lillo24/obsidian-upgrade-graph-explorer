@@ -363,7 +363,7 @@ function applyDisplayedPositions(
     positions,
     anchors,
     instrumentation,
-    forceSpatialOperation,
+    forceSpatialOperation || rules !== undefined,
   );
 }
 
@@ -694,7 +694,7 @@ export function GlobalGraphCanvas({
   const restoreArrangementDisplay = useCallback(() => {
     const session = sessionRef.current;
     if (session === undefined) return;
-    if (spatialRules !== undefined) {
+    if (latestSpatialRules.current !== undefined) {
       void session
         .applySpatialPositions(latestDisplayedPositions.current)
         .catch((error: unknown) => {
@@ -716,7 +716,7 @@ export function GlobalGraphCanvas({
         `Could not restore confirmed folder positions: ${errorMessage(error)}`,
       );
     });
-  }, [instrumentation, spatialRules]);
+  }, [instrumentation]);
 
   const cancelArrangementPreview = useCallback(
     (announcement?: string): boolean => {

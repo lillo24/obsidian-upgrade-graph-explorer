@@ -57,15 +57,22 @@ semantics, persisting resolved members, or running dynamic work on pointermove.
     optimized Tauri executable; browser and startup smoke are not substitutes.
 15. Applying authoritative spatial coordinates preserves the user's raw
     graph-space viewport center, scale, and angle while Sigma recomputes its
-    normalization. Restoration occurs after processing and before drawing; it
-    applies to Pull, Place, cache-hit, remove, and reset adoption only. Explicit
-    Fit, Search center, initial framing, pan/zoom, and later camera transitions
-    keep camera ownership.
+    normalization. Repair is armed before coordinate mutation and occurs after
+    processing but before drawing. It applies to Pull, Place, cache-hit, remove,
+    and reset adoption, including the final-rule transition to an empty registry.
+    The mutation cause, not only the new anchor/rule count, selects this path.
+    Explicit Fit, Search center, initial framing, pan/zoom, and later camera
+    transitions keep camera ownership.
 16. SPATIAL2B retains the SPATIAL2A whole-graph settlement path. It introduces
     no connected-component freeze, continuous simulation lifetime, reheating,
     cooling, or hard-constraint neighbor reaction. Those policies remain owned
     by PHYSICS1/CONVERGENCE integration; MOVE1A's temporary constraint seam is
     not reused for spatial-rule target authoring.
+17. Draft PR #60 / FLICKER1 remains the long-term owner of atomic Network camera
+    transactions. SPATIAL2B keeps only the raw-frame repair needed for spatial
+    normalization. FLICKER1 integration must absorb that repair callback into
+    its single pre-mutation transaction and replace SPATIAL2B's refresh fallback;
+    the two systems must not be nested as competing camera owners.
 
 ## Consequences
 

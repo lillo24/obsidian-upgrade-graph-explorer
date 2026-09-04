@@ -887,6 +887,19 @@ reference, copy, or selectively override an independently serializable spatial
 profile alongside query, scope, layout, hierarchy detail, settings, and
 viewport; no Saved View schema is introduced here.
 
+Every schema-v2 rule mutation is a spatial coordinate transaction, including
+the transition from one rule to an empty registry. `GlobalGraphCanvas` carries
+that cause through `applyDisplayedPositions`/`applyComposedPositions` instead of
+inferring it only from the new compatibility anchor map. Rule changes do not
+recreate the automatic-layout cancellation callback, so Remove/Reset cannot
+start an extra cache adoption or intermediate plain `applyPositions` frame.
+The spatial session arms raw graph-space center/scale restoration before the
+Graphology coordinate mutation and applies it in `afterProcess` before drawing.
+This is the narrow reconciliation seam for draft PR #60 / FLICKER1: its eventual
+atomic Network transaction should absorb the raw-frame repair callback and
+remove the explicit-refresh fallback, not layer a second camera owner around it.
+PR #60's branch remains independent of SPATIAL2B.
+
 Tauri v2 hosts the existing frontend and provides dialog plus filesystem
 read/watch capabilities through a narrow source-provider boundary. Tauri
 commands, absolute paths, events, and handles do not leak into generic core
