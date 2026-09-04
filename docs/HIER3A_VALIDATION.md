@@ -222,3 +222,12 @@ The earlier localhost production-app smoke loaded the workspace title, graph
 controls, saved graph summary, and accessible control labels successfully.
 This production smoke is separate from the user-completed local-file lab
 reviews.
+
+## Repository integration
+
+Pull request [#70](https://github.com/lillo24/icarus-graph-explorer/pull/70)
+ran the complete hosted CI workflow on the accepted candidate. Workflow run
+[33876815593](https://github.com/lillo24/icarus-graph-explorer/actions/runs/33876815593)
+passed `validate` in 2m05s and `desktop` in 9m01s. Merge and post-merge `main`
+evidence are recorded after integration so this document names the exact
+commits and runs.
