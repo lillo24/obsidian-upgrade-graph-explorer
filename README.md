@@ -1,25 +1,46 @@
 # Obsidian Upgrade Graph Explorer
 
-> An advanced Graph Explorer for Obsidian that substantially extends the default graph with richer filtering, spatial organization, alternative layouts, and deeper exploration of relationships across large vaults.
+> An advanced Graph Explorer for Obsidian that separates **what is connected** from **how those connections are organized and presented**.
 
 **Obsidian Upgrade Graph Explorer** is a local-first, read-only desktop explorer for Obsidian / Markdown knowledge bases.
 
-Instead of treating a vault as a flat graph of files, it can preserve the structure *inside* each note — files, headings, nested headings, and addressable blocks — and keep links attached to the exact place where they were written.
+Obsidian's default graph already gives a useful network of links, but most of the organization is expressed through one force-directed spatial layout. That makes physics useful, but also makes it carry too much: global structure, local structure, clusters, hierarchy, and navigation all compete in the same visual system.
+
+This project keeps the source-derived relationships independent from their presentation, then lets the same vault be reorganized through **Focus, hierarchy-aware views, filtering/grouping, folder-aware spatial rules, and different layouts** without changing the underlying links.
 
 The project is still in active development. It is currently a standalone Tauri application rather than an Obsidian plugin, and the product surface is still being refined before a stable end-user release.
 
-## What it is trying to improve
+## Main idea
 
-Obsidian's graph is excellent for quickly seeing that notes are connected. This project explores what becomes possible when the graph is also allowed to answer questions such as:
+The goal is not merely to draw the same graph with different physics. It is to make the graph useful at different scales and for different kinds of organization.
 
-- **Where inside this note does the connection come from?**
-- **What links to this exact heading?**
-- **What does this file connect to when its headings are expanded?**
-- **How does this part of the vault look globally, locally, or as a hierarchy?**
-- **Can folders influence spatial organization without becoming fake graph edges?**
-- **Can I hide, group, focus, search, and inspect large graphs without losing the underlying source truth?**
+```text
+SOURCE TRUTH
+files + headings + blocks + exact references
+        ↓
+SCOPE
+All vault ↔ Focused neighborhood
+        ↓
+ORGANIZATION
+filters + visual groups + folder spatial intent
+        ↓
+PRESENTATION
+free network ↔ structured hierarchy
+        ↓
+INSPECTION
+exact relationship provenance
+```
 
-The core model is deliberately more precise than a file-only graph:
+This changes the graph in a few important ways:
+
+- **Focus** can isolate one part of the vault instead of requiring the whole network to remain visually relevant at once.
+- **Structured / hierarchy views** can open a file into headings, nested headings, and blocks, presenting internal structure more like connected modules than particles in one force simulation.
+- **Global network views** remain available when broad topology is the useful question.
+- **Filters and Visual Groups** can organize what is visible and how it is classified without rewriting links.
+- **Folders can influence space** without pretending that folder membership is a semantic edge.
+- **Link provenance stays precise underneath every view**, so collapsing, grouping, or rearranging the graph does not destroy where a relationship came from.
+
+The core model is therefore more precise than a file-only graph:
 
 ```text
 Document
