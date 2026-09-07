@@ -7,6 +7,11 @@ coverage/
 /output/spacing1b-global/
 /output/hier2-layout-lab/
 /output/hier3a-endpoint-lab/
+/output/hier4-folder-lab/
+/output/hier4a-directional-folder-lab/
+/output/hier4-folder-benchmark*.json
+/output/hier4a-directional-folder-bands-benchmark.json
+/output/hier4a-root-balance-*.json
 /tools/focus-schematic-bakeoff/output/
 /output/convergence1a/
 /output/convergence1c/

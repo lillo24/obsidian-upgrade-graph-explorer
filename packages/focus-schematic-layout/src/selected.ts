@@ -29,7 +29,17 @@ function legacyTimings(
       timings.rightLayoutMs +
       timings.compositionMs,
     macroMs: timings.macroMs,
-    postMs: timings.crossingMinimizationMs + timings.attachmentMs,
+    postMs:
+      timings.crossingMinimizationMs +
+      timings.folderInventoryMs +
+      timings.folderInitialOrderMs +
+      timings.folderOrderRefinementMs +
+      timings.folderRankOrderingMs +
+      timings.folderBandPackingMs +
+      timings.folderModuleAssignmentMs +
+      timings.folderExceptionAnalysisMs +
+      timings.attachmentMs +
+      timings.folderQualityMs,
     validateMs: timings.validationMs,
     qualityMs: timings.qualityMs,
     serializeMs: timings.serializationMs,

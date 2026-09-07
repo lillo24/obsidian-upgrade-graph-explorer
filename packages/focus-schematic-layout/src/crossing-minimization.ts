@@ -40,6 +40,17 @@ export interface FocusSchematicEndpointOrderMetrics {
   readonly adjacentRankOrderingConnectionCount: number;
 }
 
+export interface FocusSchematicVisualSiblingOrderMetrics {
+  /** Inverted legal same-parent sibling pairs relative to Markdown source order. */
+  readonly visualSiblingOrderDeviationFromSource: number;
+  /** Sibling branch roots that participate in at least one visual inversion. */
+  readonly visuallyReorderedBranchCount: number;
+}
+
+export interface FocusSchematicCrossingMinimizationInstrumentation {
+  readonly onOrderingMetricEvaluation?: () => void;
+}
+
 interface OrderingScore extends FocusSchematicEndpointOrderMetrics {
   readonly totalVerticalError: number;
 }
@@ -103,12 +114,27 @@ function orderingSegments(
   candidate: FocusSchematicLayoutCandidate,
 ): readonly OrderingSegment[] {
   const ranks = rankByModuleId(modulePlan);
+  const nodeById = new Map(
+    candidate.nodes.map((node) => [node.projectionNodeId, node]),
+  );
+  const moduleById = new Map(
+    candidate.modules.map((module) => [module.moduleId, module]),
+  );
+  const resolvedEndpointY = (
+    endpoint: FocusSchematicConnectionEndpoint,
+  ): number | undefined => {
+    const rectangle =
+      endpoint.kind === 'visible-entity'
+        ? nodeById.get(endpoint.projectionNodeId)
+        : moduleById.get(endpoint.moduleId);
+    return rectangle === undefined ? undefined : rectangleCenterY(rectangle);
+  };
   return orderingConnections(endpointPlan)
     .flatMap((connection): OrderingSegment[] => {
       const sourceRank = ranks.get(connection.sourceModuleId);
       const targetRank = ranks.get(connection.targetModuleId);
-      const sourceY = endpointY(candidate, connection.source);
-      const targetY = endpointY(candidate, connection.target);
+      const sourceY = resolvedEndpointY(connection.source);
+      const targetY = resolvedEndpointY(connection.target);
       if (
         sourceRank === undefined ||
         targetRank === undefined ||
@@ -146,25 +172,55 @@ function orderingSegments(
 }
 
 function inversionCount(segments: readonly OrderingSegment[]): number {
+  const byRankPair = new Map<string, OrderingSegment[]>();
+  for (const segment of segments) {
+    const key = `${segment.lowerRank}:${segment.upperRank}`;
+    const group = byRankPair.get(key) ?? [];
+    group.push(segment);
+    byRankPair.set(key, group);
+  }
   let count = 0;
-  for (let leftIndex = 0; leftIndex < segments.length; leftIndex += 1) {
-    const left = segments[leftIndex]!;
-    for (
-      let rightIndex = leftIndex + 1;
-      rightIndex < segments.length;
-      rightIndex += 1
-    ) {
-      const right = segments[rightIndex]!;
-      if (
-        left.lowerRank !== right.lowerRank ||
-        left.upperRank !== right.upperRank
+  for (const group of byRankPair.values()) {
+    const ordered = [...group].sort(
+      (left, right) =>
+        left.lowerY - right.lowerY ||
+        left.upperY - right.upperY ||
+        compareText(left.connectionId, right.connectionId),
+    );
+    const upperValues = [...new Set(ordered.map(({ upperY }) => upperY))].sort(
+      (left, right) => left - right,
+    );
+    const upperIndex = new Map(
+      upperValues.map((value, index) => [value, index + 1]),
+    );
+    const tree = new Array<number>(upperValues.length + 1).fill(0);
+    const add = (index: number) => {
+      for (let cursor = index; cursor < tree.length; cursor += cursor & -cursor)
+        tree[cursor] = (tree[cursor] ?? 0) + 1;
+    };
+    const prefix = (index: number) => {
+      let total = 0;
+      for (let cursor = index; cursor > 0; cursor -= cursor & -cursor)
+        total += tree[cursor] ?? 0;
+      return total;
+    };
+    let inserted = 0;
+    for (let start = 0; start < ordered.length;) {
+      let end = start + 1;
+      while (
+        end < ordered.length &&
+        ordered[end]!.lowerY === ordered[start]!.lowerY
       )
-        continue;
-      if (
-        (left.lowerY - right.lowerY) * (left.upperY - right.upperY) <
-        -EPSILON
-      )
-        count += 1;
+        end += 1;
+      for (let index = start; index < end; index += 1) {
+        const position = upperIndex.get(ordered[index]!.upperY)!;
+        count += inserted - prefix(position);
+      }
+      for (let index = start; index < end; index += 1) {
+        add(upperIndex.get(ordered[index]!.upperY)!);
+        inserted += 1;
+      }
+      start = end;
     }
   }
   return count;
@@ -190,7 +246,9 @@ function orderingScore(
   modulePlan: FocusSchematicLayoutPlan,
   endpointPlan: FocusSchematicEndpointPlan,
   candidate: FocusSchematicLayoutCandidate,
+  instrumentation?: FocusSchematicCrossingMinimizationInstrumentation,
 ): OrderingScore {
+  instrumentation?.onOrderingMetricEvaluation?.();
   const metrics = measureFocusSchematicEndpointOrder(
     modulePlan,
     endpointPlan,
@@ -262,6 +320,7 @@ export function minimizeFocusSchematicCenterStackCrossings(
   endpointPlan: FocusSchematicEndpointPlan,
   lanePlan: FocusSchematicInternalLanePlan,
   initial: FocusSchematicLayoutCandidate,
+  instrumentation?: FocusSchematicCrossingMinimizationInstrumentation,
 ): FocusSchematicLayoutCandidate {
   const laneByNodeId = new Map(
     lanePlan.nodes.map(({ projectionNodeId, lane }) => [
@@ -383,8 +442,18 @@ export function minimizeFocusSchematicCenterStackCrossings(
           const proposal = translateNodes(candidate, deltaByNodeId);
           if (
             improves(
-              orderingScore(modulePlan, endpointPlan, proposal),
-              orderingScore(modulePlan, endpointPlan, candidate),
+              orderingScore(
+                modulePlan,
+                endpointPlan,
+                proposal,
+                instrumentation,
+              ),
+              orderingScore(
+                modulePlan,
+                endpointPlan,
+                candidate,
+                instrumentation,
+              ),
             )
           )
             candidate = proposal;
@@ -401,6 +470,7 @@ function reorderSiblingBranches(
   endpointPlan: FocusSchematicEndpointPlan,
   lanePlan: FocusSchematicInternalLanePlan,
   initial: FocusSchematicLayoutCandidate,
+  instrumentation?: FocusSchematicCrossingMinimizationInstrumentation,
 ): FocusSchematicLayoutCandidate {
   const laneByNodeId = new Map(
     lanePlan.nodes.map(({ projectionNodeId, lane }) => [
@@ -555,14 +625,113 @@ function reorderSiblingBranches(
       const proposal = translateNodes(candidate, deltaByNodeId);
       if (
         improves(
-          orderingScore(modulePlan, endpointPlan, proposal),
-          orderingScore(modulePlan, endpointPlan, candidate),
+          orderingScore(modulePlan, endpointPlan, proposal, instrumentation),
+          orderingScore(modulePlan, endpointPlan, candidate, instrumentation),
         )
       )
         candidate = proposal;
     }
   }
   return candidate;
+}
+
+/**
+ * Reuses the accepted HIER3B-FIX1 branch movers against the candidate's current
+ * external endpoint positions. Only whole, same-parent branches move, and the
+ * fixed sweep counts keep this candidate-local pass deterministic and bounded.
+ */
+export function minimizeFocusSchematicInternalBranchCrossings(
+  input: FocusSchematicLayoutInput,
+  modulePlan: FocusSchematicLayoutPlan,
+  endpointPlan: FocusSchematicEndpointPlan,
+  lanePlan: FocusSchematicInternalLanePlan,
+  initial: FocusSchematicLayoutCandidate,
+  instrumentation?: FocusSchematicCrossingMinimizationInstrumentation,
+): FocusSchematicLayoutCandidate {
+  return reorderSiblingBranches(
+    input,
+    modulePlan,
+    endpointPlan,
+    lanePlan,
+    minimizeFocusSchematicCenterStackCrossings(
+      input,
+      modulePlan,
+      endpointPlan,
+      lanePlan,
+      initial,
+      instrumentation,
+    ),
+    instrumentation,
+  );
+}
+
+export function measureFocusSchematicVisualSiblingOrder(
+  input: FocusSchematicLayoutInput,
+  lanePlan: FocusSchematicInternalLanePlan,
+  candidate: FocusSchematicLayoutCandidate,
+): FocusSchematicVisualSiblingOrderMetrics {
+  const laneByNodeId = new Map(
+    lanePlan.nodes.map(({ projectionNodeId, lane }) => [
+      projectionNodeId,
+      lane,
+    ]),
+  );
+  const nodeById = new Map(
+    candidate.nodes.map((node) => [node.projectionNodeId, node]),
+  );
+  const moduleByNodeId = new Map(
+    input.model.modules.flatMap((module) =>
+      module.visibleEntityNodeIds.map((nodeId) => [nodeId, module.id] as const),
+    ),
+  );
+  const sourceLineByNodeId = new Map(
+    input.projection.nodes.flatMap((node) =>
+      node.kind === 'entity' ? [[node.id, node.sourceStartLine] as const] : [],
+    ),
+  );
+  const childrenByParent = new Map<ProjectionNodeId, ProjectionNodeId[]>();
+  for (const edge of input.projection.edges) {
+    if (
+      edge.kind !== 'hierarchy' ||
+      moduleByNodeId.get(edge.sourceNodeId) !==
+        moduleByNodeId.get(edge.targetNodeId)
+    )
+      continue;
+    const children = childrenByParent.get(edge.sourceNodeId) ?? [];
+    children.push(edge.targetNodeId);
+    childrenByParent.set(edge.sourceNodeId, children);
+  }
+  let visualSiblingOrderDeviationFromSource = 0;
+  const reordered = new Set<ProjectionNodeId>();
+  for (const children of childrenByParent.values()) {
+    for (const lane of ['left', 'center', 'right'] as const) {
+      const group = children
+        .filter((nodeId) => laneByNodeId.get(nodeId) === lane)
+        .filter((nodeId) => nodeById.has(nodeId));
+      for (let left = 0; left < group.length; left += 1)
+        for (let right = left + 1; right < group.length; right += 1) {
+          const leftId = group[left]!;
+          const rightId = group[right]!;
+          const sourceDelta =
+            (sourceLineByNodeId.get(leftId) ?? Number.MAX_SAFE_INTEGER) -
+              (sourceLineByNodeId.get(rightId) ?? Number.MAX_SAFE_INTEGER) ||
+            compareText(leftId, rightId);
+          const visualDelta =
+            rectangleCenterY(nodeById.get(leftId)!) -
+              rectangleCenterY(nodeById.get(rightId)!) ||
+            compareText(leftId, rightId);
+          if (Math.sign(sourceDelta) !== Math.sign(visualDelta)) {
+            visualSiblingOrderDeviationFromSource += 1;
+            reordered.add(leftId);
+            reordered.add(rightId);
+          }
+        }
+    }
+  }
+  return {
+    visualSiblingOrderDeviationFromSource,
+    visuallyReorderedBranchCount: reordered.size,
+  };
 }
 
 function repackRank(
@@ -745,18 +914,11 @@ export function minimizeFocusSchematicEndpointCrossings(
     endpointPlan,
     initial,
   );
-  const candidate = minimizeFocusSchematicCenterStackCrossings(
+  return minimizeFocusSchematicInternalBranchCrossings(
     input,
     modulePlan,
     endpointPlan,
     lanePlan,
     macroOrdered,
-  );
-  return reorderSiblingBranches(
-    input,
-    modulePlan,
-    endpointPlan,
-    lanePlan,
-    candidate,
   );
 }

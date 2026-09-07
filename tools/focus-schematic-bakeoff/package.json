@@ -8,7 +8,10 @@
     "benchmark:endpoints": "tsx src/endpoint-benchmark.ts",
     "benchmark:center-spine": "tsx src/center-spine-benchmark.ts",
     "benchmark:production-worker": "tsx src/production-worker-benchmark.ts",
+    "benchmark:directional-folder-bands": "tsx src/folder-benchmark.ts",
+    "benchmark:internal-layout": "tsx src/internal-layout-benchmark.ts",
     "generate:endpoint-lab": "tsx src/endpoint-lab.ts",
+    "generate:folder-lab": "tsx src/folder-lab.ts",
     "generate:lab": "tsx src/lab.ts",
     "typecheck": "tsc --noEmit"
   },

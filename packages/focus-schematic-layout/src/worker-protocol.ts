@@ -6,7 +6,7 @@ import type {
   FocusSchematicLayoutInput,
 } from './types';
 
-export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 1 as const;
+export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 2 as const;
 
 export interface FocusSchematicLayoutWorkerRequest {
   readonly protocolVersion: typeof FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION;
@@ -182,6 +182,14 @@ export function validateFocusSchematicLayoutWorkerResponse(
       'compositionMs',
       'macroMs',
       'crossingMinimizationMs',
+      'folderInventoryMs',
+      'folderInitialOrderMs',
+      'folderOrderRefinementMs',
+      'folderRankOrderingMs',
+      'folderBandPackingMs',
+      'folderModuleAssignmentMs',
+      'folderExceptionAnalysisMs',
+      'folderQualityMs',
       'attachmentMs',
       'qualityMs',
       'validationMs',
@@ -191,6 +199,7 @@ export function validateFocusSchematicLayoutWorkerResponse(
       'inputSerializedBytes',
       'outputSerializedBytes',
       'endpointLaneSerializedBytes',
+      'folderBandSerializedBytes',
     ] as const;
     exactKeys(timings, timingKeys, 'Focus Schematic timings');
     for (const key of timingKeys) finiteNonNegative(timings[key], key);

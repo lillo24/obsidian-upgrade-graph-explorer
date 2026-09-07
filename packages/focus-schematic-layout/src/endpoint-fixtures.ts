@@ -32,7 +32,14 @@ export interface EndpointFixtureReference {
 
 export interface EndpointFixtureSpec {
   readonly id:
-    `EP${number}` | `ES${number}-${'before' | 'after'}` | `CS${number}`;
+    | `EP${number}`
+    | `ES${number}-${'before' | 'after'}`
+    | `CS${number}`
+    | `FB${number}`
+    | `DB${number}`
+    | `VS${number}`
+    | `CP${number}`
+    | `FS${number}-${'before' | 'after'}`;
   readonly label: string;
   readonly authored: string;
   readonly expectation: string;

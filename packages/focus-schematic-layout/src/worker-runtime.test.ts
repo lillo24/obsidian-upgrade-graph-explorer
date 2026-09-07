@@ -24,7 +24,7 @@ describe('Focus Schematic layout worker protocol', () => {
     );
 
     expect(response).toMatchObject({
-      protocolVersion: 1,
+      protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
       requestId: 7,
       kind: 'success',
       computeMs: 1,
@@ -51,7 +51,7 @@ describe('Focus Schematic layout worker protocol', () => {
   it('returns an explicit failure for malformed input', () => {
     const response = handleFocusSchematicLayoutWorkerRequest(
       {
-        protocolVersion: 1,
+        protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
         requestId: 3,
         kind: 'layout',
         input: {},
@@ -68,7 +68,7 @@ describe('Focus Schematic layout worker protocol', () => {
   it('rejects unexpected fields, stale IDs, and invalid computed output', () => {
     const success = handleFocusSchematicLayoutWorkerRequest(
       {
-        protocolVersion: 1,
+        protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
         requestId: 1,
         kind: 'layout',
         input,
@@ -85,7 +85,30 @@ describe('Focus Schematic layout worker protocol', () => {
     expect(() =>
       validateFocusSchematicLayoutWorkerResponse(success, 2, input),
     ).toThrow(/requestId/);
+    expect(() =>
+      validateFocusSchematicLayoutWorkerResponse(
+        { ...success, protocolVersion: 1 },
+        1,
+        input,
+      ),
+    ).toThrow(/version/);
     if (success.kind !== 'success') throw new Error('Expected success.');
+    expect(() =>
+      validateFocusSchematicLayoutWorkerResponse(
+        {
+          ...success,
+          result: {
+            ...success.result,
+            folderBandPlan: {
+              ...success.result.folderBandPlan,
+              rootFolderKey: 'wrong-folder',
+            },
+          },
+        },
+        1,
+        input,
+      ),
+    ).toThrow(/Invalid computed layout/);
     expect(() =>
       validateFocusSchematicLayoutWorkerResponse(
         { ...success, result: { ...success.result, attachments: [] } },

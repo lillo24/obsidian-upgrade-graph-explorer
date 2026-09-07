@@ -1,0 +1,2254 @@
+{
+  "schemaVersion": 1,
+  "decision": "INTERNAL_LAYOUT_REQUIRES_GRAPHICAL_REVIEW",
+  "note": "Metrics are evidence only. Current, Vertical Spine, and Adaptive Compass remain development variants until explicit graphical selection.",
+  "constants": {
+    "compassAssignmentCap": 64,
+    "compassLocalRelocationSweepLimit": 4,
+    "jointFolderRoundLimit": 2
+  },
+  "aggregate": {
+    "allHardGatesPass": true,
+    "allDeterministic": true,
+    "rowCount": 45,
+    "byVariant": {
+      "current": {
+        "cases": 15,
+        "allHardGatesPass": true,
+        "allDeterministic": true,
+        "totalCrossings": 0,
+        "totalFolderExceptions": 0,
+        "totalPrimaryManhattanSpan": 33600,
+        "totalRootModuleArea": 2960352,
+        "totalRuntimeMs": 144
+      },
+      "vertical-spine": {
+        "cases": 15,
+        "allHardGatesPass": true,
+        "allDeterministic": true,
+        "totalCrossings": 0,
+        "totalFolderExceptions": 0,
+        "totalPrimaryManhattanSpan": 33080,
+        "totalRootModuleArea": 2282752,
+        "totalRuntimeMs": 304
+      },
+      "adaptive-compass": {
+        "cases": 15,
+        "allHardGatesPass": true,
+        "allDeterministic": true,
+        "totalCrossings": 0,
+        "totalFolderExceptions": 0,
+        "totalPrimaryManhattanSpan": 35128,
+        "totalRootModuleArea": 3323584,
+        "totalRuntimeMs": 278
+      }
+    }
+  },
+  "rows": [
+    {
+      "fixtureId": "DB5",
+      "fixtureLabel": "center spine with directional bands",
+      "variant": "current",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 2608,
+        "mean": 652,
+        "p95": 688
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 1296,
+        "mean": 324
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 1,
+      "internalBranchMovement": 1544,
+      "rootModule": {
+        "width": 488,
+        "height": 412,
+        "area": 201056,
+        "branchesAbove": 0,
+        "branchesBelow": 1,
+        "branchesLeft": 0,
+        "branchesRight": 4,
+        "packedVerticalImbalance": 120
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 0,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 0
+      },
+      "runtimeMs": 29
+    },
+    {
+      "fixtureId": "DB5",
+      "fixtureLabel": "center spine with directional bands",
+      "variant": "vertical-spine",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 2784,
+        "mean": 696,
+        "p95": 776
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 1440,
+        "mean": 360
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 2,
+      "internalBranchMovement": 4164,
+      "rootModule": {
+        "width": 256,
+        "height": 656,
+        "area": 167936,
+        "branchesAbove": 4,
+        "branchesBelow": 1,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 288
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 104,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 27
+    },
+    {
+      "fixtureId": "DB5",
+      "fixtureLabel": "center spine with directional bands",
+      "variant": "adaptive-compass",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 2840,
+        "mean": 710,
+        "p95": 804
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 1528,
+        "mean": 382
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 5,
+      "internalBranchMovement": 3320,
+      "rootModule": {
+        "width": 488,
+        "height": 528,
+        "area": 257664,
+        "branchesAbove": 1,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 4,
+        "packedVerticalImbalance": 260
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 64,
+        "placementCandidatesEvaluated": 160,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 22
+    },
+    {
+      "fixtureId": "DB6",
+      "fixtureLabel": "query hides one exact folder",
+      "variant": "current",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 196,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 928,
+        "mean": 464,
+        "p95": 532
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 256,
+        "mean": 128
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 136,
+      "rootModule": {
+        "width": 256,
+        "height": 128,
+        "area": 32768,
+        "branchesAbove": 0,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 0,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 0
+      },
+      "runtimeMs": 2
+    },
+    {
+      "fixtureId": "DB6",
+      "fixtureLabel": "query hides one exact folder",
+      "variant": "vertical-spine",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 196,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 928,
+        "mean": 464,
+        "p95": 532
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 256,
+        "mean": 128
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 136,
+      "rootModule": {
+        "width": 256,
+        "height": 128,
+        "area": 32768,
+        "branchesAbove": 0,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 0,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 2
+    },
+    {
+      "fixtureId": "DB6",
+      "fixtureLabel": "query hides one exact folder",
+      "variant": "adaptive-compass",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 196,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 928,
+        "mean": 464,
+        "p95": 532
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 256,
+        "mean": 128
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 136,
+      "rootModule": {
+        "width": 256,
+        "height": 128,
+        "area": 32768,
+        "branchesAbove": 0,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 0,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 4
+    },
+    {
+      "fixtureId": "DB11",
+      "fixtureLabel": "root balance requiring endpoint reorder",
+      "variant": "current",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1374,
+        "mean": 458,
+        "p95": 524
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 390,
+        "mean": 130
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 1,
+      "internalBranchMovement": 770,
+      "rootModule": {
+        "width": 488,
+        "height": 316,
+        "area": 154208,
+        "branchesAbove": 0,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 3,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 0,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 0
+      },
+      "runtimeMs": 3
+    },
+    {
+      "fixtureId": "DB11",
+      "fixtureLabel": "root balance requiring endpoint reorder",
+      "variant": "vertical-spine",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1468,
+        "mean": 489.3333333333333,
+        "p95": 528
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 460,
+        "mean": 153.33333333333334
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 2546,
+      "rootModule": {
+        "width": 256,
+        "height": 464,
+        "area": 118784,
+        "branchesAbove": 1,
+        "branchesBelow": 2,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 96
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 56,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 10
+    },
+    {
+      "fixtureId": "DB11",
+      "fixtureLabel": "root balance requiring endpoint reorder",
+      "variant": "adaptive-compass",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1368,
+        "mean": 456,
+        "p95": 520
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 384,
+        "mean": 128
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 2,
+      "internalBranchMovement": 1378,
+      "rootModule": {
+        "width": 488,
+        "height": 312,
+        "area": 152256,
+        "branchesAbove": 0,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 3,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 16,
+        "placementCandidatesEvaluated": 64,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 14
+    },
+    {
+      "fixtureId": "DB12",
+      "fixtureLabel": "root internal-layout pressure",
+      "variant": "current",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 392,
+      "rootBandTopologyOverride": "crossing-guard",
+      "primaryReferenceManhattanSpan": {
+        "total": 2372,
+        "mean": 593,
+        "p95": 720
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 812,
+        "mean": 203
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 816,
+      "rootModule": {
+        "width": 488,
+        "height": 248,
+        "area": 121024,
+        "branchesAbove": 0,
+        "branchesBelow": 1,
+        "branchesLeft": 0,
+        "branchesRight": 2,
+        "packedVerticalImbalance": 120
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 0,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 0
+      },
+      "runtimeMs": 6
+    },
+    {
+      "fixtureId": "DB12",
+      "fixtureLabel": "root internal-layout pressure",
+      "variant": "vertical-spine",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1880,
+        "mean": 470,
+        "p95": 528
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 536,
+        "mean": 134
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 2500,
+      "rootModule": {
+        "width": 256,
+        "height": 464,
+        "area": 118784,
+        "branchesAbove": 1,
+        "branchesBelow": 2,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 96
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 56,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 11
+    },
+    {
+      "fixtureId": "DB12",
+      "fixtureLabel": "root internal-layout pressure",
+      "variant": "adaptive-compass",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 392,
+      "rootBandTopologyOverride": "crossing-guard",
+      "primaryReferenceManhattanSpan": {
+        "total": 2452,
+        "mean": 613,
+        "p95": 716
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 892,
+        "mean": 223
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 1044,
+      "rootModule": {
+        "width": 488,
+        "height": 336,
+        "area": 163968,
+        "branchesAbove": 0,
+        "branchesBelow": 1,
+        "branchesLeft": 0,
+        "branchesRight": 2,
+        "packedVerticalImbalance": 164
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 16,
+        "placementCandidatesEvaluated": 80,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 11
+    },
+    {
+      "fixtureId": "DB14",
+      "fixtureLabel": "balanced assignment chooses shorter endpoints",
+      "variant": "current",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 336,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1272,
+        "mean": 636,
+        "p95": 640
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 508,
+        "mean": 254
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 1,
+      "internalBranchMovement": 3376,
+      "rootModule": {
+        "width": 488,
+        "height": 220,
+        "area": 107360,
+        "branchesAbove": 0,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 2,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 0,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 0
+      },
+      "runtimeMs": 6
+    },
+    {
+      "fixtureId": "DB14",
+      "fixtureLabel": "balanced assignment chooses shorter endpoints",
+      "variant": "vertical-spine",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 432,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1052,
+        "mean": 526,
+        "p95": 528
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 380,
+        "mean": 190
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 4358,
+      "rootModule": {
+        "width": 256,
+        "height": 368,
+        "area": 94208,
+        "branchesAbove": 1,
+        "branchesBelow": 1,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 121,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 12
+    },
+    {
+      "fixtureId": "DB14",
+      "fixtureLabel": "balanced assignment chooses shorter endpoints",
+      "variant": "adaptive-compass",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 312,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1148,
+        "mean": 574,
+        "p95": 636
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 384,
+        "mean": 192
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 1238,
+      "rootModule": {
+        "width": 488,
+        "height": 216,
+        "area": 105408,
+        "branchesAbove": 0,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 2,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 40,
+        "placementCandidatesEvaluated": 144,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 11
+    },
+    {
+      "fixtureId": "DB16",
+      "fixtureLabel": "secondary-invariant joint ordering",
+      "variant": "current",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1374,
+        "mean": 458,
+        "p95": 524
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 390,
+        "mean": 130
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 1,
+      "internalBranchMovement": 770,
+      "rootModule": {
+        "width": 488,
+        "height": 316,
+        "area": 154208,
+        "branchesAbove": 0,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 3,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 0,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 0
+      },
+      "runtimeMs": 3
+    },
+    {
+      "fixtureId": "DB16",
+      "fixtureLabel": "secondary-invariant joint ordering",
+      "variant": "vertical-spine",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1468,
+        "mean": 489.3333333333333,
+        "p95": 528
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 460,
+        "mean": 153.33333333333334
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 2546,
+      "rootModule": {
+        "width": 256,
+        "height": 464,
+        "area": 118784,
+        "branchesAbove": 1,
+        "branchesBelow": 2,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 96
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 56,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 7
+    },
+    {
+      "fixtureId": "DB16",
+      "fixtureLabel": "secondary-invariant joint ordering",
+      "variant": "adaptive-compass",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1368,
+        "mean": 456,
+        "p95": 520
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 384,
+        "mean": 128
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 2,
+      "internalBranchMovement": 1378,
+      "rootModule": {
+        "width": 488,
+        "height": 312,
+        "area": 152256,
+        "branchesAbove": 0,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 3,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 16,
+        "placementCandidatesEvaluated": 64,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 9
+    },
+    {
+      "fixtureId": "DB18",
+      "fixtureLabel": "reroot with crossing-optimized order",
+      "variant": "current",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1908,
+        "mean": 636,
+        "p95": 764
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 684,
+        "mean": 228
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 1,
+      "internalBranchMovement": 420,
+      "rootModule": {
+        "width": 488,
+        "height": 320,
+        "area": 156160,
+        "branchesAbove": 0,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 2,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 0,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 0
+      },
+      "runtimeMs": 3
+    },
+    {
+      "fixtureId": "DB18",
+      "fixtureLabel": "reroot with crossing-optimized order",
+      "variant": "vertical-spine",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1708,
+        "mean": 569.3333333333334,
+        "p95": 652
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 700,
+        "mean": 233.33333333333334
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 1312,
+      "rootModule": {
+        "width": 256,
+        "height": 368,
+        "area": 94208,
+        "branchesAbove": 1,
+        "branchesBelow": 1,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 44,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 6
+    },
+    {
+      "fixtureId": "DB18",
+      "fixtureLabel": "reroot with crossing-optimized order",
+      "variant": "adaptive-compass",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1848,
+        "mean": 616,
+        "p95": 808
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 624,
+        "mean": 208
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 1,
+      "internalBranchMovement": 516,
+      "rootModule": {
+        "width": 488,
+        "height": 216,
+        "area": 105408,
+        "branchesAbove": 0,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 2,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 8,
+        "placementCandidatesEvaluated": 48,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 7
+    },
+    {
+      "fixtureId": "DB19",
+      "fixtureLabel": "true blocked after internal-layout optimization",
+      "variant": "current",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 392,
+      "rootBandTopologyOverride": "crossing-guard",
+      "primaryReferenceManhattanSpan": {
+        "total": 2172,
+        "mean": 543,
+        "p95": 724
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 828,
+        "mean": 207
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 828,
+      "rootModule": {
+        "width": 256,
+        "height": 368,
+        "area": 94208,
+        "branchesAbove": 1,
+        "branchesBelow": 1,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 0,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 0
+      },
+      "runtimeMs": 6
+    },
+    {
+      "fixtureId": "DB19",
+      "fixtureLabel": "true blocked after internal-layout optimization",
+      "variant": "vertical-spine",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 392,
+      "rootBandTopologyOverride": "crossing-guard",
+      "primaryReferenceManhattanSpan": {
+        "total": 2172,
+        "mean": 543,
+        "p95": 724
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 828,
+        "mean": 207
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 828,
+      "rootModule": {
+        "width": 256,
+        "height": 368,
+        "area": 94208,
+        "branchesAbove": 1,
+        "branchesBelow": 1,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 52,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 10
+    },
+    {
+      "fixtureId": "DB19",
+      "fixtureLabel": "true blocked after internal-layout optimization",
+      "variant": "adaptive-compass",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 392,
+      "rootBandTopologyOverride": "crossing-guard",
+      "primaryReferenceManhattanSpan": {
+        "total": 2172,
+        "mean": 543,
+        "p95": 724
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 828,
+        "mean": 207
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 828,
+      "rootModule": {
+        "width": 256,
+        "height": 368,
+        "area": 94208,
+        "branchesAbove": 1,
+        "branchesBelow": 1,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 8,
+        "placementCandidatesEvaluated": 56,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 13
+    },
+    {
+      "fixtureId": "FB4",
+      "fixtureLabel": "FB4-topology-tension · candidate-specific ordering",
+      "variant": "current",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 56,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 4236,
+        "mean": 706,
+        "p95": 848
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 2220,
+        "mean": 370
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 2774,
+      "rootModule": {
+        "width": 256,
+        "height": 128,
+        "area": 32768,
+        "branchesAbove": 0,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 0,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 0
+      },
+      "runtimeMs": 63
+    },
+    {
+      "fixtureId": "FB4",
+      "fixtureLabel": "FB4-topology-tension · candidate-specific ordering",
+      "variant": "vertical-spine",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 56,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 4236,
+        "mean": 706,
+        "p95": 848
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 2220,
+        "mean": 370
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 2774,
+      "rootModule": {
+        "width": 256,
+        "height": 128,
+        "area": 32768,
+        "branchesAbove": 0,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 624,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 151
+    },
+    {
+      "fixtureId": "FB4",
+      "fixtureLabel": "FB4-topology-tension · candidate-specific ordering",
+      "variant": "adaptive-compass",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 56,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 4236,
+        "mean": 706,
+        "p95": 848
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 2220,
+        "mean": 370
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 3066,
+      "rootModule": {
+        "width": 256,
+        "height": 128,
+        "area": 32768,
+        "branchesAbove": 0,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 16,
+        "placementCandidatesEvaluated": 632,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 111
+    },
+    {
+      "fixtureId": "VS2",
+      "fixtureLabel": "five-Heading root",
+      "variant": "current",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 2608,
+        "mean": 652,
+        "p95": 688
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 1296,
+        "mean": 324
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 1,
+      "internalBranchMovement": 1544,
+      "rootModule": {
+        "width": 488,
+        "height": 412,
+        "area": 201056,
+        "branchesAbove": 0,
+        "branchesBelow": 1,
+        "branchesLeft": 0,
+        "branchesRight": 4,
+        "packedVerticalImbalance": 120
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 0,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 0
+      },
+      "runtimeMs": 4
+    },
+    {
+      "fixtureId": "VS2",
+      "fixtureLabel": "five-Heading root",
+      "variant": "vertical-spine",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 2784,
+        "mean": 696,
+        "p95": 776
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 1440,
+        "mean": 360
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 2,
+      "internalBranchMovement": 4164,
+      "rootModule": {
+        "width": 256,
+        "height": 656,
+        "area": 167936,
+        "branchesAbove": 4,
+        "branchesBelow": 1,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 288
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 104,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 13
+    },
+    {
+      "fixtureId": "VS2",
+      "fixtureLabel": "five-Heading root",
+      "variant": "adaptive-compass",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 2840,
+        "mean": 710,
+        "p95": 804
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 1528,
+        "mean": 382
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 5,
+      "internalBranchMovement": 3320,
+      "rootModule": {
+        "width": 488,
+        "height": 528,
+        "area": 257664,
+        "branchesAbove": 1,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 4,
+        "packedVerticalImbalance": 260
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 64,
+        "placementCandidatesEvaluated": 160,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 15
+    },
+    {
+      "fixtureId": "VS6",
+      "fixtureLabel": "variable branch heights",
+      "variant": "current",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 2400,
+        "mean": 1200,
+        "p95": 1212
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 416,
+        "mean": 208
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 348,
+      "rootModule": {
+        "width": 1152,
+        "height": 248,
+        "area": 285696,
+        "branchesAbove": 0,
+        "branchesBelow": 1,
+        "branchesLeft": 0,
+        "branchesRight": 2,
+        "packedVerticalImbalance": 120
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 0,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 0
+      },
+      "runtimeMs": 3
+    },
+    {
+      "fixtureId": "VS6",
+      "fixtureLabel": "variable branch heights",
+      "variant": "vertical-spine",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 2368,
+        "mean": 1184,
+        "p95": 1184
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 384,
+        "mean": 192
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 2508,
+      "rootModule": {
+        "width": 912,
+        "height": 464,
+        "area": 423168,
+        "branchesAbove": 1,
+        "branchesBelow": 2,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 96
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 56,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 7
+    },
+    {
+      "fixtureId": "VS6",
+      "fixtureLabel": "variable branch heights",
+      "variant": "adaptive-compass",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 2132,
+        "mean": 1066,
+        "p95": 1184
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 388,
+        "mean": 194
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 2244,
+      "rootModule": {
+        "width": 912,
+        "height": 344,
+        "area": 313728,
+        "branchesAbove": 2,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 1,
+        "packedVerticalImbalance": 216
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 16,
+        "placementCandidatesEvaluated": 64,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 6
+    },
+    {
+      "fixtureId": "CP1",
+      "fixtureLabel": "simple compass demand",
+      "variant": "current",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1168,
+        "mean": 584,
+        "p95": 644
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 512,
+        "mean": 256
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 512,
+      "rootModule": {
+        "width": 720,
+        "height": 248,
+        "area": 178560,
+        "branchesAbove": 0,
+        "branchesBelow": 1,
+        "branchesLeft": 1,
+        "branchesRight": 1,
+        "packedVerticalImbalance": 120
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 0,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 0
+      },
+      "runtimeMs": 3
+    },
+    {
+      "fixtureId": "CP1",
+      "fixtureLabel": "simple compass demand",
+      "variant": "vertical-spine",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1056,
+        "mean": 528,
+        "p95": 528
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 384,
+        "mean": 192
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 2040,
+      "rootModule": {
+        "width": 256,
+        "height": 464,
+        "area": 118784,
+        "branchesAbove": 1,
+        "branchesBelow": 2,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 96
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 68,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 7
+    },
+    {
+      "fixtureId": "CP1",
+      "fixtureLabel": "simple compass demand",
+      "variant": "adaptive-compass",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1168,
+        "mean": 584,
+        "p95": 644
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 512,
+        "mean": 256
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 1000,
+      "rootModule": {
+        "width": 720,
+        "height": 248,
+        "area": 178560,
+        "branchesAbove": 1,
+        "branchesBelow": 0,
+        "branchesLeft": 1,
+        "branchesRight": 1,
+        "packedVerticalImbalance": 120
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 16,
+        "placementCandidatesEvaluated": 72,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 6
+    },
+    {
+      "fixtureId": "CP3",
+      "fixtureLabel": "many compass branches",
+      "variant": "current",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 7140,
+        "mean": 714,
+        "p95": 908
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 3860,
+        "mean": 386
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 4,
+      "internalBranchMovement": 772,
+      "rootModule": {
+        "width": 720,
+        "height": 508,
+        "area": 365760,
+        "branchesAbove": 0,
+        "branchesBelow": 0,
+        "branchesLeft": 5,
+        "branchesRight": 5,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 0,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 0
+      },
+      "runtimeMs": 4
+    },
+    {
+      "fixtureId": "CP3",
+      "fixtureLabel": "many compass branches",
+      "variant": "vertical-spine",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 7200,
+        "mean": 720,
+        "p95": 912
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 3840,
+        "mean": 384
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 7614,
+      "rootModule": {
+        "width": 256,
+        "height": 1136,
+        "area": 290816,
+        "branchesAbove": 5,
+        "branchesBelow": 5,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 168,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 19
+    },
+    {
+      "fixtureId": "CP3",
+      "fixtureLabel": "many compass branches",
+      "variant": "adaptive-compass",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 8920,
+        "mean": 892,
+        "p95": 1048
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 3960,
+        "mean": 396
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 5546,
+      "rootModule": {
+        "width": 720,
+        "height": 936,
+        "area": 673920,
+        "branchesAbove": 4,
+        "branchesBelow": 3,
+        "branchesLeft": 1,
+        "branchesRight": 2,
+        "packedVerticalImbalance": 96
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 82,
+        "placementCandidatesEvaluated": 204,
+        "localRelocationSweeps": 8,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 27
+    },
+    {
+      "fixtureId": "CP4",
+      "fixtureLabel": "compass width pressure",
+      "variant": "current",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1384,
+        "mean": 692,
+        "p95": 740
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 728,
+        "mean": 364
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 728,
+      "rootModule": {
+        "width": 720,
+        "height": 464,
+        "area": 334080,
+        "branchesAbove": 1,
+        "branchesBelow": 2,
+        "branchesLeft": 1,
+        "branchesRight": 1,
+        "packedVerticalImbalance": 96
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 0,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 0
+      },
+      "runtimeMs": 3
+    },
+    {
+      "fixtureId": "CP4",
+      "fixtureLabel": "compass width pressure",
+      "variant": "vertical-spine",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1056,
+        "mean": 528,
+        "p95": 528
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 384,
+        "mean": 192
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 1,
+      "internalBranchMovement": 2400,
+      "rootModule": {
+        "width": 256,
+        "height": 656,
+        "area": 167936,
+        "branchesAbove": 2,
+        "branchesBelow": 3,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 96
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 112,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 8
+    },
+    {
+      "fixtureId": "CP4",
+      "fixtureLabel": "compass width pressure",
+      "variant": "adaptive-compass",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 1052,
+        "mean": 526,
+        "p95": 528
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 388,
+        "mean": 194
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 2644,
+      "rootModule": {
+        "width": 488,
+        "height": 536,
+        "area": 261568,
+        "branchesAbove": 4,
+        "branchesBelow": 0,
+        "branchesLeft": 0,
+        "branchesRight": 1,
+        "packedVerticalImbalance": 408
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 64,
+        "placementCandidatesEvaluated": 168,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 10
+    },
+    {
+      "fixtureId": "CP5",
+      "fixtureLabel": "compass-helpful precise endpoints",
+      "variant": "current",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 656,
+        "mean": 328,
+        "p95": 328
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 0,
+        "mean": 0
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 0,
+      "rootModule": {
+        "width": 720,
+        "height": 752,
+        "area": 541440,
+        "branchesAbove": 3,
+        "branchesBelow": 3,
+        "branchesLeft": 1,
+        "branchesRight": 1,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 0,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 0
+      },
+      "runtimeMs": 6
+    },
+    {
+      "fixtureId": "CP5",
+      "fixtureLabel": "compass-helpful precise endpoints",
+      "variant": "vertical-spine",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 920,
+        "mean": 460,
+        "p95": 460
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 248,
+        "mean": 124
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 6,
+      "internalBranchMovement": 1768,
+      "rootModule": {
+        "width": 256,
+        "height": 944,
+        "area": 241664,
+        "branchesAbove": 4,
+        "branchesBelow": 4,
+        "branchesLeft": 0,
+        "branchesRight": 0,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 0,
+        "placementCandidatesEvaluated": 136,
+        "localRelocationSweeps": 0,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 14
+    },
+    {
+      "fixtureId": "CP5",
+      "fixtureLabel": "compass-helpful precise endpoints",
+      "variant": "adaptive-compass",
+      "deterministic": true,
+      "hardGates": {
+        "passed": true,
+        "failures": []
+      },
+      "exactEndpointCrossings": 0,
+      "adjacentRankOrderInversions": 0,
+      "folderExceptions": 0,
+      "folderBandSatisfaction": 1,
+      "rootBandImbalance": 0,
+      "rootBandTopologyOverride": null,
+      "primaryReferenceManhattanSpan": {
+        "total": 656,
+        "mean": 328,
+        "p95": 328
+      },
+      "primaryReferenceVerticalSpan": {
+        "total": 0,
+        "mean": 0
+      },
+      "internalHierarchyCrossings": 0,
+      "internalSourceOrderDeviation": 0,
+      "internalBranchMovement": 880,
+      "rootModule": {
+        "width": 720,
+        "height": 752,
+        "area": 541440,
+        "branchesAbove": 3,
+        "branchesBelow": 3,
+        "branchesLeft": 1,
+        "branchesRight": 1,
+        "packedVerticalImbalance": 0
+      },
+      "search": {
+        "verticalSpinePlacementCandidateCap": 64,
+        "compassAssignmentCap": 64,
+        "compassLocalRelocationSweepLimit": 4,
+        "jointFolderRoundLimit": 2,
+        "completeCompassAssignmentsEvaluated": 66,
+        "placementCandidatesEvaluated": 140,
+        "localRelocationSweeps": 8,
+        "jointFolderRounds": 2
+      },
+      "runtimeMs": 12
+    }
+  ]
+}

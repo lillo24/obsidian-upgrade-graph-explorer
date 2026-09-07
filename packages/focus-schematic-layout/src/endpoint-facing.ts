@@ -18,9 +18,20 @@ import {
 } from './crossing-minimization';
 import { assertFocusSchematicLayoutInput } from './input';
 import {
+  applyFocusSchematicFolderBands,
+  evaluateFocusSchematicFolderBandQuality,
+  validateSerializedFocusSchematicFolderBandPlan,
+} from './folder-bands';
+import {
   createFocusSchematicInternalLanePlan,
   validateFocusSchematicInternalLanePlan,
 } from './lane-plan';
+import {
+  applyFocusSchematicInternalLayoutVariant,
+  createFocusSchematicInternalLayoutEvidence,
+  createFocusSchematicInternalLayoutRunStats,
+  FOCUS_SCHEMATIC_INTERNAL_FOLDER_JOINT_ROUND_LIMIT,
+} from './internal-layout-variants';
 import {
   createFocusSchematicLayoutPlan,
   validateFocusSchematicLayoutPlan,
@@ -33,6 +44,7 @@ import {
 import type {
   FocusSchematicComputedLayout,
   FocusSchematicComputedLayoutAttempt,
+  FocusSchematicComputedLayoutOptions,
   FocusSchematicConnectionEndpoint,
   FocusSchematicEndpointAttachmentGeometry,
   FocusSchematicEndpointLayoutPhaseTimings,
@@ -98,6 +110,14 @@ function emptyTimings(totalMs = 0): FocusSchematicEndpointLayoutPhaseTimings {
     compositionMs: 0,
     macroMs: 0,
     crossingMinimizationMs: 0,
+    folderInventoryMs: 0,
+    folderInitialOrderMs: 0,
+    folderOrderRefinementMs: 0,
+    folderRankOrderingMs: 0,
+    folderBandPackingMs: 0,
+    folderModuleAssignmentMs: 0,
+    folderExceptionAnalysisMs: 0,
+    folderQualityMs: 0,
     attachmentMs: 0,
     qualityMs: 0,
     validationMs: 0,
@@ -107,6 +127,7 @@ function emptyTimings(totalMs = 0): FocusSchematicEndpointLayoutPhaseTimings {
     inputSerializedBytes: 0,
     outputSerializedBytes: 0,
     endpointLaneSerializedBytes: 0,
+    folderBandSerializedBytes: 0,
   };
 }
 
@@ -558,6 +579,36 @@ function internalLayout(
     rightLayoutMs,
     compositionMs,
   };
+}
+
+function localLayoutsFromCandidate(
+  candidate: FocusSchematicLayoutCandidate,
+  timings: readonly LocalModuleLayout[],
+): readonly LocalModuleLayout[] {
+  const timingById = new Map(timings.map((item) => [item.moduleId, item]));
+  return candidate.modules
+    .map((module) => {
+      const timing = timingById.get(module.moduleId);
+      if (timing === undefined)
+        throw new Error(
+          `Internal-layout candidate omitted module timing "${module.moduleId}".`,
+        );
+      return {
+        ...timing,
+        width: module.width,
+        height: module.height,
+        nodes: candidate.nodes
+          .filter(({ moduleId }) => moduleId === module.moduleId)
+          .map((node) => ({
+            projectionNodeId: node.projectionNodeId,
+            x: node.x - module.x,
+            y: node.y - module.y,
+            width: node.width,
+            height: node.height,
+          })),
+      };
+    })
+    .sort((left, right) => compareText(left.moduleId, right.moduleId));
 }
 
 function macroLayout(
@@ -1027,6 +1078,9 @@ export function validateFocusSchematicComputedLayout(
       'attachments',
       'candidate',
       'endpointPlan',
+      'folderBandPlan',
+      'folderBandQuality',
+      'internalLayoutEvidence',
       'internalLanePlan',
       'modulePlan',
       'quality',
@@ -1068,6 +1122,37 @@ export function validateFocusSchematicComputedLayout(
     computed.internalLanePlan,
   );
   if (!laneValidation.valid) return laneValidation;
+  const folderPlanValidation = validateSerializedFocusSchematicFolderBandPlan(
+    input,
+    computed.modulePlan,
+    computed.candidate,
+    computed.folderBandPlan,
+  );
+  if (!folderPlanValidation.valid) return folderPlanValidation;
+  const internalEvidence = computed.internalLayoutEvidence;
+  const expectedInternalVariant =
+    computed.folderBandPlan.optimization?.internalLayoutVariant ?? 'current';
+  if (
+    internalEvidence === null ||
+    typeof internalEvidence !== 'object' ||
+    internalEvidence.developmentOnly !== true ||
+    internalEvidence.variant !== expectedInternalVariant ||
+    internalEvidence.verticalSpinePlacementCandidateCap !== 64 ||
+    internalEvidence.compassAssignmentCap !== 64 ||
+    internalEvidence.compassLocalRelocationSweepLimit !== 4 ||
+    internalEvidence.jointFolderRoundLimit !== 2 ||
+    internalEvidence.jointFolderRounds > 2
+  )
+    return {
+      valid: false,
+      issues: [
+        {
+          path: '$.internalLayoutEvidence',
+          message:
+            'Internal-layout bakeoff evidence is missing, unbounded, or inconsistent with the folder candidate.',
+        },
+      ],
+    };
   if (
     !Array.isArray(computed.attachments) ||
     computed.attachments.length !== computed.endpointPlan.connections.length * 2
@@ -1143,14 +1228,54 @@ export function validateFocusSchematicComputedLayout(
         },
       ],
     };
+  const baselineEndpointQuality: FocusSchematicEndpointLayoutQuality = {
+    ...computed.quality,
+    exactEndpointCrossingCount:
+      computed.folderBandQuality.baselineExactEndpointCrossingCount,
+    adjacentRankOrderInversionCount:
+      computed.folderBandQuality.baselineAdjacentRankOrderInversionCount,
+    meanPreciseEndpointVerticalError:
+      computed.folderBandQuality.baselineMeanEndpointVerticalError,
+    p95PreciseEndpointVerticalError:
+      computed.folderBandQuality.baselineP95EndpointVerticalError,
+  };
+  const expectedFolderQuality = evaluateFocusSchematicFolderBandQuality(
+    input,
+    computed.modulePlan,
+    computed.folderBandPlan,
+    computed.candidate,
+    baselineEndpointQuality,
+    computed.quality,
+  );
+  if (
+    canonicalJson(expectedFolderQuality) !==
+    canonicalJson(computed.folderBandQuality)
+  )
+    return {
+      valid: false,
+      issues: [
+        {
+          path: '$.folderBandQuality',
+          message: 'Folder-band quality does not match computed geometry.',
+        },
+      ],
+    };
   return { valid: true, value: computed, issues: [] };
 }
 
 export function computeFocusSchematicComputedLayoutAttempt(
   value: FocusSchematicLayoutInput,
+  options: FocusSchematicComputedLayoutOptions = {},
 ): FocusSchematicComputedLayoutAttempt {
   const started = now();
-  const configId = `A1v${FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION}-${value.settings.ranker}-i${value.settings.internalNodeSeparation}-${value.settings.internalRankSeparation}-m${value.settings.macroNodeSeparation}-${value.settings.macroRankSeparation}`;
+  const endpointOrderPolicy =
+    options.endpointOrderPolicy ?? 'crossing-optimized';
+  const internalLayoutVariant = value.settings.directionalFolderBandsEnabled
+    ? (options.internalLayoutVariant ?? 'current')
+    : 'current';
+  const internalVariantConfig =
+    internalLayoutVariant === 'current' ? '' : `-il${internalLayoutVariant}`;
+  const configId = `A1v${FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION}-${value.settings.ranker}-i${value.settings.internalNodeSeparation}-${value.settings.internalRankSeparation}-m${value.settings.macroNodeSeparation}-${value.settings.macroRankSeparation}-db${value.settings.directionalFolderBandsEnabled ? 'on' : 'off'}-ho${endpointOrderPolicy}${internalVariantConfig}`;
   try {
     const inputStarted = now();
     assertFocusSchematicLayoutInput(value);
@@ -1172,21 +1297,87 @@ export function computeFocusSchematicComputedLayoutAttempt(
       .map((module) => internalLayout(value, module, internalLanePlan))
       .sort((left, right) => compareText(left.moduleId, right.moduleId));
     const macroStarted = now();
-    const { candidate: macroCandidate, nativeRoutes } = macroLayout(
-      value,
-      modulePlan,
-      localLayouts,
-    );
-    const macroMs = now() - macroStarted;
+    const currentMacro = macroLayout(value, modulePlan, localLayouts);
+    let macroMs = now() - macroStarted;
     const crossingMinimizationStarted = now();
-    const candidate = minimizeFocusSchematicEndpointCrossings(
+    const revision2Candidate = minimizeFocusSchematicEndpointCrossings(
       value,
       modulePlan,
       endpointPlan,
       internalLanePlan,
-      macroCandidate,
+      currentMacro.candidate,
     );
     const crossingMinimizationMs = now() - crossingMinimizationStarted;
+    const internalLayoutStats = createFocusSchematicInternalLayoutRunStats();
+    let baselineCandidate = revision2Candidate;
+    let nativeRoutes = currentMacro.nativeRoutes;
+    let folderApplication:
+      ReturnType<typeof applyFocusSchematicFolderBands> | undefined;
+    if (internalLayoutVariant === 'current') {
+      folderApplication = applyFocusSchematicFolderBands(
+        value,
+        modulePlan,
+        endpointPlan,
+        internalLanePlan,
+        baselineCandidate,
+        endpointOrderPolicy,
+        internalLayoutVariant,
+        internalLayoutStats,
+      );
+    } else {
+      let demandCandidate = revision2Candidate;
+      for (
+        let round = 0;
+        round < FOCUS_SCHEMATIC_INTERNAL_FOLDER_JOINT_ROUND_LIMIT;
+        round += 1
+      ) {
+        const internalCandidate = applyFocusSchematicInternalLayoutVariant(
+          value,
+          modulePlan,
+          endpointPlan,
+          demandCandidate,
+          internalLayoutVariant,
+          endpointOrderPolicy,
+          internalLayoutStats,
+        );
+        const variantMacroStarted = now();
+        const variantMacro = macroLayout(
+          value,
+          modulePlan,
+          localLayoutsFromCandidate(internalCandidate, localLayouts),
+        );
+        macroMs += now() - variantMacroStarted;
+        baselineCandidate = variantMacro.candidate;
+        nativeRoutes = variantMacro.nativeRoutes;
+        folderApplication = applyFocusSchematicFolderBands(
+          value,
+          modulePlan,
+          endpointPlan,
+          internalLanePlan,
+          baselineCandidate,
+          endpointOrderPolicy,
+          internalLayoutVariant,
+          internalLayoutStats,
+        );
+        demandCandidate = folderApplication.candidate;
+        internalLayoutStats.jointFolderRounds += 1;
+      }
+    }
+    if (folderApplication === undefined)
+      throw new Error('Internal/folder joint layout produced no candidate.');
+    const baselineAttachments = createFocusSchematicEndpointAttachments(
+      endpointPlan,
+      baselineCandidate,
+    );
+    const baselineQuality = evaluateFocusSchematicEndpointLayoutQuality(
+      value,
+      modulePlan,
+      endpointPlan,
+      internalLanePlan,
+      baselineCandidate,
+      baselineAttachments,
+    );
+    const candidate = folderApplication.candidate;
     const attachmentStarted = now();
     const attachments = createFocusSchematicEndpointAttachments(
       endpointPlan,
@@ -1203,11 +1394,31 @@ export function computeFocusSchematicComputedLayoutAttempt(
       attachments,
     );
     const qualityMs = now() - qualityStarted;
+    const folderQualityStarted = now();
+    const folderBandQuality = evaluateFocusSchematicFolderBandQuality(
+      value,
+      modulePlan,
+      folderApplication.plan,
+      candidate,
+      baselineQuality,
+      quality,
+    );
+    const folderQualityMs = now() - folderQualityStarted;
     const result: FocusSchematicComputedLayout = {
       candidate,
       modulePlan,
       endpointPlan,
       internalLanePlan,
+      folderBandPlan: folderApplication.plan,
+      folderBandQuality,
+      internalLayoutEvidence: createFocusSchematicInternalLayoutEvidence(
+        value,
+        endpointPlan,
+        candidate,
+        revision2Candidate,
+        internalLayoutVariant,
+        internalLayoutStats,
+      ),
       attachments,
       quality,
     };
@@ -1226,6 +1437,10 @@ export function computeFocusSchematicComputedLayoutAttempt(
       endpointPlan,
       internalLanePlan,
       attachments,
+    });
+    const folderBandSerializedBytes = byteLength({
+      folderBandPlan: folderApplication.plan,
+      folderBandQuality,
     });
     const serializationMs = now() - serializationStarted;
     return {
@@ -1262,8 +1477,10 @@ export function computeFocusSchematicComputedLayoutAttempt(
         ),
         macroMs,
         crossingMinimizationMs,
+        ...folderApplication.timings,
         attachmentMs,
         qualityMs,
+        folderQualityMs,
         validationMs,
         serializationMs,
         totalMs: now() - started,
@@ -1272,6 +1489,7 @@ export function computeFocusSchematicComputedLayoutAttempt(
         inputSerializedBytes,
         outputSerializedBytes,
         endpointLaneSerializedBytes,
+        folderBandSerializedBytes,
       },
     };
   } catch (error) {
@@ -1294,4 +1512,14 @@ export function computeFocusSchematicComputedLayout(
       `Focus Schematic endpoint-facing layout failed: ${attempt.reason}`,
     );
   return attempt.result;
+}
+
+/** Development-only oracle for the accepted revision-2 candidate geometry. */
+export function computeFocusSchematicRevision2LayoutAttempt(
+  input: FocusSchematicLayoutInput,
+): FocusSchematicComputedLayoutAttempt {
+  return computeFocusSchematicComputedLayoutAttempt({
+    ...input,
+    settings: { ...input.settings, directionalFolderBandsEnabled: false },
+  });
 }

@@ -33,6 +33,10 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     const key = exactFocusSchematicLayoutCacheKey(input);
     expect(key).toContain('A1-endpoint-facing-split-lanes');
     expect(key).toContain('"algorithmVersion":2');
+    expect(key).toContain('"protocolVersion":2');
+    expect(key.replace('"protocolVersion":2', '"protocolVersion":1')).not.toBe(
+      key,
+    );
     expect(exactFocusSchematicLayoutCacheKey(input, 1)).not.toBe(key);
     expect(key).toContain('nodeDimensions');
     expect(key).toContain('settings');
@@ -48,6 +52,12 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     ).not.toBe(key);
     expect(exactFocusSchematicLayoutCacheKey(fixtureInput(1))).not.toBe(key);
     expect(exactFocusSchematicLayoutCacheKey(fixtureInput(2))).not.toBe(key);
+    expect(
+      exactFocusSchematicLayoutCacheKey({
+        ...input,
+        settings: { ...input.settings, directionalFolderBandsEnabled: true },
+      }),
+    ).not.toBe(key);
   });
 
   it('re-enters unchanged semantics from cache with zero additional compute', () => {
