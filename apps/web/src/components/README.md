@@ -39,6 +39,10 @@ canonical truth, or own a platform storage implementation.
   separately annotates current query visibility, and passes that tree to the
   editor without adding folder entities to KG6. Per-pointer gesture state remains
   inside Sigma.
+  MOVE1B also owns the transient Network editing shell, renderer capability and
+  lifecycle transitions, explicit retry, and the single keyboard Move target.
+  It passes only an active flag/retry generation and coarse callbacks to the
+  mounted Network canvas; physics frames and pointer samples never enter React.
   GLOBALVIS1 compares the canonical resolved physics subset before incrementing
   the explicit All Network layout generation. Visual-only preference edits are
   still saved immediately but reach only Sigma's presentation refresh path;
@@ -76,6 +80,10 @@ canonical truth, or own a platform storage implementation.
   focused-root text, and explained disabled Focus state. `../exploration-model.ts`
   owns the pure four-way mapping to existing internal modes plus the hierarchy
   density decision: All uses `compact-schematic`, Focus uses `extended`.
+- `NetworkEditingControls.tsx` owns the compact pencil and mutually exclusive
+  Move Files / Arrange Folders / Done strip. It states the temporary-versus-saved
+  semantic boundary and shows only waiting, moving, settling, or recoverable
+  failure transitions. GraphExplorer owns the reducer and cancellation order.
 - `StructureDepthControl.tsx` owns the labeled Hierarchy depth select and
   compact Custom override indicator, and
   `structure-depth-selection.ts` maps its four options onto the existing
@@ -213,7 +221,11 @@ canonical truth, or own a platform storage implementation.
   remains in accessible names and node tooltips, without a secondary text line.
   Every projected node exposes one shared Actions surface for Focus, Inspect,
   and supported Hide behavior. Canonical Files add Size and show their custom
-  multiplier when set. Button, right-click, and keyboard invocation share one
+  multiplier when set. MOVE1B also adds Move File only for canonical Files.
+  Its one relocated controller above the virtual tree uses 8 px Arrow nudges,
+  32 px Shift+Arrow nudges, release-and-settle, and cancel; it never creates a
+  hidden editor per row or issues a semantic center request. Button, right-click,
+  and keyboard invocation share one
   logical action target. Opening Size or changing its value never selects or
   centers the node.
 - `GraphQueryEditor.tsx` is the controlled QUERY1 presentation reused in Network

@@ -30,6 +30,7 @@ import {
 import {
   isAvailableTemporaryFileMoveContext,
   TemporaryFileMoveCoordinator,
+  type TemporaryFileMoveControllerStartResult,
   type TemporaryFileMoveSessionContext,
 } from './file-move';
 import type { TemporaryNodeConstraintEndReason } from './temporary-node-constraint';
@@ -242,8 +243,10 @@ export class GlobalRendererSession {
   private fileMoveContext: TemporaryFileMoveSessionContext | undefined;
   private fileMoveCoordinator: TemporaryFileMoveCoordinator | undefined;
   private fileMoveGestureSequence = 0;
+  private keyboardFileMoveViewportPoint: SpatialPoint | undefined;
   private suppressFileMoveDoubleClick = false;
   private fileMoveLifecycleAttached = false;
+  private readonly container?: HTMLElement;
 
   private readonly fileMoveKeyDownHandler = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') this.cancelTemporaryFileMove('cancelled');
@@ -352,6 +355,7 @@ export class GlobalRendererSession {
     input: GlobalRendererInput,
     options: GlobalRendererSessionOptions,
   ) {
+    this.container = container;
     this.options = options;
     this.settings = resolveGlobalLayoutSettings(options.settings);
     this.visualSettings = resolveGlobalVisualSettings(options.settings);
@@ -740,6 +744,22 @@ export class GlobalRendererSession {
     );
   }
 
+  private updateTemporaryFileMoveCursor(): void {
+    const eligibleHover =
+      this.hoveredNode !== undefined &&
+      this.fileMoveContext?.active === true &&
+      this.fileMoveContext.capability.status === 'available' &&
+      this.eligibleFileMoveNode(this.hoveredNode);
+    this.container?.setAttribute(
+      'data-file-move-cursor',
+      this.fileMoveCoordinator?.ownsPointerSequence === true
+        ? 'grabbing'
+        : eligibleHover
+          ? 'grab'
+          : 'idle',
+    );
+  }
+
   private beginTemporaryFileMove(key: string, point: SpatialPoint): void {
     const context = this.fileMoveContext;
     if (context?.active !== true || !this.eligibleFileMoveNode(key)) return;
@@ -757,6 +777,7 @@ export class GlobalRendererSession {
       startGraphPoint: graphPoint,
       displayedNodePoint: { x: attributes.x, y: attributes.y },
     });
+    this.updateTemporaryFileMoveCursor();
   }
 
   private moveTemporaryFileMove(
@@ -777,12 +798,62 @@ export class GlobalRendererSession {
       this.nodeClicks?.cancel();
       this.suppressFileMoveDoubleClick = true;
     }
+    this.keyboardFileMoveViewportPoint = undefined;
+    this.updateTemporaryFileMoveCursor();
   }
 
-  private cancelTemporaryFileMove(
+  cancelTemporaryFileMove(
     reason: Exclude<TemporaryNodeConstraintEndReason, 'released'>,
   ): boolean {
-    return this.fileMoveCoordinator?.cancel(reason) ?? false;
+    const cancelled = this.fileMoveCoordinator?.cancel(reason) ?? false;
+    this.keyboardFileMoveViewportPoint = undefined;
+    this.updateTemporaryFileMoveCursor();
+    return cancelled;
+  }
+
+  startKeyboardTemporaryFileMove(
+    nodeKey: string,
+  ): TemporaryFileMoveControllerStartResult {
+    if (
+      this.fileMoveContext?.active !== true ||
+      this.fileMoveContext.capability.status !== 'available'
+    ) {
+      return { status: 'unavailable', reason: 'simulation-unavailable' };
+    }
+    if (!this.eligibleFileMoveNode(nodeKey)) {
+      return { status: 'unavailable', reason: 'node-unavailable' };
+    }
+    const point = this.nodeViewportPoint(nodeKey);
+    if (point === undefined) {
+      return { status: 'unavailable', reason: 'node-unavailable' };
+    }
+    this.cancelTemporaryFileMove('cancelled');
+    this.beginTemporaryFileMove(nodeKey, point);
+    if (this.fileMoveCoordinator?.ownsPointerSequence !== true) {
+      return { status: 'unavailable', reason: 'simulation-unavailable' };
+    }
+    this.keyboardFileMoveViewportPoint = point;
+    this.updateTemporaryFileMoveCursor();
+    return { status: 'started' };
+  }
+
+  nudgeKeyboardTemporaryFileMove(delta: SpatialPoint): boolean {
+    const point = this.keyboardFileMoveViewportPoint;
+    const coordinator = this.fileMoveCoordinator;
+    if (point === undefined || coordinator?.ownsPointerSequence !== true) {
+      return false;
+    }
+    const next = { x: point.x + delta.x, y: point.y + delta.y };
+    this.keyboardFileMoveViewportPoint = next;
+    coordinator.move(next, this.viewportToGraphPoint(next));
+    this.updateTemporaryFileMoveCursor();
+    return true;
+  }
+
+  releaseKeyboardTemporaryFileMove(): boolean {
+    if (this.keyboardFileMoveViewportPoint === undefined) return false;
+    this.finishTemporaryFileMove();
+    return true;
   }
 
   private attachFileMoveLifecycle(): void {
@@ -830,6 +901,7 @@ export class GlobalRendererSession {
       this.options.onNodeHovered?.(node);
       this.options.instrumentation?.count('global-hover-applications');
       this.refreshNodeStyles(previous, node);
+      this.updateTemporaryFileMoveCursor();
       this.options.instrumentation?.record(
         'global-hover',
         performance.now() - started,
@@ -844,6 +916,7 @@ export class GlobalRendererSession {
       this.options.instrumentation?.count('global-hover-applications');
       if (arrangementActive) this.refreshArrangementStyles();
       else this.refreshNodeStyles(previous);
+      this.updateTemporaryFileMoveCursor();
     });
     this.renderer.on('clickNode', ({ node }) => {
       if (this.fileMoveCoordinator?.consumeReleasedDragClick() === true) {
@@ -983,7 +1056,9 @@ export class GlobalRendererSession {
     this.fileMoveCoordinator?.cancel(cancellationReason);
     this.fileMoveCoordinator = undefined;
     this.fileMoveContext = undefined;
+    this.keyboardFileMoveViewportPoint = undefined;
     this.suppressFileMoveDoubleClick = false;
+    this.updateTemporaryFileMoveCursor();
     if (context === undefined) return;
     if (this.arrangementContext?.active === true) {
       this.setFolderArrangementContext(undefined);
@@ -1001,6 +1076,7 @@ export class GlobalRendererSession {
       });
     }
     this.attachFileMoveLifecycle();
+    this.updateTemporaryFileMoveCursor();
   }
 
   currentFolderAnchor(folderKey: string): NormalizedFolderAnchor | undefined {

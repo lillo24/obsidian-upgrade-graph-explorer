@@ -115,11 +115,15 @@ changes only draft intent; Place may rigidly preview effective members. Neither
 path adds folder entities, File-ID membership, raw coordinates, or graph history
 checkpoints.
 
-MOVE1A defines, but does not mount, a future Network editing-mode reducer. It
-allows exactly one of Move File or Arrange Folder, and requires gesture cleanup
-when tools switch, Network is left, or the workspace changes. It has no storage
-adapter or history checkpoint. The visible pencil/Edit surface and real physics
-service connection remain MOVE1B.
+MOVE1B mounts the transient Network editing model defined by MOVE1A. A compact
+**Edit Network layout** pencil opens **Move Files** by default; All also exposes
+**Arrange Folders**, while Focus exposes Move only. Tool switches, Network exit,
+scope/source changes, and retry clear the old renderer gesture before the next
+owner becomes active. Move activates the existing lazy PHYSICS1 service in both
+Network views and reports only coarse waiting/moving/settling/failure states to
+React. It has no storage adapter or history checkpoint: release cools the same
+whole-graph simulation and never saves a File position. Arrange Folders keeps
+the existing saved Pull/Place rule editor and its dirty-draft guard.
 
 Graph history remains a web-layer session concern above KG9 view state.
 Each checkpoint contains one immutable KG6 `ViewProjectionState` reference and
@@ -257,6 +261,13 @@ Hide folder is likewise disabled when the exact folder is already managed-hidden
 or contains the focused source file. Folder queries are case-sensitive and
 path-semantic: new descendants match automatically, moves out stop matching,
 and source-folder renames do not rewrite saved query text.
+
+Canonical File actions also expose **Move File**. It selects without a semantic
+center request and relocates one compact controller above the virtual tree, so
+there is never one hidden controller per row. Arrow keys nudge the same MOVE1A
+constraint by 8 viewport pixels (32 with Shift); Enter/Space releases into
+PHYSICS1 cooling and Escape cancels. Heading, Block, and diagnostic rows never
+receive the action. Projection removal or hiding ends the controller safely.
 
 The drawer starts closed, persists nothing, overlays rather than resizes the
 canvas, and closes when Layout leaves Network. Inspector and Network Explorer

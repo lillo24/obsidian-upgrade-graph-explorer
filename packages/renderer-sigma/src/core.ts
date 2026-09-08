@@ -195,6 +195,8 @@ export type {
   FileMoveFrameScheduler,
   FileMoveInstrumentationOperation,
   PrimeFileMoveInput,
+  TemporaryFileMoveController,
+  TemporaryFileMoveControllerStartResult,
   TemporaryFileMoveCoordinatorOptions,
   TemporaryFileMoveSessionContext,
 } from './file-move';

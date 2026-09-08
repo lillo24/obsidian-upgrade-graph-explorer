@@ -65,6 +65,15 @@ function begin() {
   };
 }
 
+function end() {
+  return {
+    ...begin(),
+    kind: 'end' as const,
+    sequence: 1,
+    reason: 'released' as const,
+  };
+}
+
 function frame(frameSequence: number): NetworkPhysicsFrameResponse {
   return {
     schemaVersion: NETWORK_PHYSICS_SCHEMA_VERSION,
@@ -135,6 +144,62 @@ describe('createNetworkPhysicsWorkerService', () => {
     callbacks[0]!(0);
     expect(onFrame).toHaveBeenCalledOnce();
     expect(onFrame).toHaveBeenCalledWith(frame(2));
+  });
+
+  it('reports coarse lifecycle transitions and reheats the same worker', () => {
+    const worker = new FakeWorker();
+    const createWorker = vi.fn(() => worker);
+    const onStateChange = vi.fn();
+    const service = createNetworkPhysicsWorkerService({
+      createWorker,
+      onFrame: vi.fn(),
+      onConstraint: vi.fn(),
+      onFailure: vi.fn(),
+      onStateChange,
+    });
+
+    service.initialize(seed());
+    expect(onStateChange).toHaveBeenLastCalledWith('sleeping');
+    service.begin(begin());
+    worker.emit({
+      schemaVersion: NETWORK_PHYSICS_SCHEMA_VERSION,
+      kind: 'state',
+      sessionGeneration: 'session-1',
+      simulationGeneration: 'simulation-1',
+      state: 'hot-constrained',
+    });
+    service.end(end());
+    worker.emit({
+      schemaVersion: NETWORK_PHYSICS_SCHEMA_VERSION,
+      kind: 'state',
+      sessionGeneration: 'session-1',
+      simulationGeneration: 'simulation-1',
+      state: 'cooling',
+    });
+    worker.emit({
+      schemaVersion: NETWORK_PHYSICS_SCHEMA_VERSION,
+      kind: 'state',
+      sessionGeneration: 'session-1',
+      simulationGeneration: 'simulation-1',
+      state: 'sleeping',
+    });
+    service.begin({ ...begin(), gestureId: 'gesture-2' });
+    worker.emit({
+      schemaVersion: NETWORK_PHYSICS_SCHEMA_VERSION,
+      kind: 'state',
+      sessionGeneration: 'session-1',
+      simulationGeneration: 'simulation-1',
+      state: 'hot-constrained',
+    });
+
+    expect(createWorker).toHaveBeenCalledOnce();
+    expect(onStateChange.mock.calls.map(([state]) => state)).toEqual([
+      'sleeping',
+      'hot-constrained',
+      'cooling',
+      'sleeping',
+      'hot-constrained',
+    ]);
   });
 
   it('ignores stale generations and rejects stale command sequences', () => {

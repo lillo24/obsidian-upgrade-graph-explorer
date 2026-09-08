@@ -1,8 +1,9 @@
 # PHYSICS1 — Continuous Network simulation
 
-PHYSICS1 supplies the real, transient physical layer required by MOVE1B. It
-does not expose a Move control, persist a node position, or replace the finite
-Focus and All layout workers used by ordinary browsing.
+PHYSICS1 supplies the real, transient physical layer activated by MOVE1B. The
+simulation package itself exposes no product control, persists no node position,
+and does not replace the finite Focus and All layout workers used by ordinary
+browsing.
 
 ## Architecture decision
 
@@ -67,9 +68,11 @@ query state, source Markdown, or rule resolution logic. Only Global document
 nodes are constraint eligible.
 
 The canvas integration is present behind `temporaryConstraintActive`, whose
-default is `false`. Web views supply the real lazy Worker factory, but ordinary
-product UI never enables it. Thus normal browsing retains the existing finite
-workers and creates no PHYSICS1 Worker. MOVE1B owns the later visible mode.
+default is `false`. Web views supply the real lazy Worker factory and MOVE1B
+enables the flag only while Move Files is selected. Entering editing initializes
+clone-safe seed state but constructs no Worker. Thus normal browsing and editing
+entry retain the existing finite workers; the first threshold-crossing drag or
+keyboard nudge creates the PHYSICS1 Worker.
 
 ## Pull and Place
 
@@ -120,6 +123,20 @@ cache write, dynamic Pull cache write, spatial registry write, view/history
 write, or source write. Closing or remounting can therefore forget the transient
 state and return to normal accepted layout coordinates, as Move is not Pin.
 
+## MOVE1B production activation
+
+GraphExplorer owns the transient off / Move Files / Arrange Folders state and
+clears the old renderer gesture before switching owners. All and Focus use the
+same service factory and lifecycle; All additionally retains its saved folder
+rule editor. The Network Explorer keyboard action sends viewport-relative
+nudges through the same MOVE1A coordinator rather than writing Sigma positions.
+
+React observes only capability and sleeping/hot/cooling/failed/disposed
+transitions. Hot and cooling frames remain imperative. A failure ends the
+gesture, leaves the last valid graph visible, and exposes an explicit retry that
+reinitializes the retained service. Exit and invalidation do not restore, freeze,
+or persist coordinates.
+
 ## Development lab
 
 During Vite development only, open `/?physics1-lab`. The lab uses the real
@@ -145,4 +162,4 @@ JIT and machine load:
 
 No large graph silently switches to neighborhood-only physics. Lower publish
 rates at scale are a measured consequence of whole-graph semantics and remain
-visible evidence for MOVE1B product decisions.
+visible evidence for MOVE1B native acceptance.

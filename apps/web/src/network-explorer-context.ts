@@ -13,7 +13,7 @@ import type {
 } from './network-explorer-model';
 
 export type NetworkExplorerAction =
-  'focus' | 'inspect' | 'hide' | 'hide-folder' | 'size';
+  'focus' | 'inspect' | 'move-file' | 'hide' | 'hide-folder' | 'size';
 export interface NetworkExplorerMenuAction {
   readonly id: NetworkExplorerAction;
   readonly label: string;
@@ -81,6 +81,7 @@ export function networkExplorerMenuActions(
   focusedSourcePath: string | undefined,
   hiddenPaths: ReadonlySet<string>,
   hiddenFolderKeys: ReadonlySet<WorkspaceFolderKey>,
+  fileMove?: { readonly available: boolean; readonly reason?: string },
 ): readonly NetworkExplorerMenuAction[] {
   if (target.kind === 'folder') {
     const folderKey = target.folder.path;
@@ -122,6 +123,21 @@ export function networkExplorerMenuActions(
         : {}),
     },
     { id: 'inspect', label: 'Inspect' },
+    ...(fileMove === undefined ||
+    networkExplorerSizeEntityId(node) === undefined
+      ? []
+      : [
+          {
+            id: 'move-file' as const,
+            label: 'Move File',
+            ...(fileMove.available
+              ? {}
+              : {
+                  disabledReason:
+                    fileMove.reason ?? 'Move Files is unavailable right now.',
+                }),
+          },
+        ]),
     {
       id: 'hide',
       label: 'Hide file',

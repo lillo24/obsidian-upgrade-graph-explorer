@@ -11,6 +11,7 @@ import type {
 } from '../network-explorer-model';
 import { NetworkExplorer } from './NetworkExplorer';
 import type { NetworkExplorerArrangementProps } from './NetworkExplorer';
+import type { NetworkExplorerFileMoveProps } from './NetworkExplorer';
 
 function node(
   id: string,
@@ -43,10 +44,12 @@ function renderExplorer(
   selection: GraphSelection | null = null,
   presentationOverrides: EntityPresentationOverrideMap = new Map(),
   arrangement?: NetworkExplorerArrangementProps,
+  fileMove?: NetworkExplorerFileMoveProps,
 ): string {
   return renderToStaticMarkup(
     <NetworkExplorer
       {...(arrangement === undefined ? {} : { arrangement })}
+      {...(fileMove === undefined ? {} : { fileMove })}
       presentationOverrides={presentationOverrides}
       sizePersistenceStatus="Session only — workspace identity is not stable"
       sizeEditingDisabled={false}
@@ -219,6 +222,32 @@ describe('Network Explorer drawer', () => {
     );
     expect(markup).not.toContain('role="tree"');
     expect(markup).not.toContain('network-explorer__virtual-space');
+  });
+
+  it('renders one relocated keyboard Move File controller for an active File', () => {
+    const file = node('file');
+    const fileMove: NetworkExplorerFileMoveProps = {
+      activeNodeId: file.id,
+      available: true,
+      onCancel: () => undefined,
+      onNudge: () => undefined,
+      onRelease: () => undefined,
+      onStart: () => undefined,
+      onTargetUnavailable: () => undefined,
+    };
+    const markup = renderExplorer(
+      model([file, node('heading', { kindLabel: 'Heading' })]),
+      null,
+      new Map(),
+      undefined,
+      fileMove,
+    );
+
+    expect(markup).toContain('aria-label="Move File file.md"');
+    expect(markup).toContain('Arrow keys move 8 px');
+    expect(markup).toContain('hold Shift for 32 px');
+    expect(markup).toContain('Release &amp; settle');
+    expect(markup.match(/network-explorer__file-move"/gu)).toHaveLength(1);
   });
 
   it('keeps paths as tooltip context and omits distance badges', () => {

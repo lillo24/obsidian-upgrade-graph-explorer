@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { NETWORK_EDITING_OFF, reduceNetworkEditing } from './network-editing';
+import {
+  NETWORK_EDITING_OFF,
+  networkFileMoveKeyboardAction,
+  reduceNetworkEditing,
+} from './network-editing';
 
 describe('Network editing state contract', () => {
   it('allows exactly one transient editing tool at a time', () => {
@@ -40,5 +44,48 @@ describe('Network editing state contract', () => {
     });
     expect(transition).toEqual({ state, clearActiveGesture: false });
     expect(Object.keys(transition.state).sort()).toEqual(['phase', 'tool']);
+  });
+});
+
+describe('Network File move keyboard contract', () => {
+  it.each([
+    ['ArrowLeft', false, { kind: 'nudge', x: -8, y: 0 }],
+    ['ArrowRight', true, { kind: 'nudge', x: 32, y: 0 }],
+    ['ArrowUp', false, { kind: 'nudge', x: 0, y: -8 }],
+    ['ArrowDown', true, { kind: 'nudge', x: 0, y: 32 }],
+    ['Enter', false, { kind: 'release' }],
+    [' ', false, { kind: 'release' }],
+    ['Escape', false, { kind: 'cancel' }],
+  ] as const)('%s maps to one viewport action', (key, shiftKey, expected) => {
+    expect(
+      networkFileMoveKeyboardAction({
+        altKey: false,
+        ctrlKey: false,
+        key,
+        metaKey: false,
+        shiftKey,
+      }),
+    ).toEqual(expected);
+  });
+
+  it('leaves modified and unrelated keys available to their existing owners', () => {
+    expect(
+      networkFileMoveKeyboardAction({
+        altKey: false,
+        ctrlKey: true,
+        key: 'ArrowLeft',
+        metaKey: false,
+        shiftKey: false,
+      }),
+    ).toEqual({ kind: 'none' });
+    expect(
+      networkFileMoveKeyboardAction({
+        altKey: false,
+        ctrlKey: false,
+        key: 'Tab',
+        metaKey: false,
+        shiftKey: false,
+      }),
+    ).toEqual({ kind: 'none' });
   });
 });

@@ -305,6 +305,111 @@ describe('GraphExplorer experimental availability integration', () => {
     expect(preference()).not.toHaveProperty('densityFramingStrength');
   });
 
+  it('owns the production Network editing shell and keeps Move and Arrange exclusive', async () => {
+    await mount('global');
+    expect(button('Edit Network layout')).toBeDefined();
+    const cancel = vi.fn(() => false);
+    await act(() =>
+      captured.global!.onTemporaryFileMoveControllerChange?.({
+        start: () => ({ status: 'started' }),
+        nudge: () => true,
+        release: () => true,
+        cancel,
+      }),
+    );
+
+    await click('Edit Network layout');
+    expect(captured.global!.temporaryConstraintActive).toBe(true);
+    expect(captured.global!.folderArrangement?.active).toBe(false);
+    expect(button('Move Files').getAttribute('aria-pressed')).toBe('true');
+    expect(container.textContent).toContain('positions are not saved');
+
+    await act(() =>
+      captured.global!.onTemporaryFileMoveCapabilityChange?.({
+        status: 'available',
+      }),
+    );
+    await act(() =>
+      captured.global!.onTemporaryFileMoveLifecycleChange?.('hot-constrained'),
+    );
+    expect(container.textContent).toContain('Moving…');
+    await act(() =>
+      captured.global!.onTemporaryFileMoveLifecycleChange?.('cooling'),
+    );
+    expect(container.textContent).toContain('Settling…');
+    await act(() =>
+      captured.global!.onTemporaryFileMoveLifecycleChange?.('sleeping'),
+    );
+    expect(container.textContent).toContain('Settled — ready to move.');
+
+    await act(() =>
+      captured.global!.folderArrangement?.onAvailabilityChange(true, undefined),
+    );
+
+    await click('Arrange Folders');
+    expect(cancel).toHaveBeenCalledWith('mode-exit');
+    expect(captured.global!.temporaryConstraintActive).toBe(false);
+    expect(captured.global!.folderArrangement?.active).toBe(true);
+    expect(button('Arrange Folders').getAttribute('aria-pressed')).toBe('true');
+
+    await click('Move Files');
+    expect(captured.global!.temporaryConstraintActive).toBe(true);
+    expect(captured.global!.folderArrangement?.active).toBe(false);
+
+    await click('Done');
+    expect(captured.global!.temporaryConstraintActive).toBe(false);
+    expect(button('Edit Network layout')).toBeDefined();
+  });
+
+  it('preserves Move from All to Focus, but exits editing for Hierarchy', async () => {
+    await mount('global');
+    await click('Edit Network layout');
+
+    await act(() => captured.global!.onNodeActivate(source.id));
+    expect(mode()).toBe('local-free');
+    expect(captured.local!.temporaryConstraintActive).toBe(true);
+    expect(button('Move Files')).toBeDefined();
+    expect(
+      [...container.querySelectorAll('button')].some(
+        (candidate) => candidate.textContent?.trim() === 'Arrange Folders',
+      ),
+    ).toBe(false);
+
+    await click('Hierarchy');
+    expect(mode()).toBe('local-structured');
+    expect(
+      [...container.querySelectorAll('button')].some(
+        (candidate) =>
+          candidate.getAttribute('aria-label') === 'Edit Network layout',
+      ),
+    ).toBe(false);
+
+    await click('Network');
+    expect(mode()).toBe('local-free');
+    expect(button('Edit Network layout')).toBeDefined();
+  });
+
+  it('retains the graph on Move failure and exposes explicit retry', async () => {
+    await mount('global');
+    await click('Edit Network layout');
+    const retryKey = captured.global!.temporaryConstraintRetryKey;
+
+    await act(() =>
+      captured.global!.onTemporaryFileMoveFailure?.('simulated worker failure'),
+    );
+    expect(mode()).toBe('global');
+    expect(container.textContent).toContain(
+      'Move Files stopped: simulated worker failure',
+    );
+    expect(button('Retry Move')).toBeDefined();
+
+    await click('Retry Move');
+    expect(captured.global!.temporaryConstraintRetryKey).toBe(
+      (retryKey ?? 0) + 1,
+    );
+    expect(mode()).toBe('global');
+  });
+
   it('reveals controls without projection work and preserves the flag when another preference changes', async () => {
     await mount();
     const projection = captured.global!.projection;

@@ -1172,3 +1172,53 @@ iterations. The 180-node All fixture slept after 1,920 iterations with Pull off,
 references. This evidence selects the distinct continuous-All 8,192-iteration
 small/medium cap. At scale PHYSICS1 retains whole-graph semantics; it does not
 silently switch to a faster neighborhood-only simulation.
+
+## MOVE1B production interaction boundary
+
+MOVE1B activates the PHYSICS1 service only while the production Network editor
+owns Move Files. Entering editing initializes clone-safe seed state but creates
+no Worker, starts no continuous loop, and performs no extra projection, finite
+layout, history, persistence, cache, or source write. The first real
+threshold-crossing pointer drag or keyboard nudge constructs one Worker. Later
+drags reheat that same Worker, release enters bounded cooling, and sleeping has
+no scheduled simulation work.
+
+Pointer samples and whole-graph hot/cooling frames remain in imperative session
+and canvas paths. React receives only capability plus
+waiting/moving/settling/failure transitions; it never adopts per-frame
+coordinates into component state. The Network Explorer keyboard controller uses
+the same coordinator and service, so it does not introduce a second simulation
+or a row-local controller.
+
+The PHYSICS1 100/500/1,000/5,000-node measurements above remain the scale
+baseline for this product activation. In particular, the lower whole-graph
+cadence at 1,000 and 5,000 nodes is a visible limitation rather than a trigger
+for an unapproved neighborhood-only fallback. Production browser evidence and a
+fresh optimized Windows build are required for the MOVE1B draft; native
+pointer/touchpad acceptance remains a separate mandatory release gate.
+
+Local validation on September 9, 2026 recorded PHYSICS1 four-iteration hot
+turns of 0.147 / 3.700 / 110.061 / 241.447 ms at
+100/500/1,000/5,000 nodes. The corresponding whole-frame publish rates were
+6,802.72 / 270.26 / 9.09 / 4.14 frames per second, and main-thread adoption
+proxies were 0.019 / 0.060 / 0.065 / 0.458 ms. Every lifecycle fixture slept
+with zero target error. These values are machine- and JIT-sensitive evidence,
+not thresholds.
+
+The same run measured MOVE1A no-Place and Place conversion at
+0.1321/0.3143 ms and 0.0899/0.2187 ms median/p95 per 1,000 targets. A prebuilt
+20,000-node Place index converted 1,000 targets in 1.4050/2.5845 ms, and 10,000
+raw pointer samples emitted three coalesced commands in 2.3812 ms. Local-small
+and Global-small/medium renderer benchmarks also passed; their operation
+oracles retained zero extra projections, automatic/global layouts, workspace
+transactions, and topology reconciliations for the interaction-only paths.
+
+Production-browser QA on the deterministic synthetic workspace exercised All
+and Focus pointer and keyboard movement, whole-graph reaction, release,
+cancelation, tool/scope/layout arbitration, reload non-persistence, and the
+polite Moving / Settling / Settled lifecycle. The clean cases returned to sleep
+without console errors. A separate origin with a previously saved Pull rule hit
+the deterministic cooling cap on its tiny five-node graph; the last valid graph
+remained visible and Retry Move was available, confirming the explicit failure
+boundary rather than a success-shaped fallback. This does not replace the
+mandatory optimized-Windows pointer/touchpad acceptance.

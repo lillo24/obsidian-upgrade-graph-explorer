@@ -12,5 +12,10 @@ saved layout caches, or persisted Place offsets.
   `forceAtlas2.assign` API.
 - `index.ts` is the package export surface.
 
-The browser worker owns scheduling. A sleeping simulation schedules no work;
-renderers adopt returned coordinates imperatively and must not persist them.
+The browser worker owns scheduling. MOVE1B initializes the retained service only
+while Move Files is selected, but initialization still constructs no Worker; the
+first threshold-crossing pointer drag or keyboard nudge does. A sleeping
+simulation schedules no work. A new begin during cooling reheats the same Worker.
+Renderers adopt returned coordinates imperatively, expose only coarse lifecycle
+transitions, and must not persist frames. Failure preserves the last adopted
+graph and is recovered explicitly by a fresh initialization.

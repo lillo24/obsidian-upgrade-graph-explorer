@@ -120,6 +120,16 @@
   inset: 0;
 }
 
+.global-graph-canvas__surface[data-file-move-cursor='grab'],
+.local-graph-canvas__surface[data-file-move-cursor='grab'] {
+  cursor: grab;
+}
+
+.global-graph-canvas__surface[data-file-move-cursor='grabbing'],
+.local-graph-canvas__surface[data-file-move-cursor='grabbing'] {
+  cursor: grabbing;
+}
+
 .global-graph-canvas__controls {
   position: absolute;
   z-index: 2;

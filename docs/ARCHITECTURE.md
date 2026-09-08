@@ -16,9 +16,10 @@ density-aware without changing Global or Local ForceAtlas2 geometry. Its QA
 Sandbox keeps separate transient All and Focus strengths; renderer geometry,
 layout identity, spatial rules, and persisted workspace/preference schemas do
 not observe them.
-MOVE1A defines temporary File movement across All and Focus as an optional
-constraint contract, while PHYSICS1 retains continuous simulation ownership and
-MOVE1B/PIN1 remain future product and persistence work.
+MOVE1A defines temporary File movement across All and Focus as a constraint
+contract, PHYSICS1 retains continuous simulation ownership, and MOVE1B mounts
+their production Edit Network and accessible keyboard integration. PIN1 remains
+separate future persistence work.
 
 ## Stable domain shape
 
@@ -358,11 +359,15 @@ pure 3 px state machine captures grab offset, rejects stale events, and the
 imperative coordinator coalesces updates by animation frame. File movement and
 Arrange Folders cancel one another. Lifecycle invalidations end the temporary
 constraint and never write layout caches, spatial persistence, view state,
-history, or source. The app has only an unmounted transient one-tool editing
-state contract. SPATIAL2B does not call this seam or add a second simulation
-lifecycle. PHYSICS1 still owns real simulation lifetime, reheating, cooling,
-convergence, and future hard-Place neighbor reaction; MOVE1B owns its production
-binding and Edit control; PIN1 owns any future durable individual placement.
+history, or source. The app mounts one transient one-tool editing contract;
+SPATIAL2B does not add a second simulation lifecycle. PHYSICS1 owns real
+simulation lifetime, reheating, cooling,
+convergence, and hard-constraint neighbor reaction. MOVE1B binds that service to
+the GraphExplorer-owned transient editing state: All exposes Move Files and
+Arrange Folders, Focus exposes Move Files, and leaving Network/source changes
+clear the old gesture before the next owner. The canvas reports only coarse
+capability/lifecycle changes; worker frames never become React state. PIN1 owns
+any future durable individual placement.
 
 `tools/global-renderer-spike` is now a production renderer harness rather than
 an implementation fork. It retains only synthetic KG13A fixtures, browser/Tauri
@@ -794,6 +799,13 @@ source session ends. Files never disclose. Projected headings/blocks visually
 follow their File, or remain under the real folder when File is filtered out;
 their keyboard/ARIA parent is the source folder. Diagnostics trail at root.
 Folder and Saved queries disclosure performs no projection, workspace, or layout work.
+
+MOVE1B adds a canonical File-only action to the same shared row menu. Starting
+it selects without centering and relocates one keyboard controller above the
+virtual tree. Arrow/Shift+Arrow produce 8/32 viewport-pixel samples through the
+MOVE1A coordinator; Enter/Space releases into cooling and Escape cancels. A row
+leaving the projection closes the controller and ends the constraint, so
+virtualization never strands an invisible movement owner.
 
 KG14B3 adds QUERY1 and contextual actions to that projection companion. The
 single applied formula remains `ViewProjectionState.filters.query`; the shared
@@ -1369,5 +1381,12 @@ pre-Place layer and carries resolved Pull inputs; Pull is normalized per
 physical iteration. A captured winning Place translation is applied once on
 the display side. Worker frames use camera-neutral sparse Sigma adoption and
 cannot write finite layout caches, Pull caches, spatial persistence, history,
-source, density, camera, or React tick state. The canvases expose this real
-capability behind an inactive-by-default flag; MOVE1B still owns product UI.
+source, density, camera, or React tick state. MOVE1B activates this capability
+only while Move Files is selected. The visible pencil defaults to Move, while
+All can hand exclusive input ownership to the existing persistent Arrange
+Folders editor. Canonical Network Explorer File actions use one relocated
+keyboard controller whose viewport-relative nudges enter the same constraint
+coordinator. Lifecycle UI observes only sleeping, hot, cooling, and failure
+transitions. Failure clears movement, retains the last valid graph, and exposes
+retry; no frame gains cache, camera, history, spatial, source, or persistence
+ownership.

@@ -20,9 +20,15 @@ import {
 } from './local-layout';
 import {
   createFocusNetworkPhysicsSeed,
+  type NetworkPhysicsLifecycleState,
   type NetworkPhysicsService,
   type NetworkPhysicsServiceFactory,
 } from './physics';
+import type { TemporaryFileMoveController } from './file-move';
+import type {
+  TemporaryNodeConstraintCapability,
+  TemporaryNodeConstraintEndReason,
+} from './temporary-node-constraint';
 import {
   DEFAULT_RESOLVED_NETWORK_SETTINGS,
   localLayoutSettingsFromNetworkSettings,
@@ -56,14 +62,25 @@ export interface LocalGraphCanvasProps {
   readonly layoutCache?: LocalLayoutCache;
   readonly layoutRequestKey: number;
   readonly layoutService: LocalLayoutService;
-  /** PHYSICS1 transport seam. Inactive until a later Edit/Move mode opts in. */
+  /** PHYSICS1 transport seam; MOVE1B opts in only while Move Files is active. */
   readonly physicsServiceFactory?: NetworkPhysicsServiceFactory;
   readonly temporaryConstraintActive?: boolean;
+  readonly temporaryConstraintRetryKey?: number;
   /** Shared Network preferences; only Reference Pull enters Local layout identity. */
   readonly networkSettings?: ResolvedNetworkSettings;
   /** Transient Sandbox policy; excluded from layout input and fingerprinting. */
   readonly densityFramingStrength?: number;
   readonly onFailure: (message: string) => void;
+  readonly onTemporaryFileMoveCapabilityChange?: (
+    capability: TemporaryNodeConstraintCapability,
+  ) => void;
+  readonly onTemporaryFileMoveControllerChange?: (
+    controller: TemporaryFileMoveController | undefined,
+  ) => void;
+  readonly onTemporaryFileMoveFailure?: (message: string) => void;
+  readonly onTemporaryFileMoveLifecycleChange?: (
+    state: NetworkPhysicsLifecycleState,
+  ) => void;
   readonly onDensityQaDiagnosticsChange?: (
     diagnostics: LocalDensityQaDiagnostics | undefined,
   ) => void;
@@ -105,6 +122,10 @@ export function LocalGraphCanvas({
   physicsServiceFactory,
   networkSettings = DEFAULT_RESOLVED_NETWORK_SETTINGS,
   onFailure,
+  onTemporaryFileMoveCapabilityChange,
+  onTemporaryFileMoveControllerChange,
+  onTemporaryFileMoveFailure,
+  onTemporaryFileMoveLifecycleChange,
   onDensityQaDiagnosticsChange,
   onFitRequestConsumed,
   onSelectionChange,
@@ -117,6 +138,7 @@ export function LocalGraphCanvas({
   rootEntityId,
   selection,
   temporaryConstraintActive = false,
+  temporaryConstraintRetryKey = 0,
   trackpadZoomMode,
   visualGroupStyles,
   presentationOverrides,
@@ -131,6 +153,9 @@ export function LocalGraphCanvas({
   const layoutPending = useRef(true);
   const callbacks = useRef({
     onFailure,
+    onTemporaryFileMoveCapabilityChange,
+    onTemporaryFileMoveFailure,
+    onTemporaryFileMoveLifecycleChange,
     onDensityQaDiagnosticsChange,
     onFitRequestConsumed,
     onSelectionChange,
@@ -143,6 +168,9 @@ export function LocalGraphCanvas({
   useEffect(() => {
     callbacks.current = {
       onFailure,
+      onTemporaryFileMoveCapabilityChange,
+      onTemporaryFileMoveFailure,
+      onTemporaryFileMoveLifecycleChange,
       onDensityQaDiagnosticsChange,
       onFitRequestConsumed,
       onSelectionChange,
@@ -154,6 +182,9 @@ export function LocalGraphCanvas({
     };
   }, [
     onFailure,
+    onTemporaryFileMoveCapabilityChange,
+    onTemporaryFileMoveFailure,
+    onTemporaryFileMoveLifecycleChange,
     onDensityQaDiagnosticsChange,
     onFitRequestConsumed,
     onSelectionChange,
@@ -224,6 +255,32 @@ export function LocalGraphCanvas({
     initial.cached ? undefined : 'Focus Network is ready; refining layout…',
   );
   const [layoutError, setLayoutError] = useState<string>();
+  const latestTemporaryConstraintActive = useRef(temporaryConstraintActive);
+  useLayoutEffect(() => {
+    latestTemporaryConstraintActive.current = temporaryConstraintActive;
+  }, [temporaryConstraintActive]);
+
+  const temporaryFileMoveController = useMemo<TemporaryFileMoveController>(
+    () => ({
+      start: (nodeKey) =>
+        sessionRef.current?.startKeyboardTemporaryFileMove(nodeKey) ?? {
+          status: 'unavailable',
+          reason: 'simulation-unavailable',
+        },
+      nudge: (delta) =>
+        sessionRef.current?.nudgeKeyboardTemporaryFileMove(delta) ?? false,
+      release: () =>
+        sessionRef.current?.releaseKeyboardTemporaryFileMove() ?? false,
+      cancel: (reason: Exclude<TemporaryNodeConstraintEndReason, 'released'>) =>
+        sessionRef.current?.cancelTemporaryFileMove(reason) ?? false,
+    }),
+    [],
+  );
+
+  useEffect(() => {
+    onTemporaryFileMoveControllerChange?.(temporaryFileMoveController);
+    return () => onTemporaryFileMoveControllerChange?.(undefined);
+  }, [onTemporaryFileMoveControllerChange, temporaryFileMoveController]);
 
   useEffect(() => {
     const generation = ++physicsServiceGeneration.current;
@@ -240,9 +297,22 @@ export function LocalGraphCanvas({
           { key: command.nodeKey, ...command.target },
         ]);
       },
+      onStateChange: (state) => {
+        if (physicsServiceGeneration.current === generation) {
+          callbacks.current.onTemporaryFileMoveLifecycleChange?.(state);
+        }
+      },
       onFailure: (failure) => {
         if (physicsServiceGeneration.current === generation) {
-          callbacks.current.onFailure(failure.message);
+          callbacks.current.onTemporaryFileMoveFailure?.(failure.message);
+          queueMicrotask(() => {
+            if (physicsServiceGeneration.current === generation) {
+              sessionRef.current?.setTemporaryFileMoveContext(
+                undefined,
+                'error',
+              );
+            }
+          });
         }
       },
     });
@@ -254,6 +324,16 @@ export function LocalGraphCanvas({
       queueMicrotask(() => service?.dispose());
     };
   }, [physicsServiceFactory]);
+
+  useEffect(() => {
+    const capability: TemporaryNodeConstraintCapability =
+      physicsServiceFactory === undefined
+        ? { status: 'unavailable', reason: 'simulation-unavailable' }
+        : !ready || layoutPending.current
+          ? { status: 'unavailable', reason: 'simulation-not-running' }
+          : { status: 'available' };
+    callbacks.current.onTemporaryFileMoveCapabilityChange?.(capability);
+  }, [layoutCommitKey, physicsServiceFactory, ready]);
 
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -506,7 +586,12 @@ export function LocalGraphCanvas({
       fixedTranslationByNodeKey: new Map(),
     });
     return () => {
-      session.setTemporaryFileMoveContext(undefined, 'layout-changed');
+      session.setTemporaryFileMoveContext(
+        undefined,
+        latestTemporaryConstraintActive.current
+          ? 'layout-changed'
+          : 'mode-exit',
+      );
       physicsService.invalidate('layout-changed');
     };
   }, [
@@ -516,6 +601,7 @@ export function LocalGraphCanvas({
     ready,
     requestTemplate,
     temporaryConstraintActive,
+    temporaryConstraintRetryKey,
   ]);
 
   useEffect(() => {
