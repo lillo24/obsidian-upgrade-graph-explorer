@@ -46,6 +46,12 @@ interface GraphSettingsProps {
   readonly onModularFocusHeadingOrderChange?: (
     order: GraphPreferences['modularFocusHeadingOrder'],
   ) => void;
+  readonly modularFolderStripsVisible?: GraphPreferences['modularFolderStripsVisible'];
+  readonly onModularFolderStripsVisibleChange?: (visible: boolean) => void;
+  readonly modularConnectionStyle?: GraphPreferences['modularConnectionStyle'];
+  readonly onModularConnectionStyleChange?: (
+    style: GraphPreferences['modularConnectionStyle'],
+  ) => void;
   readonly showExperimentalAllHierarchy?: boolean;
   readonly onShowExperimentalAllHierarchyChange?: (show: boolean) => void;
   readonly children?: ReactNode;
@@ -152,6 +158,10 @@ export const GraphSettings = memo(function GraphSettings({
   onModularFocusInternalLayoutChange,
   modularFocusHeadingOrder = 'crossing-optimized',
   onModularFocusHeadingOrderChange,
+  modularFolderStripsVisible = true,
+  onModularFolderStripsVisibleChange,
+  modularConnectionStyle = 'direct',
+  onModularConnectionStyleChange,
   showExperimentalAllHierarchy = false,
   onShowExperimentalAllHierarchyChange,
   children,
@@ -767,6 +777,75 @@ export const GraphSettings = memo(function GraphSettings({
                         </small>
                       </span>
                     </label>
+                    <fieldset
+                      className="graph-settings__choice-group"
+                      disabled={
+                        focusHierarchyImplementation !== 'modular-preview'
+                      }
+                    >
+                      <legend>Folder strips</legend>
+                      <label>
+                        <input
+                          checked={modularFolderStripsVisible}
+                          name="modular-folder-strips"
+                          onChange={(event) =>
+                            onModularFolderStripsVisibleChange?.(
+                              event.currentTarget.checked,
+                            )
+                          }
+                          type="checkbox"
+                        />
+                        <span>
+                          <strong>Show folder strips</strong>
+                          <small>
+                            Shows the exact directional folder-band plan without
+                            changing layout.
+                          </small>
+                        </span>
+                      </label>
+                    </fieldset>
+                    <fieldset
+                      className="graph-settings__choice-group"
+                      disabled={
+                        focusHierarchyImplementation !== 'modular-preview'
+                      }
+                    >
+                      <legend>Connection style</legend>
+                      <label>
+                        <input
+                          checked={modularConnectionStyle === 'direct'}
+                          name="modular-connection-style"
+                          onChange={() =>
+                            onModularConnectionStyleChange?.('direct')
+                          }
+                          type="radio"
+                          value="direct"
+                        />
+                        <span>
+                          <strong>Direct</strong>
+                          <small>
+                            Draws one straight path between exact endpoints.
+                          </small>
+                        </span>
+                      </label>
+                      <label>
+                        <input
+                          checked={modularConnectionStyle === 'electronic'}
+                          name="modular-connection-style"
+                          onChange={() =>
+                            onModularConnectionStyleChange?.('electronic')
+                          }
+                          type="radio"
+                          value="electronic"
+                        />
+                        <span>
+                          <strong>Electronic</strong>
+                          <small>
+                            Uses the existing stepped connector appearance.
+                          </small>
+                        </span>
+                      </label>
+                    </fieldset>
                   </div>
                 ) : null}
               </section>

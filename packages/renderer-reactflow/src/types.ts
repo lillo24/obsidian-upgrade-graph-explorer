@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import type { ReactNode } from 'react';
 import type {
   DagreLayoutInput,
   DagreLayoutMode,
@@ -18,6 +19,9 @@ export type GraphLayoutMode = DagreLayoutMode;
 
 /** Card-density grammar; intentionally independent from Dagre layout mode. */
 export type GraphVisualVariant = 'extended' | 'compact-schematic';
+
+/** Renderer-only route grammar. Omitted edges retain the shared SmoothStep path. */
+export type GraphEdgePathStyle = 'direct' | 'electronic';
 
 export type TrackpadZoomMode = 'scroll-zoom' | 'pinch-zoom';
 
@@ -109,6 +113,8 @@ export interface GraphEdgeData extends Record<string, unknown> {
   readonly referenceCount: number;
   readonly ariaLabel: string;
   readonly visualVariant: GraphVisualVariant;
+  /** Modular Preview may opt into a straight exact-endpoint connector. */
+  readonly routeStyle?: GraphEdgePathStyle;
 }
 
 export interface ModuleBoundaryNodeData extends Record<string, unknown> {
@@ -189,6 +195,8 @@ export interface GraphCanvasProps {
   readonly preparedGraph?: RendererGraph;
   readonly preparedGraphPending?: boolean;
   readonly preparedGraphStatus?: string;
+  /** Renderer-only world-space decoration; excluded from graph geometry and fitting. */
+  readonly viewportOverlay?: ReactNode;
   readonly visualVariant?: GraphVisualVariant;
   /** Required by Local Structured for root normalization and emphasis. */
   readonly rootEntityId?: string;

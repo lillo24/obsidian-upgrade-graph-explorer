@@ -1254,10 +1254,22 @@ visible, and filtered bridges remain excluded. Ordinary Compass search evaluates
 at most 64 restricted assignments per module; large modules use deterministic
 bounded relocation and no global Cartesian product.
 
+PRE-HIER4B adds no layout semantics. The Modular renderer consumes the already
+validated `folderBandPlan.bands` records to draw pointer-inert, world-coordinate
+folder strips with exact Y bounds and a shared final-rectangle X extent. This
+overlay is excluded from graph nodes and fit bounds. It includes root and
+singleton bands, uses the established `Root folder` display convention, and
+cannot expose a filtered folder because filtered modules are absent from the
+plan. Modular edges carry an optional renderer-only route style: Direct uses
+React Flow's straight exact-endpoint path and Electronic preserves SmoothStep.
+These two persisted Sandbox preferences never enter HIER1, the worker request,
+computed-layout protocol, or cache fingerprint. Omitted route style continues to
+mean SmoothStep for Classic and every unrelated renderer.
+
 Secondary edges, hover, and Visual Groups remain geometry-neutral. HIER4B owns
-Soft Folder Clusters, HIER5 retains Direct/Electronic orthogonal routing and
-overlapping-path hit-target separation, and HIER3C retains any product-default
-change.
+Soft Folder Clusters, HIER5 retains Electronic orthogonal routing, rounded
+styling, channels, obstacle avoidance, and overlapping-path hit-target
+separation, and HIER3C retains any product-default change.
 
 Optimized desktop graphical QA approved the preview with visible module
 boundaries and confirmed exact endpoints, root/rank positioning, multi-hop
@@ -1265,8 +1277,9 @@ orientation, disclosure, implementation switching, secondary-edge geometry
 invariance, Inspector behavior, and current touchpad navigation. This completes
 HIER3B. Optimized desktop graphical approval on September 4, 2026, completes
 HIER3B-FIX1. The actual-browser HIER4A integration was approved and its optimized
-desktop check/build passed on September 8, 2026. HIER4B is next; HIER5 follows
-HIER4B, and HIER3C follows HIER5.
+desktop check/build passed on September 8, 2026. PRE-HIER4B then added approved
+visible strips and Direct rendering without reopening HIER4A geometry. HIER4B is
+next; HIER5 follows HIER4B, and HIER3C follows HIER5.
 
 ## HIER0 product exposure and geometry
 
