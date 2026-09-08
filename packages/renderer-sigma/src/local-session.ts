@@ -588,7 +588,7 @@ export class LocalRendererSession {
     });
   }
 
-  /** Fake-backed MOVE1A seam; production does not activate it until PHYSICS1. */
+  /** Temporary file movement seam; callers decide when an Edit/Move mode exists. */
   setTemporaryFileMoveContext(
     context: TemporaryFileMoveSessionContext | undefined,
     cancellationReason: Exclude<
@@ -1024,6 +1024,51 @@ export class LocalRendererSession {
           { attributes: ['x', 'y'] },
         ),
     ).rendered;
+  }
+
+  /**
+   * Camera-neutral session-only adoption for continuous physics frames. This
+   * intentionally bypasses density, anchoring, layout cache, and React state.
+   */
+  applyPartialPositions(positions: readonly LocalLayoutPosition[]): void {
+    const seen = new Set<string>();
+    for (const position of positions) {
+      if (
+        position.key.length === 0 ||
+        seen.has(position.key) ||
+        !this.graph.hasNode(position.key)
+      ) {
+        throw new Error(
+          `Sparse Local positions contain an unknown or duplicate node ${JSON.stringify(position.key)}.`,
+        );
+      }
+      if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+        throw new Error(
+          `Sparse Local position has invalid coordinates for node ${position.key}.`,
+        );
+      }
+      seen.add(position.key);
+    }
+    if (positions.length === 0) return;
+    const incidentEdges = new Set<string>();
+    for (const position of positions) {
+      const attributes = this.graph.getNodeAttributes(position.key) as {
+        x: number;
+        y: number;
+      };
+      attributes.x = position.x;
+      attributes.y = position.y;
+      for (const edge of this.graph.edges(position.key))
+        incidentEdges.add(edge);
+    }
+    this.renderer.refresh({
+      partialGraph: {
+        nodes: positions.map(({ key }) => key),
+        edges: [...incidentEdges],
+      },
+      skipIndexation: false,
+      schedule: true,
+    });
   }
 
   nodeViewportPoint(key: string): LocalViewportPoint | undefined {

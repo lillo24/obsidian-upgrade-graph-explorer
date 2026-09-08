@@ -88,6 +88,23 @@ describe('temporary node constraint port contract', () => {
         target: { x: Number.NaN, y: 0 },
       }),
     ).toThrow('finite');
+    expect(() =>
+      validateTemporaryNodeConstraintCommand({
+        ...base,
+        sessionGeneration: 3,
+        kind: 'begin',
+        sequence: 0,
+        target: { x: 0, y: 0 },
+      }),
+    ).toThrow('non-empty string');
+    expect(() =>
+      validateTemporaryNodeConstraintCommand({
+        ...base,
+        kind: 'unknown',
+        sequence: 0,
+        target: { x: 0, y: 0 },
+      }),
+    ).toThrow('kind');
 
     const port = new RecordingTemporaryNodeConstraintPort();
     port.begin({ ...base, kind: 'begin', sequence: 0, target: { x: 0, y: 0 } });

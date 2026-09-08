@@ -149,6 +149,46 @@ describe('production Focus Schematic React Flow mapping', () => {
     );
   });
 
+  it('changes only Modular Preview route drawing between Direct and Electronic', () => {
+    const { graph: direct, input } = prepared('EP12');
+    const electronic = prepareFocusSchematicRendererGraph({
+      ...input,
+      routeStyle: 'electronic',
+    });
+
+    expect(direct.edges.map(({ data }) => data?.routeStyle)).toEqual(
+      Array(direct.edges.length).fill('direct'),
+    );
+    expect(electronic.edges.map(({ data }) => data?.routeStyle)).toEqual(
+      Array(electronic.edges.length).fill('electronic'),
+    );
+    expect(
+      electronic.edges.map(
+        ({ id, source, target, sourceHandle, targetHandle, data }) => ({
+          id,
+          source,
+          target,
+          sourceHandle,
+          targetHandle,
+          projectionEdgeId: data?.projectionEdgeId,
+          status: data?.status,
+        }),
+      ),
+    ).toEqual(
+      direct.edges.map(
+        ({ id, source, target, sourceHandle, targetHandle, data }) => ({
+          id,
+          source,
+          target,
+          sourceHandle,
+          targetHandle,
+          projectionEdgeId: data?.projectionEdgeId,
+          status: data?.status,
+        }),
+      ),
+    );
+  });
+
   it.each(['EP2', 'EP3', 'EP4', 'EP12'])(
     'maps exact File/Heading/Block endpoints and A1 positions for %s',
     (fixtureId) => {

@@ -66,6 +66,68 @@
   filter: saturate(1.15);
 }
 
+.focus-schematic-folder-strips {
+  position: absolute;
+  z-index: -1;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.focus-schematic-folder-strip {
+  fill: rgb(73 126 149 / 5%);
+  stroke: rgb(55 109 132 / 38%);
+  stroke-width: 1.5;
+  stroke-dasharray: 7 6;
+}
+
+.focus-schematic-folder-strip--root {
+  fill: rgb(36 94 116 / 9%);
+  stroke: rgb(36 94 116 / 58%);
+}
+
+.focus-schematic-folder-strip__guide {
+  stroke: rgb(55 109 132 / 18%);
+  stroke-width: 1;
+}
+
+.focus-schematic-folder-strip__label {
+  fill: rgb(33 79 97 / 82%);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.focus-schematic-folder-guides {
+  position: absolute;
+  z-index: -2;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.focus-schematic-folder-guide {
+  fill: rgb(73 126 149 / 4%);
+  stroke: rgb(55 109 132 / 42%);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 7;
+  stroke-linejoin: round;
+}
+
+.focus-schematic-folder-guide--capsule {
+  stroke-dasharray: 8 6;
+}
+
+.focus-schematic-folder-guide--root {
+  fill: rgb(36 94 116 / 7%);
+  stroke: rgb(36 94 116 / 56%);
+}
+
+.focus-schematic-folder-guide__label {
+  fill: rgb(33 79 97 / 84%);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
 .entity-card,
 .diagnostic-card {
   position: relative;

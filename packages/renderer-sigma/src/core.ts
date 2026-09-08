@@ -214,6 +214,7 @@ export type {
   TemporaryNodeConstraintPort,
   UpdateTemporaryNodeConstraintCommand,
 } from './temporary-node-constraint';
+export * from './physics';
 export {
   resolveLocalEdgeStyle,
   resolveLocalNodeStyle,

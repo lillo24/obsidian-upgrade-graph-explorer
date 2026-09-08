@@ -1254,10 +1254,32 @@ visible, and filtered bridges remain excluded. Ordinary Compass search evaluates
 at most 64 restricted assignments per module; large modules use deterministic
 bounded relocation and no global Cartesian product.
 
+PRE-HIER4B adds no layout semantics. The Modular renderer consumes the already
+validated `folderBandPlan.bands` records to draw pointer-inert, world-coordinate
+folder strips with exact Y bounds and a shared final-rectangle X extent. This
+overlay is excluded from graph nodes and fit bounds. It includes root and
+singleton bands, uses the established `Root folder` display convention, and
+cannot expose a filtered folder because filtered modules are absent from the
+plan. Modular edges carry an optional renderer-only route style: Direct uses
+React Flow's straight exact-endpoint path and Electronic preserves SmoothStep.
+These two persisted Sandbox preferences never enter HIER1, the worker request,
+computed-layout protocol, or cache fingerprint. Omitted route style continues to
+mean SmoothStep for Classic and every unrelated renderer.
+
+HIER4B extends that same persisted Folder guides toggle without changing its
+layout isolation. Directional Bands still renders the accepted strips; Soft
+Folder Clusters renders padded singleton regions, compact two-File capsules, or
+deterministic convex outlines around three or more final module rectangles.
+Exact visible HIER1 `folderKey` membership drives the grouping. Filtered modules
+are excluded, and proximity plus intervening different-folder modules split a
+misleading same-folder envelope into disconnected regions. Both overlays are
+created after layout adoption and remain outside projection, model, worker,
+cache, fitting, and graph geometry.
+
 Secondary edges, hover, and Visual Groups remain geometry-neutral. HIER4B owns
-Soft Folder Clusters, HIER5 retains Direct/Electronic orthogonal routing and
-overlapping-path hit-target separation, and HIER3C retains any product-default
-change.
+Soft Folder Clusters, HIER5 retains Electronic orthogonal routing, rounded
+styling, channels, obstacle avoidance, and overlapping-path hit-target
+separation, and HIER3C retains any product-default change.
 
 The HIER4B bakeoff and lab retain the separate renderer-neutral Soft Folder
 Clusters API. The same solver is also available as a Sandbox-only macro choice
@@ -1286,9 +1308,10 @@ orientation, disclosure, implementation switching, secondary-edge geometry
 invariance, Inspector behavior, and current touchpad navigation. This completes
 HIER3B. Optimized desktop graphical approval on September 4, 2026, completes
 HIER3B-FIX1. The actual-browser HIER4A integration was approved and its optimized
-desktop check/build passed on September 8, 2026. HIER4B is under real-vault
-graphical evaluation through the live Modular Preview; HIER5 follows HIER4B,
-and HIER3C follows HIER5.
+desktop check/build passed on September 8, 2026. PRE-HIER4B then added approved
+visible strips and Direct rendering without reopening HIER4A geometry. HIER4B
+is under real-vault graphical evaluation through the live Modular Preview;
+HIER5 follows HIER4B, and HIER3C follows HIER5.
 
 ## HIER0 product exposure and geometry
 
@@ -1357,3 +1380,26 @@ settings, timing, camera/density, dynamic Pull, and fixed Place.
 The canvas still adopts one final base result through FLICKER1's atomic,
 camera-neutral coordinate transaction, then composes SPATIAL2 as base → dynamic
 Pull → fixed Place. SPATIAL2 dynamic convergence and PHYSICS1 remain separate.
+
+## PHYSICS1 continuous Network simulation
+
+PHYSICS1 adds a separate, lazy `network-physics` worker without replacing the
+finite Focus or All layout workers. Its browser client can be initialized with
+clone-safe current coordinates while remaining dormant; only the first valid
+temporary-constraint begin constructs the Worker. The Worker owns one retained
+Graphology graph and explicit sleeping, hot-constrained, cooling, failed, and
+disposed states. Sleeping schedules no simulation turn.
+
+The selected adapter uses only public `forceAtlas2.assign` calls. Hot work runs
+one physical iteration between target assertions and publishes after four
+iterations. Cooling returns to canonical 32-iteration mode-specific movement
+checks. Strict schema, session/simulation generation, gesture sequence, frame
+sequence, and exact node-set checks keep stale work from adopting.
+
+Focus seeds from last accepted Local coordinates. All seeds from the dynamic
+pre-Place layer and carries resolved Pull inputs; Pull is normalized per
+physical iteration. A captured winning Place translation is applied once on
+the display side. Worker frames use camera-neutral sparse Sigma adoption and
+cannot write finite layout caches, Pull caches, spatial persistence, history,
+source, density, camera, or React tick state. The canvases expose this real
+capability behind an inactive-by-default flag; MOVE1B still owns product UI.

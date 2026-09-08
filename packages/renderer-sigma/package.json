@@ -47,6 +47,11 @@
       "import": "./src/local-convergence.ts",
       "default": "./src/local-convergence.ts"
     },
+    "./physics": {
+      "types": "./src/physics/index.ts",
+      "import": "./src/physics/index.ts",
+      "default": "./src/physics/index.ts"
+    },
     "./settings": {
       "types": "./src/settings.ts",
       "import": "./src/settings.ts",

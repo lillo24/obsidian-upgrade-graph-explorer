@@ -11,11 +11,20 @@ renderer-neutral result to validated React Flow data.
   identity, filtered anonymity, diagnostic clearance, module-aware aggregate
   hover, direct-ring predicates, provenance continuity, and secondary
   zero-geometry influence.
+- `folder-band-strips.tsx` renders the Directional macro's exact horizontal
+  world-space guides.
+- `folder-cluster-guides.tsx` derives singleton, capsule, hull, and disconnected
+  Soft macro regions from exact visible folder membership and final module
+  rectangles. Its tests cover strengths 0, 25, 50, 75, and 100 without geometry
+  mutation.
 
 The mapper is the sole owner of optional modular entity metadata. It derives
 module membership from HIER1 and direct-File ring visibility from the final
 currently rendered reference edges. Classic mapping never receives these
 fields.
+
+Both guide families are pointer-inert viewport overlays behind edges and nodes;
+they are excluded from graph nodes, fitting, layout, and cache identity.
 
 The package root does not re-export this subpath, keeping it outside Classic
 startup. Node/module geometry remains independent from future HIER4 folder

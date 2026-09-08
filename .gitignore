@@ -17,6 +17,7 @@ coverage/
 /tools/focus-schematic-bakeoff/output/
 /output/convergence1a/
 /output/convergence1c/
+/output/physics1/
 *.tsbuildinfo
 .DS_Store
 *.local

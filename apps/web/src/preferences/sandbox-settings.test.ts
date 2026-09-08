@@ -27,6 +27,8 @@ describe('Settings Sandbox reset', () => {
       modularFocusHeadingOrder: 'document-order',
       modularFocusMacroLayout: 'soft-folder-clusters',
       modularFocusSoftFolderStrength: 91,
+      modularFolderStripsVisible: false,
+      modularConnectionStyle: 'electronic',
       showExperimentalAllHierarchy: true,
       trackpadZoomMode: 'pinch-zoom',
     });
@@ -43,6 +45,8 @@ describe('Settings Sandbox reset', () => {
         modularFocusHeadingOrder: 'crossing-optimized',
         modularFocusMacroLayout: 'directional-bands',
         modularFocusSoftFolderStrength: 50,
+        modularFolderStripsVisible: true,
+        modularConnectionStyle: 'direct',
         showExperimentalAllHierarchy: false,
         trackpadZoomMode: 'pinch-zoom',
       },

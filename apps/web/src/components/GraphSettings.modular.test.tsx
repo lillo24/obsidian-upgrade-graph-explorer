@@ -33,6 +33,8 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
     implementation: 'classic' | 'modular-preview',
     internalLayout: 'adaptive-compass' | 'vertical-spine',
     headingOrder: 'crossing-optimized' | 'document-order',
+    folderStrips = true,
+    connectionStyle: 'direct' | 'electronic' = 'direct',
     onInternalLayoutChange = vi.fn(),
     onHeadingOrderChange = vi.fn(),
     macroLayout:
@@ -40,6 +42,8 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
     softFolderStrength = 50,
     onMacroLayoutChange = vi.fn(),
     onSoftFolderStrengthChange = vi.fn(),
+    onFolderStripsChange = vi.fn(),
+    onConnectionStyleChange = vi.fn(),
   ) {
     act(() => {
       root.render(
@@ -53,6 +57,8 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
           modularFocusInternalLayout={internalLayout}
           modularFocusMacroLayout={macroLayout}
           modularFocusSoftFolderStrength={softFolderStrength}
+          modularFolderStripsVisible={folderStrips}
+          modularConnectionStyle={connectionStyle}
           onAllNetworkDensityFramingStrengthChange={() => undefined}
           onFocusAppearanceChange={() => undefined}
           onFocusHierarchyImplementationChange={() => undefined}
@@ -62,6 +68,8 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
           onModularFocusInternalLayoutChange={onInternalLayoutChange}
           onModularFocusMacroLayoutChange={onMacroLayoutChange}
           onModularFocusSoftFolderStrengthChange={onSoftFolderStrengthChange}
+          onModularFolderStripsVisibleChange={onFolderStripsChange}
+          onModularConnectionStyleChange={onConnectionStyleChange}
           onOpenChange={() => undefined}
           onResetSandbox={() => undefined}
           onTrackpadZoomModeChange={() => undefined}
@@ -83,6 +91,8 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
       onInternalLayoutChange,
       onMacroLayoutChange,
       onSoftFolderStrengthChange,
+      onFolderStripsChange,
+      onConnectionStyleChange,
     };
   }
 
@@ -99,11 +109,9 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
       container.querySelector('input[aria-label="Folder strength"]'),
     ).toBeNull();
     const approvedControls = Array.from(
-      container.querySelectorAll<HTMLInputElement>(
-        'input[name^="modular-focus-"]',
-      ),
+      container.querySelectorAll<HTMLInputElement>('input[name^="modular-"]'),
     );
-    expect(approvedControls).toHaveLength(6);
+    expect(approvedControls).toHaveLength(9);
     expect(approvedControls.map(({ value }) => value).sort()).toEqual(
       [
         'adaptive-compass',
@@ -111,6 +119,9 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
         'document-order',
         'directional-bands',
         'soft-folder-clusters',
+        'direct',
+        'electronic',
+        'on',
         'vertical-spine',
       ].sort(),
     );
@@ -121,32 +132,50 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
     ).toBe(true);
   });
 
-  it('reflects persisted alternatives and emits both policy changes under Modular Preview', () => {
+  it('reflects persisted alternatives and emits every renderer and layout policy change under Modular Preview', () => {
     const onInternalLayoutChange = vi.fn();
     const onHeadingOrderChange = vi.fn();
     const onMacroLayoutChange = vi.fn();
     const onSoftFolderStrengthChange = vi.fn();
+    const onFolderStripsChange = vi.fn();
+    const onConnectionStyleChange = vi.fn();
     renderSettings(
       'modular-preview',
       'vertical-spine',
       'document-order',
+      false,
+      'electronic',
       onInternalLayoutChange,
       onHeadingOrderChange,
       'soft-folder-clusters',
       50,
       onMacroLayoutChange,
       onSoftFolderStrengthChange,
+      onFolderStripsChange,
+      onConnectionStyleChange,
     );
 
     const byValue = (value: string) =>
       container.querySelector<HTMLInputElement>(`input[value="${value}"]`)!;
     expect(byValue('vertical-spine').checked).toBe(true);
     expect(byValue('document-order').checked).toBe(true);
+    expect(byValue('electronic').checked).toBe(true);
+    expect(
+      container.querySelector<HTMLInputElement>(
+        'input[name="modular-folder-guides"]',
+      )?.checked,
+    ).toBe(false);
     expect(byValue('adaptive-compass').disabled).toBe(false);
     expect(byValue('soft-folder-clusters').checked).toBe(true);
     act(() => byValue('adaptive-compass').click());
     act(() => byValue('crossing-optimized').click());
     act(() => byValue('directional-bands').click());
+    act(() => byValue('direct').click());
+    act(() =>
+      container
+        .querySelector<HTMLInputElement>('input[name="modular-folder-guides"]')
+        ?.click(),
+    );
     const slider = container.querySelector<HTMLInputElement>(
       'input[aria-label="Folder strength"]',
     )!;
@@ -162,5 +191,7 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
     expect(onHeadingOrderChange).toHaveBeenCalledWith('crossing-optimized');
     expect(onMacroLayoutChange).toHaveBeenCalledWith('directional-bands');
     expect(onSoftFolderStrengthChange).toHaveBeenCalledWith(75);
+    expect(onConnectionStyleChange).toHaveBeenCalledWith('direct');
+    expect(onFolderStripsChange).toHaveBeenCalledWith(true);
   });
 });

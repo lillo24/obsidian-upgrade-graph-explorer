@@ -33,6 +33,9 @@ export function resetGraphSandbox(
         DEFAULT_GRAPH_PREFERENCES.modularFocusMacroLayout,
       modularFocusSoftFolderStrength:
         DEFAULT_GRAPH_PREFERENCES.modularFocusSoftFolderStrength,
+      modularFolderStripsVisible:
+        DEFAULT_GRAPH_PREFERENCES.modularFolderStripsVisible,
+      modularConnectionStyle: DEFAULT_GRAPH_PREFERENCES.modularConnectionStyle,
       showExperimentalAllHierarchy:
         DEFAULT_GRAPH_PREFERENCES.showExperimentalAllHierarchy,
     },

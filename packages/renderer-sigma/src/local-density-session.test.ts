@@ -98,6 +98,37 @@ afterEach(() => {
 });
 
 describe('Focus density camera ownership', () => {
+  it('adopts continuous sparse positions without camera or density work', () => {
+    const onDensityQaDiagnosticsChange = vi.fn();
+    const { session, renderer } = mount({
+      initialAcceptedPositions: sparsePositions,
+      onDensityQaDiagnosticsChange,
+    });
+    const cameraBefore = renderer.camera.getState();
+    const densityCallsBefore = onDensityQaDiagnosticsChange.mock.calls.length;
+    const untouched = { ...renderer.graph.getNodeAttributes('isolate') };
+
+    session.applyPartialPositions([{ key: 'near', x: 30, y: -12 }]);
+
+    expect(renderer.graph.getNodeAttributes('near')).toMatchObject({
+      x: 30,
+      y: -12,
+    });
+    expect(renderer.graph.getNodeAttributes('isolate')).toEqual(untouched);
+    expect(renderer.camera.getState()).toEqual(cameraBefore);
+    expect(onDensityQaDiagnosticsChange).toHaveBeenCalledTimes(
+      densityCallsBefore,
+    );
+    expect(renderer.refresh).toHaveBeenLastCalledWith({
+      partialGraph: {
+        nodes: ['near'],
+        edges: ['root-near'],
+      },
+      schedule: true,
+      skipIndexation: false,
+    });
+  });
+
   it('adopts the production ratio for fresh and exact cache-hit layouts', async () => {
     const input = rendererInput();
     const expected = resolveLocalDensityFit(input, sparsePositions).ratio;

@@ -40,6 +40,8 @@ describe('HIER3B semantic-model production boundary', () => {
         'apps/web/src/preferences/graph-preferences.ts',
         'apps/web/src/workers/focus-schematic-layout-worker-client.ts',
         'apps/web/src/workers/focus-schematic-layout.worker.ts',
+        'packages/renderer-reactflow/src/focus-schematic/folder-band-strips.tsx',
+        'packages/renderer-reactflow/src/focus-schematic/folder-cluster-guides.tsx',
         'packages/renderer-reactflow/src/focus-schematic/index.ts',
       ].sort(),
     );

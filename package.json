@@ -26,6 +26,7 @@
     "analyze:network-spacing": "pnpm --filter @icarus-graph-explorer/vault-diagnostics analyze:network-spacing",
     "analyze:forceatlas2-convergence": "pnpm --filter @icarus-graph-explorer/vault-diagnostics analyze:forceatlas2-convergence",
     "analyze:global-convergence": "pnpm --filter @icarus-graph-explorer/vault-diagnostics analyze:global-convergence",
+    "analyze:physics1": "pnpm --filter @icarus-graph-explorer/vault-diagnostics analyze:physics1",
     "benchmark:focus-schematic": "pnpm --filter @icarus-graph-explorer/vault-diagnostics benchmark:focus-schematic",
     "benchmark:focus-schematic-layout": "pnpm --filter @icarus-graph-explorer/focus-schematic-bakeoff benchmark",
     "benchmark:focus-schematic-endpoints": "pnpm --filter @icarus-graph-explorer/focus-schematic-bakeoff benchmark:endpoints",

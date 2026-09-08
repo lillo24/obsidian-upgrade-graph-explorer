@@ -1,6 +1,6 @@
 # Desktop Workers
 
-Status: **STABLE — stateful W1 and stateless Structure/Global/Local/Modular layout workers remain separate.**
+Status: **STABLE — stateful W1, stateless layout workers, and dormant continuous Network physics remain separate.**
 
 This folder owns browser Worker transport code. Domain state, geometry, and
 protocol behavior live in platform-independent packages; the web application
@@ -25,6 +25,9 @@ local-layout-worker-client.test.ts  Supersession, schema-v2 validation, timeout,
 focus-schematic-layout.worker.ts  Stateless HIER3B A1 production entry.
 focus-schematic-layout-worker-client.ts  Strict latest-result-wins Modular Preview client.
 focus-schematic-layout-worker-client.test.ts  Supersession, stale, failure, responsiveness, and disposal tests.
+network-physics.worker.ts    Retained public-ForceAtlas2 sleeping/hot/cooling lifecycle.
+network-physics-worker-client.ts  Lazy strict TemporaryNodeConstraint adapter with rAF-coalesced adoption.
+network-physics-worker-client.test.ts  Laziness, generation, coalescing, error, and disposal tests.
 ```
 
 The worker is instantiated only after a local-vault open starts. Sample and
@@ -82,3 +85,11 @@ generation/request guards reject stale messages, and unmount or presentation
 change disposes the worker. Startup, clone, transport, runtime, malformed, and
 computed-result failures remain explicit so the component can retain its last
 valid graph or request session-only Classic fallback.
+
+The continuous Network physics worker is dormant scaffolding for PHYSICS1. An
+`initialize` call stores clone-safe Focus or All seed data in the client but
+does not construct a Worker. The first valid temporary-constraint `begin`
+starts it. The retained graph then publishes whole-graph frames while hot,
+continues bounded convergence cooling after release, and schedules nothing
+once sleeping. The client adopts at most one newest frame per animation frame;
+worker coordinates remain session-only and never enter layout or spatial caches.

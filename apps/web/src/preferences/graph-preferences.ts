@@ -1,5 +1,6 @@
 import type {
   FocusAppearance,
+  GraphEdgePathStyle,
   TrackpadZoomMode,
 } from '@icarus-graph-explorer/renderer-reactflow';
 import {
@@ -40,6 +41,10 @@ export interface GraphPreferences {
   readonly modularFocusMacroLayout: FocusSchematicProductMacroLayout;
   /** Experimental Soft Folder Clusters strength, normalized to [0, 100]. */
   readonly modularFocusSoftFolderStrength: number;
+  /** Historical storage key for both macro-specific Folder guide overlays. */
+  readonly modularFolderStripsVisible: boolean;
+  /** Modular Preview edge drawing only; omitted from the Classic renderer. */
+  readonly modularConnectionStyle: GraphEdgePathStyle;
   /** Product exposure only; absent/malformed v1 fields default to false. */
   readonly showExperimentalAllHierarchy: boolean;
   readonly trackpadZoomMode: TrackpadZoomMode;
@@ -58,6 +63,8 @@ export const DEFAULT_GRAPH_PREFERENCES: GraphPreferences = {
     DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.macroLayout,
   modularFocusSoftFolderStrength:
     DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softFolderStrength,
+  modularFolderStripsVisible: true,
+  modularConnectionStyle: 'direct',
   showExperimentalAllHierarchy: false,
   trackpadZoomMode: 'scroll-zoom',
 };
@@ -89,6 +96,10 @@ function isFocusHierarchyImplementation(
 
 function isLocalLayoutMode(value: unknown): value is LocalLayoutMode {
   return value === 'free' || value === 'structured';
+}
+
+function isGraphEdgePathStyle(value: unknown): value is GraphEdgePathStyle {
+  return value === 'direct' || value === 'electronic';
 }
 
 function defaultLoadResult(
@@ -130,6 +141,8 @@ export function loadGraphPreferences(
         readonly modularFocusHeadingOrder?: unknown;
         readonly modularFocusMacroLayout?: unknown;
         readonly modularFocusSoftFolderStrength?: unknown;
+        readonly modularFolderStripsVisible?: unknown;
+        readonly modularConnectionStyle?: unknown;
         readonly showExperimentalAllHierarchy?: unknown;
         readonly trackpadZoomMode?: unknown;
       };
@@ -179,6 +192,15 @@ export function loadGraphPreferences(
             normalizeModularFocusSoftFolderStrength(
               stored.modularFocusSoftFolderStrength,
             ),
+          modularFolderStripsVisible:
+            typeof stored.modularFolderStripsVisible === 'boolean'
+              ? stored.modularFolderStripsVisible
+              : DEFAULT_GRAPH_PREFERENCES.modularFolderStripsVisible,
+          modularConnectionStyle: isGraphEdgePathStyle(
+            stored.modularConnectionStyle,
+          )
+            ? stored.modularConnectionStyle
+            : DEFAULT_GRAPH_PREFERENCES.modularConnectionStyle,
           trackpadZoomMode: isTrackpadZoomMode(stored.trackpadZoomMode)
             ? stored.trackpadZoomMode
             : DEFAULT_GRAPH_PREFERENCES.trackpadZoomMode,

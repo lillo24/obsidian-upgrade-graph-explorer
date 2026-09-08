@@ -1174,3 +1174,25 @@ prepared graph remains the performance boundary; no new dependency or
 serialized interaction index was needed for the bounded Focus workloads.
 
 The optimized desktop build passed final graphical review on September 4, 2026.
+
+## PHYSICS1 continuous simulation evidence
+
+`pnpm analyze:physics1` compares public ForceAtlas2 call quanta 1/2/4/8,
+verifies exact constrained targets and whole-graph reaction, checks Pull output
+independence across publish cadences, runs complete Focus/All release-to-sleep
+lifecycles, and measures 100/500/1,000/5,000-node turns. JSON is regenerated in
+ignored `output/physics1/`; no timing value is a CI gate.
+
+The selected four-iteration hot turn (four public one-iteration assignments)
+measured 0.144 / 3.395 / 82.941 / 73.525 ms for those scale cases, with
+whole-frame payloads of 5,997 / 30,303 / 60,606 / 305,678 bytes. A main-thread
+Map/adoption proxy measured 0.019 / 0.059 / 0.067 / 0.407 ms. JIT, Barnes-Hut,
+and machine load make these timings non-monotonic and investigative only.
+
+Every deterministic lifecycle fixture published zero target error and repeated
+bit-exactly. Focus chain/star/weak/isolate cases slept after 224–416 cooling
+iterations. The 180-node All fixture slept after 1,920 iterations with Pull off,
+3,616 with one Pull group, and 3,680 with competing Pull groups and cross-folder
+references. This evidence selects the distinct continuous-All 8,192-iteration
+small/medium cap. At scale PHYSICS1 retains whole-graph semantics; it does not
+silently switch to a faster neighborhood-only simulation.

@@ -319,3 +319,9 @@ normalized policy to the dedicated worker and keys the bounded cache by only
 geometry-relevant values. Disclosure, reroot, filtering, exact hover, Secondary
 presentation, and camera behavior continue through the existing projection and
 React Flow seams.
+
+The persisted Folder guides toggle is resolved after a current worker result is
+adopted. Directional mode supplies the existing band strips; Soft mode supplies
+renderer-only cluster regions from final module rectangles and exact visible
+HIER1 folder membership. Guide visibility is absent from every model, worker,
+effect, and cache dependency that can request or change layout.

@@ -25,6 +25,7 @@ import {
 import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performance';
 import {
   GraphCanvas,
+  type GraphEdgePathStyle,
   type FocusAppearance,
   type GraphCenterRequest,
   type GraphSelection,
@@ -35,6 +36,8 @@ import {
   type TrackpadZoomMode,
 } from '@icarus-graph-explorer/renderer-reactflow';
 import {
+  FocusSchematicFolderBandStrips,
+  FocusSchematicFolderClusterGuides,
   focusSchematicNodeDimensions,
   prepareFocusSchematicRendererGraph,
 } from '@icarus-graph-explorer/renderer-reactflow/focus-schematic';
@@ -58,6 +61,7 @@ export interface ModularStructuredGraphViewProps {
   readonly fitRequestKey: number;
   readonly focusAppearance: FocusAppearance;
   readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
+  readonly folderGuidesVisible?: boolean;
   readonly initialTransitionAnchor?: GraphTransitionAnchor;
   readonly internalLayoutVariant: FocusSchematicProductInternalLayoutVariant;
   readonly macroLayout: FocusSchematicProductMacroLayout;
@@ -79,6 +83,7 @@ export interface ModularStructuredGraphViewProps {
   readonly projectionState: ViewProjectionState;
   readonly projectionWorkspace: ProjectionWorkspace;
   readonly rootEntityId: string;
+  readonly routeStyle?: GraphEdgePathStyle;
   readonly selection: GraphSelection | null;
   readonly trackpadZoomMode: TrackpadZoomMode;
   readonly visualGroupStyles?: VisualGroupPresentationMap;
@@ -262,6 +267,7 @@ export default function ModularStructuredGraphView(
 ) {
   const {
     endpointOrderPolicy,
+    folderGuidesVisible = true,
     instrumentation,
     internalLayoutVariant,
     macroLayout,
@@ -272,6 +278,7 @@ export default function ModularStructuredGraphView(
     projectionWorkspace,
     rootEntityId,
     softFolderStrength,
+    routeStyle = 'direct',
   } = props;
   const workerService = useMemo(
     () => createFocusSchematicLayoutWorkerService(),
@@ -355,7 +362,11 @@ export default function ModularStructuredGraphView(
   }, [instrumentation, layoutInput, layoutPolicies]);
 
   const prepareGraph = useCallback(
-    (computed: FocusSchematicComputedLayout, secondaryVisible: boolean) => {
+    (
+      computed: FocusSchematicComputedLayout,
+      secondaryVisible: boolean,
+      pathStyle: GraphEdgePathStyle,
+    ) => {
       const prepare = () =>
         prepareFocusSchematicRendererGraph({
           projection,
@@ -364,6 +375,7 @@ export default function ModularStructuredGraphView(
           computedLayout: computed,
           rootEntityId,
           secondaryRelationshipsVisible: secondaryVisible,
+          routeStyle: pathStyle,
           visualVariant: 'extended',
         });
       return instrumentation === undefined
@@ -400,7 +412,7 @@ export default function ModularStructuredGraphView(
       }
       if (lookup.status === 'hit' && lookup.value !== undefined) {
         try {
-          const graph = prepareGraph(lookup.value, false);
+          const graph = prepareGraph(lookup.value, false, routeStyle);
           instrumentation?.record('focus-schematic-cache-hit', 0);
           instrumentation?.record(
             'focus-schematic-cache-bytes',
@@ -472,7 +484,7 @@ export default function ModularStructuredGraphView(
               result.result,
               result.metrics.softClusterEvidence,
             );
-            const graph = prepareGraph(result.result, false);
+            const graph = prepareGraph(result.result, false, routeStyle);
             focusSchematicLayoutCache.set(
               layoutInput,
               layoutPolicies,
@@ -512,6 +524,7 @@ export default function ModularStructuredGraphView(
     prepareGraph,
     retryKey,
     workerService,
+    routeStyle,
   ]);
 
   useEffect(() => {
@@ -538,6 +551,7 @@ export default function ModularStructuredGraphView(
       return prepareGraph(
         lifecycle.adopted.computed,
         secondaryRelationshipsVisible,
+        routeStyle,
       );
     } catch {
       return lifecycle.adopted.graph;
@@ -549,6 +563,37 @@ export default function ModularStructuredGraphView(
     prepareGraph,
     projection,
     secondaryRelationshipsVisible,
+    routeStyle,
+  ]);
+  // This overlay is derived after layout adoption. Its visibility never enters
+  // projection, model, worker request, layout key, or cached geometry.
+  const viewportOverlay = useMemo(() => {
+    if (
+      !folderGuidesVisible ||
+      lifecycle.adopted === undefined ||
+      lifecycle.adopted.key !== layoutKey
+    )
+      return undefined;
+    return macroLayout === 'directional-bands' ? (
+      <FocusSchematicFolderBandStrips
+        bands={lifecycle.adopted.computed.folderBandPlan.bands}
+        nodes={displayedGraph.nodes}
+      />
+    ) : (
+      <FocusSchematicFolderClusterGuides
+        modules={model.modules}
+        nodes={displayedGraph.nodes}
+        rootModuleId={model.rootModuleId}
+      />
+    );
+  }, [
+    displayedGraph.nodes,
+    folderGuidesVisible,
+    layoutKey,
+    lifecycle.adopted,
+    macroLayout,
+    model.modules,
+    model.rootModuleId,
   ]);
   const pending =
     lifecycle.phase === 'idle' ||
@@ -589,6 +634,7 @@ export default function ModularStructuredGraphView(
             ? {}
             : { performance: instrumentation })}
           preparedGraph={displayedGraph}
+          viewportOverlay={viewportOverlay}
           preparedGraphPending={pending}
           {...(status === undefined ? {} : { preparedGraphStatus: status })}
         />

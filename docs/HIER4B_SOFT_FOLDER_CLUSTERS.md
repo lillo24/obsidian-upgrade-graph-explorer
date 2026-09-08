@@ -69,6 +69,23 @@ the fixed `36 + 18` schedule, collision checks/corrections, Compass assignment
 count, and branch-region churn between the two rounds. The implementation does
 not perform HIER5 obstacle routing or HIER3C product-default work.
 
+## Folder guides
+
+The persisted Folder guides toggle defaults to On and remains renderer-only.
+Directional Bands uses the accepted horizontal strips. Soft Folder Clusters
+instead derives spatial regions from final displayed File-module rectangles and
+exact visible HIER1 folder membership. Singleton folders receive padded rounded
+regions, pairs receive compact rounded capsules, and larger local groups receive
+deterministic convex outlines. Clearly separated same-folder islands render as
+separate regions when joining them would span too much empty space or enclose a
+different folder's module.
+
+The overlay is created only after a current layout has been adopted. It is
+pointer-inert, excluded from graph nodes and fit bounds, and never enters
+projection, model creation, worker requests, cache identity, convergence, or
+geometry. Filtered modules are excluded before grouping, and no path is reparsed
+to recover folder identity.
+
 ## Ownership
 
 `packages/focus-schematic-layout/src/soft-clusters.ts` owns the renderer-neutral
@@ -81,8 +98,10 @@ includes it for Soft Folder Clusters.
 
 The real preview uses the current projection, module dimensions, exact endpoint
 plan, React Flow mapper, disclosure/reroot/filter behavior, and Secondary edge
-presentation. Strength and policy changes replace pending worker generations;
-layout remains stateless and the latest request is the only adoptable result.
+presentation. Its Folder guides switch between Directional strips and Soft
+spatial regions without requesting layout. Strength and policy changes replace
+pending worker generations; layout remains stateless and the latest request is
+the only adoptable result.
 No private vault path, name, content, topology, or screenshot is committed.
 
 The adoption decision is deliberately open. Graphical review must choose one

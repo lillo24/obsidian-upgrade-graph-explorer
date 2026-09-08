@@ -86,38 +86,70 @@ export const TEMPORARY_NODE_CONSTRAINT_UNAVAILABLE = {
   reason: 'simulation-unavailable',
 } as const satisfies TemporaryNodeConstraintCapability;
 
-function requireIdentifier(value: string, label: string): void {
-  if (value.length === 0) throw new Error(`${label} must not be empty.`);
+function requireIdentifier(
+  value: unknown,
+  label: string,
+): asserts value is string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(`${label} must be a non-empty string.`);
+  }
 }
 
-function requireSequence(value: number): void {
-  if (!Number.isSafeInteger(value) || value < 0) {
+function requireSequence(value: unknown): asserts value is number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
     throw new Error('Constraint sequence must be a non-negative safe integer.');
   }
 }
 
-function requireTarget(value: SpatialPoint): void {
-  if (!Number.isFinite(value.x) || !Number.isFinite(value.y)) {
+function requireTarget(value: unknown): asserts value is SpatialPoint {
+  const x = (value as { readonly x?: unknown } | null)?.x;
+  const y = (value as { readonly y?: unknown } | null)?.y;
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    Array.isArray(value) ||
+    typeof x !== 'number' ||
+    !Number.isFinite(x) ||
+    typeof y !== 'number' ||
+    !Number.isFinite(y)
+  ) {
     throw new Error('Constraint target must contain finite x/y coordinates.');
   }
 }
 
 export function validateTemporaryNodeConstraintCommand(
-  command: TemporaryNodeConstraintCommand,
-): void {
-  if (command.schemaVersion !== TEMPORARY_NODE_CONSTRAINT_SCHEMA_VERSION) {
+  command: unknown,
+): asserts command is TemporaryNodeConstraintCommand {
+  if (
+    typeof command !== 'object' ||
+    command === null ||
+    Array.isArray(command)
+  ) {
+    throw new Error('Temporary constraint command must be an object.');
+  }
+  const candidate = command as Record<string, unknown>;
+  if (candidate.schemaVersion !== TEMPORARY_NODE_CONSTRAINT_SCHEMA_VERSION) {
     throw new Error('Unsupported temporary constraint schema version.');
   }
-  requireIdentifier(command.sessionGeneration, 'Session generation');
-  requireIdentifier(command.simulationGeneration, 'Simulation generation');
-  requireIdentifier(command.gestureId, 'Gesture id');
-  requireIdentifier(command.nodeKey, 'Node key');
-  requireSequence(command.sequence);
-  if (command.kind === 'end') {
-    if (!TEMPORARY_NODE_CONSTRAINT_END_REASONS.has(command.reason)) {
+  requireIdentifier(candidate.sessionGeneration, 'Session generation');
+  requireIdentifier(candidate.simulationGeneration, 'Simulation generation');
+  requireIdentifier(candidate.gestureId, 'Gesture id');
+  requireIdentifier(candidate.nodeKey, 'Node key');
+  requireSequence(candidate.sequence);
+  if (candidate.kind === 'end') {
+    if (
+      typeof candidate.reason !== 'string' ||
+      !TEMPORARY_NODE_CONSTRAINT_END_REASONS.has(
+        candidate.reason as TemporaryNodeConstraintEndReason,
+      )
+    ) {
       throw new Error('Temporary constraint end reason is invalid.');
     }
-  } else requireTarget(command.target);
+  } else if (candidate.kind === 'begin' || candidate.kind === 'update') {
+    requireTarget(candidate.target);
+  } else {
+    throw new Error('Temporary constraint command kind is invalid.');
+  }
 }
 
 function sameConstraint(

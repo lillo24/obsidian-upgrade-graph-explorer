@@ -19,6 +19,11 @@ import {
   warmLocalRendererInput,
 } from './local-layout';
 import {
+  createFocusNetworkPhysicsSeed,
+  type NetworkPhysicsService,
+  type NetworkPhysicsServiceFactory,
+} from './physics';
+import {
   DEFAULT_RESOLVED_NETWORK_SETTINGS,
   localLayoutSettingsFromNetworkSettings,
 } from './local-network-settings';
@@ -51,6 +56,9 @@ export interface LocalGraphCanvasProps {
   readonly layoutCache?: LocalLayoutCache;
   readonly layoutRequestKey: number;
   readonly layoutService: LocalLayoutService;
+  /** PHYSICS1 transport seam. Inactive until a later Edit/Move mode opts in. */
+  readonly physicsServiceFactory?: NetworkPhysicsServiceFactory;
+  readonly temporaryConstraintActive?: boolean;
   /** Shared Network preferences; only Reference Pull enters Local layout identity. */
   readonly networkSettings?: ResolvedNetworkSettings;
   /** Transient Sandbox policy; excluded from layout input and fingerprinting. */
@@ -94,6 +102,7 @@ export function LocalGraphCanvas({
   layoutCache,
   layoutRequestKey,
   layoutService,
+  physicsServiceFactory,
   networkSettings = DEFAULT_RESOLVED_NETWORK_SETTINGS,
   onFailure,
   onDensityQaDiagnosticsChange,
@@ -107,6 +116,7 @@ export function LocalGraphCanvas({
   projection,
   rootEntityId,
   selection,
+  temporaryConstraintActive = false,
   trackpadZoomMode,
   visualGroupStyles,
   presentationOverrides,
@@ -198,12 +208,52 @@ export function LocalGraphCanvas({
   });
   const appliedVisualGroupStyles = useRef(initial.visualGroupStyles);
   const appliedPresentationOverrides = useRef(initial.presentationOverrides);
+  const latestAcceptedPositions = useRef(
+    initial.cachedPositions ??
+      requestTemplate.nodes.map(({ key, x, y }) => ({ key, x, y })),
+  );
+  const physicsSessionGeneration = useRef(`focus:${rootEntityId}`);
+  const physicsSimulationSequence = useRef(0);
+  const physicsServiceRef = useRef<NetworkPhysicsService | undefined>(
+    undefined,
+  );
+  const physicsServiceGeneration = useRef(0);
   const [ready, setReady] = useState(false);
   const [layoutCommitKey, setLayoutCommitKey] = useState(0);
   const [layoutStatus, setLayoutStatus] = useState<string | undefined>(
     initial.cached ? undefined : 'Focus Network is ready; refining layout…',
   );
   const [layoutError, setLayoutError] = useState<string>();
+
+  useEffect(() => {
+    const generation = ++physicsServiceGeneration.current;
+    const service = physicsServiceFactory?.({
+      onFrame: (frame) => {
+        if (physicsServiceGeneration.current !== generation) return;
+        latestAcceptedPositions.current = frame.positions;
+        sessionRef.current?.applyPartialPositions(frame.positions);
+      },
+      onConstraint: (command) => {
+        if (physicsServiceGeneration.current !== generation) return;
+        if (command.kind === 'end') return;
+        sessionRef.current?.applyPartialPositions([
+          { key: command.nodeKey, ...command.target },
+        ]);
+      },
+      onFailure: (failure) => {
+        if (physicsServiceGeneration.current === generation) {
+          callbacks.current.onFailure(failure.message);
+        }
+      },
+    });
+    physicsServiceRef.current = service;
+    return () => {
+      if (physicsServiceRef.current === service) {
+        physicsServiceRef.current = undefined;
+      }
+      queueMicrotask(() => service?.dispose());
+    };
+  }, [physicsServiceFactory]);
 
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -337,6 +387,7 @@ export function LocalGraphCanvas({
         fingerprint === initial.fingerprint
       ) {
         initialCacheAccepted.current = true;
+        latestAcceptedPositions.current = initial.cachedPositions;
         layoutPending.current = false;
         setLayoutError(undefined);
         setLayoutStatus(undefined);
@@ -347,6 +398,7 @@ export function LocalGraphCanvas({
         .applyPositions(cached)
         .then(() => {
           if (cancelled) return;
+          latestAcceptedPositions.current = cached;
           layoutPending.current = false;
           setLayoutError(undefined);
           setLayoutStatus(undefined);
@@ -378,6 +430,7 @@ export function LocalGraphCanvas({
           performance.now() - applyStarted,
         );
         if (cancelled) return;
+        latestAcceptedPositions.current = result.positions;
         instrumentation?.record('local-layout-worker', result.computeMs);
         cache.set(fingerprint, result.positions);
         layoutPending.current = false;
@@ -408,6 +461,61 @@ export function LocalGraphCanvas({
     layoutRequestKey,
     ready,
     referencePull,
+  ]);
+
+  useEffect(() => {
+    const session = sessionRef.current;
+    const physicsService = physicsServiceRef.current;
+    if (!temporaryConstraintActive || session === undefined) {
+      return;
+    }
+    if (physicsService === undefined || !ready || layoutPending.current) {
+      session.setTemporaryFileMoveContext({
+        active: true,
+        capability: {
+          status: 'unavailable',
+          reason:
+            physicsService === undefined
+              ? 'simulation-unavailable'
+              : 'simulation-not-running',
+        },
+        sessionGeneration: physicsSessionGeneration.current,
+        simulationGeneration: 'unavailable',
+        coordinateGeneration: fingerprint,
+        fixedTranslationByNodeKey: new Map(),
+      });
+      return;
+    }
+    const sessionGeneration = physicsSessionGeneration.current;
+    const simulationGeneration = `${sessionGeneration}:simulation:${++physicsSimulationSequence.current}`;
+    physicsService.initialize(
+      createFocusNetworkPhysicsSeed({
+        request: requestTemplate,
+        positions: latestAcceptedPositions.current,
+        sessionGeneration,
+        simulationGeneration,
+      }),
+    );
+    session.setTemporaryFileMoveContext({
+      active: true,
+      capability: { status: 'available' },
+      port: physicsService,
+      sessionGeneration,
+      simulationGeneration,
+      coordinateGeneration: `${fingerprint}:${layoutCommitKey}`,
+      fixedTranslationByNodeKey: new Map(),
+    });
+    return () => {
+      session.setTemporaryFileMoveContext(undefined, 'layout-changed');
+      physicsService.invalidate('layout-changed');
+    };
+  }, [
+    fingerprint,
+    layoutCommitKey,
+    physicsServiceFactory,
+    ready,
+    requestTemplate,
+    temporaryConstraintActive,
   ]);
 
   useEffect(() => {

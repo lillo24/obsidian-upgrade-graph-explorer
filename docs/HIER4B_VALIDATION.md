@@ -22,6 +22,13 @@ Adaptive/Crossing defaults, Soft/75/Spine/Document round-trip, Sandbox reset,
 numeric clamping, and invalid-value fallback. Real-vault timing and interaction
 evidence is aggregate and local only.
 
+Renderer validation derives Soft Folder guides after final layout at strengths
+0, 25, 50, 75, and 100. It covers singleton, two-File capsule, three-File hull,
+root-folder, filtered-module exclusion, deterministic input permutation, and
+same-folder regions split by an intervening different folder. Every strength
+case snapshots node positions before guide derivation and reruns the bounded
+solver to prove identical convergence and geometry.
+
 ## Fixture coverage
 
 SC1–SC24 cover a topology-only star, repeated folders, topology/folder conflict
