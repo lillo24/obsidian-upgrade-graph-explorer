@@ -25,6 +25,8 @@ describe('Settings Sandbox reset', () => {
       localLayoutMode: 'structured',
       modularFocusInternalLayout: 'vertical-spine',
       modularFocusHeadingOrder: 'document-order',
+      modularFocusMacroLayout: 'soft-folder-clusters',
+      modularFocusSoftFolderStrength: 91,
       showExperimentalAllHierarchy: true,
       trackpadZoomMode: 'pinch-zoom',
     });
@@ -39,6 +41,8 @@ describe('Settings Sandbox reset', () => {
         localLayoutMode: 'structured',
         modularFocusInternalLayout: 'adaptive-compass',
         modularFocusHeadingOrder: 'crossing-optimized',
+        modularFocusMacroLayout: 'directional-bands',
+        modularFocusSoftFolderStrength: 50,
         showExperimentalAllHierarchy: false,
         trackpadZoomMode: 'pinch-zoom',
       },

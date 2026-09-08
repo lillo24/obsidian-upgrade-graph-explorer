@@ -676,6 +676,10 @@ h2 {
   background: #f9fbfc;
 }
 
+.graph-settings__choice-group > .global-layout-strength {
+  display: grid;
+}
+
 .global-layout-strength > span,
 .global-layout-strength > small {
   display: flex;

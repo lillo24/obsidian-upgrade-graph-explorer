@@ -1731,6 +1731,7 @@ export function validateSerializedFocusSchematicFolderBandPlan(
   modulePlan: FocusSchematicLayoutPlan,
   candidate: FocusSchematicLayoutCandidate,
   plan: FocusSchematicFolderBandPlan,
+  rootAnchor: 'module' | 'file' = 'module',
 ): FocusSchematicEndpointValidationResult<FocusSchematicFolderBandPlan> {
   const issues: { path: string; message: string }[] = [];
   const rootModule = input.model.modules.find(
@@ -2002,10 +2003,16 @@ export function validateSerializedFocusSchematicFolderBandPlan(
       message: 'Directional folder-band summary is inconsistent.',
     });
   const rootRectangle = candidateById.get(input.model.rootModuleId);
-  if (rootRectangle === undefined || centerY(rootRectangle) !== 0)
+  const rootFileRectangle = candidate.nodes.find(
+    ({ projectionNodeId }) =>
+      projectionNodeId === rootModule?.documentProjectionNodeId,
+  );
+  const rootAnchorRectangle =
+    rootAnchor === 'file' ? rootFileRectangle : rootRectangle;
+  if (rootAnchorRectangle === undefined || centerY(rootAnchorRectangle) !== 0)
     issues.push({
       path: '$.candidate.modules',
-      message: 'Directional Folder Bands moved the root away from Y=0.',
+      message: 'The active macro layout moved the root anchor away from Y=0.',
     });
   if (plan.enabled) {
     const rootBand = plan.bands.find(({ root }) => root);

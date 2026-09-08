@@ -148,6 +148,7 @@ import {
 } from '../persistence/storage';
 import {
   loadGraphPreferences,
+  normalizeModularFocusSoftFolderStrength,
   saveGraphPreferences,
   type FocusHierarchyImplementation,
   type GraphPreferences,
@@ -497,6 +498,8 @@ export function GraphExplorer({
     localLayoutMode,
     modularFocusHeadingOrder,
     modularFocusInternalLayout,
+    modularFocusMacroLayout,
+    modularFocusSoftFolderStrength,
     trackpadZoomMode,
     showExperimentalAllHierarchy,
   } = preferences;
@@ -2750,6 +2753,21 @@ export function GraphExplorer({
     },
     [updateGraphPreferences],
   );
+  const changeModularFocusMacroLayout = useCallback(
+    (layout: GraphPreferences['modularFocusMacroLayout']) => {
+      updateGraphPreferences({ modularFocusMacroLayout: layout });
+    },
+    [updateGraphPreferences],
+  );
+  const changeModularFocusSoftFolderStrength = useCallback(
+    (strength: number) => {
+      updateGraphPreferences({
+        modularFocusSoftFolderStrength:
+          normalizeModularFocusSoftFolderStrength(strength),
+      });
+    },
+    [updateGraphPreferences],
+  );
   const changeLocalLayoutMode = useCallback(
     (mode: LocalLayoutMode) => {
       if (
@@ -3771,6 +3789,8 @@ export function GraphExplorer({
             focusHierarchyImplementation={focusHierarchyImplementation}
             modularFocusHeadingOrder={modularFocusHeadingOrder}
             modularFocusInternalLayout={modularFocusInternalLayout}
+            modularFocusMacroLayout={modularFocusMacroLayout}
+            modularFocusSoftFolderStrength={modularFocusSoftFolderStrength}
             showExperimentalAllHierarchy={showExperimentalAllHierarchy}
             onShowExperimentalAllHierarchyChange={
               changeExperimentalAllHierarchy
@@ -3790,6 +3810,10 @@ export function GraphExplorer({
             onModularFocusHeadingOrderChange={changeModularFocusHeadingOrder}
             onModularFocusInternalLayoutChange={
               changeModularFocusInternalLayout
+            }
+            onModularFocusMacroLayoutChange={changeModularFocusMacroLayout}
+            onModularFocusSoftFolderStrengthChange={
+              changeModularFocusSoftFolderStrength
             }
             onGlobalLayoutSettingsChange={changeGlobalLayoutSettings}
             onOpenChange={changeSettingsOpen}
@@ -3983,6 +4007,10 @@ export function GraphExplorer({
                   focusHierarchyImplementation={focusHierarchyImplementation}
                   modularFocusHeadingOrder={modularFocusHeadingOrder}
                   modularFocusInternalLayout={modularFocusInternalLayout}
+                  modularFocusMacroLayout={modularFocusMacroLayout}
+                  modularFocusSoftFolderStrength={
+                    modularFocusSoftFolderStrength
+                  }
                   showExperimentalAllHierarchy={showExperimentalAllHierarchy}
                   onShowExperimentalAllHierarchyChange={
                     changeExperimentalAllHierarchy
@@ -4004,6 +4032,12 @@ export function GraphExplorer({
                   }
                   onModularFocusInternalLayoutChange={
                     changeModularFocusInternalLayout
+                  }
+                  onModularFocusMacroLayoutChange={
+                    changeModularFocusMacroLayout
+                  }
+                  onModularFocusSoftFolderStrengthChange={
+                    changeModularFocusSoftFolderStrength
                   }
                   onGlobalLayoutSettingsChange={changeGlobalLayoutSettings}
                   onOpenChange={changeSettingsOpen}
@@ -4275,6 +4309,8 @@ export function GraphExplorer({
                 focusAppearance={focusAppearance}
                 endpointOrderPolicy={modularFocusHeadingOrder}
                 internalLayoutVariant={modularFocusInternalLayout}
+                macroLayout={modularFocusMacroLayout}
+                softFolderStrength={modularFocusSoftFolderStrength}
                 {...(localTransitionAnchor === undefined
                   ? {}
                   : { initialTransitionAnchor: localTransitionAnchor })}

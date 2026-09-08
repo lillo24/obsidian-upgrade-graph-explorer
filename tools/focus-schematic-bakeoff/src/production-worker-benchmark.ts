@@ -16,6 +16,7 @@ import {
 import { createLayoutInput } from './dimensions';
 
 type Profile = 'small' | 'medium' | 'hub' | 'supersession';
+type MacroLayout = 'directional-bands' | 'soft-folder-clusters';
 
 function profileFromArgs(): Profile {
   const index = process.argv.indexOf('--profile');
@@ -23,6 +24,21 @@ function profileFromArgs(): Profile {
   if (!['small', 'medium', 'hub', 'supersession'].includes(value ?? ''))
     throw new Error('Expected --profile small|medium|hub|supersession.');
   return value as Profile;
+}
+
+function macroFromArgs(): MacroLayout {
+  const index = process.argv.indexOf('--macro');
+  const value = index < 0 ? 'directional-bands' : process.argv[index + 1];
+  if (value !== 'directional-bands' && value !== 'soft-folder-clusters')
+    throw new Error('Expected --macro directional-bands|soft-folder-clusters.');
+  return value;
+}
+
+function strengthFromArgs(): number {
+  const index = process.argv.indexOf('--strength');
+  const value = index < 0 ? 50 : Number(process.argv[index + 1]);
+  if (!Number.isFinite(value)) throw new Error('Expected numeric --strength.');
+  return Math.min(100, Math.max(0, value));
 }
 
 function hubSpec(moduleCount: number): EndpointFixtureSpec {
@@ -49,6 +65,7 @@ function hubSpec(moduleCount: number): EndpointFixtureSpec {
 
 function inputFor(
   profile: Exclude<Profile, 'supersession'>,
+  macroLayout: MacroLayout,
 ): FocusSchematicLayoutInput {
   const fixture =
     profile === 'small'
@@ -58,16 +75,28 @@ function inputFor(
             ENDPOINT_FIXTURES.find(({ id }) => id === 'EP22')!,
           )
         : buildEndpointFixture(hubSpec(120));
-  return createLayoutInput(fixture, FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS);
+  return createLayoutInput(fixture, {
+    ...FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
+    directionalFolderBandsEnabled: macroLayout === 'directional-bands',
+  });
 }
 
-function request(input: FocusSchematicLayoutInput, requestId = 1) {
+function request(
+  input: FocusSchematicLayoutInput,
+  requestId = 1,
+  macroLayout: MacroLayout = 'directional-bands',
+  softFolderStrength = 50,
+) {
   return {
     protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
     requestId,
     kind: 'layout',
     input,
-    policies: DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+    policies: {
+      ...DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+      macroLayout,
+      softFolderStrength,
+    },
   } satisfies FocusSchematicLayoutWorkerRequest;
 }
 
@@ -104,21 +133,37 @@ async function runWorker(item: FocusSchematicLayoutWorkerRequest): Promise<{
 
 async function main() {
   const profile = profileFromArgs();
+  const macroLayout = macroFromArgs();
+  const softFolderStrength = strengthFromArgs();
   if (profile === 'supersession') {
-    const firstRequest = request(inputFor('hub'), 1);
+    const firstRequest = request(
+      inputFor('hub', macroLayout),
+      1,
+      macroLayout,
+      softFolderStrength,
+    );
     const first = new Worker(
       new URL('./production-worker-thread.ts', import.meta.url),
       { workerData: firstRequest, execArgv: process.execArgv },
     );
     const startedAt = performance.now();
     await first.terminate();
-    const second = await runWorker(request(inputFor('small'), 2));
+    const second = await runWorker(
+      request(
+        inputFor('small', macroLayout),
+        2,
+        macroLayout,
+        softFolderStrength,
+      ),
+    );
     if (second.response.kind !== 'success')
       throw new Error(second.response.message);
     console.log(
       JSON.stringify(
         {
           profile,
+          macroLayout,
+          softFolderStrength,
           supersededRequestTerminated: true,
           adoptedRequestId: second.response.requestId,
           computeMs: second.response.computeMs,
@@ -131,14 +176,18 @@ async function main() {
     );
     return;
   }
-  const input = inputFor(profile);
-  const result = await runWorker(request(input));
+  const input = inputFor(profile, macroLayout);
+  const result = await runWorker(
+    request(input, 1, macroLayout, softFolderStrength),
+  );
   if (result.response.kind !== 'success')
     throw new Error(result.response.message);
   console.log(
     JSON.stringify(
       {
         profile,
+        macroLayout,
+        softFolderStrength,
         modules: input.model.modules.length,
         projectedNodes: input.projection.nodes.length,
         projectedEdges: input.projection.edges.length,
@@ -146,6 +195,7 @@ async function main() {
         roundTripMs: result.roundTripMs,
         mainThreadGapProbe: 'covered by the browser client runtime metric',
         phaseTimings: result.response.timings,
+        softClusterEvidence: result.response.softClusterEvidence,
       },
       null,
       2,

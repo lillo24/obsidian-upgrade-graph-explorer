@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
   ENDPOINT_FIXTURES,
   FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
   FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
   buildEndpointFixture,
-  computeFocusSchematicComputedLayoutAttempt,
   type FocusSchematicLayoutInput,
   type FocusSchematicLayoutWorkerRequest,
 } from '@icarus-graph-explorer/focus-schematic-layout';
+import { handleFocusSchematicLayoutWorkerRequest } from '@icarus-graph-explorer/focus-schematic-layout/worker-runtime';
 
 import {
   createFocusSchematicLayoutWorkerClient,
@@ -70,20 +71,13 @@ class FakeWorker implements FocusSchematicLayoutWorkerTransport {
 
   succeed(): void {
     const request = this.requests.at(-1)!;
-    const attempt = computeFocusSchematicComputedLayoutAttempt(
-      request.input,
-      request.policies,
+    let clock = 0;
+    const response = handleFocusSchematicLayoutWorkerRequest(
+      request,
+      () => (clock += 5),
     );
-    if (attempt.status !== 'success') throw new Error(attempt.reason);
     this.onmessage?.({
-      data: {
-        protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
-        requestId: request.requestId,
-        kind: 'success',
-        result: attempt.result,
-        timings: attempt.timings,
-        computeMs: 5,
-      },
+      data: response,
     } as MessageEvent<unknown>);
   }
 }
@@ -157,6 +151,58 @@ describe('Focus Schematic worker client', () => {
     workers[3]!.succeed();
     expect(await requests[3]).toMatchObject({ status: 'success' });
     expect(workers[3]!.terminated).toBe(false);
+  });
+
+  it('adopts only the latest result across rapid strength and macro switches', async () => {
+    const { service, workers } = harness();
+    const softInput: FocusSchematicLayoutInput = {
+      ...input,
+      settings: {
+        ...input.settings,
+        directionalFolderBandsEnabled: false,
+      },
+    };
+    const softPolicy = (softFolderStrength: number) =>
+      ({
+        ...DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+        macroLayout: 'soft-folder-clusters',
+        softFolderStrength,
+      }) as const;
+    const strengthRequests = [0, 25, 50, 75, 100].map((strength) =>
+      service.layoutLatest(softInput, softPolicy(strength)),
+    );
+    expect(await Promise.all(strengthRequests.slice(0, 4))).toEqual([
+      { status: 'superseded' },
+      { status: 'superseded' },
+      { status: 'superseded' },
+      { status: 'superseded' },
+    ]);
+    workers[4]!.succeed();
+    expect(await strengthRequests[4]).toMatchObject({
+      status: 'success',
+      metrics: { softClusterEvidence: { strength: 100 } },
+    });
+
+    const macroRequests = [
+      service.layoutLatest(
+        input,
+        DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+      ),
+      service.layoutLatest(softInput, softPolicy(50)),
+      service.layoutLatest(
+        input,
+        DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+      ),
+    ];
+    expect(await Promise.all(macroRequests.slice(0, 2))).toEqual([
+      { status: 'superseded' },
+      { status: 'superseded' },
+    ]);
+    workers.at(-1)!.succeed();
+    const finalMacro = await macroRequests[2]!;
+    expect(finalMacro.status).toBe('success');
+    if (finalMacro.status === 'success')
+      expect(finalMacro.metrics.softClusterEvidence).toBeUndefined();
   });
 
   it('ignores a stale response before adopting the current request', async () => {

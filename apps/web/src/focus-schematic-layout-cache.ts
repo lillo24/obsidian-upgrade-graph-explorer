@@ -1,15 +1,17 @@
 import {
   DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
   FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION,
+  FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION,
   FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
   focusSchematicLayoutMatchesProductPolicies,
+  normalizeFocusSchematicSoftFolderStrength,
   validateFocusSchematicComputedLayout,
   type FocusSchematicComputedLayout,
   type FocusSchematicLayoutInput,
   type FocusSchematicProductLayoutPolicies,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 
-const SELECTED_ALGORITHM_ID = 'A1-directional-folder-bands-adaptive-internals';
+const SELECTED_ALGORITHM_ID = 'modular-focus-hierarchy';
 
 export interface FocusSchematicLayoutCacheLookup {
   readonly status: 'hit' | 'miss' | 'invalid';
@@ -42,8 +44,18 @@ export function exactFocusSchematicLayoutCacheKey(
   return JSON.stringify({
     protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
     algorithm: SELECTED_ALGORITHM_ID,
-    algorithmVersion: selectedAlgorithmVersion,
+    algorithmVersion:
+      policies.macroLayout === 'soft-folder-clusters'
+        ? FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION
+        : selectedAlgorithmVersion,
     policies: {
+      macroLayout: policies.macroLayout,
+      softFolderStrength:
+        policies.macroLayout === 'soft-folder-clusters'
+          ? normalizeFocusSchematicSoftFolderStrength(
+              policies.softFolderStrength,
+            )
+          : null,
       endpointOrderPolicy: policies.endpointOrderPolicy,
       internalLayoutVariant: policies.internalLayoutVariant,
     },

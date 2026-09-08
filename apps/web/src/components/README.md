@@ -310,3 +310,12 @@ longer in the current projection. A fatal first result asks GraphExplorer for a
 session-only Classic fallback without changing the persisted preview choice.
 `GraphExplorer.tsx` owns the presentation switch and semantic transition anchor;
 switching implementations creates no navigation-history entry.
+
+HIER4B-LIVE keeps Directional Bands as that preview's default and adds Soft
+Folder Clusters as a Sandbox-only macro policy. `GraphSettings.tsx` exposes the
+conditional 0–100 Folder strength slider alongside the existing Compass/Spine
+and Crossing/Document controls. `ModularStructuredGraphView.tsx` sends the
+normalized policy to the dedicated worker and keys the bounded cache by only
+geometry-relevant values. Disclosure, reroot, filtering, exact hover, Secondary
+presentation, and camera behavior continue through the existing projection and
+React Flow seams.

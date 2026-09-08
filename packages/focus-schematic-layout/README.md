@@ -135,11 +135,12 @@ the bakeoff evidence if changed.
 - `src/folder-fixtures.ts` owns the inherited FB1–FB18 and FS1–FS8 evidence plus
   DB1–DB19, VS1–VS7, and CP1–CP5 categorical folder, internal grammar,
   true-block, span, Secondary, and reroot review cases.
-- `src/soft-clusters.ts` owns the separate development-only HIER4B 2D macro
+- `src/soft-clusters.ts` owns the experimental HIER4B 2D macro
   solver: undirected primary springs, hop-radius preference, exact-folder
   centroid attraction, deterministic seeding, variable-rectangle collision
-  packing, and bounded two-round internal-layout evidence. It is not called by
-  the selected production or worker paths.
+  packing, and bounded two-round internal-layout evidence. The Modular worker
+  calls it only when the persisted Sandbox macro policy selects Soft Folder
+  Clusters; Directional Bands remains the default.
 - `src/soft-cluster-fixtures.ts` owns SC1–SC24 plus SC17–SC19 stability pairs.
 - `src/source-order.ts` derives public Dagre adjacent-sibling constraints from
   canonical source order.
@@ -147,7 +148,8 @@ the bakeoff evidence if changed.
   placeholder policy.
 - `src/selected.ts` maps the accepted A1 computed result to the compatible
   selected candidate/attempt API.
-- `src/worker-protocol.ts` owns the version-2 exact-shape production messages
+- `src/worker-protocol.ts` owns the version-4 exact-shape production messages,
+  macro/strength policy normalization, Soft runtime evidence,
   and originating-input result validation.
 - `src/worker-runtime.ts` validates requests, computes A1, records phase
   timings, and returns either a complete validated result or an explicit

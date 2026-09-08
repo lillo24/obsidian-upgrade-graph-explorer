@@ -7,6 +7,7 @@ import {
   buildEndpointFixture,
   computeFocusSchematicComputedLayout,
   computeFocusSchematicComputedLayoutAttempt,
+  computeFocusSchematicSoftClusterLayoutAttempt,
   type FocusSchematicLayoutInput,
   type FocusSchematicProductLayoutPolicies,
 } from '@icarus-graph-explorer/focus-schematic-layout';
@@ -34,10 +35,10 @@ describe('page-lifetime Focus Schematic layout cache', () => {
   it('uses the exact algorithm/model/projection/dimension/settings input', () => {
     const input = fixtureInput();
     const key = exactFocusSchematicLayoutCacheKey(input);
-    expect(key).toContain('A1-directional-folder-bands-adaptive-internals');
+    expect(key).toContain('modular-focus-hierarchy');
     expect(key).toContain('"algorithmVersion":3');
-    expect(key).toContain('"protocolVersion":3');
-    expect(key.replace('"protocolVersion":3', '"protocolVersion":2')).not.toBe(
+    expect(key).toContain('"protocolVersion":4');
+    expect(key.replace('"protocolVersion":4', '"protocolVersion":3')).not.toBe(
       key,
     );
     expect(exactFocusSchematicLayoutCacheKey(input, 1)).not.toBe(key);
@@ -70,18 +71,22 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     const cache = new FocusSchematicLayoutCache();
     const policies: FocusSchematicProductLayoutPolicies[] = [
       {
+        ...DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
         internalLayoutVariant: 'adaptive-compass',
         endpointOrderPolicy: 'crossing-optimized',
       },
       {
+        ...DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
         internalLayoutVariant: 'adaptive-compass',
         endpointOrderPolicy: 'document-order',
       },
       {
+        ...DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
         internalLayoutVariant: 'vertical-spine',
         endpointOrderPolicy: 'crossing-optimized',
       },
       {
+        ...DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
         internalLayoutVariant: 'vertical-spine',
         endpointOrderPolicy: 'document-order',
       },
@@ -136,6 +141,65 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     expect(exactFocusSchematicLayoutCacheKey(layoutRelevantChange)).not.toBe(
       exactFocusSchematicLayoutCacheKey(input),
     );
+  });
+
+  it('keys Soft strength only when Soft Clusters is active and restores prior strengths', () => {
+    const directionalInput = fixtureInput(4);
+    const softInput = {
+      ...directionalInput,
+      settings: {
+        ...directionalInput.settings,
+        directionalFolderBandsEnabled: false,
+      },
+    };
+    const directionalLow = {
+      ...DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+      softFolderStrength: 0,
+    };
+    const directionalHigh = {
+      ...DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+      softFolderStrength: 100,
+    };
+    expect(
+      exactFocusSchematicLayoutCacheKey(directionalInput, directionalLow),
+    ).toBe(
+      exactFocusSchematicLayoutCacheKey(directionalInput, directionalHigh),
+    );
+
+    const cache = new FocusSchematicLayoutCache();
+    const policiesAt = (softFolderStrength: number) =>
+      ({
+        ...DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+        macroLayout: 'soft-folder-clusters',
+        softFolderStrength,
+      }) as const;
+    const at25 = computeFocusSchematicSoftClusterLayoutAttempt(softInput, {
+      strength: 25,
+    });
+    const at75 = computeFocusSchematicSoftClusterLayoutAttempt(softInput, {
+      strength: 75,
+    });
+    if (at25.status !== 'success' || at75.status !== 'success')
+      throw new Error('Expected Soft Cluster cache fixtures to compute.');
+    cache.set(softInput, policiesAt(25), at25.result);
+    cache.set(softInput, policiesAt(75), at75.result);
+    expect(cache.get(softInput, policiesAt(25))).toMatchObject({
+      status: 'hit',
+      value: at25.result,
+    });
+    expect(cache.get(softInput, policiesAt(75))).toMatchObject({
+      status: 'hit',
+      value: at75.result,
+    });
+    expect(
+      exactFocusSchematicLayoutCacheKey(softInput, policiesAt(25)),
+    ).not.toBe(exactFocusSchematicLayoutCacheKey(softInput, policiesAt(75)));
+    expect(
+      exactFocusSchematicLayoutCacheKey(
+        directionalInput,
+        DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+      ),
+    ).not.toBe(exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)));
   });
 
   it('keeps selection, hover, visual style, viewport, and secondary display outside the key', () => {

@@ -74,6 +74,8 @@ export interface FocusSchematicInternalLayoutEvidence {
   readonly largeModuleFallbackCount: number;
   readonly moduleMetrics: readonly FocusSchematicInternalLayoutModuleMetrics[];
   readonly metrics: FocusSchematicInternalLayoutQualityMetrics;
+  /** Deterministic policy identity for the experimental HIER4B macro layout. */
+  readonly softClusterPolicyEvidence?: FocusSchematicSoftClusterPolicyEvidence;
 }
 
 export interface FocusSchematicNodeDimension {
@@ -262,8 +264,15 @@ export interface FocusSchematicComputedLayoutOptions {
   readonly internalLayoutVariant?: FocusSchematicInternalLayoutVariant;
 }
 
-/** Development-only HIER4B macro-layout strength. */
-export type FocusSchematicSoftClusterStrength = 0 | 25 | 50 | 75 | 100;
+/** Normalized development-only HIER4B macro-layout strength in [0, 100]. */
+export type FocusSchematicSoftClusterStrength = number;
+
+export interface FocusSchematicSoftClusterPolicyEvidence {
+  readonly schemaVersion: 1;
+  readonly layoutFamily: 'soft-folder-clusters';
+  readonly strength: FocusSchematicSoftClusterStrength;
+  readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
+}
 
 export interface FocusSchematicSoftClusterOptions {
   readonly strength?: FocusSchematicSoftClusterStrength;
@@ -311,6 +320,7 @@ export interface FocusSchematicSoftClusterEvidence {
   readonly developmentOnly: true;
   readonly layoutFamily: 'soft-folder-clusters';
   readonly strength: FocusSchematicSoftClusterStrength;
+  readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
   readonly folderInfluenceEnabled: boolean;
   readonly topologyDirectionality: 'undirected-primary';
   readonly secondaryGeometryInfluence: 0;
@@ -326,6 +336,7 @@ export type FocusSchematicSoftClusterLayoutAttempt =
       readonly configId: string;
       readonly result: FocusSchematicComputedLayout;
       readonly evidence: FocusSchematicSoftClusterEvidence;
+      readonly timings: FocusSchematicEndpointLayoutPhaseTimings;
     }
   | {
       readonly status: 'failure';

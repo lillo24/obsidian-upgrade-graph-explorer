@@ -56,6 +56,7 @@ pnpm benchmark:focus-schematic-production-worker -- --profile small
 pnpm benchmark:focus-schematic-production-worker -- --profile medium
 pnpm benchmark:focus-schematic-production-worker -- --profile hub
 pnpm benchmark:focus-schematic-production-worker -- --profile supersession
+pnpm benchmark:focus-schematic-production-worker -- --profile medium --macro soft-folder-clusters --strength 50
 
 pnpm benchmark:focus-schematic-directional-folder-bands -- --profile all --out output/hier4a-directional-folder-bands-benchmark.json
 pnpm benchmark:focus-schematic-internal-layout -- --out output/hier4a-fix2-internal-layout-benchmark.json
@@ -100,9 +101,10 @@ adjacent keyboard-accessible list. Generated output is gitignored.
 - `src/endpoint-attempt-worker.ts` bounds the 500-module A1 hub attempt.
 - `src/endpoint-lab.ts` generates the focused self-contained HIER3A review
   surface with EP1–EP26 and ES1–ES8.
-- `src/production-worker-benchmark.ts` measures the production HIER3B protocol
-  through real Node worker threads for small, medium, hub, and supersession
-  profiles without defining a timing gate.
+- `src/production-worker-benchmark.ts` measures the production HIER3B/HIER4B
+  protocol through real Node worker threads for small, medium, hub, and
+  supersession profiles under either macro policy without defining a timing
+  gate.
 - `src/production-worker-thread.ts` hosts the production runtime for that
   worker-thread benchmark.
 - `src/folder-benchmark.ts` compares categorical Off/On across FB1–FB18,

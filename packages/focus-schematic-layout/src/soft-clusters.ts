@@ -13,6 +13,8 @@ import {
   createFocusSchematicEndpointAttachments,
   evaluateFocusSchematicEndpointLayoutQuality,
 } from './endpoint-facing';
+import { evaluateFocusSchematicFolderBandQuality } from './folder-bands';
+import { normalizeFocusSchematicSoftFolderStrength } from './policies';
 import type {
   FocusSchematicComputedLayout,
   FocusSchematicEndpointPlan,
@@ -27,6 +29,7 @@ import type {
 export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE = [
   36, 18,
 ] as const;
+export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 1 as const;
 
 const STRATEGY_ID = 'HIER4B-soft-folder-clusters' as const;
 const HOP_SPACING = 520;
@@ -659,14 +662,17 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
   input: FocusSchematicLayoutInput,
   options: FocusSchematicSoftClusterOptions = {},
 ): FocusSchematicSoftClusterLayoutAttempt {
-  const strength = options.strength ?? 50;
+  const strength = normalizeFocusSchematicSoftFolderStrength(options.strength);
   const internalLayoutVariant =
     options.internalLayoutVariant ?? 'adaptive-compass';
-  const configId = `HIER4B-soft-clusters-s${strength}-${internalLayoutVariant}-${options.endpointOrderPolicy ?? 'crossing-optimized'}`;
+  const endpointOrderPolicy =
+    options.endpointOrderPolicy ?? 'crossing-optimized';
+  const configId = `HIER4B-soft-clusters-s${strength}-${internalLayoutVariant}-${endpointOrderPolicy}`;
   const started = performance.now();
   try {
     const baseAttempt = computeFocusSchematicRevision2LayoutAttempt(input);
     if (baseAttempt.status !== 'success') throw new Error(baseAttempt.reason);
+    const softStarted = performance.now();
     const base = baseAttempt.result;
     const pairs = primaryPairs(base.endpointPlan);
     const moduleIds = base.candidate.modules
@@ -686,7 +692,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       base.endpointPlan,
       candidate,
       internalLayoutVariant,
-      options.endpointOrderPolicy ?? 'crossing-optimized',
+      endpointOrderPolicy,
       stats,
     );
     const firstRegions = branchRegions(input, candidate);
@@ -710,7 +716,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       base.endpointPlan,
       candidate,
       internalLayoutVariant,
-      options.endpointOrderPolicy ?? 'crossing-optimized',
+      endpointOrderPolicy,
       stats,
     );
     const secondRegions = branchRegions(input, candidate);
@@ -747,25 +753,20 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
     const churn = [...secondRegions].filter(
       ([id, region]) => firstRegions.get(id) !== region,
     ).length;
-    const result: FocusSchematicComputedLayout = {
-      ...base,
+    const folderBandQuality = evaluateFocusSchematicFolderBandQuality(
+      input,
+      base.modulePlan,
+      base.folderBandPlan,
       candidate,
-      attachments,
+      base.quality,
       quality,
-      internalLayoutEvidence: createFocusSchematicInternalLayoutEvidence(
-        input,
-        base.endpointPlan,
-        candidate,
-        base.candidate,
-        internalLayoutVariant,
-        stats,
-      ),
-    };
+    );
     const evidence: FocusSchematicSoftClusterEvidence = {
       schemaVersion: 1,
       developmentOnly: true,
       layoutFamily: 'soft-folder-clusters',
       strength,
+      endpointOrderPolicy,
       folderInfluenceEnabled: strength > 0,
       topologyDirectionality: 'undirected-primary',
       secondaryGeometryInfluence: 0,
@@ -789,8 +790,38 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
         compassBranchRegionChurn: churn,
         collisionCheckCount: relaxation.collisionCheckCount,
         collisionCorrectionCount: relaxation.collisionCorrectionCount,
-        layoutMs: performance.now() - started,
+        layoutMs: performance.now() - softStarted,
       },
+    };
+    const result: FocusSchematicComputedLayout = {
+      ...base,
+      candidate,
+      attachments,
+      quality,
+      folderBandQuality,
+      internalLayoutEvidence: {
+        ...createFocusSchematicInternalLayoutEvidence(
+          input,
+          base.endpointPlan,
+          candidate,
+          base.candidate,
+          internalLayoutVariant,
+          stats,
+        ),
+        softClusterPolicyEvidence: {
+          schemaVersion: 1,
+          layoutFamily: 'soft-folder-clusters',
+          strength,
+          endpointOrderPolicy,
+        },
+      },
+    };
+    const timings = {
+      ...baseAttempt.timings,
+      macroMs: baseAttempt.timings.macroMs + evidence.runtime.layoutMs,
+      outputSerializedBytes: new TextEncoder().encode(JSON.stringify(result))
+        .byteLength,
+      totalMs: performance.now() - started,
     };
     return {
       status: 'success',
@@ -798,6 +829,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       configId,
       result,
       evidence,
+      timings,
     };
   } catch (error) {
     return {

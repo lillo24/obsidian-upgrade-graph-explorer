@@ -1055,6 +1055,22 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(canonicalize(value));
 }
 
+function validSoftClusterPolicyEvidence(
+  evidence: FocusSchematicComputedLayout['internalLayoutEvidence']['softClusterPolicyEvidence'],
+): boolean {
+  if (evidence === undefined) return true;
+  if (evidence === null || typeof evidence !== 'object') return false;
+  return (
+    evidence.schemaVersion === 1 &&
+    evidence.layoutFamily === 'soft-folder-clusters' &&
+    Number.isFinite(evidence.strength) &&
+    evidence.strength >= 0 &&
+    evidence.strength <= 100 &&
+    (evidence.endpointOrderPolicy === 'crossing-optimized' ||
+      evidence.endpointOrderPolicy === 'document-order')
+  );
+}
+
 export function validateFocusSchematicComputedLayout(
   input: FocusSchematicLayoutInput,
   value: unknown,
@@ -1123,16 +1139,21 @@ export function validateFocusSchematicComputedLayout(
     computed.internalLanePlan,
   );
   if (!laneValidation.valid) return laneValidation;
+  const internalEvidence = computed.internalLayoutEvidence;
+  const softClusterEvidence = internalEvidence?.softClusterPolicyEvidence;
   const folderPlanValidation = validateSerializedFocusSchematicFolderBandPlan(
     input,
     computed.modulePlan,
     computed.candidate,
     computed.folderBandPlan,
+    softClusterEvidence === undefined ? 'module' : 'file',
   );
   if (!folderPlanValidation.valid) return folderPlanValidation;
-  const internalEvidence = computed.internalLayoutEvidence;
   const expectedInternalVariant =
-    computed.folderBandPlan.optimization?.internalLayoutVariant ?? 'current';
+    softClusterEvidence === undefined
+      ? (computed.folderBandPlan.optimization?.internalLayoutVariant ??
+        'current')
+      : internalEvidence.variant;
   if (
     internalEvidence === null ||
     typeof internalEvidence !== 'object' ||
@@ -1145,7 +1166,12 @@ export function validateFocusSchematicComputedLayout(
     internalEvidence.jointFolderRoundLimit !== 2 ||
     internalEvidence.jointFolderRounds > 2 ||
     !Number.isSafeInteger(internalEvidence.largeModuleFallbackCount) ||
-    internalEvidence.largeModuleFallbackCount < 0
+    internalEvidence.largeModuleFallbackCount < 0 ||
+    !validSoftClusterPolicyEvidence(softClusterEvidence) ||
+    (softClusterEvidence !== undefined &&
+      (input.settings.directionalFolderBandsEnabled ||
+        computed.folderBandPlan.enabled ||
+        internalEvidence.variant === 'current'))
   )
     return {
       valid: false,

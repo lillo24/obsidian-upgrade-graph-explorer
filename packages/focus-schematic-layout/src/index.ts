@@ -72,6 +72,7 @@ export {
 export {
   computeFocusSchematicSoftClusterLayout,
   computeFocusSchematicSoftClusterLayoutAttempt,
+  FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION,
   FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE,
 } from './soft-clusters';
 export {

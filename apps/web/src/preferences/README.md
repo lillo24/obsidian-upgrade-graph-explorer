@@ -50,6 +50,13 @@ to Classic. Reset Sandbox restores Classic while leaving Trackpad Zoom and the
 Local Free/Structured choice intact. This is product exposure only: it does not
 enter workspace state, history, projection, or persisted coordinates.
 
+HIER4B-LIVE adds `modularFocusMacroLayout` and
+`modularFocusSoftFolderStrength` to that same v1 record. Missing or malformed
+macro values resolve to Directional Bands. Numeric strength clamps to 0–100;
+invalid values resolve to 50. Strength is retained while Directional Bands is
+active but has no Directional geometry or cache influence. Reset Sandbox
+restores Directional Bands and 50 together with the existing Modular defaults.
+
 SPACING1B-QA keeps separate All Network and Focus Network density-framing
 strengths outside this durable record. Both start at 100% on every application
 launch and exist only to compare legacy ratio 1 with each production density

@@ -1,10 +1,26 @@
 # HIER4B validation
 
-Status: **BAKEOFF READY — graphical decision pending.**
+Status: **LIVE PREVIEW READY — real-vault graphical decision pending.**
 
 The HIER4B evidence is synthetic and development-only. It compares the new
 Soft Folder Clusters macro layout with the unchanged production Directional
 Folder Bands implementation on the same Focus Schematic inputs.
+
+The real Modular worker now also dispatches both macro families. A committed
+source-neutral fixture covers a Focus File with five Heading branches, repeated
+and singleton exact folders, incoming and outgoing references, Secondary
+context, and a direct File reference. Worker validation covers all eight
+macro/internal/Heading-order combinations plus Soft strengths 0, 50, and 100.
+Directional results are compared byte-for-byte with the unchanged HIER4A call.
+Cache tests prove Soft 25 and Soft 75 are distinct, that returning to 25 restores
+the exact 25 geometry, and that stored Soft strength does not change the
+Directional key. Browser-client tests terminate obsolete generations across
+0→25→50→75→100 and Directional→Soft→Directional bursts.
+
+Preferences remain in the existing v1 record. Tests cover the Directional/50/
+Adaptive/Crossing defaults, Soft/75/Spine/Document round-trip, Sandbox reset,
+numeric clamping, and invalid-value fallback. Real-vault timing and interaction
+evidence is aggregate and local only.
 
 ## Fixture coverage
 

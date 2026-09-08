@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ENDPOINT_FIXTURES,
+  SOFT_CLUSTER_FIXTURES,
   FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
   buildEndpointFixture,
   computeFocusSchematicComputedLayout,
+  computeFocusSchematicSoftClusterLayoutAttempt,
   type EndpointFixtureSpec,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 
@@ -108,6 +110,45 @@ function highlightedReferenceIds(
 }
 
 describe('production Focus Schematic React Flow mapping', () => {
+  it('maps the worker-selected Soft Cluster geometry while Secondary remains presentation-only', () => {
+    const fixture = buildEndpointFixture(
+      SOFT_CLUSTER_FIXTURES.find(({ id }) => id === 'SC20')!,
+    );
+    const layoutInput = {
+      model: fixture.model,
+      projection: fixture.projection,
+      nodeDimensions: focusSchematicNodeDimensions(
+        fixture.projection,
+        fixture.model,
+      ),
+      settings: {
+        ...FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+        directionalFolderBandsEnabled: false,
+      },
+    };
+    const attempt = computeFocusSchematicSoftClusterLayoutAttempt(layoutInput, {
+      strength: 50,
+      internalLayoutVariant: 'adaptive-compass',
+      endpointOrderPolicy: 'crossing-optimized',
+    });
+    if (attempt.status !== 'success') throw new Error(attempt.reason);
+    const render = (secondaryRelationshipsVisible: boolean) =>
+      prepareFocusSchematicRendererGraph({
+        projection: fixture.projection,
+        model: fixture.model,
+        layoutInput,
+        computedLayout: attempt.result,
+        rootEntityId: fixture.model.rootModuleId,
+        secondaryRelationshipsVisible,
+      });
+    const hidden = render(false);
+    const visible = render(true);
+    expect(visible.edges.length).toBeGreaterThan(hidden.edges.length);
+    expect(visible.nodes.map(({ id, position }) => ({ id, position }))).toEqual(
+      hidden.nodes.map(({ id, position }) => ({ id, position })),
+    );
+  });
+
   it.each(['EP2', 'EP3', 'EP4', 'EP12'])(
     'maps exact File/Heading/Block endpoints and A1 positions for %s',
     (fixtureId) => {

@@ -1,4 +1,5 @@
 import { computeFocusSchematicComputedLayoutAttempt } from './endpoint-facing';
+import { computeFocusSchematicSoftClusterLayoutAttempt } from './soft-clusters';
 import {
   FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
   FocusSchematicLayoutProtocolError,
@@ -40,10 +41,20 @@ export function handleFocusSchematicLayoutWorkerRequest(
       candidateRequestId = Number(value.requestId);
     }
     const request = validateFocusSchematicLayoutWorkerRequest(value);
-    const attempt = computeFocusSchematicComputedLayoutAttempt(
-      request.input,
-      request.policies,
-    );
+    const softAttempt =
+      request.policies.macroLayout === 'soft-folder-clusters'
+        ? computeFocusSchematicSoftClusterLayoutAttempt(request.input, {
+            strength: request.policies.softFolderStrength,
+            endpointOrderPolicy: request.policies.endpointOrderPolicy,
+            internalLayoutVariant: request.policies.internalLayoutVariant,
+          })
+        : null;
+    const attempt =
+      softAttempt ??
+      computeFocusSchematicComputedLayoutAttempt(
+        request.input,
+        request.policies,
+      );
     const computeMs = Math.max(0, now() - startedAt);
     if (attempt.status !== 'success') {
       return failure(
@@ -58,6 +69,8 @@ export function handleFocusSchematicLayoutWorkerRequest(
       requestId: request.requestId,
       kind: 'success',
       result: attempt.result,
+      softClusterEvidence:
+        softAttempt?.status === 'success' ? softAttempt.evidence : null,
       timings: attempt.timings,
       computeMs,
     };

@@ -457,6 +457,8 @@ describe('HIER4A categorical Directional Folder Bands', () => {
   it('is byte-identical across input permutation and the production worker boundary', () => {
     const input = run('DB11', true, 'crossing-optimized').input;
     const policies = {
+      macroLayout: 'directional-bands',
+      softFolderStrength: 50,
       endpointOrderPolicy: 'crossing-optimized',
       internalLayoutVariant: 'adaptive-compass',
     } as const;

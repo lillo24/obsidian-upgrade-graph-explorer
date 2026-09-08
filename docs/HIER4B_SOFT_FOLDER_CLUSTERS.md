@@ -1,11 +1,12 @@
 # HIER4B Soft Folder Clusters
 
-Status: **UNDER EVALUATION — development bakeoff only.**
+Status: **UNDER EVALUATION — live Modular Preview wired for real-vault QA.**
 
-HIER4B evaluates a second macro-layout family for Modular Focus Hierarchy. It
-does not change the production layout. Production remains HIER4A Adaptive
-Compass with Crossing optimized order and categorical Directional Folder
-Bands. Classic Focus Hierarchy also remains the product default until HIER3C.
+HIER4B evaluates a second macro-layout family for Modular Focus Hierarchy.
+Directional Folder Bands remains the Modular Preview default, and Classic Focus
+Hierarchy remains the product default until HIER3C. Soft Folder Clusters is now
+available only through the Sandbox/Experimental Modular macro-layout control so
+real-vault interaction can inform the later adoption decision.
 
 ## Semantic model
 
@@ -36,7 +37,8 @@ translation, so anchoring cannot introduce a collision.
 
 ## Strength
 
-The development API and lab expose `0`, `25`, `50`, `75`, and `100`. Strength
+The lab exposes `0`, `25`, `50`, `75`, and `100`; the live slider accepts every
+normalized value from 0 through 100 and starts at 50. Strength
 scales only exact-folder centroid attraction. At `0`, the solver never reads a
 folder key for seeding, placement, or packing; changing every folder identity
 therefore produces byte-identical macro geometry. `100` remains a soft force:
@@ -71,9 +73,17 @@ not perform HIER5 obstacle routing or HIER3C product-default work.
 
 `packages/focus-schematic-layout/src/soft-clusters.ts` owns the renderer-neutral
 solver and evidence. `soft-cluster-fixtures.ts` owns SC1–SC24 and the stability
-pairs. The bakeoff tool owns the JSON benchmark and the self-contained HTML
-lab. No React, renderer, Tauri, worker protocol, semantic model, or product
-setting imports the new layout family.
+pairs. The bakeoff tool continues to own the JSON benchmark and self-contained
+HTML lab. The version-4 Modular worker owns macro dispatch; React supplies only
+the persisted macro, normalized strength, internal-layout, and Heading-order
+policies. The exact page cache ignores stored strength for Directional Bands and
+includes it for Soft Folder Clusters.
+
+The real preview uses the current projection, module dimensions, exact endpoint
+plan, React Flow mapper, disclosure/reroot/filter behavior, and Secondary edge
+presentation. Strength and policy changes replace pending worker generations;
+layout remains stateless and the latest request is the only adoptable result.
+No private vault path, name, content, topology, or screenshot is committed.
 
 The adoption decision is deliberately open. Graphical review must choose one
 of `ADOPT_SOFT_FOLDER_CLUSTERS`, `SOFT_CLUSTERS_REQUIRE_TUNING`,

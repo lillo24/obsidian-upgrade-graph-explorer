@@ -1239,11 +1239,11 @@ direct-File hover target and narrow nested context own the non-geometric ring.
 remain unchanged by hover.
 
 HIER4A supersedes the original center-spine production geometry for Modular
-Preview. Its strict protocol-v3 worker receives persisted internal-layout and
-Heading-order policies. Adaptive Compass plus Crossing optimized are the
-defaults; Vertical Spine and Document order remain Sandbox alternatives. The
-exact cache keys all four combinations and algorithm revision 3. Current/Mosaic
-remains development-only.
+Preview. Its Directional Folder Bands geometry remains the default. The strict
+protocol-v4 worker now receives persisted macro-layout, normalized Soft
+strength, internal-layout, and Heading-order policies. Adaptive Compass plus
+Crossing optimized remain the defaults; Vertical Spine and Document order
+remain Sandbox alternatives. Current/Mosaic remains development-only.
 
 The same worker runs categorical Directional Folder Bands after signed-rank
 placement and in a bounded two-round refinement with module-local Compass. Final
@@ -1259,16 +1259,26 @@ Soft Folder Clusters, HIER5 retains Direct/Electronic orthogonal routing and
 overlapping-path hit-target separation, and HIER3C retains any product-default
 change.
 
-The HIER4B bakeoff keeps Soft Folder Clusters behind a separate renderer-neutral
-development API. It aggregates selected-backbone and Focus-path connections as
-undirected module pairs, uses minimum undirected Focus hops as a soft radial
-prior, and applies exact-folder centroid attraction only to repeated visible
-folders. A stable identity seed, fixed 36 + 18 relaxation schedule, bounded
-variable-rectangle collision pack, and two internal-layout rounds make the
-result stateless and reproducible. Authored arrows preserve direction while
-macro coordinates carry no incoming/outgoing meaning. No production worker,
-cache key, renderer setting, persisted preference, or Classic/Modular default
-changes until graphical review selects an outcome.
+The HIER4B bakeoff and lab retain the separate renderer-neutral Soft Folder
+Clusters API. The same solver is also available as a Sandbox-only macro choice
+inside the real Modular Preview for live-vault evaluation. It aggregates
+selected-backbone and Focus-path connections as undirected module pairs, uses
+minimum undirected Focus hops as a soft radial prior, and applies exact-folder
+centroid attraction only to repeated visible folders. A stable identity seed,
+fixed 36 + 18 relaxation schedule, bounded variable-rectangle collision pack,
+and two internal-layout rounds make the result stateless and reproducible.
+Authored arrows preserve direction while macro coordinates carry no incoming/
+outgoing meaning.
+
+The 24-entry exact cache includes macro family and includes normalized strength
+only for Soft Clusters, so changing stored strength cannot miss or perturb a
+Directional layout. Policy changes use the existing terminating
+latest-result-wins worker lifecycle. The worker response carries aggregate Soft
+solver, Compass, and collision evidence while computed geometry carries only a
+deterministic policy identity. The real projection continues to own disclosure,
+reroot, filters, hidden modules, and watcher updates; the renderer continues to
+own exact hover, Secondary edge presentation, and the camera. No Classic/
+Modular default changes until graphical review selects an outcome.
 
 Optimized desktop graphical QA approved the preview with visible module
 boundaries and confirmed exact endpoints, root/rank positioning, multi-hop
@@ -1276,8 +1286,9 @@ orientation, disclosure, implementation switching, secondary-edge geometry
 invariance, Inspector behavior, and current touchpad navigation. This completes
 HIER3B. Optimized desktop graphical approval on September 4, 2026, completes
 HIER3B-FIX1. The actual-browser HIER4A integration was approved and its optimized
-desktop check/build passed on September 8, 2026. HIER4B is under graphical
-evaluation; HIER5 follows HIER4B, and HIER3C follows HIER5.
+desktop check/build passed on September 8, 2026. HIER4B is under real-vault
+graphical evaluation through the live Modular Preview; HIER5 follows HIER4B,
+and HIER3C follows HIER5.
 
 ## HIER0 product exposure and geometry
 

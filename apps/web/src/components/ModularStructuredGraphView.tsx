@@ -11,11 +11,15 @@ import {
 import { createFocusSchematicModel } from '@icarus-graph-explorer/focus-schematic';
 import {
   FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
+  DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+  normalizeFocusSchematicSoftFolderStrength,
   type FocusSchematicComputedLayout,
   type FocusSchematicEndpointLayoutPhaseTimings,
   type FocusSchematicLayoutInput,
   type FocusSchematicProductInternalLayoutVariant,
   type FocusSchematicProductLayoutPolicies,
+  type FocusSchematicProductMacroLayout,
+  type FocusSchematicSoftClusterEvidence,
   type FocusSchematicEndpointOrderPolicy,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performance';
@@ -56,6 +60,8 @@ export interface ModularStructuredGraphViewProps {
   readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
   readonly initialTransitionAnchor?: GraphTransitionAnchor;
   readonly internalLayoutVariant: FocusSchematicProductInternalLayoutVariant;
+  readonly macroLayout: FocusSchematicProductMacroLayout;
+  readonly softFolderStrength: number;
   readonly instrumentation?: PerformanceInstrumentation;
   readonly onFatalFailure: (message: string) => void;
   readonly onFitRequestConsumed?: (key: number) => void;
@@ -172,6 +178,7 @@ function recordAttemptTimings(
 function recordAttemptEvidence(
   instrumentation: PerformanceInstrumentation | undefined,
   computed: FocusSchematicComputedLayout,
+  soft: FocusSchematicSoftClusterEvidence | undefined,
 ): void {
   const internal = computed.internalLayoutEvidence;
   const folder = computed.folderBandPlan.optimization;
@@ -191,6 +198,20 @@ function recordAttemptEvidence(
     'focus-schematic-crossing-evaluations',
     folder?.crossingMetricEvaluations ?? 0,
   );
+  if (soft !== undefined) {
+    instrumentation?.record(
+      'focus-schematic-soft-cluster-layout',
+      soft.runtime.layoutMs,
+    );
+    instrumentation?.record(
+      'focus-schematic-soft-cluster-collision-checks',
+      soft.runtime.collisionCheckCount,
+    );
+    instrumentation?.record(
+      'focus-schematic-soft-cluster-collision-corrections',
+      soft.runtime.collisionCorrectionCount,
+    );
+  }
 }
 
 function currentSafeGraph(
@@ -243,12 +264,14 @@ export default function ModularStructuredGraphView(
     endpointOrderPolicy,
     instrumentation,
     internalLayoutVariant,
+    macroLayout,
     onFatalFailure,
     onViewportObservation,
     projection,
     projectionState,
     projectionWorkspace,
     rootEntityId,
+    softFolderStrength,
   } = props;
   const workerService = useMemo(
     () => createFocusSchematicLayoutWorkerService(),
@@ -260,9 +283,23 @@ export default function ModularStructuredGraphView(
   const [retryKey, setRetryKey] = useState(0);
   const [lifecycle, setLifecycle] = useState<LifecycleState>({ phase: 'idle' });
   const fatalReported = useRef(false);
+  const effectiveSoftFolderStrength =
+    macroLayout === 'soft-folder-clusters'
+      ? normalizeFocusSchematicSoftFolderStrength(softFolderStrength)
+      : DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softFolderStrength;
   const layoutPolicies = useMemo<FocusSchematicProductLayoutPolicies>(
-    () => ({ endpointOrderPolicy, internalLayoutVariant }),
-    [endpointOrderPolicy, internalLayoutVariant],
+    () => ({
+      macroLayout,
+      softFolderStrength: effectiveSoftFolderStrength,
+      endpointOrderPolicy,
+      internalLayoutVariant,
+    }),
+    [
+      effectiveSoftFolderStrength,
+      endpointOrderPolicy,
+      internalLayoutVariant,
+      macroLayout,
+    ],
   );
 
   const model = useMemo(() => {
@@ -291,7 +328,10 @@ export default function ModularStructuredGraphView(
       model,
       projection,
       nodeDimensions,
-      settings: FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
+      settings: {
+        ...FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
+        directionalFolderBandsEnabled: macroLayout === 'directional-bands',
+      },
     });
 
     return instrumentation === undefined
@@ -301,7 +341,7 @@ export default function ModularStructuredGraphView(
           undefined,
           prepare,
         );
-  }, [instrumentation, model, nodeDimensions, projection]);
+  }, [instrumentation, macroLayout, model, nodeDimensions, projection]);
   const layoutKey = useMemo(() => {
     const serialize = () =>
       exactFocusSchematicLayoutCacheKey(layoutInput, layoutPolicies);
@@ -427,7 +467,11 @@ export default function ModularStructuredGraphView(
             return;
           }
           try {
-            recordAttemptEvidence(instrumentation, result.result);
+            recordAttemptEvidence(
+              instrumentation,
+              result.result,
+              result.metrics.softClusterEvidence,
+            );
             const graph = prepareGraph(result.result, false);
             focusSchematicLayoutCache.set(
               layoutInput,

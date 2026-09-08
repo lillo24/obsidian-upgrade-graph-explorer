@@ -6,6 +6,7 @@ import {
   type FocusSchematicEndpointLayoutPhaseTimings,
   type FocusSchematicLayoutInput,
   type FocusSchematicProductLayoutPolicies,
+  type FocusSchematicSoftClusterEvidence,
   type FocusSchematicLayoutWorkerRequest,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 
@@ -15,6 +16,7 @@ export interface FocusSchematicLayoutWorkerMetrics {
   readonly workerStartupMs: number;
   readonly mainThreadHighGapMs?: number;
   readonly timings?: FocusSchematicEndpointLayoutPhaseTimings;
+  readonly softClusterEvidence?: FocusSchematicSoftClusterEvidence;
 }
 
 export type FocusSchematicLayoutWorkerResult =
@@ -74,6 +76,7 @@ function metrics(
   workerStartupMs: number,
   mainThreadHighGapMs: number | undefined,
   timings?: FocusSchematicEndpointLayoutPhaseTimings,
+  softClusterEvidence?: FocusSchematicSoftClusterEvidence,
 ): FocusSchematicLayoutWorkerMetrics {
   return {
     workerComputeMs,
@@ -81,6 +84,7 @@ function metrics(
     workerStartupMs,
     ...(mainThreadHighGapMs === undefined ? {} : { mainThreadHighGapMs }),
     ...(timings === undefined ? {} : { timings }),
+    ...(softClusterEvidence === undefined ? {} : { softClusterEvidence }),
   };
 }
 
@@ -195,6 +199,9 @@ export function createFocusSchematicLayoutWorkerClient(
         request.workerStartupMs,
         request.finishResponsivenessProbe(),
         response.kind === 'success' ? response.timings : undefined,
+        response.kind === 'success'
+          ? (response.softClusterEvidence ?? undefined)
+          : undefined,
       );
       request.resolve(
         response.kind === 'success'
