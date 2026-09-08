@@ -121,7 +121,7 @@ describe.each(['global', 'local'] as const)(
       return { resolve, reject };
     }
 
-    it.each(['reference-only', 'chunked-prior'] as const)(
+    it.each(['reference-only', 'fixed-total-field'] as const)(
       'shows progress and clears visible status after %s succeeds',
       async (algorithm) => {
         const pending = await mount();
@@ -132,13 +132,24 @@ describe.each(['global', 'local'] as const)(
           pending.resolve(
             mode === 'global'
               ? {
-                  schemaVersion: 1,
+                  schemaVersion: 2,
                   kind: 'result',
                   requestId: 1,
                   positions: [],
                   computeMs: 1,
                   folderPriorMs: 0,
                   algorithm,
+                  policyVersion: 'global-fa2-folder-convergence-v1',
+                  macroVersion:
+                    algorithm === 'reference-only'
+                      ? 'global-folder-none-v1'
+                      : 'global-folder-fixed-field-v1',
+                  stopReason: 'degenerate',
+                  iterationsCompleted: 0,
+                  macroStepsCompleted: 0,
+                  stableMacroSteps: 0,
+                  finalMacroStepIterations: 0,
+                  finalMovement: null,
                   metrics: {
                     meanWithinFolderDistance: 0,
                     meanCrossFolderDistance: 0,

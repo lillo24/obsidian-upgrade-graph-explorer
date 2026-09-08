@@ -9,7 +9,11 @@ export type GlobalReferenceStatus =
 export type GlobalVisualLod = 'far' | 'regional' | 'near';
 export type GlobalSpacingPreset = 'compact' | 'normal' | 'spacious';
 export type GlobalFolderPriorAlgorithm =
-  'reference-only' | 'chunked-prior' | 'offset-field';
+  | 'reference-only'
+  | 'fixed-total-field'
+  /** Diagnostic-only legacy identities rejected by schema-v2 validation. */
+  | 'chunked-prior'
+  | 'offset-field';
 export type GlobalTrackpadZoomMode = 'scroll-zoom' | 'pinch-zoom';
 
 export interface GlobalLayoutCustomSettings {
@@ -169,11 +173,55 @@ export interface GlobalLayoutEdge {
   readonly weight: number;
 }
 
+export type GlobalConvergencePolicyVersion = 'global-fa2-folder-convergence-v1';
+export type GlobalFolderMacroVersion =
+  'global-folder-none-v1' | 'global-folder-fixed-field-v1';
+
+export interface GlobalConvergencePolicy {
+  readonly version: GlobalConvergencePolicyVersion;
+  readonly batchIterations: 32;
+  readonly allP90Threshold: 0.00512;
+  readonly lowDegreeMaximumThreshold: 0.01024;
+  readonly normalizedCentroidDriftThreshold: 0.00512;
+  readonly stableMacroStepsRequired: 3;
+  readonly maxIterations: number;
+  readonly centroidAlignment: 'centroid-translation-v1';
+  readonly scaleNormalization: 'previous-centroid-rms-v1';
+  readonly scaleFloor: 0.000001;
+  readonly maxWallTimeMs: 5000;
+}
+
+export interface GlobalFolderMacroPolicy {
+  readonly version: GlobalFolderMacroVersion;
+  readonly algorithm: GlobalFolderPriorAlgorithm;
+  readonly priorApplications: 0 | 1;
+  readonly feedback: 'output-only';
+}
+
+export interface GlobalConvergenceDistribution {
+  readonly count: number;
+  readonly p50: number | null;
+  readonly p90: number | null;
+  readonly maximum: number | null;
+}
+
+export interface GlobalConvergenceMovement {
+  readonly scale: number;
+  readonly all: GlobalConvergenceDistribution;
+  readonly degree0: GlobalConvergenceDistribution;
+  readonly degree1: GlobalConvergenceDistribution;
+  readonly degree2Plus: GlobalConvergenceDistribution;
+  readonly lowDegree: GlobalConvergenceDistribution;
+  readonly rawCentroidDrift: number;
+  readonly normalizedCentroidDrift: number;
+}
+
 export interface GlobalLayoutRequest {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly requestId: number;
   readonly algorithm: GlobalFolderPriorAlgorithm;
-  readonly iterations: number;
+  readonly policy: GlobalConvergencePolicy;
+  readonly macro: GlobalFolderMacroPolicy;
   readonly settings: GlobalLayoutSettings;
   readonly nodes: readonly GlobalLayoutNode[];
   readonly edges: readonly GlobalLayoutEdge[];
@@ -193,10 +241,18 @@ export interface GlobalFolderPriorMetrics {
 }
 
 export interface GlobalLayoutResult {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly kind: 'result';
   readonly requestId: number;
   readonly algorithm: GlobalFolderPriorAlgorithm;
+  readonly policyVersion: GlobalConvergencePolicyVersion;
+  readonly macroVersion: GlobalFolderMacroVersion;
+  readonly stopReason: 'stable' | 'max-iterations' | 'degenerate';
+  readonly iterationsCompleted: number;
+  readonly macroStepsCompleted: number;
+  readonly stableMacroSteps: number;
+  readonly finalMacroStepIterations: number;
+  readonly finalMovement: GlobalConvergenceMovement | null;
   readonly computeMs: number;
   readonly folderPriorMs: number;
   readonly positions: readonly GlobalLayoutPosition[];
@@ -204,9 +260,16 @@ export interface GlobalLayoutResult {
 }
 
 export interface GlobalLayoutFailure {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly kind: 'error';
   readonly requestId: number;
+  readonly code: 'max-wall-time' | 'layout-error';
+  readonly policyVersion: GlobalConvergencePolicyVersion;
+  readonly macroVersion: GlobalFolderMacroVersion;
+  readonly iterationsCompleted: number;
+  readonly macroStepsCompleted: number;
+  readonly finalMovement: GlobalConvergenceMovement | null;
+  readonly computeMs: number;
   readonly message: string;
 }
 

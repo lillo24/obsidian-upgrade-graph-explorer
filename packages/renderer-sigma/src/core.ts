@@ -18,6 +18,7 @@ export type {
 } from './interaction-contract';
 export {
   computeGlobalLayout,
+  createGlobalLayoutFailure,
   createGlobalLayoutRequest,
   createGlobalLayoutRequestFromAutomaticPositions,
   globalLayoutPositionsFromInput,
@@ -25,6 +26,31 @@ export {
   reconcileGlobalAutomaticPositions,
   warmGlobalRendererInput,
 } from './layout';
+export {
+  createGlobalConvergenceDegreeIndex,
+  createGlobalConvergencePolicy,
+  GLOBAL_CONVERGENCE_ALL_P90_THRESHOLD,
+  GLOBAL_CONVERGENCE_BATCH_ITERATIONS,
+  GLOBAL_CONVERGENCE_CENTROID_DRIFT_THRESHOLD,
+  GLOBAL_CONVERGENCE_LOW_DEGREE_MAXIMUM_THRESHOLD,
+  GLOBAL_CONVERGENCE_MAX_WALL_TIME_MS,
+  GLOBAL_CONVERGENCE_POLICY_VERSION,
+  GLOBAL_CONVERGENCE_SCALE_FLOOR,
+  GLOBAL_CONVERGENCE_STABLE_MACRO_STEPS_REQUIRED,
+  globalConvergenceBatchPlan,
+  globalConvergenceMacroStepIsStable,
+  globalConvergenceMaxIterations,
+  measureGlobalConvergenceMovement,
+  nextGlobalConvergenceStableMacroStepCount,
+  validateGlobalConvergencePolicy,
+} from './global-convergence';
+export {
+  createGlobalFolderMacroPolicy,
+  deriveGlobalFolderMacroSnapshot,
+  GLOBAL_FOLDER_FIXED_FIELD_VERSION,
+  GLOBAL_FOLDER_NONE_VERSION,
+  validateGlobalFolderMacroPolicy,
+} from './global-folder-macro';
 export { GlobalLayoutCache } from './layout-cache';
 export { GlobalSpatialInfluenceCache } from './spatial-influence-cache';
 export {

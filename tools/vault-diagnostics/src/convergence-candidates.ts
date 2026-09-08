@@ -11,6 +11,7 @@ import { MultiDirectedGraph } from 'graphology';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 
 import type { ConvergenceFixture } from './convergence-fixtures';
+import { currentFixedBaseline } from './global-convergence-candidates';
 import {
   measureDisplacement,
   measureLayoutQuality,
@@ -349,9 +350,8 @@ function productionPass(
       form: 'reuse',
     }).positions;
   }
-  const result = computeGlobalLayout({
+  const warmRequest = {
     ...fixture.request,
-    requestId,
     nodes: fixture.request.nodes.map((node) => {
       const position = byKey.get(node.key);
       if (position === undefined) {
@@ -359,7 +359,16 @@ function productionPass(
       }
       return { ...node, x: position.x, y: position.y };
     }),
-  });
+  };
+  if (fixture.request.algorithm === 'chunked-prior') {
+    return currentFixedBaseline({
+      id: fixture.id,
+      description: fixture.description,
+      category: 'folder',
+      request: warmRequest,
+    }).positions;
+  }
+  const result = computeGlobalLayout({ ...warmRequest, requestId });
   return result.positions;
 }
 

@@ -1292,6 +1292,27 @@ survivors and seeds only new nodes.
 
 This is finite off-main settlement, not continuous simulation or mathematical
 equilibrium. PHYSICS1 continues to own any persistent interactive simulation,
-reheating/cooling, and real temporary constraints. Global layout and SPATIAL2
-remain on their separate lifecycles; CONVERGENCE1C owns Global folder-macro
-convergence.
+reheating/cooling, and real temporary constraints.
+
+## CONVERGENCE1C Global folder-macro convergence
+
+All Network uses schema-v2 `global-fa2-folder-convergence-v1`. One replacement
+worker reuses one Graphology graph across public 32-iteration FA2 batches.
+Consecutive output snapshots are centroid-aligned and normalized by the
+previous-frame centroid RMS radius. Stability requires all-node p90 ≤ `0.00512`,
+degree-0/1 maximum ≤ `0.01024`, and normalized centroid drift ≤ `0.00512` for
+three full macro-steps. Caps are 640 / 120 / 80 by the ≤1,000 / ≤5,000 / >5,000
+node classes; a partial terminal batch adopts as `max-iterations` but cannot
+advance stability. The 5 s boundary produces a non-cacheable failure.
+
+Folder-on requests derive `global-folder-fixed-field-v1` after each FA2 batch.
+The fixed one-application cohesion/separation transform is output-only and is
+never written to the working FA2 graph. Extra convergence checks therefore do
+not accumulate folder strength. Reference-only requests use the same lifecycle
+with an identity macro. `global-layout-v2` fingerprints the complete policy,
+macro, topology, weights, and resolved physics while excluding seeds, visual
+settings, timing, camera/density, dynamic Pull, and fixed Place.
+
+The canvas still adopts one final base result through FLICKER1's atomic,
+camera-neutral coordinate transaction, then composes SPATIAL2 as base → dynamic
+Pull → fixed Place. SPATIAL2 dynamic convergence and PHYSICS1 remain separate.

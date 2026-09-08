@@ -565,6 +565,15 @@ claim mathematical equilibrium. PHYSICS1 still owns any future continuous
 interactive lifecycle, reheating/cooling, and real temporary-constraint
 adapter.
 
+All Network uses the separate `global-fa2-folder-convergence-v1` schema-v2
+policy. `global-convergence.ts` owns centroid-aligned movement, the low-degree
+and centroid-drift guards, three-step stability, 32-iteration batches, the
+640/120/80 caps, and 5 s safety boundary. `global-folder-macro.ts` owns the
+duration-independent `global-folder-fixed-field-v1` output adapter. It applies
+one current-prior-equivalent transform to snapshots only and never feeds folder
+coordinates back into the reused FA2 graph. `layout.ts` owns strict request,
+result, failure, rounding, metric, and `global-layout-v2` fingerprint contracts.
+
 The same GROUP1A map feeds Local Free. File, Heading, and Block base fills may
 use the accent; diagnostic colors and all edges remain unchanged. Root/LOD,
 hover, selection, and deemphasis stay authoritative. A style-map update uses

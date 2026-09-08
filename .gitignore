@@ -9,6 +9,7 @@ coverage/
 /output/hier3a-endpoint-lab/
 /tools/focus-schematic-bakeoff/output/
 /output/convergence1a/
+/output/convergence1c/
 *.tsbuildinfo
 .DS_Store
 *.local

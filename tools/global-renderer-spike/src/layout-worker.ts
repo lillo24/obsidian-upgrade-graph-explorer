@@ -31,8 +31,7 @@ export function createHarnessGlobalLayoutService(): GlobalLayoutService {
             try {
               const response = validateGlobalLayoutWorkerResponse(
                 event.data,
-                id,
-                request.nodes.map(({ key }) => key),
+                complete,
               );
               finish();
               if (response.kind === 'error') {

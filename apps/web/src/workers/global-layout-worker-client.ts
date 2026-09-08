@@ -20,7 +20,7 @@ export function createGlobalLayoutWorkerClient(options: {
   let active:
     | {
         readonly requestId: number;
-        readonly expectedNodeKeys: readonly string[];
+        readonly request: GlobalLayoutRequest;
         readonly resolve: (result: GlobalLayoutResult) => void;
         readonly reject: (error: Error) => void;
       }
@@ -70,7 +70,7 @@ export function createGlobalLayoutWorkerClient(options: {
       return new Promise((resolve, reject) => {
         active = {
           requestId,
-          expectedNodeKeys: request.nodes.map(({ key }) => key),
+          request: completeRequest,
           resolve,
           reject,
         };
@@ -81,8 +81,7 @@ export function createGlobalLayoutWorkerClient(options: {
           try {
             response = validateGlobalLayoutWorkerResponse(
               event.data,
-              requestId,
-              current.expectedNodeKeys,
+              current.request,
             );
           } catch (error: unknown) {
             rejectActive(
@@ -94,7 +93,9 @@ export function createGlobalLayoutWorkerClient(options: {
           terminate();
           if (response.kind === 'error') {
             reject(
-              new Error(`The Global layout worker failed: ${response.message}`),
+              new Error(
+                `The Global layout worker failed (${response.code}): ${response.message}`,
+              ),
             );
           } else resolve(response);
         };

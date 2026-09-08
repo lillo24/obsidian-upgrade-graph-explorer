@@ -1496,7 +1496,7 @@ export class GlobalRendererSession {
     service: GlobalLayoutService,
     input: GlobalRendererInput,
     settings: GlobalLayoutSettings,
-    iterations: number,
+    _iterations: number,
     automaticPositions: readonly GlobalLayoutPosition[],
   ): Promise<GlobalRendererMeasurement> {
     const started = performance.now();
@@ -1505,7 +1505,6 @@ export class GlobalRendererSession {
       createGlobalLayoutRequestFromAutomaticPositions(
         input,
         settings,
-        iterations,
         automaticPositions,
       ),
     );

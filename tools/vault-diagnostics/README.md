@@ -48,6 +48,8 @@ src/
   convergence-candidates.ts Public-batch runners and bounded stopping-policy evaluation.
   forceatlas2-convergence-analysis.ts CONVERGENCE1A evidence and self-contained SVG/HTML generator.
   convergence-*.test.ts Metric invariants, fixtures, and diagnostic lifecycle contracts.
+  global-convergence-candidates.ts CONVERGENCE1C M0/M1/M2/M3 macro runners and fixture matrix.
+  global-convergence-analysis.ts CONVERGENCE1C gate, JSON evidence, and self-contained HTML comparison.
   performance-benchmark.ts Repeated versioned pipeline/projection/renderer/inspection results.
   query-projection-benchmark.ts PERFQ1A projection phases, operations, and repeated-query evidence.
   performance-policy.ts Class budgets plus measured KG12B worker/cache decisions.

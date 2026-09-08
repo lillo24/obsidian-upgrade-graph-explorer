@@ -1,318 +1,181 @@
 import { describe, expect, it } from 'vitest';
 
-import { GlobalLayoutCache } from './layout-cache';
+import {
+  createGlobalConvergencePolicy,
+  globalConvergenceBatchPlan,
+} from './global-convergence';
 import {
   computeGlobalLayout,
+  createGlobalLayoutFailure,
   createGlobalLayoutRequest,
   globalLayoutFingerprint,
-  warmGlobalRendererInput,
+  validateGlobalLayoutWorkerResponse,
 } from './layout';
 import { mapProjectionToGlobal } from './mapping';
-import {
-  customGlobalLayoutSettings,
-  DEFAULT_GLOBAL_LAYOUT_SETTINGS,
-  withFolderClusteringStrength,
-  resolveGlobalLayoutSettings,
-  validateGlobalLayoutSettings,
-} from './settings';
+import { DEFAULT_GLOBAL_LAYOUT_SETTINGS } from './settings';
 import { globalTestProjection } from './test-fixture';
 
-function request(
-  algorithm: 'reference-only' | 'chunked-prior' | 'offset-field',
-) {
-  const settings = {
-    ...DEFAULT_GLOBAL_LAYOUT_SETTINGS,
-    folderClustering: algorithm !== 'reference-only',
-  };
+function request(folderClustering = false) {
+  const settings = { ...DEFAULT_GLOBAL_LAYOUT_SETTINGS, folderClustering };
   return {
     ...createGlobalLayoutRequest(
       mapProjectionToGlobal(globalTestProjection(), settings),
       settings,
-      20,
-      algorithm,
     ),
     requestId: 1,
   } as const;
 }
 
-function positionDistance(
-  positions: readonly {
-    readonly key: string;
-    readonly x: number;
-    readonly y: number;
-  }[],
-  leftKey: string,
-  rightKey: string,
-): number {
-  const left = positions.find(({ key }) => key === leftKey)!;
-  const right = positions.find(({ key }) => key === rightKey)!;
-  return Math.hypot(left.x - right.x, left.y - right.y);
-}
-
-function referencePullRequest(linkForce: number) {
-  const settings = {
-    folderClustering: false,
-    spacingPreset: 'normal' as const,
-    custom: {
-      ...customGlobalLayoutSettings('normal'),
-      linkForce,
-    },
-  };
-  return {
-    schemaVersion: 1 as const,
-    requestId: 1,
-    algorithm: 'reference-only' as const,
-    iterations: 200,
-    settings,
-    nodes: [
-      { key: 'root', x: 0, y: 0, size: 1 },
-      { key: 'reference', x: 8, y: 1, size: 1 },
-      { key: 'other', x: -5, y: 3, size: 1 },
-    ],
-    edges: [
-      {
-        key: 'reference-edge',
-        source: 'root',
-        target: 'reference',
-        weight: 4,
+describe('Global bounded layout convergence', () => {
+  it('derives schema-v2 policy and duration-independent macro identity centrally', () => {
+    expect(request(false)).toMatchObject({
+      schemaVersion: 2,
+      algorithm: 'reference-only',
+      policy: {
+        version: 'global-fa2-folder-convergence-v1',
+        batchIterations: 32,
+        maxIterations: 640,
       },
-      {
-        key: 'ordinary-edge',
-        source: 'root',
-        target: 'other',
-        weight: 1,
-      },
-    ],
-  };
-}
-
-describe('Global folder-aware layout', () => {
-  it('maps weak, default, and strong Reference Pull to increasing Global attraction', () => {
-    const weak = computeGlobalLayout(referencePullRequest(0.25));
-    const normal = computeGlobalLayout(referencePullRequest(1));
-    const strong = computeGlobalLayout(referencePullRequest(2));
-    const weakDistance = positionDistance(weak.positions, 'root', 'reference');
-    const normalDistance = positionDistance(
-      normal.positions,
-      'root',
-      'reference',
-    );
-    const strongDistance = positionDistance(
-      strong.positions,
-      'root',
-      'reference',
-    );
-
-    expect(normalDistance).toBeLessThan(weakDistance);
-    expect(strongDistance).toBeLessThan(normalDistance);
-  });
-
-  it('keeps Off reference-only and changes positions rather than edges when On', () => {
-    const baseline = computeGlobalLayout(request('reference-only'));
-    const clustered = computeGlobalLayout(request('chunked-prior'));
-    expect(baseline.algorithm).toBe('reference-only');
-    expect(clustered.algorithm).toBe('chunked-prior');
-    expect(clustered.positions).not.toEqual(baseline.positions);
-    expect(clustered.positions).toHaveLength(
-      request('chunked-prior').nodes.length,
-    );
-  });
-
-  it('is deterministic and compares both documented soft-prior candidates', () => {
-    const chunked = computeGlobalLayout(request('chunked-prior'));
-    const repeated = computeGlobalLayout(request('chunked-prior'));
-    const offset = computeGlobalLayout(request('offset-field'));
-    expect(chunked.positions).toEqual(repeated.positions);
-    expect(chunked.metrics).toEqual(repeated.metrics);
-    expect(offset.positions).not.toEqual(chunked.positions);
-    expect(chunked.metrics.meanCrossFolderReferenceLength).toBeGreaterThan(0);
-    expect(offset.metrics.meanCrossFolderReferenceLength).toBeGreaterThan(0);
-  });
-
-  it.each([0, 100])(
-    'keeps folder strength %i finite, deterministic, and topology-neutral',
-    (strength) => {
-      const base = request('chunked-prior');
-      const settings = withFolderClusteringStrength(base.settings, strength);
-      const configured = { ...base, settings };
-      const first = computeGlobalLayout(configured);
-      const repeated = computeGlobalLayout(configured);
-
-      expect(repeated.positions).toEqual(first.positions);
-      expect(
-        first.positions.every(
-          ({ x, y }) => Number.isFinite(x) && Number.isFinite(y),
-        ),
-      ).toBe(true);
-      expect(configured.edges).toEqual(base.edges);
-    },
-  );
-
-  it('keeps strong cross-folder reference edges influential at maximum strength', () => {
-    const base = request('chunked-prior');
-    const settings = withFolderClusteringStrength(base.settings, 100);
-    const ordinary = computeGlobalLayout({ ...base, settings });
-    const strong = computeGlobalLayout({
-      ...base,
-      settings,
-      edges: base.edges.map((edge) =>
-        edge.key === 'edge-ac' ? { ...edge, weight: 40 } : edge,
-      ),
+      macro: { version: 'global-folder-none-v1', priorApplications: 0 },
     });
-
-    expect(strong.positions).not.toEqual(ordinary.positions);
-    expect(strong.metrics.meanCrossFolderReferenceLength).toBeGreaterThan(0);
+    expect(request(true)).toMatchObject({
+      algorithm: 'fixed-total-field',
+      macro: {
+        version: 'global-folder-fixed-field-v1',
+        priorApplications: 1,
+        feedback: 'output-only',
+      },
+    });
   });
 
-  it('validates presets and every custom bound', () => {
-    for (const preset of ['compact', 'normal', 'spacious'] as const) {
-      expect(
-        resolveGlobalLayoutSettings({
-          folderClustering: true,
-          spacingPreset: preset,
-        }).spacingPreset,
-      ).toBe(preset);
-      expect(customGlobalLayoutSettings(preset).nodeSize).toBeGreaterThan(0);
-    }
-    expect(() =>
-      validateGlobalLayoutSettings({
-        ...DEFAULT_GLOBAL_LAYOUT_SETTINGS,
-        custom: {
-          ...customGlobalLayoutSettings('normal'),
-          folderCohesion: 2,
+  it('reuses one graph through full batches and accepts stable output atomically', () => {
+    const batches: number[] = [];
+    const result = computeGlobalLayout(request(false), {
+      assignBatch: (_graph, iterations) => batches.push(iterations),
+    });
+    expect(batches).toEqual([32, 32, 32]);
+    expect(result).toMatchObject({
+      stopReason: 'stable',
+      iterationsCompleted: 96,
+      macroStepsCompleted: 3,
+      stableMacroSteps: 3,
+    });
+  });
+
+  it('plans a partial final cap explicitly', () => {
+    expect(globalConvergenceBatchPlan(1_001)).toEqual([32, 32, 32, 24]);
+    expect(globalConvergenceBatchPlan(5_001)).toEqual([32, 32, 16]);
+  });
+
+  it('executes and accepts the final partial cap without calling it stable', () => {
+    const base = request(false);
+    const nodes = Array.from({ length: 1_001 }, (_, index) => ({
+      key: `node-${index}`,
+      x: index % 17,
+      y: index % 31,
+      size: 1,
+    }));
+    const batches: number[] = [];
+    const result = computeGlobalLayout(
+      {
+        ...base,
+        nodes,
+        edges: [],
+        policy: createGlobalConvergencePolicy(nodes.length),
+      },
+      {
+        assignBatch: (graph, iterations) => {
+          batches.push(iterations);
+          graph.forEachNode((key, value) =>
+            graph.mergeNodeAttributes(key, {
+              x: value.x + (Number(key.slice(5)) % 2 === 0 ? 1 : -1),
+            }),
+          );
         },
-      }),
-    ).toThrow('folderCohesion');
+      },
+    );
+    expect(batches).toEqual([32, 32, 32, 24]);
+    expect(result).toMatchObject({
+      stopReason: 'max-iterations',
+      iterationsCompleted: 120,
+      macroStepsCompleted: 4,
+      finalMacroStepIterations: 24,
+    });
   });
 
-  it('fingerprints topology, folder and settings but not warm-seed coordinates', () => {
-    const base = request('chunked-prior');
-    const movedSeed = {
+  it('turns a between-step timeout into non-success worker evidence', () => {
+    let clock = 0;
+    const complete = request(false);
+    let failure;
+    try {
+      computeGlobalLayout(complete, {
+        maxWallTimeMs: 5,
+        now: () => (clock += 3),
+        assignBatch: (graph) =>
+          graph.forEachNode((key, value) =>
+            graph.mergeNodeAttributes(key, { x: value.x + key.length }),
+          ),
+      });
+    } catch (error: unknown) {
+      failure = createGlobalLayoutFailure(complete, error);
+    }
+    expect(failure).toMatchObject({
+      kind: 'error',
+      code: 'max-wall-time',
+      iterationsCompleted: 32,
+      macroStepsCompleted: 1,
+    });
+    expect(failure).not.toHaveProperty('positions');
+  });
+
+  it('never feeds folder correction back into the FA2 graph', () => {
+    const frames: string[] = [];
+    computeGlobalLayout(request(true), {
+      assignBatch: (graph) =>
+        frames.push(JSON.stringify(graphPositions(graph))),
+    });
+    expect(new Set(frames).size).toBe(1);
+  });
+
+  it('is deterministic and reports centroid drift separately', () => {
+    const first = computeGlobalLayout(request(true));
+    const second = computeGlobalLayout(request(true));
+    expect(second.positions).toEqual(first.positions);
+    expect(second.finalMovement).toEqual(first.finalMovement);
+    expect(first.finalMovement?.normalizedCentroidDrift).toBeGreaterThanOrEqual(
+      0,
+    );
+  });
+
+  it('strictly validates the originating request identity', () => {
+    const complete = request(false);
+    const result = computeGlobalLayout(complete);
+    expect(validateGlobalLayoutWorkerResponse(result, complete)).toEqual(
+      result,
+    );
+    expect(() =>
+      validateGlobalLayoutWorkerResponse(
+        { ...result, macroVersion: 'global-folder-fixed-field-v1' },
+        complete,
+      ),
+    ).toThrow('policy identity');
+  });
+
+  it('uses v2 identity while excluding warm coordinates', () => {
+    const base = request(true);
+    const moved = {
       ...base,
       nodes: base.nodes.map((node) => ({ ...node, x: node.x + 99 })),
     };
-    const movedFolder = {
-      ...base,
-      nodes: base.nodes.map((node, index) =>
-        index === 0 ? { ...node, folderKey: 'renamed' } : node,
-      ),
-    };
-    const changedSettings = {
-      ...base,
-      settings: { ...base.settings, spacingPreset: 'spacious' as const },
-    };
-    expect(globalLayoutFingerprint(movedSeed)).toBe(
-      globalLayoutFingerprint(base),
-    );
-    expect(globalLayoutFingerprint(movedFolder)).not.toBe(
-      globalLayoutFingerprint(base),
-    );
-    expect(globalLayoutFingerprint(changedSettings)).not.toBe(
-      globalLayoutFingerprint(base),
-    );
-  });
-
-  it('fingerprints only settings and topology consumed by current physics', () => {
-    const baselineSettings = {
-      folderClustering: true,
-      spacingPreset: 'normal' as const,
-      custom: customGlobalLayoutSettings('normal'),
-    };
-    const makeRequest = (settings: typeof baselineSettings) =>
-      createGlobalLayoutRequest(
-        mapProjectionToGlobal(globalTestProjection(), settings),
-        settings,
-        20,
-      );
-    const baseline = makeRequest(baselineSettings);
-    for (const [key, value] of [
-      ['nodeSize', 8],
-      ['referenceDegreeSizeInfluence', 90],
-      ['linkThickness', 1.8],
-      ['labelThreshold', 13],
-    ] as const) {
-      const visual = makeRequest({
-        ...baselineSettings,
-        custom: { ...baselineSettings.custom, [key]: value },
-      });
-      expect(globalLayoutFingerprint(visual), key).toBe(
-        globalLayoutFingerprint(baseline),
-      );
-      expect(visual.edges.map(({ weight }) => weight)).toEqual(
-        baseline.edges.map(({ weight }) => weight),
-      );
-    }
-    for (const [key, value] of [
-      ['linkForce', 1.4],
-      ['folderCohesion', 0.12],
-      ['withinFolderSpacing', 1.8],
-      ['betweenFolderSpacing', 5],
-    ] as const) {
-      const physics = makeRequest({
-        ...baselineSettings,
-        custom: { ...baselineSettings.custom, [key]: value },
-      });
-      expect(globalLayoutFingerprint(physics), key).not.toBe(
-        globalLayoutFingerprint(baseline),
-      );
-    }
-    expect(
-      globalLayoutFingerprint({
-        ...baseline,
-        settings: { ...baselineSettings, folderClustering: false },
-        algorithm: 'reference-only',
-      }),
-    ).not.toBe(globalLayoutFingerprint(baseline));
-  });
-
-  it('keeps transported node size inert while ForceAtlas2 adjustSizes is disabled', () => {
-    const baseline = request('chunked-prior');
-    const resized = {
-      ...baseline,
-      nodes: baseline.nodes.map((node, index) => ({
-        ...node,
-        size: node.size + index + 100,
-      })),
-    };
-
-    expect(computeGlobalLayout(resized).positions).toEqual(
-      computeGlobalLayout(baseline).positions,
-    );
-    expect(globalLayoutFingerprint(resized)).toBe(
-      globalLayoutFingerprint(baseline),
-    );
-  });
-
-  it('provides exact memory-only LRU hits and bounded eviction', () => {
-    const cache = new GlobalLayoutCache(2);
-    const positions = [{ key: 'a', x: 1, y: 2 }] as const;
-    cache.set('one', positions);
-    cache.set('two', positions);
-    expect(cache.get('one')).toEqual(positions);
-    cache.set('three', positions);
-    expect(cache.get('two')).toBeUndefined();
-    expect(cache.get('one')).toEqual(positions);
-    expect(cache.size).toBe(2);
-  });
-
-  it('warms a remounted renderer from an exact cached position set', () => {
-    const input = mapProjectionToGlobal(
-      globalTestProjection(),
-      DEFAULT_GLOBAL_LAYOUT_SETTINGS,
-    );
-    const positions = input.nodes.map((node, index) => ({
-      key: node.key,
-      x: index + 20,
-      y: index - 20,
-    }));
-
-    const warmed = warmGlobalRendererInput(input, positions);
-
-    expect(
-      warmed.nodes.map(({ attributes }) => [attributes.x, attributes.y]),
-    ).toEqual(positions.map(({ x, y }) => [x, y]));
-    expect(() => warmGlobalRendererInput(input, positions.slice(1))).toThrow(
-      'does not match the projected nodes',
-    );
+    expect(globalLayoutFingerprint(base)).toMatch(/^global-layout-v2-/);
+    expect(globalLayoutFingerprint(moved)).toBe(globalLayoutFingerprint(base));
   });
 });
+
+function graphPositions(graph: {
+  mapNodes: <T>(
+    callback: (key: string, value: { x: number; y: number }) => T,
+  ) => T[];
+}) {
+  return graph.mapNodes((key, value) => ({ key, x: value.x, y: value.y }));
+}
