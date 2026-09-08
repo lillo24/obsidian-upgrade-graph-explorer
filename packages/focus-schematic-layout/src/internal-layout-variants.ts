@@ -58,6 +58,7 @@ export interface FocusSchematicInternalLayoutRunStats {
   completeCompassAssignmentsEvaluated: number;
   placementCandidatesEvaluated: number;
   localRelocationSweeps: number;
+  largeModuleFallbackCount: number;
   readonly optimizedModuleIds: Set<string>;
 }
 
@@ -67,6 +68,7 @@ export function createFocusSchematicInternalLayoutRunStats(): FocusSchematicInte
     completeCompassAssignmentsEvaluated: 0,
     placementCandidatesEvaluated: 0,
     localRelocationSweeps: 0,
+    largeModuleFallbackCount: 0,
     optimizedModuleIds: new Set(),
   };
 }
@@ -873,6 +875,7 @@ function compassAssignments(
         ),
       );
   } else {
+    stats.largeModuleFallbackCount += 1;
     const initial = new Map<ProjectionNodeId, CompassRegion>();
     let topHeight = 0;
     let bottomHeight = 0;
@@ -1090,7 +1093,7 @@ export function createFocusSchematicInternalLayoutEvidence(
 ): FocusSchematicInternalLayoutEvidence {
   return {
     variant,
-    developmentOnly: true,
+    developmentOnly: variant === 'current',
     verticalSpinePlacementCandidateCap:
       FOCUS_SCHEMATIC_VERTICAL_SPINE_PLACEMENT_CANDIDATE_CAP,
     compassAssignmentCap: FOCUS_SCHEMATIC_COMPASS_ASSIGNMENT_CAP,
@@ -1103,6 +1106,7 @@ export function createFocusSchematicInternalLayoutEvidence(
       stats.completeCompassAssignmentsEvaluated,
     placementCandidatesEvaluated: stats.placementCandidatesEvaluated,
     localRelocationSweeps: stats.localRelocationSweeps,
+    largeModuleFallbackCount: stats.largeModuleFallbackCount,
     moduleMetrics: candidate.modules
       .flatMap((module) => {
         const metrics = moduleMetrics(input, candidate, module.moduleId);

@@ -7,7 +7,10 @@ import {
   INTERNAL_LAYOUT_FIXTURES,
 } from './folder-fixtures';
 import { computeFocusSchematicComputedLayoutAttempt } from './endpoint-facing';
-import { FOCUS_SCHEMATIC_LAYOUT_SETTINGS } from './settings';
+import {
+  FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+  FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
+} from './settings';
 import { layoutInput } from './test-helpers';
 import type {
   FocusSchematicEndpointOrderPolicy,
@@ -64,7 +67,7 @@ function rootModuleMetrics(
 }
 
 describe('HIER4A-FIX2 internal File-module layout bakeoff', () => {
-  it('keeps product Folder Bands Off on the exact Current oracle', () => {
+  it('keeps the development Folder Bands Off oracle on exact Current geometry', () => {
     const spec = fixture('DB12');
     const current = runSpec(spec, 'current', 'crossing-optimized', false);
     for (const variant of ['vertical-spine', 'adaptive-compass'] as const) {
@@ -78,6 +81,43 @@ describe('HIER4A-FIX2 internal File-module layout bakeoff', () => {
       expect(comparison.attempt.configId).toBe(current.attempt.configId);
     }
   });
+
+  it('uses the approved production defaults across folder and multi-module fixtures', () => {
+    for (const id of ['DB5', 'DB11', 'DB12', 'FB4', 'DB14', 'DB19']) {
+      const spec = fixture(id);
+      const input = layoutInput(
+        buildEndpointFixture(spec),
+        FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
+      );
+      const before = JSON.stringify(input);
+      const attempt = computeFocusSchematicComputedLayoutAttempt(input);
+      expect(attempt.status, id).toBe('success');
+      if (attempt.status !== 'success') continue;
+      expect(attempt.result.folderBandPlan.enabled, id).toBe(true);
+      expect(attempt.result.internalLayoutEvidence.variant, id).toBe(
+        'adaptive-compass',
+      );
+      expect(
+        attempt.result.folderBandPlan.optimization?.endpointOrderPolicy,
+        id,
+      ).toBe('crossing-optimized');
+      expect(attempt.result.quality.moduleOverlapPairs, id).toEqual([]);
+      expect(attempt.result.quality.nodeOverlapPairs, id).toEqual([]);
+      expect(JSON.stringify(input), id).toBe(before);
+    }
+
+    const multiModuleInput = layoutInput(
+      buildEndpointFixture(fixture('DB17')),
+      FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
+    );
+    const multiModule =
+      computeFocusSchematicComputedLayoutAttempt(multiModuleInput);
+    expect(multiModule.status).toBe('success');
+    if (multiModule.status === 'success')
+      expect(
+        multiModule.result.internalLayoutEvidence.modulesOptimized,
+      ).toBeGreaterThanOrEqual(3);
+  }, 30_000);
 
   it('keeps both candidates finite, contained, deterministic, and hard-gate safe', () => {
     const inherited = ['DB5', 'DB11', 'DB12', 'DB14', 'DB19', 'FB4'];
@@ -168,6 +208,7 @@ describe('HIER4A-FIX2 internal File-module layout bakeoff', () => {
     expect(many.localRelocationSweeps).toBeLessThanOrEqual(
       many.compassLocalRelocationSweepLimit * many.jointFolderRoundLimit,
     );
+    expect(many.largeModuleFallbackCount).toBeGreaterThan(0);
 
     const compassWidth = rootModuleMetrics(
       run('CP4', 'adaptive-compass').attempt.result,

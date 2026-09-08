@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ENDPOINT_FIXTURES,
   FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
-  FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+  FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
   buildEndpointFixture,
   computeFocusSchematicComputedLayoutAttempt,
   type FocusSchematicLayoutInput,
@@ -34,7 +34,7 @@ const input: FocusSchematicLayoutInput = {
           ? { width: 184, height: 72 }
           : { width: 152, height: 64 }),
     })),
-  settings: FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+  settings: FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
 };
 
 class FakeWorker implements FocusSchematicLayoutWorkerTransport {
@@ -70,7 +70,10 @@ class FakeWorker implements FocusSchematicLayoutWorkerTransport {
 
   succeed(): void {
     const request = this.requests.at(-1)!;
-    const attempt = computeFocusSchematicComputedLayoutAttempt(request.input);
+    const attempt = computeFocusSchematicComputedLayoutAttempt(
+      request.input,
+      request.policies,
+    );
     if (attempt.status !== 'success') throw new Error(attempt.reason);
     this.onmessage?.({
       data: {

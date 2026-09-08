@@ -22,11 +22,11 @@ export const FOCUS_SCHEMATIC_FOLDER_BAND_PLAN_SCHEMA_VERSION = 4 as const;
 export type FocusSchematicFilteredModulePolicy =
   'compact-bridge' | 'context-card';
 
-/** Development-review policy; Markdown/source order always remains canonical. */
+/** Visual branch order; Markdown/source order always remains canonical. */
 export type FocusSchematicEndpointOrderPolicy =
   'document-order' | 'crossing-optimized';
 
-/** Development-only HIER4A-FIX2 bakeoff family; no product setting is persisted. */
+/** Internal File-module layout family. Current remains a lab-only comparator. */
 export type FocusSchematicInternalLayoutVariant =
   'current' | 'vertical-spine' | 'adaptive-compass';
 
@@ -61,7 +61,7 @@ export interface FocusSchematicInternalLayoutQualityMetrics {
 
 export interface FocusSchematicInternalLayoutEvidence {
   readonly variant: FocusSchematicInternalLayoutVariant;
-  readonly developmentOnly: true;
+  readonly developmentOnly: boolean;
   readonly verticalSpinePlacementCandidateCap: 64;
   readonly compassAssignmentCap: 64;
   readonly compassLocalRelocationSweepLimit: 4;
@@ -71,6 +71,7 @@ export interface FocusSchematicInternalLayoutEvidence {
   readonly completeCompassAssignmentsEvaluated: number;
   readonly placementCandidatesEvaluated: number;
   readonly localRelocationSweeps: number;
+  readonly largeModuleFallbackCount: number;
   readonly moduleMetrics: readonly FocusSchematicInternalLayoutModuleMetrics[];
   readonly metrics: FocusSchematicInternalLayoutQualityMetrics;
 }
@@ -255,9 +256,9 @@ export interface FocusSchematicLayoutInput {
 }
 
 export interface FocusSchematicComputedLayoutOptions {
-  /** Non-persisted HIER4A review oracle. Ignored while Folder Bands are Off. */
+  /** Visual ordering policy. Ignored while Folder Bands are Off. */
   readonly endpointOrderPolicy?: FocusSchematicEndpointOrderPolicy;
-  /** Non-persisted FIX2 bakeoff oracle. Ignored while Folder Bands are Off. */
+  /** Internal layout; Current is retained only for lab comparison evidence. */
   readonly internalLayoutVariant?: FocusSchematicInternalLayoutVariant;
 }
 
@@ -497,6 +498,7 @@ export interface FocusSchematicEndpointLayoutPhaseTimings {
   readonly leftLayoutMs: number;
   readonly rightLayoutMs: number;
   readonly compositionMs: number;
+  readonly internalVariantMs: number;
   readonly macroMs: number;
   readonly crossingMinimizationMs: number;
   readonly folderInventoryMs: number;

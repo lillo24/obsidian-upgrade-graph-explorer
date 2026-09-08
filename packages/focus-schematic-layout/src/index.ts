@@ -1,8 +1,10 @@
 export * from './types';
+export * from './policies';
 export {
   FILTERED_MODULE_DIMENSIONS,
   FOCUS_SCHEMATIC_LAYOUT_CLEARANCE,
   FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+  FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
 } from './settings';
 export {
   assertFocusSchematicLayoutInput,

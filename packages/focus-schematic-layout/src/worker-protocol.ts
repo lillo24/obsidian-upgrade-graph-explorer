@@ -1,18 +1,25 @@
 import { validateFocusSchematicComputedLayout } from './endpoint-facing';
 import { validateFocusSchematicLayoutInput } from './input';
+import {
+  focusSchematicLayoutMatchesProductPolicies,
+  isFocusSchematicEndpointOrderPolicy,
+  isFocusSchematicProductInternalLayoutVariant,
+  type FocusSchematicProductLayoutPolicies,
+} from './policies';
 import type {
   FocusSchematicComputedLayout,
   FocusSchematicEndpointLayoutPhaseTimings,
   FocusSchematicLayoutInput,
 } from './types';
 
-export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 2 as const;
+export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 3 as const;
 
 export interface FocusSchematicLayoutWorkerRequest {
   readonly protocolVersion: typeof FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION;
   readonly requestId: number;
   readonly kind: 'layout';
   readonly input: FocusSchematicLayoutInput;
+  readonly policies: FocusSchematicProductLayoutPolicies;
 }
 
 export type FocusSchematicLayoutWorkerFailureCode =
@@ -91,7 +98,7 @@ export function validateFocusSchematicLayoutWorkerRequest(
   const candidate = record(value, 'Focus Schematic worker request');
   exactKeys(
     candidate,
-    ['protocolVersion', 'requestId', 'kind', 'input'],
+    ['protocolVersion', 'requestId', 'kind', 'input', 'policies'],
     'Focus Schematic worker request',
   );
   if (
@@ -115,11 +122,37 @@ export function validateFocusSchematicLayoutWorkerRequest(
         .join('; ')}`,
     );
   }
+  if (!validation.value.settings.directionalFolderBandsEnabled)
+    throw new FocusSchematicLayoutProtocolError(
+      'Production Focus Schematic worker requests require Directional Folder Bands.',
+    );
+  const policies = record(candidate.policies, 'Focus Schematic policies');
+  exactKeys(
+    policies,
+    ['endpointOrderPolicy', 'internalLayoutVariant'],
+    'Focus Schematic policies',
+  );
+  if (!isFocusSchematicEndpointOrderPolicy(policies.endpointOrderPolicy))
+    throw new FocusSchematicLayoutProtocolError(
+      'Focus Schematic endpoint order policy is invalid.',
+    );
+  if (
+    !isFocusSchematicProductInternalLayoutVariant(
+      policies.internalLayoutVariant,
+    )
+  )
+    throw new FocusSchematicLayoutProtocolError(
+      'Focus Schematic internal layout policy is invalid.',
+    );
   return {
     protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
     requestId: id,
     kind: 'layout',
     input: validation.value,
+    policies: {
+      endpointOrderPolicy: policies.endpointOrderPolicy,
+      internalLayoutVariant: policies.internalLayoutVariant,
+    },
   };
 }
 
@@ -127,6 +160,7 @@ export function validateFocusSchematicLayoutWorkerResponse(
   value: unknown,
   expectedRequestId: number,
   input: FocusSchematicLayoutInput,
+  policies: FocusSchematicProductLayoutPolicies,
 ): FocusSchematicLayoutWorkerResponse {
   const candidate = record(value, 'Focus Schematic worker response');
   if (
@@ -166,6 +200,10 @@ export function validateFocusSchematicLayoutWorkerResponse(
           .join('; ')}`,
       );
     }
+    if (!focusSchematicLayoutMatchesProductPolicies(validation.value, policies))
+      throw new FocusSchematicLayoutProtocolError(
+        'Computed layout does not match the requested product policies.',
+      );
     // Phase timings are part of the attempt API. JSON cloning plus this exact
     // finite-number check prevents partial or embellished timing payloads.
     const timings = record(candidate.timings, 'Focus Schematic timings');
@@ -180,6 +218,7 @@ export function validateFocusSchematicLayoutWorkerResponse(
       'leftLayoutMs',
       'rightLayoutMs',
       'compositionMs',
+      'internalVariantMs',
       'macroMs',
       'crossingMinimizationMs',
       'folderInventoryMs',

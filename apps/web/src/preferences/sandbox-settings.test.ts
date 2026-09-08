@@ -23,6 +23,8 @@ describe('Settings Sandbox reset', () => {
         custom: customGlobalLayoutSettings('spacious'),
       },
       localLayoutMode: 'structured',
+      modularFocusInternalLayout: 'vertical-spine',
+      modularFocusHeadingOrder: 'document-order',
       showExperimentalAllHierarchy: true,
       trackpadZoomMode: 'pinch-zoom',
     });
@@ -35,6 +37,8 @@ describe('Settings Sandbox reset', () => {
         focusHierarchyImplementation: 'classic',
         globalLayoutSettings: DEFAULT_GLOBAL_LAYOUT_SETTINGS,
         localLayoutMode: 'structured',
+        modularFocusInternalLayout: 'adaptive-compass',
+        modularFocusHeadingOrder: 'crossing-optimized',
         showExperimentalAllHierarchy: false,
         trackpadZoomMode: 'pinch-zoom',
       },

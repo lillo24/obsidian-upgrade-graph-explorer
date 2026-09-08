@@ -495,6 +495,8 @@ export function GraphExplorer({
     focusHierarchyImplementation,
     globalLayoutSettings,
     localLayoutMode,
+    modularFocusHeadingOrder,
+    modularFocusInternalLayout,
     trackpadZoomMode,
     showExperimentalAllHierarchy,
   } = preferences;
@@ -2736,6 +2738,18 @@ export function GraphExplorer({
     },
     [updateGraphPreferences, activeLayout, activeScope],
   );
+  const changeModularFocusInternalLayout = useCallback(
+    (layout: GraphPreferences['modularFocusInternalLayout']) => {
+      updateGraphPreferences({ modularFocusInternalLayout: layout });
+    },
+    [updateGraphPreferences],
+  );
+  const changeModularFocusHeadingOrder = useCallback(
+    (order: GraphPreferences['modularFocusHeadingOrder']) => {
+      updateGraphPreferences({ modularFocusHeadingOrder: order });
+    },
+    [updateGraphPreferences],
+  );
   const changeLocalLayoutMode = useCallback(
     (mode: LocalLayoutMode) => {
       if (
@@ -3755,6 +3769,8 @@ export function GraphExplorer({
               focusNetworkDensityFramingStrength
             }
             focusHierarchyImplementation={focusHierarchyImplementation}
+            modularFocusHeadingOrder={modularFocusHeadingOrder}
+            modularFocusInternalLayout={modularFocusInternalLayout}
             showExperimentalAllHierarchy={showExperimentalAllHierarchy}
             onShowExperimentalAllHierarchyChange={
               changeExperimentalAllHierarchy
@@ -3770,6 +3786,10 @@ export function GraphExplorer({
             onFocusAppearanceChange={changeFocusAppearance}
             onFocusHierarchyImplementationChange={
               changeFocusHierarchyImplementation
+            }
+            onModularFocusHeadingOrderChange={changeModularFocusHeadingOrder}
+            onModularFocusInternalLayoutChange={
+              changeModularFocusInternalLayout
             }
             onGlobalLayoutSettingsChange={changeGlobalLayoutSettings}
             onOpenChange={changeSettingsOpen}
@@ -3961,6 +3981,8 @@ export function GraphExplorer({
                     focusNetworkDensityFramingStrength
                   }
                   focusHierarchyImplementation={focusHierarchyImplementation}
+                  modularFocusHeadingOrder={modularFocusHeadingOrder}
+                  modularFocusInternalLayout={modularFocusInternalLayout}
                   showExperimentalAllHierarchy={showExperimentalAllHierarchy}
                   onShowExperimentalAllHierarchyChange={
                     changeExperimentalAllHierarchy
@@ -3976,6 +3998,12 @@ export function GraphExplorer({
                   onFocusAppearanceChange={changeFocusAppearance}
                   onFocusHierarchyImplementationChange={
                     changeFocusHierarchyImplementation
+                  }
+                  onModularFocusHeadingOrderChange={
+                    changeModularFocusHeadingOrder
+                  }
+                  onModularFocusInternalLayoutChange={
+                    changeModularFocusInternalLayout
                   }
                   onGlobalLayoutSettingsChange={changeGlobalLayoutSettings}
                   onOpenChange={changeSettingsOpen}
@@ -4245,6 +4273,8 @@ export function GraphExplorer({
                   : { centerRequest: localStructuredCenterRequest })}
                 fitRequestKey={localFitRequestKey ?? 0}
                 focusAppearance={focusAppearance}
+                endpointOrderPolicy={modularFocusHeadingOrder}
+                internalLayoutVariant={modularFocusInternalLayout}
                 {...(localTransitionAnchor === undefined
                   ? {}
                   : { initialTransitionAnchor: localTransitionAnchor })}

@@ -10,9 +10,15 @@ export const FOCUS_SCHEMATIC_LAYOUT_SETTINGS = {
   internalRankSeparation: 48,
   macroNodeSeparation: 36,
   macroRankSeparation: 80,
-  // HIER4A review starts from pure A1. Production selection follows approval.
+  // Development labs retain pure A1 as the Folder Bands Off oracle.
   directionalFolderBandsEnabled: false,
   ranker: 'network-simplex',
+} as const satisfies FocusSchematicPrototypeSettings;
+
+/** Modular Focus Hierarchy settings selected by the HIER4A production gate. */
+export const FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS = {
+  ...FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+  directionalFolderBandsEnabled: true,
 } as const satisfies FocusSchematicPrototypeSettings;
 
 export const FOCUS_SCHEMATIC_LAYOUT_CLEARANCE = 16;

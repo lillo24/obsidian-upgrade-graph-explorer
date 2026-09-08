@@ -59,7 +59,7 @@ import type {
 
 const STRATEGY_ID = 'A1-endpoint-facing-split-lanes' as const;
 /** Cache/evidence revision for the selected A1 implementation. */
-export const FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION = 2 as const;
+export const FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION = 3 as const;
 const now = () => Date.now();
 const compareText = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
@@ -108,6 +108,7 @@ function emptyTimings(totalMs = 0): FocusSchematicEndpointLayoutPhaseTimings {
     leftLayoutMs: 0,
     rightLayoutMs: 0,
     compositionMs: 0,
+    internalVariantMs: 0,
     macroMs: 0,
     crossingMinimizationMs: 0,
     folderInventoryMs: 0,
@@ -1135,13 +1136,16 @@ export function validateFocusSchematicComputedLayout(
   if (
     internalEvidence === null ||
     typeof internalEvidence !== 'object' ||
-    internalEvidence.developmentOnly !== true ||
+    internalEvidence.developmentOnly !==
+      (internalEvidence.variant === 'current') ||
     internalEvidence.variant !== expectedInternalVariant ||
     internalEvidence.verticalSpinePlacementCandidateCap !== 64 ||
     internalEvidence.compassAssignmentCap !== 64 ||
     internalEvidence.compassLocalRelocationSweepLimit !== 4 ||
     internalEvidence.jointFolderRoundLimit !== 2 ||
-    internalEvidence.jointFolderRounds > 2
+    internalEvidence.jointFolderRounds > 2 ||
+    !Number.isSafeInteger(internalEvidence.largeModuleFallbackCount) ||
+    internalEvidence.largeModuleFallbackCount < 0
   )
     return {
       valid: false,
@@ -1271,7 +1275,7 @@ export function computeFocusSchematicComputedLayoutAttempt(
   const endpointOrderPolicy =
     options.endpointOrderPolicy ?? 'crossing-optimized';
   const internalLayoutVariant = value.settings.directionalFolderBandsEnabled
-    ? (options.internalLayoutVariant ?? 'current')
+    ? (options.internalLayoutVariant ?? 'adaptive-compass')
     : 'current';
   const internalVariantConfig =
     internalLayoutVariant === 'current' ? '' : `-il${internalLayoutVariant}`;
@@ -1299,6 +1303,7 @@ export function computeFocusSchematicComputedLayoutAttempt(
     const macroStarted = now();
     const currentMacro = macroLayout(value, modulePlan, localLayouts);
     let macroMs = now() - macroStarted;
+    let internalVariantMs = 0;
     const crossingMinimizationStarted = now();
     const revision2Candidate = minimizeFocusSchematicEndpointCrossings(
       value,
@@ -1331,6 +1336,7 @@ export function computeFocusSchematicComputedLayoutAttempt(
         round < FOCUS_SCHEMATIC_INTERNAL_FOLDER_JOINT_ROUND_LIMIT;
         round += 1
       ) {
+        const internalVariantStarted = now();
         const internalCandidate = applyFocusSchematicInternalLayoutVariant(
           value,
           modulePlan,
@@ -1340,6 +1346,7 @@ export function computeFocusSchematicComputedLayoutAttempt(
           endpointOrderPolicy,
           internalLayoutStats,
         );
+        internalVariantMs += now() - internalVariantStarted;
         const variantMacroStarted = now();
         const variantMacro = macroLayout(
           value,
@@ -1475,6 +1482,7 @@ export function computeFocusSchematicComputedLayoutAttempt(
           (sum, item) => sum + item.compositionMs,
           0,
         ),
+        internalVariantMs,
         macroMs,
         crossingMinimizationMs,
         ...folderApplication.timings,

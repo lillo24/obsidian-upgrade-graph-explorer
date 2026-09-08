@@ -1,12 +1,15 @@
 import {
+  DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
   FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION,
   FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
+  focusSchematicLayoutMatchesProductPolicies,
   validateFocusSchematicComputedLayout,
   type FocusSchematicComputedLayout,
   type FocusSchematicLayoutInput,
+  type FocusSchematicProductLayoutPolicies,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 
-const SELECTED_ALGORITHM_ID = 'A1-endpoint-facing-split-lanes';
+const SELECTED_ALGORITHM_ID = 'A1-directional-folder-bands-adaptive-internals';
 
 export interface FocusSchematicLayoutCacheLookup {
   readonly status: 'hit' | 'miss' | 'invalid';
@@ -23,12 +26,27 @@ interface CacheEntry {
 
 export function exactFocusSchematicLayoutCacheKey(
   input: FocusSchematicLayoutInput,
+  policiesOrAlgorithmVersion:
+    | FocusSchematicProductLayoutPolicies
+    | number = DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
   algorithmVersion: number = FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION,
 ): string {
+  const policies =
+    typeof policiesOrAlgorithmVersion === 'number'
+      ? DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES
+      : policiesOrAlgorithmVersion;
+  const selectedAlgorithmVersion =
+    typeof policiesOrAlgorithmVersion === 'number'
+      ? policiesOrAlgorithmVersion
+      : algorithmVersion;
   return JSON.stringify({
     protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
     algorithm: SELECTED_ALGORITHM_ID,
-    algorithmVersion,
+    algorithmVersion: selectedAlgorithmVersion,
+    policies: {
+      endpointOrderPolicy: policies.endpointOrderPolicy,
+      internalLayoutVariant: policies.internalLayoutVariant,
+    },
     input,
   });
 }
@@ -50,13 +68,19 @@ export class FocusSchematicLayoutCache {
     this.#maximumEntries = maximumEntries;
   }
 
-  get(input: FocusSchematicLayoutInput): FocusSchematicLayoutCacheLookup {
-    const key = exactFocusSchematicLayoutCacheKey(input);
+  get(
+    input: FocusSchematicLayoutInput,
+    policies: FocusSchematicProductLayoutPolicies = DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+  ): FocusSchematicLayoutCacheLookup {
+    const key = exactFocusSchematicLayoutCacheKey(input, policies);
     const entry = this.#entries.get(key);
     if (entry === undefined)
       return { status: 'miss', key, approximateBytes: 0 };
     const validation = validateFocusSchematicComputedLayout(input, entry.value);
-    if (!validation.valid) {
+    if (
+      !validation.valid ||
+      !focusSchematicLayoutMatchesProductPolicies(entry.value, policies)
+    ) {
       this.#entries.delete(key);
       return {
         status: 'invalid',
@@ -77,13 +101,33 @@ export class FocusSchematicLayoutCache {
   set(
     input: FocusSchematicLayoutInput,
     value: FocusSchematicComputedLayout,
+  ): void;
+  set(
+    input: FocusSchematicLayoutInput,
+    policies: FocusSchematicProductLayoutPolicies,
+    value: FocusSchematicComputedLayout,
+  ): void;
+  set(
+    input: FocusSchematicLayoutInput,
+    policiesOrValue:
+      FocusSchematicProductLayoutPolicies | FocusSchematicComputedLayout,
+    maybeValue?: FocusSchematicComputedLayout,
   ): void {
+    const policies =
+      maybeValue === undefined
+        ? DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES
+        : (policiesOrValue as FocusSchematicProductLayoutPolicies);
+    const value =
+      maybeValue ?? (policiesOrValue as FocusSchematicComputedLayout);
     const validation = validateFocusSchematicComputedLayout(input, value);
-    if (!validation.valid)
+    if (
+      !validation.valid ||
+      !focusSchematicLayoutMatchesProductPolicies(value, policies)
+    )
       throw new Error(
-        `Cannot cache an invalid Focus Schematic layout: ${validation.issues[0]?.message ?? 'unknown issue'}`,
+        `Cannot cache an invalid or policy-mismatched Focus Schematic layout: ${validation.valid ? 'policy mismatch' : (validation.issues[0]?.message ?? 'unknown issue')}`,
       );
-    const key = exactFocusSchematicLayoutCacheKey(input);
+    const key = exactFocusSchematicLayoutCacheKey(input, policies);
     const entry: CacheEntry = {
       key,
       value,
@@ -102,8 +146,25 @@ export class FocusSchematicLayoutCache {
   replaceForTesting(
     input: FocusSchematicLayoutInput,
     value: FocusSchematicComputedLayout,
+  ): void;
+  replaceForTesting(
+    input: FocusSchematicLayoutInput,
+    policies: FocusSchematicProductLayoutPolicies,
+    value: FocusSchematicComputedLayout,
+  ): void;
+  replaceForTesting(
+    input: FocusSchematicLayoutInput,
+    policiesOrValue:
+      FocusSchematicProductLayoutPolicies | FocusSchematicComputedLayout,
+    maybeValue?: FocusSchematicComputedLayout,
   ): void {
-    const key = exactFocusSchematicLayoutCacheKey(input);
+    const policies =
+      maybeValue === undefined
+        ? DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES
+        : (policiesOrValue as FocusSchematicProductLayoutPolicies);
+    const value =
+      maybeValue ?? (policiesOrValue as FocusSchematicComputedLayout);
+    const key = exactFocusSchematicLayoutCacheKey(input, policies);
     this.#entries.set(key, { key, value, approximateBytes: 1 });
   }
 

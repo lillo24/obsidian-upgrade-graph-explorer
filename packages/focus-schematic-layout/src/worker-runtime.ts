@@ -40,7 +40,10 @@ export function handleFocusSchematicLayoutWorkerRequest(
       candidateRequestId = Number(value.requestId);
     }
     const request = validateFocusSchematicLayoutWorkerRequest(value);
-    const attempt = computeFocusSchematicComputedLayoutAttempt(request.input);
+    const attempt = computeFocusSchematicComputedLayoutAttempt(
+      request.input,
+      request.policies,
+    );
     const computeMs = Math.max(0, now() - startedAt);
     if (attempt.status !== 'success') {
       return failure(

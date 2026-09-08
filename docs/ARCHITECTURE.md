@@ -1238,16 +1238,35 @@ direct-File hover target and narrow nested context own the non-geometric ring.
 `GraphSelection`, Inspector, history, projection, model, worker, and cache state
 remain unchanged by hover.
 
-HIER4 retains soft folder-band positioning, HIER5 retains Direct/Electronic
-orthogonal routing and overlapping-path hit-target separation, and HIER3C
-retains any product-default change.
+HIER4A supersedes the original center-spine production geometry for Modular
+Preview. Its strict protocol-v3 worker receives persisted internal-layout and
+Heading-order policies. Adaptive Compass plus Crossing optimized are the
+defaults; Vertical Spine and Document order remain Sandbox alternatives. The
+exact cache keys all four combinations and algorithm revision 3. Current/Mosaic
+remains development-only.
+
+The same worker runs categorical Directional Folder Bands after signed-rank
+placement and in a bounded two-round refinement with module-local Compass. Final
+module dimensions determine exact band heights; endpoint crossings and
+adjacent-rank inversions guard folder/module/branch ordering before packed-height
+root balance. Every visible exact folder retains a band, singleton folders stay
+visible, and filtered bridges remain excluded. Ordinary Compass search evaluates
+at most 64 restricted assignments per module; large modules use deterministic
+bounded relocation and no global Cartesian product.
+
+Secondary edges, hover, and Visual Groups remain geometry-neutral. HIER4B owns
+Soft Folder Clusters, HIER5 retains Direct/Electronic orthogonal routing and
+overlapping-path hit-target separation, and HIER3C retains any product-default
+change.
 
 Optimized desktop graphical QA approved the preview with visible module
 boundaries and confirmed exact endpoints, root/rank positioning, multi-hop
 orientation, disclosure, implementation switching, secondary-edge geometry
 invariance, Inspector behavior, and current touchpad navigation. This completes
 HIER3B. Optimized desktop graphical approval on September 4, 2026, completes
-HIER3B-FIX1; HIER4 is next, HIER5 follows HIER4, and HIER3C follows HIER5.
+HIER3B-FIX1. The actual-browser HIER4A integration was approved and its optimized
+desktop check/build passed on September 8, 2026. HIER4B is next; HIER5 follows
+HIER4B, and HIER3C follows HIER5.
 
 ## HIER0 product exposure and geometry
 

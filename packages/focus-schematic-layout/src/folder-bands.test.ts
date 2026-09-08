@@ -32,6 +32,7 @@ function runSpec(
   });
   const attempt = computeFocusSchematicComputedLayoutAttempt(input, {
     endpointOrderPolicy,
+    internalLayoutVariant: 'current',
   });
   if (attempt.status !== 'success')
     throw new Error(
@@ -454,8 +455,17 @@ describe('HIER4A categorical Directional Folder Bands', () => {
   });
 
   it('is byte-identical across input permutation and the production worker boundary', () => {
-    const baselineRun = run('DB11', true, 'crossing-optimized');
-    const input = baselineRun.input;
+    const input = run('DB11', true, 'crossing-optimized').input;
+    const policies = {
+      endpointOrderPolicy: 'crossing-optimized',
+      internalLayoutVariant: 'adaptive-compass',
+    } as const;
+    const baseline = computeFocusSchematicComputedLayoutAttempt(
+      input,
+      policies,
+    );
+    expect(baseline.status).toBe('success');
+    if (baseline.status !== 'success') return;
     const permuted = computeFocusSchematicComputedLayoutAttempt(
       {
         ...input,
@@ -482,11 +492,11 @@ describe('HIER4A categorical Directional Folder Bands', () => {
           edges: [...input.projection.edges].reverse(),
         },
       },
-      { endpointOrderPolicy: 'crossing-optimized' },
+      policies,
     );
     expect(permuted.status).toBe('success');
     if (permuted.status !== 'success') return;
-    expect(permuted.result).toEqual(baselineRun.attempt.result);
+    expect(permuted.result).toEqual(baseline.result);
 
     const worker = handleFocusSchematicLayoutWorkerRequest(
       {
@@ -494,12 +504,13 @@ describe('HIER4A categorical Directional Folder Bands', () => {
         requestId: 1,
         kind: 'layout',
         input,
+        policies,
       },
       () => 0,
     );
     expect(worker.kind).toBe('success');
     if (worker.kind !== 'success') return;
-    expect(worker.result).toEqual(baselineRun.attempt.result);
+    expect(worker.result).toEqual(baseline.result);
   });
 
   it('rebalances previously same-sided two-folder cases', () => {

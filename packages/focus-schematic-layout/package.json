@@ -10,6 +10,11 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./policies": {
+      "types": "./src/policies.ts",
+      "import": "./src/policies.ts",
+      "default": "./src/policies.ts"
+    },
     "./worker-runtime": {
       "types": "./src/worker-runtime.ts",
       "import": "./src/worker-runtime.ts",

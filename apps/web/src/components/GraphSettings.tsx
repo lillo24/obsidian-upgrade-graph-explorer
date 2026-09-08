@@ -19,7 +19,10 @@ import type {
   LocalDensityQaDiagnostics,
 } from '@icarus-graph-explorer/renderer-sigma/types';
 
-import type { FocusHierarchyImplementation } from '../preferences/graph-preferences';
+import type {
+  FocusHierarchyImplementation,
+  GraphPreferences,
+} from '../preferences/graph-preferences';
 
 import {
   graphSettingsTabForKey,
@@ -34,6 +37,14 @@ interface GraphSettingsProps {
   readonly focusHierarchyImplementation?: FocusHierarchyImplementation;
   readonly onFocusHierarchyImplementationChange?: (
     implementation: FocusHierarchyImplementation,
+  ) => void;
+  readonly modularFocusInternalLayout?: GraphPreferences['modularFocusInternalLayout'];
+  readonly onModularFocusInternalLayoutChange?: (
+    layout: GraphPreferences['modularFocusInternalLayout'],
+  ) => void;
+  readonly modularFocusHeadingOrder?: GraphPreferences['modularFocusHeadingOrder'];
+  readonly onModularFocusHeadingOrderChange?: (
+    order: GraphPreferences['modularFocusHeadingOrder'],
   ) => void;
   readonly showExperimentalAllHierarchy?: boolean;
   readonly onShowExperimentalAllHierarchyChange?: (show: boolean) => void;
@@ -137,6 +148,10 @@ export const GraphSettings = memo(function GraphSettings({
   focusNetworkDensityFramingStrength,
   focusHierarchyImplementation = 'classic',
   onFocusHierarchyImplementationChange,
+  modularFocusInternalLayout = 'adaptive-compass',
+  onModularFocusInternalLayoutChange,
+  modularFocusHeadingOrder = 'crossing-optimized',
+  onModularFocusHeadingOrderChange,
   showExperimentalAllHierarchy = false,
   onShowExperimentalAllHierarchyChange,
   children,
@@ -630,6 +645,106 @@ export const GraphSettings = memo(function GraphSettings({
                           <small>
                             New File-module layout with exact File/Heading/Block
                             endpoints. Experimental until HIER3C.
+                          </small>
+                        </span>
+                      </label>
+                    </fieldset>
+                    <fieldset
+                      className="graph-settings__choice-group"
+                      disabled={
+                        focusHierarchyImplementation !== 'modular-preview'
+                      }
+                    >
+                      <legend>Internal layout</legend>
+                      <label>
+                        <input
+                          checked={
+                            modularFocusInternalLayout === 'adaptive-compass'
+                          }
+                          name="modular-focus-internal-layout"
+                          onChange={() =>
+                            onModularFocusInternalLayoutChange?.(
+                              'adaptive-compass',
+                            )
+                          }
+                          type="radio"
+                          value="adaptive-compass"
+                        />
+                        <span>
+                          <strong>Adaptive Compass</strong>
+                          <small>
+                            Places structural branches around each File using
+                            exact endpoint demand.
+                          </small>
+                        </span>
+                      </label>
+                      <label>
+                        <input
+                          checked={
+                            modularFocusInternalLayout === 'vertical-spine'
+                          }
+                          name="modular-focus-internal-layout"
+                          onChange={() =>
+                            onModularFocusInternalLayoutChange?.(
+                              'vertical-spine',
+                            )
+                          }
+                          type="radio"
+                          value="vertical-spine"
+                        />
+                        <span>
+                          <strong>Vertical Spine</strong>
+                          <small>
+                            Keeps structural branches above and below each File.
+                          </small>
+                        </span>
+                      </label>
+                    </fieldset>
+                    <fieldset
+                      className="graph-settings__choice-group"
+                      disabled={
+                        focusHierarchyImplementation !== 'modular-preview'
+                      }
+                    >
+                      <legend>Heading order</legend>
+                      <label>
+                        <input
+                          checked={
+                            modularFocusHeadingOrder === 'crossing-optimized'
+                          }
+                          name="modular-focus-heading-order"
+                          onChange={() =>
+                            onModularFocusHeadingOrderChange?.(
+                              'crossing-optimized',
+                            )
+                          }
+                          type="radio"
+                          value="crossing-optimized"
+                        />
+                        <span>
+                          <strong>Crossing optimized</strong>
+                          <small>
+                            Reorders visual branches when that reduces exact
+                            endpoint crossings.
+                          </small>
+                        </span>
+                      </label>
+                      <label>
+                        <input
+                          checked={
+                            modularFocusHeadingOrder === 'document-order'
+                          }
+                          name="modular-focus-heading-order"
+                          onChange={() =>
+                            onModularFocusHeadingOrderChange?.('document-order')
+                          }
+                          type="radio"
+                          value="document-order"
+                        />
+                        <span>
+                          <strong>Document order</strong>
+                          <small>
+                            Uses Markdown source order for visual branches.
                           </small>
                         </span>
                       </label>
