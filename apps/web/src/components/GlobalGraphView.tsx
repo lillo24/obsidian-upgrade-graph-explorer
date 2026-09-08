@@ -10,11 +10,12 @@ import '@icarus-graph-explorer/renderer-sigma/styles.css';
 
 import { createGlobalLayoutWorkerService } from '../workers/global-layout-worker-client';
 import { createGlobalSpatialInfluenceWorkerService } from '../workers/global-spatial-influence-worker-client';
+import { createNetworkPhysicsWorkerService } from '../workers/network-physics-worker-client';
 import { useWorkerServiceDisposal } from './use-worker-service-disposal';
 
 export type GlobalGraphViewProps = Omit<
   GlobalGraphCanvasProps,
-  'layoutCache' | 'layoutService'
+  'layoutCache' | 'layoutService' | 'physicsServiceFactory'
 >;
 
 // The lazy module survives component unmounts, so exact derived layouts remain
@@ -35,6 +36,7 @@ export default function GlobalGraphView(props: GlobalGraphViewProps) {
       {...props}
       layoutCache={layoutCache}
       layoutService={layoutService}
+      physicsServiceFactory={createNetworkPhysicsWorkerService}
       spatialInfluenceCache={spatialInfluenceCache}
       spatialInfluenceService={spatialInfluenceService}
     />
