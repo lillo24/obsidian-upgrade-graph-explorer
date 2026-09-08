@@ -971,7 +971,7 @@ export class GlobalRendererSession {
     }
   }
 
-  /** Fake-backed MOVE1A seam; production does not activate it until PHYSICS1. */
+  /** Temporary file movement seam; callers decide when an Edit/Move mode exists. */
   setTemporaryFileMoveContext(
     context: TemporaryFileMoveSessionContext | undefined,
     cancellationReason: Exclude<

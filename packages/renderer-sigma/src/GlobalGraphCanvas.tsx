@@ -13,6 +13,7 @@ import {
   setFolderSpatialDraftScopePreset,
   setFolderSpatialDraftStrength,
   toggleFolderSpatialDraftSubtree,
+  indexAppliedFixedTranslations,
   type FolderClusterAnchorMap,
   type FolderScopeVisualization,
   type FolderSpatialRule,
@@ -55,6 +56,11 @@ import {
 } from './mapping';
 import { GlobalRendererSession } from './session';
 import {
+  createAllNetworkPhysicsSeed,
+  type NetworkPhysicsService,
+  type NetworkPhysicsServiceFactory,
+} from './physics';
+import {
   globalLayoutSettingsFromPhysics,
   resolveGlobalPhysicsSettings,
 } from './settings';
@@ -77,6 +83,7 @@ import type {
   GlobalLayoutSettings,
   GlobalRendererInstrumentation,
   GlobalSelection,
+  GlobalSpatialInfluenceAttractor,
   GlobalTrackpadZoomMode,
   GlobalTransitionAnchorApi,
   GlobalSpatialInfluenceService,
@@ -152,6 +159,9 @@ export interface GlobalGraphCanvasProps {
   /** Optional session cache owner; the lazy web module keeps this across mode switches. */
   readonly layoutCache?: GlobalLayoutCache;
   readonly layoutService: GlobalLayoutService;
+  /** PHYSICS1 transport seam. Inactive until a later Edit/Move mode opts in. */
+  readonly physicsServiceFactory?: NetworkPhysicsServiceFactory;
+  readonly temporaryConstraintActive?: boolean;
   /** Separate latest-result worker for schema-v2 dynamic pull rules. */
   readonly spatialInfluenceService?: GlobalSpatialInfluenceService;
   readonly spatialInfluenceCache?: GlobalSpatialInfluenceCache;
@@ -403,6 +413,7 @@ export function GlobalGraphCanvas({
   layoutRequestKey,
   layoutCache,
   layoutService,
+  physicsServiceFactory,
   spatialInfluenceService,
   spatialInfluenceCache,
   spatialSourceKey,
@@ -418,6 +429,7 @@ export function GlobalGraphCanvas({
   settings,
   spatialOverrides,
   spatialRules,
+  temporaryConstraintActive = false,
   trackpadZoomMode,
   visualGroupStyles,
   presentationOverrides,
@@ -540,6 +552,69 @@ export function GlobalGraphCanvas({
   const latestSpatialOverrides = useRef(spatialOverrides);
   const latestSpatialRules = useRef(spatialRules);
   const latestInput = useRef(input);
+  const physicsFixedTranslationByNodeKey = useRef<
+    ReadonlyMap<string, SpatialPoint>
+  >(new Map());
+  const physicsSessionGeneration = useRef('all-network');
+  const physicsSimulationSequence = useRef(0);
+  const physicsServiceRef = useRef<NetworkPhysicsService | undefined>(
+    undefined,
+  );
+  const physicsServiceGeneration = useRef(0);
+  const applyPhysicsDisplayTranslation = useCallback(
+    (positions: readonly GlobalLayoutPosition[]) =>
+      positions.map((position) => {
+        const translation = physicsFixedTranslationByNodeKey.current.get(
+          position.key,
+        );
+        return translation === undefined
+          ? position
+          : {
+              key: position.key,
+              x: position.x + translation.x,
+              y: position.y + translation.y,
+            };
+      }),
+    [],
+  );
+  useEffect(() => {
+    const generation = ++physicsServiceGeneration.current;
+    const service = physicsServiceFactory?.({
+      onFrame: (frame) => {
+        if (physicsServiceGeneration.current !== generation) return;
+        latestDynamicPositions.current = frame.positions;
+        const displayed = applyPhysicsDisplayTranslation(frame.positions);
+        latestDisplayedPositions.current = displayed;
+        sessionRef.current?.applyPartialPositions(displayed);
+      },
+      onConstraint: (command) => {
+        if (physicsServiceGeneration.current !== generation) return;
+        if (command.kind === 'end') return;
+        const translation = physicsFixedTranslationByNodeKey.current.get(
+          command.nodeKey,
+        );
+        sessionRef.current?.applyPartialPositions([
+          {
+            key: command.nodeKey,
+            x: command.target.x + (translation?.x ?? 0),
+            y: command.target.y + (translation?.y ?? 0),
+          },
+        ]);
+      },
+      onFailure: (failure) => {
+        if (physicsServiceGeneration.current === generation) {
+          callbacks.current.onFailure(failure.message);
+        }
+      },
+    });
+    physicsServiceRef.current = service;
+    return () => {
+      if (physicsServiceRef.current === service) {
+        physicsServiceRef.current = undefined;
+      }
+      queueMicrotask(() => service?.dispose());
+    };
+  }, [applyPhysicsDisplayTranslation, physicsServiceFactory]);
   const pendingArrangementCommit = useRef<
     | {
         readonly folderKey: string;
@@ -1609,6 +1684,113 @@ export function GlobalGraphCanvas({
     layoutService,
     ready,
     layoutSettings,
+  ]);
+
+  useEffect(() => {
+    const session = sessionRef.current;
+    const physicsService = physicsServiceRef.current;
+    if (!temporaryConstraintActive || session === undefined) {
+      return;
+    }
+    if (physicsService === undefined || !ready || layoutPendingState) {
+      session.setTemporaryFileMoveContext({
+        active: true,
+        capability: {
+          status: 'unavailable',
+          reason:
+            physicsService === undefined
+              ? 'simulation-unavailable'
+              : 'simulation-not-running',
+        },
+        sessionGeneration: physicsSessionGeneration.current,
+        simulationGeneration: 'unavailable',
+        coordinateGeneration: fingerprint,
+        fixedTranslationByNodeKey: physicsFixedTranslationByNodeKey.current,
+      });
+      return;
+    }
+    const basePositions = latestAutomaticPositions.current;
+    const dynamicPositions = latestDynamicPositions.current;
+    let attractors: GlobalSpatialInfluenceAttractor[] = [];
+    let activeFolders: ReturnType<
+      typeof composeGlobalFolderSpatialRules
+    >['activeFolders'] = [];
+    if (latestSpatialRules.current !== undefined) {
+      const resolved = resolveGlobalFolderSpatialRules(
+        latestInput.current,
+        latestSpatialRules.current,
+      );
+      attractors = [
+        ...createGlobalSpatialInfluenceRequest(
+          latestInput.current,
+          layoutSettings,
+          spatialInfluenceIterations(latestInput.current.nodes.length),
+          basePositions,
+          fingerprint,
+          resolved,
+        ).attractors,
+      ];
+      activeFolders = composeGlobalFolderSpatialRules(
+        basePositions,
+        dynamicPositions,
+        latestInput.current,
+        resolved,
+      ).activeFolders;
+    } else if (
+      latestSpatialOverrides.current !== undefined &&
+      latestSpatialOverrides.current.size > 0
+    ) {
+      activeFolders = composeGlobalSpatialOverrides(
+        basePositions,
+        latestInput.current,
+        latestSpatialOverrides.current,
+      ).activeFolders;
+    }
+    const fixedTranslationByNodeKey =
+      indexAppliedFixedTranslations(activeFolders);
+    physicsFixedTranslationByNodeKey.current = fixedTranslationByNodeKey;
+    const sessionGeneration = physicsSessionGeneration.current;
+    const simulationGeneration = `${sessionGeneration}:simulation:${++physicsSimulationSequence.current}`;
+    physicsService.initialize(
+      createAllNetworkPhysicsSeed({
+        request: requestTemplate,
+        dynamicPositions,
+        attractors,
+        constraintEligibleNodeKeys: new Set(
+          latestInput.current.nodes.flatMap((node) =>
+            node.attributes.nodeKind === 'document' ? [node.key] : [],
+          ),
+        ),
+        sessionGeneration,
+        simulationGeneration,
+      }),
+    );
+    session.setTemporaryFileMoveContext({
+      active: true,
+      capability: { status: 'available' },
+      port: physicsService,
+      sessionGeneration,
+      simulationGeneration,
+      coordinateGeneration: `${fingerprint}:${layoutCommitKey}:${spatialCommitKey}`,
+      fixedTranslationByNodeKey,
+    });
+    return () => {
+      session.setTemporaryFileMoveContext(undefined, 'layout-changed');
+      physicsService.invalidate('layout-changed');
+      physicsFixedTranslationByNodeKey.current = new Map();
+    };
+  }, [
+    fingerprint,
+    layoutCommitKey,
+    layoutPendingState,
+    layoutSettings,
+    physicsServiceFactory,
+    ready,
+    requestTemplate,
+    spatialCommitKey,
+    spatialOverrides,
+    spatialRules,
+    temporaryConstraintActive,
   ]);
 
   useEffect(() => {

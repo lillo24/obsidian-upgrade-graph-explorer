@@ -16,6 +16,120 @@
   color-scheme: light;
 }
 
+.physics1-lab {
+  min-height: 100vh;
+  padding: 24px;
+  color: #e8eef2;
+  background: #10171c;
+  font:
+    14px/1.45 Inter,
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.physics1-lab__header,
+.physics1-lab__fixture > header {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.physics1-lab h1,
+.physics1-lab h2,
+.physics1-lab p {
+  margin-block: 0 8px;
+}
+
+.physics1-lab__eyebrow {
+  color: #8ed5c9;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.physics1-lab__controls,
+.physics1-lab__state {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+}
+
+.physics1-lab label {
+  display: grid;
+  gap: 4px;
+}
+
+.physics1-lab button,
+.physics1-lab select {
+  min-height: 36px;
+  padding: 7px 10px;
+  color: inherit;
+  background: #1d2a32;
+  border: 1px solid #48606d;
+  border-radius: 6px;
+}
+
+.physics1-lab__fixture {
+  max-width: 1100px;
+  margin: 24px auto 0;
+  padding: 18px;
+  background: #162129;
+  border: 1px solid #334650;
+  border-radius: 12px;
+}
+
+.physics1-lab__state span {
+  min-width: 112px;
+  padding: 8px 10px;
+  color: #aee9dd;
+  background: #0d1418;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.physics1-lab__graph {
+  width: 100%;
+  max-height: 680px;
+  margin-top: 16px;
+  background: #0b1115;
+  border-radius: 8px;
+  touch-action: none;
+}
+
+.physics1-lab__edges line {
+  stroke: #536873;
+  stroke-width: 0.35;
+}
+
+.physics1-lab__nodes circle {
+  fill: #73c8bb;
+  stroke: #d8fff8;
+  stroke-width: 0.35;
+  cursor: grab;
+}
+
+.physics1-lab__nodes circle[data-node-key='n0'] {
+  fill: #f2b866;
+}
+
+.physics1-lab__nodes circle:active {
+  cursor: grabbing;
+}
+
+.physics1-lab__hint {
+  color: #aebbc2;
+}
+
+@media (max-width: 720px) {
+  .physics1-lab__header,
+  .physics1-lab__fixture > header {
+    flex-direction: column;
+  }
+}
+
 * {
   box-sizing: border-box;
 }

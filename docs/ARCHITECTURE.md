@@ -1335,3 +1335,26 @@ settings, timing, camera/density, dynamic Pull, and fixed Place.
 The canvas still adopts one final base result through FLICKER1's atomic,
 camera-neutral coordinate transaction, then composes SPATIAL2 as base → dynamic
 Pull → fixed Place. SPATIAL2 dynamic convergence and PHYSICS1 remain separate.
+
+## PHYSICS1 continuous Network simulation
+
+PHYSICS1 adds a separate, lazy `network-physics` worker without replacing the
+finite Focus or All layout workers. Its browser client can be initialized with
+clone-safe current coordinates while remaining dormant; only the first valid
+temporary-constraint begin constructs the Worker. The Worker owns one retained
+Graphology graph and explicit sleeping, hot-constrained, cooling, failed, and
+disposed states. Sleeping schedules no simulation turn.
+
+The selected adapter uses only public `forceAtlas2.assign` calls. Hot work runs
+one physical iteration between target assertions and publishes after four
+iterations. Cooling returns to canonical 32-iteration mode-specific movement
+checks. Strict schema, session/simulation generation, gesture sequence, frame
+sequence, and exact node-set checks keep stale work from adopting.
+
+Focus seeds from last accepted Local coordinates. All seeds from the dynamic
+pre-Place layer and carries resolved Pull inputs; Pull is normalized per
+physical iteration. A captured winning Place translation is applied once on
+the display side. Worker frames use camera-neutral sparse Sigma adoption and
+cannot write finite layout caches, Pull caches, spatial persistence, history,
+source, density, camera, or React tick state. The canvases expose this real
+capability behind an inactive-by-default flag; MOVE1B still owns product UI.

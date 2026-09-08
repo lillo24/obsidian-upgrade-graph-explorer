@@ -50,7 +50,7 @@ reorder KG14.
 | **SPATIAL2 — Folder spatial behavior**              | Hierarchical folder scope plus fixed placement and dynamic soft-attractor behavior in All Network.                                                               | **Release candidate — native SPATIAL2B interaction QA pending.**      |
 | **SPATIAL2A — Scope/attractor foundation**          | Schema-v2 migration, most-specific membership, three position layers, separate worker/cache, bake-off, harness, and aggregate evidence.                          | **Complete.**                                                         |
 | **SPATIAL2B — Product rule editor**                 | Production behavior/scope/exclusion/strength controls over the SPATIAL2A contracts.                                                                              | **Implemented — draft PR remains gated on native pointer QA.**        |
-| **PHYSICS1 — Continuous simulation lifecycle**      | Simulation ownership, reheating, convergence/cooling, and a concrete temporary-constraint adapter.                                                               | **Parallel dependency; not delivered on main.**                       |
+| **PHYSICS1 — Continuous simulation lifecycle**      | Lazy worker ownership, real temporary hard constraints, whole-graph reaction, Pull-aware cooling, and camera-neutral frame adoption.                             | **Complete — dormant production foundation; development lab passed.** |
 | **MOVE1 — Temporary physical File movement**        | Direct manipulation that ends on release and returns the File to automatic physical behavior.                                                                    | **In progress.**                                                      |
 | **MOVE1A — Constraint/gesture foundation**          | Display-to-dynamic coordinate inverse, serializable consumer port, pure gesture/coalescing, session seams, and lifecycle/arbitration tests.                      | **Complete.**                                                         |
 | **MOVE1B — Production Edit/Move mode**              | Visible editing surface and real PHYSICS1 adapter integration with runtime cooling/RAF evidence.                                                                 | **Next after PHYSICS1.**                                              |
@@ -71,7 +71,8 @@ separate future continuous interactive simulation lifecycle.
 
 CONVERGENCE1C gives Global a distinct centroid-aligned policy and an output-only
 folder field whose strength cannot accumulate with extra convergence checks.
-SPATIAL2 dynamic convergence and PHYSICS1 remain separate future work.
+SPATIAL2 static dynamic convergence remains separate. PHYSICS1 now supplies the
+dormant continuous runtime required by MOVE1B without exposing product Move.
 
 ## Accepted future interaction guidance
 
