@@ -1,9 +1,11 @@
 import {
+  DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
   FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
   validateFocusSchematicLayoutWorkerResponse,
   type FocusSchematicComputedLayout,
   type FocusSchematicEndpointLayoutPhaseTimings,
   type FocusSchematicLayoutInput,
+  type FocusSchematicProductLayoutPolicies,
   type FocusSchematicLayoutWorkerRequest,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 
@@ -31,6 +33,7 @@ export type FocusSchematicLayoutWorkerResult =
 export interface FocusSchematicLayoutWorkerService {
   readonly layoutLatest: (
     input: FocusSchematicLayoutInput,
+    policies?: FocusSchematicProductLayoutPolicies,
   ) => Promise<FocusSchematicLayoutWorkerResult>;
   readonly cancelPending: () => void;
   readonly dispose: () => void;
@@ -53,6 +56,7 @@ export interface FocusSchematicLayoutWorkerClientOptions {
 interface ActiveLayout {
   readonly requestId: number;
   readonly input: FocusSchematicLayoutInput;
+  readonly policies: FocusSchematicProductLayoutPolicies;
   readonly startedAt: number;
   readonly workerStartupMs: number;
   readonly finishResponsivenessProbe: () => number | undefined;
@@ -174,6 +178,7 @@ export function createFocusSchematicLayoutWorkerClient(
           event.data,
           request.requestId,
           request.input,
+          request.policies,
         );
       } catch (error: unknown) {
         failTransport(
@@ -223,7 +228,10 @@ export function createFocusSchematicLayoutWorkerClient(
   }
 
   return {
-    layoutLatest(input) {
+    layoutLatest(
+      input,
+      policies = DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+    ) {
       if (disposed) {
         return Promise.resolve({
           status: 'failure',
@@ -253,12 +261,14 @@ export function createFocusSchematicLayoutWorkerClient(
         requestId,
         kind: 'layout',
         input,
+        policies,
       };
       return new Promise((resolve) => {
         const startedAt = now();
         active = {
           requestId,
           input,
+          policies,
           startedAt,
           workerStartupMs: ensured.startupMs,
           finishResponsivenessProbe: createResponsivenessProbe(),

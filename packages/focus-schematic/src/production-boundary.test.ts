@@ -37,10 +37,24 @@ describe('HIER3B semantic-model production boundary', () => {
       [
         'apps/web/src/components/ModularStructuredGraphView.tsx',
         'apps/web/src/focus-schematic-layout-cache.ts',
+        'apps/web/src/preferences/graph-preferences.ts',
         'apps/web/src/workers/focus-schematic-layout-worker-client.ts',
         'apps/web/src/workers/focus-schematic-layout.worker.ts',
         'packages/renderer-reactflow/src/focus-schematic/index.ts',
       ].sort(),
     );
+    expect(
+      readFileSync(
+        join(
+          repository,
+          'apps',
+          'web',
+          'src',
+          'preferences',
+          'graph-preferences.ts',
+        ),
+        'utf8',
+      ),
+    ).toContain('@icarus-graph-explorer/focus-schematic-layout/policies');
   });
 });

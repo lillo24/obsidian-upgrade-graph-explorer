@@ -1,7 +1,9 @@
 import { Worker } from 'node:worker_threads';
 
 import {
+  DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
   ENDPOINT_FIXTURES,
+  FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
   FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
   buildEndpointFixture,
   validateFocusSchematicLayoutWorkerResponse,
@@ -56,7 +58,7 @@ function inputFor(
             ENDPOINT_FIXTURES.find(({ id }) => id === 'EP22')!,
           )
         : buildEndpointFixture(hubSpec(120));
-  return createLayoutInput(fixture);
+  return createLayoutInput(fixture, FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS);
 }
 
 function request(input: FocusSchematicLayoutInput, requestId = 1) {
@@ -65,6 +67,7 @@ function request(input: FocusSchematicLayoutInput, requestId = 1) {
     requestId,
     kind: 'layout',
     input,
+    policies: DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
   } satisfies FocusSchematicLayoutWorkerRequest;
 }
 
@@ -85,6 +88,7 @@ async function runWorker(item: FocusSchematicLayoutWorkerRequest): Promise<{
             value,
             item.requestId,
             item.input,
+            item.policies,
           ),
           roundTripMs: performance.now() - startedAt,
         });

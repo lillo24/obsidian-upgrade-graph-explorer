@@ -1,4 +1,8 @@
-import type { EntityId, ReferenceId } from '@icarus-graph-explorer/core';
+import type {
+  EntityId,
+  ReferenceId,
+  WorkspaceFolderKey,
+} from '@icarus-graph-explorer/core';
 import type {
   FocusSchematicLayoutCandidate,
   FocusSchematicLayoutQuality,
@@ -13,9 +17,64 @@ import type {
 export const FOCUS_SCHEMATIC_LAYOUT_PLAN_SCHEMA_VERSION = 1 as const;
 export const FOCUS_SCHEMATIC_ENDPOINT_PLAN_SCHEMA_VERSION = 1 as const;
 export const FOCUS_SCHEMATIC_INTERNAL_LANE_PLAN_SCHEMA_VERSION = 1 as const;
+export const FOCUS_SCHEMATIC_FOLDER_BAND_PLAN_SCHEMA_VERSION = 4 as const;
 
 export type FocusSchematicFilteredModulePolicy =
   'compact-bridge' | 'context-card';
+
+/** Visual branch order; Markdown/source order always remains canonical. */
+export type FocusSchematicEndpointOrderPolicy =
+  'document-order' | 'crossing-optimized';
+
+/** Internal File-module layout family. Current remains a lab-only comparator. */
+export type FocusSchematicInternalLayoutVariant =
+  'current' | 'vertical-spine' | 'adaptive-compass';
+
+export interface FocusSchematicInternalLayoutModuleMetrics {
+  readonly moduleId: EntityId;
+  readonly topLevelBranchCount: number;
+  readonly branchesAboveFile: number;
+  readonly branchesBelowFile: number;
+  readonly branchesLeftOfFile: number;
+  readonly branchesRightOfFile: number;
+  readonly packedExtentAboveFile: number;
+  readonly packedExtentBelowFile: number;
+  readonly packedExtentImbalance: number;
+  readonly width: number;
+  readonly height: number;
+  readonly area: number;
+}
+
+export interface FocusSchematicInternalLayoutQualityMetrics {
+  readonly totalPrimaryReferenceManhattanSpan: number;
+  readonly meanPrimaryReferenceManhattanSpan: number | null;
+  readonly p95PrimaryReferenceManhattanSpan: number | null;
+  readonly totalPrimaryReferenceVerticalSpan: number;
+  readonly meanPrimaryReferenceVerticalSpan: number | null;
+  readonly internalHierarchyCrossingCount: number;
+  readonly internalSourceOrderDeviation: number;
+  readonly totalInternalBranchMovement: number;
+  readonly totalModuleArea: number;
+  readonly maximumModuleWidth: number;
+  readonly maximumModuleHeight: number;
+}
+
+export interface FocusSchematicInternalLayoutEvidence {
+  readonly variant: FocusSchematicInternalLayoutVariant;
+  readonly developmentOnly: boolean;
+  readonly verticalSpinePlacementCandidateCap: 64;
+  readonly compassAssignmentCap: 64;
+  readonly compassLocalRelocationSweepLimit: 4;
+  readonly jointFolderRoundLimit: 2;
+  readonly jointFolderRounds: number;
+  readonly modulesOptimized: number;
+  readonly completeCompassAssignmentsEvaluated: number;
+  readonly placementCandidatesEvaluated: number;
+  readonly localRelocationSweeps: number;
+  readonly largeModuleFallbackCount: number;
+  readonly moduleMetrics: readonly FocusSchematicInternalLayoutModuleMetrics[];
+  readonly metrics: FocusSchematicInternalLayoutQualityMetrics;
+}
 
 export interface FocusSchematicNodeDimension {
   readonly projectionNodeId: ProjectionNodeId;
@@ -32,7 +91,161 @@ export interface FocusSchematicPrototypeSettings {
   readonly internalRankSeparation: number;
   readonly macroNodeSeparation: number;
   readonly macroRankSeparation: number;
+  /** Categorical HIER4A development/production geometry switch. */
+  readonly directionalFolderBandsEnabled: boolean;
   readonly ranker: 'network-simplex' | 'tight-tree' | 'longest-path';
+}
+
+export interface FocusSchematicFolderBand {
+  readonly folderKey: WorkspaceFolderKey;
+  readonly root: boolean;
+  readonly order: number;
+  readonly topY: number;
+  readonly bottomY: number;
+  readonly centerY: number;
+  readonly height: number;
+  readonly moduleIds: readonly EntityId[];
+  readonly requiredHeight: number;
+  readonly baselineMedianCenterY: number;
+  readonly singleton: boolean;
+}
+
+export interface FocusSchematicFolderModulePlacement {
+  readonly moduleId: EntityId;
+  readonly folderKey: WorkspaceFolderKey;
+  readonly signedRank: -3 | -2 | -1 | 0 | 1 | 2 | 3;
+  readonly baselineCenterY: number;
+  readonly preferredBandCenterY: number;
+  readonly finalCenterY: number;
+  readonly displacementY: number;
+  readonly distanceToOwnBand: number;
+  readonly status: 'inside-own-band' | 'exception-outside-own-band';
+  readonly exceptionId: string | null;
+}
+
+export type FocusSchematicFolderBandExceptionReason =
+  | 'crossing-guard'
+  | 'rank-order-inversion-guard'
+  | 'root-anchor'
+  | 'unsatisfiable-order-cycle';
+
+export interface FocusSchematicFolderBandException {
+  readonly id: string;
+  readonly moduleId: EntityId;
+  readonly folderKey: WorkspaceFolderKey;
+  readonly reason: FocusSchematicFolderBandExceptionReason;
+  readonly distanceToOwnBand: number;
+  readonly evidence: {
+    readonly baselineCrossings: number;
+    readonly candidateCrossings: number;
+    readonly baselineInversions: number;
+    readonly candidateInversions: number;
+  };
+}
+
+export interface FocusSchematicFolderBandSummary {
+  readonly visibleFolderCount: number;
+  readonly visibleModuleCount: number;
+  readonly satisfiedModuleCount: number;
+  readonly exceptionModuleCount: number;
+  readonly satisfactionRatio: number | null;
+  readonly rootFolderVisibleModuleCount: number;
+  readonly filteredExcludedModuleCount: number;
+}
+
+export interface FocusSchematicFolderBandRootBalance {
+  readonly aboveFolderKeys: readonly WorkspaceFolderKey[];
+  readonly belowFolderKeys: readonly WorkspaceFolderKey[];
+  /** Packed extent from the root-band boundary, including inter-band gaps. */
+  readonly abovePackedExtent: number;
+  readonly belowPackedExtent: number;
+  readonly packedExtentImbalance: number;
+  /** Best height-weighted partition before higher-priority topology guards. */
+  readonly bestUnconstrainedImbalance: number;
+  readonly topologyOverride: {
+    readonly reason: 'crossing-guard' | 'rank-order-inversion-guard';
+    readonly attemptedFolderOrder: readonly WorkspaceFolderKey[];
+    readonly attemptedPackedExtentImbalance: number;
+    readonly evidence: FocusSchematicFolderBandException['evidence'];
+  } | null;
+}
+
+export interface FocusSchematicFolderBandCandidateMetrics {
+  readonly exactEndpointCrossingCount: number;
+  readonly adjacentRankOrderInversionCount: number;
+  readonly folderBandExceptionModuleCount: number;
+  readonly oneSidedRootPenalty: 0 | 1;
+  readonly rootBalanceImbalance: number;
+  readonly totalPrimaryReferenceVerticalSpan: number;
+  readonly meanPrimaryReferenceVerticalSpan: number | null;
+  readonly p95PrimaryReferenceVerticalSpan: number | null;
+  readonly maximumPrimaryReferenceVerticalSpan: number | null;
+  readonly totalExceptionDistanceToOwnBand: number;
+  readonly totalModuleDisplacementFromPureA1: number;
+  readonly visualSiblingOrderDeviationFromSource: number;
+}
+
+export interface FocusSchematicFolderBandCandidateEvidence {
+  readonly folderOrder: readonly WorkspaceFolderKey[];
+  readonly metrics: FocusSchematicFolderBandCandidateMetrics;
+  readonly rejectionReason: string | null;
+}
+
+export interface FocusSchematicFolderBandOptimizationEvidence {
+  readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
+  readonly internalLayoutVariant: FocusSchematicInternalLayoutVariant;
+  readonly jointRoundLimit: 2;
+  readonly folderPartitionsEvaluated: number;
+  readonly folderOrderCandidatesEvaluated: number;
+  readonly candidateLocalHeadingReorderSweeps: number;
+  readonly rankOrderSweeps: number;
+  readonly jointRounds: number;
+  readonly crossingMetricEvaluations: number;
+  readonly visuallyReorderedBranchCount: number;
+  readonly selectedCandidate: FocusSchematicFolderBandCandidateEvidence;
+  readonly nearestRejectedCandidate: FocusSchematicFolderBandCandidateEvidence | null;
+}
+
+export interface FocusSchematicFolderBandPlan {
+  readonly schemaVersion: typeof FOCUS_SCHEMATIC_FOLDER_BAND_PLAN_SCHEMA_VERSION;
+  readonly enabled: boolean;
+  readonly rootFolderKey: WorkspaceFolderKey;
+  readonly folderOrder: readonly WorkspaceFolderKey[];
+  readonly bands: readonly FocusSchematicFolderBand[];
+  /** Filtered modules are deliberately omitted to avoid exposing hidden folders. */
+  readonly modulePlacements: readonly FocusSchematicFolderModulePlacement[];
+  readonly exceptions: readonly FocusSchematicFolderBandException[];
+  readonly rootBalance: FocusSchematicFolderBandRootBalance | null;
+  readonly optimization: FocusSchematicFolderBandOptimizationEvidence | null;
+  readonly summary: FocusSchematicFolderBandSummary;
+}
+
+export interface FocusSchematicFolderBandQuality {
+  readonly visibleFolderCount: number;
+  readonly visibleModuleCount: number;
+  readonly folderBandSatisfiedModuleCount: number;
+  readonly folderBandExceptionModuleCount: number;
+  readonly folderBandSatisfactionRatio: number | null;
+  readonly rankFolderFragmentCount: number;
+  readonly sameFolderAdjacencyRatioWithinRanks: number | null;
+  readonly meanDistanceToOwnBand: number | null;
+  readonly p95DistanceToOwnBand: number | null;
+  readonly maximumDistanceToOwnBand: number | null;
+  readonly totalExceptionDistance: number;
+  readonly maximumExceptionDistance: number;
+  readonly meanFolderModuleDisplacement: number;
+  readonly p95FolderModuleDisplacement: number;
+  readonly maximumFolderModuleDisplacement: number;
+  /** Includes the fixed root module. */
+  readonly rootFolderMeanAbsoluteOffset: number | null;
+  readonly baselineExactEndpointCrossingCount: number;
+  readonly finalExactEndpointCrossingCount: number;
+  readonly baselineAdjacentRankOrderInversionCount: number;
+  readonly finalAdjacentRankOrderInversionCount: number;
+  readonly baselineMeanEndpointVerticalError: number | null;
+  readonly finalMeanEndpointVerticalError: number | null;
+  readonly baselineP95EndpointVerticalError: number | null;
+  readonly finalP95EndpointVerticalError: number | null;
 }
 
 export interface FocusSchematicLayoutInput {
@@ -40,6 +253,13 @@ export interface FocusSchematicLayoutInput {
   readonly projection: ViewProjection;
   readonly nodeDimensions: readonly FocusSchematicNodeDimension[];
   readonly settings: FocusSchematicPrototypeSettings;
+}
+
+export interface FocusSchematicComputedLayoutOptions {
+  /** Visual ordering policy. Ignored while Folder Bands are Off. */
+  readonly endpointOrderPolicy?: FocusSchematicEndpointOrderPolicy;
+  /** Internal layout; Current is retained only for lab comparison evidence. */
+  readonly internalLayoutVariant?: FocusSchematicInternalLayoutVariant;
 }
 
 export interface FocusSchematicLayoutPlanModule {
@@ -260,6 +480,9 @@ export interface FocusSchematicComputedLayout {
   readonly modulePlan: FocusSchematicLayoutPlan;
   readonly endpointPlan: FocusSchematicEndpointPlan;
   readonly internalLanePlan: FocusSchematicInternalLanePlan;
+  readonly folderBandPlan: FocusSchematicFolderBandPlan;
+  readonly folderBandQuality: FocusSchematicFolderBandQuality;
+  readonly internalLayoutEvidence: FocusSchematicInternalLayoutEvidence;
   readonly attachments: readonly FocusSchematicEndpointAttachmentGeometry[];
   readonly quality: FocusSchematicEndpointLayoutQuality;
 }
@@ -275,8 +498,17 @@ export interface FocusSchematicEndpointLayoutPhaseTimings {
   readonly leftLayoutMs: number;
   readonly rightLayoutMs: number;
   readonly compositionMs: number;
+  readonly internalVariantMs: number;
   readonly macroMs: number;
   readonly crossingMinimizationMs: number;
+  readonly folderInventoryMs: number;
+  readonly folderInitialOrderMs: number;
+  readonly folderOrderRefinementMs: number;
+  readonly folderRankOrderingMs: number;
+  readonly folderBandPackingMs: number;
+  readonly folderModuleAssignmentMs: number;
+  readonly folderExceptionAnalysisMs: number;
+  readonly folderQualityMs: number;
   readonly attachmentMs: number;
   readonly qualityMs: number;
   readonly validationMs: number;
@@ -286,6 +518,7 @@ export interface FocusSchematicEndpointLayoutPhaseTimings {
   readonly inputSerializedBytes: number;
   readonly outputSerializedBytes: number;
   readonly endpointLaneSerializedBytes: number;
+  readonly folderBandSerializedBytes: number;
 }
 
 export type FocusSchematicComputedLayoutAttempt =

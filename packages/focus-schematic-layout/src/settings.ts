@@ -10,10 +10,21 @@ export const FOCUS_SCHEMATIC_LAYOUT_SETTINGS = {
   internalRankSeparation: 48,
   macroNodeSeparation: 36,
   macroRankSeparation: 80,
+  // Development labs retain pure A1 as the Folder Bands Off oracle.
+  directionalFolderBandsEnabled: false,
   ranker: 'network-simplex',
 } as const satisfies FocusSchematicPrototypeSettings;
 
+/** Modular Focus Hierarchy settings selected by the HIER4A production gate. */
+export const FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS = {
+  ...FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+  directionalFolderBandsEnabled: true,
+} as const satisfies FocusSchematicPrototypeSettings;
+
 export const FOCUS_SCHEMATIC_LAYOUT_CLEARANCE = 16;
+
+/** Interior breathing room between a module edge and its exact band guide. */
+export const FOCUS_SCHEMATIC_DIRECTIONAL_FOLDER_BAND_PADDING_Y = 16;
 
 export const FILTERED_MODULE_DIMENSIONS = {
   'compact-bridge': { width: 72, height: 40 },

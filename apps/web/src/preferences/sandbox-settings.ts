@@ -25,6 +25,10 @@ export function resetGraphSandbox(
       focusHierarchyImplementation:
         DEFAULT_GRAPH_PREFERENCES.focusHierarchyImplementation,
       globalLayoutSettings: DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
+      modularFocusInternalLayout:
+        DEFAULT_GRAPH_PREFERENCES.modularFocusInternalLayout,
+      modularFocusHeadingOrder:
+        DEFAULT_GRAPH_PREFERENCES.modularFocusHeadingOrder,
       showExperimentalAllHierarchy:
         DEFAULT_GRAPH_PREFERENCES.showExperimentalAllHierarchy,
     },

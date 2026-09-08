@@ -34,8 +34,9 @@ Future package names, state libraries, and implementation details are intentiona
 | **HIER3A**      | Precise File/Heading/Block endpoint plan, endpoint-facing internal lanes, bounded endpoint-aware ordering, and validated non-production A1 selection. | **Complete — `ADOPT_ENDPOINT_FACING_SPLIT_LANES`.**         |
 | **HIER3B**      | Production modular worker and renderer preview with latest-result-wins adoption, caching/failure policy, and unchanged Classic fallback.              | **Complete — modular production preview approved.**         |
 | **HIER3B-FIX1** | Center-spine module composition plus module-aware File hover and a direct-File connection ring.                                                       | **Complete — optimized desktop graphical approval passed.** |
-| **HIER4**       | Soft folder-band positioning after signed-rank and endpoint-readability constraints.                                                                  | **Next.**                                                   |
-| **HIER5**       | Direct/Electronic orthogonal routing, Rounded route styling, channels, and distinct hit targets over exact endpoints.                                 | **After HIER4.**                                            |
+| **HIER4A**      | Directional exact-folder bands, packed root balance, joint endpoint-aware ordering, and Adaptive Compass production integration.                      | **Complete — `ADOPT_ADAPTIVE_COMPASS`.**                    |
+| **HIER4B**      | Soft Folder Clusters beyond exact categorical bands.                                                                                                  | **Next.**                                                   |
+| **HIER5**       | Direct/Electronic orthogonal routing, Rounded route styling, channels, and distinct hit targets over exact endpoints.                                 | **After HIER4B.**                                           |
 | **HIER3C**      | Product adoption of modular Focus Hierarchy and Experimental exposure of the preserved Classic Focus Hierarchy.                                       | **After HIER5.**                                            |
 
 This track composes with the active KG14 sequence; it does not replace or

@@ -10,10 +10,13 @@ import {
 
 import { createFocusSchematicModel } from '@icarus-graph-explorer/focus-schematic';
 import {
-  FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+  FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
   type FocusSchematicComputedLayout,
   type FocusSchematicEndpointLayoutPhaseTimings,
   type FocusSchematicLayoutInput,
+  type FocusSchematicProductInternalLayoutVariant,
+  type FocusSchematicProductLayoutPolicies,
+  type FocusSchematicEndpointOrderPolicy,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performance';
 import {
@@ -50,7 +53,9 @@ export interface ModularStructuredGraphViewProps {
   readonly centerRequest?: GraphCenterRequest;
   readonly fitRequestKey: number;
   readonly focusAppearance: FocusAppearance;
+  readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
   readonly initialTransitionAnchor?: GraphTransitionAnchor;
+  readonly internalLayoutVariant: FocusSchematicProductInternalLayoutVariant;
   readonly instrumentation?: PerformanceInstrumentation;
   readonly onFatalFailure: (message: string) => void;
   readonly onFitRequestConsumed?: (key: number) => void;
@@ -128,12 +133,27 @@ function recordAttemptTimings(
       timings.compositionMs,
   );
   instrumentation?.record(
+    'focus-schematic-phase-compass-layout',
+    timings.internalVariantMs,
+  );
+  instrumentation?.record(
     'focus-schematic-phase-macro-layout',
     timings.macroMs,
   );
   instrumentation?.record(
     'focus-schematic-phase-crossing-ordering',
     timings.crossingMinimizationMs,
+  );
+  instrumentation?.record(
+    'focus-schematic-phase-folder-bands',
+    timings.folderInventoryMs +
+      timings.folderInitialOrderMs +
+      timings.folderOrderRefinementMs +
+      timings.folderRankOrderingMs +
+      timings.folderBandPackingMs +
+      timings.folderModuleAssignmentMs +
+      timings.folderExceptionAnalysisMs +
+      timings.folderQualityMs,
   );
   instrumentation?.record(
     'focus-schematic-phase-attachments',
@@ -146,6 +166,30 @@ function recordAttemptTimings(
   instrumentation?.record(
     'focus-schematic-phase-serialization',
     timings.serializationMs,
+  );
+}
+
+function recordAttemptEvidence(
+  instrumentation: PerformanceInstrumentation | undefined,
+  computed: FocusSchematicComputedLayout,
+): void {
+  const internal = computed.internalLayoutEvidence;
+  const folder = computed.folderBandPlan.optimization;
+  instrumentation?.record(
+    'focus-schematic-joint-refinement-rounds',
+    internal.jointFolderRounds,
+  );
+  instrumentation?.record(
+    'focus-schematic-compass-assignment-evaluations',
+    internal.completeCompassAssignmentsEvaluated,
+  );
+  instrumentation?.record(
+    'focus-schematic-compass-large-module-fallbacks',
+    internal.largeModuleFallbackCount,
+  );
+  instrumentation?.record(
+    'focus-schematic-crossing-evaluations',
+    folder?.crossingMetricEvaluations ?? 0,
   );
 }
 
@@ -196,7 +240,9 @@ export default function ModularStructuredGraphView(
   props: ModularStructuredGraphViewProps,
 ) {
   const {
+    endpointOrderPolicy,
     instrumentation,
+    internalLayoutVariant,
     onFatalFailure,
     onViewportObservation,
     projection,
@@ -214,6 +260,10 @@ export default function ModularStructuredGraphView(
   const [retryKey, setRetryKey] = useState(0);
   const [lifecycle, setLifecycle] = useState<LifecycleState>({ phase: 'idle' });
   const fatalReported = useRef(false);
+  const layoutPolicies = useMemo<FocusSchematicProductLayoutPolicies>(
+    () => ({ endpointOrderPolicy, internalLayoutVariant }),
+    [endpointOrderPolicy, internalLayoutVariant],
+  );
 
   const model = useMemo(() => {
     const build = () =>
@@ -241,7 +291,7 @@ export default function ModularStructuredGraphView(
       model,
       projection,
       nodeDimensions,
-      settings: FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+      settings: FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
     });
 
     return instrumentation === undefined
@@ -253,7 +303,8 @@ export default function ModularStructuredGraphView(
         );
   }, [instrumentation, model, nodeDimensions, projection]);
   const layoutKey = useMemo(() => {
-    const serialize = () => exactFocusSchematicLayoutCacheKey(layoutInput);
+    const serialize = () =>
+      exactFocusSchematicLayoutCacheKey(layoutInput, layoutPolicies);
     return instrumentation === undefined
       ? serialize()
       : instrumentation.measure(
@@ -261,7 +312,7 @@ export default function ModularStructuredGraphView(
           undefined,
           serialize,
         );
-  }, [instrumentation, layoutInput]);
+  }, [instrumentation, layoutInput, layoutPolicies]);
 
   const prepareGraph = useCallback(
     (computed: FocusSchematicComputedLayout, secondaryVisible: boolean) => {
@@ -298,7 +349,7 @@ export default function ModularStructuredGraphView(
       }));
       let lookup;
       try {
-        lookup = focusSchematicLayoutCache.get(layoutInput);
+        lookup = focusSchematicLayoutCache.get(layoutInput, layoutPolicies);
       } catch {
         lookup = {
           status: 'invalid' as const,
@@ -336,64 +387,74 @@ export default function ModularStructuredGraphView(
         ...(state.adopted === undefined ? {} : { adopted: state.adopted }),
       }));
       instrumentation?.count('layouts');
-      void workerService.layoutLatest(layoutInput).then((result) => {
-        if (!current || result.status === 'superseded') return;
-        instrumentation?.record(
-          'focus-schematic-worker-compute',
-          result.metrics.workerComputeMs,
-        );
-        instrumentation?.record(
-          'focus-schematic-worker-round-trip',
-          result.metrics.workerRoundTripMs,
-        );
-        instrumentation?.record(
-          'focus-schematic-worker-startup',
-          result.metrics.workerStartupMs,
-        );
-        if (result.metrics.mainThreadHighGapMs !== undefined)
+      void workerService
+        .layoutLatest(layoutInput, layoutPolicies)
+        .then((result) => {
+          if (!current || result.status === 'superseded') return;
           instrumentation?.record(
-            'focus-schematic-main-thread-gap',
-            result.metrics.mainThreadHighGapMs,
+            'focus-schematic-worker-compute',
+            result.metrics.workerComputeMs,
           );
-        if (result.metrics.timings !== undefined)
-          recordAttemptTimings(instrumentation, result.metrics.timings);
-        if (result.status === 'failure') {
-          setLifecycle((state) => {
-            if (state.adopted !== undefined) {
-              return {
-                phase: 'warning-with-last-valid',
-                adopted: state.adopted,
-                message: `${result.message} The last valid modular graph remains visible.`,
-              };
-            }
-            return { phase: 'fatal-no-valid-result', message: result.message };
-          });
-          return;
-        }
-        try {
-          const graph = prepareGraph(result.result, false);
-          focusSchematicLayoutCache.set(layoutInput, result.result);
           instrumentation?.record(
-            'focus-schematic-request-adoption',
-            Math.max(0, globalThis.performance.now() - startedAt),
+            'focus-schematic-worker-round-trip',
+            result.metrics.workerRoundTripMs,
           );
-          setLifecycle({
-            phase: 'ready',
-            adopted: { key: layoutKey, computed: result.result, graph },
-          });
-        } catch (error: unknown) {
-          const message = `Modular renderer adoption failed: ${errorMessage(error)}`;
-          setLifecycle((state) =>
-            state.adopted === undefined
-              ? { phase: 'fatal-no-valid-result', message }
-              : {
+          instrumentation?.record(
+            'focus-schematic-worker-startup',
+            result.metrics.workerStartupMs,
+          );
+          if (result.metrics.mainThreadHighGapMs !== undefined)
+            instrumentation?.record(
+              'focus-schematic-main-thread-gap',
+              result.metrics.mainThreadHighGapMs,
+            );
+          if (result.metrics.timings !== undefined)
+            recordAttemptTimings(instrumentation, result.metrics.timings);
+          if (result.status === 'failure') {
+            setLifecycle((state) => {
+              if (state.adopted !== undefined) {
+                return {
                   phase: 'warning-with-last-valid',
                   adopted: state.adopted,
-                  message: `${message} The last valid modular graph remains visible.`,
-                },
-          );
-        }
-      });
+                  message: `${result.message} The last valid modular graph remains visible.`,
+                };
+              }
+              return {
+                phase: 'fatal-no-valid-result',
+                message: result.message,
+              };
+            });
+            return;
+          }
+          try {
+            recordAttemptEvidence(instrumentation, result.result);
+            const graph = prepareGraph(result.result, false);
+            focusSchematicLayoutCache.set(
+              layoutInput,
+              layoutPolicies,
+              result.result,
+            );
+            instrumentation?.record(
+              'focus-schematic-request-adoption',
+              Math.max(0, globalThis.performance.now() - startedAt),
+            );
+            setLifecycle({
+              phase: 'ready',
+              adopted: { key: layoutKey, computed: result.result, graph },
+            });
+          } catch (error: unknown) {
+            const message = `Modular renderer adoption failed: ${errorMessage(error)}`;
+            setLifecycle((state) =>
+              state.adopted === undefined
+                ? { phase: 'fatal-no-valid-result', message }
+                : {
+                    phase: 'warning-with-last-valid',
+                    adopted: state.adopted,
+                    message: `${message} The last valid modular graph remains visible.`,
+                  },
+            );
+          }
+        });
     });
     return () => {
       current = false;
@@ -403,6 +464,7 @@ export default function ModularStructuredGraphView(
     instrumentation,
     layoutInput,
     layoutKey,
+    layoutPolicies,
     prepareGraph,
     retryKey,
     workerService,

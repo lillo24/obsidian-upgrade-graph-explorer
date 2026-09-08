@@ -632,7 +632,7 @@ describe('HIER3B-FIX1 center-spine layout', () => {
       expect(first.status, fixtureSpec.id).toBe('success');
       expect(second.status, fixtureSpec.id).toBe('success');
       if (first.status !== 'success' || second.status !== 'success') continue;
-      expect(first.configId, fixtureSpec.id).toContain('A1v2-');
+      expect(first.configId, fixtureSpec.id).toContain('A1v3-');
       expect(second.result, fixtureSpec.id).toEqual(first.result);
       expect(first.result.quality, fixtureSpec.id).toMatchObject({
         moduleOverlapPairs: [],

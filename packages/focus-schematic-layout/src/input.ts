@@ -42,6 +42,7 @@ export function validateFocusSchematicLayoutInput(
     input.model.schemaVersion !== 1 ||
     typeof input.model.rootModuleId !== 'string' ||
     !Array.isArray(input.model.modules) ||
+    !Array.isArray(input.model.folders) ||
     !Array.isArray(input.model.relationships) ||
     !Array.isArray(input.model.parentCandidates)
   )
@@ -127,6 +128,7 @@ export function validateFocusSchematicLayoutInput(
   const settingsKeys = [
     'diagnosticReserveHeight',
     'filteredModulePolicy',
+    'directionalFolderBandsEnabled',
     'internalNodeSeparation',
     'internalRankSeparation',
     'macroNodeSeparation',
@@ -150,6 +152,11 @@ export function validateFocusSchematicLayoutInput(
     issues.push({
       path: '$.settings',
       message: 'Spacing must be finite and nonnegative.',
+    });
+  if (typeof input.settings.directionalFolderBandsEnabled !== 'boolean')
+    issues.push({
+      path: '$.settings.directionalFolderBandsEnabled',
+      message: 'Directional Folder Bands must be enabled or disabled.',
     });
   if (
     !['compact-bridge', 'context-card'].includes(

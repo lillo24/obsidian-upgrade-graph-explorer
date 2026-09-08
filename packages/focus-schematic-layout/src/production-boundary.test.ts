@@ -30,7 +30,7 @@ describe('HIER3B production boundary', () => {
     );
   });
 
-  it('is imported only by the approved lazy renderer and web integration seams', () => {
+  it('is imported only by the approved renderer, worker/cache, and policy seams', () => {
     const repository = fileURLToPath(new URL('../../..', import.meta.url));
     const packageRoot = join(repository, 'packages', 'focus-schematic-layout');
     const roots = ['apps', 'packages']
@@ -48,10 +48,24 @@ describe('HIER3B production boundary', () => {
       [
         'apps/web/src/components/ModularStructuredGraphView.tsx',
         'apps/web/src/focus-schematic-layout-cache.ts',
+        'apps/web/src/preferences/graph-preferences.ts',
         'apps/web/src/workers/focus-schematic-layout-worker-client.ts',
         'apps/web/src/workers/focus-schematic-layout.worker.ts',
         'packages/renderer-reactflow/src/focus-schematic/index.ts',
       ].sort(),
     );
+    expect(
+      readFileSync(
+        join(
+          repository,
+          'apps',
+          'web',
+          'src',
+          'preferences',
+          'graph-preferences.ts',
+        ),
+        'utf8',
+      ),
+    ).toContain('@icarus-graph-explorer/focus-schematic-layout/policies');
   });
 });

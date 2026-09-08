@@ -5,6 +5,23 @@ changing production rendering. It generates synthetic F1–F18, seeded holdout,
 scale, stability, dynamic-layout, filtered-policy, source-order, route, and
 visual evidence. It also owns the focused HIER3A endpoint/lane benchmark and
 graphical review lab.
+It also owns the HIER4A categorical Directional Folder Bands benchmark and
+graphical review lab. HIER4A-FIX1 compares document-order and
+crossing-optimized graph-only Heading order, candidate-specific two-round joint
+refinement, true post-reorder topology blocks, packed-height root balance, and
+exact primary endpoint span. The rejected 0–100 directional-pull prototype
+remains historical evidence only. HIER4A stays a development decision until
+graphical approval selects categorical On and its Heading-order policy, or
+retains pure A1.
+
+HIER4A-FIX2 extends that same unmerged decision with an internal File-module
+bakeoff: M0 Current, V1 Strict Vertical Spine, and C1 Adaptive Compass. The lab
+defaults to V1 versus C1 side by side and keeps Folder Bands plus Heading-order
+controls. Its evidence includes primary Manhattan/vertical span, internal
+hierarchy crossings, File-relative branch regions, module width/height/area,
+bounded candidate counts, and runtime. DB12 is neutral internal-layout pressure;
+DB19 is the replacement true-blocked oracle after V1/C1 optimization. Metrics
+remain evidence only until the user explicitly selects one grammar.
 
 The accepted outcome is stateless Strategy A. D0 remains the Classic baseline,
 B is retained as rejected evidence, and C remains honestly unbuilt because A
@@ -32,6 +49,10 @@ pnpm benchmark:focus-schematic-production-worker -- --profile small
 pnpm benchmark:focus-schematic-production-worker -- --profile medium
 pnpm benchmark:focus-schematic-production-worker -- --profile hub
 pnpm benchmark:focus-schematic-production-worker -- --profile supersession
+
+pnpm benchmark:focus-schematic-directional-folder-bands -- --profile all --out output/hier4a-directional-folder-bands-benchmark.json
+pnpm benchmark:focus-schematic-internal-layout -- --out output/hier4a-fix2-internal-layout-benchmark.json
+pnpm generate:focus-schematic-folder-lab -- --out output/hier4a-fix2-internal-layout-lab
 ```
 
 Medium and hub attempts run in disposable worker threads with hard timeouts.
@@ -74,6 +95,20 @@ adjacent keyboard-accessible list. Generated output is gitignored.
   profiles without defining a timing gate.
 - `src/production-worker-thread.ts` hosts the production runtime for that
   worker-thread benchmark.
+- `src/folder-benchmark.ts` compares categorical Off/On across FB1–FB18,
+  DB1–DB19, document/crossing-order policy cases, 20/100 Heading stress,
+  generated scale cases, FS1–FS8, height-weighted root balance, primary endpoint
+  span, bounded candidate accounting, post-reorder topology overrides, hard
+  gates, stability, runtime, and frozen revision-2 candidate hashes.
+- `src/folder-lab.ts` generates the focused self-contained HIER4A review
+  surface with exact interval guides, hierarchy/endpoint links, Off/On,
+  Heading-order, M0/V1/C1 controls, side-by-side internal-layout comparisons,
+  transparent quality metrics, and visible post-reorder override proofs.
+- `src/internal-layout-benchmark.ts` reports the M0/V1/C1 trade-off table,
+  bounded search counts, determinism, hard gates, DB12 reinterpretation, DB19
+  proof, CP4 width pressure, and the fair CP5 Compass improvement case.
+- `src/folder-lab.test.ts` verifies the required graphical-review cases,
+  accessibility labels, and offline output.
 - `src/endpoint-*.test.ts` covers the inherited HIER2 corpus and review-lab
   defaults/accessibility.
 - `src/strategies.test.ts` covers D0, compound output, dimensions, source order,

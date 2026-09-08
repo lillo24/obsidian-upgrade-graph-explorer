@@ -8,6 +8,13 @@ import {
   type GlobalLayoutSettings,
 } from '@icarus-graph-explorer/renderer-sigma/settings';
 import type { LocalLayoutMode } from '@icarus-graph-explorer/view-state';
+import {
+  DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+  isFocusSchematicEndpointOrderPolicy,
+  isFocusSchematicProductInternalLayoutVariant,
+  type FocusSchematicEndpointOrderPolicy,
+  type FocusSchematicProductInternalLayoutVariant,
+} from '@icarus-graph-explorer/focus-schematic-layout/policies';
 
 import type { StorageLike } from '../persistence/storage';
 
@@ -22,6 +29,10 @@ export interface GraphPreferences {
   readonly focusHierarchyImplementation: FocusHierarchyImplementation;
   readonly globalLayoutSettings: GlobalLayoutSettings;
   readonly localLayoutMode: LocalLayoutMode;
+  /** Modular Preview File-module policy. Current/Mosaic values migrate here. */
+  readonly modularFocusInternalLayout: FocusSchematicProductInternalLayoutVariant;
+  /** Modular Preview visual Heading/Block ordering policy. */
+  readonly modularFocusHeadingOrder: FocusSchematicEndpointOrderPolicy;
   /** Product exposure only; absent/malformed v1 fields default to false. */
   readonly showExperimentalAllHierarchy: boolean;
   readonly trackpadZoomMode: TrackpadZoomMode;
@@ -32,6 +43,10 @@ export const DEFAULT_GRAPH_PREFERENCES: GraphPreferences = {
   focusHierarchyImplementation: 'classic',
   globalLayoutSettings: DEFAULT_GLOBAL_LAYOUT_SETTINGS,
   localLayoutMode: 'free',
+  modularFocusInternalLayout:
+    DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.internalLayoutVariant,
+  modularFocusHeadingOrder:
+    DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.endpointOrderPolicy,
   showExperimentalAllHierarchy: false,
   trackpadZoomMode: 'scroll-zoom',
 };
@@ -94,6 +109,8 @@ export function loadGraphPreferences(
         readonly focusHierarchyImplementation?: unknown;
         readonly globalLayoutSettings?: unknown;
         readonly localLayoutMode?: unknown;
+        readonly modularFocusInternalLayout?: unknown;
+        readonly modularFocusHeadingOrder?: unknown;
         readonly showExperimentalAllHierarchy?: unknown;
         readonly trackpadZoomMode?: unknown;
       };
@@ -123,6 +140,17 @@ export function loadGraphPreferences(
           localLayoutMode: isLocalLayoutMode(stored.localLayoutMode)
             ? stored.localLayoutMode
             : DEFAULT_GRAPH_PREFERENCES.localLayoutMode,
+          modularFocusInternalLayout:
+            isFocusSchematicProductInternalLayoutVariant(
+              stored.modularFocusInternalLayout,
+            )
+              ? stored.modularFocusInternalLayout
+              : DEFAULT_GRAPH_PREFERENCES.modularFocusInternalLayout,
+          modularFocusHeadingOrder: isFocusSchematicEndpointOrderPolicy(
+            stored.modularFocusHeadingOrder,
+          )
+            ? stored.modularFocusHeadingOrder
+            : DEFAULT_GRAPH_PREFERENCES.modularFocusHeadingOrder,
           trackpadZoomMode: isTrackpadZoomMode(stored.trackpadZoomMode)
             ? stored.trackpadZoomMode
             : DEFAULT_GRAPH_PREFERENCES.trackpadZoomMode,

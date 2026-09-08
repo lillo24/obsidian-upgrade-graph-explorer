@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
   ENDPOINT_FIXTURES,
-  FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+  FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
   buildEndpointFixture,
   computeFocusSchematicComputedLayout,
+  computeFocusSchematicComputedLayoutAttempt,
   type FocusSchematicLayoutInput,
+  type FocusSchematicProductLayoutPolicies,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 import { focusSchematicNodeDimensions } from '@icarus-graph-explorer/renderer-reactflow/focus-schematic';
 
@@ -23,7 +26,7 @@ function fixtureInput(index = 0): FocusSchematicLayoutInput {
       fixture.projection,
       fixture.model,
     ),
-    settings: FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+    settings: FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
   };
 }
 
@@ -31,11 +34,16 @@ describe('page-lifetime Focus Schematic layout cache', () => {
   it('uses the exact algorithm/model/projection/dimension/settings input', () => {
     const input = fixtureInput();
     const key = exactFocusSchematicLayoutCacheKey(input);
-    expect(key).toContain('A1-endpoint-facing-split-lanes');
-    expect(key).toContain('"algorithmVersion":2');
+    expect(key).toContain('A1-directional-folder-bands-adaptive-internals');
+    expect(key).toContain('"algorithmVersion":3');
+    expect(key).toContain('"protocolVersion":3');
+    expect(key.replace('"protocolVersion":3', '"protocolVersion":2')).not.toBe(
+      key,
+    );
     expect(exactFocusSchematicLayoutCacheKey(input, 1)).not.toBe(key);
     expect(key).toContain('nodeDimensions');
     expect(key).toContain('settings');
+    expect(key).toContain('"internalLayoutVariant":"adaptive-compass"');
     expect(exactFocusSchematicLayoutCacheKey(input)).toBe(key);
     expect(
       exactFocusSchematicLayoutCacheKey({
@@ -48,6 +56,61 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     ).not.toBe(key);
     expect(exactFocusSchematicLayoutCacheKey(fixtureInput(1))).not.toBe(key);
     expect(exactFocusSchematicLayoutCacheKey(fixtureInput(2))).not.toBe(key);
+    expect(
+      exactFocusSchematicLayoutCacheKey({
+        ...input,
+        settings: { ...input.settings, directionalFolderBandsEnabled: false },
+      }),
+    ).not.toBe(key);
+  });
+
+  it('distinguishes and restores all four product policy combinations exactly', () => {
+    const input = fixtureInput(4);
+    const snapshot = JSON.stringify(input);
+    const cache = new FocusSchematicLayoutCache();
+    const policies: FocusSchematicProductLayoutPolicies[] = [
+      {
+        internalLayoutVariant: 'adaptive-compass',
+        endpointOrderPolicy: 'crossing-optimized',
+      },
+      {
+        internalLayoutVariant: 'adaptive-compass',
+        endpointOrderPolicy: 'document-order',
+      },
+      {
+        internalLayoutVariant: 'vertical-spine',
+        endpointOrderPolicy: 'crossing-optimized',
+      },
+      {
+        internalLayoutVariant: 'vertical-spine',
+        endpointOrderPolicy: 'document-order',
+      },
+    ];
+    expect(
+      new Set(
+        policies.map((policy) =>
+          exactFocusSchematicLayoutCacheKey(input, policy),
+        ),
+      ).size,
+    ).toBe(4);
+
+    const results = policies.map((policy) => {
+      const attempt = computeFocusSchematicComputedLayoutAttempt(input, policy);
+      if (attempt.status !== 'success') throw new Error(attempt.reason);
+      cache.set(input, policy, attempt.result);
+      expect(cache.get(input, policy)).toMatchObject({
+        status: 'hit',
+        value: attempt.result,
+      });
+      return attempt.result;
+    });
+
+    for (const [index, policy] of policies.entries())
+      expect(cache.get(input, policy).value).toEqual(results[index]);
+    expect(JSON.stringify(input)).toBe(snapshot);
+    expect(
+      cache.get(input, DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES).value,
+    ).toEqual(results[0]);
   });
 
   it('re-enters unchanged semantics from cache with zero additional compute', () => {
