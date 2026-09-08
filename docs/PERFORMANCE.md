@@ -1077,6 +1077,33 @@ p25/p50/p75 candidates as `0.000655` / `0.00201` / `0.00505`; the accepted
 `0.000672` / `0.00204` / `0.00512` evidence and v1 production policy remain
 fixed rather than being retuned.
 
+## CONVERGENCE1C Global macro-convergence evidence
+
+`pnpm analyze:global-convergence` evaluates M0/M1/M2/M3 on 18 deterministic
+synthetic fixtures and runs the selected production lifecycle at the requested
+size boundaries. M2 was the only candidate to pass. Its forced 3/5/8/12-step
+maximum relative folder-quality spread was `0.02956`; M0 and M1 measured
+`0.20687` and `0.49730`. M2 settled 16/18 fixtures, produced zero false early
+stops, and repeated bit-exactly. The two caps are explicit accepted bounded
+outcomes.
+
+Windows/Node measurements on 2026-09-08 are investigative local evidence, not
+CI timing thresholds:
+
+| Nodes / edges | Stop           | Iterations / macro-steps | Final step | Compute ms | Folder field ms |
+| ------------: | -------------- | -----------------------: | ---------: | ---------: | --------------: |
+|      100 / 99 | max-iterations |                 640 / 20 |         32 |     39.287 |           2.109 |
+|     500 / 499 | max-iterations |                 640 / 20 |         32 |    938.962 |           6.784 |
+|   1,000 / 999 | max-iterations |                 640 / 20 |         32 |  3,335.481 |          16.430 |
+| 5,000 / 4,999 | max-iterations |                  120 / 4 |         24 |  4,386.676 |          24.537 |
+| 5,001 / 5,000 | max-iterations |                   80 / 3 |         16 |  2,955.881 |          16.579 |
+
+All five completed under the 5 s production safety boundary on this machine.
+The 5,000 and 5,001 cases exercise both size-class caps and final partial-step
+semantics. The workload uses synthetic folder metadata and a sparse reference
+tree; browser/desktop responsiveness remains release-QA evidence. JSON and the
+self-contained comparison are regenerated under ignored `output/convergence1c/`.
+
 ## HIER3B production worker instrumentation
 
 The Modular Preview records HIER1 model construction, dimension derivation,

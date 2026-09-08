@@ -57,10 +57,18 @@ function layoutResult(
   sequence: number,
 ): GlobalLayoutResult {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     kind: 'result',
     requestId: sequence,
     algorithm: request.algorithm,
+    policyVersion: request.policy.version,
+    macroVersion: request.macro.version,
+    stopReason: 'max-iterations',
+    iterationsCompleted: request.policy.maxIterations,
+    macroStepsCompleted: Math.ceil(request.policy.maxIterations / 32),
+    stableMacroSteps: 0,
+    finalMacroStepIterations: 32,
+    finalMovement: null,
     computeMs: 0,
     folderPriorMs: 0,
     positions: request.nodes.map((node, index) => ({

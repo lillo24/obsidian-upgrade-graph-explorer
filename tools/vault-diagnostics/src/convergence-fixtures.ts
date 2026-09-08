@@ -1,5 +1,6 @@
 import {
   createLocalLayoutRequest,
+  createGlobalConvergencePolicy,
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
   deterministicGlobalPosition,
 } from '@icarus-graph-explorer/renderer-sigma/core';
@@ -105,9 +106,23 @@ function globalFixture(
     description: definition.description,
     currentBudget: globalBudget(definition.nodeCount),
     request: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       algorithm: definition.algorithm,
-      iterations: globalBudget(definition.nodeCount),
+      policy: createGlobalConvergencePolicy(definition.nodeCount),
+      macro:
+        definition.algorithm === 'reference-only'
+          ? {
+              version: 'global-folder-none-v1',
+              algorithm: 'reference-only',
+              priorApplications: 0,
+              feedback: 'output-only',
+            }
+          : {
+              version: 'global-folder-fixed-field-v1',
+              algorithm: definition.algorithm,
+              priorApplications: 1,
+              feedback: 'output-only',
+            },
       settings: { ...DEFAULT_GLOBAL_LAYOUT_SETTINGS, folderClustering },
       nodes,
       edges,

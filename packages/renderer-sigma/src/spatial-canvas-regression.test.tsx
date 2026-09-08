@@ -101,10 +101,18 @@ describe('All Network automatic/displayed position separation', () => {
       async (request: Omit<GlobalLayoutRequest, 'requestId'>) => {
         requests.push(request);
         return {
-          schemaVersion: 1,
+          schemaVersion: 2,
           kind: 'result',
           requestId: layout.mock.calls.length,
           algorithm: 'reference-only',
+          policyVersion: request.policy.version,
+          macroVersion: request.macro.version,
+          stopReason: 'max-iterations',
+          iterationsCompleted: request.policy.maxIterations,
+          macroStepsCompleted: Math.ceil(request.policy.maxIterations / 32),
+          stableMacroSteps: 0,
+          finalMacroStepIterations: 32,
+          finalMovement: null,
           computeMs: 0,
           folderPriorMs: 0,
           positions: automaticPositions(layout.mock.calls.length),
@@ -296,10 +304,18 @@ describe('All Network automatic/displayed position separation', () => {
     await harness.flush();
     const automatic = automaticPositions(1);
     resolveLayout({
-      schemaVersion: 1,
+      schemaVersion: 2,
       kind: 'result',
       requestId: 1,
       algorithm: 'reference-only',
+      policyVersion: 'global-fa2-folder-convergence-v1',
+      macroVersion: 'global-folder-none-v1',
+      stopReason: 'max-iterations',
+      iterationsCompleted: 640,
+      macroStepsCompleted: 20,
+      stableMacroSteps: 0,
+      finalMacroStepIterations: 32,
+      finalMovement: null,
       computeMs: 0,
       folderPriorMs: 0,
       positions: automatic,
@@ -378,10 +394,18 @@ describe('All Network automatic/displayed position separation', () => {
     const layout = vi.fn(
       async (request: Omit<GlobalLayoutRequest, 'requestId'>) =>
         ({
-          schemaVersion: 1,
+          schemaVersion: 2,
           kind: 'result',
           requestId: layout.mock.calls.length,
           algorithm: 'reference-only',
+          policyVersion: request.policy.version,
+          macroVersion: request.macro.version,
+          stopReason: 'max-iterations',
+          iterationsCompleted: request.policy.maxIterations,
+          macroStepsCompleted: Math.ceil(request.policy.maxIterations / 32),
+          stableMacroSteps: 0,
+          finalMacroStepIterations: 32,
+          finalMovement: null,
           computeMs: 0,
           folderPriorMs: 0,
           positions: request.nodes.map(({ key, x, y }) => ({ key, x, y })),
@@ -466,10 +490,18 @@ describe('All Network automatic/displayed position separation', () => {
       requestCount += 1;
       if (requestCount > 1) return new Promise<GlobalLayoutResult>(() => {});
       return Promise.resolve({
-        schemaVersion: 1,
+        schemaVersion: 2,
         kind: 'result',
         requestId: 1,
         algorithm: 'reference-only',
+        policyVersion: 'global-fa2-folder-convergence-v1',
+        macroVersion: 'global-folder-none-v1',
+        stopReason: 'max-iterations',
+        iterationsCompleted: 640,
+        macroStepsCompleted: 20,
+        stableMacroSteps: 0,
+        finalMacroStepIterations: 32,
+        finalMovement: null,
         computeMs: 0,
         folderPriorMs: 0,
         positions: firstAutomatic,

@@ -1,8 +1,10 @@
 /// <reference lib="webworker" />
 
-import { computeGlobalLayout } from '@icarus-graph-explorer/renderer-sigma/layout';
+import {
+  computeGlobalLayout,
+  createGlobalLayoutFailure,
+} from '@icarus-graph-explorer/renderer-sigma/layout';
 import type {
-  GlobalLayoutFailure,
   GlobalLayoutRequest,
   GlobalLayoutWorkerResponse,
 } from '@icarus-graph-explorer/renderer-sigma/types';
@@ -18,13 +20,7 @@ host.onmessage = (event) => {
   try {
     host.postMessage(computeGlobalLayout(event.data));
   } catch (error: unknown) {
-    const response: GlobalLayoutFailure = {
-      schemaVersion: 1,
-      kind: 'error',
-      requestId: event.data.requestId,
-      message: error instanceof Error ? error.message : String(error),
-    };
-    host.postMessage(response);
+    host.postMessage(createGlobalLayoutFailure(event.data, error));
   }
 };
 

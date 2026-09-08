@@ -58,15 +58,19 @@ reorder KG14.
 
 ### ForceAtlas2 convergence track
 
-| Milestone         | Outcome                                                                                                                      | Status                           |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| **CONVERGENCE1A** | Synthetic public-batch decision spike, displacement oracle, caps, and Local/Global ownership split.                          | **Complete.**                    |
-| **CONVERGENCE1B** | Production Focus Network bounded convergence with schema-v2 worker evidence, strict failure, cache, and benchmark contracts. | **Complete.**                    |
-| **CONVERGENCE1C** | Duration-independent Global folder-macro convergence design and production integration.                                      | **Next / pending; not started.** |
+| Milestone         | Outcome                                                                                                                      | Status        |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| **CONVERGENCE1A** | Synthetic public-batch decision spike, displacement oracle, caps, and Local/Global ownership split.                          | **Complete.** |
+| **CONVERGENCE1B** | Production Focus Network bounded convergence with schema-v2 worker evidence, strict failure, cache, and benchmark contracts. | **Complete.** |
+| **CONVERGENCE1C** | Duration-independent Global folder-macro convergence design and production integration.                                      | **Complete.** |
 
 CONVERGENCE1B settles finite Local replacement-worker jobs until practical
 positional stability or a deterministic cap. It does not deliver PHYSICS1's
 separate future continuous interactive simulation lifecycle.
+
+CONVERGENCE1C gives Global a distinct centroid-aligned policy and an output-only
+folder field whose strength cannot accumulate with extra convergence checks.
+SPATIAL2 dynamic convergence and PHYSICS1 remain separate future work.
 
 ## Accepted future interaction guidance
 

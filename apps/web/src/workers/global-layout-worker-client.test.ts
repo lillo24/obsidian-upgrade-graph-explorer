@@ -9,9 +9,27 @@ import {
 
 function request() {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     algorithm: 'reference-only',
-    iterations: 1,
+    policy: {
+      version: 'global-fa2-folder-convergence-v1',
+      batchIterations: 32,
+      allP90Threshold: 0.00512,
+      lowDegreeMaximumThreshold: 0.01024,
+      normalizedCentroidDriftThreshold: 0.00512,
+      stableMacroStepsRequired: 3,
+      maxIterations: 640,
+      centroidAlignment: 'centroid-translation-v1',
+      scaleNormalization: 'previous-centroid-rms-v1',
+      scaleFloor: 0.000001,
+      maxWallTimeMs: 5000,
+    },
+    macro: {
+      version: 'global-folder-none-v1',
+      algorithm: 'reference-only',
+      priorApplications: 0,
+      feedback: 'output-only',
+    },
     settings: { folderClustering: false, spacingPreset: 'normal' },
     nodes: [{ key: 'a', x: 0, y: 0, size: 1 }],
     edges: [],
@@ -54,10 +72,18 @@ describe('Global latest-layout worker client', () => {
     const latest = workers[1]!;
     latest.onmessage?.({
       data: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         kind: 'result',
         requestId: 2,
         algorithm: 'reference-only',
+        policyVersion: 'global-fa2-folder-convergence-v1',
+        macroVersion: 'global-folder-none-v1',
+        stopReason: 'degenerate',
+        iterationsCompleted: 0,
+        macroStepsCompleted: 0,
+        stableMacroSteps: 0,
+        finalMacroStepIterations: 0,
+        finalMovement: null,
         computeMs: 1,
         folderPriorMs: 0,
         positions: [{ key: 'a', x: 1, y: 2 }],

@@ -97,10 +97,18 @@ describe.each(['global', 'local'] as const)(
             }));
             return mode === 'global'
               ? ({
-                  schemaVersion: 1,
+                  schemaVersion: 2,
                   kind: 'result',
                   requestId: 1,
                   algorithm: 'reference-only',
+                  policyVersion: 'global-fa2-folder-convergence-v1',
+                  macroVersion: 'global-folder-none-v1',
+                  stopReason: 'max-iterations',
+                  iterationsCompleted: 640,
+                  macroStepsCompleted: 20,
+                  stableMacroSteps: 0,
+                  finalMacroStepIterations: 32,
+                  finalMovement: null,
                   computeMs: 0,
                   folderPriorMs: 0,
                   positions,

@@ -111,10 +111,18 @@ describe('All Network Arrange folders canvas', () => {
     const onAnnouncement = vi.fn();
     const layout = vi.fn(
       async (request: Omit<GlobalLayoutRequest, 'requestId'>) => ({
-        schemaVersion: 1 as const,
+        schemaVersion: 2 as const,
         kind: 'result' as const,
         requestId: 1,
         algorithm: 'reference-only' as const,
+        policyVersion: request.policy.version,
+        macroVersion: request.macro.version,
+        stopReason: 'max-iterations' as const,
+        iterationsCompleted: request.policy.maxIterations,
+        macroStepsCompleted: Math.ceil(request.policy.maxIterations / 32),
+        stableMacroSteps: 0,
+        finalMacroStepIterations: 32,
+        finalMovement: null,
         computeMs: 0,
         folderPriorMs: 0,
         positions: request.nodes.map(({ key, x, y }) => ({ key, x, y })),

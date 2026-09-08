@@ -294,10 +294,6 @@ function folderScopeTreeContains(
   return false;
 }
 
-function layoutIterations(nodeCount: number): number {
-  return nodeCount <= 1_000 ? 100 : nodeCount <= 5_000 ? 30 : 20;
-}
-
 function displayedPositions(
   automaticPositions: readonly GlobalLayoutPosition[],
   input: ReturnType<typeof mapProjectionToGlobal>,
@@ -345,6 +341,10 @@ function displayedPositions(
         'spatial-compositions',
         compose,
       );
+}
+
+function spatialInfluenceIterations(nodeCount: number): number {
+  return nodeCount <= 1_000 ? 30 : nodeCount <= 5_000 ? 30 : 20;
 }
 
 function applyDisplayedPositions(
@@ -495,12 +495,7 @@ export function GlobalGraphCanvas({
       : instrumentation.measure('global-map', 'global-mappings', map);
   }, [instrumentation, projection]);
   const requestTemplate = useMemo(
-    () =>
-      createGlobalLayoutRequest(
-        input,
-        layoutSettings,
-        layoutIterations(input.nodes.length),
-      ),
+    () => createGlobalLayoutRequest(input, layoutSettings),
     [input, layoutSettings],
   );
   const fingerprint = useMemo(
@@ -1341,7 +1336,7 @@ export function GlobalGraphCanvas({
     const request = createGlobalSpatialInfluenceRequest(
       input,
       layoutSettings,
-      Math.min(30, requestTemplate.iterations),
+      spatialInfluenceIterations(input.nodes.length),
       basePositions,
       fingerprint,
       resolved,
@@ -1492,7 +1487,6 @@ export function GlobalGraphCanvas({
     layoutPendingState,
     layoutSettings,
     ready,
-    requestTemplate.iterations,
     spatialInfluenceService,
     spatialOverrides,
     spatialRules,
@@ -1558,7 +1552,6 @@ export function GlobalGraphCanvas({
     const request = createGlobalLayoutRequestFromAutomaticPositions(
       input,
       layoutSettings,
-      requestTemplate.iterations,
       latestAutomaticPositions.current,
     );
     instrumentation?.count('global-layouts');
@@ -1615,7 +1608,6 @@ export function GlobalGraphCanvas({
     layoutRequestKey,
     layoutService,
     ready,
-    requestTemplate.iterations,
     layoutSettings,
   ]);
 
