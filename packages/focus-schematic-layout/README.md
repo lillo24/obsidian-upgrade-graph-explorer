@@ -135,6 +135,12 @@ the bakeoff evidence if changed.
 - `src/folder-fixtures.ts` owns the inherited FB1–FB18 and FS1–FS8 evidence plus
   DB1–DB19, VS1–VS7, and CP1–CP5 categorical folder, internal grammar,
   true-block, span, Secondary, and reroot review cases.
+- `src/soft-clusters.ts` owns the separate development-only HIER4B 2D macro
+  solver: undirected primary springs, hop-radius preference, exact-folder
+  centroid attraction, deterministic seeding, variable-rectangle collision
+  packing, and bounded two-round internal-layout evidence. It is not called by
+  the selected production or worker paths.
+- `src/soft-cluster-fixtures.ts` owns SC1–SC24 plus SC17–SC19 stability pairs.
 - `src/source-order.ts` derives public Dagre adjacent-sibling constraints from
   canonical source order.
 - `src/settings.ts` owns the frozen spacing, reserve, clearance, and filtered

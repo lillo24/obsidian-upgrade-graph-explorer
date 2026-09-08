@@ -1259,14 +1259,25 @@ Soft Folder Clusters, HIER5 retains Direct/Electronic orthogonal routing and
 overlapping-path hit-target separation, and HIER3C retains any product-default
 change.
 
+The HIER4B bakeoff keeps Soft Folder Clusters behind a separate renderer-neutral
+development API. It aggregates selected-backbone and Focus-path connections as
+undirected module pairs, uses minimum undirected Focus hops as a soft radial
+prior, and applies exact-folder centroid attraction only to repeated visible
+folders. A stable identity seed, fixed 36 + 18 relaxation schedule, bounded
+variable-rectangle collision pack, and two internal-layout rounds make the
+result stateless and reproducible. Authored arrows preserve direction while
+macro coordinates carry no incoming/outgoing meaning. No production worker,
+cache key, renderer setting, persisted preference, or Classic/Modular default
+changes until graphical review selects an outcome.
+
 Optimized desktop graphical QA approved the preview with visible module
 boundaries and confirmed exact endpoints, root/rank positioning, multi-hop
 orientation, disclosure, implementation switching, secondary-edge geometry
 invariance, Inspector behavior, and current touchpad navigation. This completes
 HIER3B. Optimized desktop graphical approval on September 4, 2026, completes
 HIER3B-FIX1. The actual-browser HIER4A integration was approved and its optimized
-desktop check/build passed on September 8, 2026. HIER4B is next; HIER5 follows
-HIER4B, and HIER3C follows HIER5.
+desktop check/build passed on September 8, 2026. HIER4B is under graphical
+evaluation; HIER5 follows HIER4B, and HIER3C follows HIER5.
 
 ## HIER0 product exposure and geometry
 

@@ -262,6 +262,78 @@ export interface FocusSchematicComputedLayoutOptions {
   readonly internalLayoutVariant?: FocusSchematicInternalLayoutVariant;
 }
 
+/** Development-only HIER4B macro-layout strength. */
+export type FocusSchematicSoftClusterStrength = 0 | 25 | 50 | 75 | 100;
+
+export interface FocusSchematicSoftClusterOptions {
+  readonly strength?: FocusSchematicSoftClusterStrength;
+  readonly endpointOrderPolicy?: FocusSchematicEndpointOrderPolicy;
+  /** Development-lab comparator; Adaptive Compass is the HIER4B default. */
+  readonly internalLayoutVariant?: 'adaptive-compass' | 'vertical-spine';
+}
+
+export interface FocusSchematicSoftClusterMetrics {
+  readonly repeatedFolderCount: number;
+  readonly repeatedFolderModuleCount: number;
+  readonly repeatedFolderRmsRadiusMean: number | null;
+  readonly repeatedFolderRmsRadiusMedian: number | null;
+  readonly repeatedFolderRmsRadiusP95: number | null;
+  readonly connectedPairCount: number;
+  readonly connectedPairDistanceMean: number | null;
+  readonly connectedPairDistanceP95: number | null;
+  readonly exactPrimaryEndpointSpanMean: number | null;
+  readonly exactPrimaryEndpointSpanP95: number | null;
+  readonly exactEndpointCrossingCount: number;
+  readonly hopMeanAbsoluteRadiusError: number | null;
+  readonly hopRadiusCorrelation: number | null;
+  readonly boundsWidth: number;
+  readonly boundsHeight: number;
+  readonly boundsArea: number;
+  readonly overlapCount: number;
+  readonly minimumModuleGap: number | null;
+}
+
+export interface FocusSchematicSoftClusterRuntimeEvidence {
+  readonly moduleCount: number;
+  readonly primaryPairCount: number;
+  readonly repeatedFolderCount: number;
+  readonly iterationCount: 54;
+  readonly jointRoundCount: 2;
+  readonly compassAssignmentCount: number;
+  readonly compassBranchRegionChurn: number;
+  readonly collisionCheckCount: number;
+  readonly collisionCorrectionCount: number;
+  readonly layoutMs: number;
+}
+
+export interface FocusSchematicSoftClusterEvidence {
+  readonly schemaVersion: 1;
+  readonly developmentOnly: true;
+  readonly layoutFamily: 'soft-folder-clusters';
+  readonly strength: FocusSchematicSoftClusterStrength;
+  readonly folderInfluenceEnabled: boolean;
+  readonly topologyDirectionality: 'undirected-primary';
+  readonly secondaryGeometryInfluence: 0;
+  readonly fixedIterationSchedule: readonly [36, 18];
+  readonly metrics: FocusSchematicSoftClusterMetrics;
+  readonly runtime: FocusSchematicSoftClusterRuntimeEvidence;
+}
+
+export type FocusSchematicSoftClusterLayoutAttempt =
+  | {
+      readonly status: 'success';
+      readonly strategyId: 'HIER4B-soft-folder-clusters';
+      readonly configId: string;
+      readonly result: FocusSchematicComputedLayout;
+      readonly evidence: FocusSchematicSoftClusterEvidence;
+    }
+  | {
+      readonly status: 'failure';
+      readonly strategyId: 'HIER4B-soft-folder-clusters';
+      readonly configId: string;
+      readonly reason: string;
+    };
+
 export interface FocusSchematicLayoutPlanModule {
   readonly moduleId: EntityId;
   readonly side: 'center' | 'left' | 'right';

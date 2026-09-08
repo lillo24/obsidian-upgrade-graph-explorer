@@ -12,6 +12,8 @@ coverage/
 /output/hier4-folder-benchmark*.json
 /output/hier4a-directional-folder-bands-benchmark.json
 /output/hier4a-root-balance-*.json
+/output/hier4b-soft-clusters-lab/
+/output/hier4b-soft-folder-clusters-benchmark.json
 /tools/focus-schematic-bakeoff/output/
 /output/convergence1a/
 /output/convergence1c/

@@ -70,6 +70,11 @@ export {
   type FocusSchematicFolderBandTimings,
 } from './folder-bands';
 export {
+  computeFocusSchematicSoftClusterLayout,
+  computeFocusSchematicSoftClusterLayoutAttempt,
+  FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE,
+} from './soft-clusters';
+export {
   buildEndpointFixture,
   CENTER_SPINE_FIXTURES,
   ENDPOINT_FIXTURES,
@@ -77,6 +82,13 @@ export {
   type EndpointFixtureSpec,
   type EndpointStabilityPair,
 } from './endpoint-fixtures';
+export {
+  SOFT_CLUSTER_FIXTURES,
+  SOFT_CLUSTER_STABILITY_PAIRS,
+  createSoftClusterHubFixture,
+  createSoftClusterMultiplicityFixture,
+  type SoftClusterStabilityPair,
+} from './soft-cluster-fixtures';
 export {
   DIRECTIONAL_FOLDER_BAND_FIXTURES,
   FOLDER_FIXTURES,

@@ -10,8 +10,10 @@
     "benchmark:production-worker": "tsx src/production-worker-benchmark.ts",
     "benchmark:directional-folder-bands": "tsx src/folder-benchmark.ts",
     "benchmark:internal-layout": "tsx src/internal-layout-benchmark.ts",
+    "benchmark:soft-clusters": "tsx src/soft-cluster-benchmark.ts",
     "generate:endpoint-lab": "tsx src/endpoint-lab.ts",
     "generate:folder-lab": "tsx src/folder-lab.ts",
+    "generate:soft-cluster-lab": "tsx src/soft-cluster-lab.ts",
     "generate:lab": "tsx src/lab.ts",
     "typecheck": "tsc --noEmit"
   },

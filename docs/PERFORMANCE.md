@@ -2,6 +2,26 @@
 
 Status: **STABLE — KG12 baselines plus W1/W3 worker implementation and evidence are complete.**
 
+## HIER4B Soft Folder Clusters bakeoff
+
+HIER4B adds local, non-gating timing and operation evidence for a development-
+only Focus Schematic macro-layout candidate. The solver performs exactly two
+joint rounds with 36 and 18 relaxation iterations. Every iteration visits the
+sorted primary module-pair list, exact repeated-folder membership once, and
+the rectangle collision pairs. A bounded final pack handles dense hubs without
+an unbounded convergence condition. Multiplicity is aggregated per undirected
+primary pair and capped at weight 4; Secondary edges are excluded before the
+solver begins.
+
+The recorded 24-fixture strength-50 run averaged about 5.3 ms with a local p95
+of about 15.5 ms. SC21 (37 modules) was the slowest fixed strength-50 case at
+about 26.6 ms. Across the 20/50/100-module hub profiles and all five strengths,
+the maximum observed solver time was about 59.6 ms. These wall-clock values are
+machine-local evidence and are not CI thresholds. The durable gates are fixed
+iteration/candidate bounds, zero overlap, deterministic output, and invariant
+checks. See `docs/HIER4B_VALIDATION.md` and the ignored generated JSON for the
+full metric schema.
+
 KG12A measured the final UX4B application without changing its product
 behavior. KG12B implements the resulting narrow split: whole-workspace
 transactions run in stateful W1, Dagre runs in stateless latest-result-wins W3,
