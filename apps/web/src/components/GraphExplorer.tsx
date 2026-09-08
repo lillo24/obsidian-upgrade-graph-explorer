@@ -497,6 +497,8 @@ export function GraphExplorer({
     localLayoutMode,
     modularFocusHeadingOrder,
     modularFocusInternalLayout,
+    modularFolderStripsVisible,
+    modularConnectionStyle,
     trackpadZoomMode,
     showExperimentalAllHierarchy,
   } = preferences;
@@ -2750,6 +2752,18 @@ export function GraphExplorer({
     },
     [updateGraphPreferences],
   );
+  const changeModularFolderStripsVisible = useCallback(
+    (visible: GraphPreferences['modularFolderStripsVisible']) => {
+      updateGraphPreferences({ modularFolderStripsVisible: visible });
+    },
+    [updateGraphPreferences],
+  );
+  const changeModularConnectionStyle = useCallback(
+    (style: GraphPreferences['modularConnectionStyle']) => {
+      updateGraphPreferences({ modularConnectionStyle: style });
+    },
+    [updateGraphPreferences],
+  );
   const changeLocalLayoutMode = useCallback(
     (mode: LocalLayoutMode) => {
       if (
@@ -3771,6 +3785,8 @@ export function GraphExplorer({
             focusHierarchyImplementation={focusHierarchyImplementation}
             modularFocusHeadingOrder={modularFocusHeadingOrder}
             modularFocusInternalLayout={modularFocusInternalLayout}
+            modularFolderStripsVisible={modularFolderStripsVisible}
+            modularConnectionStyle={modularConnectionStyle}
             showExperimentalAllHierarchy={showExperimentalAllHierarchy}
             onShowExperimentalAllHierarchyChange={
               changeExperimentalAllHierarchy
@@ -3791,6 +3807,10 @@ export function GraphExplorer({
             onModularFocusInternalLayoutChange={
               changeModularFocusInternalLayout
             }
+            onModularFolderStripsVisibleChange={
+              changeModularFolderStripsVisible
+            }
+            onModularConnectionStyleChange={changeModularConnectionStyle}
             onGlobalLayoutSettingsChange={changeGlobalLayoutSettings}
             onOpenChange={changeSettingsOpen}
             onTrackpadZoomModeChange={changeTrackpadZoomMode}
@@ -3983,6 +4003,8 @@ export function GraphExplorer({
                   focusHierarchyImplementation={focusHierarchyImplementation}
                   modularFocusHeadingOrder={modularFocusHeadingOrder}
                   modularFocusInternalLayout={modularFocusInternalLayout}
+                  modularFolderStripsVisible={modularFolderStripsVisible}
+                  modularConnectionStyle={modularConnectionStyle}
                   showExperimentalAllHierarchy={showExperimentalAllHierarchy}
                   onShowExperimentalAllHierarchyChange={
                     changeExperimentalAllHierarchy
@@ -4005,6 +4027,10 @@ export function GraphExplorer({
                   onModularFocusInternalLayoutChange={
                     changeModularFocusInternalLayout
                   }
+                  onModularFolderStripsVisibleChange={
+                    changeModularFolderStripsVisible
+                  }
+                  onModularConnectionStyleChange={changeModularConnectionStyle}
                   onGlobalLayoutSettingsChange={changeGlobalLayoutSettings}
                   onOpenChange={changeSettingsOpen}
                   onTrackpadZoomModeChange={changeTrackpadZoomMode}
@@ -4274,7 +4300,9 @@ export function GraphExplorer({
                 fitRequestKey={localFitRequestKey ?? 0}
                 focusAppearance={focusAppearance}
                 endpointOrderPolicy={modularFocusHeadingOrder}
+                folderStripsVisible={modularFolderStripsVisible}
                 internalLayoutVariant={modularFocusInternalLayout}
+                routeStyle={modularConnectionStyle}
                 {...(localTransitionAnchor === undefined
                   ? {}
                   : { initialTransitionAnchor: localTransitionAnchor })}

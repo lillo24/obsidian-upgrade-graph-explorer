@@ -33,8 +33,12 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
     implementation: 'classic' | 'modular-preview',
     internalLayout: 'adaptive-compass' | 'vertical-spine',
     headingOrder: 'crossing-optimized' | 'document-order',
+    folderStrips = true,
+    connectionStyle: 'direct' | 'electronic' = 'direct',
     onInternalLayoutChange = vi.fn(),
     onHeadingOrderChange = vi.fn(),
+    onFolderStripsChange = vi.fn(),
+    onConnectionStyleChange = vi.fn(),
   ) {
     act(() => {
       root.render(
@@ -46,6 +50,8 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
           globalLayoutSettings={DEFAULT_GLOBAL_LAYOUT_SETTINGS}
           modularFocusHeadingOrder={headingOrder}
           modularFocusInternalLayout={internalLayout}
+          modularFolderStripsVisible={folderStrips}
+          modularConnectionStyle={connectionStyle}
           onAllNetworkDensityFramingStrengthChange={() => undefined}
           onFocusAppearanceChange={() => undefined}
           onFocusHierarchyImplementationChange={() => undefined}
@@ -53,6 +59,8 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
           onGlobalLayoutSettingsChange={() => undefined}
           onModularFocusHeadingOrderChange={onHeadingOrderChange}
           onModularFocusInternalLayoutChange={onInternalLayoutChange}
+          onModularFolderStripsVisibleChange={onFolderStripsChange}
+          onModularConnectionStyleChange={onConnectionStyleChange}
           onOpenChange={() => undefined}
           onResetSandbox={() => undefined}
           onTrackpadZoomModeChange={() => undefined}
@@ -69,7 +77,12 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
       (button) => button.textContent?.includes('Experimental'),
     );
     act(() => experimental?.click());
-    return { onInternalLayoutChange, onHeadingOrderChange };
+    return {
+      onInternalLayoutChange,
+      onHeadingOrderChange,
+      onFolderStripsChange,
+      onConnectionStyleChange,
+    };
   }
 
   it('shows only the approved product alternatives and disables them under Classic', () => {
@@ -80,16 +93,17 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
     expect(container.textContent).toContain('Crossing optimized');
     expect(container.textContent).toContain('Document order');
     const approvedControls = Array.from(
-      container.querySelectorAll<HTMLInputElement>(
-        'input[name^="modular-focus-"]',
-      ),
+      container.querySelectorAll<HTMLInputElement>('input[name^="modular-"]'),
     );
-    expect(approvedControls).toHaveLength(4);
+    expect(approvedControls).toHaveLength(7);
     expect(approvedControls.map(({ value }) => value).sort()).toEqual(
       [
         'adaptive-compass',
         'crossing-optimized',
         'document-order',
+        'direct',
+        'electronic',
+        'on',
         'vertical-spine',
       ].sort(),
     );
@@ -103,22 +117,42 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
   it('reflects persisted alternatives and emits both policy changes under Modular Preview', () => {
     const onInternalLayoutChange = vi.fn();
     const onHeadingOrderChange = vi.fn();
+    const onFolderStripsChange = vi.fn();
+    const onConnectionStyleChange = vi.fn();
     renderSettings(
       'modular-preview',
       'vertical-spine',
       'document-order',
+      false,
+      'electronic',
       onInternalLayoutChange,
       onHeadingOrderChange,
+      onFolderStripsChange,
+      onConnectionStyleChange,
     );
 
     const byValue = (value: string) =>
       container.querySelector<HTMLInputElement>(`input[value="${value}"]`)!;
     expect(byValue('vertical-spine').checked).toBe(true);
     expect(byValue('document-order').checked).toBe(true);
+    expect(byValue('electronic').checked).toBe(true);
+    expect(
+      container.querySelector<HTMLInputElement>(
+        'input[name="modular-folder-strips"]',
+      )?.checked,
+    ).toBe(false);
     expect(byValue('adaptive-compass').disabled).toBe(false);
     act(() => byValue('adaptive-compass').click());
     act(() => byValue('crossing-optimized').click());
+    act(() => byValue('direct').click());
+    act(() =>
+      container
+        .querySelector<HTMLInputElement>('input[name="modular-folder-strips"]')
+        ?.click(),
+    );
     expect(onInternalLayoutChange).toHaveBeenCalledWith('adaptive-compass');
     expect(onHeadingOrderChange).toHaveBeenCalledWith('crossing-optimized');
+    expect(onConnectionStyleChange).toHaveBeenCalledWith('direct');
+    expect(onFolderStripsChange).toHaveBeenCalledWith(true);
   });
 });

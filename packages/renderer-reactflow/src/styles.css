@@ -66,6 +66,37 @@
   filter: saturate(1.15);
 }
 
+.focus-schematic-folder-strips {
+  position: absolute;
+  z-index: -1;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.focus-schematic-folder-strip {
+  fill: rgb(73 126 149 / 5%);
+  stroke: rgb(55 109 132 / 38%);
+  stroke-width: 1.5;
+  stroke-dasharray: 7 6;
+}
+
+.focus-schematic-folder-strip--root {
+  fill: rgb(36 94 116 / 9%);
+  stroke: rgb(36 94 116 / 58%);
+}
+
+.focus-schematic-folder-strip__guide {
+  stroke: rgb(55 109 132 / 18%);
+  stroke-width: 1;
+}
+
+.focus-schematic-folder-strip__label {
+  fill: rgb(33 79 97 / 82%);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
 .entity-card,
 .diagnostic-card {
   position: relative;

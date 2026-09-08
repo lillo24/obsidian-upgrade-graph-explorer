@@ -65,6 +65,7 @@ export type {
   GraphCanvasProps,
   GraphCenterRequest,
   GraphEdgeData,
+  GraphEdgePathStyle,
   GraphFlowEdge,
   GraphFlowNode,
   GraphHoverTarget,

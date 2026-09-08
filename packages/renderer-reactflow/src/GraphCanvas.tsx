@@ -148,6 +148,7 @@ function GraphCanvasInner({
   preparedGraph,
   preparedGraphPending = false,
   preparedGraphStatus,
+  viewportOverlay,
   projection,
   rootEntityId,
   selection,
@@ -1115,6 +1116,7 @@ function GraphCanvasInner({
               gap={24}
               variant={BackgroundVariant.Dots}
             />
+            {viewportOverlay}
             <Controls
               aria-label="Graph viewport controls"
               fitViewOptions={GRAPH_FIT_VIEW_OPTIONS}

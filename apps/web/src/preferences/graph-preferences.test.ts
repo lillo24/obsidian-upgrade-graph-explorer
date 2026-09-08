@@ -64,6 +64,8 @@ describe('graph preferences', () => {
       localLayoutMode: 'free',
       modularFocusInternalLayout: 'adaptive-compass',
       modularFocusHeadingOrder: 'crossing-optimized',
+      modularFolderStripsVisible: true,
+      modularConnectionStyle: 'direct',
       showExperimentalAllHierarchy: false,
       trackpadZoomMode: 'pinch-zoom',
     });
@@ -76,12 +78,14 @@ describe('graph preferences', () => {
         localLayoutMode: 'free',
         modularFocusInternalLayout: 'vertical-spine',
         modularFocusHeadingOrder: 'document-order',
+        modularFolderStripsVisible: false,
+        modularConnectionStyle: 'electronic',
         showExperimentalAllHierarchy: false,
         trackpadZoomMode: 'scroll-zoom',
       }),
     ).toEqual({ ok: true });
     expect(storage.value).toBe(
-      '{"focusAppearance":"minimal","focusHierarchyImplementation":"modular-preview","globalLayoutSettings":{"folderClustering":true,"spacingPreset":"normal"},"localLayoutMode":"free","modularFocusInternalLayout":"vertical-spine","modularFocusHeadingOrder":"document-order","showExperimentalAllHierarchy":false,"trackpadZoomMode":"scroll-zoom"}',
+      '{"focusAppearance":"minimal","focusHierarchyImplementation":"modular-preview","globalLayoutSettings":{"folderClustering":true,"spacingPreset":"normal"},"localLayoutMode":"free","modularFocusInternalLayout":"vertical-spine","modularFocusHeadingOrder":"document-order","modularFolderStripsVisible":false,"modularConnectionStyle":"electronic","showExperimentalAllHierarchy":false,"trackpadZoomMode":"scroll-zoom"}',
     );
   });
 
@@ -117,6 +121,8 @@ describe('graph preferences', () => {
       localLayoutMode: 'free',
       modularFocusInternalLayout: 'adaptive-compass',
       modularFocusHeadingOrder: 'crossing-optimized',
+      modularFolderStripsVisible: true,
+      modularConnectionStyle: 'direct',
       showExperimentalAllHierarchy: false,
       trackpadZoomMode: 'pinch-zoom',
     });
@@ -133,6 +139,8 @@ describe('graph preferences', () => {
       localLayoutMode: 'free',
       modularFocusInternalLayout: 'adaptive-compass',
       modularFocusHeadingOrder: 'crossing-optimized',
+      modularFolderStripsVisible: true,
+      modularConnectionStyle: 'direct',
       showExperimentalAllHierarchy: false,
       trackpadZoomMode: 'scroll-zoom',
     });
@@ -282,6 +290,8 @@ describe('graph preferences', () => {
         localLayoutMode: 'free',
         modularFocusInternalLayout: 'adaptive-compass',
         modularFocusHeadingOrder: 'crossing-optimized',
+        modularFolderStripsVisible: true,
+        modularConnectionStyle: 'direct',
         showExperimentalAllHierarchy: false,
         trackpadZoomMode: 'pinch-zoom',
       }),
@@ -355,10 +365,41 @@ describe('Modular Focus Hierarchy preview preference compatibility', () => {
 });
 
 describe('Modular Focus Hierarchy production layout policies', () => {
+  it('defaults, persists, and isolates renderer-only strips and connection style', () => {
+    const storage = memoryStorage();
+    expect(loadGraphPreferences(storage).preferences).toMatchObject({
+      modularFolderStripsVisible: true,
+      modularConnectionStyle: 'direct',
+    });
+    saveGraphPreferences(storage, {
+      ...DEFAULT_GRAPH_PREFERENCES,
+      focusHierarchyImplementation: 'classic',
+      modularFolderStripsVisible: false,
+      modularConnectionStyle: 'electronic',
+    });
+    expect(loadGraphPreferences(storage).preferences).toMatchObject({
+      focusHierarchyImplementation: 'classic',
+      modularFolderStripsVisible: false,
+      modularConnectionStyle: 'electronic',
+    });
+    expect(
+      loadGraphPreferences(
+        memoryStorage(
+          '{"modularFolderStripsVisible":"yes","modularConnectionStyle":"curve"}',
+        ),
+      ).preferences,
+    ).toMatchObject({
+      modularFolderStripsVisible: true,
+      modularConnectionStyle: 'direct',
+    });
+  });
+
   it('defaults to Adaptive Compass with crossing-optimized Heading order', () => {
     expect(loadGraphPreferences(memoryStorage()).preferences).toMatchObject({
       modularFocusInternalLayout: 'adaptive-compass',
       modularFocusHeadingOrder: 'crossing-optimized',
+      modularFolderStripsVisible: true,
+      modularConnectionStyle: 'direct',
     });
   });
 

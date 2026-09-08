@@ -13,6 +13,10 @@ import type {
 } from '@icarus-graph-explorer/view-projection';
 
 import { rendererNodeId } from '../ids';
+export {
+  FocusSchematicFolderBandStrips,
+  focusSchematicFolderStrips,
+} from './folder-band-strips';
 import {
   DIAGNOSTIC_NODE_DIMENSIONS,
   ENTITY_NODE_DIMENSIONS,
@@ -23,6 +27,8 @@ import type {
   FilteredBridgeFlowNode,
   GraphFlowEdge,
   GraphFlowNode,
+  GraphEdgeData,
+  GraphEdgePathStyle,
   GraphVisualVariant,
   ModuleBoundaryFlowNode,
   RendererGraph,
@@ -37,6 +43,8 @@ export interface PrepareFocusSchematicRendererGraphInput {
   readonly computedLayout: FocusSchematicComputedLayout;
   readonly rootEntityId: string;
   readonly secondaryRelationshipsVisible: boolean;
+  /** Presentation-only path style; never reaches the layout worker or cache. */
+  readonly routeStyle?: GraphEdgePathStyle;
   readonly visualVariant?: GraphVisualVariant;
 }
 
@@ -314,6 +322,7 @@ export function prepareFocusSchematicRendererGraph(
   input: PrepareFocusSchematicRendererGraphInput,
 ): RendererGraph {
   const visualVariant = input.visualVariant ?? 'extended';
+  const routeStyle = input.routeStyle ?? 'direct';
   const base = mapProjectionToReactFlow(input.projection, 'local-structured', {
     rootEntityId: input.rootEntityId,
     visualVariant,
@@ -528,6 +537,7 @@ export function prepareFocusSchematicRendererGraph(
         referenceCount: connection.referenceIds.length,
         ariaLabel,
         visualVariant,
+        routeStyle,
       },
     });
   }
@@ -595,7 +605,14 @@ export function prepareFocusSchematicRendererGraph(
   );
   const graph: RendererGraph = {
     nodes: decoratedNodes,
-    edges: edges.sort((left, right) => compareText(left.id, right.id)),
+    edges: edges
+      .map((edge): GraphFlowEdge => {
+        if (edge.data === undefined)
+          throw new Error(`Focus edge "${edge.id}" has no renderer data.`);
+        const data: GraphEdgeData = { ...edge.data, routeStyle };
+        return { ...edge, data };
+      })
+      .sort((left, right) => compareText(left.id, right.id)),
     layoutWarning: null,
   };
   const validation = validatePrepared(input, graph);

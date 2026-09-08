@@ -28,17 +28,21 @@ product setting.
 
 ## Settings and compatibility
 
-Sandbox exposes two Modular-only choices:
+Sandbox exposes four Modular-only choices:
 
 - Internal layout: Adaptive Compass or Vertical Spine.
 - Heading order: Crossing optimized or Document order.
+- Folder strips: On or Off; On is the default.
+- Connection style: Direct or Electronic; Direct is the default.
 
 Fresh and upgraded preferences default to Adaptive Compass plus Crossing
 optimized under the existing graph-preferences v1 storage key. The normalizer
 migrates an obsolete Current/Mosaic value and any unknown internal-layout value
 to Adaptive Compass; an unknown Heading-order value becomes Crossing optimized.
-Changing either choice recomputes immediately and persists across reloads.
-Classic ignores both values.
+Changing the internal-layout or Heading-order choice recomputes immediately.
+Folder strips and connection style persist across reloads but are renderer-only:
+they do not change the model, worker request, computed layout, cache key, or
+viewport. Classic ignores all four values.
 
 ## Worker and cache contract
 
@@ -80,6 +84,15 @@ dimensions, and accepted topology exceptions remain explicit in layout evidence.
 Disclosure, reroot, query hide/restore, selection, Inspector, direct-File rings,
 module-aware File hover, exact Heading/Block hover, camera behavior, and the
 shared React Flow surface keep their existing contracts. Secondary relationships,
-hover, and Visual Groups have zero influence on geometry. React Flow SmoothStep
-routing remains unchanged; HIER5 owns explicit connector routing. HIER4B owns
-Soft Folder Clusters, and HIER3C owns the later product-default flip.
+hover, and Visual Groups have zero influence on geometry.
+
+PRE-HIER4B renders every visible `folderBandPlan.bands` record as a quiet,
+non-interactive, world-coordinate strip behind edges and nodes. Its shared X
+extent comes only from final renderer rectangles; its exact Y interval, visible
+folder identity, root treatment, singleton presence, and filtered privacy come
+from the validated plan. Modular Direct uses one `getStraightPath` segment
+between the existing exact handles. Electronic retains the prior SmoothStep
+appearance. Both are a narrow renderer seam, so HIER5 still owns orthogonal
+routing, rounded styling, channels, obstacle avoidance, and hit-target work.
+HIER4B still owns Soft Folder Clusters, and HIER3C still owns the later
+product-default flip.

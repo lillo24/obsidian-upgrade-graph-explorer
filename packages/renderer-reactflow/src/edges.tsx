@@ -3,10 +3,51 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getSmoothStepPath,
+  getStraightPath,
+  type Position,
   type EdgeProps,
 } from '@xyflow/react';
 
-import type { GraphFlowEdge } from './types';
+import type {
+  GraphEdgePathStyle,
+  GraphFlowEdge,
+  GraphVisualVariant,
+} from './types';
+
+export interface GraphEdgePathInput {
+  readonly routeStyle: GraphEdgePathStyle | undefined;
+  readonly sourcePosition: Position;
+  readonly sourceX: number;
+  readonly sourceY: number;
+  readonly targetPosition: Position;
+  readonly targetX: number;
+  readonly targetY: number;
+  readonly visualVariant: GraphVisualVariant;
+}
+
+/** Keeps path selection at the renderer seam; geometry and endpoint identity stay intact. */
+export function graphEdgePath({
+  routeStyle,
+  sourcePosition,
+  sourceX,
+  sourceY,
+  targetPosition,
+  targetX,
+  targetY,
+  visualVariant,
+}: GraphEdgePathInput) {
+  if (routeStyle === 'direct')
+    return getStraightPath({ sourceX, sourceY, targetX, targetY });
+  return getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    borderRadius: visualVariant === 'compact-schematic' ? 3 : 10,
+  });
+}
 
 function GraphEdgeComponent({
   data,
@@ -23,14 +64,15 @@ function GraphEdgeComponent({
   if (data === undefined) {
     throw new Error(`Renderer edge ${id} is missing graph edge data.`);
   }
-  const [path, labelX, labelY] = getSmoothStepPath({
+  const [path, labelX, labelY] = graphEdgePath({
+    routeStyle: data.routeStyle,
     sourceX,
     sourceY,
     sourcePosition,
     targetX,
     targetY,
     targetPosition,
-    borderRadius: data.visualVariant === 'compact-schematic' ? 3 : 10,
+    visualVariant: data.visualVariant,
   });
   const diagnosticMarker =
     data.status === 'unresolved'
@@ -47,7 +89,7 @@ function GraphEdgeComponent({
       <BaseEdge
         className={`graph-edge-path graph-edge-path--${data.kind}${
           data.status === null ? '' : ` graph-edge-path--${data.status}`
-        }${data.visualVariant === 'compact-schematic' ? ' graph-edge-path--compact-schematic' : ''}`}
+        }${data.visualVariant === 'compact-schematic' ? ' graph-edge-path--compact-schematic' : ''}${data.routeStyle === undefined ? '' : ` graph-edge-path--${data.routeStyle}`}`}
         id={id}
         markerEnd={markerEnd ?? ''}
         path={path}
