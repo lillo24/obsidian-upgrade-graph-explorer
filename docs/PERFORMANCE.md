@@ -1185,44 +1185,88 @@ hidden neighborhood-only simulation or success-shaped failure.
 
 ## MOVE1B production interaction boundary
 
-MOVE1B activates the PHYSICS1 service only while the production Network editor
-owns Move Files. Entering editing initializes clone-safe seed state but creates
-no Worker, starts no continuous loop, and performs no extra projection, finite
-layout, history, persistence, cache, or source write. The first real
-threshold-crossing pointer drag or keyboard nudge constructs one Worker. Later
-drags reheat that same Worker, release enters bounded cooling, and sleeping has
-no scheduled simulation work.
+MOVE1B arms PHYSICS1 directly in every supported, ready All or Focus Network and
+suspends it only while Arrange Folders owns input. Arming initializes clone-safe
+seed state but creates no Worker, starts no continuous loop, and performs no
+extra projection, finite layout, history, persistence, cache, or source write.
+The first real threshold-crossing pointer drag or keyboard nudge constructs one
+Worker. Later drags reheat that same Worker, release enters bounded cooling, and
+sleeping has no scheduled simulation work.
 
 Pointer samples and whole-graph hot/cooling frames remain in imperative session
-and canvas paths. React receives only capability plus
-waiting/moving/settling/failure transitions; it never adopts per-frame
-coordinates into component state. The Network Explorer keyboard controller uses
+and canvas paths. React receives only capability, raw lifecycle, presentation
+settling, and failure transitions; it never adopts per-frame coordinates into
+component state. A bounded display catch-up carries only current/target state,
+uses elapsed time, reaches exact raw coordinates within at most 120 ms, and
+stops scheduling when caught up. The Network Explorer keyboard controller uses
 the same coordinator and service, so it does not introduce a second simulation
 or a row-local controller.
 
-Move Files is therefore available only at 100 or fewer visible simulation
-nodes in this release. Larger views expose `graph-too-large`, never create the
-continuous Worker, and show the limit in the editor status. This is a release
+Direct File movement is available only at 100 or fewer visible simulation nodes
+in this release. Larger views expose `graph-too-large`, never create the
+continuous Worker, and show the limit near the Network controls. This is a release
 boundary, not a claim that every topology under the boundary must converge.
 Unexpected cap/wall/runtime failures remain explicit and retryable. Production
 browser evidence and a fresh optimized Windows build are required for the
 MOVE1B draft; native pointer/touchpad acceptance remains a separate mandatory
 release gate.
 
-The same run measured MOVE1A no-Place and Place conversion at
-0.1321/0.3143 ms and 0.0899/0.2187 ms median/p95 per 1,000 targets. A prebuilt
-20,000-node Place index converted 1,000 targets in 1.4050/2.5845 ms, and 10,000
-raw pointer samples emitted three coalesced commands in 2.3812 ms. Local-small
+The September 9, 2026 rerun measured MOVE1A no-Place and Place conversion at
+0.1361/0.2984 ms and 0.1338/0.6248 ms median/p95 per 1,000 targets. A prebuilt
+20,000-node Place index converted 1,000 targets in 2.1653/3.7895 ms, and 10,000
+raw pointer samples emitted three coalesced commands in 3.3792 ms. Local-small
 and Global-small/medium renderer benchmarks also passed; their operation
 oracles retained zero extra projections, automatic/global layouts, workspace
 transactions, and topology reconciliations for the interaction-only paths.
 
-Production-browser QA on the deterministic synthetic workspace exercised All
-and Focus pointer and keyboard movement, whole-graph reaction, release,
-cancelation, tool/scope/layout arbitration, reload non-persistence, and the
-polite Moving / Settling / Settled lifecycle. The clean cases returned to sleep
-without console errors. A separate origin with a previously saved Pull rule hit
+Earlier production-browser QA on the deterministic synthetic workspace exercised
+All and Focus pointer and keyboard movement, whole-graph reaction, release,
+cancelation, tool/scope/layout arbitration, reload non-persistence, and the old
+editing-shell lifecycle. The clean cases returned to sleep without console
+errors. A separate origin with a previously saved Pull rule hit
 the deterministic cooling cap on its tiny five-node graph; the last valid graph
 remained visible and Retry Move was available, confirming the explicit failure
 boundary rather than a success-shaped fallback. This does not replace the
-mandatory optimized-Windows pointer/touchpad acceptance.
+mandatory optimized-Windows pointer/touchpad acceptance or the corrected direct-
+drag/release evidence below.
+
+### Direct-drag release continuity evidence
+
+An ignored query-gated trace on the production Worker/client/Sigma path used a
+fixed 1280×720 viewport and a fitted five-File synthetic workspace. The trace
+recorded raw frames at client receipt, presentation callbacks, and Sigma
+`afterRender` viewport coordinates. Those hooks and query switches were removed
+before the final production build.
+
+The direct-adoption control reproduced the discontinuity: after release, its
+first presented canonical cooling endpoint was 14.40 graph units from the prior
+presentation, and the next post-presentation Sigma render moved a node by
+190.84 px. The raw end transition itself did not reset coordinates. A separate
+baseline client regression collapsed three valid cooling frames from `x=11`
+directly to `x=50`, proving that newest-only animation-frame adoption compounded
+the already-large physical endpoint.
+
+With bounded catch-up enabled, All Network kept the first cooling presentation
+and first corresponding Sigma render at 0 px from the last immediate drag
+preview. Its next rendered step was 12.46 px; across the sampled cooling tail,
+nearest-rank p95/max rendered displacement was 23.92/26.91 px and frame gaps
+remained approximately 17–20 ms. Raw physics slept 226.5 ms after release at
+1,344 cooling iterations. The exact final presentation callback arrived at
+356.9 ms and its next Sigma render at 374.4 ms. The full gesture received 56 raw
+frames and presented 26 frames, including six hot presentations and 20
+cooling/sleep presentations; no raw frame queue was introduced.
+
+Focus Network independently kept its first cooling presentation and first
+corresponding Sigma render at 0 px. Across 11 post-release Sigma renders,
+nearest-rank p95/max displacement was 39.21/39.21 px and p95/max frame gap was
+19/19 ms. Raw physics slept at 70.9 ms and 448 cooling iterations; the exact
+final presentation callback arrived at 200.2 ms. Fifteen raw cooling frames were
+reduced to 11 visible presentations. These pixel observations describe the fixed
+fixture and camera, not a universal per-frame motion threshold.
+
+The analyzer separately kept the supported 100-node Focus, All, and All-with-
+Pull releases successful: 832 iterations/47.435 ms, 2,304/127.458 ms, and
+4,832/418.608 ms respectively on this run. Production browser interaction used
+the bundled small fixture; browser-level 100-node All/Focus evidence remains a
+native acceptance item rather than being inferred from the analyzer or the
+100-node Global renderer benchmark.

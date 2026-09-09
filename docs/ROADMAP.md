@@ -54,7 +54,7 @@ reorder KG14.
 | **PHYSICS1 — Continuous simulation lifecycle**      | Lazy worker ownership, real temporary hard constraints, whole-graph reaction, Pull-aware cooling, and camera-neutral frame adoption.                             | **Hardened for the ≤100-node release boundary; browser/native evidence pending.**           |
 | **MOVE1 — Temporary physical File movement**        | Direct manipulation that ends on release and returns the File to automatic physical behavior.                                                                    | **Implementation ready at ≤100 visible nodes; native acceptance pending.**                  |
 | **MOVE1A — Constraint/gesture foundation**          | Display-to-dynamic coordinate inverse, serializable consumer port, pure gesture/coalescing, session seams, and lifecycle/arbitration tests.                      | **Complete.**                                                                               |
-| **MOVE1B — Production Edit/Move mode**              | Visible editing surface and real PHYSICS1 adapter integration with bounded transport, guarded cooling, and an explicit supported-size limit.                     | **Implemented in draft — mandatory optimized Windows pointer/touchpad acceptance pending.** |
+| **MOVE1B — Production direct movement**             | Direct Network File dragging and real PHYSICS1 integration with bounded transport, guarded cooling, and an explicit supported-size limit.                        | **Implemented in draft — mandatory optimized Windows pointer/touchpad acceptance pending.** |
 | **PIN1 — Persistent individual placement**          | Explicit durable single-File placement semantics, storage, reconciliation, and authoring controls.                                                               | **Later; no schema is defined.**                                                            |
 | **SAVED1 — Saved Views**                            | Later composition of query, Scope/Layout, hierarchy detail, settings, viewport, and spatial profile/reference.                                                   | **Later** — no schema is defined.                                                           |
 
@@ -168,7 +168,8 @@ product rule editor is implemented but remains a release candidate until the
 mandatory native pointer/touchpad gate passes. MOVE1A establishes temporary File
 constraint, coordinate, gesture, and renderer-session contracts. PHYSICS1 owns
 continuous simulation lifecycle, and MOVE1B now connects both to the production
-Network editor and accessible Network Explorer controller. That implementation
+All/Focus Network interaction and accessible Network Explorer controller, with
+Arrange Folders remaining an explicit All-only owner. That implementation
 remains a draft until the mandatory optimized Windows pointer/touchpad acceptance
 passes. PIN1 remains a separate later persistence feature rather than a side
 effect of Move. Named Saved Views remain later derived presentation work.

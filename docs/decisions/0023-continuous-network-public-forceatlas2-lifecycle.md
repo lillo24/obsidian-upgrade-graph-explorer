@@ -61,3 +61,6 @@ Reapplying shaped output into the working graph remains forbidden.
   generation/sequence commands, arbitration, and displayed-to-dynamic inversion.
 - MOVE1B may activate the dormant capability but must not reinterpret these
   lifecycle, coordinate, camera, or storage contracts.
+- Raw lifecycle and convergence stay authoritative even when MOVE1B uses a
+  bounded browser-only catch-up to present valid cooling results. Eased
+  coordinates never become simulation input or cache state.

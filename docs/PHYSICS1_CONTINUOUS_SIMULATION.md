@@ -70,7 +70,7 @@ queued display frame.
 
 Constraint transport is bounded. One update may be in flight and only the
 newest later update is retained; a release flushes that newest target before the
-end command. Begin/end/invalidate ordering is never coalesced away. Worker
+end command. Begin/end/invalidate ordering is never coalesced away. Hot Worker
 frames are still coalesced to the newest valid value and adopted at most once
 per `requestAnimationFrame`. Hot turns are paced to at most one scheduled turn
 per 16 ms so the Worker does not intentionally allocate and clone whole-graph
@@ -98,11 +98,12 @@ field after invalidation/remount. This is an explicit compatibility limit, not
 a claim that live physics retains the automatic field.
 
 The canvas integration is present behind `temporaryConstraintActive`, whose
-default is `false`. Web views supply the real lazy Worker factory and MOVE1B
-enables the flag only while Move Files is selected. Entering editing initializes
-clone-safe seed state but constructs no Worker. Thus normal browsing and editing
-entry retain the existing finite workers; the first threshold-crossing drag or
-keyboard nudge creates the PHYSICS1 Worker.
+default is `false`. In production that compatibility prop means direct dragging
+is available: Web views enable it in supported Network layouts and suspend it
+only while Arrange Folders owns input. Arming initializes clone-safe seed state
+but constructs no Worker. Mount, hover, click, double-click, and sub-threshold
+movement therefore retain the finite-worker boundary; the first threshold-
+crossing drag or keyboard nudge creates the PHYSICS1 Worker.
 
 ## Pull and Place
 
@@ -163,16 +164,33 @@ cache write, dynamic Pull cache write, spatial registry write, view/history
 write, or source write. Closing or remounting can therefore forget the transient
 state and return to normal accepted layout coordinates, as Move is not Pin.
 
+Release has a separate presentation layer because raw 32-iteration cooling
+endpoints can be both physically far apart and computed faster than a display
+callback. Raw validated frames remain authoritative for convergence and future
+physics seeds. Display starts from the last presented coordinates and chases
+only the newest valid raw target with cubic smoothstep time progress, no queued frame
+history, and a displacement-derived duration capped at 120 ms. Tiny changes can
+complete on the next frame; there is no minimum animation duration. Re-grabbing
+during catch-up makes the held File exact immediately and bridges only the other
+visible nodes for at most 80 ms. Reduced-motion skips decorative catch-up and
+adopts the accepted raw result. Cancellation, failure, invalidation, and
+disposal cancel pending display callbacks. The solver call boundaries, complete
+32-iteration convergence checks, iteration/wall caps, camera, Pull, Place, and
+M2 composition are unchanged.
+
 ## MOVE1B production activation
 
-GraphExplorer owns the transient off / Move Files / Arrange Folders state and
-clears the old renderer gesture before switching owners. All and Focus use the
-same service factory and lifecycle; All additionally retains its saved folder
-rule editor. The Network Explorer keyboard action sends viewport-relative
-nudges through the same MOVE1A coordinator rather than writing Sigma positions.
+GraphExplorer owns only the transient Arrange Folders input owner. File dragging
+is an ordinary supported All/Focus Network interaction with no Edit or Move
+mode. Entering Arrange Folders ends any File gesture and invalidates its
+simulation ownership before the existing saved-rule editor takes over; exiting
+re-arms direct movement. The Network Explorer keyboard action starts the same
+MOVE1A coordinator directly and sends viewport-relative nudges rather than
+writing Sigma positions.
 
-React observes only capability and sleeping/hot/cooling/failed/disposed
-transitions. Hot and cooling frames remain imperative. A failure ends the
+React observes capability, raw sleeping/hot/cooling/failed/disposed transitions,
+and a distinct idle/settling presentation state. Hot, cooling, and catch-up
+frames remain imperative. A failure ends the
 gesture, leaves the last valid graph visible, and exposes an explicit retry that
 reinitializes the retained service. Exit and invalidation do not restore, freeze,
 or persist coordinates.
@@ -181,6 +199,20 @@ Production Move is enabled only when the current simulation has at most 100
 visible nodes. Larger views report `graph-too-large`, construct no continuous
 Worker, and show the supported limit. The development lab and analyzer can
 still exercise larger retained simulations as explicit evidence.
+
+The MOVE1B native-QA correction reproduced release independently of UI state.
+`handle(end)` was coordinate-identical to the last hot worker state on every
+fixture, ruling out rollback, cache restoration, and M2/Place recomposition at
+that boundary. The first canonical 32-iteration endpoint nevertheless moved a
+node by 32.56, 42.68, and 35.80 graph units on the Focus chain, star, and
+single-isolate fixtures, and by 20.62 and 14.74 units on All cross-reference and
+All Place-layer fixtures. Four eager endpoints before one display opportunity
+raised the largest All cross-reference gap to 40.03 units. A client regression
+then reproduced one visible jump from `x=11` directly to `x=50` when three valid
+cooling results arrived before the display callback. The correction retains
+those raw physical results and call boundaries while presenting bounded
+intermediate coordinates; unsupported reset/camera explanations remain ruled
+out by source-path tests rather than inferred from scheduling alone.
 
 ## Development lab
 

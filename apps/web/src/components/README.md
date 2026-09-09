@@ -80,10 +80,10 @@ canonical truth, or own a platform storage implementation.
   focused-root text, and explained disabled Focus state. `../exploration-model.ts`
   owns the pure four-way mapping to existing internal modes plus the hierarchy
   density decision: All uses `compact-schematic`, Focus uses `extended`.
-- `NetworkEditingControls.tsx` owns the compact pencil and mutually exclusive
-  Move Files / Arrange Folders / Done strip. It states the temporary-versus-saved
-  semantic boundary and shows only waiting, moving, settling, or recoverable
-  failure transitions. GraphExplorer owns the reducer and cancellation order.
+- `NetworkEditingControls.tsx` exposes Arrange Folders directly in All Network
+  and its Done/saved-rule meaning only while active. Focus renders this surface
+  only for actionable movement status or recovery. File dragging has no toolbar
+  mode; GraphExplorer owns Arrange arbitration and cancellation order.
 - `StructureDepthControl.tsx` owns the labeled Hierarchy depth select and
   compact Custom override indicator, and
   `structure-depth-selection.ts` maps its four options onto the existing

@@ -245,16 +245,17 @@ PHYSICS1 owns runtime reheating, convergence, and reaction policy, including
 reactive neighbors around hard Place constraints.
 
 MOVE1A adds a separate temporary File constraint seam to both Network Sigma
-sessions, and MOVE1B connects it to the real PHYSICS1 service from the production
-Edit Network shell. One canonical document may own a pointer sequence after the
-same 3 px threshold; Focus
+sessions, and MOVE1B connects it directly to the real PHYSICS1 service whenever
+a supported Network is ready and Arrange Folders does not own input. One
+canonical document may own a pointer sequence after the same 3 px threshold; Focus
 headings, blocks, and diagnostics remain ineligible. The reducer captures the
 pointer-to-node offset and winning fixed Place translation, converts every live
 viewport sample through Sigma, and sends the dynamic target through a plain
 begin/update/end port. Raw updates coalesce to the latest animation frame;
 release flushes the latest update before one end command.
 
-Folder arrangement and File movement are mutually exclusive. Below threshold,
+Folder arrangement and File movement are mutually exclusive; no global File
+editing mode exists. Below threshold,
 selection, confirmed reveal, and document double-click keep their existing
 meaning. A real drag suppresses its trailing click/double-click. Escape,
 capture/stage loss, blur, visibility loss, topology/layout/scope/spatial or
@@ -266,8 +267,11 @@ worker handles, source text, or persisted coordinates. The same session exposes
 a coarse keyboard controller: it primes a visible File at its current viewport
 point, sends 8/32 px nudges through the identical coordinator, and releases into
 cooling. The canvases report only capability and lifecycle transitions to React;
-whole-graph frames remain imperative and camera-neutral. Physics failure clears
-the gesture, retains the last valid graph, and leaves explicit retry to the app.
+whole-graph frames remain imperative and camera-neutral. Raw Worker coordinates
+remain the authoritative seed while the browser may present a bounded,
+time-based release catch-up; eased coordinates never enter finite-layout,
+dynamic-Pull, or physics caches. Physics failure clears the gesture, retains the
+last valid graph, and leaves explicit retry to the app.
 
 VISUAL1A's reference-degree boost applies only to All Network. Ordinary document nodes add a bounded
 reference-degree boost to the configured base size. At the persisted

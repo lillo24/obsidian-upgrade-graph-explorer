@@ -12,16 +12,19 @@ saved layout caches, or persisted Place offsets.
   `forceAtlas2.assign` API.
 - `index.ts` is the package export surface.
 
-The browser worker owns scheduling. MOVE1B initializes the retained service only
-while Move Files is selected, but initialization still constructs no Worker; the
-first threshold-crossing pointer drag or keyboard nudge does. A sleeping
+The browser worker owns scheduling. MOVE1B initializes the retained service
+whenever supported All or Focus Network movement is armed, but initialization
+still constructs no Worker; the first threshold-crossing pointer drag or
+keyboard nudge does. Arrange Folders temporarily suspends this ownership. A sleeping
 simulation schedules no work. A new begin during cooling reheats the same Worker.
 Frames carry a monotonic interaction revision plus gesture/File identity.
 Renderers may adopt lagging neighbor progress, but overlay the constrained File
 at the newest target; update transport retains at most one in-flight and one
-pending target. Renderers adopt coordinates imperatively, expose only coarse
-lifecycle transitions, and must not persist frames. Failure preserves the last
-adopted graph and is recovered explicitly by a fresh initialization.
+pending target. Renderers retain exact raw coordinates separately from bounded
+display catch-up, adopt presentation coordinates imperatively, expose only
+coarse raw lifecycle/presentation transitions, and must not persist frames.
+Failure preserves the last adopted graph and is recovered explicitly by a fresh
+initialization.
 
 All seeds explicitly label whether they began from an output-only M2 folder
 snapshot. That automatic field may relax during transient Move; it is never

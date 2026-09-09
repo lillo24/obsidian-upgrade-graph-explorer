@@ -115,15 +115,16 @@ changes only draft intent; Place may rigidly preview effective members. Neither
 path adds folder entities, File-ID membership, raw coordinates, or graph history
 checkpoints.
 
-MOVE1B mounts the transient Network editing model defined by MOVE1A. A compact
-**Edit Network layout** pencil opens **Move Files** by default; All also exposes
-**Arrange Folders**, while Focus exposes Move only. Tool switches, Network exit,
-scope/source changes, and retry clear the old renderer gesture before the next
-owner becomes active. Move activates the existing lazy PHYSICS1 service in both
-Network views and reports only coarse waiting/moving/settling/failure states to
-React. It has no storage adapter or history checkpoint: release cools the same
-whole-graph simulation and never saves a File position. Arrange Folders keeps
-the existing saved Pull/Place rule editor and its dirty-draft guard.
+MOVE1B arms MOVE1A directly in every supported, ready All or Focus Network;
+there is no Edit Network or Move Files prerequisite. Clicking and
+double-clicking retain selection/reveal and Focus meaning below the three-pixel
+threshold. A real drag lazily starts PHYSICS1, releases into cooling, and never
+saves a File position or history checkpoint. **Arrange Folders** remains a
+direct All-only entry to the saved Pull/Place rule editor. It cancels and
+suspends File movement while it owns input, retains its dirty-draft guard, and
+returns to ordinary direct dragging on exit. React reports only actionable
+waiting/limit/failure text and a quiet settling state; Retry Move remains
+available after a worker failure.
 
 Graph history remains a web-layer session concern above KG9 view state.
 Each checkpoint contains one immutable KG6 `ViewProjectionState` reference and
