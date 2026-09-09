@@ -38,7 +38,7 @@ src/
   spatial-influence.ts     Pure soft-attractor request, fingerprint, compute, validation, metrics.
   spatial-influence-cache.ts  Four-entry memory-only LRU of dynamic positions.
   arrangement.ts           Pure thresholded prime/drag/commit/cancel gesture reducer.
-  temporary-node-constraint.ts  Serializable fake-backed PHYSICS1 consumer port.
+  temporary-node-constraint.ts  Serializable PHYSICS1 consumer port and strict test fake.
   file-move.ts             Pure File gesture reducer and frame-coalesced coordinator.
   node-size.ts             Per-File multiplier composition and final display-only bounds.
   node-size-presentation.ts  Sparse override diff and topology-owned File-to-node key index.
@@ -252,19 +252,21 @@ zero dynamic workers; no rule edit enters the automatic layout fingerprint.
 The SPATIAL2A worker still performs its existing whole-graph ForceAtlas2
 refinement, so disconnected geometry movement is layout evidence rather than a
 camera fit. SPATIAL2B does not introduce a competing simulation lifecycle;
-PHYSICS1 owns future reheating, convergence, and reaction policy, including
+PHYSICS1 owns runtime reheating, convergence, and reaction policy, including
 reactive neighbors around hard Place constraints.
 
-MOVE1A adds a separate, fake-backed temporary File constraint seam to both
-Network Sigma sessions without exposing a production control. One canonical
-document may own a pointer sequence after the same 3 px threshold; Focus
+MOVE1A adds a separate temporary File constraint seam to both Network Sigma
+sessions, and MOVE1B connects it directly to the real PHYSICS1 service whenever
+a supported Network is ready and Arrange Folders does not own input. One
+canonical document may own a pointer sequence after the same 3 px threshold; Focus
 headings, blocks, and diagnostics remain ineligible. The reducer captures the
 pointer-to-node offset and winning fixed Place translation, converts every live
 viewport sample through Sigma, and sends the dynamic target through a plain
 begin/update/end port. Raw updates coalesce to the latest animation frame;
 release flushes the latest update before one end command.
 
-Folder arrangement and File movement are mutually exclusive. Below threshold,
+Folder arrangement and File movement are mutually exclusive; no global File
+editing mode exists. Below threshold,
 selection, confirmed reveal, and document double-click keep their existing
 meaning. A real drag suppresses its trailing click/double-click. Escape,
 capture/stage loss, blur, visibility loss, topology/layout/scope/spatial or
@@ -272,8 +274,15 @@ workspace invalidation, service failure, mode exit, and disposal remove the
 temporary constraint. The port carries stable node key, session/simulation
 generation, gesture ID, monotonic sequence, simulation-space target, and end
 reason only; it owns no alpha/cooling values, Graphology/Sigma instances,
-worker handles, source text, or persisted coordinates. PHYSICS1 owns the future
-real adapter and MOVE1B owns the visible Edit/Move mode.
+worker handles, source text, or persisted coordinates. The same session exposes
+a coarse keyboard controller: it primes a visible File at its current viewport
+point, sends 8/32 px nudges through the identical coordinator, and releases into
+cooling. The canvases report only capability and lifecycle transitions to React;
+whole-graph frames remain imperative and camera-neutral. Raw Worker coordinates
+remain the authoritative seed while the browser may present a bounded,
+time-based release catch-up; eased coordinates never enter finite-layout,
+dynamic-Pull, or physics caches. Physics failure clears the gesture, retains the
+last valid graph, and leaves explicit retry to the app.
 
 VISUAL1A's reference-degree boost applies only to All Network. Ordinary document nodes add a bounded
 reference-degree boost to the configured base size. At the persisted

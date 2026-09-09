@@ -5,7 +5,7 @@ import {
   type TemporaryNodeConstraintPort,
 } from '../temporary-node-constraint';
 
-export const NETWORK_PHYSICS_SCHEMA_VERSION = 1 as const;
+export const NETWORK_PHYSICS_SCHEMA_VERSION = 2 as const;
 
 export type NetworkPhysicsMode = 'focus' | 'all';
 export type NetworkPhysicsLifecycleState =
@@ -56,6 +56,11 @@ export interface NetworkPhysicsSeed {
   readonly edges: readonly NetworkPhysicsEdge[];
   readonly settings: NetworkPhysicsSettings;
   readonly attractors: readonly NetworkPhysicsAttractor[];
+  /**
+   * M2 is an output-only base-layout field. All Move starts from that shaped
+   * snapshot but deliberately does not feed or reapply the field per tick.
+   */
+  readonly automaticFolderFieldPolicy: 'none' | 'seeded-output-relaxation';
 }
 
 export interface NetworkPhysicsConstraintMessage {
@@ -110,6 +115,12 @@ export interface NetworkPhysicsFrameResponse extends NetworkPhysicsResponseBase 
   readonly state: 'sleeping' | 'hot-constrained' | 'cooling';
   readonly frameSequence: number;
   readonly iterationsCompleted: number;
+  /** Monotonic within one retained simulation; increments on every begin. */
+  readonly interactionRevision: number;
+  readonly gestureId: string;
+  readonly constraintNodeKey: string;
+  /** Last begin/update/end command incorporated into this frame. */
+  readonly commandSequence: number;
   readonly constraintSequence: number | null;
   readonly positions: readonly NetworkPhysicsPosition[];
 }
@@ -144,11 +155,20 @@ export interface NetworkPhysicsService extends TemporaryNodeConstraintPort {
 }
 
 export interface NetworkPhysicsServiceFactoryOptions {
+  /** Exact validated Worker state; never presentation-interpolated. */
+  readonly onRawFrame?: (frame: NetworkPhysicsFrameResponse) => void;
+  /** Imperative browser presentation; may contain bounded catch-up positions. */
   readonly onFrame: (frame: NetworkPhysicsFrameResponse) => void;
   readonly onConstraint: (command: TemporaryNodeConstraintCommand) => void;
   readonly onStateChange?: (state: NetworkPhysicsLifecycleState) => void;
+  /** Browser display catch-up; independent from raw simulation lifecycle. */
+  readonly onPresentationStateChange?: (
+    state: NetworkPhysicsPresentationState,
+  ) => void;
   readonly onFailure: (failure: NetworkPhysicsFailureResponse) => void;
 }
+
+export type NetworkPhysicsPresentationState = 'idle' | 'settling';
 
 export type NetworkPhysicsServiceFactory = (
   options: NetworkPhysicsServiceFactoryOptions,
@@ -269,6 +289,19 @@ export function validateNetworkPhysicsSeed(
   if (!Array.isArray(value.attractors)) {
     throw new Error('Network physics seed requires an attractor array.');
   }
+  if (
+    value.automaticFolderFieldPolicy !== 'none' &&
+    value.automaticFolderFieldPolicy !== 'seeded-output-relaxation'
+  ) {
+    throw new Error(
+      'Network physics seed has an invalid automatic folder-field policy.',
+    );
+  }
+  if (value.mode === 'focus' && value.automaticFolderFieldPolicy !== 'none') {
+    throw new Error(
+      'Network physics Focus seed cannot relax an automatic folder field.',
+    );
+  }
   if (value.mode === 'focus' && value.attractors.length !== 0) {
     throw new Error(
       'Network physics Focus seed cannot contain Pull attractors.',
@@ -380,11 +413,27 @@ export function validateNetworkPhysicsWorkerResponse(
       (value.frameSequence as number) < 1 ||
       !Number.isSafeInteger(value.iterationsCompleted) ||
       (value.iterationsCompleted as number) < 0 ||
+      !Number.isSafeInteger(value.interactionRevision) ||
+      (value.interactionRevision as number) < 1 ||
+      !Number.isSafeInteger(value.commandSequence) ||
+      (value.commandSequence as number) < 0 ||
       (value.constraintSequence !== null &&
         (!Number.isSafeInteger(value.constraintSequence) ||
-          (value.constraintSequence as number) < 0))
+          (value.constraintSequence as number) < 0)) ||
+      (value.constraintSequence !== null &&
+        value.constraintSequence !== value.commandSequence)
     ) {
       throw new Error('Network physics frame counters are invalid.');
+    }
+    identifier(value.gestureId, 'frame gesture id');
+    identifier(value.constraintNodeKey, 'frame constraint node key');
+    if (
+      (value.state === 'hot-constrained') !==
+      (value.constraintSequence !== null)
+    ) {
+      throw new Error(
+        'Network physics frame constraint state is inconsistent.',
+      );
     }
     if (!Array.isArray(value.positions)) {
       throw new Error('Network physics frame requires positions.');

@@ -70,6 +70,14 @@ import type {
   SemanticGlobalViewport,
   SemanticLocalViewport,
 } from '@icarus-graph-explorer/renderer-sigma/types';
+import type {
+  NetworkPhysicsLifecycleState,
+  TemporaryFileMoveController,
+  TemporaryNodeConstraintCapability,
+  TemporaryNodeConstraintEndReason,
+} from '@icarus-graph-explorer/renderer-sigma';
+import { NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT } from '@icarus-graph-explorer/renderer-sigma/physics';
+import type { NetworkPhysicsPresentationState } from '@icarus-graph-explorer/renderer-sigma/physics';
 import { resolveNetworkSettings } from '@icarus-graph-explorer/renderer-sigma/settings';
 import {
   compileVisualGroups,
@@ -168,6 +176,12 @@ import {
 } from '../spatial-overrides/arrangement';
 import { createFolderScopeTree } from '../spatial-overrides/folder-scope-model';
 import {
+  NETWORK_EDITING_OFF,
+  reduceNetworkEditing,
+  type NetworkEditingAction,
+  type NetworkEditingState,
+} from '../network-editing';
+import {
   commitVisualGroupSessionMutation,
   createVisualGroupSession,
   resetCorruptVisualGroupSession,
@@ -186,6 +200,7 @@ import {
 import { activateMaximizedGraphMode } from './maximized-graph-mode';
 import { ProvenanceInspector } from './ProvenanceInspector';
 import { NetworkExplorer } from './NetworkExplorer';
+import { NetworkEditingControls } from './NetworkEditingControls';
 import type { SavedGraphQueriesState } from './SavedGraphQueries';
 import { StructureDepthControl } from './StructureDepthControl';
 import { VisualGroups } from './VisualGroups';
@@ -619,6 +634,50 @@ export function GraphExplorer({
   );
   const [folderArrangementDraftDirty, setFolderArrangementDraftDirty] =
     useState(false);
+  const [networkEditingState, setNetworkEditingState] =
+    useState<NetworkEditingState>(NETWORK_EDITING_OFF);
+  const [temporaryFileMoveController, setTemporaryFileMoveController] =
+    useState<TemporaryFileMoveController>();
+  const temporaryFileMoveControllerRef = useRef<
+    TemporaryFileMoveController | undefined
+  >(undefined);
+  const [temporaryFileMoveCapability, setTemporaryFileMoveCapability] =
+    useState<TemporaryNodeConstraintCapability>({
+      status: 'unavailable',
+      reason: 'simulation-not-running',
+    });
+  const [temporaryFileMoveLifecycle, setTemporaryFileMoveLifecycle] =
+    useState<NetworkPhysicsLifecycleState>('sleeping');
+  const [temporaryFileMovePresentation, setTemporaryFileMovePresentation] =
+    useState<NetworkPhysicsPresentationState>('idle');
+  const [temporaryFileMoveFailure, setTemporaryFileMoveFailure] =
+    useState<string>();
+  const [temporaryFileMoveRetryKey, setTemporaryFileMoveRetryKey] = useState(0);
+  const [keyboardFileMoveNodeId, setKeyboardFileMoveNodeId] =
+    useState<ProjectionNodeId>();
+  const [keyboardFileMoveRequestKey, setKeyboardFileMoveRequestKey] =
+    useState(0);
+  const handledKeyboardFileMoveRequest = useRef(0);
+  const transitionNetworkEditing = useCallback(
+    (
+      action: NetworkEditingAction,
+      cancellationReason: Exclude<
+        TemporaryNodeConstraintEndReason,
+        'released'
+      > = 'mode-exit',
+    ) => {
+      const transition = reduceNetworkEditing(networkEditingState, action);
+      if (transition.clearActiveGesture) {
+        temporaryFileMoveController?.cancel(cancellationReason);
+      }
+      setNetworkEditingState(transition.state);
+      if (transition.state.phase === 'editing') {
+        setKeyboardFileMoveNodeId(undefined);
+      }
+      return transition;
+    },
+    [networkEditingState, temporaryFileMoveController],
+  );
   const [
     folderArrangementFocusRequestKey,
     setFolderArrangementFocusRequestKey,
@@ -767,8 +826,39 @@ export function GraphExplorer({
     };
   }, [changeFolderArrangementAvailability, effectiveRendererMode]);
   useEffect(() => {
-    dispatchFolderArrangementMode({ type: 'exit' });
+    temporaryFileMoveControllerRef.current?.cancel('workspace-changed');
+    queueMicrotask(() => {
+      setNetworkEditingState(NETWORK_EDITING_OFF);
+      setKeyboardFileMoveNodeId(undefined);
+      setTemporaryFileMoveFailure(undefined);
+      setTemporaryFileMoveLifecycle('sleeping');
+      setTemporaryFileMovePresentation('idle');
+      dispatchFolderArrangementMode({ type: 'exit' });
+    });
   }, [workspaceId]);
+  useEffect(() => {
+    if (
+      activeLayout === 'network' &&
+      !(
+        activeScope === 'focus' &&
+        networkEditingState.phase === 'editing' &&
+        networkEditingState.tool === 'arrange-folder'
+      )
+    ) {
+      return;
+    }
+    temporaryFileMoveController?.cancel('layout-changed');
+    queueMicrotask(() => {
+      transitionNetworkEditing({ type: 'leave-network' }, 'layout-changed');
+      dispatchFolderArrangementMode({ type: 'exit' });
+    });
+  }, [
+    activeLayout,
+    activeScope,
+    networkEditingState,
+    temporaryFileMoveController,
+    transitionNetworkEditing,
+  ]);
   const unavailableProjection: ProjectionResult = {
     ok: false,
     message: 'The active graph presentation could not be prepared.',
@@ -990,13 +1080,21 @@ export function GraphExplorer({
         setFolderArrangementFocusRequestKey((current) => current + 1);
         return;
       }
+      temporaryFileMoveController?.cancel('mode-exit');
+      setKeyboardFileMoveNodeId(undefined);
+      transitionNetworkEditing({ type: 'enter', tool: 'arrange-folder' });
       dispatchFolderArrangementMode({
         type: 'enter',
         ...(folderKey === undefined ? {} : { folderKey }),
       });
       setFolderArrangementFocusRequestKey((current) => current + 1);
     },
-    [folderArrangementDraftDirty, folderArrangementMode],
+    [
+      folderArrangementDraftDirty,
+      folderArrangementMode,
+      temporaryFileMoveController,
+      transitionNetworkEditing,
+    ],
   );
   const folderArrangementIsActive = folderArrangementActive(
     folderArrangementMode,
@@ -1049,7 +1147,10 @@ export function GraphExplorer({
       persistenceStatus: spatialOverrides.session.status,
       onActiveChange: (active) => {
         if (active) beginFolderArrangement();
-        else dispatchFolderArrangementMode({ type: 'exit' });
+        else {
+          transitionNetworkEditing({ type: 'exit' });
+          dispatchFolderArrangementMode({ type: 'exit' });
+        }
       },
       onActiveFolderChange: (folderKey) =>
         dispatchFolderArrangementMode({
@@ -1095,6 +1196,7 @@ export function GraphExplorer({
       spatialOverrides.session.status,
       spatialOverrides.setFolderAnchor,
       spatialOverrides.setFolderRule,
+      transitionNetworkEditing,
     ],
   );
   const ruleByFolderKey = useMemo(
@@ -1142,6 +1244,93 @@ export function GraphExplorer({
       removeFolderRule,
     ],
   );
+  const retainDirtyFolderDraft = useCallback(() => {
+    if (!folderArrangementDraftDirty) return false;
+    setNavigationAnnouncement(
+      'Apply or cancel the current spatial rule changes before leaving Arrange Folders.',
+    );
+    setFolderArrangementFocusRequestKey((current) => current + 1);
+    return true;
+  }, [folderArrangementDraftDirty]);
+  const finishNetworkEditing = useCallback(() => {
+    if (retainDirtyFolderDraft()) return;
+    transitionNetworkEditing({ type: 'exit' });
+    dispatchFolderArrangementMode({ type: 'exit' });
+  }, [retainDirtyFolderDraft, transitionNetworkEditing]);
+  const retryTemporaryFileMove = useCallback(() => {
+    temporaryFileMoveController?.cancel('error');
+    setKeyboardFileMoveNodeId(undefined);
+    setTemporaryFileMoveFailure(undefined);
+    setTemporaryFileMoveLifecycle('sleeping');
+    setTemporaryFileMovePresentation('idle');
+    setTemporaryFileMoveRetryKey((current) => current + 1);
+    setNavigationAnnouncement('Retrying File movement.');
+  }, [temporaryFileMoveController]);
+  const changeTemporaryFileMoveCapability = useCallback(
+    (capability: TemporaryNodeConstraintCapability) => {
+      setTemporaryFileMoveCapability((current) =>
+        current.status === capability.status &&
+        (current.status === 'available' ||
+          (capability.status === 'unavailable' &&
+            current.reason === capability.reason))
+          ? current
+          : capability,
+      );
+    },
+    [],
+  );
+  const changeTemporaryFileMoveLifecycle = useCallback(
+    (lifecycle: NetworkPhysicsLifecycleState) => {
+      setTemporaryFileMoveLifecycle((current) =>
+        current === lifecycle ? current : lifecycle,
+      );
+    },
+    [],
+  );
+  const changeTemporaryFileMovePresentation = useCallback(
+    (state: NetworkPhysicsPresentationState) => {
+      setTemporaryFileMovePresentation((current) =>
+        current === state ? current : state,
+      );
+    },
+    [],
+  );
+  const reportTemporaryFileMoveFailure = useCallback((message: string) => {
+    setKeyboardFileMoveNodeId(undefined);
+    setTemporaryFileMoveLifecycle('failed');
+    setTemporaryFileMovePresentation('idle');
+    setTemporaryFileMoveFailure(`File movement stopped: ${message}`);
+    setNavigationAnnouncement(
+      'File movement stopped. The last valid graph remains visible; use Retry Move to recover.',
+    );
+  }, []);
+  const changeTemporaryFileMoveController = useCallback(
+    (controller: TemporaryFileMoveController | undefined) => {
+      temporaryFileMoveControllerRef.current = controller;
+      setTemporaryFileMoveController(controller);
+    },
+    [],
+  );
+  useEffect(() => {
+    if (networkEditingState.phase === 'off') return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest(
+          '[role="dialog"], [role="menu"], input, textarea, select, [contenteditable="true"], [data-network-editing-escape="handled"]',
+        ) !== null
+      ) {
+        return;
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      finishNetworkEditing();
+    };
+    window.addEventListener('keydown', handleEscape, true);
+    return () => window.removeEventListener('keydown', handleEscape, true);
+  }, [finishNetworkEditing, networkEditingState.phase]);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const inspectorToolbarRef = useRef<HTMLButtonElement>(null);
   const inspectorHandleRef = useRef<HTMLButtonElement>(null);
@@ -1261,6 +1450,141 @@ export function GraphExplorer({
             visualGroupPresentation.styles,
           ),
     [inspectionWorkspace, networkProjection, visualGroupPresentation.styles],
+  );
+  const startKeyboardFileMove = useCallback(
+    (nodeId: ProjectionNodeId) => {
+      const node = networkExplorerModel?.nodeById.get(nodeId);
+      if (node?.kindLabel !== 'File') {
+        setNavigationAnnouncement('Only visible Files can be moved.');
+        return;
+      }
+      if (networkEditingState.phase === 'editing') {
+        setNavigationAnnouncement(
+          'Finish Arrange Folders before moving a File.',
+        );
+        return;
+      }
+      if (retainDirtyFolderDraft()) return;
+      temporaryFileMoveController?.cancel('mode-exit');
+      // Keyboard movement selects without issuing a semantic center request.
+      setSelection({ kind: 'node', id: nodeId });
+      setKeyboardFileMoveNodeId(nodeId);
+      setKeyboardFileMoveRequestKey((current) => current + 1);
+      setNavigationAnnouncement(
+        `Move File ${node.name}. Use arrow keys, then release to settle. The position is not saved.`,
+      );
+    },
+    [
+      networkEditingState.phase,
+      networkExplorerModel,
+      retainDirtyFolderDraft,
+      temporaryFileMoveController,
+    ],
+  );
+  useEffect(() => {
+    if (
+      keyboardFileMoveNodeId === undefined ||
+      keyboardFileMoveRequestKey === handledKeyboardFileMoveRequest.current ||
+      temporaryFileMoveCapability.status !== 'available'
+    ) {
+      return;
+    }
+    const result = temporaryFileMoveController?.start(keyboardFileMoveNodeId);
+    if (result?.status === 'started') {
+      handledKeyboardFileMoveRequest.current = keyboardFileMoveRequestKey;
+      return;
+    }
+    if (result?.reason === 'node-unavailable') {
+      queueMicrotask(() => {
+        setKeyboardFileMoveNodeId(undefined);
+        setNavigationAnnouncement(
+          'The selected File is no longer available to move.',
+        );
+      });
+    }
+  }, [
+    keyboardFileMoveNodeId,
+    keyboardFileMoveRequestKey,
+    temporaryFileMoveCapability.status,
+    temporaryFileMoveController,
+  ]);
+  const nudgeKeyboardFileMove = useCallback(
+    (x: number, y: number) => {
+      if (temporaryFileMoveController?.nudge({ x, y }) === true) return;
+      setKeyboardFileMoveNodeId(undefined);
+      setNavigationAnnouncement(
+        'Move File ended because the graph changed or movement became unavailable.',
+      );
+    },
+    [temporaryFileMoveController],
+  );
+  const releaseKeyboardFileMove = useCallback(() => {
+    temporaryFileMoveController?.release();
+    setKeyboardFileMoveNodeId(undefined);
+    setNavigationAnnouncement(
+      'File released. Network physics is settling; no position was saved.',
+    );
+  }, [temporaryFileMoveController]);
+  const cancelKeyboardFileMove = useCallback(() => {
+    temporaryFileMoveController?.cancel('cancelled');
+    setKeyboardFileMoveNodeId(undefined);
+    setNavigationAnnouncement('File movement canceled; no position was saved.');
+  }, [temporaryFileMoveController]);
+  const handleUnavailableKeyboardFileMoveTarget = useCallback(() => {
+    temporaryFileMoveController?.cancel('topology-changed');
+    setKeyboardFileMoveNodeId(undefined);
+    setNavigationAnnouncement(
+      'The File being moved is no longer visible. Movement ended safely.',
+    );
+  }, [temporaryFileMoveController]);
+  const networkExplorerFileMove = useMemo(
+    () => ({
+      ...(keyboardFileMoveNodeId === undefined
+        ? {}
+        : { activeNodeId: keyboardFileMoveNodeId }),
+      available:
+        temporaryFileMoveCapability.status === 'available' &&
+        temporaryFileMoveFailure === undefined &&
+        networkEditingState.phase === 'off' &&
+        !folderArrangementDraftDirty,
+      ...(networkEditingState.phase === 'editing'
+        ? { unavailableReason: 'Finish Arrange Folders first.' }
+        : folderArrangementDraftDirty
+          ? {
+              unavailableReason:
+                'Apply or cancel the current folder rule changes first.',
+            }
+          : temporaryFileMoveFailure !== undefined
+            ? { unavailableReason: 'Retry File movement before moving a File.' }
+            : temporaryFileMoveCapability.status === 'available'
+              ? {}
+              : {
+                  unavailableReason:
+                    temporaryFileMoveCapability.reason ===
+                    'simulation-not-running'
+                      ? 'Waiting for Network layout…'
+                      : temporaryFileMoveCapability.reason === 'graph-too-large'
+                        ? `File movement supports up to ${NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT} visible nodes in this release.`
+                        : 'File movement is unavailable in this Network view.',
+                }),
+      onCancel: cancelKeyboardFileMove,
+      onNudge: nudgeKeyboardFileMove,
+      onRelease: releaseKeyboardFileMove,
+      onStart: startKeyboardFileMove,
+      onTargetUnavailable: handleUnavailableKeyboardFileMoveTarget,
+    }),
+    [
+      cancelKeyboardFileMove,
+      folderArrangementDraftDirty,
+      handleUnavailableKeyboardFileMoveTarget,
+      keyboardFileMoveNodeId,
+      nudgeKeyboardFileMove,
+      networkEditingState.phase,
+      releaseKeyboardFileMove,
+      startKeyboardFileMove,
+      temporaryFileMoveCapability,
+      temporaryFileMoveFailure,
+    ],
   );
   const activeSelection =
     projection !== undefined && selectionExists(projection, selection)
@@ -1662,6 +1986,8 @@ export function GraphExplorer({
         );
   }, [applyHistoryTraversal, currentHistoryCheckpoint, performance]);
   const exitFocusToAll = useCallback((): void => {
+    temporaryFileMoveController?.cancel('scope-changed');
+    setKeyboardFileMoveNodeId(undefined);
     if (returnToPriorAll()) return;
     const applyFallback = () => {
       const focusState = activeViewStateRef.current;
@@ -1811,6 +2137,7 @@ export function GraphExplorer({
     returnToPriorAll,
     setGlobalSemanticViewportBookmark,
     setSemanticViewportBookmark,
+    temporaryFileMoveController,
   ]);
   const goBack = useCallback(
     () => void traverseGraphHistory('back'),
@@ -2810,6 +3137,12 @@ export function GraphExplorer({
       ) {
         return;
       }
+      if (mode === 'structured') {
+        temporaryFileMoveController?.cancel('layout-changed');
+        setKeyboardFileMoveNodeId(undefined);
+        transitionNetworkEditing({ type: 'leave-network' }, 'layout-changed');
+        dispatchFolderArrangementMode({ type: 'exit' });
+      }
       const rootEntityId = activeViewStateRef.current.focus?.rootEntityId;
       const rootNode =
         rootEntityId === undefined
@@ -2874,7 +3207,14 @@ export function GraphExplorer({
             }`,
       );
     },
-    [updateGraphPreferences, projection, requestLocalSemanticCenter, selection],
+    [
+      updateGraphPreferences,
+      projection,
+      requestLocalSemanticCenter,
+      selection,
+      temporaryFileMoveController,
+      transitionNetworkEditing,
+    ],
   );
   const changeSettingsOpen = useCallback((open: boolean) => {
     dispatchWorkspaceOverlay({ type: 'change-settings', open });
@@ -3025,6 +3365,13 @@ export function GraphExplorer({
         (nextMode === 'global' && globalFailure !== undefined)
       ) {
         return;
+      }
+      if (rendererModeRef.current === 'global' && nextMode === 'structure') {
+        if (retainDirtyFolderDraft()) return;
+        temporaryFileMoveController?.cancel('layout-changed');
+        setKeyboardFileMoveNodeId(undefined);
+        transitionNetworkEditing({ type: 'leave-network' }, 'layout-changed');
+        dispatchFolderArrangementMode({ type: 'exit' });
       }
       const currentState = activeViewStateRef.current;
       const nextAllState: ViewProjectionState = {
@@ -3218,11 +3565,14 @@ export function GraphExplorer({
       requestGlobalFit,
       requestGlobalSemanticCenter,
       requestSemanticCenter,
+      retainDirtyFolderDraft,
       exitFocusToAll,
       selection,
       setGlobalSemanticViewportBookmark,
       setSemanticViewportBookmark,
       structureResult,
+      temporaryFileMoveController,
+      transitionNetworkEditing,
     ],
   );
   const applyExperimentalAllHierarchyAvailability = useCallback(
@@ -3292,6 +3642,18 @@ export function GraphExplorer({
     (entityId: EntityId): void => {
       const sourceMode = rendererModeRef.current;
       if (sourceMode !== 'global' && sourceMode !== 'structure') return;
+      if (
+        sourceMode === 'global' &&
+        networkEditingState.phase === 'editing' &&
+        networkEditingState.tool === 'arrange-folder'
+      ) {
+        if (retainDirtyFolderDraft()) return;
+        transitionNetworkEditing({ type: 'exit' }, 'scope-changed');
+        dispatchFolderArrangementMode({ type: 'exit' });
+      } else {
+        temporaryFileMoveController?.cancel('scope-changed');
+        setKeyboardFileMoveNodeId(undefined);
+      }
       try {
         const targetLayoutMode: LocalLayoutMode =
           sourceMode === 'global' ? 'free' : 'structured';
@@ -3420,9 +3782,13 @@ export function GraphExplorer({
       performance,
       projection,
       projectionWorkspace,
+      networkEditingState,
+      retainDirtyFolderDraft,
       replaceNavigationHistory,
       requestLocalSemanticCenter,
       setLocalSemanticViewportBookmark,
+      temporaryFileMoveController,
+      transitionNetworkEditing,
     ],
   );
   const navigateToEntity = useCallback(
@@ -3679,6 +4045,21 @@ export function GraphExplorer({
     [activeLayout, activeScope, changeLocalLayoutMode, changeRendererMode],
   );
 
+  const temporaryFileMoveStatus =
+    temporaryFileMoveFailure !== undefined ||
+    networkEditingState.phase === 'editing'
+      ? undefined
+      : temporaryFileMoveCapability.status === 'unavailable'
+        ? temporaryFileMoveCapability.reason === 'simulation-not-running'
+          ? 'Waiting for Network layout…'
+          : temporaryFileMoveCapability.reason === 'graph-too-large'
+            ? `File movement supports up to ${NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT} visible nodes in this release.`
+            : 'File movement is unavailable in this Network view.'
+        : temporaryFileMoveLifecycle === 'cooling' ||
+            temporaryFileMovePresentation === 'settling'
+          ? 'Settling…'
+          : undefined;
+
   function resetSavedView(): void {
     if (persistenceStorage === undefined) {
       setPersistenceError(
@@ -3909,6 +4290,30 @@ export function GraphExplorer({
               onScopeChange={changeExplorationScope}
               scope={activeScope}
             />
+            {networkLayoutActive ? (
+              <NetworkEditingControls
+                {...(activeScope !== 'all' ||
+                folderArrangementAvailability.available
+                  ? {}
+                  : {
+                      arrangeDisabledReason:
+                        folderArrangementAvailability.reason === undefined
+                          ? 'Arrange Folders is unavailable right now.'
+                          : 'Waiting for Network layout…',
+                    })}
+                {...(temporaryFileMoveFailure === undefined
+                  ? {}
+                  : { failure: temporaryFileMoveFailure })}
+                onDone={finishNetworkEditing}
+                onArrange={beginFolderArrangement}
+                onRetry={retryTemporaryFileMove}
+                scope={activeScope}
+                state={networkEditingState}
+                {...(temporaryFileMoveStatus === undefined
+                  ? {}
+                  : { status: temporaryFileMoveStatus })}
+              />
+            ) : null}
             {activeScope === 'focus' || activeLayout === 'hierarchy' ? (
               <StructureDepthControl
                 custom={
@@ -3927,6 +4332,24 @@ export function GraphExplorer({
               >
                 <button
                   onClick={() => {
+                    if (
+                      networkEditingState.phase === 'editing' &&
+                      networkEditingState.tool === 'arrange-folder' &&
+                      retainDirtyFolderDraft()
+                    ) {
+                      return;
+                    }
+                    temporaryFileMoveController?.cancel('layout-changed');
+                    setKeyboardFileMoveNodeId(undefined);
+                    if (
+                      networkEditingState.phase === 'editing' &&
+                      networkEditingState.tool === 'arrange-folder'
+                    ) {
+                      transitionNetworkEditing(
+                        { type: 'exit' },
+                        'layout-changed',
+                      );
+                    }
                     dispatchFolderArrangementMode({ type: 'exit' });
                     if (activeScope === 'focus') {
                       setLocalLayoutRequestKey((current) => current + 1);
@@ -4220,6 +4643,19 @@ export function GraphExplorer({
                     `All Network renderer failed: ${message} All Hierarchy remains available for this session.`,
                   )
                 }
+                onTemporaryFileMoveCapabilityChange={
+                  changeTemporaryFileMoveCapability
+                }
+                onTemporaryFileMoveControllerChange={
+                  changeTemporaryFileMoveController
+                }
+                onTemporaryFileMoveFailure={reportTemporaryFileMoveFailure}
+                onTemporaryFileMoveLifecycleChange={
+                  changeTemporaryFileMoveLifecycle
+                }
+                onTemporaryFileMovePresentationChange={
+                  changeTemporaryFileMovePresentation
+                }
                 onDensityQaDiagnosticsChange={setAllNetworkDensityQaDiagnostics}
                 onCenterRequestConsumed={consumeGlobalCenterRequest}
                 onFitRequestConsumed={consumeGlobalFitRequest}
@@ -4237,6 +4673,8 @@ export function GraphExplorer({
                 spatialRules={spatialOverrides.rules}
                 spatialSourceKey={workspaceId}
                 trackpadZoomMode={trackpadZoomMode}
+                temporaryConstraintActive={networkEditingState.phase === 'off'}
+                temporaryConstraintRetryKey={temporaryFileMoveRetryKey}
                 visualGroupStyles={visualGroupPresentation.styles}
               />
             )
@@ -4324,6 +4762,19 @@ export function GraphExplorer({
                     `Focus Network renderer failed: ${message} Use Focus Hierarchy or return to All.`,
                   )
                 }
+                onTemporaryFileMoveCapabilityChange={
+                  changeTemporaryFileMoveCapability
+                }
+                onTemporaryFileMoveControllerChange={
+                  changeTemporaryFileMoveController
+                }
+                onTemporaryFileMoveFailure={reportTemporaryFileMoveFailure}
+                onTemporaryFileMoveLifecycleChange={
+                  changeTemporaryFileMoveLifecycle
+                }
+                onTemporaryFileMovePresentationChange={
+                  changeTemporaryFileMovePresentation
+                }
                 onDensityQaDiagnosticsChange={
                   setFocusNetworkDensityQaDiagnostics
                 }
@@ -4339,6 +4790,8 @@ export function GraphExplorer({
                 projection={result.projection}
                 rootEntityId={localRootEntityId}
                 selection={activeSelection}
+                temporaryConstraintActive={networkEditingState.phase === 'off'}
+                temporaryConstraintRetryKey={temporaryFileMoveRetryKey}
                 trackpadZoomMode={trackpadZoomMode}
                 presentationOverrides={nodePresentation.overrides}
                 visualGroupStyles={visualGroupPresentation.styles}
@@ -4469,6 +4922,7 @@ export function GraphExplorer({
               {...(networkExplorerArrangement === undefined
                 ? {}
                 : { arrangement: networkExplorerArrangement })}
+              fileMove={networkExplorerFileMove}
               presentationOverrides={nodePresentation.overrides}
               sizePersistenceStatus={nodePresentation.session.status}
               sizeEditingDisabled={

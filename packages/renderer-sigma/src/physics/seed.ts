@@ -71,6 +71,7 @@ export function createFocusNetworkPhysicsSeed(input: {
       barnesHutThreshold: 600,
     },
     attractors: [],
+    automaticFolderFieldPolicy: 'none',
   };
 }
 
@@ -116,5 +117,9 @@ export function createAllNetworkPhysicsSeed(input: {
       ...attractor,
       memberNodeKeys: [...attractor.memberNodeKeys],
     })),
+    automaticFolderFieldPolicy:
+      input.request.macro.algorithm === 'fixed-total-field'
+        ? 'seeded-output-relaxation'
+        : 'none',
   };
 }

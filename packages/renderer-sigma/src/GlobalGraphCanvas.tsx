@@ -57,9 +57,17 @@ import {
 import { GlobalRendererSession } from './session';
 import {
   createAllNetworkPhysicsSeed,
+  networkPhysicsNodeCountIsSupported,
+  type NetworkPhysicsLifecycleState,
+  type NetworkPhysicsPresentationState,
   type NetworkPhysicsService,
   type NetworkPhysicsServiceFactory,
 } from './physics';
+import type { TemporaryFileMoveController } from './file-move';
+import type {
+  TemporaryNodeConstraintCapability,
+  TemporaryNodeConstraintEndReason,
+} from './temporary-node-constraint';
 import {
   globalLayoutSettingsFromPhysics,
   resolveGlobalPhysicsSettings,
@@ -161,14 +169,28 @@ export interface GlobalGraphCanvasProps {
   /** Optional session cache owner; the lazy web module keeps this across mode switches. */
   readonly layoutCache?: GlobalLayoutCache;
   readonly layoutService: GlobalLayoutService;
-  /** PHYSICS1 transport seam. Inactive until a later Edit/Move mode opts in. */
+  /** PHYSICS1 transport seam; direct File dragging is armed while available. */
   readonly physicsServiceFactory?: NetworkPhysicsServiceFactory;
   readonly temporaryConstraintActive?: boolean;
+  readonly temporaryConstraintRetryKey?: number;
   /** Separate latest-result worker for schema-v2 dynamic pull rules. */
   readonly spatialInfluenceService?: GlobalSpatialInfluenceService;
   readonly spatialInfluenceCache?: GlobalSpatialInfluenceCache;
   readonly spatialSourceKey?: string;
   readonly onFailure: (message: string) => void;
+  readonly onTemporaryFileMoveCapabilityChange?: (
+    capability: TemporaryNodeConstraintCapability,
+  ) => void;
+  readonly onTemporaryFileMoveControllerChange?: (
+    controller: TemporaryFileMoveController | undefined,
+  ) => void;
+  readonly onTemporaryFileMoveFailure?: (message: string) => void;
+  readonly onTemporaryFileMoveLifecycleChange?: (
+    state: NetworkPhysicsLifecycleState,
+  ) => void;
+  readonly onTemporaryFileMovePresentationChange?: (
+    state: NetworkPhysicsPresentationState,
+  ) => void;
   readonly onDensityQaDiagnosticsChange?: (
     diagnostics: GlobalDensityQaDiagnostics | undefined,
   ) => void;
@@ -425,6 +447,11 @@ export function GlobalGraphCanvas({
   spatialInfluenceCache,
   spatialSourceKey,
   onFailure,
+  onTemporaryFileMoveCapabilityChange,
+  onTemporaryFileMoveControllerChange,
+  onTemporaryFileMoveFailure,
+  onTemporaryFileMoveLifecycleChange,
+  onTemporaryFileMovePresentationChange,
   onDensityQaDiagnosticsChange,
   onCenterRequestConsumed,
   onFitRequestConsumed,
@@ -440,6 +467,7 @@ export function GlobalGraphCanvas({
   spatialOverrides,
   spatialRules,
   temporaryConstraintActive = false,
+  temporaryConstraintRetryKey = 0,
   trackpadZoomMode,
   visualGroupStyles,
   presentationOverrides,
@@ -462,6 +490,10 @@ export function GlobalGraphCanvas({
   const callbacks = useRef({
     folderArrangement,
     onFailure,
+    onTemporaryFileMoveCapabilityChange,
+    onTemporaryFileMoveFailure,
+    onTemporaryFileMoveLifecycleChange,
+    onTemporaryFileMovePresentationChange,
     onDensityQaDiagnosticsChange,
     onCenterRequestConsumed,
     onFitRequestConsumed,
@@ -475,6 +507,10 @@ export function GlobalGraphCanvas({
     callbacks.current = {
       folderArrangement,
       onFailure,
+      onTemporaryFileMoveCapabilityChange,
+      onTemporaryFileMoveFailure,
+      onTemporaryFileMoveLifecycleChange,
+      onTemporaryFileMovePresentationChange,
       onDensityQaDiagnosticsChange,
       onCenterRequestConsumed,
       onFitRequestConsumed,
@@ -487,6 +523,10 @@ export function GlobalGraphCanvas({
   }, [
     folderArrangement,
     onFailure,
+    onTemporaryFileMoveCapabilityChange,
+    onTemporaryFileMoveFailure,
+    onTemporaryFileMoveLifecycleChange,
+    onTemporaryFileMovePresentationChange,
     onDensityQaDiagnosticsChange,
     onCenterRequestConsumed,
     onFitRequestConsumed,
@@ -534,6 +574,7 @@ export function GlobalGraphCanvas({
     () => createGlobalLayoutRequest(input, layoutSettings),
     [input, layoutSettings],
   );
+  const physicsNodeCount = requestTemplate.nodes.length;
   const fingerprint = useMemo(
     () => globalLayoutFingerprint(requestTemplate),
     [requestTemplate],
@@ -617,6 +658,30 @@ export function GlobalGraphCanvas({
     undefined,
   );
   const physicsServiceGeneration = useRef(0);
+  const latestTemporaryConstraintActive = useRef(temporaryConstraintActive);
+  useLayoutEffect(() => {
+    latestTemporaryConstraintActive.current = temporaryConstraintActive;
+  }, [temporaryConstraintActive]);
+  const temporaryFileMoveController = useMemo<TemporaryFileMoveController>(
+    () => ({
+      start: (nodeKey) =>
+        sessionRef.current?.startKeyboardTemporaryFileMove(nodeKey) ?? {
+          status: 'unavailable',
+          reason: 'simulation-unavailable',
+        },
+      nudge: (delta) =>
+        sessionRef.current?.nudgeKeyboardTemporaryFileMove(delta) ?? false,
+      release: () =>
+        sessionRef.current?.releaseKeyboardTemporaryFileMove() ?? false,
+      cancel: (reason: Exclude<TemporaryNodeConstraintEndReason, 'released'>) =>
+        sessionRef.current?.cancelTemporaryFileMove(reason) ?? false,
+    }),
+    [],
+  );
+  useEffect(() => {
+    onTemporaryFileMoveControllerChange?.(temporaryFileMoveController);
+    return () => onTemporaryFileMoveControllerChange?.(undefined);
+  }, [onTemporaryFileMoveControllerChange, temporaryFileMoveController]);
   const applyPhysicsDisplayTranslation = useCallback(
     (positions: readonly GlobalLayoutPosition[]) =>
       positions.map((position) => {
@@ -636,9 +701,12 @@ export function GlobalGraphCanvas({
   useEffect(() => {
     const generation = ++physicsServiceGeneration.current;
     const service = physicsServiceFactory?.({
-      onFrame: (frame) => {
+      onRawFrame: (frame) => {
         if (physicsServiceGeneration.current !== generation) return;
         latestDynamicPositions.current = frame.positions;
+      },
+      onFrame: (frame) => {
+        if (physicsServiceGeneration.current !== generation) return;
         const displayed = applyPhysicsDisplayTranslation(frame.positions);
         latestDisplayedPositions.current = displayed;
         sessionRef.current?.applyPartialPositions(displayed);
@@ -657,9 +725,27 @@ export function GlobalGraphCanvas({
           },
         ]);
       },
+      onStateChange: (state) => {
+        if (physicsServiceGeneration.current === generation) {
+          callbacks.current.onTemporaryFileMoveLifecycleChange?.(state);
+        }
+      },
+      onPresentationStateChange: (state) => {
+        if (physicsServiceGeneration.current === generation) {
+          callbacks.current.onTemporaryFileMovePresentationChange?.(state);
+        }
+      },
       onFailure: (failure) => {
         if (physicsServiceGeneration.current === generation) {
-          callbacks.current.onFailure(failure.message);
+          callbacks.current.onTemporaryFileMoveFailure?.(failure.message);
+          queueMicrotask(() => {
+            if (physicsServiceGeneration.current === generation) {
+              sessionRef.current?.setTemporaryFileMoveContext(
+                undefined,
+                'error',
+              );
+            }
+          });
         }
       },
     });
@@ -671,6 +757,7 @@ export function GlobalGraphCanvas({
       queueMicrotask(() => service?.dispose());
     };
   }, [applyPhysicsDisplayTranslation, physicsServiceFactory]);
+
   const pendingArrangementCommit = useRef<
     | {
         readonly folderKey: string;
@@ -694,6 +781,17 @@ export function GlobalGraphCanvas({
   const [layoutPendingState, setLayoutPendingState] = useState(!initial.cached);
   const [spatialCommitKey, setSpatialCommitKey] = useState(0);
   const spatialGeneration = useRef(0);
+  useEffect(() => {
+    const capability: TemporaryNodeConstraintCapability =
+      physicsServiceFactory === undefined
+        ? { status: 'unavailable', reason: 'simulation-unavailable' }
+        : !ready || layoutPendingState
+          ? { status: 'unavailable', reason: 'simulation-not-running' }
+          : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+            ? { status: 'unavailable', reason: 'graph-too-large' }
+            : { status: 'available' };
+    callbacks.current.onTemporaryFileMoveCapabilityChange?.(capability);
+  }, [layoutPendingState, physicsNodeCount, physicsServiceFactory, ready]);
   const [arrangementGesturePhase, setArrangementGesturePhase] = useState<
     'idle' | 'primed' | 'dragging' | 'committing'
   >('idle');
@@ -1791,7 +1889,12 @@ export function GlobalGraphCanvas({
     if (!temporaryConstraintActive || session === undefined) {
       return;
     }
-    if (physicsService === undefined || !ready || layoutPendingState) {
+    if (
+      physicsService === undefined ||
+      !ready ||
+      layoutPendingState ||
+      !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+    ) {
       session.setTemporaryFileMoveContext({
         active: true,
         capability: {
@@ -1799,7 +1902,9 @@ export function GlobalGraphCanvas({
           reason:
             physicsService === undefined
               ? 'simulation-unavailable'
-              : 'simulation-not-running',
+              : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+                ? 'graph-too-large'
+                : 'simulation-not-running',
         },
         sessionGeneration: physicsSessionGeneration.current,
         simulationGeneration: 'unavailable',
@@ -1874,7 +1979,12 @@ export function GlobalGraphCanvas({
       fixedTranslationByNodeKey,
     });
     return () => {
-      session.setTemporaryFileMoveContext(undefined, 'layout-changed');
+      session.setTemporaryFileMoveContext(
+        undefined,
+        latestTemporaryConstraintActive.current
+          ? 'layout-changed'
+          : 'mode-exit',
+      );
       physicsService.invalidate('layout-changed');
       physicsFixedTranslationByNodeKey.current = new Map();
     };
@@ -1883,6 +1993,7 @@ export function GlobalGraphCanvas({
     layoutCommitKey,
     layoutPendingState,
     layoutSettings,
+    physicsNodeCount,
     physicsServiceFactory,
     ready,
     requestTemplate,
@@ -1890,6 +2001,7 @@ export function GlobalGraphCanvas({
     spatialOverrides,
     spatialRules,
     temporaryConstraintActive,
+    temporaryConstraintRetryKey,
   ]);
 
   useEffect(() => {

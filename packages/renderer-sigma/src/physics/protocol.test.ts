@@ -4,6 +4,7 @@ import {
   NETWORK_PHYSICS_SCHEMA_VERSION,
   validateNetworkPhysicsSeed,
   validateNetworkPhysicsWorkerRequest,
+  validateNetworkPhysicsWorkerResponse,
 } from './protocol';
 
 const seed = {
@@ -23,6 +24,7 @@ const seed = {
     barnesHutThreshold: 600,
   },
   attractors: [],
+  automaticFolderFieldPolicy: 'none',
 } as const;
 
 describe('network physics protocol validation', () => {
@@ -59,5 +61,42 @@ describe('network physics protocol validation', () => {
         },
       }),
     ).toThrow('non-empty string');
+  });
+
+  it('requires gesture identity and consistent command counters on frames', () => {
+    const frame = {
+      schemaVersion: NETWORK_PHYSICS_SCHEMA_VERSION,
+      kind: 'frame',
+      sessionGeneration: 'session',
+      simulationGeneration: 'simulation',
+      state: 'hot-constrained',
+      frameSequence: 1,
+      iterationsCompleted: 4,
+      interactionRevision: 1,
+      gestureId: 'gesture',
+      constraintNodeKey: 'node',
+      commandSequence: 2,
+      constraintSequence: 2,
+      positions: [{ key: 'node', x: 4, y: 5 }],
+    } as const;
+    expect(() => validateNetworkPhysicsWorkerResponse(frame)).not.toThrow();
+    expect(() =>
+      validateNetworkPhysicsWorkerResponse({
+        ...frame,
+        interactionRevision: 0,
+      }),
+    ).toThrow('counters');
+    expect(() =>
+      validateNetworkPhysicsWorkerResponse({
+        ...frame,
+        gestureId: '',
+      }),
+    ).toThrow('gesture id');
+    expect(() =>
+      validateNetworkPhysicsWorkerResponse({
+        ...frame,
+        state: 'cooling',
+      }),
+    ).toThrow('constraint state');
   });
 });

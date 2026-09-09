@@ -16,6 +16,7 @@ export type {
   NetworkPhysicsMode,
   NetworkPhysicsNode,
   NetworkPhysicsPosition,
+  NetworkPhysicsPresentationState,
   NetworkPhysicsReadyResponse,
   NetworkPhysicsService,
   NetworkPhysicsServiceFactory,
@@ -36,6 +37,11 @@ export {
 } from './pull';
 export {
   ContinuousNetworkSimulation,
+  NETWORK_PHYSICS_FOCUS_ROOT_DRIFT_THRESHOLD,
+  NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT,
+  networkPhysicsFocusBatchIsStable,
   networkPhysicsCoolingMaxIterations,
+  networkPhysicsNodeCountIsSupported,
+  nextNetworkPhysicsStableBatchCount,
   type NetworkPhysicsAdvanceResult,
 } from './simulation';

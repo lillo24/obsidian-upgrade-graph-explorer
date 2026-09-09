@@ -11,6 +11,7 @@ import {
 } from '../global-convergence';
 import {
   LOCAL_CONVERGENCE_BATCH_ITERATIONS,
+  LOCAL_CONVERGENCE_ALL_P90_THRESHOLD,
   LOCAL_CONVERGENCE_MAX_WALL_TIME_MS,
   LOCAL_CONVERGENCE_STABLE_BATCHES_REQUIRED,
   createLocalConvergenceDegreeIndex,
@@ -40,6 +41,20 @@ type PhysicsGraph = MultiDirectedGraph<
 >;
 
 const HOT_ITERATIONS_PER_TURN = 4;
+export const NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT = 100 as const;
+
+export function networkPhysicsNodeCountIsSupported(nodeCount: number): boolean {
+  if (!Number.isSafeInteger(nodeCount) || nodeCount < 0) {
+    throw new Error(
+      'Network physics node count must be a non-negative safe integer.',
+    );
+  }
+  return nodeCount <= NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT;
+}
+
+/** Live Focus must settle in the displayed fixed frame as well as in shape. */
+export const NETWORK_PHYSICS_FOCUS_ROOT_DRIFT_THRESHOLD =
+  LOCAL_CONVERGENCE_ALL_P90_THRESHOLD;
 
 /** Interactive All displacement needs more tail work than a seeded base layout. */
 export function networkPhysicsCoolingMaxIterations(
@@ -78,10 +93,58 @@ function buildGraph(seed: NetworkPhysicsSeed): PhysicsGraph {
 
 function graphPositions(
   graph: PhysicsGraph,
+  nodeKeys: readonly string[],
 ): readonly NetworkPhysicsPosition[] {
-  return graph
-    .mapNodes((key, node) => ({ key, x: node.x, y: node.y }))
-    .sort((left, right) => left.key.localeCompare(right.key));
+  return nodeKeys.map((key) => {
+    const node = graph.getNodeAttributes(key);
+    return { key, x: node.x, y: node.y };
+  });
+}
+
+export function networkPhysicsFocusBatchIsStable(input: {
+  readonly before: readonly NetworkPhysicsPosition[];
+  readonly after: readonly NetworkPhysicsPosition[];
+  readonly rootKey: string;
+  readonly degreeByKey: ReadonlyMap<string, number>;
+}): boolean {
+  const movement = measureLocalConvergenceMovement(input);
+  const beforeRoot = input.before.find(({ key }) => key === input.rootKey);
+  const afterRoot = input.after.find(({ key }) => key === input.rootKey);
+  if (beforeRoot === undefined || afterRoot === undefined) {
+    throw new Error(
+      `Network physics Focus frame omitted root ${input.rootKey}.`,
+    );
+  }
+  const normalizedRootDrift =
+    Math.hypot(afterRoot.x - beforeRoot.x, afterRoot.y - beforeRoot.y) /
+    movement.scale;
+  return (
+    localConvergenceBatchIsStable(movement) &&
+    normalizedRootDrift <= NETWORK_PHYSICS_FOCUS_ROOT_DRIFT_THRESHOLD
+  );
+}
+
+/** Partial cap tails neither increment nor reset the full-batch streak. */
+export function nextNetworkPhysicsStableBatchCount(input: {
+  readonly previousStableBatches: number;
+  readonly batchIterations: number;
+  readonly fullBatchIterations: number;
+  readonly stable: boolean;
+}): number {
+  if (
+    !Number.isSafeInteger(input.previousStableBatches) ||
+    input.previousStableBatches < 0 ||
+    !Number.isSafeInteger(input.batchIterations) ||
+    input.batchIterations < 1 ||
+    !Number.isSafeInteger(input.fullBatchIterations) ||
+    input.fullBatchIterations < 1
+  ) {
+    throw new Error('Network physics stable-batch counters are invalid.');
+  }
+  if (input.batchIterations !== input.fullBatchIterations) {
+    return input.previousStableBatches;
+  }
+  return input.stable ? input.previousStableBatches + 1 : 0;
 }
 
 export interface NetworkPhysicsAdvanceResult {
@@ -92,12 +155,14 @@ export interface NetworkPhysicsAdvanceResult {
 /** Retained worker-side simulation. Scheduling deliberately lives outside it. */
 export class ContinuousNetworkSimulation {
   private readonly graph: PhysicsGraph;
+  private readonly nodeKeys: readonly string[];
   private readonly degreeByKey: ReadonlyMap<string, number>;
   private stateValue: NetworkPhysicsLifecycleState = 'sleeping';
   private active: TemporaryNodeConstraintCommandBase | undefined;
   private target: { x: number; y: number } | undefined;
-  private lastConstraintSequence = -1;
+  private lastCommandSequence = -1;
   private lastEnd: TemporaryNodeConstraintCommand | undefined;
+  private interactionRevision = 0;
   private frameSequence = 0;
   private iterationsCompleted = 0;
   private stableBatches = 0;
@@ -109,6 +174,9 @@ export class ContinuousNetworkSimulation {
   ) {
     validateNetworkPhysicsSeed(seed);
     this.graph = buildGraph(seed);
+    this.nodeKeys = seed.nodes
+      .map(({ key }) => key)
+      .sort((left, right) => left.localeCompare(right));
     this.degreeByKey =
       seed.mode === 'focus'
         ? createLocalConvergenceDegreeIndex(
@@ -132,7 +200,7 @@ export class ContinuousNetworkSimulation {
   }
 
   positions(): readonly NetworkPhysicsPosition[] {
-    return graphPositions(this.graph);
+    return graphPositions(this.graph, this.nodeKeys);
   }
 
   handle(command: TemporaryNodeConstraintCommand): NetworkPhysicsFrameResponse {
@@ -170,8 +238,9 @@ export class ContinuousNetworkSimulation {
       }
       this.active = { ...command };
       this.target = { ...command.target };
-      this.lastConstraintSequence = 0;
+      this.lastCommandSequence = 0;
       this.lastEnd = undefined;
+      this.interactionRevision += 1;
       this.stateValue = 'hot-constrained';
       this.iterationsCompleted = 0;
       this.stableBatches = 0;
@@ -181,11 +250,11 @@ export class ContinuousNetworkSimulation {
           'Temporary constraint update does not match the active gesture.',
         );
       }
-      if (command.sequence <= this.lastConstraintSequence) {
+      if (command.sequence <= this.lastCommandSequence) {
         throw new Error('Temporary constraint update sequence is stale.');
       }
       this.target = { ...command.target };
-      this.lastConstraintSequence = command.sequence;
+      this.lastCommandSequence = command.sequence;
     } else {
       if (
         this.active === undefined &&
@@ -207,10 +276,10 @@ export class ContinuousNetworkSimulation {
           'Temporary constraint end does not match the active gesture.',
         );
       }
-      if (command.sequence <= this.lastConstraintSequence) {
+      if (command.sequence <= this.lastCommandSequence) {
         throw new Error('Temporary constraint end sequence is stale.');
       }
-      this.lastConstraintSequence = command.sequence;
+      this.lastCommandSequence = command.sequence;
       this.lastEnd = { ...command };
       this.active = undefined;
       this.target = undefined;
@@ -227,6 +296,8 @@ export class ContinuousNetworkSimulation {
     if (this.stateValue === 'disposed') return;
     this.active = undefined;
     this.target = undefined;
+    this.lastEnd = undefined;
+    this.lastCommandSequence = -1;
     this.stateValue = 'sleeping';
     this.iterationsCompleted = 0;
     this.stableBatches = 0;
@@ -295,14 +366,12 @@ export class ContinuousNetworkSimulation {
     const after = this.positions();
     const stable =
       this.seed.mode === 'focus'
-        ? localConvergenceBatchIsStable(
-            measureLocalConvergenceMovement({
-              before,
-              after,
-              rootKey: this.seed.rootKey!,
-              degreeByKey: this.degreeByKey,
-            }),
-          )
+        ? networkPhysicsFocusBatchIsStable({
+            before,
+            after,
+            rootKey: this.seed.rootKey!,
+            degreeByKey: this.degreeByKey,
+          })
         : globalConvergenceMacroStepIsStable(
             measureGlobalConvergenceMovement({
               before,
@@ -310,7 +379,12 @@ export class ContinuousNetworkSimulation {
               degreeByKey: this.degreeByKey,
             }),
           );
-    this.stableBatches = stable ? this.stableBatches + 1 : 0;
+    this.stableBatches = nextNetworkPhysicsStableBatchCount({
+      previousStableBatches: this.stableBatches,
+      batchIterations: iterations,
+      fullBatchIterations: batchIterations,
+      stable,
+    });
     const required =
       this.seed.mode === 'focus'
         ? LOCAL_CONVERGENCE_STABLE_BATCHES_REQUIRED
@@ -368,6 +442,10 @@ export class ContinuousNetworkSimulation {
     ) {
       throw new Error(`Cannot publish a frame while ${this.stateValue}.`);
     }
+    const interaction = this.active ?? this.lastEnd;
+    if (interaction === undefined || this.lastCommandSequence < 0) {
+      throw new Error('Cannot publish a frame without an interaction.');
+    }
     return {
       schemaVersion: NETWORK_PHYSICS_SCHEMA_VERSION,
       kind: 'frame',
@@ -376,8 +454,12 @@ export class ContinuousNetworkSimulation {
       state: this.stateValue,
       frameSequence: ++this.frameSequence,
       iterationsCompleted: this.iterationsCompleted,
+      interactionRevision: this.interactionRevision,
+      gestureId: interaction.gestureId,
+      constraintNodeKey: interaction.nodeKey,
+      commandSequence: this.lastCommandSequence,
       constraintSequence:
-        this.active === undefined ? null : this.lastConstraintSequence,
+        this.active === undefined ? null : this.lastCommandSequence,
       positions: this.positions(),
     };
   }

@@ -308,6 +308,43 @@ describe('temporary File move renderer sessions', () => {
     });
   });
 
+  it('routes keyboard nudges through the same All constraint coordinator', () => {
+    const { port, session } = globalHarness();
+
+    expect(session.startKeyboardTemporaryFileMove('entity:doc-a')).toEqual({
+      status: 'started',
+    });
+    expect(port.commands).toEqual([]);
+    expect(session.nudgeKeyboardTemporaryFileMove({ x: 8, y: 0 })).toBe(true);
+    expect(session.nudgeKeyboardTemporaryFileMove({ x: 0, y: -8 })).toBe(true);
+    expect(session.releaseKeyboardTemporaryFileMove()).toBe(true);
+
+    expect(port.commands).toEqual([
+      expect.objectContaining({
+        kind: 'begin',
+        nodeKey: 'entity:doc-a',
+        sequence: 0,
+      }),
+      expect.objectContaining({ kind: 'update', sequence: 1 }),
+      expect.objectContaining({
+        kind: 'end',
+        reason: 'released',
+        sequence: 2,
+      }),
+    ]);
+  });
+
+  it('keeps non-File Focus rows unavailable to the keyboard controller', () => {
+    const { port, session } = localHarness();
+
+    expect(session.startKeyboardTemporaryFileMove('entity:heading')).toEqual({
+      status: 'unavailable',
+      reason: 'node-unavailable',
+    });
+    expect(session.nudgeKeyboardTemporaryFileMove({ x: 8, y: 0 })).toBe(false);
+    expect(port.commands).toEqual([]);
+  });
+
   it('reports an unavailable simulation attempt without stealing pointer input', () => {
     const { count, renderer, session } = globalHarness();
     session.setTemporaryFileMoveContext({

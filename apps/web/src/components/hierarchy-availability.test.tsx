@@ -325,6 +325,121 @@ describe('GraphExplorer experimental availability integration', () => {
     expect(preference()).not.toHaveProperty('densityFramingStrength');
   });
 
+  it('arms direct File dragging and keeps Arrange Folders an exclusive explicit tool', async () => {
+    await mount('global');
+    expect(captured.global!.temporaryConstraintActive).toBe(true);
+    expect(container.textContent).not.toContain('Move Files');
+    expect(button('Arrange Folders')).toBeDefined();
+    const cancel = vi.fn(() => false);
+    await act(() =>
+      captured.global!.onTemporaryFileMoveControllerChange?.({
+        start: () => ({ status: 'started' }),
+        nudge: () => true,
+        release: () => true,
+        cancel,
+      }),
+    );
+    expect(captured.global!.folderArrangement?.active).toBe(false);
+
+    await act(() =>
+      captured.global!.onTemporaryFileMoveCapabilityChange?.({
+        status: 'unavailable',
+        reason: 'graph-too-large',
+      }),
+    );
+    expect(container.textContent).toContain(
+      'File movement supports up to 100 visible nodes in this release.',
+    );
+
+    await act(() =>
+      captured.global!.onTemporaryFileMoveCapabilityChange?.({
+        status: 'available',
+      }),
+    );
+    await act(() =>
+      captured.global!.onTemporaryFileMoveLifecycleChange?.('hot-constrained'),
+    );
+    expect(container.textContent).not.toContain('Moving…');
+    await act(() =>
+      captured.global!.onTemporaryFileMoveLifecycleChange?.('cooling'),
+    );
+    expect(container.textContent).toContain('Settling…');
+    await act(() =>
+      captured.global!.onTemporaryFileMoveLifecycleChange?.('sleeping'),
+    );
+    expect(container.textContent).not.toContain('Settled — ready to move.');
+    await act(() =>
+      captured.global!.onTemporaryFileMovePresentationChange?.('settling'),
+    );
+    expect(container.textContent).toContain('Settling…');
+    await act(() =>
+      captured.global!.onTemporaryFileMovePresentationChange?.('idle'),
+    );
+    expect(container.textContent).not.toContain('Settling…');
+
+    await act(() =>
+      captured.global!.folderArrangement?.onAvailabilityChange(true, undefined),
+    );
+
+    await click('Arrange Folders');
+    expect(cancel).toHaveBeenCalledWith('mode-exit');
+    expect(captured.global!.temporaryConstraintActive).toBe(false);
+    expect(captured.global!.folderArrangement?.active).toBe(true);
+    expect(captured.global!.folderArrangement?.activeFolderKey).toBeUndefined();
+    expect(button('Arrange Folders').getAttribute('aria-pressed')).toBe('true');
+
+    await click('Done');
+    expect(captured.global!.temporaryConstraintActive).toBe(true);
+    expect(captured.global!.folderArrangement?.active).toBe(false);
+    expect(button('Arrange Folders')).toBeDefined();
+  });
+
+  it('keeps direct dragging armed across All and Focus Network only', async () => {
+    await mount('global');
+
+    await act(() => captured.global!.onNodeActivate(source.id));
+    expect(mode()).toBe('local-free');
+    expect(captured.local!.temporaryConstraintActive).toBe(true);
+    expect(
+      [...container.querySelectorAll('button')].some(
+        (candidate) => candidate.textContent?.trim() === 'Arrange Folders',
+      ),
+    ).toBe(false);
+
+    await click('Hierarchy');
+    expect(mode()).toBe('local-structured');
+    expect(
+      [...container.querySelectorAll('button')].some(
+        (candidate) =>
+          candidate.getAttribute('aria-label') === 'Edit Network layout',
+      ),
+    ).toBe(false);
+
+    await click('Network');
+    expect(mode()).toBe('local-free');
+    expect(captured.local!.temporaryConstraintActive).toBe(true);
+  });
+
+  it('retains the graph on Move failure and exposes explicit retry', async () => {
+    await mount('global');
+    const retryKey = captured.global!.temporaryConstraintRetryKey;
+
+    await act(() =>
+      captured.global!.onTemporaryFileMoveFailure?.('simulated worker failure'),
+    );
+    expect(mode()).toBe('global');
+    expect(container.textContent).toContain(
+      'File movement stopped: simulated worker failure',
+    );
+    expect(button('Retry Move')).toBeDefined();
+
+    await click('Retry Move');
+    expect(captured.global!.temporaryConstraintRetryKey).toBe(
+      (retryKey ?? 0) + 1,
+    );
+    expect(mode()).toBe('global');
+  });
+
   it('reveals controls without projection work and preserves the flag when another preference changes', async () => {
     await mount();
     const projection = captured.global!.projection;

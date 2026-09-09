@@ -43,20 +43,20 @@ Future package names, state libraries, and implementation details are intentiona
 This track composes with the active KG14 sequence; it does not replace or
 reorder KG14.
 
-| Milestone                                           | Outcome                                                                                                                                                          | Status                                                                |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| **SPATIAL1**                                        | Durable, normalized workspace spatial intent layered after automatic layout.                                                                                     | **Complete** — foundation and direct exact-folder arrangement passed. |
-| **SPATIAL1A — Normalized folder-anchor foundation** | Source-neutral exact-folder registry, automatic/display position separation, stable-workspace persistence, renderer composition, tests, and development harness. | **Complete.**                                                         |
-| **SPATIAL1B — Arrange Folders interaction**         | Spotlight/torch mode, temporary drag preview, commit/cancel, and accessible production controls over the SPATIAL1A seam.                                         | **Complete.**                                                         |
-| **SPATIAL2 — Folder spatial behavior**              | Hierarchical folder scope plus fixed placement and dynamic soft-attractor behavior in All Network.                                                               | **Release candidate — native SPATIAL2B interaction QA pending.**      |
-| **SPATIAL2A — Scope/attractor foundation**          | Schema-v2 migration, most-specific membership, three position layers, separate worker/cache, bake-off, harness, and aggregate evidence.                          | **Complete.**                                                         |
-| **SPATIAL2B — Product rule editor**                 | Production behavior/scope/exclusion/strength controls over the SPATIAL2A contracts.                                                                              | **Implemented — draft PR remains gated on native pointer QA.**        |
-| **PHYSICS1 — Continuous simulation lifecycle**      | Lazy worker ownership, real temporary hard constraints, whole-graph reaction, Pull-aware cooling, and camera-neutral frame adoption.                             | **Complete — dormant production foundation; development lab passed.** |
-| **MOVE1 — Temporary physical File movement**        | Direct manipulation that ends on release and returns the File to automatic physical behavior.                                                                    | **In progress.**                                                      |
-| **MOVE1A — Constraint/gesture foundation**          | Display-to-dynamic coordinate inverse, serializable consumer port, pure gesture/coalescing, session seams, and lifecycle/arbitration tests.                      | **Complete.**                                                         |
-| **MOVE1B — Production Edit/Move mode**              | Visible editing surface and real PHYSICS1 adapter integration with runtime cooling/RAF evidence.                                                                 | **Next after PHYSICS1.**                                              |
-| **PIN1 — Persistent individual placement**          | Explicit durable single-File placement semantics, storage, reconciliation, and authoring controls.                                                               | **Later; no schema is defined.**                                      |
-| **SAVED1 — Saved Views**                            | Later composition of query, Scope/Layout, hierarchy detail, settings, viewport, and spatial profile/reference.                                                   | **Later** — no schema is defined.                                     |
+| Milestone                                           | Outcome                                                                                                                                                          | Status                                                                                      |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| **SPATIAL1**                                        | Durable, normalized workspace spatial intent layered after automatic layout.                                                                                     | **Complete** — foundation and direct exact-folder arrangement passed.                       |
+| **SPATIAL1A — Normalized folder-anchor foundation** | Source-neutral exact-folder registry, automatic/display position separation, stable-workspace persistence, renderer composition, tests, and development harness. | **Complete.**                                                                               |
+| **SPATIAL1B — Arrange Folders interaction**         | Spotlight/torch mode, temporary drag preview, commit/cancel, and accessible production controls over the SPATIAL1A seam.                                         | **Complete.**                                                                               |
+| **SPATIAL2 — Folder spatial behavior**              | Hierarchical folder scope plus fixed placement and dynamic soft-attractor behavior in All Network.                                                               | **Release candidate — native SPATIAL2B interaction QA pending.**                            |
+| **SPATIAL2A — Scope/attractor foundation**          | Schema-v2 migration, most-specific membership, three position layers, separate worker/cache, bake-off, harness, and aggregate evidence.                          | **Complete.**                                                                               |
+| **SPATIAL2B — Product rule editor**                 | Production behavior/scope/exclusion/strength controls over the SPATIAL2A contracts.                                                                              | **Implemented — draft PR remains gated on native pointer QA.**                              |
+| **PHYSICS1 — Continuous simulation lifecycle**      | Lazy worker ownership, real temporary hard constraints, whole-graph reaction, Pull-aware cooling, and camera-neutral frame adoption.                             | **Hardened for the ≤100-node release boundary; browser/native evidence pending.**           |
+| **MOVE1 — Temporary physical File movement**        | Direct manipulation that ends on release and returns the File to automatic physical behavior.                                                                    | **Implementation ready at ≤100 visible nodes; native acceptance pending.**                  |
+| **MOVE1A — Constraint/gesture foundation**          | Display-to-dynamic coordinate inverse, serializable consumer port, pure gesture/coalescing, session seams, and lifecycle/arbitration tests.                      | **Complete.**                                                                               |
+| **MOVE1B — Production direct movement**             | Direct Network File dragging and real PHYSICS1 integration with bounded transport, guarded cooling, and an explicit supported-size limit.                        | **Implemented in draft — mandatory optimized Windows pointer/touchpad acceptance pending.** |
+| **PIN1 — Persistent individual placement**          | Explicit durable single-File placement semantics, storage, reconciliation, and authoring controls.                                                               | **Later; no schema is defined.**                                                            |
+| **SAVED1 — Saved Views**                            | Later composition of query, Scope/Layout, hierarchy detail, settings, viewport, and spatial profile/reference.                                                   | **Later** — no schema is defined.                                                           |
 
 ### ForceAtlas2 convergence track
 
@@ -68,12 +68,12 @@ reorder KG14.
 
 CONVERGENCE1B settles finite Local replacement-worker jobs until practical
 positional stability or a deterministic cap. It does not deliver PHYSICS1's
-separate future continuous interactive simulation lifecycle.
+separate continuous interactive simulation lifecycle.
 
 CONVERGENCE1C gives Global a distinct centroid-aligned policy and an output-only
 folder field whose strength cannot accumulate with extra convergence checks.
-SPATIAL2 static dynamic convergence remains separate. PHYSICS1 now supplies the
-dormant continuous runtime required by MOVE1B without exposing product Move.
+SPATIAL2 static dynamic convergence remains separate. PHYSICS1 supplies the
+continuous runtime that MOVE1B activates only for a real temporary File move.
 
 ## Accepted future interaction guidance
 
@@ -165,12 +165,14 @@ Local spatial architecture. SPATIAL1's normalized exact-folder foundation and
 Arrange Folders interaction are complete. SPATIAL2A's schema, hierarchy,
 soft-attractor worker/cache, and development evidence are complete. SPATIAL2B's
 product rule editor is implemented but remains a release candidate until the
-mandatory native pointer/touchpad gate passes. MOVE1A independently establishes temporary
-File constraint, coordinate, gesture, and renderer-session contracts without a
-production control or real cooling adapter. PHYSICS1 owns continuous simulation
-lifecycle; MOVE1B follows it with product integration. PIN1 remains a separate
-later persistence feature rather than a side effect of Move. Named Saved Views
-remain later derived presentation work.
+mandatory native pointer/touchpad gate passes. MOVE1A establishes temporary File
+constraint, coordinate, gesture, and renderer-session contracts. PHYSICS1 owns
+continuous simulation lifecycle, and MOVE1B now connects both to the production
+All/Focus Network interaction and accessible Network Explorer controller, with
+Arrange Folders remaining an explicit All-only owner. That implementation
+remains a draft until the mandatory optimized Windows pointer/touchpad acceptance
+passes. PIN1 remains a separate later persistence feature rather than a side
+effect of Move. Named Saved Views remain later derived presentation work.
 
 Post-MVP analytics—typed conceptual relations, pathfinding variants,
 centrality, betweenness, communities, connected components, co-citation,

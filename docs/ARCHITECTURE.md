@@ -16,9 +16,11 @@ density-aware without changing Global or Local ForceAtlas2 geometry. Its QA
 Sandbox keeps separate transient All and Focus strengths; renderer geometry,
 layout identity, spatial rules, and persisted workspace/preference schemas do
 not observe them.
-MOVE1A defines temporary File movement across All and Focus as an optional
-constraint contract, while PHYSICS1 retains continuous simulation ownership and
-MOVE1B/PIN1 remain future product and persistence work.
+MOVE1A defines temporary File movement across All and Focus as a constraint
+contract, PHYSICS1 retains continuous simulation ownership, and MOVE1B mounts
+their direct production interaction plus accessible keyboard integration.
+Arrange Folders remains an explicit, mutually exclusive All-only tool. PIN1
+remains separate future persistence work.
 
 ## Stable domain shape
 
@@ -358,11 +360,16 @@ pure 3 px state machine captures grab offset, rejects stale events, and the
 imperative coordinator coalesces updates by animation frame. File movement and
 Arrange Folders cancel one another. Lifecycle invalidations end the temporary
 constraint and never write layout caches, spatial persistence, view state,
-history, or source. The app has only an unmounted transient one-tool editing
-state contract. SPATIAL2B does not call this seam or add a second simulation
-lifecycle. PHYSICS1 still owns real simulation lifetime, reheating, cooling,
-convergence, and future hard-Place neighbor reaction; MOVE1B owns its production
-binding and Edit control; PIN1 owns any future durable individual placement.
+history, or source. The app keeps transient input ownership only for Arrange
+Folders; direct File movement has no global editing mode. SPATIAL2B does not add
+a second simulation lifecycle. PHYSICS1 owns real
+simulation lifetime, reheating, cooling,
+convergence, and hard-constraint neighbor reaction. MOVE1B binds that service to
+supported, ready All and Focus Network views by default. All exposes Arrange
+Folders separately, and leaving Network/source changes clear the old gesture
+before the next owner. The canvas reports only coarse capability, raw lifecycle,
+and presentation-settling changes; worker frames never become React state. PIN1
+owns any future durable individual placement.
 
 `tools/global-renderer-spike` is now a production renderer harness rather than
 an implementation fork. It retains only synthetic KG13A fixtures, browser/Tauri
@@ -794,6 +801,13 @@ source session ends. Files never disclose. Projected headings/blocks visually
 follow their File, or remain under the real folder when File is filtered out;
 their keyboard/ARIA parent is the source folder. Diagnostics trail at root.
 Folder and Saved queries disclosure performs no projection, workspace, or layout work.
+
+MOVE1B adds a canonical File-only action to the same shared row menu. Starting
+it selects without centering and relocates one keyboard controller above the
+virtual tree. Arrow/Shift+Arrow produce 8/32 viewport-pixel samples through the
+MOVE1A coordinator; Enter/Space releases into cooling and Escape cancels. A row
+leaving the projection closes the controller and ends the constraint, so
+virtualization never strands an invisible movement owner.
 
 KG14B3 adds QUERY1 and contextual actions to that projection companion. The
 single applied formula remains `ViewProjectionState.filters.query`; the shared
@@ -1361,13 +1375,36 @@ disposed states. Sleeping schedules no simulation turn.
 The selected adapter uses only public `forceAtlas2.assign` calls. Hot work runs
 one physical iteration between target assertions and publishes after four
 iterations. Cooling returns to canonical 32-iteration mode-specific movement
-checks. Strict schema, session/simulation generation, gesture sequence, frame
-sequence, and exact node-set checks keep stale work from adopting.
+checks. Focus adds raw root drift to its root-relative shape guard, and partial
+cap tails cannot count as full stable batches. Strict schema,
+session/simulation generation, simulation-local interaction revision,
+gesture/File identity, command/frame sequence, lifecycle, and exact node-set
+checks keep stale work from adopting. The client can adopt a lagging
+same-gesture neighbor frame while overlaying the File at its newest target; one
+in-flight plus one newest pending update bounds worker command flow.
 
 Focus seeds from last accepted Local coordinates. All seeds from the dynamic
 pre-Place layer and carries resolved Pull inputs; Pull is normalized per
 physical iteration. A captured winning Place translation is applied once on
 the display side. Worker frames use camera-neutral sparse Sigma adoption and
 cannot write finite layout caches, Pull caches, spatial persistence, history,
-source, density, camera, or React tick state. The canvases expose this real
-capability behind an inactive-by-default flag; MOVE1B still owns product UI.
+source, density, camera, or React tick state. MOVE1B activates this capability
+directly whenever a supported All or Focus Network is ready. All can hand
+exclusive input ownership to the existing persistent Arrange Folders editor;
+there is no File editing mode. Canonical Network Explorer File actions use one
+relocated keyboard controller whose viewport-relative nudges enter the same
+constraint coordinator. Raw lifecycle and browser presentation status remain
+separate. Cooling display chases only the newest valid raw target from the last
+presented coordinates, with bounded time-based state and exact final adoption;
+re-grab makes the held File exact without seeding physics from eased neighbors.
+Failure clears movement, retains the last valid graph, and exposes retry; no
+frame gains cache, camera, history, spatial, source, or persistence ownership.
+
+An All seed begins from the current output-only M2 snapshot without reapplying
+the field, so activation is jump-free and feedback cannot accumulate. Automatic
+folder shaping may temporarily relax during Move and returns with the normal
+finite layout after invalidation/remount. Production canvases expose Move only
+at 100 or fewer visible nodes; larger graphs return `graph-too-large` before
+Worker construction. This boundary follows direct release probes where
+500-node Focus/All-with-Pull and the 1,000/5,000-node cases reached explicit
+caps or wall limits.

@@ -124,6 +124,43 @@ describe('network physics seeds', () => {
       },
     ]);
     expect(seed.attractors).toEqual(attractors);
+    expect(seed.automaticFolderFieldPolicy).toBe('none');
     expect(JSON.stringify({ request, attractors })).toBe(before);
+  });
+
+  it('marks an M2-shaped All snapshot for intentional temporary relaxation without changing activation coordinates', () => {
+    const settings = {
+      folderClustering: true,
+      spacingPreset: 'normal',
+    } as const;
+    const nodes = [
+      { key: 'a', x: -5, y: 0, size: 4, folderKey: 'docs' },
+      { key: 'b', x: 5, y: 0, size: 4, folderKey: 'docs' },
+    ];
+    const shapedSnapshot = [
+      { key: 'a', x: 41, y: -7 },
+      { key: 'b', x: 44, y: -7 },
+    ];
+    const seed = createAllNetworkPhysicsSeed({
+      request: {
+        schemaVersion: 2,
+        algorithm: 'fixed-total-field',
+        policy: createGlobalConvergencePolicy(nodes.length),
+        macro: createGlobalFolderMacroPolicy(nodes, settings),
+        settings,
+        nodes,
+        edges: [{ key: 'ab', source: 'a', target: 'b', weight: 1 }],
+      },
+      dynamicPositions: shapedSnapshot,
+      attractors: [],
+      constraintEligibleNodeKeys: new Set(['a', 'b']),
+      sessionGeneration: 'session',
+      simulationGeneration: 'simulation',
+    });
+
+    expect(seed.automaticFolderFieldPolicy).toBe('seeded-output-relaxation');
+    expect(seed.nodes.map(({ key, x, y }) => ({ key, x, y }))).toEqual(
+      shapedSnapshot,
+    );
   });
 });
