@@ -12,6 +12,15 @@ export interface WheelDeltaInput {
   readonly deltaY: number;
 }
 
+export interface WheelPanDeltaInput extends WheelDeltaInput {
+  readonly deltaX: number;
+}
+
+export interface WheelPanViewportDimensions {
+  readonly height: number;
+  readonly width: number;
+}
+
 interface SigmaWheelDefaultControl {
   sigmaDefaultPrevented: boolean;
   preventSigmaDefault(): void;
@@ -86,6 +95,31 @@ export function normalizeWheelDeltaPixels(
   const compressedMagnitude =
     PRECISE_LINEAR_DELTA_PIXELS + compressionRange * easedMagnitude;
   return Math.sign(boundedPixels) * compressedMagnitude;
+}
+
+/** Converts both wheel axes to CSS pixels without applying the zoom curve. */
+export function normalizeWheelPanDeltaPixels(
+  event: WheelPanDeltaInput,
+  viewport: WheelPanViewportDimensions,
+): { readonly x: number; readonly y: number } {
+  const xMultiplier =
+    event.deltaMode === 1
+      ? LINE_HEIGHT_PIXELS
+      : event.deltaMode === 2
+        ? Math.max(1, viewport.width)
+        : 1;
+  const yMultiplier =
+    event.deltaMode === 1
+      ? LINE_HEIGHT_PIXELS
+      : event.deltaMode === 2
+        ? Math.max(1, viewport.height)
+        : 1;
+  const x = event.deltaX * xMultiplier;
+  const y = event.deltaY * yMultiplier;
+  return {
+    x: Number.isFinite(x) ? x : 0,
+    y: Number.isFinite(y) ? y : 0,
+  };
 }
 
 export function isCoarseWheelDelta(deltaPixels: number): boolean {

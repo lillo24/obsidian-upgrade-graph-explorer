@@ -246,6 +246,26 @@ describe('GraphExplorer experimental availability integration', () => {
     },
   );
 
+  it('retires completed Global Fit and center intents at application scope', async () => {
+    await mount('global', false, 'fit');
+    expect(captured.global?.fitRequestKey).toBe(1);
+    expect(captured.global?.automaticFitRequestKey).toBe(1);
+
+    await act(() => captured.global?.onFitRequestConsumed?.(1));
+
+    expect(captured.global?.fitRequestKey).toBe(0);
+    expect(captured.global?.automaticFitRequestKey).toBeUndefined();
+
+    await act(() => root.unmount());
+    root = createRoot(container);
+    await mount('global');
+    expect(captured.global?.centerRequest?.key).toBe(1);
+
+    await act(() => captured.global?.onCenterRequestConsumed?.(1));
+
+    expect(captured.global?.centerRequest).toBeUndefined();
+  });
+
   it('keeps All density strength transient and camera-only', async () => {
     await mount('global');
     expect(mode()).toBe('global');

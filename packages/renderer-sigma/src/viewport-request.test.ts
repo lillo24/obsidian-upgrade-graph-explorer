@@ -28,4 +28,26 @@ describe('Global semantic viewport requests', () => {
       }),
     ).toBe(false);
   });
+
+  it('waits for the latest final displayed geometry generation', () => {
+    const request = {
+      handledKey: 0,
+      layoutPending: false,
+      ready: true,
+      requestKey: 1,
+    };
+
+    expect(
+      shouldApplyGlobalViewportRequest({
+        ...request,
+        geometryReady: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldApplyGlobalViewportRequest({
+        ...request,
+        geometryReady: true,
+      }),
+    ).toBe(true);
+  });
 });

@@ -148,6 +148,8 @@ export interface GlobalFolderScopeTreeNode {
 }
 
 export interface GlobalGraphCanvasProps {
+  /** Identifies a startup Fit that must yield to newer manual camera input. */
+  readonly automaticFitRequestKey?: number;
   readonly folderArrangement?: GlobalFolderArrangementProps;
   readonly centerRequest?: GlobalCenterRequest;
   readonly fitRequestKey: number;
@@ -170,6 +172,10 @@ export interface GlobalGraphCanvasProps {
   readonly onDensityQaDiagnosticsChange?: (
     diagnostics: GlobalDensityQaDiagnostics | undefined,
   ) => void;
+  readonly onCenterRequestConsumed?: (key: number) => void;
+  readonly onFitRequestConsumed?: (key: number) => void;
+  /** Routes the visible Fit action through the final-geometry request gate. */
+  readonly onFitRequested?: () => void;
   readonly onNodeActivate: (entityId: string) => void;
   readonly onNodeSingleClick?: (nodeId: string) => void;
   readonly onSelectionChange: (selection: GlobalSelection | null) => void;
@@ -404,6 +410,7 @@ function applyComposedPositions(
 }
 
 export function GlobalGraphCanvas({
+  automaticFitRequestKey,
   centerRequest,
   densityFramingStrength,
   fitRequestKey,
@@ -419,6 +426,9 @@ export function GlobalGraphCanvas({
   spatialSourceKey,
   onFailure,
   onDensityQaDiagnosticsChange,
+  onCenterRequestConsumed,
+  onFitRequestConsumed,
+  onFitRequested,
   onNodeActivate,
   onNodeSingleClick,
   onSelectionChange,
@@ -445,12 +455,17 @@ export function GlobalGraphCanvas({
   );
   const handledCenterRequest = useRef(0);
   const handledFitRequest = useRef(0);
+  const automaticFitRequestKeyRef = useRef(automaticFitRequestKey);
+  const userCameraIntentGeneration = useRef(0);
   const handledLayoutRequest = useRef(layoutRequestKey);
   const layoutPending = useRef(true);
   const callbacks = useRef({
     folderArrangement,
     onFailure,
     onDensityQaDiagnosticsChange,
+    onCenterRequestConsumed,
+    onFitRequestConsumed,
+    onFitRequested,
     onNodeActivate,
     onNodeSingleClick,
     onSelectionChange,
@@ -461,6 +476,9 @@ export function GlobalGraphCanvas({
       folderArrangement,
       onFailure,
       onDensityQaDiagnosticsChange,
+      onCenterRequestConsumed,
+      onFitRequestConsumed,
+      onFitRequested,
       onNodeActivate,
       onNodeSingleClick,
       onSelectionChange,
@@ -470,11 +488,17 @@ export function GlobalGraphCanvas({
     folderArrangement,
     onFailure,
     onDensityQaDiagnosticsChange,
+    onCenterRequestConsumed,
+    onFitRequestConsumed,
+    onFitRequested,
     onNodeActivate,
     onNodeSingleClick,
     onSelectionChange,
     onViewportObservation,
   ]);
+  useLayoutEffect(() => {
+    automaticFitRequestKeyRef.current = automaticFitRequestKey;
+  }, [automaticFitRequestKey]);
   const resolvedPhysics = resolveGlobalPhysicsSettings(settings);
   const {
     folderClustering,
@@ -543,6 +567,38 @@ export function GlobalGraphCanvas({
       presentationOverrides,
     };
   });
+  const finalGeometryGeneration = useMemo(
+    () => ({
+      fingerprint,
+      input,
+      layoutRequestKey,
+      spatialOverrides,
+      spatialRules,
+      spatialSourceKey,
+    }),
+    [
+      fingerprint,
+      input,
+      layoutRequestKey,
+      spatialOverrides,
+      spatialRules,
+      spatialSourceKey,
+    ],
+  );
+  const finalGeometryGenerationRef = useRef(finalGeometryGeneration);
+  const [
+    committedFinalGeometryGeneration,
+    setCommittedFinalGeometryGeneration,
+  ] = useState<object>();
+  useLayoutEffect(() => {
+    finalGeometryGenerationRef.current = finalGeometryGeneration;
+  }, [finalGeometryGeneration]);
+  const commitFinalGeometry = useCallback((generation: object) => {
+    if (finalGeometryGenerationRef.current !== generation) return;
+    setCommittedFinalGeometryGeneration((current) =>
+      current === generation ? current : generation,
+    );
+  }, []);
   const appliedVisualGroupStyles = useRef(initial.visualGroupStyles);
   const appliedPresentationOverrides = useRef(initial.presentationOverrides);
   const appliedSpatialOverrides = useRef(initial.spatialOverrides);
@@ -1011,6 +1067,17 @@ export function GlobalGraphCanvas({
             callbacks.current.onViewportObservation(viewport),
           onDensityQaDiagnosticsChange: (diagnostics) =>
             callbacks.current.onDensityQaDiagnosticsChange?.(diagnostics),
+          onUserCameraIntent: () => {
+            userCameraIntentGeneration.current += 1;
+            const key = automaticFitRequestKeyRef.current;
+            if (key === undefined) return;
+            automaticFitRequestKeyRef.current = undefined;
+            handledFitRequest.current = Math.max(
+              handledFitRequest.current,
+              key,
+            );
+            callbacks.current.onFitRequestConsumed?.(key);
+          },
         }),
     );
     if (!mounted.ok) {
@@ -1336,7 +1403,12 @@ export function GlobalGraphCanvas({
 
   useEffect(() => {
     if (spatialRules !== undefined) return;
-    if (appliedSpatialOverrides.current === spatialOverrides) return;
+    if (appliedSpatialOverrides.current === spatialOverrides) {
+      commitFinalGeometry(finalGeometryGeneration);
+      return;
+    }
+    const generation = finalGeometryGeneration;
+    let cancelled = false;
     const previousSpatialOverrides = appliedSpatialOverrides.current;
     appliedSpatialOverrides.current = spatialOverrides;
     const session = sessionRef.current;
@@ -1360,6 +1432,10 @@ export function GlobalGraphCanvas({
         previousSpatialOverrides.size > 0,
     )
       .then(() => {
+        if (cancelled || finalGeometryGenerationRef.current !== generation) {
+          return;
+        }
+        commitFinalGeometry(generation);
         if (pending === undefined) return;
         if (pendingArrangementCommit.current !== pending) return;
         pendingArrangementCommit.current = undefined;
@@ -1377,9 +1453,19 @@ export function GlobalGraphCanvas({
         );
       })
       .catch((error: unknown) => {
-        callbacks.current.onFailure(errorMessage(error));
+        if (!cancelled) callbacks.current.onFailure(errorMessage(error));
       });
-  }, [input, instrumentation, spatialOverrides, spatialRules]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    commitFinalGeometry,
+    finalGeometryGeneration,
+    input,
+    instrumentation,
+    spatialOverrides,
+    spatialRules,
+  ]);
 
   useEffect(() => {
     dynamicCache.clear();
@@ -1443,6 +1529,7 @@ export function GlobalGraphCanvas({
       appliedSpatialOverrides.current = spatialOverrides;
       setSpatialError(undefined);
       setSpatialCommitKey((current) => current + 1);
+      commitFinalGeometry(finalGeometryGeneration);
       const pending = pendingArrangementCommit.current;
       if (pending === undefined) return;
       const incomingRule = spatialRules.find(
@@ -1555,6 +1642,8 @@ export function GlobalGraphCanvas({
     };
   }, [
     dynamicCache,
+    commitFinalGeometry,
+    finalGeometryGeneration,
     fingerprint,
     input,
     instrumentation,
@@ -1610,6 +1699,9 @@ export function GlobalGraphCanvas({
           setLayoutError(undefined);
           setLayoutStatus(undefined);
           setLayoutCommitKey((current) => current + 1);
+          if (latestSpatialRules.current === undefined) {
+            commitFinalGeometry(finalGeometryGenerationRef.current);
+          }
         })
         .catch((error: unknown) => {
           if (!cancelled) callbacks.current.onFailure(errorMessage(error));
@@ -1661,6 +1753,9 @@ export function GlobalGraphCanvas({
         setLayoutPendingState(false);
         setLayoutStatus(undefined);
         setLayoutCommitKey((current) => current + 1);
+        if (latestSpatialRules.current === undefined) {
+          commitFinalGeometry(finalGeometryGenerationRef.current);
+        }
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -1670,6 +1765,9 @@ export function GlobalGraphCanvas({
         setLayoutError(message);
         setLayoutStatus('The last valid All Network positions remain visible.');
         setLayoutCommitKey((current) => current + 1);
+        if (latestSpatialRules.current === undefined) {
+          commitFinalGeometry(finalGeometryGenerationRef.current);
+        }
       });
     return () => {
       cancelled = true;
@@ -1677,6 +1775,7 @@ export function GlobalGraphCanvas({
   }, [
     cache,
     cancelArrangementPreview,
+    commitFinalGeometry,
     fingerprint,
     input,
     instrumentation,
@@ -1794,8 +1893,11 @@ export function GlobalGraphCanvas({
   ]);
 
   useEffect(() => {
+    const geometryReady =
+      committedFinalGeometryGeneration === finalGeometryGeneration;
     if (
       !shouldApplyGlobalViewportRequest({
+        geometryReady,
         handledKey: handledCenterRequest.current,
         layoutPending: layoutPending.current,
         ready,
@@ -1805,18 +1907,45 @@ export function GlobalGraphCanvas({
     ) {
       return;
     }
-    handledCenterRequest.current = centerRequest.key;
-    void sessionRef.current?.center(centerRequest).catch((error: unknown) => {
-      setLayoutError(`Could not center Global: ${errorMessage(error)}`);
-    });
-  }, [centerRequest, layoutCommitKey, ready]);
+    const session = sessionRef.current;
+    if (session === undefined) return;
+    let cancelled = false;
+    const request = centerRequest;
+    void session
+      .center(request)
+      .then(() => {
+        if (
+          cancelled ||
+          finalGeometryGenerationRef.current !== finalGeometryGeneration
+        ) {
+          return;
+        }
+        handledCenterRequest.current = request.key;
+        callbacks.current.onCenterRequestConsumed?.(request.key);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        handledCenterRequest.current = request.key;
+        callbacks.current.onCenterRequestConsumed?.(request.key);
+        setLayoutError(`Could not center Global: ${errorMessage(error)}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    centerRequest,
+    committedFinalGeometryGeneration,
+    finalGeometryGeneration,
+    layoutCommitKey,
+    ready,
+  ]);
 
   useEffect(() => {
-    const spatialViewportReady =
-      spatialRules === undefined || spatialCommitKey > 0;
+    const geometryReady =
+      committedFinalGeometryGeneration === finalGeometryGeneration;
     if (
-      !spatialViewportReady ||
       !shouldApplyGlobalViewportRequest({
+        geometryReady,
         handledKey: handledFitRequest.current,
         layoutPending: layoutPending.current,
         ready,
@@ -1826,12 +1955,29 @@ export function GlobalGraphCanvas({
       return;
     }
     handledFitRequest.current = fitRequestKey;
-    sessionRef.current?.fit();
-  }, [fitRequestKey, layoutCommitKey, ready, spatialCommitKey, spatialRules]);
+    const automaticRequestSuperseded =
+      automaticFitRequestKey === fitRequestKey &&
+      userCameraIntentGeneration.current > 0;
+    if (!automaticRequestSuperseded) sessionRef.current?.fit();
+    callbacks.current.onFitRequestConsumed?.(fitRequestKey);
+  }, [
+    automaticFitRequestKey,
+    committedFinalGeometryGeneration,
+    finalGeometryGeneration,
+    fitRequestKey,
+    layoutCommitKey,
+    ready,
+  ]);
 
   const zoomIn = useCallback(() => sessionRef.current?.zoomBy(0.82), []);
   const zoomOut = useCallback(() => sessionRef.current?.zoomBy(1.22), []);
-  const fit = useCallback(() => sessionRef.current?.fit(), []);
+  const fit = useCallback(() => {
+    if (callbacks.current.onFitRequested !== undefined) {
+      callbacks.current.onFitRequested();
+      return;
+    }
+    sessionRef.current?.fit();
+  }, []);
   const activeArrangementFolderKey = folderArrangement?.activeFolderKey;
 
   const nudgeActiveFolder = useCallback(

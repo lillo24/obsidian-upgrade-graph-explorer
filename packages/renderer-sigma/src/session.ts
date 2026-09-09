@@ -63,6 +63,7 @@ import {
 import {
   isCoarseWheelDelta,
   normalizeWheelDeltaPixels,
+  normalizeWheelPanDeltaPixels,
   preventSigmaWheelDefault,
   ratioAfterWheelDelta,
   WheelDirectionStabilizer,
@@ -147,6 +148,8 @@ export interface GlobalRendererSessionOptions {
   readonly onDensityQaDiagnosticsChange?: (
     diagnostics: GlobalDensityQaDiagnostics,
   ) => void;
+  /** Reports a manual or semantic camera claim so queued automatic Fit can yield. */
+  readonly onUserCameraIntent?: () => void;
 }
 
 export interface GlobalFolderArrangementContext {
@@ -265,14 +268,12 @@ export class GlobalRendererSession {
 
   private readonly mouseDragHandler = (): void => {
     if (this.renderer.getMouseCaptor().isMouseDown) {
-      this.cameraOwnership = 'user';
-      this.positionCameraIntent.claimCamera();
+      this.claimUserCamera();
     }
   };
 
   private readonly touchMoveHandler = (): void => {
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
   };
 
   private readonly cameraUpdatedHandler = (): void => {
@@ -313,8 +314,7 @@ export class GlobalRendererSession {
     }
     const original = coordinates.original as WheelEvent;
     preventSigmaWheelDefault(coordinates);
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     const deltaPixels = normalizeWheelDeltaPixels(
       original,
       this.renderer.getDimensions().height,
@@ -452,16 +452,23 @@ export class GlobalRendererSession {
   private applyWheelPan(event: WheelEvent): void {
     const dimensions = this.renderer.getDimensions();
     const center = { x: dimensions.width / 2, y: dimensions.height / 2 };
-    const before = this.renderer.viewportToGraph(center);
-    const after = this.renderer.viewportToGraph({
-      x: center.x + event.deltaX,
-      y: center.y + event.deltaY,
+    const delta = normalizeWheelPanDeltaPixels(event, dimensions);
+    const before = this.renderer.viewportToFramedGraph(center);
+    const after = this.renderer.viewportToFramedGraph({
+      x: center.x + delta.x,
+      y: center.y + delta.y,
     });
     const camera = this.renderer.getCamera();
     camera.setState({
       x: camera.x + before.x - after.x,
       y: camera.y + before.y - after.y,
     });
+  }
+
+  private claimUserCamera(): void {
+    this.cameraOwnership = 'user';
+    this.positionCameraIntent.claimCamera();
+    this.options.onUserCameraIntent?.();
   }
 
   private reduceNode(key: string, attributes: GlobalNodeAttributes) {
@@ -1023,8 +1030,7 @@ export class GlobalRendererSession {
     }
     // Pointer and keyboard arrangement are explicit navigation. Confirmed
     // geometry may update density later, but it must not steal this viewport.
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     const geometry = this.folderPreviewGeometry(folderKey);
     const preview = previewFolderClusterAtAnchor({
       geometry,
@@ -1079,8 +1085,7 @@ export class GlobalRendererSession {
     if (context?.active !== true) {
       throw new Error('Arrange folders is not active.');
     }
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     const frame = computeAutomaticGraphFrame(
       context.automaticPositions,
       globalFolderKeyByNodeKey(context.input).keys(),
@@ -1239,8 +1244,7 @@ export class GlobalRendererSession {
     const anchor =
       anchorKey === undefined ? undefined : this.nodeViewportPoint(anchorKey);
     this.densityFramingStrength = strengthPercentage;
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     const ratio = this.effectiveDensityRatio();
     if (anchorKey === undefined || anchor === undefined) {
       this.renderer.getCamera().setState({ ratio });
@@ -1896,8 +1900,7 @@ export class GlobalRendererSession {
     if (display === undefined) {
       throw new Error(`Cannot center missing Global node ${request.nodeId}.`);
     }
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     this.semanticAnchorNodeKey = request.nodeId;
     const started = performance.now();
     await this.renderer
@@ -1924,8 +1927,7 @@ export class GlobalRendererSession {
   }
 
   zoomBy(factor: number): void {
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     const camera = this.renderer.getCamera();
     camera.animate(
       { ratio: Math.max(0.02, Math.min(6, camera.ratio * factor)) },
@@ -1942,7 +1944,7 @@ export class GlobalRendererSession {
       {
         x: 0.5,
         y: 0.5,
-        ratio: this.effectiveDensityRatio(),
+        ratio: 1,
         angle: 0,
       },
       { duration: preferredMotionDuration() },

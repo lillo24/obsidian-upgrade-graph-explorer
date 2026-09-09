@@ -878,14 +878,17 @@ export function GraphExplorer({
       localStructuredCenterRequest?.key ?? 0,
     ),
   );
-  const [globalFitRequestKey, setGlobalFitRequestKey] = useState(
+  const initialGlobalFitRequest =
     rendererMode === 'global' &&
-      (fitInitialViewport ||
-        (restoredGlobalViewport !== undefined &&
-          restoredGlobalAnchor === undefined))
-      ? 1
-      : 0,
-  );
+    (fitInitialViewport ||
+      (restoredGlobalViewport !== undefined &&
+        restoredGlobalAnchor === undefined))
+      ? { key: 1, automatic: true }
+      : undefined;
+  const [globalFitRequest, setGlobalFitRequest] = useState<
+    { readonly key: number; readonly automatic: boolean } | undefined
+  >(initialGlobalFitRequest);
+  const globalFitRequestGeneration = useRef(initialGlobalFitRequest?.key ?? 0);
   const [globalLayoutRequestKey, setGlobalLayoutRequestKey] = useState(0);
   const [localLayoutRequestKey, setLocalLayoutRequestKey] = useState(0);
   const initialLocalFitRequestKey =
@@ -899,6 +902,8 @@ export function GraphExplorer({
     number | undefined
   >(initialLocalFitRequestKey);
   const localFitRequestGeneration = useRef(initialLocalFitRequestKey ?? 0);
+  const [automaticLocalFitRequestKey, setAutomaticLocalFitRequestKey] =
+    useState(initialLocalFitRequestKey);
   const [localTransitionAnchor, setLocalTransitionAnchor] = useState<
     GraphTransitionAnchor | undefined
   >();
@@ -1352,6 +1357,7 @@ export function GraphExplorer({
         globalCenterRequestGeneration.current,
       );
       globalCenterRequestGeneration.current = key;
+      setGlobalFitRequest(undefined);
       setGlobalCenterRequest({ key, ...request });
     },
     [],
@@ -1366,6 +1372,8 @@ export function GraphExplorer({
         localCenterRequestGeneration.current,
       );
       localCenterRequestGeneration.current = key;
+      setAutomaticLocalFitRequestKey(undefined);
+      setLocalFitRequestKey(undefined);
       if (localLayoutModeRef.current === 'structured') {
         setLocalCenterRequest(undefined);
         setLocalStructuredCenterRequest({
@@ -1384,13 +1392,40 @@ export function GraphExplorer({
     },
     [],
   );
+  const requestGlobalFit = useCallback(() => {
+    const key = nextGraphViewportRequestKey(globalFitRequestGeneration.current);
+    globalFitRequestGeneration.current = key;
+    setGlobalCenterRequest(undefined);
+    setGlobalFitRequest({ key, automatic: false });
+  }, []);
+  const consumeGlobalFitRequest = useCallback((key: number) => {
+    setGlobalFitRequest((current) =>
+      current?.key === key ? undefined : current,
+    );
+  }, []);
+  const consumeGlobalCenterRequest = useCallback((key: number) => {
+    setGlobalCenterRequest((current) =>
+      current?.key === key ? undefined : current,
+    );
+  }, []);
   const requestLocalFit = useCallback(() => {
     const key = nextGraphViewportRequestKey(localFitRequestGeneration.current);
     localFitRequestGeneration.current = key;
+    setAutomaticLocalFitRequestKey(undefined);
+    setLocalCenterRequest(undefined);
+    setLocalStructuredCenterRequest(undefined);
     setLocalFitRequestKey(key);
   }, []);
   const consumeLocalFitRequest = useCallback((key: number) => {
+    setAutomaticLocalFitRequestKey((current) =>
+      current === key ? undefined : current,
+    );
     setLocalFitRequestKey((current) => (current === key ? undefined : current));
+  }, []);
+  const consumeLocalCenterRequest = useCallback((key: number) => {
+    setLocalCenterRequest((current) =>
+      current?.key === key ? undefined : current,
+    );
   }, []);
   const consumeLocalTransitionAnchor = useCallback((key: number) => {
     setLocalTransitionAnchor((current) =>
@@ -1492,7 +1527,7 @@ export function GraphExplorer({
           if (options.fitDestination) {
             setGlobalSemanticViewportBookmark(undefined);
             setGlobalCenterRequest(undefined);
-            setGlobalFitRequestKey((current) => current + 1);
+            requestGlobalFit();
           }
         } else if (rendererModeRef.current === 'local') {
           setLocalCenterRequest(undefined);
@@ -1507,6 +1542,7 @@ export function GraphExplorer({
     },
     [
       commitGraphDestination,
+      requestGlobalFit,
       requestLocalFit,
       setGlobalSemanticViewportBookmark,
       setLocalSemanticViewportBookmark,
@@ -1737,7 +1773,7 @@ export function GraphExplorer({
         setSelection(null);
         if (targetMode === 'global') {
           setGlobalCenterRequest(undefined);
-          setGlobalFitRequestKey((value) => value + 1);
+          requestGlobalFit();
         } else {
           setCenterRequest(undefined);
           setFitRequestKey((value) => value + 1);
@@ -1769,6 +1805,7 @@ export function GraphExplorer({
     performance,
     projectionWorkspace,
     replaceNavigationHistory,
+    requestGlobalFit,
     requestGlobalSemanticCenter,
     requestSemanticCenter,
     returnToPriorAll,
@@ -1997,7 +2034,7 @@ export function GraphExplorer({
         }
         setGlobalSemanticViewportBookmark(undefined);
         setGlobalCenterRequest(undefined);
-        setGlobalFitRequestKey((current) => current + 1);
+        requestGlobalFit();
         return;
       }
       if (request.presentationMode === 'local') {
@@ -2044,6 +2081,7 @@ export function GraphExplorer({
   }, [
     effectiveRendererMode,
     pendingHistoryViewportRestore,
+    requestGlobalFit,
     requestGlobalSemanticCenter,
     requestLocalFit,
     requestLocalSemanticCenter,
@@ -3070,7 +3108,7 @@ export function GraphExplorer({
           );
           setSelection(null);
           setGlobalCenterRequest(undefined);
-          setGlobalFitRequestKey((value) => value + 1);
+          requestGlobalFit();
         } else {
           const node = candidate;
           const savedGlobalViewport = globalViewportBookmarkRef.current;
@@ -3177,6 +3215,7 @@ export function GraphExplorer({
       projection,
       projectionWorkspace,
       replaceNavigationHistory,
+      requestGlobalFit,
       requestGlobalSemanticCenter,
       requestSemanticCenter,
       exitFocusToAll,
@@ -3688,7 +3727,8 @@ export function GraphExplorer({
     setLocalTransitionAnchor(undefined);
     setTransientResetKey((current) => current + 1);
     setFitRequestKey((current) => current + 1);
-    setGlobalFitRequestKey((current) => current + 1);
+    requestGlobalFit();
+    setAutomaticLocalFitRequestKey(undefined);
     setLocalFitRequestKey(undefined);
     persistenceWritable.current = true;
     setPersistenceError(undefined);
@@ -4159,12 +4199,15 @@ export function GraphExplorer({
               </p>
             ) : (
               <GlobalGraphView
+                {...(globalFitRequest?.automatic === true
+                  ? { automaticFitRequestKey: globalFitRequest.key }
+                  : {})}
                 densityFramingStrength={allNetworkDensityFramingStrength}
                 folderArrangement={folderArrangementViewProps}
                 {...(globalCenterRequest === undefined
                   ? {}
                   : { centerRequest: globalCenterRequest })}
-                fitRequestKey={globalFitRequestKey}
+                fitRequestKey={globalFitRequest?.key ?? 0}
                 {...(globalViewportBookmark === undefined
                   ? {}
                   : { initialViewport: globalViewportBookmark })}
@@ -4178,6 +4221,9 @@ export function GraphExplorer({
                   )
                 }
                 onDensityQaDiagnosticsChange={setAllNetworkDensityQaDiagnostics}
+                onCenterRequestConsumed={consumeGlobalCenterRequest}
+                onFitRequestConsumed={consumeGlobalFitRequest}
+                onFitRequested={requestGlobalFit}
                 onNodeActivate={enterFocusScope}
                 onNodeSingleClick={revealGraphNode}
                 onSelectionChange={changeGlobalSelection}
@@ -4250,6 +4296,11 @@ export function GraphExplorer({
               </p>
             ) : localLayoutMode === 'free' && LocalGraphView !== undefined ? (
               <LocalGraphView
+                {...(automaticLocalFitRequestKey === undefined
+                  ? {}
+                  : {
+                      automaticFitRequestKey: automaticLocalFitRequestKey,
+                    })}
                 densityFramingStrength={focusNetworkDensityFramingStrength}
                 {...(localCenterRequest === undefined
                   ? {}
@@ -4276,7 +4327,9 @@ export function GraphExplorer({
                 onDensityQaDiagnosticsChange={
                   setFocusNetworkDensityQaDiagnostics
                 }
+                onCenterRequestConsumed={consumeLocalCenterRequest}
                 onFitRequestConsumed={consumeLocalFitRequest}
+                onFitRequested={requestLocalFit}
                 onNodeActivate={focusLocalEntity}
                 onNodeSingleClick={revealGraphNode}
                 onSelectionChange={changeLocalSelection}

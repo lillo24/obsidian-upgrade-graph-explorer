@@ -8,6 +8,7 @@ import {
   GLOBAL_ZOOM_SENSITIVITY,
   isCoarseWheelDelta,
   normalizeWheelDeltaPixels,
+  normalizeWheelPanDeltaPixels,
   preventSigmaWheelDefault,
   ratioAfterWheelDelta,
   WheelDirectionStabilizer,
@@ -251,6 +252,21 @@ describe('Global visual interactions', () => {
     expect(normalized).toBeLessThan(48);
     expect(nextRatio).toBeGreaterThan(1.03);
     expect(nextRatio).toBeLessThan(1.06);
+  });
+
+  it('normalizes two-axis line and page pan units against the viewport', () => {
+    expect(
+      normalizeWheelPanDeltaPixels(
+        { deltaMode: 1, deltaX: -2, deltaY: 3 },
+        { width: 1_200, height: 800 },
+      ),
+    ).toEqual({ x: -32, y: 48 });
+    expect(
+      normalizeWheelPanDeltaPixels(
+        { deltaMode: 2, deltaX: -0.5, deltaY: 0.25 },
+        { width: 1_200, height: 800 },
+      ),
+    ).toEqual({ x: -600, y: 200 });
   });
 
   it('compresses a coarse pixel-mode wheel event to a modest step', () => {

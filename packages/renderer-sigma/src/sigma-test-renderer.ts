@@ -231,42 +231,63 @@ export class SigmaTestRenderer {
   }
   framedGraphToViewport(
     point: { x: number; y: number },
-    override?: { cameraState?: { x: number; y: number; ratio: number } },
+    override?: {
+      cameraState?: { x: number; y: number; ratio: number; angle?: number };
+    },
   ) {
     const camera = override?.cameraState ?? this.camera;
     const dimensions = this.getDimensions();
     const scale = this.normalizeDisplayCoordinates
       ? Math.min(dimensions.width, dimensions.height)
       : 1;
+    const translatedX = point.x - camera.x;
+    const translatedY = point.y - camera.y;
+    const cosine = Math.cos(camera.angle ?? 0);
+    const sine = Math.sin(camera.angle ?? 0);
     return {
-      x: ((point.x - camera.x) * scale) / camera.ratio + dimensions.width / 2,
-      y: ((point.y - camera.y) * scale) / camera.ratio + dimensions.height / 2,
+      x:
+        ((translatedX * cosine + translatedY * sine) * scale) / camera.ratio +
+        dimensions.width / 2,
+      y:
+        ((-translatedX * sine + translatedY * cosine) * scale) / camera.ratio +
+        dimensions.height / 2,
     };
   }
   viewportToFramedGraph(
     point: { x: number; y: number },
-    override?: { cameraState?: { x: number; y: number; ratio: number } },
+    override?: {
+      cameraState?: { x: number; y: number; ratio: number; angle?: number };
+    },
   ) {
     const camera = override?.cameraState ?? this.camera;
     const dimensions = this.getDimensions();
     const scale = this.normalizeDisplayCoordinates
       ? Math.min(dimensions.width, dimensions.height)
       : 1;
+    const viewportX = ((point.x - dimensions.width / 2) * camera.ratio) / scale;
+    const viewportY =
+      ((point.y - dimensions.height / 2) * camera.ratio) / scale;
+    const cosine = Math.cos(camera.angle ?? 0);
+    const sine = Math.sin(camera.angle ?? 0);
     return {
-      x: ((point.x - dimensions.width / 2) * camera.ratio) / scale + camera.x,
-      y: ((point.y - dimensions.height / 2) * camera.ratio) / scale + camera.y,
+      x: viewportX * cosine - viewportY * sine + camera.x,
+      y: viewportX * sine + viewportY * cosine + camera.y,
     };
   }
   viewportToGraph(
     point: { x: number; y: number },
-    override?: { cameraState?: { x: number; y: number; ratio: number } },
+    override?: {
+      cameraState?: { x: number; y: number; ratio: number; angle?: number };
+    },
   ) {
     if (!this.normalizeDisplayCoordinates) return point;
     return this.denormalize(this.viewportToFramedGraph(point, override));
   }
   graphToViewport(
     point: { x: number; y: number },
-    override?: { cameraState?: { x: number; y: number; ratio: number } },
+    override?: {
+      cameraState?: { x: number; y: number; ratio: number; angle?: number };
+    },
   ) {
     return this.normalizeDisplayCoordinates
       ? this.framedGraphToViewport(this.normalize(point), override)

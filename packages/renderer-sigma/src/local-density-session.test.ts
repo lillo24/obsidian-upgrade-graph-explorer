@@ -406,12 +406,13 @@ describe('Focus density camera ownership', () => {
     expect(session.nodeViewportPoint('root')!.x).toBeCloseTo(anchor.x);
     expect(session.nodeViewportPoint('root')!.y).toBeCloseTo(anchor.y);
 
+    expect(compactRatio).not.toBe(1);
     session.fit();
     expect(renderer.camera).toMatchObject({
       x: 0.5,
       y: 0.5,
       angle: 0,
-      ratio: compactRatio,
+      ratio: 1,
     });
     expect(renderer.camera.animatedReset).not.toHaveBeenCalled();
     session.destroy();
