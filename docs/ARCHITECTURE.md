@@ -1204,7 +1204,7 @@ Classic Focus Hierarchy remains the default. The application dynamically loads
 the modular component only for Focus + Hierarchy + Modular Preview. That
 component owns HIER1 construction, renderer-dimension adaptation, an exact
 24-entry page cache, and a dedicated latest-result-wins worker. The layout
-package owns the strict version-1 plain-data protocol/runtime; the renderer owns
+package owns the strict version-5 plain-data protocol/runtime; the renderer owns
 the lazy computed-layout mapper; neither layer reads workspace persistence or
 source-provider state.
 
@@ -1240,8 +1240,8 @@ remain unchanged by hover.
 
 HIER4A supersedes the original center-spine production geometry for Modular
 Preview. Its Directional Folder Bands geometry remains the default. The strict
-protocol-v4 worker now receives persisted macro-layout, normalized Soft
-strength, internal-layout, and Heading-order policies. Adaptive Compass plus
+protocol-v5 worker now receives persisted macro-layout, normalized Soft
+strength, sparse workspace Soft scope, internal-layout, and Heading-order policies. Adaptive Compass plus
 Crossing optimized remain the defaults; Vertical Spine and Document order
 remain Sandbox alternatives. Current/Mosaic remains development-only.
 
@@ -1270,11 +1270,31 @@ HIER4B extends that same persisted Folder guides toggle without changing its
 layout isolation. Directional Bands still renders the accepted strips; Soft
 Folder Clusters renders padded singleton regions, compact two-File capsules, or
 deterministic convex outlines around three or more final module rectangles.
-Exact visible HIER1 `folderKey` membership drives the grouping. Filtered modules
+Effective visible Soft membership drives the grouping; without a sparse scope
+override it equals exact HIER1 `folderKey`. Filtered modules
 are excluded, and proximity plus intervening different-folder modules split a
 misleading same-folder envelope into disconnected regions. Both overlays are
 created after layout adoption and remain outside projection, model, worker,
 cache, fitting, and graph geometry.
+
+HIER4B-FIX1 keeps exact folder identity immutable and stores only sparse
+exact-folder → strict-ancestor spatial rules under the stable workspace ID.
+Canonical snapshot folder keys supply sibling discovery even when a sibling is
+filtered from the current Focus view. One guide action promotes only the current
+effective group; a separate action includes effective siblings; Reset removes
+rules represented by the merged guide. The renderer displays visible members
+only, its hull remains pointer-inert, and its small label/control chip is the
+sole input surface. The independent registry never mutates Markdown or SPATIAL2
+rules and never enters Directional layout/cache identity.
+
+Soft File and module-anchor endpoints use final-geometry cardinal attachments.
+The dominant delta between exact endpoint rectangle centers chooses left/right
+or top/bottom, with a stable horizontal tie. Heading and Block endpoints keep
+their precise internal-side semantics. Bounded Compass candidate scoring uses
+these same cardinal segment crossings, and final attachments are recomputed
+after collision movement. Direct and Electronic consume the same handles;
+route style remains renderer-only. Directional Bands preserves its signed-rank
+attachment output byte-for-byte.
 
 Secondary edges, hover, and Visual Groups remain geometry-neutral. HIER4B owns
 Soft Folder Clusters, HIER5 retains Electronic orthogonal routing, rounded
@@ -1285,16 +1305,16 @@ The HIER4B bakeoff and lab retain the separate renderer-neutral Soft Folder
 Clusters API. The same solver is also available as a Sandbox-only macro choice
 inside the real Modular Preview for live-vault evaluation. It aggregates
 selected-backbone and Focus-path connections as undirected module pairs, uses
-minimum undirected Focus hops as a soft radial prior, and applies exact-folder
-centroid attraction only to repeated visible folders. A stable identity seed,
+minimum undirected Focus hops as a soft radial prior, and applies effective-group
+centroid attraction only to repeated visible groups. A stable identity seed,
 fixed 36 + 18 relaxation schedule, bounded variable-rectangle collision pack,
 and two internal-layout rounds make the result stateless and reproducible.
 Authored arrows preserve direction while macro coordinates carry no incoming/
 outgoing meaning.
 
-The 24-entry exact cache includes macro family and includes normalized strength
-only for Soft Clusters, so changing stored strength cannot miss or perturb a
-Directional layout. Policy changes use the existing terminating
+The 24-entry exact cache includes macro family plus normalized strength and
+canonical sparse scope only for Soft Clusters, so changing stored Soft state
+cannot miss or perturb a Directional layout. Policy changes use the existing terminating
 latest-result-wins worker lifecycle. The worker response carries aggregate Soft
 solver, Compass, and collision evidence while computed geometry carries only a
 deterministic policy identity. The real projection continues to own disclosure,
@@ -1311,6 +1331,7 @@ HIER3B-FIX1. The actual-browser HIER4A integration was approved and its optimize
 desktop check/build passed on September 8, 2026. PRE-HIER4B then added approved
 visible strips and Direct rendering without reopening HIER4A geometry. HIER4B
 is under real-vault graphical evaluation through the live Modular Preview;
+HIER4B-FIX1 adds per-folder Soft scope and cardinal File ports to that unmerged evaluation;
 HIER5 follows HIER4B, and HIER3C follows HIER5.
 
 ## HIER0 product exposure and geometry

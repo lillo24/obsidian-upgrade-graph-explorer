@@ -2,7 +2,9 @@ import type {
   FocusSchematicComputedLayout,
   FocusSchematicEndpointOrderPolicy,
   FocusSchematicInternalLayoutVariant,
+  FocusSchematicSoftFolderScopeOverride,
 } from './types';
+import { canonicalFocusSchematicSoftFolderScopeOverrides } from './soft-folder-scope';
 
 export type { FocusSchematicEndpointOrderPolicy } from './types';
 
@@ -18,6 +20,7 @@ export type FocusSchematicProductMacroLayout =
 export interface FocusSchematicProductLayoutPolicies {
   readonly macroLayout: FocusSchematicProductMacroLayout;
   readonly softFolderStrength: number;
+  readonly softFolderScopeOverrides: readonly FocusSchematicSoftFolderScopeOverride[];
   readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
   readonly internalLayoutVariant: FocusSchematicProductInternalLayoutVariant;
 }
@@ -25,6 +28,7 @@ export interface FocusSchematicProductLayoutPolicies {
 export const DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES = {
   macroLayout: 'directional-bands',
   softFolderStrength: 50,
+  softFolderScopeOverrides: [],
   endpointOrderPolicy: 'crossing-optimized',
   internalLayoutVariant: 'adaptive-compass',
 } as const satisfies FocusSchematicProductLayoutPolicies;
@@ -41,6 +45,12 @@ export function normalizeFocusSchematicSoftFolderStrength(
   return typeof value === 'number' && Number.isFinite(value)
     ? Math.min(100, Math.max(0, value))
     : DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softFolderStrength;
+}
+
+export function normalizeFocusSchematicSoftFolderScopeOverrides(
+  value: unknown,
+): readonly FocusSchematicSoftFolderScopeOverride[] {
+  return canonicalFocusSchematicSoftFolderScopeOverrides(value ?? []);
 }
 
 export function isFocusSchematicEndpointOrderPolicy(
@@ -71,11 +81,16 @@ export function focusSchematicLayoutMatchesProductPolicies(
         policies.endpointOrderPolicy
     );
   const evidence = computed.internalLayoutEvidence.softClusterPolicyEvidence;
+  const expectedScope = normalizeFocusSchematicSoftFolderScopeOverrides(
+    policies.softFolderScopeOverrides,
+  );
   return (
     !computed.folderBandPlan.enabled &&
     evidence?.layoutFamily === 'soft-folder-clusters' &&
     evidence.endpointOrderPolicy === policies.endpointOrderPolicy &&
     evidence.strength ===
-      normalizeFocusSchematicSoftFolderStrength(policies.softFolderStrength)
+      normalizeFocusSchematicSoftFolderStrength(policies.softFolderStrength) &&
+    JSON.stringify(evidence.scopeOverrides) === JSON.stringify(expectedScope) &&
+    evidence.fileAttachmentPolicy === 'spatial-cardinal'
   );
 }

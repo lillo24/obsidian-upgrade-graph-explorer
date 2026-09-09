@@ -4,6 +4,7 @@ import {
   FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION,
   FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
   focusSchematicLayoutMatchesProductPolicies,
+  normalizeFocusSchematicSoftFolderScopeOverrides,
   normalizeFocusSchematicSoftFolderStrength,
   validateFocusSchematicComputedLayout,
   type FocusSchematicComputedLayout,
@@ -54,6 +55,12 @@ export function exactFocusSchematicLayoutCacheKey(
         policies.macroLayout === 'soft-folder-clusters'
           ? normalizeFocusSchematicSoftFolderStrength(
               policies.softFolderStrength,
+            )
+          : null,
+      softFolderScopeOverrides:
+        policies.macroLayout === 'soft-folder-clusters'
+          ? normalizeFocusSchematicSoftFolderScopeOverrides(
+              policies.softFolderScopeOverrides,
             )
           : null,
       endpointOrderPolicy: policies.endpointOrderPolicy,

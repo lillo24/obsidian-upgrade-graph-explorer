@@ -1,5 +1,6 @@
 export * from './types';
 export * from './policies';
+export * from './soft-folder-scope';
 export {
   FILTERED_MODULE_DIMENSIONS,
   FOCUS_SCHEMATIC_LAYOUT_CLEARANCE,
@@ -48,7 +49,6 @@ export {
   type FocusSchematicInternalLayoutRunStats,
 } from './internal-layout-variants';
 export {
-  createFocusSchematicEndpointAttachments,
   computeFocusSchematicComputedLayout,
   computeFocusSchematicComputedLayoutAttempt,
   computeFocusSchematicRevision2LayoutAttempt,
@@ -56,6 +56,13 @@ export {
   FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION,
   validateFocusSchematicComputedLayout,
 } from './endpoint-facing';
+export {
+  createFocusSchematicEndpointAttachments,
+  focusSchematicSpatialCardinalSide,
+  measureFocusSchematicAttachmentCrossings,
+  measureFocusSchematicCandidateAttachmentCrossings,
+  type FocusSchematicEndpointAttachmentPolicy,
+} from './attachments';
 export {
   applyFocusSchematicFolderBands,
   evaluateFocusSchematicFolderBandQuality,

@@ -161,6 +161,7 @@ import {
 import { deriveProjectionVisualGroupPresentationMap } from '../visual-groups/presentation';
 import { usePresentationOverrides } from '../presentation-overrides/use-presentation-overrides';
 import { useSpatialOverrides } from '../spatial-overrides/use-spatial-overrides';
+import { useSoftFolderScope } from '../soft-folder-scope/use-soft-folder-scope';
 import {
   folderArrangementActive,
   folderArrangementActiveFolder,
@@ -613,6 +614,25 @@ export function GraphExplorer({
   });
   const spatialOverrides = useSpatialOverrides({
     workspaceId,
+    eligibility,
+    storage: persistenceStorage,
+  });
+  const workspaceExactFolderKeys = useMemo(
+    () =>
+      [
+        ...new Set(
+          snapshot.entities.flatMap((entity) =>
+            entity.kind === 'document'
+              ? [workspaceFolderKeyFromPath(entity.source.path)]
+              : [],
+          ),
+        ),
+      ].sort(),
+    [snapshot.entities],
+  );
+  const softFolderScope = useSoftFolderScope({
+    workspaceId,
+    workspaceExactFolderKeys,
     eligibility,
     storage: persistenceStorage,
   });
@@ -4338,6 +4358,11 @@ export function GraphExplorer({
                 internalLayoutVariant={modularFocusInternalLayout}
                 macroLayout={modularFocusMacroLayout}
                 softFolderStrength={modularFocusSoftFolderStrength}
+                softFolderScopeOverrides={softFolderScope.overrides}
+                softFolderScopePersistenceError={softFolderScope.session.error}
+                softFolderScopePersistenceStatus={
+                  softFolderScope.session.status
+                }
                 routeStyle={modularConnectionStyle}
                 {...(localTransitionAnchor === undefined
                   ? {}
@@ -4354,6 +4379,11 @@ export function GraphExplorer({
                 onFitRequestConsumed={consumeLocalFitRequest}
                 onFocusEntity={focusLocalEntity}
                 onSelectionChange={changeSelection}
+                onPromoteSoftFolderGroup={softFolderScope.promoteGroup}
+                onPromoteSoftFolderGroupWithSiblings={
+                  softFolderScope.promoteGroupWithSiblings
+                }
+                onResetSoftFolderGroup={softFolderScope.resetGroup}
                 onToggleEntity={toggleEntity}
                 onTransitionAnchorApiChange={
                   changeLocalStructuredTransitionAnchorApi

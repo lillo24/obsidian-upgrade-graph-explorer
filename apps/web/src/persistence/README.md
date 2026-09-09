@@ -24,6 +24,10 @@ view contract.
   in-memory migration without writing on read. Session policy, including
   durable write-before-adopt behavior and explicit corrupt-value recovery, is
   in `../spatial-overrides/session.ts`.
+- `soft-folder-scope.ts` owns the independent schema-v1 sparse Soft grouping
+  registry. It stores normalized exact-folder → ancestor-group rules under the
+  stable workspace identity; session and reconciliation policy live in
+  `../soft-folder-scope/`.
 
 Malformed or unsupported values are not overwritten or deleted. Transient and
 legacy reports never read or write cross-session state. The stored record
@@ -101,3 +105,11 @@ confirmed displayed composition and moves the session into its existing
 blocked-write state. Reset one exact-root rule and the explicitly confirmed
 Reset all use the same transaction. Corrupt recovery deletes only this spatial
 key and is exposed outside the otherwise-disabled Arrange mode.
+
+Soft Folder Cluster scope uses
+`icarus-graph-explorer:soft-folder-scope:<encodeURIComponent(workspaceId)>`.
+Stable workspaces write canonical sparse rules before adopting them; transient
+or legacy reports keep them in memory. Invalid or stale exact-folder rules are
+ignored conservatively with no rename inference. The record contains normalized
+workspace-relative folder keys only and remains separate from Graph Preferences
+and SPATIAL2 folder rules.

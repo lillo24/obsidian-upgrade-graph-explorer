@@ -320,8 +320,17 @@ geometry-relevant values. Disclosure, reroot, filtering, exact hover, Secondary
 presentation, and camera behavior continue through the existing projection and
 React Flow seams.
 
+HIER4B-FIX1 keeps exact folders as source truth while `GraphExplorer.tsx`
+derives a stable sibling inventory from the current canonical snapshot and owns
+the workspace-keyed sparse scope session. `ModularStructuredGraphView.tsx`
+sends scope rules only for Soft layout requests and passes guide actions to the
+renderer. Directional requests use an empty scope and retain their exact cache
+identity. Soft File and module-anchor handles come from final endpoint geometry;
+Heading and Block attachment semantics remain exact.
+
 The persisted Folder guides toggle is resolved after a current worker result is
 adopted. Directional mode supplies the existing band strips; Soft mode supplies
-renderer-only cluster regions from final module rectangles and exact visible
-HIER1 folder membership. Guide visibility is absent from every model, worker,
-effect, and cache dependency that can request or change layout.
+renderer-only cluster regions from final module rectangles and effective visible
+scope membership. Only the small Soft guide label opens the keyboard-accessible
+promotion/reset toolbar. Guide visibility remains absent from every model,
+worker, effect, and cache dependency that can request or change layout.

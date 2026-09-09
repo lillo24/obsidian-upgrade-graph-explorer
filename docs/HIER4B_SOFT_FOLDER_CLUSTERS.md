@@ -25,9 +25,10 @@ The solver combines five bounded terms:
    `min(4, 1 + log2(count))`, so multiplicity has useful but capped influence.
 2. A soft radial term prefers `minimumHopDistance × 520 px` from the Focus
    root. This is a preference, not a ring constraint.
-3. A linear-time centroid term attracts modules sharing the same exact
-   `folderKey`. Filtered bridge modules never enter a centroid. Singleton
-   folders have exactly zero folder force.
+3. A linear-time centroid term attracts modules sharing the same effective Soft
+   group. Without overrides this is the exact `folderKey`. Filtered bridge
+   modules never enter a centroid. Singleton groups have exactly zero folder
+   force.
 4. A weak stable seed and compactness term limits gratuitous movement.
 5. Collision passes use final variable module rectangles and a 72 px target
    gap. A bounded deterministic spiral pack closes dense-hub collisions.
@@ -39,9 +40,9 @@ translation, so anchoring cannot introduce a collision.
 
 The lab exposes `0`, `25`, `50`, `75`, and `100`; the live slider accepts every
 normalized value from 0 through 100 and starts at 50. Strength
-scales only exact-folder centroid attraction. At `0`, the solver never reads a
-folder key for seeding, placement, or packing; changing every folder identity
-therefore produces byte-identical macro geometry. `100` remains a soft force:
+scales only effective-group centroid attraction. At `0`, the solver never uses a
+folder group for seeding, placement, or packing; changing folder identity or
+scope therefore produces byte-identical macro geometry. `100` remains a soft force:
 topology, hop distance, rectangle validity, and the stable anchor can still
 split a folder when the graph requires it.
 
@@ -69,32 +70,62 @@ the fixed `36 + 18` schedule, collision checks/corrections, Compass assignment
 count, and branch-region churn between the two rounds. The implementation does
 not perform HIER5 obstacle routing or HIER3C product-default work.
 
+## Per-folder spatial scope
+
+HIER4B-FIX1 stores sparse `exactFolderKey → spatialGroupKey` rules under the
+stable workspace ID. The target must be a strict normalized ancestor. No rule
+means exact-folder grouping. Each guide can promote only its represented exact
+folders one level, promote that group plus workspace-known effective siblings,
+or reset every represented override. Repeated promotion can reach workspace
+root, and direct Files in the target parent naturally join the same effective
+group.
+
+Sibling discovery comes from canonical document folder keys already in the
+workspace snapshot, including currently hidden siblings. The renderer performs
+no file I/O and displays membership from visible modules only. Deleted or moved
+exact keys are ignored without guessing rename identity. Stable sessions write
+before adopting; transient/legacy sessions remain memory-only. The independent
+registry is not Graph Preferences, SPATIAL2 intent, or Markdown source state.
+
 ## Folder guides
 
 The persisted Folder guides toggle defaults to On and remains renderer-only.
 Directional Bands uses the accepted horizontal strips. Soft Folder Clusters
 instead derives spatial regions from final displayed File-module rectangles and
-exact visible HIER1 folder membership. Singleton folders receive padded rounded
+effective visible Soft group membership. Singleton groups receive padded rounded
 regions, pairs receive compact rounded capsules, and larger local groups receive
 deterministic convex outlines. Clearly separated same-folder islands render as
 separate regions when joining them would span too much empty space or enclose a
 different folder's module.
 
-The overlay is created only after a current layout has been adopted. It is
-pointer-inert, excluded from graph nodes and fit bounds, and never enters
+The overlay is created only after a current layout has been adopted. Its hull is
+pointer-inert; only a small keyboard-accessible label/control chip accepts input.
+Guide visibility is excluded from graph nodes and fit bounds and never enters
 projection, model creation, worker requests, cache identity, convergence, or
 geometry. Filtered modules are excluded before grouping, and no path is reparsed
 to recover folder identity.
+
+## Soft File ports
+
+Soft mode derives each File or module-anchor attachment independently from the
+final two endpoint rectangle centers. The dominant absolute delta chooses
+left/right or top/bottom; horizontal wins an exact 45-degree tie and coincident
+centers fall back to right. Final collision-corrected geometry is always used.
+Heading and Block endpoints retain their precise Adaptive Compass/lane semantics.
+The same selected handles feed Direct and Electronic rendering. The cardinal
+segments also supply the first crossing objective while bounded internal-layout
+candidates are compared. Directional Bands retains its existing signed-rank
+left/right policy byte-for-byte.
 
 ## Ownership
 
 `packages/focus-schematic-layout/src/soft-clusters.ts` owns the renderer-neutral
 solver and evidence. `soft-cluster-fixtures.ts` owns SC1–SC24 and the stability
 pairs. The bakeoff tool continues to own the JSON benchmark and self-contained
-HTML lab. The version-4 Modular worker owns macro dispatch; React supplies only
-the persisted macro, normalized strength, internal-layout, and Heading-order
-policies. The exact page cache ignores stored strength for Directional Bands and
-includes it for Soft Folder Clusters.
+HTML lab. The version-5 Modular worker owns macro dispatch; React supplies the
+persisted macro, normalized strength, sparse Soft scope, internal-layout, and
+Heading-order policies. The exact page cache ignores strength and Soft scope for
+Directional Bands and includes both for Soft Folder Clusters.
 
 The real preview uses the current projection, module dimensions, exact endpoint
 plan, React Flow mapper, disclosure/reroot/filter behavior, and Secondary edge
@@ -104,7 +135,7 @@ pending worker generations; layout remains stateless and the latest request is
 the only adoptable result.
 No private vault path, name, content, topology, or screenshot is committed.
 
-The adoption decision is deliberately open. Graphical review must choose one
+The adoption decision remains open after HIER4B-FIX1. Graphical review must choose one
 of `ADOPT_SOFT_FOLDER_CLUSTERS`, `SOFT_CLUSTERS_REQUIRE_TUNING`,
 `KEEP_DIRECTIONAL_BANDS_ONLY`, or `SOFT_CLUSTERS_REQUIRE_REDESIGN`, and record a
 preferred strength when relevant.

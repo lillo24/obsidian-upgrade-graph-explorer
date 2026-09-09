@@ -161,6 +161,7 @@ describe('Focus Schematic layout worker protocol', () => {
           const selectedPolicies = {
             macroLayout,
             softFolderStrength: 50,
+            softFolderScopeOverrides: [],
             internalLayoutVariant,
             endpointOrderPolicy,
           } as const;
@@ -231,7 +232,7 @@ describe('Focus Schematic layout worker protocol', () => {
           combinations += 1;
         }
     expect(combinations).toBe(8);
-  });
+  }, 30_000);
 
   it('runs continuous Soft Cluster strengths through the production worker path', () => {
     const selectedInput = liveInput('soft-folder-clusters');
@@ -259,6 +260,39 @@ describe('Focus Schematic layout worker protocol', () => {
     });
     expect(candidates[0]).not.toEqual(candidates[1]);
     expect(candidates[1]).not.toEqual(candidates[2]);
+  });
+
+  it('keeps Directional output byte-identical with non-empty Soft scope state', () => {
+    const selectedInput = liveInput('directional-bands');
+    const request = (requestId: number, withScope: boolean) => ({
+      protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
+      requestId,
+      kind: 'layout' as const,
+      input: selectedInput,
+      policies: {
+        ...policies,
+        softFolderScopeOverrides: withScope
+          ? [
+              {
+                exactFolderKey: 'alpha/child',
+                spatialGroupKey: 'alpha',
+              },
+            ]
+          : [],
+      },
+    });
+    const exact = handleFocusSchematicLayoutWorkerRequest(
+      request(450, false),
+      () => 0,
+    );
+    const ignored = handleFocusSchematicLayoutWorkerRequest(
+      request(451, true),
+      () => 0,
+    );
+    if (exact.kind !== 'success' || ignored.kind !== 'success')
+      throw new Error('Expected Directional worker success.');
+    expect(ignored.result).toEqual(exact.result);
+    expect(ignored.softClusterEvidence).toBeNull();
   });
 
   it('returns an explicit failure for malformed input', () => {

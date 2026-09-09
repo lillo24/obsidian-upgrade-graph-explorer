@@ -12,19 +12,54 @@ import {
 import { FOCUS_SCHEMATIC_LAYOUT_SETTINGS } from './settings';
 import { layoutInput } from './test-helpers';
 import type { EndpointFixtureSpec } from './endpoint-fixtures';
+import type { FocusSchematicSoftFolderScopeOverride } from './types';
 
-function run(spec: EndpointFixtureSpec, strength: 0 | 25 | 50 | 75 | 100 = 50) {
+function run(
+  spec: EndpointFixtureSpec,
+  strength: 0 | 25 | 50 | 75 | 100 = 50,
+  scopeOverrides: readonly FocusSchematicSoftFolderScopeOverride[] = [],
+) {
   const input = layoutInput(buildEndpointFixture(spec), {
     ...FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
     directionalFolderBandsEnabled: false,
   });
   const attempt = computeFocusSchematicSoftClusterLayoutAttempt(input, {
     strength,
+    scopeOverrides,
   });
   if (attempt.status !== 'success')
     throw new Error(`${spec.id}/${strength} failed: ${attempt.reason}`);
   return { input, attempt };
 }
+
+const mixedScopeFixture: EndpointFixtureSpec = {
+  id: 'SC25',
+  label: 'mixed per-folder Soft scope',
+  authored: 'Synthetic exact-folder hierarchy for HIER4B-FIX1.',
+  expectation: 'Only explicitly promoted branches share a Soft spatial group.',
+  inspect: 'Compare exact, one-child, sibling, and mixed-granularity grouping.',
+  rootDocumentId: 'Focus',
+  documents: [
+    { id: 'Focus', path: 'root/Focus.md' },
+    { id: 'LanguageParent', path: 'Language/Parent.md' },
+    { id: 'PragmaticsA', path: 'Language/Pragmatics/A.md' },
+    { id: 'PragmaticsB', path: 'Language/Pragmatics/B.md' },
+    { id: 'GrammarA', path: 'Language/Grammar/A.md' },
+    { id: 'GrammarB', path: 'Language/Grammar/B.md' },
+    { id: 'PatternA', path: 'Pattern Theory/A/A.md' },
+    { id: 'PatternB', path: 'Pattern Theory/B/B.md' },
+  ],
+  references: [
+    { sourceEntityId: 'Focus', targetEntityId: 'LanguageParent' },
+    { sourceEntityId: 'Focus', targetEntityId: 'PragmaticsA' },
+    { sourceEntityId: 'PragmaticsA', targetEntityId: 'PragmaticsB' },
+    { sourceEntityId: 'Focus', targetEntityId: 'GrammarA' },
+    { sourceEntityId: 'GrammarA', targetEntityId: 'GrammarB' },
+    { sourceEntityId: 'Focus', targetEntityId: 'PatternA' },
+    { sourceEntityId: 'Focus', targetEntityId: 'PatternB' },
+  ],
+  hops: 2,
+};
 
 function fixture(id: `SC${number}`) {
   const value = SOFT_CLUSTER_FIXTURES.find((item) => item.id === id);
@@ -108,6 +143,55 @@ describe('HIER4B Soft Folder Clusters', () => {
       JSON.stringify(after.result.candidate),
     );
   });
+
+  it('keeps strength zero geometry independent of promoted spatial scope', () => {
+    const exact = run(mixedScopeFixture, 0).attempt;
+    const promoted = run(mixedScopeFixture, 0, [
+      {
+        exactFolderKey: 'Language/Pragmatics',
+        spatialGroupKey: 'Language',
+      },
+      {
+        exactFolderKey: 'Pattern Theory/A',
+        spatialGroupKey: 'Pattern Theory',
+      },
+      {
+        exactFolderKey: 'Pattern Theory/B',
+        spatialGroupKey: 'Pattern Theory',
+      },
+    ]).attempt;
+    expect(promoted.evidence.folderInfluenceEnabled).toBe(false);
+    expect(promoted.result.candidate).toEqual(exact.result.candidate);
+  });
+
+  it.each([0, 25, 50, 75, 100] as const)(
+    'uses the same mixed effective groups at strength %i',
+    (strength) => {
+      const scopeOverrides = [
+        {
+          exactFolderKey: 'Language/Pragmatics',
+          spatialGroupKey: 'Language',
+        },
+        {
+          exactFolderKey: 'Pattern Theory/A',
+          spatialGroupKey: 'Pattern Theory',
+        },
+        {
+          exactFolderKey: 'Pattern Theory/B',
+          spatialGroupKey: 'Pattern Theory',
+        },
+      ] as const;
+      const result = run(mixedScopeFixture, strength, scopeOverrides).attempt;
+      expect(
+        result.result.internalLayoutEvidence.softClusterPolicyEvidence,
+      ).toMatchObject({ scopeOverrides, strength });
+      expect(result.evidence).toMatchObject({
+        effectiveGroupCount: 4,
+        scopeOverrideCount: 3,
+      });
+    },
+    20_000,
+  );
 
   it('keeps singleton folders force-free and improves repeated-folder cohesion at full strength', () => {
     const singleton0 = run(fixture('SC6'), 0).attempt;

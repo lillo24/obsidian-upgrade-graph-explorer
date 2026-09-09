@@ -1,6 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ViewportPortal } from '@xyflow/react';
 import type { FocusSchematicModule } from '@icarus-graph-explorer/focus-schematic';
+import {
+  createFocusSchematicSoftFolderGroupResolver,
+  focusSchematicParentFolderKey,
+  type FocusSchematicSoftFolderScopeOverride,
+} from '@icarus-graph-explorer/focus-schematic-layout';
 
 import type { GraphFlowNode } from '../types';
 
@@ -24,10 +29,12 @@ interface ModuleRectangle {
 }
 
 export interface FocusSchematicFolderClusterGuide {
-  readonly folderKey: string;
+  readonly spatialGroupKey: string;
+  readonly exactFolderKeys: readonly string[];
   readonly label: string;
   readonly root: boolean;
   readonly regionIndex: number;
+  readonly regionCount: number;
   readonly shape: 'singleton' | 'capsule' | 'hull';
   readonly memberModuleIds: readonly string[];
   readonly x: number;
@@ -241,9 +248,11 @@ function paddedCorners(rectangle: ModuleRectangle): readonly Point[] {
 }
 
 function guideForIsland(
-  folderKey: string,
+  spatialGroupKey: string,
+  exactFolderKeys: readonly string[],
   root: boolean,
   regionIndex: number,
+  regionCount: number,
   rectangles: readonly ModuleRectangle[],
 ): FocusSchematicFolderClusterGuide {
   const memberModuleIds = rectangles
@@ -261,10 +270,12 @@ function guideForIsland(
         ? 'capsule'
         : 'hull';
   return {
-    folderKey,
-    label: folderLabel(folderKey),
+    spatialGroupKey,
+    exactFolderKeys,
+    label: folderLabel(spatialGroupKey),
     root,
     regionIndex,
+    regionCount,
     shape,
     memberModuleIds,
     x,
@@ -289,6 +300,7 @@ export function focusSchematicFolderClusterGuides(
   modules: readonly FocusSchematicModule[],
   nodes: readonly GraphFlowNode[],
   rootModuleId: string,
+  scopeOverrides: readonly FocusSchematicSoftFolderScopeOverride[] = [],
 ): readonly FocusSchematicFolderClusterGuide[] {
   const rectangleByModuleId = new Map<string, ModuleRectangle>();
   for (const node of nodes) {
@@ -302,29 +314,49 @@ export function focusSchematicFolderClusterGuides(
       ...size,
     });
   }
-  const byFolder = new Map<string, ModuleRectangle[]>();
+  const byFolder = new Map<
+    string,
+    { rectangles: ModuleRectangle[]; exactFolderKeys: Set<string> }
+  >();
+  const resolveGroup =
+    createFocusSchematicSoftFolderGroupResolver(scopeOverrides);
   for (const module of [...modules].sort((left, right) =>
     compareText(left.id, right.id),
   )) {
     if (module.presentation === 'filtered') continue;
     const rectangle = rectangleByModuleId.get(module.id);
     if (rectangle === undefined) continue;
-    const folder = byFolder.get(module.folderKey) ?? [];
-    folder.push(rectangle);
-    byFolder.set(module.folderKey, folder);
+    const spatialGroupKey = resolveGroup(module.folderKey);
+    const folder = byFolder.get(spatialGroupKey) ?? {
+      rectangles: [],
+      exactFolderKeys: new Set(),
+    };
+    folder.rectangles.push(rectangle);
+    folder.exactFolderKeys.add(module.folderKey);
+    byFolder.set(spatialGroupKey, folder);
   }
   return [...byFolder]
     .sort(([left], [right]) => compareText(left, right))
-    .flatMap(([folderKey, rectangles]) => {
+    .flatMap(([spatialGroupKey, group]) => {
       const root = modules.some(
         (module) =>
-          module.id === rootModuleId && module.folderKey === folderKey,
+          module.id === rootModuleId &&
+          resolveGroup(module.folderKey) === spatialGroupKey,
       );
       const blockers = [...byFolder]
-        .filter(([otherFolderKey]) => otherFolderKey !== folderKey)
-        .flatMap(([, items]) => items);
-      return splitIntoIslands(rectangles, blockers).map((island, regionIndex) =>
-        guideForIsland(folderKey, root, regionIndex, island),
+        .filter(([otherFolderKey]) => otherFolderKey !== spatialGroupKey)
+        .flatMap(([, { rectangles }]) => rectangles);
+      const islands = splitIntoIslands(group.rectangles, blockers);
+      const exactFolderKeys = [...group.exactFolderKeys].sort(compareText);
+      return islands.map((island, regionIndex) =>
+        guideForIsland(
+          spatialGroupKey,
+          exactFolderKeys,
+          root,
+          regionIndex,
+          islands.length,
+          island,
+        ),
       );
     });
 }
@@ -333,50 +365,177 @@ export function FocusSchematicFolderClusterGuides({
   modules,
   nodes,
   rootModuleId,
+  scopeOverrides,
+  persistenceStatus,
+  persistenceError,
+  onPromoteGroup,
+  onPromoteGroupWithSiblings,
+  onResetGroup,
 }: {
   readonly modules: readonly FocusSchematicModule[];
   readonly nodes: readonly GraphFlowNode[];
   readonly rootModuleId: string;
+  readonly scopeOverrides: readonly FocusSchematicSoftFolderScopeOverride[];
+  readonly persistenceStatus: string;
+  readonly persistenceError: string | undefined;
+  readonly onPromoteGroup: (spatialGroupKey: string) => void;
+  readonly onPromoteGroupWithSiblings: (spatialGroupKey: string) => void;
+  readonly onResetGroup: (spatialGroupKey: string) => void;
 }) {
   const guides = useMemo(
-    () => focusSchematicFolderClusterGuides(modules, nodes, rootModuleId),
-    [modules, nodes, rootModuleId],
+    () =>
+      focusSchematicFolderClusterGuides(
+        modules,
+        nodes,
+        rootModuleId,
+        scopeOverrides,
+      ),
+    [modules, nodes, rootModuleId, scopeOverrides],
   );
+  const [openGroupKey, setOpenGroupKey] = useState<string | null>(null);
   if (guides.length === 0) return null;
   return (
     <ViewportPortal>
-      <svg
-        aria-hidden="true"
-        className="focus-schematic-folder-guides"
-        focusable="false"
-      >
-        {guides.map((guide) => {
-          const className = `focus-schematic-folder-guide focus-schematic-folder-guide--${guide.shape}${guide.root ? ' focus-schematic-folder-guide--root' : ''}`;
-          return (
-            <g key={`${guide.folderKey}\0${guide.regionIndex}`}>
-              {guide.path === null ? (
-                <rect
-                  className={className}
-                  height={guide.height}
-                  rx={guide.radius}
-                  width={guide.width}
-                  x={guide.x}
-                  y={guide.y}
-                />
-              ) : (
-                <path className={className} d={guide.path} />
-              )}
-              <text
-                className="focus-schematic-folder-guide__label"
-                x={guide.labelX}
-                y={guide.labelY}
+      <>
+        <svg
+          aria-hidden="true"
+          className="focus-schematic-folder-guides"
+          focusable="false"
+        >
+          {guides.map((guide) => {
+            const className = `focus-schematic-folder-guide focus-schematic-folder-guide--${guide.shape}${guide.root ? ' focus-schematic-folder-guide--root' : ''}`;
+            return (
+              <g key={`${guide.spatialGroupKey}\0${guide.regionIndex}`}>
+                {guide.path === null ? (
+                  <rect
+                    className={className}
+                    height={guide.height}
+                    rx={guide.radius}
+                    width={guide.width}
+                    x={guide.x}
+                    y={guide.y}
+                  />
+                ) : (
+                  <path className={className} d={guide.path} />
+                )}
+                {guide.regionIndex === 0 ? null : (
+                  <text
+                    className="focus-schematic-folder-guide__label"
+                    x={guide.labelX}
+                    y={guide.labelY}
+                  >
+                    {`${guide.label} — island ${guide.regionIndex + 1} of ${guide.regionCount}`}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+        {guides
+          .filter(({ regionIndex }) => regionIndex === 0)
+          .map((guide) => {
+            const parent = focusSchematicParentFolderKey(guide.spatialGroupKey);
+            const open = openGroupKey === guide.spatialGroupKey;
+            const resettable = scopeOverrides.some(
+              ({ spatialGroupKey }) =>
+                spatialGroupKey === guide.spatialGroupKey,
+            );
+            const islandDescription =
+              guide.regionCount === 1
+                ? ''
+                : `, ${guide.regionCount} spatial islands`;
+            return (
+              <div
+                className="focus-schematic-folder-guide-controls nodrag nopan nowheel"
+                data-graph-wheel-ignore
+                key={guide.spatialGroupKey}
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget))
+                    setOpenGroupKey(null);
+                }}
+                onFocus={() => setOpenGroupKey(guide.spatialGroupKey)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.stopPropagation();
+                    setOpenGroupKey(null);
+                  }
+                }}
+                onMouseEnter={() => setOpenGroupKey(guide.spatialGroupKey)}
+                onMouseLeave={() => setOpenGroupKey(null)}
+                style={{
+                  transform: `translate(${guide.labelX}px, ${guide.labelY - 18}px)`,
+                }}
               >
-                {guide.label}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
+                <button
+                  aria-expanded={open}
+                  aria-label={`Spatial group ${guide.label}, ${guide.exactFolderKeys.length} visible source folder${guide.exactFolderKeys.length === 1 ? '' : 's'}${islandDescription}`}
+                  className="focus-schematic-folder-guide-controls__chip"
+                  onClick={() =>
+                    setOpenGroupKey(open ? null : guide.spatialGroupKey)
+                  }
+                  type="button"
+                >
+                  {guide.label}
+                </button>
+                {open ? (
+                  <div
+                    aria-label={`Spatial group controls for ${guide.label}`}
+                    className="focus-schematic-folder-guide-controls__popover"
+                    role="group"
+                  >
+                    <strong>Spatial group</strong>
+                    <span>{guide.label}</span>
+                    <span>
+                      {guide.exactFolderKeys.length} visible source folder
+                      {guide.exactFolderKeys.length === 1 ? '' : 's'}
+                    </span>
+                    {guide.exactFolderKeys.length <= 3 ? (
+                      <small>
+                        {guide.exactFolderKeys.map(folderLabel).join(', ')}
+                      </small>
+                    ) : null}
+                    <span>
+                      {parent === null
+                        ? 'Already at workspace root'
+                        : `Parent: ${folderLabel(parent)}`}
+                    </span>
+                    <button
+                      aria-label={`Promote only this spatial group into ${parent === null ? 'workspace root' : folderLabel(parent)}`}
+                      disabled={parent === null}
+                      onClick={() => onPromoteGroup(guide.spatialGroupKey)}
+                      type="button"
+                    >
+                      ↑ This group
+                    </button>
+                    <button
+                      aria-label={`Promote this group and sibling folders into ${parent === null ? 'workspace root' : folderLabel(parent)}`}
+                      disabled={parent === null}
+                      onClick={() =>
+                        onPromoteGroupWithSiblings(guide.spatialGroupKey)
+                      }
+                      type="button"
+                    >
+                      ↑ This + sibling folders
+                    </button>
+                    <button
+                      aria-label={`Reset this spatial group ${guide.label}`}
+                      disabled={!resettable}
+                      onClick={() => onResetGroup(guide.spatialGroupKey)}
+                      type="button"
+                    >
+                      Reset
+                    </button>
+                    <small>Sibling folders share the same parent.</small>
+                    <small>{persistenceStatus}</small>
+                    {persistenceError === undefined ? null : (
+                      <small role="alert">{persistenceError}</small>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+      </>
     </ViewportPortal>
   );
 }

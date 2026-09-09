@@ -15,6 +15,10 @@ import {
 } from './endpoint-facing';
 import { evaluateFocusSchematicFolderBandQuality } from './folder-bands';
 import { normalizeFocusSchematicSoftFolderStrength } from './policies';
+import {
+  canonicalFocusSchematicSoftFolderScopeOverrides,
+  createFocusSchematicSoftFolderGroupResolver,
+} from './soft-folder-scope';
 import type {
   FocusSchematicComputedLayout,
   FocusSchematicEndpointPlan,
@@ -24,12 +28,13 @@ import type {
   FocusSchematicSoftClusterMetrics,
   FocusSchematicSoftClusterOptions,
   FocusSchematicSoftClusterStrength,
+  FocusSchematicSoftFolderScopeOverride,
 } from './types';
 
 export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE = [
   36, 18,
 ] as const;
-export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 1 as const;
+export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 2 as const;
 
 const STRATEGY_ID = 'HIER4B-soft-folder-clusters' as const;
 const HOP_SPACING = 520;
@@ -247,16 +252,20 @@ function initialPositions(
 function repeatedFolders(
   input: FocusSchematicLayoutInput,
   strength: FocusSchematicSoftClusterStrength,
+  scopeOverrides: readonly FocusSchematicSoftFolderScopeOverride[],
 ) {
   if (strength === 0) return new Map<string, readonly string[]>();
   const groups = new Map<string, string[]>();
+  const resolveGroup =
+    createFocusSchematicSoftFolderGroupResolver(scopeOverrides);
   for (const module of [...input.model.modules].sort((a, b) =>
     compareText(a.id, b.id),
   )) {
     if (module.presentation === 'filtered') continue;
-    const ids = groups.get(module.folderKey) ?? [];
+    const effectiveGroup = resolveGroup(module.folderKey);
+    const ids = groups.get(effectiveGroup) ?? [];
     ids.push(module.id);
-    groups.set(module.folderKey, ids);
+    groups.set(effectiveGroup, ids);
   }
   return new Map(
     [...groups.entries()]
@@ -379,6 +388,7 @@ function relax(
   pairs: readonly Pair[],
   hops: ReadonlyMap<string, number>,
   strength: FocusSchematicSoftClusterStrength,
+  scopeOverrides: readonly FocusSchematicSoftFolderScopeOverride[],
   iterations: number,
   stats: RelaxationStats,
 ) {
@@ -388,7 +398,7 @@ function relax(
     compareText(a.moduleId, b.moduleId),
   );
   const sizeById = new Map(modules.map((module) => [module.moduleId, module]));
-  const folderGroups = repeatedFolders(input, strength);
+  const folderGroups = repeatedFolders(input, strength, scopeOverrides);
   const folderFactor = strength / 100;
   for (let iteration = 0; iteration < iterations; iteration += 1) {
     const changes = new Map(
@@ -561,11 +571,12 @@ function metrics(
   quality: FocusSchematicComputedLayout['quality'],
   pairs: readonly Pair[],
   hops: ReadonlyMap<string, number>,
+  scopeOverrides: readonly FocusSchematicSoftFolderScopeOverride[],
 ): FocusSchematicSoftClusterMetrics {
   const positions = new Map(
     candidate.modules.map((module) => [module.moduleId, center(module)]),
   );
-  const repeated = repeatedFolders(input, 100);
+  const repeated = repeatedFolders(input, 100, scopeOverrides);
   const folderRadii = [...repeated.values()].map((ids) => {
     const centroid = ids.reduce(
       (sum, id) => {
@@ -667,7 +678,17 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
     options.internalLayoutVariant ?? 'adaptive-compass';
   const endpointOrderPolicy =
     options.endpointOrderPolicy ?? 'crossing-optimized';
-  const configId = `HIER4B-soft-clusters-s${strength}-${internalLayoutVariant}-${endpointOrderPolicy}`;
+  const scopeOverrides = canonicalFocusSchematicSoftFolderScopeOverrides(
+    options.scopeOverrides ?? [],
+  );
+  const resolveGroup =
+    createFocusSchematicSoftFolderGroupResolver(scopeOverrides);
+  const scopeFingerprint = Math.floor(
+    hashUnit(JSON.stringify(scopeOverrides)) * 0x1_0000_0000,
+  )
+    .toString(16)
+    .padStart(8, '0');
+  const configId = `HIER4B-soft-clusters-s${strength}-${internalLayoutVariant}-${endpointOrderPolicy}-scope-${scopeOverrides.length}-${scopeFingerprint}`;
   const started = performance.now();
   try {
     const baseAttempt = computeFocusSchematicRevision2LayoutAttempt(input);
@@ -694,6 +715,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       internalLayoutVariant,
       endpointOrderPolicy,
       stats,
+      'soft-cardinal-files',
     );
     const firstRegions = branchRegions(input, candidate);
     positions = new Map(
@@ -706,6 +728,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       pairs,
       hops,
       strength,
+      scopeOverrides,
       FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE[0],
       relaxation,
     );
@@ -718,6 +741,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       internalLayoutVariant,
       endpointOrderPolicy,
       stats,
+      'soft-cardinal-files',
     );
     const secondRegions = branchRegions(input, candidate);
     positions = new Map(
@@ -730,6 +754,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       pairs,
       hops,
       strength,
+      scopeOverrides,
       FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE[1],
       relaxation,
     );
@@ -737,6 +762,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
     const attachments = createFocusSchematicEndpointAttachments(
       base.endpointPlan,
       candidate,
+      'soft-cardinal-files',
     );
     const quality = evaluateFocusSchematicEndpointLayoutQuality(
       input,
@@ -745,6 +771,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       base.internalLanePlan,
       candidate,
       attachments,
+      'soft-cardinal-files',
     );
     if (quality.moduleOverlapPairs.length > 0)
       throw new Error(
@@ -767,6 +794,13 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       layoutFamily: 'soft-folder-clusters',
       strength,
       endpointOrderPolicy,
+      scopeOverrideCount: scopeOverrides.length,
+      effectiveGroupCount: new Set(
+        input.model.modules
+          .filter(({ presentation }) => presentation !== 'filtered')
+          .map(({ folderKey }) => resolveGroup(folderKey)),
+      ).size,
+      fileAttachmentPolicy: 'spatial-cardinal',
       folderInfluenceEnabled: strength > 0,
       topologyDirectionality: 'undirected-primary',
       secondaryGeometryInfluence: 0,
@@ -779,11 +813,12 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
         quality,
         pairs,
         hops,
+        scopeOverrides,
       ),
       runtime: {
         moduleCount: candidate.modules.length,
         primaryPairCount: pairs.length,
-        repeatedFolderCount: repeatedFolders(input, 100).size,
+        repeatedFolderCount: repeatedFolders(input, 100, scopeOverrides).size,
         iterationCount: 54,
         jointRoundCount: 2,
         compassAssignmentCount: stats.completeCompassAssignmentsEvaluated,
@@ -813,6 +848,8 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
           layoutFamily: 'soft-folder-clusters',
           strength,
           endpointOrderPolicy,
+          scopeOverrides,
+          fileAttachmentPolicy: 'spatial-cardinal',
         },
       },
     };

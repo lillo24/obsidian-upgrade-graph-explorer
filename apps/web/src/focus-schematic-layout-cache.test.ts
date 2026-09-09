@@ -37,8 +37,8 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     const key = exactFocusSchematicLayoutCacheKey(input);
     expect(key).toContain('modular-focus-hierarchy');
     expect(key).toContain('"algorithmVersion":3');
-    expect(key).toContain('"protocolVersion":4');
-    expect(key.replace('"protocolVersion":4', '"protocolVersion":3')).not.toBe(
+    expect(key).toContain('"protocolVersion":5');
+    expect(key.replace('"protocolVersion":5', '"protocolVersion":4')).not.toBe(
       key,
     );
     expect(exactFocusSchematicLayoutCacheKey(input, 1)).not.toBe(key);
@@ -200,6 +200,44 @@ describe('page-lifetime Focus Schematic layout cache', () => {
         DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
       ),
     ).not.toBe(exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)));
+  });
+
+  it('keys canonical scope only in Soft mode', () => {
+    const input = fixtureInput(4);
+    const scope = [
+      { exactFolderKey: 'A/Child', spatialGroupKey: 'A' },
+      { exactFolderKey: 'Z/Child', spatialGroupKey: 'Z' },
+    ] as const;
+    const directional = DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES;
+    const directionalWithScope = {
+      ...directional,
+      softFolderScopeOverrides: scope,
+    };
+    expect(exactFocusSchematicLayoutCacheKey(input, directionalWithScope)).toBe(
+      exactFocusSchematicLayoutCacheKey(input, directional),
+    );
+
+    const soft = {
+      ...directional,
+      macroLayout: 'soft-folder-clusters' as const,
+    };
+    expect(
+      exactFocusSchematicLayoutCacheKey(input, {
+        ...soft,
+        softFolderScopeOverrides: scope,
+      }),
+    ).not.toBe(exactFocusSchematicLayoutCacheKey(input, soft));
+    expect(
+      exactFocusSchematicLayoutCacheKey(input, {
+        ...soft,
+        softFolderScopeOverrides: [...scope].reverse(),
+      }),
+    ).toBe(
+      exactFocusSchematicLayoutCacheKey(input, {
+        ...soft,
+        softFolderScopeOverrides: scope,
+      }),
+    );
   });
 
   it('keeps selection, hover, visual style, viewport, and secondary display outside the key', () => {

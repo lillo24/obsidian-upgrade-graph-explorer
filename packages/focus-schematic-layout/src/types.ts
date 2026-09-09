@@ -267,16 +267,24 @@ export interface FocusSchematicComputedLayoutOptions {
 /** Normalized development-only HIER4B macro-layout strength in [0, 100]. */
 export type FocusSchematicSoftClusterStrength = number;
 
+export interface FocusSchematicSoftFolderScopeOverride {
+  readonly exactFolderKey: WorkspaceFolderKey;
+  readonly spatialGroupKey: WorkspaceFolderKey;
+}
+
 export interface FocusSchematicSoftClusterPolicyEvidence {
   readonly schemaVersion: 1;
   readonly layoutFamily: 'soft-folder-clusters';
   readonly strength: FocusSchematicSoftClusterStrength;
   readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
+  readonly scopeOverrides: readonly FocusSchematicSoftFolderScopeOverride[];
+  readonly fileAttachmentPolicy: 'spatial-cardinal';
 }
 
 export interface FocusSchematicSoftClusterOptions {
   readonly strength?: FocusSchematicSoftClusterStrength;
   readonly endpointOrderPolicy?: FocusSchematicEndpointOrderPolicy;
+  readonly scopeOverrides?: readonly FocusSchematicSoftFolderScopeOverride[];
   /** Development-lab comparator; Adaptive Compass is the HIER4B default. */
   readonly internalLayoutVariant?: 'adaptive-compass' | 'vertical-spine';
 }
@@ -321,6 +329,9 @@ export interface FocusSchematicSoftClusterEvidence {
   readonly layoutFamily: 'soft-folder-clusters';
   readonly strength: FocusSchematicSoftClusterStrength;
   readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
+  readonly scopeOverrideCount: number;
+  readonly effectiveGroupCount: number;
+  readonly fileAttachmentPolicy: 'spatial-cardinal';
   readonly folderInfluenceEnabled: boolean;
   readonly topologyDirectionality: 'undirected-primary';
   readonly secondaryGeometryInfluence: 0;

@@ -5,6 +5,7 @@ import {
   isFocusSchematicEndpointOrderPolicy,
   isFocusSchematicProductMacroLayout,
   isFocusSchematicProductInternalLayoutVariant,
+  normalizeFocusSchematicSoftFolderScopeOverrides,
   normalizeFocusSchematicSoftFolderStrength,
   type FocusSchematicProductLayoutPolicies,
 } from './policies';
@@ -15,7 +16,7 @@ import type {
   FocusSchematicSoftClusterEvidence,
 } from './types';
 
-export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 4 as const;
+export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 5 as const;
 
 export interface FocusSchematicLayoutWorkerRequest {
   readonly protocolVersion: typeof FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION;
@@ -124,6 +125,9 @@ function validateSoftClusterEvidence(
       'layoutFamily',
       'strength',
       'endpointOrderPolicy',
+      'scopeOverrideCount',
+      'effectiveGroupCount',
+      'fileAttachmentPolicy',
       'folderInfluenceEnabled',
       'topologyDirectionality',
       'secondaryGeometryInfluence',
@@ -140,6 +144,10 @@ function validateSoftClusterEvidence(
     evidence.strength !==
       normalizeFocusSchematicSoftFolderStrength(policies.softFolderStrength) ||
     evidence.endpointOrderPolicy !== policies.endpointOrderPolicy ||
+    evidence.scopeOverrideCount !== policies.softFolderScopeOverrides.length ||
+    !Number.isSafeInteger(evidence.effectiveGroupCount) ||
+    Number(evidence.effectiveGroupCount) < 0 ||
+    evidence.fileAttachmentPolicy !== 'spatial-cardinal' ||
     evidence.folderInfluenceEnabled !== Number(evidence.strength) > 0 ||
     evidence.topologyDirectionality !== 'undirected-primary' ||
     evidence.secondaryGeometryInfluence !== 0 ||
@@ -244,6 +252,7 @@ export function validateFocusSchematicLayoutWorkerRequest(
     [
       'macroLayout',
       'softFolderStrength',
+      'softFolderScopeOverrides',
       'endpointOrderPolicy',
       'internalLayoutVariant',
     ],
@@ -270,6 +279,16 @@ export function validateFocusSchematicLayoutWorkerRequest(
     throw new FocusSchematicLayoutProtocolError(
       'Focus Schematic macro-layout policy does not match the layout input settings.',
     );
+  let softFolderScopeOverrides;
+  try {
+    softFolderScopeOverrides = normalizeFocusSchematicSoftFolderScopeOverrides(
+      policies.softFolderScopeOverrides,
+    );
+  } catch (error: unknown) {
+    throw new FocusSchematicLayoutProtocolError(
+      `Focus Schematic Soft folder scope policy is invalid: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
   return {
     protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
     requestId: id,
@@ -280,6 +299,7 @@ export function validateFocusSchematicLayoutWorkerRequest(
       softFolderStrength: normalizeFocusSchematicSoftFolderStrength(
         policies.softFolderStrength,
       ),
+      softFolderScopeOverrides: directional ? [] : softFolderScopeOverrides,
       endpointOrderPolicy: policies.endpointOrderPolicy,
       internalLayoutVariant: policies.internalLayoutVariant,
     },

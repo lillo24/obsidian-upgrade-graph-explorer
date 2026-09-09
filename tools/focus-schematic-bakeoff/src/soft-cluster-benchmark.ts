@@ -2,17 +2,24 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { compareFocusSchematicLayouts } from '@icarus-graph-explorer/focus-schematic';
+import {
+  compareFocusSchematicLayouts,
+  type FocusSchematicLayoutCandidate,
+} from '@icarus-graph-explorer/focus-schematic';
 import {
   buildEndpointFixture,
   computeFocusSchematicComputedLayoutAttempt,
   computeFocusSchematicSoftClusterLayoutAttempt,
+  createFocusSchematicEndpointAttachments,
+  measureFocusSchematicAttachmentCrossings,
   createSoftClusterHubFixture,
   createSoftClusterMultiplicityFixture,
   FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
   SOFT_CLUSTER_FIXTURES,
   SOFT_CLUSTER_STABILITY_PAIRS,
   type EndpointFixtureSpec,
+  type FocusSchematicEndpointPlan,
+  type FocusSchematicSoftFolderScopeOverride,
   type FocusSchematicSoftClusterStrength,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 
@@ -31,13 +38,16 @@ function inputFor(spec: EndpointFixtureSpec, bands: boolean) {
 function soft(
   spec: EndpointFixtureSpec,
   strength: FocusSchematicSoftClusterStrength,
+  scopeOverrides: readonly FocusSchematicSoftFolderScopeOverride[] = [],
 ) {
   const input = inputFor(spec, false);
   const first = computeFocusSchematicSoftClusterLayoutAttempt(input, {
     strength,
+    scopeOverrides,
   });
   const second = computeFocusSchematicSoftClusterLayoutAttempt(input, {
     strength,
+    scopeOverrides,
   });
   if (first.status !== 'success')
     throw new Error(`${spec.id}/${strength}: ${first.reason}`);
@@ -69,8 +79,241 @@ function soft(
     },
     metrics: first.evidence.metrics,
     runtime: first.evidence.runtime,
+    scopeOverrideCount: first.evidence.scopeOverrideCount,
+    effectiveGroupCount: first.evidence.effectiveGroupCount,
+    attachmentSideCounts: Object.fromEntries(
+      ['left', 'right', 'top', 'bottom'].map((side) => [
+        side,
+        first.result.attachments.filter(
+          (attachment) => attachment.side === side,
+        ).length,
+      ]),
+    ),
   };
 }
+
+const fix1ScopeFixture: EndpointFixtureSpec = {
+  id: 'SC25',
+  label: 'HIER4B-FIX1 scope stress',
+  authored: 'Synthetic nested exact-folder registry for scope benchmarks.',
+  expectation: 'Sparse overrides remain deterministic and bounded.',
+  inspect: 'Compare mixed, sibling, repeated, and high-count scope rules.',
+  rootDocumentId: 'Focus',
+  documents: [
+    { id: 'Focus', path: 'root/Focus.md' },
+    { id: 'LanguageParent', path: 'Language/Parent.md' },
+    { id: 'Pragmatics', path: 'Language/Pragmatics/File.md' },
+    { id: 'Grammar', path: 'Language/Grammar/File.md' },
+    { id: 'PatternA', path: 'Pattern Theory/A/File.md' },
+    { id: 'PatternB', path: 'Pattern Theory/B/File.md' },
+    { id: 'Deep', path: 'A/B/C/File.md' },
+    ...Array.from({ length: 30 }, (_, index) => ({
+      id: `Team${index}`,
+      path: `Teams/Team${index}/Child/File.md`,
+    })),
+  ],
+  references: [
+    'LanguageParent',
+    'Pragmatics',
+    'Grammar',
+    'PatternA',
+    'PatternB',
+    'Deep',
+    ...Array.from({ length: 30 }, (_, index) => `Team${index}`),
+  ].map((targetEntityId) => ({ sourceEntityId: 'Focus', targetEntityId })),
+  hops: 1,
+};
+
+const fix1ScopeRows = [
+  {
+    profile: 'mixed-spatial-scope',
+    overrides: [
+      {
+        exactFolderKey: 'Language/Pragmatics',
+        spatialGroupKey: 'Language',
+      },
+      {
+        exactFolderKey: 'Pattern Theory/A',
+        spatialGroupKey: 'Pattern Theory',
+      },
+      {
+        exactFolderKey: 'Pattern Theory/B',
+        spatialGroupKey: 'Pattern Theory',
+      },
+    ],
+  },
+  {
+    profile: 'promoted-parent',
+    overrides: [
+      {
+        exactFolderKey: 'Language/Pragmatics',
+        spatialGroupKey: 'Language',
+      },
+    ],
+  },
+  {
+    profile: 'promoted-siblings',
+    overrides: [
+      {
+        exactFolderKey: 'Language/Grammar',
+        spatialGroupKey: 'Language',
+      },
+      {
+        exactFolderKey: 'Language/Pragmatics',
+        spatialGroupKey: 'Language',
+      },
+    ],
+  },
+  {
+    profile: 'deep-repeated-promotion',
+    overrides: [{ exactFolderKey: 'A/B/C', spatialGroupKey: '.' }],
+  },
+  {
+    profile: 'many-folder-overrides',
+    overrides: Array.from({ length: 30 }, (_, index) => ({
+      exactFolderKey: `Teams/Team${index}/Child`,
+      spatialGroupKey: `Teams/Team${index}`,
+    })),
+  },
+].map(({ profile, overrides }) => ({
+  profile,
+  ...soft(fix1ScopeFixture, 50, overrides),
+}));
+
+function cardinalPlan(
+  connections: readonly {
+    readonly id: string;
+    readonly sourceModuleId: string;
+    readonly targetModuleId: string;
+  }[],
+): FocusSchematicEndpointPlan {
+  const endpoint = (moduleId: string) => ({
+    kind: 'visible-entity' as const,
+    projectionNodeId: `node-${moduleId}`,
+    entityId: `entity-${moduleId}`,
+    entityKind: 'document' as const,
+    moduleId,
+    attachmentSide: 'right' as const,
+  });
+  return {
+    schemaVersion: 1,
+    rootModuleId: 'root',
+    connections: connections.map(({ id, sourceModuleId, targetModuleId }) => ({
+      id,
+      kind: 'precise',
+      relationshipId: `relationship-${id}`,
+      projectedEdgeId: `edge-${id}`,
+      referenceIds: [`reference-${id}`],
+      sourceModuleId,
+      targetModuleId,
+      source: endpoint(sourceModuleId),
+      target: endpoint(targetModuleId),
+      role: 'focus-path',
+    })),
+    nodeDemands: [],
+    summary: {
+      preciseConnectionCount: connections.length,
+      fallbackConnectionCount: 0,
+      preciseReferenceIdCount: connections.length,
+      fallbackReferenceIdCount: 0,
+      totalReferenceIdCount: connections.length,
+    },
+  };
+}
+
+function cardinalCandidate(
+  positions: Readonly<Record<string, readonly [number, number]>>,
+): FocusSchematicLayoutCandidate {
+  const modules = Object.entries(positions).map(([moduleId, [x, y]]) => ({
+    moduleId,
+    x,
+    y,
+    width: 100,
+    height: 100,
+  }));
+  return {
+    modelSchemaVersion: 1,
+    rootModuleId: 'root',
+    modules,
+    nodes: modules.map((module) => ({
+      projectionNodeId: `node-${module.moduleId}`,
+      moduleId: module.moduleId,
+      x: module.x + 20,
+      y: module.y + 20,
+      width: 60,
+      height: 60,
+    })),
+    routes: [],
+  };
+}
+
+const cardinalConnections = ['left', 'right', 'top', 'bottom'].map((side) => ({
+  id: side,
+  sourceModuleId: 'root',
+  targetModuleId: side,
+}));
+const cardinalGeometryRows = [
+  {
+    profile: '4-side-root-fan',
+    plan: cardinalPlan(cardinalConnections),
+    candidate: cardinalCandidate({
+      root: [0, 0],
+      left: [-300, 0],
+      right: [300, 0],
+      top: [0, -300],
+      bottom: [0, 300],
+    }),
+  },
+  {
+    profile: 'vertical-file-fan',
+    plan: cardinalPlan(cardinalConnections.slice(2)),
+    candidate: cardinalCandidate({
+      root: [0, 0],
+      top: [0, -300],
+      bottom: [0, 300],
+    }),
+  },
+  {
+    profile: 'cardinal-crossing-regression',
+    plan: cardinalPlan([
+      { id: 'descending', sourceModuleId: 'leftA', targetModuleId: 'rightB' },
+      { id: 'ascending', sourceModuleId: 'leftB', targetModuleId: 'rightA' },
+    ]),
+    candidate: cardinalCandidate({
+      root: [-600, 0],
+      leftA: [-300, -100],
+      leftB: [-300, 100],
+      rightA: [300, -100],
+      rightB: [300, 100],
+    }),
+  },
+].map(({ profile, plan, candidate }) => {
+  const attachments = createFocusSchematicEndpointAttachments(
+    plan,
+    candidate,
+    'soft-cardinal-files',
+  );
+  return {
+    profile,
+    deterministic:
+      JSON.stringify(attachments) ===
+      JSON.stringify(
+        createFocusSchematicEndpointAttachments(
+          plan,
+          candidate,
+          'soft-cardinal-files',
+        ),
+      ),
+    attachmentSides: attachments.map(
+      ({ connectionId, endpoint, side }) =>
+        `${connectionId}:${endpoint}:${side}`,
+    ),
+    exactEndpointCrossingCount: measureFocusSchematicAttachmentCrossings(
+      plan,
+      attachments,
+    ),
+  };
+});
 
 function directionalReference(spec: EndpointFixtureSpec) {
   const attempt = computeFocusSchematicComputedLayoutAttempt(
@@ -276,6 +519,8 @@ const report = {
   stabilityRows: stability,
   stressRows,
   multiplicityRows,
+  fix1ScopeRows,
+  cardinalGeometryRows,
 };
 
 const outIndex = process.argv.indexOf('--out');

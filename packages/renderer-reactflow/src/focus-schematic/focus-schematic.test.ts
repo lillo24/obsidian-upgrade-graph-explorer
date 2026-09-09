@@ -132,7 +132,10 @@ describe('production Focus Schematic React Flow mapping', () => {
       endpointOrderPolicy: 'crossing-optimized',
     });
     if (attempt.status !== 'success') throw new Error(attempt.reason);
-    const render = (secondaryRelationshipsVisible: boolean) =>
+    const render = (
+      secondaryRelationshipsVisible: boolean,
+      routeStyle: 'direct' | 'electronic' = 'direct',
+    ) =>
       prepareFocusSchematicRendererGraph({
         projection: fixture.projection,
         model: fixture.model,
@@ -140,13 +143,31 @@ describe('production Focus Schematic React Flow mapping', () => {
         computedLayout: attempt.result,
         rootEntityId: fixture.model.rootModuleId,
         secondaryRelationshipsVisible,
+        routeStyle,
       });
     const hidden = render(false);
     const visible = render(true);
+    const electronic = render(false, 'electronic');
     expect(visible.edges.length).toBeGreaterThan(hidden.edges.length);
     expect(visible.nodes.map(({ id, position }) => ({ id, position }))).toEqual(
       hidden.nodes.map(({ id, position }) => ({ id, position })),
     );
+    expect(
+      electronic.edges.map(({ id, sourceHandle, targetHandle }) => ({
+        id,
+        sourceHandle,
+        targetHandle,
+      })),
+    ).toEqual(
+      hidden.edges.map(({ id, sourceHandle, targetHandle }) => ({
+        id,
+        sourceHandle,
+        targetHandle,
+      })),
+    );
+    expect(
+      new Set(attempt.result.attachments.map(({ side }) => side)).size,
+    ).toBeGreaterThan(1);
   });
 
   it('changes only Modular Preview route drawing between Direct and Electronic', () => {

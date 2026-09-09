@@ -84,23 +84,32 @@ describe('Soft Folder Cluster renderer guides', () => {
 
     const guides = focusSchematicFolderClusterGuides(modules, nodes, 'root');
 
-    expect(guides.map(({ folderKey, shape }) => [folderKey, shape])).toEqual([
+    expect(
+      guides.map(({ spatialGroupKey, shape }) => [spatialGroupKey, shape]),
+    ).toEqual([
       ['.', 'singleton'],
       ['language', 'capsule'],
       ['science', 'hull'],
     ]);
-    expect(guides.find(({ folderKey }) => folderKey === '.')?.root).toBe(true);
-    expect(guides.find(({ folderKey }) => folderKey === '.')?.path).toBeNull();
     expect(
-      guides.find(({ folderKey }) => folderKey === 'language')?.path,
+      guides.find(({ spatialGroupKey }) => spatialGroupKey === '.')?.root,
+    ).toBe(true);
+    expect(
+      guides.find(({ spatialGroupKey }) => spatialGroupKey === '.')?.path,
+    ).toBeNull();
+    expect(
+      guides.find(({ spatialGroupKey }) => spatialGroupKey === 'language')
+        ?.path,
     ).toContain('Q');
     expect(
-      guides.find(({ folderKey }) => folderKey === 'science'),
+      guides.find(({ spatialGroupKey }) => spatialGroupKey === 'science'),
     ).toMatchObject({
       memberModuleIds: ['science-a', 'science-b', 'science-c'],
       shape: 'hull',
     });
-    expect(guides.some(({ folderKey }) => folderKey === 'private')).toBe(false);
+    expect(
+      guides.some(({ spatialGroupKey }) => spatialGroupKey === 'private'),
+    ).toBe(false);
   });
 
   it('splits clearly disconnected same-folder islands deterministically', () => {
@@ -124,7 +133,7 @@ describe('Soft Folder Cluster renderer guides', () => {
     );
 
     expect(
-      expected.filter(({ folderKey }) => folderKey === 'science'),
+      expected.filter(({ spatialGroupKey }) => spatialGroupKey === 'science'),
     ).toHaveLength(2);
     expect(expected).toEqual(reversed);
   });
@@ -171,7 +180,9 @@ describe('Soft Folder Cluster renderer guides', () => {
       if (repeated.status !== 'success') throw new Error(repeated.reason);
 
       expect(guides.length).toBeGreaterThan(0);
-      expect(new Set(guides.map(({ folderKey }) => folderKey))).toEqual(
+      expect(
+        new Set(guides.map(({ spatialGroupKey }) => spatialGroupKey)),
+      ).toEqual(
         new Set(
           fixture.model.modules
             .filter(({ presentation }) => presentation !== 'filtered')
@@ -188,4 +199,37 @@ describe('Soft Folder Cluster renderer guides', () => {
     },
     20_000,
   );
+
+  it('merges promoted exact folders into one effective guide identity', () => {
+    const modules = [
+      focusModule('parent', 'Language'),
+      focusModule('pragmatics', 'Language/Pragmatics'),
+      focusModule('grammar', 'Language/Grammar'),
+    ];
+    const guides = focusSchematicFolderClusterGuides(
+      modules,
+      [
+        moduleNode('parent', 0, 0),
+        moduleNode('pragmatics', 180, 0),
+        moduleNode('grammar', 500, 0),
+      ],
+      'parent',
+      [
+        {
+          exactFolderKey: 'Language/Pragmatics',
+          spatialGroupKey: 'Language',
+        },
+      ],
+    );
+
+    expect(guides.map(({ spatialGroupKey }) => spatialGroupKey)).toEqual([
+      'Language',
+      'Language/Grammar',
+    ]);
+    expect(guides[0]).toMatchObject({
+      exactFolderKeys: ['Language', 'Language/Pragmatics'],
+      memberModuleIds: ['parent', 'pragmatics'],
+      shape: 'capsule',
+    });
+  });
 });

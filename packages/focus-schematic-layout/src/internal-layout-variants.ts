@@ -5,6 +5,10 @@ import type {
 import type { ProjectionNodeId } from '@icarus-graph-explorer/view-projection';
 
 import { measureFocusSchematicEndpointOrder } from './crossing-minimization';
+import {
+  measureFocusSchematicCandidateAttachmentCrossings,
+  type FocusSchematicEndpointAttachmentPolicy,
+} from './attachments';
 import type {
   FocusSchematicEndpointOrderPolicy,
   FocusSchematicEndpointPlan,
@@ -639,6 +643,7 @@ function scoreCandidate(
   moduleId: string,
   variant: FocusSchematicInternalLayoutVariant,
   stableKey: string,
+  attachmentPolicy: FocusSchematicEndpointAttachmentPolicy,
 ): readonly (number | string)[] {
   const order = measureFocusSchematicEndpointOrder(
     modulePlan,
@@ -647,6 +652,14 @@ function scoreCandidate(
   );
   const quality = qualityMetrics(input, endpointPlan, candidate, baseline);
   const module = moduleMetrics(input, candidate, moduleId);
+  const exactEndpointCrossingCount =
+    attachmentPolicy === 'soft-cardinal-files'
+      ? measureFocusSchematicCandidateAttachmentCrossings(
+          endpointPlan,
+          candidate,
+          attachmentPolicy,
+        )
+      : order.exactEndpointCrossingCount;
   const verticalBranchCount =
     (module?.branchesAboveFile ?? 0) + (module?.branchesBelowFile ?? 0);
   const hasLateralBranches =
@@ -659,7 +672,7 @@ function scoreCandidate(
       ? 1
       : 0;
   return [
-    order.exactEndpointCrossingCount,
+    exactEndpointCrossingCount,
     order.adjacentRankOrderInversionCount,
     quality.internalHierarchyCrossingCount,
     oneSided,
@@ -751,6 +764,7 @@ function verticalSpineModule(
   structure: ModuleStructure,
   policy: FocusSchematicEndpointOrderPolicy,
   stats: FocusSchematicInternalLayoutRunStats,
+  attachmentPolicy: FocusSchematicEndpointAttachmentPolicy,
 ): FocusSchematicLayoutCandidate {
   const demand = new Map(
     structure.branches.map((branch) => [
@@ -841,6 +855,7 @@ function verticalSpineModule(
       structure.module.moduleId,
       'vertical-spine',
       key,
+      attachmentPolicy,
     ),
   ).candidate;
 }
@@ -927,6 +942,7 @@ function adaptiveCompassModule(
   structure: ModuleStructure,
   policy: FocusSchematicEndpointOrderPolicy,
   stats: FocusSchematicInternalLayoutRunStats,
+  attachmentPolicy: FocusSchematicEndpointAttachmentPolicy,
 ): FocusSchematicLayoutCandidate {
   const candidates = compassAssignments(
     endpointPlan,
@@ -972,6 +988,7 @@ function adaptiveCompassModule(
       structure.module.moduleId,
       'adaptive-compass',
       key,
+      attachmentPolicy,
     ),
   ).candidate;
 }
@@ -984,6 +1001,7 @@ export function applyFocusSchematicInternalLayoutVariant(
   variant: FocusSchematicInternalLayoutVariant,
   policy: FocusSchematicEndpointOrderPolicy,
   stats: FocusSchematicInternalLayoutRunStats,
+  attachmentPolicy: FocusSchematicEndpointAttachmentPolicy = 'directional',
 ): FocusSchematicLayoutCandidate {
   if (variant === 'current') return initial;
   let candidate = initial;
@@ -1003,6 +1021,7 @@ export function applyFocusSchematicInternalLayoutVariant(
             structure,
             policy,
             stats,
+            attachmentPolicy,
           )
         : adaptiveCompassModule(
             input,
@@ -1012,6 +1031,7 @@ export function applyFocusSchematicInternalLayoutVariant(
             structure,
             policy,
             stats,
+            attachmentPolicy,
           );
   }
   return candidate;
@@ -1025,6 +1045,7 @@ export function refineFocusSchematicInternalLayoutOrder(
   variant: FocusSchematicInternalLayoutVariant,
   policy: FocusSchematicEndpointOrderPolicy,
   stats: FocusSchematicInternalLayoutRunStats,
+  attachmentPolicy: FocusSchematicEndpointAttachmentPolicy = 'directional',
 ): FocusSchematicLayoutCandidate {
   if (variant === 'current' || policy === 'document-order') return initial;
   let candidate = initial;
@@ -1077,6 +1098,7 @@ export function refineFocusSchematicInternalLayoutOrder(
         module.moduleId,
         variant,
         key,
+        attachmentPolicy,
       ),
     ).candidate;
   }

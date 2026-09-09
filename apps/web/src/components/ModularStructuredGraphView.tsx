@@ -66,11 +66,23 @@ export interface ModularStructuredGraphViewProps {
   readonly internalLayoutVariant: FocusSchematicProductInternalLayoutVariant;
   readonly macroLayout: FocusSchematicProductMacroLayout;
   readonly softFolderStrength: number;
+  readonly softFolderScopeOverrides: FocusSchematicProductLayoutPolicies['softFolderScopeOverrides'];
+  readonly softFolderScopePersistenceStatus: string;
+  readonly softFolderScopePersistenceError: string | undefined;
   readonly instrumentation?: PerformanceInstrumentation;
   readonly onFatalFailure: (message: string) => void;
   readonly onFitRequestConsumed?: (key: number) => void;
   readonly onFocusEntity: (entityId: string) => void;
   readonly onSelectionChange: (selection: GraphSelection | null) => void;
+  readonly onPromoteSoftFolderGroup: (
+    spatialGroupKey: string,
+  ) => string | undefined;
+  readonly onPromoteSoftFolderGroupWithSiblings: (
+    spatialGroupKey: string,
+  ) => string | undefined;
+  readonly onResetSoftFolderGroup: (
+    spatialGroupKey: string,
+  ) => string | undefined;
   readonly onToggleEntity: (entityId: string, currentlyOpen: boolean) => void;
   readonly onTransitionAnchorApiChange?: (
     api: GraphTransitionAnchorApi | undefined,
@@ -278,6 +290,12 @@ export default function ModularStructuredGraphView(
     projectionWorkspace,
     rootEntityId,
     softFolderStrength,
+    softFolderScopeOverrides,
+    softFolderScopePersistenceStatus,
+    softFolderScopePersistenceError,
+    onPromoteSoftFolderGroup,
+    onPromoteSoftFolderGroupWithSiblings,
+    onResetSoftFolderGroup,
     routeStyle = 'direct',
   } = props;
   const workerService = useMemo(
@@ -288,6 +306,8 @@ export default function ModularStructuredGraphView(
   const [secondaryRelationshipsVisible, setSecondaryRelationshipsVisible] =
     useState(false);
   const [retryKey, setRetryKey] = useState(0);
+  const [softFolderScopeMutationError, setSoftFolderScopeMutationError] =
+    useState<string | undefined>();
   const [lifecycle, setLifecycle] = useState<LifecycleState>({ phase: 'idle' });
   const fatalReported = useRef(false);
   const effectiveSoftFolderStrength =
@@ -298,6 +318,8 @@ export default function ModularStructuredGraphView(
     () => ({
       macroLayout,
       softFolderStrength: effectiveSoftFolderStrength,
+      softFolderScopeOverrides:
+        macroLayout === 'soft-folder-clusters' ? softFolderScopeOverrides : [],
       endpointOrderPolicy,
       internalLayoutVariant,
     }),
@@ -306,6 +328,7 @@ export default function ModularStructuredGraphView(
       endpointOrderPolicy,
       internalLayoutVariant,
       macroLayout,
+      softFolderScopeOverrides,
     ],
   );
 
@@ -583,7 +606,27 @@ export default function ModularStructuredGraphView(
       <FocusSchematicFolderClusterGuides
         modules={model.modules}
         nodes={displayedGraph.nodes}
+        onPromoteGroup={(spatialGroupKey) =>
+          setSoftFolderScopeMutationError(
+            onPromoteSoftFolderGroup(spatialGroupKey),
+          )
+        }
+        onPromoteGroupWithSiblings={(spatialGroupKey) =>
+          setSoftFolderScopeMutationError(
+            onPromoteSoftFolderGroupWithSiblings(spatialGroupKey),
+          )
+        }
+        onResetGroup={(spatialGroupKey) =>
+          setSoftFolderScopeMutationError(
+            onResetSoftFolderGroup(spatialGroupKey),
+          )
+        }
+        persistenceError={
+          softFolderScopeMutationError ?? softFolderScopePersistenceError
+        }
+        persistenceStatus={softFolderScopePersistenceStatus}
         rootModuleId={model.rootModuleId}
+        scopeOverrides={softFolderScopeOverrides}
       />
     );
   }, [
@@ -594,6 +637,13 @@ export default function ModularStructuredGraphView(
     macroLayout,
     model.modules,
     model.rootModuleId,
+    onPromoteSoftFolderGroup,
+    onPromoteSoftFolderGroupWithSiblings,
+    onResetSoftFolderGroup,
+    softFolderScopeMutationError,
+    softFolderScopeOverrides,
+    softFolderScopePersistenceError,
+    softFolderScopePersistenceStatus,
   ]);
   const pending =
     lifecycle.phase === 'idle' ||

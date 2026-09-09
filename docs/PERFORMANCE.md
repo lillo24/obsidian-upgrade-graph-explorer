@@ -1133,7 +1133,7 @@ and the HIER3A input/module/endpoint/internal/macro/crossing/attachment/
 validation/serialization phases through the existing in-memory performance
 recorder. The recorder does not define a release threshold.
 
-The production benchmark runs the exact version-4 runtime through Node worker
+The production benchmark runs the exact version-5 runtime through Node worker
 threads for EP12, EP22, a synthetic 120-module hub, and a supersession case. It
 accepts Directional Bands or Soft Folder Clusters plus a normalized strength and
 reports payload size, worker compute, round trip, phase timings, Soft solver
@@ -1141,9 +1141,16 @@ time, Compass assignments, collision work, and main-thread responsiveness;
 the browser remains authoritative for Vite Worker startup and render behavior.
 The exact page cache is capped at 24 complete results and has no persistence.
 Secondary-edge visibility is excluded from its key because it cannot influence
-geometry. Stored Soft strength is also excluded while Directional Bands is
-active. Soft results key the normalized strength and retain deterministic policy
+geometry. Stored Soft strength and sparse scope are also excluded while
+Directional Bands is active. Soft results key normalized strength plus canonical
+sparse scope and retain deterministic policy
 identity separately from non-deterministic runtime evidence.
+
+HIER4B-FIX1 keeps scope resolution linear through one sparse-rule index per
+batch and derives cardinal File sides in linear time per candidate connection
+set. The Soft benchmark retains 120 fixture rows and 15 stress rows, and adds
+five scope profiles plus three cardinal-geometry profiles. These remain evidence,
+not timing thresholds, and introduce no new global candidate dimension.
 
 The optimized Vite build keeps the Modular component and its A1 worker in
 separate lazy chunks from Classic and W3. The recorded release-candidate build

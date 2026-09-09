@@ -33,6 +33,11 @@ import {
   FOCUS_SCHEMATIC_INTERNAL_FOLDER_JOINT_ROUND_LIMIT,
 } from './internal-layout-variants';
 import {
+  createFocusSchematicEndpointAttachments,
+  measureFocusSchematicAttachmentCrossings,
+  type FocusSchematicEndpointAttachmentPolicy,
+} from './attachments';
+import {
   createFocusSchematicLayoutPlan,
   validateFocusSchematicLayoutPlan,
 } from './plan';
@@ -45,7 +50,6 @@ import type {
   FocusSchematicComputedLayout,
   FocusSchematicComputedLayoutAttempt,
   FocusSchematicComputedLayoutOptions,
-  FocusSchematicConnectionEndpoint,
   FocusSchematicEndpointAttachmentGeometry,
   FocusSchematicEndpointLayoutPhaseTimings,
   FocusSchematicEndpointLayoutQuality,
@@ -56,6 +60,9 @@ import type {
   FocusSchematicLayoutPlan,
   FocusSchematicNativeRoute,
 } from './types';
+import { validateFocusSchematicSoftFolderScopeOverrides } from './soft-folder-scope';
+
+export { createFocusSchematicEndpointAttachments } from './attachments';
 
 const STRATEGY_ID = 'A1-endpoint-facing-split-lanes' as const;
 /** Cache/evidence revision for the selected A1 implementation. */
@@ -716,104 +723,6 @@ function macroLayout(
   };
 }
 
-function resolveAutoSide(
-  own: FocusSchematicRectangle,
-  counterpart: FocusSchematicRectangle,
-): 'left' | 'right' | 'top' | 'bottom' {
-  const ownCenter = center(own);
-  const counterpartCenter = center(counterpart);
-  if (counterpartCenter.x < ownCenter.x) return 'left';
-  if (counterpartCenter.x > ownCenter.x) return 'right';
-  return counterpartCenter.y < ownCenter.y ? 'top' : 'bottom';
-}
-
-function attachmentPoint(
-  rectangle: FocusSchematicRectangle,
-  side: 'left' | 'right' | 'top' | 'bottom',
-) {
-  return side === 'left'
-    ? { x: rectangle.x, y: rectangle.y + rectangle.height / 2 }
-    : side === 'right'
-      ? {
-          x: rectangle.x + rectangle.width,
-          y: rectangle.y + rectangle.height / 2,
-        }
-      : side === 'top'
-        ? { x: rectangle.x + rectangle.width / 2, y: rectangle.y }
-        : {
-            x: rectangle.x + rectangle.width / 2,
-            y: rectangle.y + rectangle.height,
-          };
-}
-
-export function createFocusSchematicEndpointAttachments(
-  endpointPlan: FocusSchematicEndpointPlan,
-  candidate: FocusSchematicLayoutCandidate,
-): readonly FocusSchematicEndpointAttachmentGeometry[] {
-  const moduleById = new Map(
-    candidate.modules.map((module) => [module.moduleId, module]),
-  );
-  const nodeById = new Map(
-    candidate.nodes.map((node) => [node.projectionNodeId, node]),
-  );
-  const one = (
-    connectionId: string,
-    endpointName: 'source' | 'target',
-    endpoint: FocusSchematicConnectionEndpoint,
-    counterpartModuleId: string,
-  ): FocusSchematicEndpointAttachmentGeometry => {
-    const ownModule = moduleById.get(endpoint.moduleId);
-    const counterpart = moduleById.get(counterpartModuleId);
-    if (ownModule === undefined || counterpart === undefined)
-      throw new Error(
-        `Attachment "${connectionId}" references a missing module.`,
-      );
-    const rectangle =
-      endpoint.kind === 'visible-entity'
-        ? nodeById.get(endpoint.projectionNodeId)
-        : ownModule;
-    if (rectangle === undefined)
-      throw new Error(
-        `Attachment "${connectionId}" references a missing node.`,
-      );
-    const side =
-      endpoint.attachmentSide === 'auto'
-        ? resolveAutoSide(ownModule, counterpart)
-        : endpoint.attachmentSide;
-    return {
-      connectionId,
-      endpoint: endpointName,
-      kind:
-        endpoint.kind === 'visible-entity' ? 'visible-node' : 'module-anchor',
-      projectionNodeId:
-        endpoint.kind === 'visible-entity' ? endpoint.projectionNodeId : null,
-      moduleId: endpoint.moduleId,
-      side,
-      ...attachmentPoint(rectangle, side),
-    };
-  };
-  return endpointPlan.connections
-    .flatMap((connection) => [
-      one(
-        connection.id,
-        'source',
-        connection.source,
-        connection.targetModuleId,
-      ),
-      one(
-        connection.id,
-        'target',
-        connection.target,
-        connection.sourceModuleId,
-      ),
-    ])
-    .sort(
-      (left, right) =>
-        compareText(left.connectionId, right.connectionId) ||
-        compareText(left.endpoint, right.endpoint),
-    );
-}
-
 function percentile(
   values: readonly number[],
   quantile: number,
@@ -873,6 +782,7 @@ export function evaluateFocusSchematicEndpointLayoutQuality(
   lanePlan: FocusSchematicInternalLanePlan,
   candidate: FocusSchematicLayoutCandidate,
   attachments: readonly FocusSchematicEndpointAttachmentGeometry[],
+  attachmentPolicy: FocusSchematicEndpointAttachmentPolicy = 'directional',
 ): FocusSchematicEndpointLayoutQuality {
   const base = evaluateFocusSchematicLayout(input.model, candidate, {
     clearance: FOCUS_SCHEMATIC_LAYOUT_CLEARANCE,
@@ -1007,6 +917,10 @@ export function evaluateFocusSchematicEndpointLayoutQuality(
     nodeOutsideModuleIds: base.nodeOutsideModuleIds,
     totalBoundsArea: base.totalBoundsArea,
     ...orderMetrics,
+    exactEndpointCrossingCount:
+      attachmentPolicy === 'soft-cardinal-files'
+        ? measureFocusSchematicAttachmentCrossings(endpointPlan, attachments)
+        : orderMetrics.exactEndpointCrossingCount,
     meanPreciseEndpointVerticalError:
       verticalErrors.length === 0
         ? null
@@ -1060,6 +974,9 @@ function validSoftClusterPolicyEvidence(
 ): boolean {
   if (evidence === undefined) return true;
   if (evidence === null || typeof evidence !== 'object') return false;
+  const scopeValidation = validateFocusSchematicSoftFolderScopeOverrides(
+    evidence.scopeOverrides,
+  );
   return (
     evidence.schemaVersion === 1 &&
     evidence.layoutFamily === 'soft-folder-clusters' &&
@@ -1067,7 +984,11 @@ function validSoftClusterPolicyEvidence(
     evidence.strength >= 0 &&
     evidence.strength <= 100 &&
     (evidence.endpointOrderPolicy === 'crossing-optimized' ||
-      evidence.endpointOrderPolicy === 'document-order')
+      evidence.endpointOrderPolicy === 'document-order') &&
+    scopeValidation.valid &&
+    JSON.stringify(scopeValidation.value) ===
+      JSON.stringify(evidence.scopeOverrides) &&
+    evidence.fileAttachmentPolicy === 'spatial-cardinal'
   );
 }
 
@@ -1196,9 +1117,12 @@ export function validateFocusSchematicComputedLayout(
         },
       ],
     };
+  const attachmentPolicy =
+    softClusterEvidence === undefined ? 'directional' : 'soft-cardinal-files';
   const expectedAttachments = createFocusSchematicEndpointAttachments(
     computed.endpointPlan,
     computed.candidate,
+    attachmentPolicy,
   );
   if (
     canonicalJson(expectedAttachments) !== canonicalJson(computed.attachments)
@@ -1247,6 +1171,7 @@ export function validateFocusSchematicComputedLayout(
     computed.internalLanePlan,
     computed.candidate,
     computed.attachments,
+    attachmentPolicy,
   );
   if (canonicalJson(expectedQuality) !== canonicalJson(computed.quality))
     return {
