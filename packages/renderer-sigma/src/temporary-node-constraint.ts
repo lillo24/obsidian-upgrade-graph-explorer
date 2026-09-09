@@ -78,6 +78,7 @@ export type TemporaryNodeConstraintCapability =
       readonly reason:
         | 'simulation-unavailable'
         | 'simulation-not-running'
+        | 'graph-too-large'
         | 'unsupported-view';
     };
 

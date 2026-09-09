@@ -326,6 +326,16 @@ describe('GraphExplorer experimental availability integration', () => {
 
     await act(() =>
       captured.global!.onTemporaryFileMoveCapabilityChange?.({
+        status: 'unavailable',
+        reason: 'graph-too-large',
+      }),
+    );
+    expect(container.textContent).toContain(
+      'Move Files supports up to 100 visible nodes in this release.',
+    );
+
+    await act(() =>
+      captured.global!.onTemporaryFileMoveCapabilityChange?.({
         status: 'available',
       }),
     );

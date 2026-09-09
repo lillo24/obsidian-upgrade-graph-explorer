@@ -88,5 +88,12 @@ The continuous Network physics worker is dormant scaffolding for PHYSICS1. An
 does not construct a Worker. The first valid temporary-constraint `begin`
 starts it. The retained graph then publishes whole-graph frames while hot,
 continues bounded convergence cooling after release, and schedules nothing
-once sleeping. The client adopts at most one newest frame per animation frame;
-worker coordinates remain session-only and never enter layout or spatial caches.
+once sleeping. Hot turns are paced to a 16 ms scheduling interval. The client bounds target
+transport, accepts lagging same-gesture neighbor progress, overlays the newest
+File target, validates gesture identity both before and at adoption, and adopts
+at most one newest frame per animation frame. Worker coordinates remain
+session-only and never enter layout or spatial caches.
+
+Production canvases gate worker initialization at the shared 100-visible-node
+support limit. Larger views surface `graph-too-large` instead of starting work
+known to exceed Focus caps or All-with-Pull wall limits in the release probes.

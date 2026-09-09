@@ -4,7 +4,14 @@ import {
   NETWORK_PHYSICS_SCHEMA_VERSION,
   type NetworkPhysicsSeed,
 } from './protocol';
-import { ContinuousNetworkSimulation } from './simulation';
+import {
+  ContinuousNetworkSimulation,
+  NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT,
+  networkPhysicsCoolingMaxIterations,
+  networkPhysicsFocusBatchIsStable,
+  networkPhysicsNodeCountIsSupported,
+  nextNetworkPhysicsStableBatchCount,
+} from './simulation';
 
 function focusSeed(): NetworkPhysicsSeed {
   return {
@@ -31,6 +38,7 @@ function focusSeed(): NetworkPhysicsSeed {
       barnesHutThreshold: 600,
     },
     attractors: [],
+    automaticFolderFieldPolicy: 'none',
   };
 }
 
@@ -61,6 +69,15 @@ function end(sequence = 2) {
 }
 
 describe('ContinuousNetworkSimulation', () => {
+  it('exposes the evidence-backed supported Move boundary', () => {
+    expect(NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT).toBe(100);
+    expect(networkPhysicsNodeCountIsSupported(100)).toBe(true);
+    expect(networkPhysicsNodeCountIsSupported(101)).toBe(false);
+    expect(() => networkPhysicsNodeCountIsSupported(-1)).toThrow(
+      'non-negative safe integer',
+    );
+  });
+
   it('is dormant until begin and keeps the constrained node exact while neighbors react', () => {
     const simulation = new ContinuousNetworkSimulation(focusSeed());
     expect(simulation.state).toBe('sleeping');
@@ -80,6 +97,51 @@ describe('ContinuousNetworkSimulation', () => {
     expect(stepped.positions.find(({ key }) => key === 'b')).not.toEqual(
       initialNeighbor,
     );
+  });
+
+  it('attributes neighbor response to displacement against an equal-work settled control', () => {
+    const initialSeed = focusSeed();
+    const settling = new ContinuousNetworkSimulation(initialSeed);
+    settling.handle({ ...begin(), target: { x: 0, y: 0 } });
+    settling.handle({ ...end(), sequence: 1 });
+    for (let count = 0; count < 40 && settling.hasScheduledWork; count += 1) {
+      expect(settling.advance().failure).toBeUndefined();
+    }
+    expect(settling.state).toBe('sleeping');
+    const settledByKey = new Map(
+      settling.positions().map((position) => [position.key, position]),
+    );
+    const settledSeed: NetworkPhysicsSeed = {
+      ...initialSeed,
+      nodes: initialSeed.nodes.map((node) => ({
+        ...node,
+        x: settledByKey.get(node.key)!.x,
+        y: settledByKey.get(node.key)!.y,
+      })),
+    };
+    const root = settledByKey.get('a')!;
+    const control = new ContinuousNetworkSimulation(settledSeed);
+    const displaced = new ContinuousNetworkSimulation(settledSeed);
+    control.handle({ ...begin(), target: { x: root.x, y: root.y } });
+    displaced.handle({
+      ...begin(),
+      target: { x: root.x + 30, y: root.y - 20 },
+    });
+    for (let count = 0; count < 4; count += 1) {
+      control.advance();
+      displaced.advance();
+    }
+    const controlNeighbor = control.positions().find(({ key }) => key === 'b')!;
+    const displacedNeighbor = displaced
+      .positions()
+      .find(({ key }) => key === 'b')!;
+
+    expect(
+      Math.hypot(
+        controlNeighbor.x - displacedNeighbor.x,
+        controlNeighbor.y - displacedNeighbor.y,
+      ),
+    ).toBeGreaterThan(0.01);
   });
 
   it('enforces generations and monotonic gesture sequences', () => {
@@ -109,6 +171,96 @@ describe('ContinuousNetworkSimulation', () => {
       }),
     ).toThrow('not a canonical File');
   });
+
+  it('carries a monotonic interaction identity through hot and cooling frames', () => {
+    const simulation = new ContinuousNetworkSimulation(focusSeed());
+    expect(simulation.handle(begin())).toMatchObject({
+      interactionRevision: 1,
+      gestureId: 'gesture-1',
+      constraintNodeKey: 'a',
+      commandSequence: 0,
+      constraintSequence: 0,
+    });
+    expect(
+      simulation.handle({ ...begin(), kind: 'update', sequence: 1 }),
+    ).toMatchObject({
+      interactionRevision: 1,
+      commandSequence: 1,
+      constraintSequence: 1,
+    });
+    expect(simulation.handle(end())).toMatchObject({
+      interactionRevision: 1,
+      gestureId: 'gesture-1',
+      commandSequence: 2,
+      constraintSequence: null,
+      state: 'cooling',
+    });
+    expect(
+      simulation.handle({
+        ...begin(),
+        gestureId: 'gesture-2',
+        nodeKey: 'b',
+      }),
+    ).toMatchObject({
+      interactionRevision: 2,
+      gestureId: 'gesture-2',
+      constraintNodeKey: 'b',
+      commandSequence: 0,
+    });
+  });
+
+  it('does not treat rigid Focus translation as live visual rest', () => {
+    const before = [
+      { key: 'a', x: 0, y: 0 },
+      { key: 'b', x: 10, y: 0 },
+      { key: 'c', x: 0, y: 10 },
+    ];
+    const degreeByKey = new Map([
+      ['a', 2],
+      ['b', 1],
+      ['c', 1],
+    ]);
+    expect(
+      networkPhysicsFocusBatchIsStable({
+        before,
+        after: before,
+        rootKey: 'a',
+        degreeByKey,
+      }),
+    ).toBe(true);
+    expect(
+      networkPhysicsFocusBatchIsStable({
+        before,
+        after: before.map((position) => ({
+          ...position,
+          x: position.x + 100,
+          y: position.y - 70,
+        })),
+        rootKey: 'a',
+        degreeByKey,
+      }),
+    ).toBe(false);
+  });
+
+  it.each([
+    [100, 1_000, 8],
+    [500, 600, 24],
+    [501, 240, 16],
+  ])(
+    'does not count the final partial batch at the %i-node Focus cap',
+    (nodeCount, cap, finalBatchIterations) => {
+      expect(networkPhysicsCoolingMaxIterations('focus', nodeCount)).toBe(cap);
+      expect(cap % 32).toBe(finalBatchIterations);
+      expect(
+        nextNetworkPhysicsStableBatchCount({
+          previousStableBatches: 2,
+          batchIterations: finalBatchIterations,
+          fullBatchIterations: 32,
+          stable: true,
+        }),
+      ).toBe(2);
+    },
+  );
 
   it('releases into bounded cooling and reaches practical sleep', () => {
     const simulation = new ContinuousNetworkSimulation(focusSeed());
@@ -174,6 +326,39 @@ describe('ContinuousNetworkSimulation', () => {
     });
     expect(simulation.state).toBe('hot-constrained');
     expect(simulation.positions()[0]).toMatchObject({ x: -5, y: 9 });
+  });
+
+  it('starts All Move without reapplying an M2-shaped output snapshot', () => {
+    const seed: NetworkPhysicsSeed = {
+      schemaVersion: NETWORK_PHYSICS_SCHEMA_VERSION,
+      kind: 'initialize',
+      mode: 'all',
+      sessionGeneration: 'session-1',
+      simulationGeneration: 'simulation-1',
+      nodes: [
+        { key: 'a', x: 41, y: -7, size: 4, constraintEligible: true },
+        { key: 'b', x: 44, y: -7, size: 4, constraintEligible: true },
+      ],
+      edges: [{ key: 'ab', source: 'a', target: 'b', weight: 1 }],
+      settings: {
+        edgeWeightInfluence: 1,
+        scalingRatio: 1,
+        strongGravityMode: false,
+        gravity: 1,
+        barnesHutThreshold: 1_000,
+      },
+      attractors: [],
+      automaticFolderFieldPolicy: 'seeded-output-relaxation',
+    };
+    const simulation = new ContinuousNetworkSimulation(seed);
+    const before = simulation.positions();
+    const activation = simulation.handle({
+      ...begin(),
+      nodeKey: 'a',
+      target: { x: 41, y: -7 },
+    });
+
+    expect(activation.positions).toEqual(before);
   });
 
   it('makes disposal terminal', () => {

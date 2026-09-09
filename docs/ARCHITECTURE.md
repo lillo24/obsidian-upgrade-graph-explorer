@@ -1373,8 +1373,13 @@ disposed states. Sleeping schedules no simulation turn.
 The selected adapter uses only public `forceAtlas2.assign` calls. Hot work runs
 one physical iteration between target assertions and publishes after four
 iterations. Cooling returns to canonical 32-iteration mode-specific movement
-checks. Strict schema, session/simulation generation, gesture sequence, frame
-sequence, and exact node-set checks keep stale work from adopting.
+checks. Focus adds raw root drift to its root-relative shape guard, and partial
+cap tails cannot count as full stable batches. Strict schema,
+session/simulation generation, simulation-local interaction revision,
+gesture/File identity, command/frame sequence, lifecycle, and exact node-set
+checks keep stale work from adopting. The client can adopt a lagging
+same-gesture neighbor frame while overlaying the File at its newest target; one
+in-flight plus one newest pending update bounds worker command flow.
 
 Focus seeds from last accepted Local coordinates. All seeds from the dynamic
 pre-Place layer and carries resolved Pull inputs; Pull is normalized per
@@ -1390,3 +1395,12 @@ coordinator. Lifecycle UI observes only sleeping, hot, cooling, and failure
 transitions. Failure clears movement, retains the last valid graph, and exposes
 retry; no frame gains cache, camera, history, spatial, source, or persistence
 ownership.
+
+An All seed begins from the current output-only M2 snapshot without reapplying
+the field, so activation is jump-free and feedback cannot accumulate. Automatic
+folder shaping may temporarily relax during Move and returns with the normal
+finite layout after invalidation/remount. Production canvases expose Move only
+at 100 or fewer visible nodes; larger graphs return `graph-too-large` before
+Worker construction. This boundary follows direct release probes where
+500-node Focus/All-with-Pull and the 1,000/5,000-node cases reached explicit
+caps or wall limits.

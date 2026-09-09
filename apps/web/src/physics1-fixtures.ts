@@ -98,6 +98,7 @@ function makeFixture(input: {
               barnesHutThreshold: 1_000,
             },
       attractors: input.attractors ?? [],
+      automaticFolderFieldPolicy: 'none',
     },
     placeTranslationByNodeKey: input.place ?? new Map(),
   };

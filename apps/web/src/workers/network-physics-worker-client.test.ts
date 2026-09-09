@@ -49,6 +49,7 @@ function seed(): NetworkPhysicsSeed {
       barnesHutThreshold: 600,
     },
     attractors: [],
+    automaticFolderFieldPolicy: 'none',
   };
 }
 
@@ -74,7 +75,22 @@ function end() {
   };
 }
 
-function frame(frameSequence: number): NetworkPhysicsFrameResponse {
+function update(
+  sequence: number,
+  target = { x: 20 + sequence, y: -12 - sequence },
+) {
+  return {
+    ...begin(),
+    kind: 'update' as const,
+    sequence,
+    target,
+  };
+}
+
+function frame(
+  frameSequence: number,
+  overrides: Partial<NetworkPhysicsFrameResponse> = {},
+): NetworkPhysicsFrameResponse {
   return {
     schemaVersion: NETWORK_PHYSICS_SCHEMA_VERSION,
     kind: 'frame',
@@ -83,11 +99,16 @@ function frame(frameSequence: number): NetworkPhysicsFrameResponse {
     state: 'hot-constrained',
     frameSequence,
     iterationsCompleted: frameSequence * 4,
+    interactionRevision: 1,
+    gestureId: 'gesture-1',
+    constraintNodeKey: 'a',
+    commandSequence: 0,
     constraintSequence: 0,
     positions: [
       { key: 'a', x: 20, y: -12 },
       { key: 'b', x: 10 + frameSequence, y: 0 },
     ],
+    ...overrides,
   };
 }
 
@@ -144,6 +165,252 @@ describe('createNetworkPhysicsWorkerService', () => {
     callbacks[0]!(0);
     expect(onFrame).toHaveBeenCalledOnce();
     expect(onFrame).toHaveBeenCalledWith(frame(2));
+  });
+
+  it('fails explicitly when an otherwise valid frame omits an initialized node', () => {
+    const worker = new FakeWorker();
+    const onFailure = vi.fn();
+    const service = createNetworkPhysicsWorkerService({
+      createWorker: () => worker,
+      scheduler: { request: vi.fn(() => 1), cancel: vi.fn() },
+      onFrame: vi.fn(),
+      onConstraint: vi.fn(),
+      onFailure,
+    });
+    service.initialize(seed());
+    service.begin(begin());
+
+    worker.emit(frame(1, { positions: [{ key: 'a', x: 20, y: -12 }] }));
+
+    expect(onFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        state: 'failed',
+        message: expect.stringContaining('initialized node set'),
+      }),
+    );
+  });
+
+  it('adopts lagging neighbor progress while keeping the File at the newest target', () => {
+    const worker = new FakeWorker();
+    const callbacks: FrameRequestCallback[] = [];
+    const onFrame = vi.fn();
+    const service = createNetworkPhysicsWorkerService({
+      createWorker: () => worker,
+      scheduler: {
+        request(callback) {
+          callbacks.push(callback);
+          return callbacks.length;
+        },
+        cancel: vi.fn(),
+      },
+      onFrame,
+      onConstraint: vi.fn(),
+      onFailure: vi.fn(),
+    });
+    service.initialize(seed());
+    service.begin(begin());
+    service.update(update(1));
+    worker.emit(frame(1));
+    service.update(update(2, { x: 99, y: 44 }));
+
+    callbacks[0]!(0);
+
+    expect(onFrame).toHaveBeenCalledWith(
+      expect.objectContaining({
+        positions: [
+          { key: 'a', x: 99, y: 44 },
+          { key: 'b', x: 11, y: 0 },
+        ],
+      }),
+    );
+    expect(
+      worker.messages.filter(
+        (message) => (message as { kind?: string }).kind === 'constraint',
+      ),
+    ).toEqual([
+      expect.objectContaining({ command: begin() }),
+      expect.objectContaining({ command: update(1) }),
+    ]);
+  });
+
+  it('keeps adopting when the Worker remains one target behind for sustained input', () => {
+    const worker = new FakeWorker();
+    const callbacks: FrameRequestCallback[] = [];
+    const onFrame = vi.fn();
+    const service = createNetworkPhysicsWorkerService({
+      createWorker: () => worker,
+      scheduler: {
+        request(callback) {
+          callbacks.push(callback);
+          return callbacks.length;
+        },
+        cancel: vi.fn(),
+      },
+      onFrame,
+      onConstraint: vi.fn(),
+      onFailure: vi.fn(),
+    });
+    service.initialize(seed());
+    service.begin(begin());
+
+    for (let sequence = 1; sequence <= 120; sequence += 1) {
+      service.update(update(sequence));
+      worker.emit(
+        frame(sequence, {
+          commandSequence: sequence - 1,
+          constraintSequence: sequence - 1,
+        }),
+      );
+      callbacks.at(-1)!(sequence * 16);
+    }
+
+    expect(onFrame).toHaveBeenCalledTimes(120);
+    expect(onFrame.mock.calls.at(-1)?.[0].positions).toEqual([
+      { key: 'a', x: 140, y: -132 },
+      { key: 'b', x: 130, y: 0 },
+    ]);
+  });
+
+  it('does not cancel a queued matching frame when another target arrives before RAF', () => {
+    const worker = new FakeWorker();
+    const callbacks: FrameRequestCallback[] = [];
+    const cancel = vi.fn();
+    const onFrame = vi.fn();
+    const service = createNetworkPhysicsWorkerService({
+      createWorker: () => worker,
+      scheduler: {
+        request(callback) {
+          callbacks.push(callback);
+          return callbacks.length;
+        },
+        cancel,
+      },
+      onFrame,
+      onConstraint: vi.fn(),
+      onFailure: vi.fn(),
+    });
+    service.initialize(seed());
+    service.begin(begin());
+    worker.emit(frame(1));
+    service.update(update(1, { x: 77, y: -31 }));
+
+    expect(cancel).not.toHaveBeenCalled();
+    callbacks[0]!(0);
+    expect(onFrame.mock.calls[0]?.[0].positions[0]).toEqual({
+      key: 'a',
+      x: 77,
+      y: -31,
+    });
+  });
+
+  it('bounds sustained updates and flushes only the newest pending target', () => {
+    const worker = new FakeWorker();
+    const service = createNetworkPhysicsWorkerService({
+      createWorker: () => worker,
+      scheduler: { request: vi.fn(() => 1), cancel: vi.fn() },
+      onFrame: vi.fn(),
+      onConstraint: vi.fn(),
+      onFailure: vi.fn(),
+    });
+    service.initialize(seed());
+    service.begin(begin());
+    for (let sequence = 1; sequence <= 120; sequence += 1) {
+      service.update(update(sequence));
+    }
+    expect(worker.messages).toHaveLength(2);
+
+    worker.emit(frame(1));
+
+    expect(worker.messages).toHaveLength(3);
+    expect(worker.messages.at(-1)).toMatchObject({
+      kind: 'constraint',
+      command: { kind: 'update', sequence: 120 },
+    });
+  });
+
+  it('preserves the newest target before an end while keeping the queue bounded', () => {
+    const worker = new FakeWorker();
+    const service = createNetworkPhysicsWorkerService({
+      createWorker: () => worker,
+      scheduler: { request: vi.fn(() => 1), cancel: vi.fn() },
+      onFrame: vi.fn(),
+      onConstraint: vi.fn(),
+      onFailure: vi.fn(),
+    });
+    service.initialize(seed());
+    service.begin(begin());
+    for (let sequence = 1; sequence <= 80; sequence += 1) {
+      service.update(update(sequence));
+    }
+    service.end({ ...end(), sequence: 81 });
+
+    expect(
+      worker.messages
+        .filter(
+          (message) => (message as { kind?: string }).kind === 'constraint',
+        )
+        .map(
+          (message) =>
+            (message as { command: { kind: string; sequence: number } })
+              .command,
+        ),
+    ).toEqual([
+      expect.objectContaining({ kind: 'begin', sequence: 0 }),
+      expect.objectContaining({ kind: 'update', sequence: 80 }),
+      expect.objectContaining({ kind: 'end', sequence: 81 }),
+    ]);
+  });
+
+  it('rejects delayed frames across gestures at receipt and adoption', () => {
+    const worker = new FakeWorker();
+    const callbacks: FrameRequestCallback[] = [];
+    const onFrame = vi.fn();
+    const service = createNetworkPhysicsWorkerService({
+      createWorker: () => worker,
+      scheduler: {
+        request(callback) {
+          callbacks.push(callback);
+          return callbacks.length;
+        },
+        cancel: vi.fn(),
+      },
+      onFrame,
+      onConstraint: vi.fn(),
+      onFailure: vi.fn(),
+    });
+    service.initialize(seed());
+    service.begin(begin());
+    worker.emit(frame(1));
+    service.end(end());
+    service.begin({
+      ...begin(),
+      gestureId: 'gesture-2',
+      nodeKey: 'b',
+      target: { x: 99, y: 0 },
+    });
+
+    callbacks[0]!(0);
+    worker.emit(frame(2));
+    expect(onFrame).not.toHaveBeenCalled();
+
+    worker.emit(
+      frame(3, {
+        interactionRevision: 2,
+        gestureId: 'gesture-2',
+        constraintNodeKey: 'b',
+        positions: [
+          { key: 'a', x: 12, y: 0 },
+          { key: 'b', x: 99, y: 0 },
+        ],
+      }),
+    );
+    callbacks[1]!(0);
+    expect(onFrame).toHaveBeenCalledOnce();
+    expect(onFrame.mock.calls[0]?.[0]).toMatchObject({
+      interactionRevision: 2,
+      gestureId: 'gesture-2',
+      constraintNodeKey: 'b',
+    });
   });
 
   it('reports coarse lifecycle transitions and reheats the same worker', () => {

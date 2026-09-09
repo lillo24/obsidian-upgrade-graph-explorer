@@ -1154,24 +1154,34 @@ The optimized desktop build passed final graphical review on September 4, 2026.
 ## PHYSICS1 continuous simulation evidence
 
 `pnpm analyze:physics1` compares public ForceAtlas2 call quanta 1/2/4/8,
-verifies exact constrained targets and whole-graph reaction, checks Pull output
-independence across publish cadences, runs complete Focus/All release-to-sleep
-lifecycles, and measures 100/500/1,000/5,000-node turns. JSON is regenerated in
-ignored `output/physics1/`; no timing value is a CI gate.
+verifies exact constrained targets and drag-caused neighbor reaction, exercises
+the production seed factories and Pull function for unclipped, clipped, and multiple displaced
+groups, runs Focus/All release lifecycles, and retains an explicitly limited
+100/500/1,000/5,000-node assign microbenchmark. JSON is regenerated in ignored
+`output/physics1/`; no timing value is a CI gate.
 
-The selected four-iteration hot turn (four public one-iteration assignments)
-measured 0.144 / 3.395 / 82.941 / 73.525 ms for those scale cases, with
-whole-frame payloads of 5,997 / 30,303 / 60,606 / 305,678 bytes. A main-thread
-Map/adoption proxy measured 0.019 / 0.059 / 0.067 / 0.407 ms. JIT, Barnes-Hut,
-and machine load make these timings non-monotonic and investigative only.
+The scale microbenchmark now uses three warmups and twelve measured samples per
+size and reports synchronous `assign(graph, 4)` p50/p95, theoretical rates,
+JSON-estimated bytes, and array-to-Map p50/p95 literally. It does not exercise
+browser Worker scheduling, structured cloning, client validation/coalescing,
+Sigma adoption, WebGL rendering, or actual displayed frame cadence. It is not
+end-to-end drag evidence and cannot justify comparing supported scale from its
+non-monotonic timings.
 
 Every deterministic lifecycle fixture published zero target error and repeated
 bit-exactly. Focus chain/star/weak/isolate cases slept after 224–416 cooling
 iterations. The 180-node All fixture slept after 1,920 iterations with Pull off,
 3,616 with one Pull group, and 3,680 with competing Pull groups and cross-folder
 references. This evidence selects the distinct continuous-All 8,192-iteration
-small/medium cap. At scale PHYSICS1 retains whole-graph semantics; it does not
-silently switch to a faster neighborhood-only simulation.
+small/medium cap. A separate direct retained-simulation release probe on
+September 9, 2026 found all 100-node Focus, All, and All-with-Pull cases
+sleeping. The 500-node Focus case reached `max-iterations`; 500-node All with
+Pull reached `max-wall-time`; and 1,000-node Focus plus 1,000/5,000-node All
+reached explicit cap or wall failures. Repeated no-Pull 500-node All runs
+straddled the five-second wall boundary, so that size is not a reliable
+cross-mode product guarantee. These probes still omit browser Worker and Sigma
+costs. They select a conservative 100-visible-node product limit rather than a
+hidden neighborhood-only simulation or success-shaped failure.
 
 ## MOVE1B production interaction boundary
 
@@ -1190,20 +1200,14 @@ coordinates into component state. The Network Explorer keyboard controller uses
 the same coordinator and service, so it does not introduce a second simulation
 or a row-local controller.
 
-The PHYSICS1 100/500/1,000/5,000-node measurements above remain the scale
-baseline for this product activation. In particular, the lower whole-graph
-cadence at 1,000 and 5,000 nodes is a visible limitation rather than a trigger
-for an unapproved neighborhood-only fallback. Production browser evidence and a
-fresh optimized Windows build are required for the MOVE1B draft; native
-pointer/touchpad acceptance remains a separate mandatory release gate.
-
-Local validation on September 9, 2026 recorded PHYSICS1 four-iteration hot
-turns of 0.147 / 3.700 / 110.061 / 241.447 ms at
-100/500/1,000/5,000 nodes. The corresponding whole-frame publish rates were
-6,802.72 / 270.26 / 9.09 / 4.14 frames per second, and main-thread adoption
-proxies were 0.019 / 0.060 / 0.065 / 0.458 ms. Every lifecycle fixture slept
-with zero target error. These values are machine- and JIT-sensitive evidence,
-not thresholds.
+Move Files is therefore available only at 100 or fewer visible simulation
+nodes in this release. Larger views expose `graph-too-large`, never create the
+continuous Worker, and show the limit in the editor status. This is a release
+boundary, not a claim that every topology under the boundary must converge.
+Unexpected cap/wall/runtime failures remain explicit and retryable. Production
+browser evidence and a fresh optimized Windows build are required for the
+MOVE1B draft; native pointer/touchpad acceptance remains a separate mandatory
+release gate.
 
 The same run measured MOVE1A no-Place and Place conversion at
 0.1321/0.3143 ms and 0.0899/0.2187 ms median/p95 per 1,000 targets. A prebuilt

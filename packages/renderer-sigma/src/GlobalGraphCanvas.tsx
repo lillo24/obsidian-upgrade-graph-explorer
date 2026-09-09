@@ -57,6 +57,7 @@ import {
 import { GlobalRendererSession } from './session';
 import {
   createAllNetworkPhysicsSeed,
+  networkPhysicsNodeCountIsSupported,
   type NetworkPhysicsLifecycleState,
   type NetworkPhysicsService,
   type NetworkPhysicsServiceFactory,
@@ -541,6 +542,7 @@ export function GlobalGraphCanvas({
     () => createGlobalLayoutRequest(input, layoutSettings),
     [input, layoutSettings],
   );
+  const physicsNodeCount = requestTemplate.nodes.length;
   const fingerprint = useMemo(
     () => globalLayoutFingerprint(requestTemplate),
     [requestTemplate],
@@ -713,9 +715,11 @@ export function GlobalGraphCanvas({
         ? { status: 'unavailable', reason: 'simulation-unavailable' }
         : !ready || layoutPendingState
           ? { status: 'unavailable', reason: 'simulation-not-running' }
-          : { status: 'available' };
+          : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+            ? { status: 'unavailable', reason: 'graph-too-large' }
+            : { status: 'available' };
     callbacks.current.onTemporaryFileMoveCapabilityChange?.(capability);
-  }, [layoutPendingState, physicsServiceFactory, ready]);
+  }, [layoutPendingState, physicsNodeCount, physicsServiceFactory, ready]);
   const [arrangementGesturePhase, setArrangementGesturePhase] = useState<
     'idle' | 'primed' | 'dragging' | 'committing'
   >('idle');
@@ -1770,7 +1774,12 @@ export function GlobalGraphCanvas({
     if (!temporaryConstraintActive || session === undefined) {
       return;
     }
-    if (physicsService === undefined || !ready || layoutPendingState) {
+    if (
+      physicsService === undefined ||
+      !ready ||
+      layoutPendingState ||
+      !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+    ) {
       session.setTemporaryFileMoveContext({
         active: true,
         capability: {
@@ -1778,7 +1787,9 @@ export function GlobalGraphCanvas({
           reason:
             physicsService === undefined
               ? 'simulation-unavailable'
-              : 'simulation-not-running',
+              : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+                ? 'graph-too-large'
+                : 'simulation-not-running',
         },
         sessionGeneration: physicsSessionGeneration.current,
         simulationGeneration: 'unavailable',
@@ -1867,6 +1878,7 @@ export function GlobalGraphCanvas({
     layoutCommitKey,
     layoutPendingState,
     layoutSettings,
+    physicsNodeCount,
     physicsServiceFactory,
     ready,
     requestTemplate,

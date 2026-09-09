@@ -51,10 +51,10 @@ reorder KG14.
 | **SPATIAL2 — Folder spatial behavior**              | Hierarchical folder scope plus fixed placement and dynamic soft-attractor behavior in All Network.                                                               | **Release candidate — native SPATIAL2B interaction QA pending.**                            |
 | **SPATIAL2A — Scope/attractor foundation**          | Schema-v2 migration, most-specific membership, three position layers, separate worker/cache, bake-off, harness, and aggregate evidence.                          | **Complete.**                                                                               |
 | **SPATIAL2B — Product rule editor**                 | Production behavior/scope/exclusion/strength controls over the SPATIAL2A contracts.                                                                              | **Implemented — draft PR remains gated on native pointer QA.**                              |
-| **PHYSICS1 — Continuous simulation lifecycle**      | Lazy worker ownership, real temporary hard constraints, whole-graph reaction, Pull-aware cooling, and camera-neutral frame adoption.                             | **Complete — activated by the MOVE1B production adapter.**                                  |
-| **MOVE1 — Temporary physical File movement**        | Direct manipulation that ends on release and returns the File to automatic physical behavior.                                                                    | **Implementation ready; native acceptance pending.**                                        |
+| **PHYSICS1 — Continuous simulation lifecycle**      | Lazy worker ownership, real temporary hard constraints, whole-graph reaction, Pull-aware cooling, and camera-neutral frame adoption.                             | **Hardened for the ≤100-node release boundary; browser/native evidence pending.**           |
+| **MOVE1 — Temporary physical File movement**        | Direct manipulation that ends on release and returns the File to automatic physical behavior.                                                                    | **Implementation ready at ≤100 visible nodes; native acceptance pending.**                  |
 | **MOVE1A — Constraint/gesture foundation**          | Display-to-dynamic coordinate inverse, serializable consumer port, pure gesture/coalescing, session seams, and lifecycle/arbitration tests.                      | **Complete.**                                                                               |
-| **MOVE1B — Production Edit/Move mode**              | Visible editing surface and real PHYSICS1 adapter integration with runtime cooling/RAF evidence.                                                                 | **Implemented in draft — mandatory optimized Windows pointer/touchpad acceptance pending.** |
+| **MOVE1B — Production Edit/Move mode**              | Visible editing surface and real PHYSICS1 adapter integration with bounded transport, guarded cooling, and an explicit supported-size limit.                     | **Implemented in draft — mandatory optimized Windows pointer/touchpad acceptance pending.** |
 | **PIN1 — Persistent individual placement**          | Explicit durable single-File placement semantics, storage, reconciliation, and authoring controls.                                                               | **Later; no schema is defined.**                                                            |
 | **SAVED1 — Saved Views**                            | Later composition of query, Scope/Layout, hierarchy detail, settings, viewport, and spatial profile/reference.                                                   | **Later** — no schema is defined.                                                           |
 
@@ -68,7 +68,7 @@ reorder KG14.
 
 CONVERGENCE1B settles finite Local replacement-worker jobs until practical
 positional stability or a deterministic cap. It does not deliver PHYSICS1's
-separate future continuous interactive simulation lifecycle.
+separate continuous interactive simulation lifecycle.
 
 CONVERGENCE1C gives Global a distinct centroid-aligned policy and an output-only
 folder field whose strength cannot accumulate with extra convergence checks.

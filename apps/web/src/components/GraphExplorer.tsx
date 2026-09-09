@@ -76,6 +76,7 @@ import type {
   TemporaryNodeConstraintCapability,
   TemporaryNodeConstraintEndReason,
 } from '@icarus-graph-explorer/renderer-sigma';
+import { NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT } from '@icarus-graph-explorer/renderer-sigma/physics';
 import { resolveNetworkSettings } from '@icarus-graph-explorer/renderer-sigma/settings';
 import {
   compileVisualGroups,
@@ -1582,7 +1583,9 @@ export function GraphExplorer({
                   temporaryFileMoveCapability.reason ===
                   'simulation-not-running'
                     ? 'Waiting for Network layout…'
-                    : 'Move Files is unavailable in this Network view.',
+                    : temporaryFileMoveCapability.reason === 'graph-too-large'
+                      ? `Move Files supports up to ${NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT} visible nodes in this release.`
+                      : 'Move Files is unavailable in this Network view.',
               }),
       onCancel: cancelKeyboardFileMove,
       onNudge: nudgeKeyboardFileMove,
@@ -4035,7 +4038,9 @@ export function GraphExplorer({
       : temporaryFileMoveCapability.status === 'unavailable'
         ? temporaryFileMoveCapability.reason === 'simulation-not-running'
           ? 'Waiting for Network layout…'
-          : 'Move Files is unavailable in this Network view.'
+          : temporaryFileMoveCapability.reason === 'graph-too-large'
+            ? `Move Files supports up to ${NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT} visible nodes in this release.`
+            : 'Move Files is unavailable in this Network view.'
         : temporaryFileMoveLifecycle === 'hot-constrained'
           ? 'Moving…'
           : temporaryFileMoveLifecycle === 'cooling'

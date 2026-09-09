@@ -20,6 +20,7 @@ import {
 } from './local-layout';
 import {
   createFocusNetworkPhysicsSeed,
+  networkPhysicsNodeCountIsSupported,
   type NetworkPhysicsLifecycleState,
   type NetworkPhysicsService,
   type NetworkPhysicsServiceFactory,
@@ -216,6 +217,7 @@ export function LocalGraphCanvas({
       ),
     [input, referencePull],
   );
+  const physicsNodeCount = requestTemplate.nodes.length;
   const fingerprint = useMemo(
     () => localLayoutFingerprint(requestTemplate),
     [requestTemplate],
@@ -331,9 +333,11 @@ export function LocalGraphCanvas({
         ? { status: 'unavailable', reason: 'simulation-unavailable' }
         : !ready || layoutPending.current
           ? { status: 'unavailable', reason: 'simulation-not-running' }
-          : { status: 'available' };
+          : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+            ? { status: 'unavailable', reason: 'graph-too-large' }
+            : { status: 'available' };
     callbacks.current.onTemporaryFileMoveCapabilityChange?.(capability);
-  }, [layoutCommitKey, physicsServiceFactory, ready]);
+  }, [layoutCommitKey, physicsNodeCount, physicsServiceFactory, ready]);
 
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -549,7 +553,12 @@ export function LocalGraphCanvas({
     if (!temporaryConstraintActive || session === undefined) {
       return;
     }
-    if (physicsService === undefined || !ready || layoutPending.current) {
+    if (
+      physicsService === undefined ||
+      !ready ||
+      layoutPending.current ||
+      !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+    ) {
       session.setTemporaryFileMoveContext({
         active: true,
         capability: {
@@ -557,7 +566,9 @@ export function LocalGraphCanvas({
           reason:
             physicsService === undefined
               ? 'simulation-unavailable'
-              : 'simulation-not-running',
+              : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+                ? 'graph-too-large'
+                : 'simulation-not-running',
         },
         sessionGeneration: physicsSessionGeneration.current,
         simulationGeneration: 'unavailable',
@@ -597,6 +608,7 @@ export function LocalGraphCanvas({
   }, [
     fingerprint,
     layoutCommitKey,
+    physicsNodeCount,
     physicsServiceFactory,
     ready,
     requestTemplate,
