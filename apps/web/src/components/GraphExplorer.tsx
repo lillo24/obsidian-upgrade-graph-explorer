@@ -77,6 +77,7 @@ import type {
   TemporaryNodeConstraintEndReason,
 } from '@icarus-graph-explorer/renderer-sigma';
 import { NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT } from '@icarus-graph-explorer/renderer-sigma/physics';
+import type { NetworkPhysicsPresentationState } from '@icarus-graph-explorer/renderer-sigma/physics';
 import { resolveNetworkSettings } from '@icarus-graph-explorer/renderer-sigma/settings';
 import {
   compileVisualGroups,
@@ -179,7 +180,6 @@ import {
   reduceNetworkEditing,
   type NetworkEditingAction,
   type NetworkEditingState,
-  type NetworkEditingTool,
 } from '../network-editing';
 import {
   commitVisualGroupSessionMutation,
@@ -648,6 +648,8 @@ export function GraphExplorer({
     });
   const [temporaryFileMoveLifecycle, setTemporaryFileMoveLifecycle] =
     useState<NetworkPhysicsLifecycleState>('sleeping');
+  const [temporaryFileMovePresentation, setTemporaryFileMovePresentation] =
+    useState<NetworkPhysicsPresentationState>('idle');
   const [temporaryFileMoveFailure, setTemporaryFileMoveFailure] =
     useState<string>();
   const [temporaryFileMoveRetryKey, setTemporaryFileMoveRetryKey] = useState(0);
@@ -669,15 +671,8 @@ export function GraphExplorer({
         temporaryFileMoveController?.cancel(cancellationReason);
       }
       setNetworkEditingState(transition.state);
-      if (
-        transition.state.phase === 'off' ||
-        transition.state.tool !== 'move-file'
-      ) {
+      if (transition.state.phase === 'editing') {
         setKeyboardFileMoveNodeId(undefined);
-      }
-      if (transition.state.phase === 'off') {
-        setTemporaryFileMoveFailure(undefined);
-        setTemporaryFileMoveLifecycle('sleeping');
       }
       return transition;
     },
@@ -837,6 +832,7 @@ export function GraphExplorer({
       setKeyboardFileMoveNodeId(undefined);
       setTemporaryFileMoveFailure(undefined);
       setTemporaryFileMoveLifecycle('sleeping');
+      setTemporaryFileMovePresentation('idle');
       dispatchFolderArrangementMode({ type: 'exit' });
     });
   }, [workspaceId]);
@@ -1079,10 +1075,9 @@ export function GraphExplorer({
         setFolderArrangementFocusRequestKey((current) => current + 1);
         return;
       }
-      transitionNetworkEditing({
-        type: networkEditingState.phase === 'off' ? 'enter' : 'switch-tool',
-        tool: 'arrange-folder',
-      });
+      temporaryFileMoveController?.cancel('mode-exit');
+      setKeyboardFileMoveNodeId(undefined);
+      transitionNetworkEditing({ type: 'enter', tool: 'arrange-folder' });
       dispatchFolderArrangementMode({
         type: 'enter',
         ...(folderKey === undefined ? {} : { folderKey }),
@@ -1092,7 +1087,7 @@ export function GraphExplorer({
     [
       folderArrangementDraftDirty,
       folderArrangementMode,
-      networkEditingState.phase,
+      temporaryFileMoveController,
       transitionNetworkEditing,
     ],
   );
@@ -1252,24 +1247,6 @@ export function GraphExplorer({
     setFolderArrangementFocusRequestKey((current) => current + 1);
     return true;
   }, [folderArrangementDraftDirty]);
-  const enterNetworkEditing = useCallback(() => {
-    setTemporaryFileMoveFailure(undefined);
-    transitionNetworkEditing({ type: 'enter', tool: 'move-file' });
-    dispatchFolderArrangementMode({ type: 'exit' });
-  }, [transitionNetworkEditing]);
-  const changeNetworkEditingTool = useCallback(
-    (tool: NetworkEditingTool) => {
-      if (tool === 'arrange-folder') {
-        beginFolderArrangement();
-        return;
-      }
-      if (retainDirtyFolderDraft()) return;
-      dispatchFolderArrangementMode({ type: 'exit' });
-      setTemporaryFileMoveFailure(undefined);
-      transitionNetworkEditing({ type: 'switch-tool', tool: 'move-file' });
-    },
-    [beginFolderArrangement, retainDirtyFolderDraft, transitionNetworkEditing],
-  );
   const finishNetworkEditing = useCallback(() => {
     if (retainDirtyFolderDraft()) return;
     transitionNetworkEditing({ type: 'exit' });
@@ -1280,8 +1257,9 @@ export function GraphExplorer({
     setKeyboardFileMoveNodeId(undefined);
     setTemporaryFileMoveFailure(undefined);
     setTemporaryFileMoveLifecycle('sleeping');
+    setTemporaryFileMovePresentation('idle');
     setTemporaryFileMoveRetryKey((current) => current + 1);
-    setNavigationAnnouncement('Retrying Move Files.');
+    setNavigationAnnouncement('Retrying File movement.');
   }, [temporaryFileMoveController]);
   const changeTemporaryFileMoveCapability = useCallback(
     (capability: TemporaryNodeConstraintCapability) => {
@@ -1304,12 +1282,21 @@ export function GraphExplorer({
     },
     [],
   );
+  const changeTemporaryFileMovePresentation = useCallback(
+    (state: NetworkPhysicsPresentationState) => {
+      setTemporaryFileMovePresentation((current) =>
+        current === state ? current : state,
+      );
+    },
+    [],
+  );
   const reportTemporaryFileMoveFailure = useCallback((message: string) => {
     setKeyboardFileMoveNodeId(undefined);
     setTemporaryFileMoveLifecycle('failed');
-    setTemporaryFileMoveFailure(`Move Files stopped: ${message}`);
+    setTemporaryFileMovePresentation('idle');
+    setTemporaryFileMoveFailure(`File movement stopped: ${message}`);
     setNavigationAnnouncement(
-      'Move Files stopped. The last valid graph remains visible; use Retry Move to recover.',
+      'File movement stopped. The last valid graph remains visible; use Retry Move to recover.',
     );
   }, []);
   const changeTemporaryFileMoveController = useCallback(
@@ -1334,22 +1321,11 @@ export function GraphExplorer({
       }
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (temporaryFileMoveController?.cancel('cancelled') === true) {
-        setKeyboardFileMoveNodeId(undefined);
-        setNavigationAnnouncement(
-          'File movement canceled. Move Files remains active.',
-        );
-        return;
-      }
       finishNetworkEditing();
     };
     window.addEventListener('keydown', handleEscape, true);
     return () => window.removeEventListener('keydown', handleEscape, true);
-  }, [
-    finishNetworkEditing,
-    networkEditingState.phase,
-    temporaryFileMoveController,
-  ]);
+  }, [finishNetworkEditing, networkEditingState.phase]);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const inspectorToolbarRef = useRef<HTMLButtonElement>(null);
   const inspectorHandleRef = useRef<HTMLButtonElement>(null);
@@ -1477,14 +1453,14 @@ export function GraphExplorer({
         setNavigationAnnouncement('Only visible Files can be moved.');
         return;
       }
+      if (networkEditingState.phase === 'editing') {
+        setNavigationAnnouncement(
+          'Finish Arrange Folders before moving a File.',
+        );
+        return;
+      }
       if (retainDirtyFolderDraft()) return;
       temporaryFileMoveController?.cancel('mode-exit');
-      dispatchFolderArrangementMode({ type: 'exit' });
-      setTemporaryFileMoveFailure(undefined);
-      transitionNetworkEditing({
-        type: networkEditingState.phase === 'off' ? 'enter' : 'switch-tool',
-        tool: 'move-file',
-      });
       // Keyboard movement selects without issuing a semantic center request.
       setSelection({ kind: 'node', id: nodeId });
       setKeyboardFileMoveNodeId(nodeId);
@@ -1498,15 +1474,12 @@ export function GraphExplorer({
       networkExplorerModel,
       retainDirtyFolderDraft,
       temporaryFileMoveController,
-      transitionNetworkEditing,
     ],
   );
   useEffect(() => {
     if (
       keyboardFileMoveNodeId === undefined ||
       keyboardFileMoveRequestKey === handledKeyboardFileMoveRequest.current ||
-      networkEditingState.phase !== 'editing' ||
-      networkEditingState.tool !== 'move-file' ||
       temporaryFileMoveCapability.status !== 'available'
     ) {
       return;
@@ -1527,7 +1500,6 @@ export function GraphExplorer({
   }, [
     keyboardFileMoveNodeId,
     keyboardFileMoveRequestKey,
-    networkEditingState,
     temporaryFileMoveCapability.status,
     temporaryFileMoveController,
   ]);
@@ -1568,25 +1540,28 @@ export function GraphExplorer({
       available:
         temporaryFileMoveCapability.status === 'available' &&
         temporaryFileMoveFailure === undefined &&
+        networkEditingState.phase === 'off' &&
         !folderArrangementDraftDirty,
-      ...(folderArrangementDraftDirty
-        ? {
-            unavailableReason:
-              'Apply or cancel the current folder rule changes first.',
-          }
-        : temporaryFileMoveFailure !== undefined
-          ? { unavailableReason: 'Retry Move Files before moving a File.' }
-          : temporaryFileMoveCapability.status === 'available'
-            ? {}
-            : {
-                unavailableReason:
-                  temporaryFileMoveCapability.reason ===
-                  'simulation-not-running'
-                    ? 'Waiting for Network layout…'
-                    : temporaryFileMoveCapability.reason === 'graph-too-large'
-                      ? `Move Files supports up to ${NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT} visible nodes in this release.`
-                      : 'Move Files is unavailable in this Network view.',
-              }),
+      ...(networkEditingState.phase === 'editing'
+        ? { unavailableReason: 'Finish Arrange Folders first.' }
+        : folderArrangementDraftDirty
+          ? {
+              unavailableReason:
+                'Apply or cancel the current folder rule changes first.',
+            }
+          : temporaryFileMoveFailure !== undefined
+            ? { unavailableReason: 'Retry File movement before moving a File.' }
+            : temporaryFileMoveCapability.status === 'available'
+              ? {}
+              : {
+                  unavailableReason:
+                    temporaryFileMoveCapability.reason ===
+                    'simulation-not-running'
+                      ? 'Waiting for Network layout…'
+                      : temporaryFileMoveCapability.reason === 'graph-too-large'
+                        ? `File movement supports up to ${NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT} visible nodes in this release.`
+                        : 'File movement is unavailable in this Network view.',
+                }),
       onCancel: cancelKeyboardFileMove,
       onNudge: nudgeKeyboardFileMove,
       onRelease: releaseKeyboardFileMove,
@@ -1599,6 +1574,7 @@ export function GraphExplorer({
       handleUnavailableKeyboardFileMoveTarget,
       keyboardFileMoveNodeId,
       nudgeKeyboardFileMove,
+      networkEditingState.phase,
       releaseKeyboardFileMove,
       startKeyboardFileMove,
       temporaryFileMoveCapability,
@@ -4031,23 +4007,19 @@ export function GraphExplorer({
   );
 
   const temporaryFileMoveStatus =
-    networkEditingState.phase !== 'editing' ||
-    networkEditingState.tool !== 'move-file' ||
-    temporaryFileMoveFailure !== undefined
+    temporaryFileMoveFailure !== undefined ||
+    networkEditingState.phase === 'editing'
       ? undefined
       : temporaryFileMoveCapability.status === 'unavailable'
         ? temporaryFileMoveCapability.reason === 'simulation-not-running'
           ? 'Waiting for Network layout…'
           : temporaryFileMoveCapability.reason === 'graph-too-large'
-            ? `Move Files supports up to ${NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT} visible nodes in this release.`
-            : 'Move Files is unavailable in this Network view.'
-        : temporaryFileMoveLifecycle === 'hot-constrained'
-          ? 'Moving…'
-          : temporaryFileMoveLifecycle === 'cooling'
-            ? 'Settling…'
-            : temporaryFileMoveLifecycle === 'sleeping'
-              ? 'Settled — ready to move.'
-              : undefined;
+            ? `File movement supports up to ${NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT} visible nodes in this release.`
+            : 'File movement is unavailable in this Network view.'
+        : temporaryFileMoveLifecycle === 'cooling' ||
+            temporaryFileMovePresentation === 'settling'
+          ? 'Settling…'
+          : undefined;
 
   function resetSavedView(): void {
     if (persistenceStorage === undefined) {
@@ -4293,9 +4265,8 @@ export function GraphExplorer({
                   ? {}
                   : { failure: temporaryFileMoveFailure })}
                 onDone={finishNetworkEditing}
-                onEnter={enterNetworkEditing}
+                onArrange={beginFolderArrangement}
                 onRetry={retryTemporaryFileMove}
-                onToolChange={changeNetworkEditingTool}
                 scope={activeScope}
                 state={networkEditingState}
                 {...(temporaryFileMoveStatus === undefined
@@ -4639,6 +4610,9 @@ export function GraphExplorer({
                 onTemporaryFileMoveLifecycleChange={
                   changeTemporaryFileMoveLifecycle
                 }
+                onTemporaryFileMovePresentationChange={
+                  changeTemporaryFileMovePresentation
+                }
                 onDensityQaDiagnosticsChange={setAllNetworkDensityQaDiagnostics}
                 onNodeActivate={enterFocusScope}
                 onNodeSingleClick={revealGraphNode}
@@ -4653,10 +4627,7 @@ export function GraphExplorer({
                 spatialRules={spatialOverrides.rules}
                 spatialSourceKey={workspaceId}
                 trackpadZoomMode={trackpadZoomMode}
-                temporaryConstraintActive={
-                  networkEditingState.phase === 'editing' &&
-                  networkEditingState.tool === 'move-file'
-                }
+                temporaryConstraintActive={networkEditingState.phase === 'off'}
                 temporaryConstraintRetryKey={temporaryFileMoveRetryKey}
                 visualGroupStyles={visualGroupPresentation.styles}
               />
@@ -4750,6 +4721,9 @@ export function GraphExplorer({
                 onTemporaryFileMoveLifecycleChange={
                   changeTemporaryFileMoveLifecycle
                 }
+                onTemporaryFileMovePresentationChange={
+                  changeTemporaryFileMovePresentation
+                }
                 onDensityQaDiagnosticsChange={
                   setFocusNetworkDensityQaDiagnostics
                 }
@@ -4763,10 +4737,7 @@ export function GraphExplorer({
                 projection={result.projection}
                 rootEntityId={localRootEntityId}
                 selection={activeSelection}
-                temporaryConstraintActive={
-                  networkEditingState.phase === 'editing' &&
-                  networkEditingState.tool === 'move-file'
-                }
+                temporaryConstraintActive={networkEditingState.phase === 'off'}
                 temporaryConstraintRetryKey={temporaryFileMoveRetryKey}
                 trackpadZoomMode={trackpadZoomMode}
                 presentationOverrides={nodePresentation.overrides}

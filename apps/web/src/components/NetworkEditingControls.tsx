@@ -1,16 +1,12 @@
 import type { ExplorationScope } from '../exploration-model';
-import type {
-  NetworkEditingState,
-  NetworkEditingTool,
-} from '../network-editing';
+import type { NetworkEditingState } from '../network-editing';
 
 export function NetworkEditingControls({
   arrangeDisabledReason,
   failure,
   onDone,
-  onEnter,
+  onArrange,
   onRetry,
-  onToolChange,
   scope,
   state,
   status,
@@ -18,61 +14,42 @@ export function NetworkEditingControls({
   readonly arrangeDisabledReason?: string;
   readonly failure?: string;
   readonly onDone: () => void;
-  readonly onEnter: () => void;
+  readonly onArrange: () => void;
   readonly onRetry: () => void;
-  readonly onToolChange: (tool: NetworkEditingTool) => void;
   readonly scope: ExplorationScope;
   readonly state: NetworkEditingState;
   readonly status?: string;
 }) {
-  if (state.phase === 'off') {
-    return (
-      <div className="control-group network-editing-controls">
-        <button
-          aria-label="Edit Network layout"
-          className="network-editing-controls__pencil"
-          onClick={onEnter}
-          title="Edit Network layout"
-          type="button"
-        >
-          <span aria-hidden="true">✎</span>
-        </button>
-      </div>
-    );
-  }
+  if (scope !== 'all' && status === undefined && failure === undefined)
+    return null;
 
   return (
     <div
-      aria-label="Edit Network layout"
-      className="control-group network-editing-controls network-editing-controls--active"
+      aria-label="Network movement"
+      className={`control-group network-editing-controls${state.phase === 'editing' ? ' network-editing-controls--active' : ''}`}
       role="group"
     >
-      <button
-        aria-pressed={state.tool === 'move-file'}
-        onClick={() => onToolChange('move-file')}
-        type="button"
-      >
-        Move Files
-      </button>
       {scope === 'all' ? (
         <button
-          aria-pressed={state.tool === 'arrange-folder'}
+          aria-pressed={state.phase === 'editing'}
           disabled={arrangeDisabledReason !== undefined}
-          onClick={() => onToolChange('arrange-folder')}
+          onClick={() => onArrange()}
           title={arrangeDisabledReason}
           type="button"
         >
           Arrange Folders
         </button>
       ) : null}
-      <button onClick={onDone} type="button">
-        Done
-      </button>
-      <small className="network-editing-controls__meaning">
-        {state.tool === 'move-file'
-          ? 'Temporary movement — positions are not saved.'
-          : 'Edits saved Pull and Place folder rules.'}
-      </small>
+      {state.phase === 'editing' ? (
+        <>
+          <button onClick={onDone} type="button">
+            Done
+          </button>
+          <small className="network-editing-controls__meaning">
+            Edits saved Pull and Place folder rules.
+          </small>
+        </>
+      ) : null}
       {status === undefined ? null : (
         <small
           aria-atomic="true"

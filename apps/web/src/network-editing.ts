@@ -1,4 +1,4 @@
-export type NetworkEditingTool = 'move-file' | 'arrange-folder';
+export type NetworkEditingTool = 'arrange-folder';
 
 export type NetworkEditingState =
   | { readonly phase: 'off' }
@@ -57,8 +57,8 @@ export const NETWORK_EDITING_OFF = {
 } as const satisfies NetworkEditingState;
 
 /**
- * Pure, transient product contract for the Network editing toolbar.
- * It owns no persistence and intentionally does not participate in history.
+ * Pure ownership contract for the explicit Arrange Folders tool. Temporary
+ * File movement is an ordinary Network interaction and has no editing mode.
  */
 export function reduceNetworkEditing(
   state: NetworkEditingState,

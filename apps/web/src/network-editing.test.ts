@@ -7,23 +7,23 @@ import {
 } from './network-editing';
 
 describe('Network editing state contract', () => {
-  it('allows exactly one transient editing tool at a time', () => {
-    const move = reduceNetworkEditing(NETWORK_EDITING_OFF, {
+  it('gives the explicit folder editor one transient owner', () => {
+    const arrange = reduceNetworkEditing(NETWORK_EDITING_OFF, {
       type: 'enter',
-      tool: 'move-file',
+      tool: 'arrange-folder',
     });
-    expect(move).toEqual({
-      state: { phase: 'editing', tool: 'move-file' },
+    expect(arrange).toEqual({
+      state: { phase: 'editing', tool: 'arrange-folder' },
       clearActiveGesture: false,
     });
     expect(
-      reduceNetworkEditing(move.state, {
+      reduceNetworkEditing(arrange.state, {
         type: 'switch-tool',
         tool: 'arrange-folder',
       }),
     ).toEqual({
       state: { phase: 'editing', tool: 'arrange-folder' },
-      clearActiveGesture: true,
+      clearActiveGesture: false,
     });
   });
 
@@ -31,16 +31,19 @@ describe('Network editing state contract', () => {
     '%s clears editing and any active transient gesture',
     (type) => {
       expect(
-        reduceNetworkEditing({ phase: 'editing', tool: 'move-file' }, { type }),
+        reduceNetworkEditing(
+          { phase: 'editing', tool: 'arrange-folder' },
+          { type },
+        ),
       ).toEqual({ state: NETWORK_EDITING_OFF, clearActiveGesture: true });
     },
   );
 
   it('keeps repeated tool selection idempotent and out of persistence/history', () => {
-    const state = { phase: 'editing', tool: 'move-file' } as const;
+    const state = { phase: 'editing', tool: 'arrange-folder' } as const;
     const transition = reduceNetworkEditing(state, {
       type: 'switch-tool',
-      tool: 'move-file',
+      tool: 'arrange-folder',
     });
     expect(transition).toEqual({ state, clearActiveGesture: false });
     expect(Object.keys(transition.state).sort()).toEqual(['phase', 'tool']);

@@ -5,13 +5,12 @@ import { NetworkEditingControls } from './NetworkEditingControls';
 
 const callbacks = {
   onDone: () => undefined,
-  onEnter: () => undefined,
+  onArrange: () => undefined,
   onRetry: () => undefined,
-  onToolChange: () => undefined,
 };
 
 describe('Network editing controls', () => {
-  it('exposes one compact pencil while editing is off', () => {
+  it('exposes Arrange Folders directly while File dragging stays mode-free', () => {
     const markup = renderToStaticMarkup(
       <NetworkEditingControls
         {...callbacks}
@@ -20,35 +19,33 @@ describe('Network editing controls', () => {
       />,
     );
 
-    expect(markup).toContain('aria-label="Edit Network layout"');
-    expect(markup).toContain('>✎</span>');
+    expect(markup).toContain('>Arrange Folders</button>');
+    expect(markup).not.toContain('Edit Network layout');
     expect(markup).not.toContain('Move Files');
   });
 
-  it('offers both All tools and makes temporary movement explicit', () => {
+  it('shows only the explicit saved-rule editor while it owns input', () => {
     const markup = renderToStaticMarkup(
       <NetworkEditingControls
         {...callbacks}
         scope="all"
-        state={{ phase: 'editing', tool: 'move-file' }}
-        status="Moving…"
+        state={{ phase: 'editing', tool: 'arrange-folder' }}
       />,
     );
 
     expect(markup).toContain('aria-pressed="true"');
-    expect(markup).toContain('>Move Files</button>');
     expect(markup).toContain('Arrange Folders');
-    expect(markup).toContain('Temporary movement — positions are not saved.');
-    expect(markup).toContain('aria-live="polite"');
+    expect(markup).toContain('Edits saved Pull and Place folder rules.');
+    expect(markup).toContain('>Done</button>');
   });
 
   it('omits Arrange Folders from Focus and exposes explicit retry', () => {
     const markup = renderToStaticMarkup(
       <NetworkEditingControls
         {...callbacks}
-        failure="Move Files stopped: worker failed."
+        failure="File movement stopped: worker failed."
         scope="focus"
-        state={{ phase: 'editing', tool: 'move-file' }}
+        state={{ phase: 'off' }}
       />,
     );
 

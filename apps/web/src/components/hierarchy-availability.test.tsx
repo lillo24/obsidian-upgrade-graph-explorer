@@ -305,9 +305,11 @@ describe('GraphExplorer experimental availability integration', () => {
     expect(preference()).not.toHaveProperty('densityFramingStrength');
   });
 
-  it('owns the production Network editing shell and keeps Move and Arrange exclusive', async () => {
+  it('arms direct File dragging and keeps Arrange Folders an exclusive explicit tool', async () => {
     await mount('global');
-    expect(button('Edit Network layout')).toBeDefined();
+    expect(captured.global!.temporaryConstraintActive).toBe(true);
+    expect(container.textContent).not.toContain('Move Files');
+    expect(button('Arrange Folders')).toBeDefined();
     const cancel = vi.fn(() => false);
     await act(() =>
       captured.global!.onTemporaryFileMoveControllerChange?.({
@@ -317,12 +319,7 @@ describe('GraphExplorer experimental availability integration', () => {
         cancel,
       }),
     );
-
-    await click('Edit Network layout');
-    expect(captured.global!.temporaryConstraintActive).toBe(true);
     expect(captured.global!.folderArrangement?.active).toBe(false);
-    expect(button('Move Files').getAttribute('aria-pressed')).toBe('true');
-    expect(container.textContent).toContain('positions are not saved');
 
     await act(() =>
       captured.global!.onTemporaryFileMoveCapabilityChange?.({
@@ -331,7 +328,7 @@ describe('GraphExplorer experimental availability integration', () => {
       }),
     );
     expect(container.textContent).toContain(
-      'Move Files supports up to 100 visible nodes in this release.',
+      'File movement supports up to 100 visible nodes in this release.',
     );
 
     await act(() =>
@@ -342,7 +339,7 @@ describe('GraphExplorer experimental availability integration', () => {
     await act(() =>
       captured.global!.onTemporaryFileMoveLifecycleChange?.('hot-constrained'),
     );
-    expect(container.textContent).toContain('Moving…');
+    expect(container.textContent).not.toContain('Moving…');
     await act(() =>
       captured.global!.onTemporaryFileMoveLifecycleChange?.('cooling'),
     );
@@ -350,7 +347,15 @@ describe('GraphExplorer experimental availability integration', () => {
     await act(() =>
       captured.global!.onTemporaryFileMoveLifecycleChange?.('sleeping'),
     );
-    expect(container.textContent).toContain('Settled — ready to move.');
+    expect(container.textContent).not.toContain('Settled — ready to move.');
+    await act(() =>
+      captured.global!.onTemporaryFileMovePresentationChange?.('settling'),
+    );
+    expect(container.textContent).toContain('Settling…');
+    await act(() =>
+      captured.global!.onTemporaryFileMovePresentationChange?.('idle'),
+    );
+    expect(container.textContent).not.toContain('Settling…');
 
     await act(() =>
       captured.global!.folderArrangement?.onAvailabilityChange(true, undefined),
@@ -360,25 +365,21 @@ describe('GraphExplorer experimental availability integration', () => {
     expect(cancel).toHaveBeenCalledWith('mode-exit');
     expect(captured.global!.temporaryConstraintActive).toBe(false);
     expect(captured.global!.folderArrangement?.active).toBe(true);
+    expect(captured.global!.folderArrangement?.activeFolderKey).toBeUndefined();
     expect(button('Arrange Folders').getAttribute('aria-pressed')).toBe('true');
 
-    await click('Move Files');
+    await click('Done');
     expect(captured.global!.temporaryConstraintActive).toBe(true);
     expect(captured.global!.folderArrangement?.active).toBe(false);
-
-    await click('Done');
-    expect(captured.global!.temporaryConstraintActive).toBe(false);
-    expect(button('Edit Network layout')).toBeDefined();
+    expect(button('Arrange Folders')).toBeDefined();
   });
 
-  it('preserves Move from All to Focus, but exits editing for Hierarchy', async () => {
+  it('keeps direct dragging armed across All and Focus Network only', async () => {
     await mount('global');
-    await click('Edit Network layout');
 
     await act(() => captured.global!.onNodeActivate(source.id));
     expect(mode()).toBe('local-free');
     expect(captured.local!.temporaryConstraintActive).toBe(true);
-    expect(button('Move Files')).toBeDefined();
     expect(
       [...container.querySelectorAll('button')].some(
         (candidate) => candidate.textContent?.trim() === 'Arrange Folders',
@@ -396,12 +397,11 @@ describe('GraphExplorer experimental availability integration', () => {
 
     await click('Network');
     expect(mode()).toBe('local-free');
-    expect(button('Edit Network layout')).toBeDefined();
+    expect(captured.local!.temporaryConstraintActive).toBe(true);
   });
 
   it('retains the graph on Move failure and exposes explicit retry', async () => {
     await mount('global');
-    await click('Edit Network layout');
     const retryKey = captured.global!.temporaryConstraintRetryKey;
 
     await act(() =>
@@ -409,7 +409,7 @@ describe('GraphExplorer experimental availability integration', () => {
     );
     expect(mode()).toBe('global');
     expect(container.textContent).toContain(
-      'Move Files stopped: simulated worker failure',
+      'File movement stopped: simulated worker failure',
     );
     expect(button('Retry Move')).toBeDefined();
 

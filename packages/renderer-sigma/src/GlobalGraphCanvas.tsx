@@ -59,6 +59,7 @@ import {
   createAllNetworkPhysicsSeed,
   networkPhysicsNodeCountIsSupported,
   type NetworkPhysicsLifecycleState,
+  type NetworkPhysicsPresentationState,
   type NetworkPhysicsService,
   type NetworkPhysicsServiceFactory,
 } from './physics';
@@ -166,7 +167,7 @@ export interface GlobalGraphCanvasProps {
   /** Optional session cache owner; the lazy web module keeps this across mode switches. */
   readonly layoutCache?: GlobalLayoutCache;
   readonly layoutService: GlobalLayoutService;
-  /** PHYSICS1 transport seam; MOVE1B opts in only while Move Files is active. */
+  /** PHYSICS1 transport seam; direct File dragging is armed while available. */
   readonly physicsServiceFactory?: NetworkPhysicsServiceFactory;
   readonly temporaryConstraintActive?: boolean;
   readonly temporaryConstraintRetryKey?: number;
@@ -184,6 +185,9 @@ export interface GlobalGraphCanvasProps {
   readonly onTemporaryFileMoveFailure?: (message: string) => void;
   readonly onTemporaryFileMoveLifecycleChange?: (
     state: NetworkPhysicsLifecycleState,
+  ) => void;
+  readonly onTemporaryFileMovePresentationChange?: (
+    state: NetworkPhysicsPresentationState,
   ) => void;
   readonly onDensityQaDiagnosticsChange?: (
     diagnostics: GlobalDensityQaDiagnostics | undefined,
@@ -440,6 +444,7 @@ export function GlobalGraphCanvas({
   onTemporaryFileMoveControllerChange,
   onTemporaryFileMoveFailure,
   onTemporaryFileMoveLifecycleChange,
+  onTemporaryFileMovePresentationChange,
   onDensityQaDiagnosticsChange,
   onNodeActivate,
   onNodeSingleClick,
@@ -476,6 +481,7 @@ export function GlobalGraphCanvas({
     onTemporaryFileMoveCapabilityChange,
     onTemporaryFileMoveFailure,
     onTemporaryFileMoveLifecycleChange,
+    onTemporaryFileMovePresentationChange,
     onDensityQaDiagnosticsChange,
     onNodeActivate,
     onNodeSingleClick,
@@ -489,6 +495,7 @@ export function GlobalGraphCanvas({
       onTemporaryFileMoveCapabilityChange,
       onTemporaryFileMoveFailure,
       onTemporaryFileMoveLifecycleChange,
+      onTemporaryFileMovePresentationChange,
       onDensityQaDiagnosticsChange,
       onNodeActivate,
       onNodeSingleClick,
@@ -501,6 +508,7 @@ export function GlobalGraphCanvas({
     onTemporaryFileMoveCapabilityChange,
     onTemporaryFileMoveFailure,
     onTemporaryFileMoveLifecycleChange,
+    onTemporaryFileMovePresentationChange,
     onDensityQaDiagnosticsChange,
     onNodeActivate,
     onNodeSingleClick,
@@ -637,9 +645,12 @@ export function GlobalGraphCanvas({
   useEffect(() => {
     const generation = ++physicsServiceGeneration.current;
     const service = physicsServiceFactory?.({
-      onFrame: (frame) => {
+      onRawFrame: (frame) => {
         if (physicsServiceGeneration.current !== generation) return;
         latestDynamicPositions.current = frame.positions;
+      },
+      onFrame: (frame) => {
+        if (physicsServiceGeneration.current !== generation) return;
         const displayed = applyPhysicsDisplayTranslation(frame.positions);
         latestDisplayedPositions.current = displayed;
         sessionRef.current?.applyPartialPositions(displayed);
@@ -661,6 +672,11 @@ export function GlobalGraphCanvas({
       onStateChange: (state) => {
         if (physicsServiceGeneration.current === generation) {
           callbacks.current.onTemporaryFileMoveLifecycleChange?.(state);
+        }
+      },
+      onPresentationStateChange: (state) => {
+        if (physicsServiceGeneration.current === generation) {
+          callbacks.current.onTemporaryFileMovePresentationChange?.(state);
         }
       },
       onFailure: (failure) => {

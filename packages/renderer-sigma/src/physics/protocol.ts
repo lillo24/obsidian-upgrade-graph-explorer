@@ -155,11 +155,20 @@ export interface NetworkPhysicsService extends TemporaryNodeConstraintPort {
 }
 
 export interface NetworkPhysicsServiceFactoryOptions {
+  /** Exact validated Worker state; never presentation-interpolated. */
+  readonly onRawFrame?: (frame: NetworkPhysicsFrameResponse) => void;
+  /** Imperative browser presentation; may contain bounded catch-up positions. */
   readonly onFrame: (frame: NetworkPhysicsFrameResponse) => void;
   readonly onConstraint: (command: TemporaryNodeConstraintCommand) => void;
   readonly onStateChange?: (state: NetworkPhysicsLifecycleState) => void;
+  /** Browser display catch-up; independent from raw simulation lifecycle. */
+  readonly onPresentationStateChange?: (
+    state: NetworkPhysicsPresentationState,
+  ) => void;
   readonly onFailure: (failure: NetworkPhysicsFailureResponse) => void;
 }
+
+export type NetworkPhysicsPresentationState = 'idle' | 'settling';
 
 export type NetworkPhysicsServiceFactory = (
   options: NetworkPhysicsServiceFactoryOptions,

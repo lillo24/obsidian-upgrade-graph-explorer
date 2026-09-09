@@ -134,7 +134,8 @@ export function networkExplorerMenuActions(
               ? {}
               : {
                   disabledReason:
-                    fileMove.reason ?? 'Move Files is unavailable right now.',
+                    fileMove.reason ??
+                    'File movement is unavailable right now.',
                 }),
           },
         ]),

@@ -16,6 +16,7 @@ export type {
   NetworkPhysicsMode,
   NetworkPhysicsNode,
   NetworkPhysicsPosition,
+  NetworkPhysicsPresentationState,
   NetworkPhysicsReadyResponse,
   NetworkPhysicsService,
   NetworkPhysicsServiceFactory,

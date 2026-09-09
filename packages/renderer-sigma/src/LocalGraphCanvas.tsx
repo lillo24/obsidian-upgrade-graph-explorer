@@ -22,6 +22,7 @@ import {
   createFocusNetworkPhysicsSeed,
   networkPhysicsNodeCountIsSupported,
   type NetworkPhysicsLifecycleState,
+  type NetworkPhysicsPresentationState,
   type NetworkPhysicsService,
   type NetworkPhysicsServiceFactory,
 } from './physics';
@@ -63,7 +64,7 @@ export interface LocalGraphCanvasProps {
   readonly layoutCache?: LocalLayoutCache;
   readonly layoutRequestKey: number;
   readonly layoutService: LocalLayoutService;
-  /** PHYSICS1 transport seam; MOVE1B opts in only while Move Files is active. */
+  /** PHYSICS1 transport seam; direct File dragging is armed while available. */
   readonly physicsServiceFactory?: NetworkPhysicsServiceFactory;
   readonly temporaryConstraintActive?: boolean;
   readonly temporaryConstraintRetryKey?: number;
@@ -81,6 +82,9 @@ export interface LocalGraphCanvasProps {
   readonly onTemporaryFileMoveFailure?: (message: string) => void;
   readonly onTemporaryFileMoveLifecycleChange?: (
     state: NetworkPhysicsLifecycleState,
+  ) => void;
+  readonly onTemporaryFileMovePresentationChange?: (
+    state: NetworkPhysicsPresentationState,
   ) => void;
   readonly onDensityQaDiagnosticsChange?: (
     diagnostics: LocalDensityQaDiagnostics | undefined,
@@ -127,6 +131,7 @@ export function LocalGraphCanvas({
   onTemporaryFileMoveControllerChange,
   onTemporaryFileMoveFailure,
   onTemporaryFileMoveLifecycleChange,
+  onTemporaryFileMovePresentationChange,
   onDensityQaDiagnosticsChange,
   onFitRequestConsumed,
   onSelectionChange,
@@ -157,6 +162,7 @@ export function LocalGraphCanvas({
     onTemporaryFileMoveCapabilityChange,
     onTemporaryFileMoveFailure,
     onTemporaryFileMoveLifecycleChange,
+    onTemporaryFileMovePresentationChange,
     onDensityQaDiagnosticsChange,
     onFitRequestConsumed,
     onSelectionChange,
@@ -172,6 +178,7 @@ export function LocalGraphCanvas({
       onTemporaryFileMoveCapabilityChange,
       onTemporaryFileMoveFailure,
       onTemporaryFileMoveLifecycleChange,
+      onTemporaryFileMovePresentationChange,
       onDensityQaDiagnosticsChange,
       onFitRequestConsumed,
       onSelectionChange,
@@ -186,6 +193,7 @@ export function LocalGraphCanvas({
     onTemporaryFileMoveCapabilityChange,
     onTemporaryFileMoveFailure,
     onTemporaryFileMoveLifecycleChange,
+    onTemporaryFileMovePresentationChange,
     onDensityQaDiagnosticsChange,
     onFitRequestConsumed,
     onSelectionChange,
@@ -287,9 +295,12 @@ export function LocalGraphCanvas({
   useEffect(() => {
     const generation = ++physicsServiceGeneration.current;
     const service = physicsServiceFactory?.({
-      onFrame: (frame) => {
+      onRawFrame: (frame) => {
         if (physicsServiceGeneration.current !== generation) return;
         latestAcceptedPositions.current = frame.positions;
+      },
+      onFrame: (frame) => {
+        if (physicsServiceGeneration.current !== generation) return;
         sessionRef.current?.applyPartialPositions(frame.positions);
       },
       onConstraint: (command) => {
@@ -302,6 +313,11 @@ export function LocalGraphCanvas({
       onStateChange: (state) => {
         if (physicsServiceGeneration.current === generation) {
           callbacks.current.onTemporaryFileMoveLifecycleChange?.(state);
+        }
+      },
+      onPresentationStateChange: (state) => {
+        if (physicsServiceGeneration.current === generation) {
+          callbacks.current.onTemporaryFileMovePresentationChange?.(state);
         }
       },
       onFailure: (failure) => {

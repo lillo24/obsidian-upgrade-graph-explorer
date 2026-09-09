@@ -1044,7 +1044,7 @@ export class GlobalRendererSession {
     }
   }
 
-  /** Temporary file movement seam; callers decide when an Edit/Move mode exists. */
+  /** Temporary File movement seam; callers suspend it for competing tools. */
   setTemporaryFileMoveContext(
     context: TemporaryFileMoveSessionContext | undefined,
     cancellationReason: Exclude<

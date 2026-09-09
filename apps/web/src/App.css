@@ -358,13 +358,6 @@ h2 {
   flex: 0 1 auto;
 }
 
-.network-editing-controls__pencil {
-  width: 2.25rem;
-  padding: 0.35rem;
-  font-size: 1rem;
-  line-height: 1;
-}
-
 .network-editing-controls--active {
   padding: 0.2rem;
   border: 1px solid #b7c8cf;
