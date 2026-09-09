@@ -232,6 +232,7 @@ export class GlobalRendererSession {
   private globalNodeStyleRefreshPending = false;
   private globalNodeIndexationPending = false;
   private globalEdgeStyleRefreshPending = false;
+  private globalVisualRefreshFrame: number | undefined;
   private destroyed = false;
   private nodeClicks: NodeClickArbitrator | undefined;
   private readonly wheelDirection = new WheelDirectionStabilizer();
@@ -1306,7 +1307,7 @@ export class GlobalRendererSession {
     this.globalNodeStyleRefreshPending ||= nodeSizeChanged || labelChanged;
     this.globalNodeIndexationPending ||= nodeSizeChanged;
     this.globalEdgeStyleRefreshPending ||= edgeSizeChanged;
-    if (this.topologyRefreshPending === undefined) this.refreshPendingStyles();
+    this.scheduleGlobalVisualRefresh();
   }
 
   updateTrackpadZoomMode(mode: GlobalTrackpadZoomMode): void {
@@ -1368,12 +1369,19 @@ export class GlobalRendererSession {
     const edges = this.globalEdgeStyleRefreshPending ? this.graph.edges() : [];
     const needsNodeIndexation =
       this.globalNodeIndexationPending || sizeKeys.length > 0;
+    const globalVisualRefresh =
+      this.globalNodeStyleRefreshPending ||
+      this.globalNodeIndexationPending ||
+      this.globalEdgeStyleRefreshPending;
     this.visualStyleRefreshPending = false;
     this.globalNodeStyleRefreshPending = false;
     this.globalNodeIndexationPending = false;
     this.globalEdgeStyleRefreshPending = false;
     this.sizeStyleRefreshPending = undefined;
     if (nodes.length === 0 && edges.length === 0) return;
+    if (globalVisualRefresh) {
+      this.options.instrumentation?.count('global-visual-refreshes');
+    }
     // Sigma 3.0.3 refresh reruns only these reducers. Radius changes must also
     // process label/program/picking indices (skipIndexation=false), but never
     // submit a layout or change Graphology coordinates. Color-only stays fast.
@@ -1384,6 +1392,22 @@ export class GlobalRendererSession {
       },
       skipIndexation: !needsNodeIndexation,
       schedule: true,
+    });
+  }
+
+  private scheduleGlobalVisualRefresh(): void {
+    if (
+      this.destroyed ||
+      this.topologyRefreshPending !== undefined ||
+      this.globalVisualRefreshFrame !== undefined
+    ) {
+      return;
+    }
+    this.globalVisualRefreshFrame = requestAnimationFrame(() => {
+      this.globalVisualRefreshFrame = undefined;
+      if (this.topologyRefreshPending === undefined) {
+        this.refreshPendingStyles();
+      }
     });
   }
 
@@ -1526,6 +1550,22 @@ export class GlobalRendererSession {
     return this.measureNextRender(
       enabled ? 'edge-events-on' : 'edge-events-off',
       () => this.renderer.setSetting('enableEdgeEvents', enabled),
+    );
+  }
+
+  measureVisualSettings(
+    operation: string,
+    settings: GlobalLayoutSettings,
+  ): Promise<GlobalRendererMeasurement> {
+    const gapProbe = startRafGapProbe();
+    return this.measureNextRender(operation, () =>
+      this.updateSettings(settings),
+    ).then(
+      (measurement) => ({ ...measurement, highRafGapMs: gapProbe() }),
+      (error: unknown) => {
+        gapProbe();
+        throw error;
+      },
     );
   }
 
@@ -2085,6 +2125,10 @@ export class GlobalRendererSession {
     }
     if (this.viewportObservationTimer !== undefined) {
       window.clearTimeout(this.viewportObservationTimer);
+    }
+    if (this.globalVisualRefreshFrame !== undefined) {
+      cancelAnimationFrame(this.globalVisualRefreshFrame);
+      this.globalVisualRefreshFrame = undefined;
     }
     this.renderer.kill();
   }

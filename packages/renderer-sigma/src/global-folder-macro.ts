@@ -1,10 +1,9 @@
 import { stableHash32 } from './deterministic';
-import { resolveGlobalPhysicsSettings } from './settings';
 import type {
   GlobalFolderMacroPolicy,
   GlobalLayoutNode,
   GlobalLayoutPosition,
-  GlobalLayoutSettings,
+  ResolvedGlobalPhysicsSettings,
 } from './types';
 
 export const GLOBAL_FOLDER_NONE_VERSION = 'global-folder-none-v1' as const;
@@ -18,12 +17,11 @@ function folderDirection(folderKey: string): { x: number; y: number } {
 
 export function createGlobalFolderMacroPolicy(
   nodes: readonly Pick<GlobalLayoutNode, 'folderKey'>[],
-  settings: GlobalLayoutSettings,
+  settings: ResolvedGlobalPhysicsSettings,
 ): GlobalFolderMacroPolicy {
-  const resolved = resolveGlobalPhysicsSettings(settings);
   const active =
-    resolved.folderClustering &&
-    resolved.folderCohesion > 0 &&
+    settings.folderClustering &&
+    settings.folderCohesion > 0 &&
     nodes.some(({ folderKey }) => folderKey !== undefined);
   return active
     ? {
@@ -43,7 +41,7 @@ export function createGlobalFolderMacroPolicy(
 export function validateGlobalFolderMacroPolicy(input: {
   readonly policy: GlobalFolderMacroPolicy;
   readonly nodes: readonly Pick<GlobalLayoutNode, 'folderKey'>[];
-  readonly settings: GlobalLayoutSettings;
+  readonly settings: ResolvedGlobalPhysicsSettings;
 }): void {
   const expected = createGlobalFolderMacroPolicy(input.nodes, input.settings);
   if (Object.keys(input.policy).length !== Object.keys(expected).length) {
@@ -68,7 +66,7 @@ export function validateGlobalFolderMacroPolicy(input: {
 export function deriveGlobalFolderMacroSnapshot(input: {
   readonly nodes: readonly Pick<GlobalLayoutNode, 'key' | 'folderKey'>[];
   readonly positions: readonly GlobalLayoutPosition[];
-  readonly settings: GlobalLayoutSettings;
+  readonly settings: ResolvedGlobalPhysicsSettings;
   readonly policy: GlobalFolderMacroPolicy;
 }): readonly GlobalLayoutPosition[] {
   validateGlobalFolderMacroPolicy({
@@ -87,7 +85,6 @@ export function deriveGlobalFolderMacroSnapshot(input: {
       left.key.localeCompare(right.key),
     );
   }
-  const resolved = resolveGlobalPhysicsSettings(input.settings);
   const folders = new Map<
     string,
     { readonly keys: string[]; x: number; y: number }
@@ -121,9 +118,14 @@ export function deriveGlobalFolderMacroSnapshot(input: {
     ),
   );
   const radialFactor =
-    1 - resolved.folderCohesion + (resolved.withinFolderSpacing - 1) * 0.012;
+    1 -
+    input.settings.folderCohesion +
+    (input.settings.withinFolderSpacing - 1) * 0.012;
   const separation =
-    resolved.folderCohesion * 0.16 * resolved.betweenFolderSpacing * scale;
+    input.settings.folderCohesion *
+    0.16 *
+    input.settings.betweenFolderSpacing *
+    scale;
   for (const [folderKey, folder] of [...folders].sort(([left], [right]) =>
     left.localeCompare(right),
   )) {

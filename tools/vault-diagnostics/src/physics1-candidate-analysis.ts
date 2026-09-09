@@ -17,6 +17,7 @@ import {
   createGlobalConvergencePolicy,
   createGlobalFolderMacroPolicy,
   createLocalConvergencePolicy,
+  resolveGlobalPhysicsSettings,
 } from '@icarus-graph-explorer/renderer-sigma/core';
 
 type Position = {
@@ -339,13 +340,13 @@ function simulationSeed(
     size: 4,
     folderKey: 'analysis',
   }));
-  const settings = {
+  const settings = resolveGlobalPhysicsSettings({
     folderClustering: false,
     spacingPreset: 'normal',
-  } as const;
+  });
   return createAllNetworkPhysicsSeed({
     request: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       algorithm: 'reference-only',
       policy: createGlobalConvergencePolicy(nodes.length),
       macro: createGlobalFolderMacroPolicy(nodes, settings),

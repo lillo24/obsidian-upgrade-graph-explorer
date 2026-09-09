@@ -1,7 +1,6 @@
 import {
   computeGlobalLayout,
   localConvergenceMaxIterations,
-  resolveGlobalPhysicsSettings,
 } from '@icarus-graph-explorer/renderer-sigma/core';
 import type {
   GlobalLayoutPosition,
@@ -169,7 +168,7 @@ function buildGraph(
     graph.addNode(node.key, {
       x: position.x,
       y: position.y,
-      size: node.size,
+      size: 'size' in node ? node.size : 1,
       ...('folderKey' in node && node.folderKey !== undefined
         ? { folderKey: node.folderKey }
         : {}),
@@ -217,7 +216,7 @@ function assignBatch(
     });
     return;
   }
-  const settings = resolveGlobalPhysicsSettings(fixture.request.settings);
+  const settings = fixture.request.settings;
   forceAtlas2.assign(graph, {
     iterations,
     getEdgeWeight: 'weight',

@@ -18,7 +18,7 @@ import {
 import { stableHash32 } from './deterministic';
 import {
   resolveGlobalPhysicsSettings,
-  validateGlobalLayoutSettings,
+  validateGlobalPhysicsSettings,
 } from './settings';
 import type {
   GlobalConvergenceMovement,
@@ -30,12 +30,13 @@ import type {
   GlobalLayoutSettings,
   GlobalLayoutWorkerResponse,
   GlobalRendererInput,
+  ResolvedGlobalPhysicsSettings,
 } from './types';
 
-export const GLOBAL_LAYOUT_SCHEMA_VERSION = 2 as const;
+export const GLOBAL_LAYOUT_SCHEMA_VERSION = 3 as const;
 
 type LayoutGraph = MultiDirectedGraph<
-  { x: number; y: number; size: number; folderKey?: string },
+  { x: number; y: number; folderKey?: string },
   { weight: number }
 >;
 
@@ -96,7 +97,7 @@ export function validateGlobalLayoutRequest(
       'Global layout request requires policy and macro identities.',
     );
   }
-  validateGlobalLayoutSettings(request.settings);
+  validateGlobalPhysicsSettings(request.settings);
   validateGlobalConvergencePolicy(request.policy, request.nodes.length);
   validateGlobalFolderMacroPolicy({
     policy: request.macro,
@@ -114,7 +115,6 @@ export function validateGlobalLayoutRequest(
     nodeKeys.add(node.key);
     finite(node.x, `node ${node.key} x`);
     finite(node.y, `node ${node.key} y`);
-    finitePositive(node.size, `node ${node.key} size`);
     if (node.folderKey !== undefined && node.folderKey.length === 0) {
       throw new Error(
         `Global layout node ${node.key} has an empty folder key.`,
@@ -136,7 +136,7 @@ export function validateGlobalLayoutRequest(
 
 function buildGraph(request: GlobalLayoutRequest): LayoutGraph {
   const graph = new MultiDirectedGraph<
-    { x: number; y: number; size: number; folderKey?: string },
+    { x: number; y: number; folderKey?: string },
     { weight: number }
   >();
   for (const node of request.nodes) graph.addNode(node.key, { ...node });
@@ -163,15 +163,14 @@ function assignForceAtlas2Batch(
   iterations: number,
   request: GlobalLayoutRequest,
 ): void {
-  const settings = resolveGlobalPhysicsSettings(request.settings);
   forceAtlas2.assign(graph, {
     iterations,
     getEdgeWeight: 'weight',
     settings: {
       ...forceAtlas2.inferSettings(graph),
       barnesHutOptimize: graph.order >= 1_000,
-      edgeWeightInfluence: settings.linkForce,
-      scalingRatio: Math.max(0.1, settings.withinFolderSpacing),
+      edgeWeightInfluence: request.settings.linkForce,
+      scalingRatio: Math.max(0.1, request.settings.withinFolderSpacing),
     },
   });
 }
@@ -293,7 +292,7 @@ export function computeGlobalLayout(
     const positions =
       graph.order === 0 ? [] : [{ key: graph.nodes()[0]!, x: 0, y: 0 }];
     return {
-      schemaVersion: 2,
+      schemaVersion: GLOBAL_LAYOUT_SCHEMA_VERSION,
       kind: 'result',
       requestId: request.requestId,
       algorithm: request.algorithm,
@@ -377,7 +376,7 @@ export function computeGlobalLayout(
     y: Number(position.y.toFixed(8)),
   }));
   return {
-    schemaVersion: 2,
+    schemaVersion: GLOBAL_LAYOUT_SCHEMA_VERSION,
     kind: 'result',
     requestId: request.requestId,
     algorithm: request.algorithm,
@@ -402,7 +401,7 @@ export function createGlobalLayoutFailure(
 ): GlobalLayoutFailure {
   if (error instanceof GlobalLayoutMaxWallTimeError) {
     return {
-      schemaVersion: 2,
+      schemaVersion: GLOBAL_LAYOUT_SCHEMA_VERSION,
       kind: 'error',
       requestId: request.requestId,
       code: error.code,
@@ -416,7 +415,7 @@ export function createGlobalLayoutFailure(
     };
   }
   return {
-    schemaVersion: 2,
+    schemaVersion: GLOBAL_LAYOUT_SCHEMA_VERSION,
     kind: 'error',
     requestId: request.requestId,
     code: 'layout-error',
@@ -432,29 +431,30 @@ export function createGlobalLayoutFailure(
 
 export function createGlobalLayoutRequest(
   input: GlobalRendererInput,
-  settings: GlobalLayoutSettings,
+  settings: GlobalLayoutSettings | ResolvedGlobalPhysicsSettings,
   _legacyIterations?: number,
   _legacyAlgorithm?: 'reference-only' | 'chunked-prior' | 'offset-field',
 ): Omit<GlobalLayoutRequest, 'requestId'> {
   void _legacyIterations;
   void _legacyAlgorithm;
-  validateGlobalLayoutSettings(settings);
+  const physicsSettings = Object.hasOwn(settings, 'spacingPreset')
+    ? resolveGlobalPhysicsSettings(settings as GlobalLayoutSettings)
+    : validateGlobalPhysicsSettings(settings);
   const nodes = input.nodes.map(({ key, attributes }) => ({
     key,
     x: attributes.x,
     y: attributes.y,
-    size: attributes.size,
     ...(attributes.folderKey === null
       ? {}
       : { folderKey: attributes.folderKey }),
   }));
-  const macro = createGlobalFolderMacroPolicy(nodes, settings);
+  const macro = createGlobalFolderMacroPolicy(nodes, physicsSettings);
   return {
-    schemaVersion: 2,
+    schemaVersion: GLOBAL_LAYOUT_SCHEMA_VERSION,
     algorithm: macro.algorithm,
     policy: createGlobalConvergencePolicy(nodes.length),
     macro,
-    settings,
+    settings: physicsSettings,
     nodes,
     edges: input.edges.map(({ key, source, target, attributes }) => ({
       key,
@@ -490,7 +490,7 @@ export function reconcileGlobalAutomaticPositions(
 
 export function createGlobalLayoutRequestFromAutomaticPositions(
   input: GlobalRendererInput,
-  settings: GlobalLayoutSettings,
+  settings: GlobalLayoutSettings | ResolvedGlobalPhysicsSettings,
   iterationsOrPositions: number | readonly GlobalLayoutPosition[],
   legacyPositions?: readonly GlobalLayoutPosition[],
   _legacyAlgorithm?: 'reference-only' | 'chunked-prior' | 'offset-field',
@@ -546,7 +546,7 @@ export function globalLayoutFingerprint(
     algorithm: request.algorithm,
     policy: request.policy,
     macro: request.macro,
-    settings: resolveGlobalPhysicsSettings(request.settings),
+    settings: request.settings,
     nodes: [...request.nodes]
       .sort((left, right) => left.key.localeCompare(right.key))
       .map((node): readonly string[] => [node.key, node.folderKey ?? '']),
@@ -559,7 +559,7 @@ export function globalLayoutFingerprint(
         edge.weight,
       ]),
   });
-  return `global-layout-v2-${stableHash32(value).toString(16).padStart(8, '0')}`;
+  return `global-layout-v3-${stableHash32(value).toString(16).padStart(8, '0')}`;
 }
 
 function validatePositions(value: unknown, request: GlobalLayoutRequest): void {
@@ -680,8 +680,11 @@ export function validateGlobalLayoutWorkerResponse(
   value: unknown,
   request: GlobalLayoutRequest,
 ): GlobalLayoutWorkerResponse {
-  if (!plainRecord(value) || value.schemaVersion !== 2) {
-    throw new Error('Expected a schema-v2 Global layout response.');
+  if (
+    !plainRecord(value) ||
+    value.schemaVersion !== GLOBAL_LAYOUT_SCHEMA_VERSION
+  ) {
+    throw new Error('Expected a schema-v3 Global layout response.');
   }
   if (value.requestId !== request.requestId) {
     throw new Error(`Expected Global layout request ${request.requestId}.`);

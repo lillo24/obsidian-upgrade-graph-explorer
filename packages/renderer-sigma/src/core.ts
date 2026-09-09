@@ -154,6 +154,7 @@ export {
   sameGlobalPhysicsSettings,
   sameGlobalVisualSettings,
   validateGlobalLayoutSettings,
+  validateGlobalPhysicsSettings,
   withFolderClusteringStrength,
   withGlobalSpacingPreset,
 } from './settings';

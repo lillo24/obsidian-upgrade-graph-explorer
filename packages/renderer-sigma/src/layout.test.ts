@@ -12,7 +12,10 @@ import {
   validateGlobalLayoutWorkerResponse,
 } from './layout';
 import { mapProjectionToGlobal } from './mapping';
-import { DEFAULT_GLOBAL_LAYOUT_SETTINGS } from './settings';
+import {
+  customGlobalLayoutSettings,
+  DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+} from './settings';
 import { globalTestProjection } from './test-fixture';
 
 function request(folderClustering = false) {
@@ -27,9 +30,9 @@ function request(folderClustering = false) {
 }
 
 describe('Global bounded layout convergence', () => {
-  it('derives schema-v2 policy and duration-independent macro identity centrally', () => {
+  it('derives schema-v3 spatial-only requests and macro identity centrally', () => {
     expect(request(false)).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       algorithm: 'reference-only',
       policy: {
         version: 'global-fa2-folder-convergence-v1',
@@ -73,7 +76,6 @@ describe('Global bounded layout convergence', () => {
       key: `node-${index}`,
       x: index % 17,
       y: index % 31,
-      size: 1,
     }));
     const batches: number[] = [];
     const result = computeGlobalLayout(
@@ -161,14 +163,64 @@ describe('Global bounded layout convergence', () => {
     ).toThrow('policy identity');
   });
 
-  it('uses v2 identity while excluding warm coordinates', () => {
+  it('uses v3 identity while excluding warm coordinates', () => {
     const base = request(true);
     const moved = {
       ...base,
       nodes: base.nodes.map((node) => ({ ...node, x: node.x + 99 })),
     };
-    expect(globalLayoutFingerprint(base)).toMatch(/^global-layout-v2-/);
+    expect(globalLayoutFingerprint(base)).toMatch(/^global-layout-v3-/);
     expect(globalLayoutFingerprint(moved)).toBe(globalLayoutFingerprint(base));
+  });
+
+  it('makes visual variants exact request/cache matches and spatial variants misses', () => {
+    const projection = globalTestProjection();
+    const baseline = {
+      folderClustering: true,
+      spacingPreset: 'normal' as const,
+      custom: customGlobalLayoutSettings('normal'),
+    };
+    const visual = {
+      ...baseline,
+      custom: {
+        ...baseline.custom,
+        nodeSize: 8,
+        referenceDegreeSizeInfluence: 100,
+        linkThickness: 2,
+        labelThreshold: 12,
+      },
+    };
+    const baselineRequest = createGlobalLayoutRequest(
+      mapProjectionToGlobal(projection, baseline),
+      baseline,
+    );
+    const visualRequest = createGlobalLayoutRequest(
+      mapProjectionToGlobal(projection, visual),
+      visual,
+    );
+    expect(visualRequest).toEqual(baselineRequest);
+    expect(globalLayoutFingerprint(visualRequest)).toBe(
+      globalLayoutFingerprint(baselineRequest),
+    );
+
+    for (const spatial of [
+      {
+        ...baseline,
+        custom: { ...baseline.custom, linkForce: 1.5 },
+      },
+      {
+        ...baseline,
+        custom: { ...baseline.custom, betweenFolderSpacing: 5 },
+      },
+    ]) {
+      const spatialRequest = createGlobalLayoutRequest(
+        mapProjectionToGlobal(projection, spatial),
+        spatial,
+      );
+      expect(globalLayoutFingerprint(spatialRequest)).not.toBe(
+        globalLayoutFingerprint(baselineRequest),
+      );
+    }
   });
 });
 

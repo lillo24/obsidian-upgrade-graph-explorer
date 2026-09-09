@@ -10,10 +10,14 @@ import {
 } from '@icarus-graph-explorer/global-renderer-spike/core';
 import {
   buildGlobalGraph,
+  automaticGlobalEdgeSize,
+  automaticGlobalNodeSize,
   composeGlobalSpatialOverrides,
   computeGlobalSpatialInfluence,
   computeGlobalLayout,
   createGlobalLayoutRequest,
+  createGlobalReferenceDegreeIndex,
+  customGlobalLayoutSettings,
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
   GlobalLayoutCache,
   GlobalSpatialInfluenceCache,
@@ -22,6 +26,8 @@ import {
   globalSpatialInfluenceFingerprint,
   mapProjectionToGlobal,
   reconcileGlobalGraph,
+  resolveGlobalLayoutSettings,
+  resolveGlobalNodeStyle,
   type GlobalRendererInput,
   type GlobalSpatialInfluenceRequest,
 } from '@icarus-graph-explorer/renderer-sigma/core';
@@ -165,6 +171,74 @@ function updateEvidence(
       buildGlobalGraph(changed);
     }, repeats),
     incrementalMutation: distribution(incrementalSamples),
+  };
+}
+
+function visualPresentationEvidence(
+  input: GlobalRendererInput,
+  repeats: number,
+) {
+  const degrees = createGlobalReferenceDegreeIndex(input);
+  const baseline = resolveGlobalLayoutSettings({
+    ...DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+    custom: customGlobalLayoutSettings('normal'),
+  });
+  let checksum = 0;
+  const nodePass = (
+    settings: typeof baseline,
+    includeLabelVisibility = false,
+  ) => {
+    for (const node of input.nodes) {
+      const automaticSize = automaticGlobalNodeSize(
+        node.attributes.nodeKind,
+        degrees.get(node.key) ?? 0,
+        settings,
+      );
+      checksum += includeLabelVisibility
+        ? resolveGlobalNodeStyle(node.attributes, {
+            hovered: false,
+            relatedToHover: true,
+            selected: false,
+            lod: 'regional',
+            settings,
+            automaticSize,
+          }).label.length
+        : automaticSize;
+    }
+  };
+  const baseSize = { ...baseline, nodeSize: 7 };
+  const linkInfluence = {
+    ...baseline,
+    referenceDegreeSizeInfluence: 100,
+  };
+  const linkThickness = { ...baseline, linkThickness: 1.5 };
+  const labelThreshold = { ...baseline, labelThreshold: 12 };
+  return {
+    nodeCount: input.nodes.length,
+    edgeCount: input.edges.length,
+    baseNodeSize: measureRepeated(() => nodePass(baseSize), repeats),
+    linkInfluence: measureRepeated(() => nodePass(linkInfluence), repeats),
+    linkThickness: measureRepeated(() => {
+      for (const edge of input.edges) {
+        checksum += automaticGlobalEdgeSize(
+          edge.attributes.referenceCount,
+          linkThickness,
+        );
+      }
+    }, repeats),
+    labelThreshold: measureRepeated(
+      () => nodePass(labelThreshold, true),
+      repeats,
+    ),
+    checksum: Number(checksum.toFixed(3)),
+    operationContract: {
+      projectionRequests: 0,
+      topologyMappings: 0,
+      graphologyReconciliations: 0,
+      layoutRequests: 0,
+      coordinateWrites: 0,
+      sigmaVisualRefreshes: 1,
+    },
   };
 }
 
@@ -491,6 +565,7 @@ async function main(): Promise<void> {
   const graphBuild = measureRepeated(() => {
     buildGlobalGraph(productInput);
   }, repeats);
+  const visualPresentation = visualPresentationEvidence(productInput, repeats);
   const syntheticFolderKeys = [
     ...new Set(
       productInput.nodes.flatMap((node) =>
@@ -700,6 +775,7 @@ async function main(): Promise<void> {
           ).length,
           mapping,
           graphologyBuild: graphBuild,
+          visualPresentation,
           updates: {
             onePercent: updateEvidence(productInput, onePercentInput, repeats),
             tenPercent: updateEvidence(productInput, tenPercentInput, repeats),
@@ -749,6 +825,10 @@ async function main(): Promise<void> {
             'edge-events-on',
             'destroy-recreate',
             'forceatlas2-worker',
+            'visual-base-size',
+            'visual-link-influence',
+            'visual-link-thickness',
+            'visual-label-threshold',
             'spatial-direct-drag',
           ],
         },

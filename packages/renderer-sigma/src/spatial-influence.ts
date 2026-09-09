@@ -18,11 +18,11 @@ import {
 import { SIGMA_VISUAL_DOWN_GRAPH_Y_SIGN } from './spatial';
 import type {
   GlobalLayoutEdge,
-  GlobalLayoutNode,
   GlobalRendererInput,
   GlobalSpatialInfluenceAlgorithm,
   GlobalSpatialInfluenceAttractor,
   GlobalSpatialInfluenceMetrics,
+  GlobalSpatialInfluenceNode,
   GlobalSpatialInfluenceRequest,
   GlobalSpatialInfluenceResult,
   GlobalSpatialInfluenceWorkerResponse,
@@ -429,7 +429,9 @@ export function createGlobalSpatialInfluenceRequest(
   };
 }
 
-function stableNode(node: GlobalLayoutNode): readonly (string | number)[] {
+function stableNode(
+  node: GlobalSpatialInfluenceNode,
+): readonly (string | number)[] {
   return [node.key, node.x, node.y, node.size];
 }
 

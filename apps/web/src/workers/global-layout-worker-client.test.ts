@@ -9,7 +9,7 @@ import {
 
 function request() {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     algorithm: 'reference-only',
     policy: {
       version: 'global-fa2-folder-convergence-v1',
@@ -30,8 +30,14 @@ function request() {
       priorApplications: 0,
       feedback: 'output-only',
     },
-    settings: { folderClustering: false, spacingPreset: 'normal' },
-    nodes: [{ key: 'a', x: 0, y: 0, size: 1 }],
+    settings: {
+      folderClustering: false,
+      folderCohesion: 0.08,
+      linkForce: 1,
+      withinFolderSpacing: 1.15,
+      betweenFolderSpacing: 3.2,
+    },
+    nodes: [{ key: 'a', x: 0, y: 0 }],
     edges: [],
   } as const satisfies Omit<GlobalLayoutRequest, 'requestId'>;
 }
@@ -72,7 +78,7 @@ describe('Global latest-layout worker client', () => {
     const latest = workers[1]!;
     latest.onmessage?.({
       data: {
-        schemaVersion: 2,
+        schemaVersion: 3,
         kind: 'result',
         requestId: 2,
         algorithm: 'reference-only',

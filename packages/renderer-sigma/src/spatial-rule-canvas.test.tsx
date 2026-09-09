@@ -80,7 +80,7 @@ describe('production spatial rule adoption', () => {
       const layout = vi.fn(
         async (request: Omit<GlobalLayoutRequest, 'requestId'>) =>
           ({
-            schemaVersion: 2,
+            schemaVersion: 3,
             kind: 'result',
             requestId: 1,
             algorithm: 'reference-only',
@@ -210,7 +210,7 @@ describe('production spatial rule adoption', () => {
     const layout = vi.fn(
       async (request: Omit<GlobalLayoutRequest, 'requestId'>) =>
         ({
-          schemaVersion: 2,
+          schemaVersion: 3,
           kind: 'result',
           requestId: layout.mock.calls.length,
           algorithm: 'reference-only',
@@ -496,7 +496,7 @@ describe('production spatial rule adoption', () => {
     const layout = vi.fn(
       async (request: Omit<GlobalLayoutRequest, 'requestId'>) =>
         ({
-          schemaVersion: 2,
+          schemaVersion: 3,
           kind: 'result',
           requestId: 1,
           algorithm: 'reference-only',
@@ -616,7 +616,7 @@ describe('production spatial rule adoption', () => {
     const layout = vi.fn(
       async (request: Omit<GlobalLayoutRequest, 'requestId'>) =>
         ({
-          schemaVersion: 2,
+          schemaVersion: 3,
           kind: 'result',
           requestId: 1,
           algorithm: 'reference-only',
@@ -771,7 +771,7 @@ describe('production spatial rule adoption', () => {
       throw new Error('Expected a pending Global layout request.');
     }
     resolveLayout({
-      schemaVersion: 2,
+      schemaVersion: 3,
       kind: 'result',
       requestId: 1,
       algorithm: 'reference-only',
@@ -820,7 +820,7 @@ describe('production spatial rule adoption', () => {
       layout: vi.fn(
         async (request: Omit<GlobalLayoutRequest, 'requestId'>) =>
           ({
-            schemaVersion: 2,
+            schemaVersion: 3,
             kind: 'result',
             requestId: 1,
             algorithm: 'reference-only',

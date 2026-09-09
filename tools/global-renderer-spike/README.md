@@ -49,6 +49,11 @@ chrome now owns Pull/Place and exact/full-subtree/Custom authoring in
 The harness is intentionally separate from product orchestration. It may expose
 edge-event toggles, destroy/recreate, and stress profiles for evidence, but it
 must not add alternate graph semantics or duplicate production renderer code.
+VISUAL1C adds a repeatable Visual Settings sample button that toggles the four
+presentation controls through the production session, records each completed
+Sigma refresh and its highest rAF gap, and performs no worker layout. The Node
+benchmark reports the matching reducer-pass costs and zero-work operation
+contract separately.
 The WebGL scene remains `aria-hidden`; DOM Search, Inspector, status, and native
 controls remain the accessible evidence surface.
 

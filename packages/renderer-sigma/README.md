@@ -303,6 +303,15 @@ count without changing layout edge weight. Radius refreshes retain Sigma's
 indexed processing for labels/programs/picking; thickness and label changes do
 not submit ForceAtlas2 or reapply coordinates.
 
+VISUAL1C makes that boundary structural. The finite All layout worker's
+schema-v3 request carries only folder clustering, folder cohesion, reference
+link force, within-folder spacing, and between-folder spacing. Worker nodes no
+longer carry display radius; ForceAtlas2 continues to run with
+`adjustSizes: false`. Node size, reference-degree size influence, link
+thickness, and label threshold stay in Sigma reducers. Rapid Visual updates are
+coalesced into one presentation refresh on the next animation frame without
+projection, mapping, reconciliation, worker, cache, coordinate, or camera work.
+
 NETWORKSETTINGS1 extends Base node size, Link thickness, and Label threshold to
 Focus without moving those values into Local topology or layout. Base size
 scales the automatic root/document/section/block/diagnostic radii before the
@@ -585,14 +594,14 @@ claim mathematical equilibrium. PHYSICS1 still owns any future continuous
 interactive lifecycle, reheating/cooling, and real temporary-constraint
 adapter.
 
-All Network uses the separate `global-fa2-folder-convergence-v1` schema-v2
+All Network uses the separate `global-fa2-folder-convergence-v1` schema-v3
 policy. `global-convergence.ts` owns centroid-aligned movement, the low-degree
 and centroid-drift guards, three-step stability, 32-iteration batches, the
 640/120/80 caps, and 5 s safety boundary. `global-folder-macro.ts` owns the
 duration-independent `global-folder-fixed-field-v1` output adapter. It applies
 one current-prior-equivalent transform to snapshots only and never feeds folder
 coordinates back into the reused FA2 graph. `layout.ts` owns strict request,
-result, failure, rounding, metric, and `global-layout-v2` fingerprint contracts.
+result, failure, rounding, metric, and `global-layout-v3` fingerprint contracts.
 
 The same GROUP1A map feeds Local Free. File, Heading, and Block base fills may
 use the accent; diagnostic colors and all edges remain unchanged. Root/LOD,

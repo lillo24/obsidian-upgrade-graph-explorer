@@ -159,7 +159,9 @@ function buildGraph(
     { x: number; y: number; size: number; folderKey?: string },
     { weight: number }
   >();
-  for (const node of request.nodes) graph.addNode(node.key, { ...node });
+  for (const node of request.nodes) {
+    graph.addNode(node.key, { ...node, size: 1 });
+  }
   for (const edge of request.edges) {
     graph.addDirectedEdgeWithKey(edge.key, edge.source, edge.target, {
       weight: edge.weight,
@@ -240,7 +242,6 @@ function fixedTotalField(
   graph: CandidateGraph,
   settings: ResolvedGlobalPhysicsSettings,
 ): readonly GlobalLayoutPosition[] {
-  const layoutSettings = globalLayoutSettingsFromResolved(settings);
   const nodes = graph.mapNodes((key, attributes) => ({
     key,
     ...(attributes.folderKey === undefined
@@ -250,25 +251,9 @@ function fixedTotalField(
   return deriveGlobalFolderMacroSnapshot({
     nodes,
     positions: positions(graph),
-    settings: layoutSettings,
-    policy: createGlobalFolderMacroPolicy(nodes, layoutSettings),
+    settings,
+    policy: createGlobalFolderMacroPolicy(nodes, settings),
   });
-}
-
-function globalLayoutSettingsFromResolved(
-  settings: ResolvedGlobalPhysicsSettings,
-): GlobalLayoutSettings {
-  return {
-    folderClustering: settings.folderClustering,
-    spacingPreset: 'normal',
-    custom: {
-      ...customGlobalLayoutSettings('normal'),
-      folderCohesion: settings.folderCohesion,
-      linkForce: settings.linkForce,
-      withinFolderSpacing: settings.withinFolderSpacing,
-      betweenFolderSpacing: settings.betweenFolderSpacing,
-    },
-  };
 }
 
 function alignFrozenTarget(
@@ -412,7 +397,7 @@ export function runGlobalMacroCandidate(input: {
     throw new Error('Global macro step count must be a non-negative integer.');
   }
   const presettleIterations = input.presettleIterations ?? 0;
-  const settings = resolveGlobalPhysicsSettings(input.fixture.request.settings);
+  const settings = input.fixture.request.settings;
   const graph = buildGraph(input.fixture.request);
   const started = performance.now();
   if (presettleIterations > 0) {
@@ -529,7 +514,7 @@ export function convergeGlobalMacroCandidate(input: {
     batchIterations: [...acceptedBatches, MACRO_BATCH_ITERATIONS],
   });
   const initialGraph = buildGraph(input.fixture.request);
-  const settings = resolveGlobalPhysicsSettings(input.fixture.request.settings);
+  const settings = input.fixture.request.settings;
   let previous = candidateOutput(input.candidate, initialGraph, settings);
   let stableSteps = 0;
   let finalMovement: DisplacementMetrics | null = null;
@@ -702,7 +687,7 @@ function fixture(input: {
       ? 'folder'
       : 'reference-only',
     request: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       algorithm: input.layoutSettings.folderClustering
         ? 'chunked-prior'
         : 'reference-only',
@@ -720,7 +705,7 @@ function fixture(input: {
             priorApplications: 0,
             feedback: 'output-only',
           },
-      settings: input.layoutSettings,
+      settings: resolveGlobalPhysicsSettings(input.layoutSettings),
       nodes,
       edges,
     },
@@ -855,7 +840,7 @@ export function globalMacroFixtures(): readonly GlobalMacroFixture[] {
 
 export function currentFixedBaseline(fixture: GlobalMacroFixture) {
   const graph = buildGraph(fixture.request);
-  const settings = resolveGlobalPhysicsSettings(fixture.request.settings);
+  const settings = fixture.request.settings;
   const iterations =
     graph.order <= 1_000 ? 100 : graph.order <= 5_000 ? 30 : 20;
   const chunks = Math.min(5, iterations);

@@ -12,6 +12,7 @@ export type GlobalInteraction =
   | 'inspector'
   | 'projection-change'
   | 'folder-assignment-change'
+  | 'visual-settings-change'
   | 'layout-settings-change'
   | 'source-topology-change'
   | 'explicit-relayout';
@@ -68,6 +69,7 @@ export const GLOBAL_INTERACTION_OPERATION_CONTRACTS: Readonly<
     layoutRequest: 1,
     visualRefresh: 1,
   },
+  'visual-settings-change': VISUAL_ONLY,
   'layout-settings-change': {
     projection: 0,
     graphReconciliation: 0,
