@@ -48,6 +48,8 @@ import type { ResolvedNetworkSettings } from './types';
 import { shouldApplyGlobalViewportRequest } from './viewport-request';
 
 export interface LocalGraphCanvasProps {
+  /** Identifies a startup Fit that must yield to newer manual camera input. */
+  readonly automaticFitRequestKey?: number;
   readonly centerRequest?: LocalCenterRequest;
   readonly fitRequestKey?: number;
   readonly initialTransitionAnchor?: LocalTransitionAnchor;
@@ -67,7 +69,10 @@ export interface LocalGraphCanvasProps {
   readonly onDensityQaDiagnosticsChange?: (
     diagnostics: LocalDensityQaDiagnostics | undefined,
   ) => void;
+  readonly onCenterRequestConsumed?: (key: number) => void;
   readonly onFitRequestConsumed?: (key: number) => void;
+  /** Routes the visible Fit action through the committed-layout request gate. */
+  readonly onFitRequested?: () => void;
   readonly onSelectionChange: (selection: LocalSelection | null) => void;
   readonly onNodeSingleClick?: (nodeId: string) => void;
   readonly onNodeActivate?: (entityId: string) => void;
@@ -93,6 +98,7 @@ function errorMessage(error: unknown): string {
 }
 
 export function LocalGraphCanvas({
+  automaticFitRequestKey,
   centerRequest,
   densityFramingStrength = DEFAULT_LOCAL_DENSITY_FRAMING_STRENGTH,
   fitRequestKey,
@@ -106,7 +112,9 @@ export function LocalGraphCanvas({
   networkSettings = DEFAULT_RESOLVED_NETWORK_SETTINGS,
   onFailure,
   onDensityQaDiagnosticsChange,
+  onCenterRequestConsumed,
   onFitRequestConsumed,
+  onFitRequested,
   onSelectionChange,
   onNodeSingleClick,
   onNodeActivate,
@@ -126,13 +134,17 @@ export function LocalGraphCanvas({
   const [cache] = useState(() => layoutCache ?? new LocalLayoutCache());
   const handledCenterRequest = useRef(0);
   const handledFitRequest = useRef(0);
+  const automaticFitRequestKeyRef = useRef(automaticFitRequestKey);
+  const userCameraIntentGeneration = useRef(0);
   const handledLayoutRequest = useRef(layoutRequestKey);
   const initialCacheAccepted = useRef(false);
   const layoutPending = useRef(true);
   const callbacks = useRef({
     onFailure,
     onDensityQaDiagnosticsChange,
+    onCenterRequestConsumed,
     onFitRequestConsumed,
+    onFitRequested,
     onSelectionChange,
     onNodeSingleClick,
     onNodeActivate,
@@ -144,7 +156,9 @@ export function LocalGraphCanvas({
     callbacks.current = {
       onFailure,
       onDensityQaDiagnosticsChange,
+      onCenterRequestConsumed,
       onFitRequestConsumed,
+      onFitRequested,
       onSelectionChange,
       onNodeSingleClick,
       onNodeActivate,
@@ -155,7 +169,9 @@ export function LocalGraphCanvas({
   }, [
     onFailure,
     onDensityQaDiagnosticsChange,
+    onCenterRequestConsumed,
     onFitRequestConsumed,
+    onFitRequested,
     onSelectionChange,
     onNodeSingleClick,
     onNodeActivate,
@@ -163,6 +179,9 @@ export function LocalGraphCanvas({
     onTransitionAnchorConsumed,
     onViewportObservation,
   ]);
+  useLayoutEffect(() => {
+    automaticFitRequestKeyRef.current = automaticFitRequestKey;
+  }, [automaticFitRequestKey]);
 
   const topology = useMemo(() => {
     const map = () => mapProjectionToLocalTopology(projection, rootEntityId);
@@ -297,6 +316,17 @@ export function LocalGraphCanvas({
             callbacks.current.onDensityQaDiagnosticsChange?.(diagnostics),
           onViewportObservation: (viewport) =>
             callbacks.current.onViewportObservation(viewport),
+          onUserCameraIntent: () => {
+            userCameraIntentGeneration.current += 1;
+            const key = automaticFitRequestKeyRef.current;
+            if (key === undefined) return;
+            automaticFitRequestKeyRef.current = undefined;
+            handledFitRequest.current = Math.max(
+              handledFitRequest.current,
+              key,
+            );
+            callbacks.current.onFitRequestConsumed?.(key);
+          },
         }),
     );
     if (!mounted.ok) {
@@ -530,10 +560,12 @@ export function LocalGraphCanvas({
     ) {
       return;
     }
-    handledCenterRequest.current = centerRequest.key;
-    void sessionRef.current?.center(centerRequest).catch((error: unknown) => {
+    const request = centerRequest;
+    handledCenterRequest.current = request.key;
+    void sessionRef.current?.center(request).catch((error: unknown) => {
       setLayoutError(`Could not center Local: ${errorMessage(error)}`);
     });
+    callbacks.current.onCenterRequestConsumed?.(request.key);
   }, [centerRequest, layoutCommitKey, ready]);
 
   useEffect(() => {
@@ -549,13 +581,22 @@ export function LocalGraphCanvas({
       return;
     }
     handledFitRequest.current = fitRequestKey;
-    sessionRef.current?.fit();
+    const automaticRequestSuperseded =
+      automaticFitRequestKey === fitRequestKey &&
+      userCameraIntentGeneration.current > 0;
+    if (!automaticRequestSuperseded) sessionRef.current?.fit();
     callbacks.current.onFitRequestConsumed?.(fitRequestKey);
-  }, [fitRequestKey, layoutCommitKey, ready]);
+  }, [automaticFitRequestKey, fitRequestKey, layoutCommitKey, ready]);
 
   const zoomIn = useCallback(() => sessionRef.current?.zoomBy(0.82), []);
   const zoomOut = useCallback(() => sessionRef.current?.zoomBy(1.22), []);
-  const fit = useCallback(() => sessionRef.current?.fit(), []);
+  const fit = useCallback(() => {
+    if (callbacks.current.onFitRequested !== undefined) {
+      callbacks.current.onFitRequested();
+      return;
+    }
+    sessionRef.current?.fit();
+  }, []);
 
   return (
     <div className="local-graph-canvas">

@@ -53,7 +53,7 @@ src/
   raw-viewport-frame.ts    Raw graph-space center/scale diagnostics and bounded repair primitive.
   network-camera-intent.ts One-shot initial framing versus camera-neutral position-adoption policy.
   network-position-frame.ts Validates the stable presented-position normalization extent.
-  precision-wheel-zoom.ts  Fine-linear/coarse-compressed wheel curve and Sigma default guard.
+  precision-wheel-zoom.ts  Zoom curve, two-axis wheel-unit normalization, and Sigma default guard.
   session.ts               Imperative Sigma lifecycle and high-frequency interaction ownership.
   node-click.ts            Shared 300 ms single/double-click arbitration; selection stays immediate.
   viewport-request.ts      Layout-commit gate for semantic center and Fit requests.
@@ -82,6 +82,7 @@ src/
   canvas-test-harness.ts    Test-only hook/effect driver for the real canvas dependency paths.
   sigma-test-renderer.ts    Test-only reducer cache and process-boundary Sigma double.
   size-canvas-regression.test.tsx  Real canvas/session layout-count and exact-coordinate regression.
+  network-wheel-pan-session.test.ts  Extent/rotation/delta-mode invariant Network pan regression.
   arrangement-session.test.ts  Exact-folder pointer ownership, sparse refresh, and commit contract.
   file-move-session.test.ts  All/Focus eligibility, arbitration, lifecycle, and fake-port contract.
   arrangement-canvas.test.tsx  Accessible nudge/save and write-failure rollback contract.
@@ -102,6 +103,16 @@ pending reveals. The renderer never scrolls sidebar DOM.
 
 Network layout progress remains visible while preparing/refining; success clears
 the status, while layout failure retains the error and last-position recovery text.
+
+Network Fit and density framing are intentionally different camera actions. Fit
+rebases the current all-node extent and uses Sigma's ratio `1`; the shared 24 px
+stage padding covers the maximum 24 px Network node radius, while labels remain
+opportunistic. The density sliders retain their explicit anchor-preserving ratio
+preview and may omit peripheral nodes. Parent-issued Center/Fit commands are
+consumed once, and Global waits for the exact current layout plus Pull/Place
+generation before applying either. A queued fresh-source Fit yields to newer
+manual camera ownership. Two-finger pan converts wheel units to CSS pixels and
+uses only framed coordinates, so raw graph scale cannot amplify the gesture.
 
 Global is documents-first. A section or block at this boundary is an error;
 headings never enter Global layout. Reference edges remain the only semantic

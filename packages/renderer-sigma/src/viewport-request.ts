@@ -1,4 +1,5 @@
 export interface GlobalViewportRequestReadiness {
+  readonly geometryReady?: boolean;
   readonly handledKey: number;
   readonly layoutPending: boolean;
   readonly ready: boolean;
@@ -7,6 +8,7 @@ export interface GlobalViewportRequestReadiness {
 
 /** A semantic camera intent is consumed only against committed layout positions. */
 export function shouldApplyGlobalViewportRequest({
+  geometryReady = true,
   handledKey,
   layoutPending,
   ready,
@@ -14,6 +16,7 @@ export function shouldApplyGlobalViewportRequest({
 }: GlobalViewportRequestReadiness): boolean {
   return (
     ready &&
+    geometryReady &&
     !layoutPending &&
     requestKey !== undefined &&
     requestKey > handledKey

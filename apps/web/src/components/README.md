@@ -25,12 +25,13 @@ canonical truth, or own a platform storage implementation.
   lost. Exact in-memory layout coordinates and saved semantic viewports remain
   available for within-session mode/history restoration. The app marks each
   fresh source-session mount as `initialViewport="fit"`, so startup, report
-  upload, vault open, and sample restoration issue one Fit after authoritative
-  layout and spatial-rule adoption instead of reopening onto a stale camera.
+  upload, vault open, and sample restoration issue one fit-all after the latest
+  authoritative layout and spatial-rule generation instead of reopening onto a
+  stale camera. Manual navigation cancels that automatic request.
   Live revisions do not remount the source session and therefore do not refit.
-  Local hop/direction changes preserve that camera. Transition anchors and Local
-  Fit requests are consumed once, preventing remount or Back/Forward from
-  replaying stale camera work.
+  Local hop/direction changes preserve that camera. Global/Local Network Center
+  and Fit requests are consumed once, preventing remount or Back/Forward from
+  replaying stale camera work; newer Center and Fit intents supersede older ones.
   Graphology, worker positions, and transition points are never persisted.
   SPATIAL1 also owns the independent workspace spatial-override session and
   passes its resolved map only to All Network. SPATIAL2B expands the web-owned

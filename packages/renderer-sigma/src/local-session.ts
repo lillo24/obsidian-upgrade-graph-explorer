@@ -45,6 +45,7 @@ import {
 import {
   isCoarseWheelDelta,
   normalizeWheelDeltaPixels,
+  normalizeWheelPanDeltaPixels,
   preventSigmaWheelDefault,
   ratioAfterWheelDelta,
   WheelDirectionStabilizer,
@@ -95,6 +96,8 @@ export interface LocalRendererSessionOptions {
   readonly onDensityQaDiagnosticsChange?: (
     diagnostics: LocalDensityQaDiagnostics,
   ) => void;
+  /** Reports a manual or semantic camera claim so queued automatic Fit can yield. */
+  readonly onUserCameraIntent?: () => void;
 }
 
 export interface LocalRendererReady {
@@ -178,14 +181,12 @@ export class LocalRendererSession {
 
   private readonly mouseDragHandler = (): void => {
     if (this.renderer.getMouseCaptor().isMouseDown) {
-      this.cameraOwnership = 'user';
-      this.positionCameraIntent.claimCamera();
+      this.claimUserCamera();
     }
   };
 
   private readonly touchMoveHandler = (): void => {
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
   };
 
   private readonly cameraUpdatedHandler = (): void => {
@@ -224,8 +225,7 @@ export class LocalRendererSession {
       original,
       this.renderer.getDimensions().height,
     );
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     if (this.trackpadZoomMode === 'pinch-zoom' && !original.ctrlKey) {
       this.applyWheelPan(original);
       return;
@@ -358,16 +358,23 @@ export class LocalRendererSession {
   private applyWheelPan(event: WheelEvent): void {
     const dimensions = this.renderer.getDimensions();
     const center = { x: dimensions.width / 2, y: dimensions.height / 2 };
-    const before = this.renderer.viewportToGraph(center);
-    const after = this.renderer.viewportToGraph({
-      x: center.x + event.deltaX,
-      y: center.y + event.deltaY,
+    const delta = normalizeWheelPanDeltaPixels(event, dimensions);
+    const before = this.renderer.viewportToFramedGraph(center);
+    const after = this.renderer.viewportToFramedGraph({
+      x: center.x + delta.x,
+      y: center.y + delta.y,
     });
     const camera = this.renderer.getCamera();
     camera.setState({
       x: camera.x + before.x - after.x,
       y: camera.y + before.y - after.y,
     });
+  }
+
+  private claimUserCamera(): void {
+    this.cameraOwnership = 'user';
+    this.positionCameraIntent.claimCamera();
+    this.options.onUserCameraIntent?.();
   }
 
   private reduceNode(key: string, attributes: LocalNodeAttributes) {
@@ -630,8 +637,7 @@ export class LocalRendererSession {
     // Moving the Sandbox slider is an explicit camera action. Preview the
     // accepted density decision immediately, then protect that viewport from
     // later topology/layout completion exactly like wheel, pinch, or drag.
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     const ratio = this.effectiveDensityRatio();
     if (anchor === undefined) {
       this.renderer.getCamera().setState({ ratio });
@@ -1149,8 +1155,7 @@ export class LocalRendererSession {
     if (display === undefined) {
       throw new Error(`Cannot center missing Local node ${request.nodeId}.`);
     }
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     const started = performance.now();
     await this.renderer
       .getCamera()
@@ -1166,8 +1171,7 @@ export class LocalRendererSession {
   }
 
   zoomBy(factor: number): void {
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     const camera = this.renderer.getCamera();
     void camera.animate(
       { ratio: Math.max(0.02, Math.min(6, camera.ratio * factor)) },
@@ -1184,7 +1188,7 @@ export class LocalRendererSession {
         x: 0.5,
         y: 0.5,
         angle: 0,
-        ratio: this.effectiveDensityRatio(),
+        ratio: 1,
       },
       { duration: preferredMotionDuration() },
     );
