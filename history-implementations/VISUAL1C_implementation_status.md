@@ -1,7 +1,10 @@
 # VISUAL1C implementation report
 
-Status: **implemented and locally validated; PR/CI integration is recorded when
-complete.**
+Status: **implemented, locally validated, and accepted by PR CI.**
+
+[PR #82](https://github.com/lillo24/obsidian-upgrade-graph-explorer/pull/82)
+is the isolated integration vehicle. Its implementation commit `08da5eb` passed
+the required `validate` and `desktop` jobs before this status-only follow-up.
 
 ## Implemented boundary
 
