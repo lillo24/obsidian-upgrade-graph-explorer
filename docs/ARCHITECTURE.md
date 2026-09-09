@@ -1342,7 +1342,7 @@ reheating/cooling, and real temporary constraints.
 
 ## CONVERGENCE1C Global folder-macro convergence
 
-All Network uses schema-v2 `global-fa2-folder-convergence-v1`. One replacement
+All Network uses schema-v3 `global-fa2-folder-convergence-v1`. One replacement
 worker reuses one Graphology graph across public 32-iteration FA2 batches.
 Consecutive output snapshots are centroid-aligned and normalized by the
 previous-frame centroid RMS radius. Stability requires all-node p90 ≤ `0.00512`,
@@ -1355,9 +1355,11 @@ Folder-on requests derive `global-folder-fixed-field-v1` after each FA2 batch.
 The fixed one-application cohesion/separation transform is output-only and is
 never written to the working FA2 graph. Extra convergence checks therefore do
 not accumulate folder strength. Reference-only requests use the same lifecycle
-with an identity macro. `global-layout-v2` fingerprints the complete policy,
-macro, topology, weights, and resolved physics while excluding seeds, visual
-settings, timing, camera/density, dynamic Pull, and fixed Place.
+with an identity macro. The schema-v3 finite request carries only the five
+resolved spatial settings and topology nodes without display radius.
+`global-layout-v3` fingerprints the complete policy, macro, topology, weights,
+and resolved physics while excluding seeds, visual settings, timing,
+camera/density, dynamic Pull, and fixed Place.
 
 The canvas still adopts one final base result through FLICKER1's atomic,
 camera-neutral coordinate transaction, then composes SPATIAL2 as base → dynamic

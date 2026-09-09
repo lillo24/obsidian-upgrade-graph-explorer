@@ -55,6 +55,12 @@ function sortedPositions(positions: readonly GlobalLayoutPosition[]) {
 
 beforeEach(() => {
   SigmaTestRenderer.instances = [];
+  let frame = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    queueMicrotask(() => callback(performance.now()));
+    return ++frame;
+  });
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
   vi.stubGlobal('window', {
     setTimeout: vi.fn(() => 1),
     clearTimeout: vi.fn(),
@@ -101,7 +107,7 @@ describe('All Network automatic/displayed position separation', () => {
       async (request: Omit<GlobalLayoutRequest, 'requestId'>) => {
         requests.push(request);
         return {
-          schemaVersion: 2,
+          schemaVersion: 3,
           kind: 'result',
           requestId: layout.mock.calls.length,
           algorithm: 'reference-only',
@@ -304,7 +310,7 @@ describe('All Network automatic/displayed position separation', () => {
     await harness.flush();
     const automatic = automaticPositions(1);
     resolveLayout({
-      schemaVersion: 2,
+      schemaVersion: 3,
       kind: 'result',
       requestId: 1,
       algorithm: 'reference-only',
@@ -394,7 +400,7 @@ describe('All Network automatic/displayed position separation', () => {
     const layout = vi.fn(
       async (request: Omit<GlobalLayoutRequest, 'requestId'>) =>
         ({
-          schemaVersion: 2,
+          schemaVersion: 3,
           kind: 'result',
           requestId: layout.mock.calls.length,
           algorithm: 'reference-only',
@@ -490,7 +496,7 @@ describe('All Network automatic/displayed position separation', () => {
       requestCount += 1;
       if (requestCount > 1) return new Promise<GlobalLayoutResult>(() => {});
       return Promise.resolve({
-        schemaVersion: 2,
+        schemaVersion: 3,
         kind: 'result',
         requestId: 1,
         algorithm: 'reference-only',

@@ -548,14 +548,13 @@ export function GlobalGraphCanvas({
     betweenFolderSpacing,
   } = resolvedPhysics;
   const layoutSettings = useMemo(
-    () =>
-      globalLayoutSettingsFromPhysics({
-        folderClustering,
-        folderCohesion,
-        linkForce,
-        withinFolderSpacing,
-        betweenFolderSpacing,
-      }),
+    () => ({
+      folderClustering,
+      folderCohesion,
+      linkForce,
+      withinFolderSpacing,
+      betweenFolderSpacing,
+    }),
     [
       betweenFolderSpacing,
       folderClustering,
@@ -563,6 +562,13 @@ export function GlobalGraphCanvas({
       linkForce,
       withinFolderSpacing,
     ],
+  );
+  // The separate schema-v1 soft-attractor worker still accepts the persisted
+  // shape. Freeze its visual fields to the baseline while its protocol remains
+  // backward compatible; the finite Global layout worker is spatial-only.
+  const spatialInfluenceSettings = useMemo(
+    () => globalLayoutSettingsFromPhysics(layoutSettings),
+    [layoutSettings],
   );
   const input = useMemo(() => {
     const map = () => mapProjectionToGlobalTopology(projection);
@@ -1594,7 +1600,7 @@ export function GlobalGraphCanvas({
           );
     const request = createGlobalSpatialInfluenceRequest(
       input,
-      layoutSettings,
+      spatialInfluenceSettings,
       spatialInfluenceIterations(input.nodes.length),
       basePositions,
       fingerprint,
@@ -1747,7 +1753,7 @@ export function GlobalGraphCanvas({
     instrumentation,
     layoutCommitKey,
     layoutPendingState,
-    layoutSettings,
+    spatialInfluenceSettings,
     ready,
     spatialInfluenceService,
     spatialOverrides,
@@ -1927,7 +1933,7 @@ export function GlobalGraphCanvas({
       attractors = [
         ...createGlobalSpatialInfluenceRequest(
           latestInput.current,
-          layoutSettings,
+          spatialInfluenceSettings,
           spatialInfluenceIterations(latestInput.current.nodes.length),
           basePositions,
           fingerprint,
@@ -2000,6 +2006,7 @@ export function GlobalGraphCanvas({
     spatialCommitKey,
     spatialOverrides,
     spatialRules,
+    spatialInfluenceSettings,
     temporaryConstraintActive,
     temporaryConstraintRetryKey,
   ]);

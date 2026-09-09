@@ -1,5 +1,4 @@
 import type { LocalLayoutPosition, LocalLayoutRequest } from '../local-types';
-import { resolveGlobalPhysicsSettings } from '../settings';
 import type {
   GlobalLayoutPosition,
   GlobalLayoutRequest,
@@ -85,7 +84,7 @@ export function createAllNetworkPhysicsSeed(input: {
   readonly simulationGeneration: string;
 }): NetworkPhysicsSeed {
   const byKey = positionIndex(input.dynamicPositions);
-  const settings = resolveGlobalPhysicsSettings(input.request.settings);
+  const settings = input.request.settings;
   return {
     schemaVersion: NETWORK_PHYSICS_SCHEMA_VERSION,
     kind: 'initialize',
@@ -101,7 +100,9 @@ export function createAllNetworkPhysicsSeed(input: {
         key: node.key,
         x: position.x,
         y: position.y,
-        size: node.size,
+        // All Network visual radius is not physics. ForceAtlas2 keeps
+        // adjustSizes=false, so the continuous adapter receives a neutral size.
+        size: 1,
         constraintEligible: input.constraintEligibleNodeKeys.has(node.key),
       };
     }),

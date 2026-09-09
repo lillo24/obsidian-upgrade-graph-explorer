@@ -8,6 +8,7 @@ import { createHarnessSpatialInfluenceService } from './spatial-influence-worker
 import {
   composeGlobalFolderSpatialRules,
   createGlobalSpatialInfluenceRequest,
+  customGlobalLayoutSettings,
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
   globalSpatialInfluenceFingerprint,
   globalLayoutPositionsFromInput,
@@ -81,6 +82,7 @@ declare global {
     icarusGlobalRendererSpike: {
       snapshot(): SpikeSnapshot;
       runInteractionSample(): Promise<SpikeSnapshot>;
+      runVisualSettingsSample(): Promise<SpikeSnapshot>;
       compareUpdate(fraction: 0.01 | 0.1): Promise<SpikeSnapshot>;
     };
   }
@@ -102,6 +104,8 @@ const updateOneButton = requiredElement<HTMLButtonElement>('update-one');
 const updateTenButton = requiredElement<HTMLButtonElement>('update-ten');
 const recreateButton = requiredElement<HTMLButtonElement>('recreate');
 const interactionsButton = requiredElement<HTMLButtonElement>('interactions');
+const visualSettingsButton =
+  requiredElement<HTMLButtonElement>('visual-settings');
 const bookmarkButton = requiredElement<HTMLButtonElement>('bookmark');
 const spatialForm = requiredElement<HTMLFormElement>('spatial-form');
 const arrangeFoldersButton =
@@ -165,6 +169,10 @@ const spatialInfluenceService: GlobalSpatialInfluenceService =
   createHarnessSpatialInfluenceService();
 const spatialInfluenceCache = new GlobalSpatialInfluenceCache(8);
 const measurements: GlobalRendererMeasurement[] = [];
+let visualSettings = {
+  ...DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+  custom: customGlobalLayoutSettings('normal'),
+};
 const numberFormatter = new Intl.NumberFormat();
 
 function record(measurement: GlobalRendererMeasurement): void {
@@ -221,7 +229,7 @@ function createSession(): GlobalRendererSession {
     container,
     warmGlobalRendererInput(input, spatialComposition.displayedPositions),
     {
-      settings: DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+      settings: visualSettings,
       trackpadZoomMode: 'scroll-zoom',
       labels: labelsInput.checked,
       edgeEvents: edgeEventsInput.checked,
@@ -642,6 +650,29 @@ async function runInteractionSample(): Promise<SpikeSnapshot> {
   return snapshot();
 }
 
+async function runVisualSettingsSample(): Promise<SpikeSnapshot> {
+  const restoreBaseline = visualSettings.custom.nodeSize === 7;
+  const samples = [
+    ['visual-base-size', { nodeSize: restoreBaseline ? 4.5 : 7 }],
+    [
+      'visual-link-influence',
+      { referenceDegreeSizeInfluence: restoreBaseline ? 50 : 100 },
+    ],
+    ['visual-link-thickness', { linkThickness: restoreBaseline ? 0.7 : 1.5 }],
+    ['visual-label-threshold', { labelThreshold: restoreBaseline ? 7 : 12 }],
+  ] as const;
+  for (const [operation, change] of samples) {
+    visualSettings = {
+      ...visualSettings,
+      custom: { ...visualSettings.custom, ...change },
+    };
+    record(
+      await activeSession().measureVisualSettings(operation, visualSettings),
+    );
+  }
+  return snapshot();
+}
+
 function snapshot(): SpikeSnapshot {
   const currentSession = activeSession();
   const counts = currentSession.counts();
@@ -788,6 +819,17 @@ interactionsButton.addEventListener('click', () => {
     .finally(() => setBusy(interactionsButton, false));
 });
 
+visualSettingsButton.addEventListener('click', () => {
+  setBusy(visualSettingsButton, true);
+  void runVisualSettingsSample()
+    .then(() => {
+      status.textContent =
+        'Visual sample completed: Base size, Link influence, Link thickness, and Label threshold refreshed Sigma without layout work.';
+    })
+    .catch(showFailure)
+    .finally(() => setBusy(visualSettingsButton, false));
+});
+
 bookmarkButton.addEventListener('click', () => {
   const viewport = activeSession().semanticViewport();
   status.textContent =
@@ -913,5 +955,6 @@ renderMetrics();
 window.icarusGlobalRendererSpike = {
   snapshot,
   runInteractionSample,
+  runVisualSettingsSample,
   compareUpdate,
 };

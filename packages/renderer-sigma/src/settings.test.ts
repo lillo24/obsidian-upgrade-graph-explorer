@@ -12,6 +12,7 @@ import {
   resolveNetworkSettings,
   sameGlobalPhysicsSettings,
   sameGlobalVisualSettings,
+  validateGlobalPhysicsSettings,
   validateGlobalLayoutSettings,
   withFolderClusteringStrength,
   withGlobalSpacingPreset,
@@ -257,7 +258,7 @@ describe('Global physics and visual settings boundary', () => {
     ).toBe(false);
   });
 
-  it('adapts physics to schema-v1 worker settings with a fixed visual baseline', () => {
+  it('adapts physics to legacy soft-attractor settings with a fixed visual baseline', () => {
     const physics = resolveGlobalPhysicsSettings({
       ...baseline,
       custom: {
@@ -271,5 +272,19 @@ describe('Global physics and visual settings boundary', () => {
     expect(resolveGlobalVisualSettings(workerSettings)).toEqual(
       resolveGlobalVisualSettings(DEFAULT_GLOBAL_LAYOUT_SETTINGS),
     );
+  });
+
+  it('strictly validates the finite worker spatial contract', () => {
+    const physics = resolveGlobalPhysicsSettings(baseline);
+    expect(validateGlobalPhysicsSettings(physics)).toEqual(physics);
+    expect(() =>
+      validateGlobalPhysicsSettings({ ...physics, nodeSize: 8 }),
+    ).toThrow('unexpected field nodeSize');
+    expect(() =>
+      validateGlobalPhysicsSettings({
+        ...physics,
+        betweenFolderSpacing: undefined,
+      }),
+    ).toThrow('betweenFolderSpacing');
   });
 });

@@ -15,6 +15,7 @@ vi.mock('sigma', async () => ({
 import { CanvasTestHarness } from './canvas-test-harness';
 import { GlobalGraphCanvas } from './GlobalGraphCanvas';
 import { GlobalLayoutCache } from './layout-cache';
+import { GlobalRendererSession } from './session';
 import {
   automaticGlobalEdgeSize,
   automaticGlobalNodeSize,
@@ -57,7 +58,7 @@ function layoutResult(
   sequence: number,
 ): GlobalLayoutResult {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     kind: 'result',
     requestId: sequence,
     algorithm: request.algorithm,
@@ -87,6 +88,12 @@ function layoutResult(
 
 beforeEach(() => {
   SigmaTestRenderer.instances = [];
+  let frame = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    queueMicrotask(() => callback(performance.now()));
+    return ++frame;
+  });
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
   vi.stubGlobal('window', {
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
@@ -106,6 +113,71 @@ afterEach(() => {
 });
 
 describe('All Network global visual settings ownership', () => {
+  it('coalesces rapid global visual changes into one indexed latest-state frame', async () => {
+    const input = mapProjectionToGlobalTopology(globalTestProjection());
+    const count = vi.fn();
+    const session = new GlobalRendererSession(
+      { setAttribute: vi.fn() } as unknown as HTMLElement,
+      input,
+      {
+        settings: settings(),
+        trackpadZoomMode: 'pinch-zoom',
+        instrumentation: {
+          count,
+          measure: (_phase, _operation, run) => run(),
+          record: noop,
+        },
+      },
+    );
+    const renderer = SigmaTestRenderer.instances.at(-1)!;
+    const refreshesBefore = renderer.refresh.mock.calls.length;
+    const before = coordinates(renderer);
+
+    session.updateSettings(settings({ nodeSize: 5 }));
+    session.updateSettings(
+      settings({ nodeSize: 6, referenceDegreeSizeInfluence: 75 }),
+    );
+    session.updateSettings(
+      settings({
+        nodeSize: 7,
+        referenceDegreeSizeInfluence: 100,
+        linkThickness: 1.5,
+      }),
+    );
+    session.updateSettings(
+      settings({
+        nodeSize: 8,
+        referenceDegreeSizeInfluence: 100,
+        linkThickness: 2,
+        labelThreshold: 12,
+      }),
+    );
+
+    expect(renderer.refresh).toHaveBeenCalledTimes(refreshesBefore);
+    await Promise.resolve();
+    expect(renderer.refresh).toHaveBeenCalledTimes(refreshesBefore + 1);
+    expect(count).toHaveBeenCalledWith('global-visual-refreshes');
+    expect(
+      count.mock.calls.filter(
+        ([operation]) => operation === 'global-visual-refreshes',
+      ),
+    ).toHaveLength(1);
+    expect(coordinates(renderer)).toEqual(before);
+    expect(renderer.displayNodes.get('entity:doc-a')?.size).toBe(
+      automaticGlobalNodeSize(
+        'document',
+        createGlobalReferenceDegreeIndex(input).get('entity:doc-a') ?? 0,
+        settings({
+          nodeSize: 8,
+          referenceDegreeSizeInfluence: 100,
+          linkThickness: 2,
+          labelThreshold: 12,
+        }).custom!,
+      ),
+    );
+    session.destroy();
+  });
+
   it('keeps rapid visual sequences out of layout, coordinates, camera, selection, and folder arrangement', async () => {
     const projection = globalTestProjection();
     const anchors: FolderClusterAnchorMap = new Map([

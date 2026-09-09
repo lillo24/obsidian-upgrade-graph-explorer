@@ -3,6 +3,7 @@ import {
   createGlobalConvergencePolicy,
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
   deterministicGlobalPosition,
+  resolveGlobalPhysicsSettings,
 } from '@icarus-graph-explorer/renderer-sigma/core';
 import type {
   GlobalFolderPriorAlgorithm,
@@ -88,7 +89,6 @@ function globalFixture(
       return {
         key,
         ...position,
-        size: 4.5,
         ...(folderKey === undefined ? {} : { folderKey }),
       };
     },
@@ -106,7 +106,7 @@ function globalFixture(
     description: definition.description,
     currentBudget: globalBudget(definition.nodeCount),
     request: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       algorithm: definition.algorithm,
       policy: createGlobalConvergencePolicy(definition.nodeCount),
       macro:
@@ -123,7 +123,10 @@ function globalFixture(
               priorApplications: 1,
               feedback: 'output-only',
             },
-      settings: { ...DEFAULT_GLOBAL_LAYOUT_SETTINGS, folderClustering },
+      settings: resolveGlobalPhysicsSettings({
+        ...DEFAULT_GLOBAL_LAYOUT_SETTINGS,
+        folderClustering,
+      }),
       nodes,
       edges,
     },

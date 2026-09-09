@@ -111,7 +111,7 @@ describe('All Network Arrange folders canvas', () => {
     const onAnnouncement = vi.fn();
     const layout = vi.fn(
       async (request: Omit<GlobalLayoutRequest, 'requestId'>) => ({
-        schemaVersion: 2 as const,
+        schemaVersion: 3 as const,
         kind: 'result' as const,
         requestId: 1,
         algorithm: 'reference-only' as const,

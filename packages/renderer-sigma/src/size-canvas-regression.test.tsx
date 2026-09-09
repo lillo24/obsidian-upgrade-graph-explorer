@@ -97,7 +97,7 @@ describe.each(['global', 'local'] as const)(
             }));
             return mode === 'global'
               ? ({
-                  schemaVersion: 2,
+                  schemaVersion: 3,
                   kind: 'result',
                   requestId: 1,
                   algorithm: 'reference-only',

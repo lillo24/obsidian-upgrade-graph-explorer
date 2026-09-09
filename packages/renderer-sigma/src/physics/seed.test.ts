@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createGlobalConvergencePolicy } from '../global-convergence';
 import { createGlobalFolderMacroPolicy } from '../global-folder-macro';
 import { createLocalConvergencePolicy } from '../local-convergence';
+import { resolveGlobalPhysicsSettings } from '../settings';
 import {
   createAllNetworkPhysicsSeed,
   createFocusNetworkPhysicsSeed,
@@ -62,22 +63,21 @@ describe('network physics seeds', () => {
   });
 
   it('uses All dynamic pre-Place positions and preserves resolved Pull data', () => {
-    const settings = {
+    const settings = resolveGlobalPhysicsSettings({
       folderClustering: false,
       spacingPreset: 'normal',
-    } as const;
+    });
     const nodes = [
-      { key: 'file', x: 100, y: 100, size: 4, folderKey: 'docs' },
+      { key: 'file', x: 100, y: 100, folderKey: 'docs' },
       {
         key: 'diagnostic',
         x: 110,
         y: 100,
-        size: 3,
         folderKey: 'docs',
       },
     ];
     const request = {
-      schemaVersion: 2 as const,
+      schemaVersion: 3 as const,
       algorithm: 'reference-only' as const,
       policy: createGlobalConvergencePolicy(nodes.length),
       macro: createGlobalFolderMacroPolicy(nodes, settings),
@@ -114,12 +114,12 @@ describe('network physics seeds', () => {
       simulationGeneration: 'simulation',
     });
     expect(seed.nodes).toEqual([
-      { key: 'file', x: 4, y: 5, size: 4, constraintEligible: true },
+      { key: 'file', x: 4, y: 5, size: 1, constraintEligible: true },
       {
         key: 'diagnostic',
         x: 8,
         y: 9,
-        size: 3,
+        size: 1,
         constraintEligible: false,
       },
     ]);
@@ -129,13 +129,13 @@ describe('network physics seeds', () => {
   });
 
   it('marks an M2-shaped All snapshot for intentional temporary relaxation without changing activation coordinates', () => {
-    const settings = {
+    const settings = resolveGlobalPhysicsSettings({
       folderClustering: true,
       spacingPreset: 'normal',
-    } as const;
+    });
     const nodes = [
-      { key: 'a', x: -5, y: 0, size: 4, folderKey: 'docs' },
-      { key: 'b', x: 5, y: 0, size: 4, folderKey: 'docs' },
+      { key: 'a', x: -5, y: 0, folderKey: 'docs' },
+      { key: 'b', x: 5, y: 0, folderKey: 'docs' },
     ];
     const shapedSnapshot = [
       { key: 'a', x: 41, y: -7 },
@@ -143,7 +143,7 @@ describe('network physics seeds', () => {
     ];
     const seed = createAllNetworkPhysicsSeed({
       request: {
-        schemaVersion: 2,
+        schemaVersion: 3,
         algorithm: 'fixed-total-field',
         policy: createGlobalConvergencePolicy(nodes.length),
         macro: createGlobalFolderMacroPolicy(nodes, settings),

@@ -162,8 +162,12 @@ export interface GlobalLayoutNode {
   readonly key: string;
   readonly x: number;
   readonly y: number;
-  readonly size: number;
   readonly folderKey?: string;
+}
+
+/** Schema-v1 soft-attractor input; retained separately from finite layout. */
+export interface GlobalSpatialInfluenceNode extends GlobalLayoutNode {
+  readonly size: number;
 }
 
 export interface GlobalLayoutEdge {
@@ -217,12 +221,12 @@ export interface GlobalConvergenceMovement {
 }
 
 export interface GlobalLayoutRequest {
-  readonly schemaVersion: 2;
+  readonly schemaVersion: 3;
   readonly requestId: number;
   readonly algorithm: GlobalFolderPriorAlgorithm;
   readonly policy: GlobalConvergencePolicy;
   readonly macro: GlobalFolderMacroPolicy;
-  readonly settings: GlobalLayoutSettings;
+  readonly settings: ResolvedGlobalPhysicsSettings;
   readonly nodes: readonly GlobalLayoutNode[];
   readonly edges: readonly GlobalLayoutEdge[];
 }
@@ -241,7 +245,7 @@ export interface GlobalFolderPriorMetrics {
 }
 
 export interface GlobalLayoutResult {
-  readonly schemaVersion: 2;
+  readonly schemaVersion: 3;
   readonly kind: 'result';
   readonly requestId: number;
   readonly algorithm: GlobalFolderPriorAlgorithm;
@@ -260,7 +264,7 @@ export interface GlobalLayoutResult {
 }
 
 export interface GlobalLayoutFailure {
-  readonly schemaVersion: 2;
+  readonly schemaVersion: 3;
   readonly kind: 'error';
   readonly requestId: number;
   readonly code: 'max-wall-time' | 'layout-error';
@@ -301,7 +305,7 @@ export interface GlobalSpatialInfluenceRequest {
   readonly algorithmVersion: 1;
   readonly baseLayoutFingerprint: string;
   readonly iterations: number;
-  readonly nodes: readonly GlobalLayoutNode[];
+  readonly nodes: readonly GlobalSpatialInfluenceNode[];
   readonly edges: readonly GlobalLayoutEdge[];
   readonly attractors: readonly GlobalSpatialInfluenceAttractor[];
   readonly globalLayoutSettings: GlobalLayoutSettings;
@@ -402,6 +406,7 @@ export type GlobalPerformanceOperation =
   | 'spatial-pull-cache-hits'
   | 'spatial-fixed-compositions'
   | 'global-style-updates'
+  | 'global-visual-refreshes'
   | 'global-hover-applications'
   | 'global-selection-applications'
   | 'global-centers'
