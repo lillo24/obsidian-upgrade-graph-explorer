@@ -37,8 +37,8 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     const key = exactFocusSchematicLayoutCacheKey(input);
     expect(key).toContain('modular-focus-hierarchy');
     expect(key).toContain('"algorithmVersion":3');
-    expect(key).toContain('"protocolVersion":5');
-    expect(key.replace('"protocolVersion":5', '"protocolVersion":4')).not.toBe(
+    expect(key).toContain('"protocolVersion":6');
+    expect(key.replace('"protocolVersion":6', '"protocolVersion":5')).not.toBe(
       key,
     );
     expect(exactFocusSchematicLayoutCacheKey(input, 1)).not.toBe(key);
@@ -202,16 +202,19 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     ).not.toBe(exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)));
   });
 
-  it('keys canonical scope only in Soft mode', () => {
+  it('keys canonical manual display intent only in Soft mode', () => {
     const input = fixtureInput(4);
-    const scope = [
-      { exactFolderKey: 'A/Child', spatialGroupKey: 'A' },
-      { exactFolderKey: 'Z/Child', spatialGroupKey: 'Z' },
-    ] as const;
+    const displayIntent = {
+      fileParentOverrides: [
+        { fileId: 'a', displayParentFolderKey: 'A' },
+        { fileId: 'z', displayParentFolderKey: 'Z' },
+      ],
+      flattenedFolderKeys: ['A/Child', 'Z/Child'],
+    } as const;
     const directional = DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES;
     const directionalWithScope = {
       ...directional,
-      softFolderScopeOverrides: scope,
+      softFolderDisplayIntent: displayIntent,
     };
     expect(exactFocusSchematicLayoutCacheKey(input, directionalWithScope)).toBe(
       exactFocusSchematicLayoutCacheKey(input, directional),
@@ -224,18 +227,21 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     expect(
       exactFocusSchematicLayoutCacheKey(input, {
         ...soft,
-        softFolderScopeOverrides: scope,
+        softFolderDisplayIntent: displayIntent,
       }),
     ).not.toBe(exactFocusSchematicLayoutCacheKey(input, soft));
     expect(
       exactFocusSchematicLayoutCacheKey(input, {
         ...soft,
-        softFolderScopeOverrides: [...scope].reverse(),
+        softFolderDisplayIntent: {
+          fileParentOverrides: [...displayIntent.fileParentOverrides].reverse(),
+          flattenedFolderKeys: [...displayIntent.flattenedFolderKeys].reverse(),
+        },
       }),
     ).toBe(
       exactFocusSchematicLayoutCacheKey(input, {
         ...soft,
-        softFolderScopeOverrides: scope,
+        softFolderDisplayIntent: displayIntent,
       }),
     );
   });

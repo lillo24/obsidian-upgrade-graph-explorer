@@ -1,6 +1,6 @@
 export * from './types';
 export * from './policies';
-export * from './soft-folder-scope';
+export * from './soft-folder-display';
 export {
   FILTERED_MODULE_DIMENSIONS,
   FOCUS_SCHEMATIC_LAYOUT_CLEARANCE,

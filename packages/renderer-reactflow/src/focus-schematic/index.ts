@@ -21,6 +21,7 @@ export {
   FocusSchematicFolderClusterGuides,
   focusSchematicFolderClusterGuides,
   type FocusSchematicFolderClusterGuide,
+  type FocusSchematicFolderGuideContextRequest,
 } from './folder-cluster-guides';
 import {
   DIAGNOSTIC_NODE_DIMENSIONS,

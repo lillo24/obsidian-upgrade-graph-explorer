@@ -459,7 +459,10 @@ describe('HIER4A categorical Directional Folder Bands', () => {
     const policies = {
       macroLayout: 'directional-bands',
       softFolderStrength: 50,
-      softFolderScopeOverrides: [],
+      softFolderDisplayIntent: {
+        fileParentOverrides: [],
+        flattenedFolderKeys: [],
+      },
       endpointOrderPolicy: 'crossing-optimized',
       internalLayoutVariant: 'adaptive-compass',
     } as const;

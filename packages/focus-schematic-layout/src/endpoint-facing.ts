@@ -60,7 +60,7 @@ import type {
   FocusSchematicLayoutPlan,
   FocusSchematicNativeRoute,
 } from './types';
-import { validateFocusSchematicSoftFolderScopeOverrides } from './soft-folder-scope';
+import { validateFocusSchematicSoftFolderDisplayIntent } from './soft-folder-display';
 
 export { createFocusSchematicEndpointAttachments } from './attachments';
 
@@ -974,20 +974,23 @@ function validSoftClusterPolicyEvidence(
 ): boolean {
   if (evidence === undefined) return true;
   if (evidence === null || typeof evidence !== 'object') return false;
-  const scopeValidation = validateFocusSchematicSoftFolderScopeOverrides(
-    evidence.scopeOverrides,
+  const intentValidation = validateFocusSchematicSoftFolderDisplayIntent(
+    evidence.displayIntent,
   );
   return (
-    evidence.schemaVersion === 1 &&
+    evidence.schemaVersion === 2 &&
     evidence.layoutFamily === 'soft-folder-clusters' &&
     Number.isFinite(evidence.strength) &&
     evidence.strength >= 0 &&
     evidence.strength <= 100 &&
     (evidence.endpointOrderPolicy === 'crossing-optimized' ||
       evidence.endpointOrderPolicy === 'document-order') &&
-    scopeValidation.valid &&
-    JSON.stringify(scopeValidation.value) ===
-      JSON.stringify(evidence.scopeOverrides) &&
+    intentValidation.valid &&
+    JSON.stringify(intentValidation.value) ===
+      JSON.stringify(evidence.displayIntent) &&
+    (evidence.hierarchyForcePolicy === 'nearest-only' ||
+      evidence.hierarchyForcePolicy === 'normalized-decay' ||
+      evidence.hierarchyForcePolicy === 'normalized-equal') &&
     evidence.fileAttachmentPolicy === 'spatial-cardinal'
   );
 }

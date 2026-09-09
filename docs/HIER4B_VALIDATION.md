@@ -1,134 +1,109 @@
 # HIER4B validation
 
-Status: **HIER4B-FIX1 IMPLEMENTED — optimized real-vault graphical decision pending.**
+Status: **HIER4B-FIX2 IMPLEMENTED — optimized graphical decision pending.**
 
-The HIER4B evidence is synthetic and development-only. It compares the new
-Soft Folder Clusters macro layout with the unchanged production Directional
-Folder Bands implementation on the same Focus Schematic inputs.
+HIER4B evidence remains synthetic and development-only. Directional Folder
+Bands is the unchanged reference and default. No HIER4B adoption PR exists.
 
-The real Modular worker now also dispatches both macro families. A committed
-source-neutral fixture covers a Focus File with five Heading branches, repeated
-and singleton exact folders, incoming and outgoing references, Secondary
-context, and a direct File reference. Worker validation covers all eight
-macro/internal/Heading-order combinations plus Soft strengths 0, 50, and 100.
-Directional results are compared byte-for-byte with the unchanged HIER4A call,
-including requests that carry nonempty Soft scope state.
-Cache tests prove Soft 25 and Soft 75 are distinct, that returning to 25 restores
-the exact 25 geometry, and that stored Soft strength or scope does not change the
-Directional key. Canonically equivalent Soft scope arrays share a key.
-Browser-client tests terminate obsolete generations across
-0→25→50→75→100 and Directional→Soft→Directional bursts.
+## Hard regression boundaries
 
-Preferences remain in the existing v1 record. Tests cover the Directional/50/
-Adaptive/Crossing defaults, Soft/75/Spine/Document round-trip, Sandbox reset,
-numeric clamping, and invalid-value fallback. Real-vault timing and interaction
-evidence is aggregate and local only.
+Automated tests verify:
 
-Renderer validation derives Soft Folder guides after final layout at strengths
-0, 25, 50, 75, and 100. It covers singleton, two-File capsule, three-File hull,
-root-folder, filtered-module exclusion, deterministic input permutation, and
-same-folder regions split by an intervening different folder. Every strength
-case snapshots node positions before guide derivation and reruns the bounded
-solver to prove identical convergence and geometry.
+- Directional output remains byte-identical when a request carries nonempty
+  Soft File-parent and flattened-layer intent; its cache key erases that intent.
+- exact source folder keys and stable File identity remain immutable;
+- stale manual intent reconciles without path/rename guesses or cross-workspace
+  reuse;
+- query-hidden File intent survives until that File becomes visible again;
+- Heading disclosure leaves display-tree identity unchanged;
+- Secondary connections retain zero geometry influence;
+- Soft File/module anchors retain final-geometry left/right/top/bottom ports;
+- Direct and Electronic consume identical selected handles;
+- the root File stays centered and all final variable module rectangles remain
+  non-overlapping.
 
-HIER4B-FIX1 adds strict sparse-scope helper tests for exact default, one-child
-promotion, explicit sibling promotion, mixed granularity, repeated promotion,
-merged-guide reset, and stale-key reconciliation. Persistence tests cover stable
-A→B→A workspace isolation, reload, transient/legacy memory-only state,
-corruption preservation, and last-confirmed-state retention after write failure.
-Guide tests cover merged effective identity and keyboard-accessible promotion and
-reset while the SVG hull remains hidden from accessibility and pointer input.
+## Display-tree cases
 
-Cardinal attachment tests cover left/right/top/bottom use by one File, independent
-target mirroring, 45-degree and coincident-center ties, recomputation after a
-geometry move, preserved Heading semantics, the Directional default oracle, and
-the exact cardinal crossing objective used by bounded candidate scoring. The
-production renderer test proves Direct and Electronic reuse identical Soft
-handles, and existing Secondary geometry tests continue to pass.
+`soft-folder-display.test.ts` covers N1–N17: nested parent/child folders,
+single-File and repeated promotion, exact restore, one-layer and sibling
+flattening, layer restore, one-child-unit compression, deep chains, meaningful
+two-unit folders, visibility changes, disclosure invariance, manual/automatic
+provenance, workspace isolation, and stale intent. Directional isolation is
+covered by the worker/runtime oracle as N18.
 
-## Fixture coverage
+The selected compression rule suppresses a non-root folder only when it has
+exactly one direct displayed child unit after manual intent. Empty visible
+layers are pruned. The transformation repeats to a meaningful branching level
+and stores no automatic result.
 
-SC1–SC24 cover a topology-only star, repeated folders, topology/folder conflict
-and cooperation, disconnected same-folder modules, singleton and nested exact
-folders, root-folder peers, three-hop chains, cycles, 20/50/100-leaf hubs,
-parallel-reference saturation, a filtered bridge, 5–8-branch Adaptive Compass,
-mixed authored directions, all five strengths, small perturbation, hide and
-restore, reroot, Secondary mutation, a large mixed-folder graph, asymmetric
-module rectangles, a topology-legitimate folder split, and free 2D placement.
+## Guide and interaction cases
 
-The automated report retains 120 fixed fixture/strength rows, 15 hub stress
-rows, five multiplicity rows, Directional Bands reference rows, and SC17–SC19
-stability rows. HIER4B-FIX1 adds five deterministic scope profiles and three
-cardinal geometry profiles without multiplying the solver candidate space. Its
-hard gates require:
+Renderer tests prove bottom-up parent containment, direct File plus child-guide
+enclosure, hierarchy labels, disconnected islands, bounded fixed padding,
+determinism, parent/sibling emphasis, compressed ancestry text, pointer-inert
+hulls, and removal of the old toolbar.
 
-- exact root File anchoring;
-- zero module overlap and valid node containment;
-- byte-identical repeated cold runs;
-- byte-identical geometry after input-order permutation;
-- byte-identical strength-zero geometry after folder-key mutation;
-- byte-identical geometry after removing Secondary-only references;
-- fixed `36 + 18` relaxation accounting;
-- zero declared Secondary geometry influence.
+Shared-menu and GraphCanvas tests cover right-click plus Shift+F10/ContextMenu
+entry, disabled actions, keyboard traversal, Escape and outside dismissal.
+Application action tests prove one File update, one folder-layer update,
+sibling flatten, restore, root/exact disabled state, and reset availability.
+Menu and hover state are absent from layout policy/cache input.
 
-The multiplicity fixture verifies that 20 and 100 parallel references produce
-identical geometry after the spring cap. Singleton folders produce identical
-geometry at strengths 0 and 100. Across repeated-folder cases in the recorded
-run, mean RMS folder radius decreased from about 326 px at strength 0 to 260 px
-at 50 and 230 px at 100, showing progressive rather than categorical cohesion.
+## Hierarchy-force bakeoff
 
-SC17's recorded strength-50 perturbation kept the median shared and unaffected
-module displacement at 0 px; p95/max displacement was about 67 px for the one
-affected shared module. SC18 and SC19 retain explicit hide and reroot evidence;
-rerooting intentionally moves the coordinate frame because the new Focus File
-must become `(0, 0)`.
+The generated benchmark compares:
 
-## Recorded commands
+```text
+H0 — nearest displayed folder only
+H1 — normalized decaying ancestor weights (selected)
+H2 — normalized equal ancestor shares
+```
 
-```bash
-pnpm install --frozen-lockfile
+HFA1–HFA7 cover a parent direct File plus nested child, sibling nested folders,
+depth three, promoted File, flattened parent with surviving grandchild,
+disconnected islands, and topology opposing nesting. Hard gates require no
+overlap, deterministic output, exact crossing evidence, bounded fixed schedule,
+and maximum total folder weight per File no greater than one. H1 keeps child
+coherence stronger while still supplying parent coherence. Strength 0 creates
+no folder force.
+
+The current benchmark passed:
+
+- 120 SC1–SC24 strength rows;
+- 15 hub stress rows;
+- five manual display-intent profiles;
+- 21 HFA1–HFA7 policy rows;
+- 35 HFA1–HFA7 strength rows;
+- three cardinal attachment geometry profiles.
+
+Decision state remains `REQUIRES_GRAPHICAL_REVIEW`.
+
+## Commands
+
+```text
 pnpm --filter @icarus-graph-explorer/focus-schematic-layout typecheck
 pnpm exec vitest run packages/focus-schematic-layout
-pnpm --filter @icarus-graph-explorer/focus-schematic-bakeoff typecheck
-pnpm exec vitest run tools/focus-schematic-bakeoff
+pnpm --filter @icarus-graph-explorer/renderer-reactflow typecheck
+pnpm exec vitest run packages/renderer-reactflow
+pnpm --filter @icarus-graph-explorer/web typecheck
+pnpm exec vitest run apps/web
 pnpm benchmark:focus-schematic-soft-clusters
 pnpm benchmark:focus-schematic-production-worker -- --profile small
 pnpm benchmark:focus-schematic-production-worker -- --profile medium
-pnpm generate:focus-schematic-soft-cluster-lab -- --out output/hier4b-soft-clusters-lab
 pnpm check
 pnpm desktop:check
 pnpm desktop:build
 git diff --check
 ```
 
-The generated JSON and lab remain ignored local evidence under `output/`. The
-benchmark records wall-clock time for diagnosis, but timing is not a CI gate.
-Graphical review should prioritize SC3, SC5, SC7, SC9, SC11, SC14, SC15, SC16,
-SC17, SC21, SC23, and SC24. SC16 always renders all five strengths side by
-side. Folder hulls, centroids, hop guides, module bounds, primary arrows,
-internal-layout variants, and Heading-order policies can be toggled.
+## Privacy and traceability
 
-## HIER4B-FIX1 recorded result
+Tests and benchmark fixtures are synthetic. The renderer consumes visible HIER1
+membership only. Persisted records contain stable File IDs and normalized
+workspace-relative folder keys, never absolute paths, source contents, hidden
+guide membership, geometry, or screenshots.
 
-On September 9, 2026, `pnpm check` passed 212 test files and 1,719 tests, all
-workspace typechecks, lint, formatting, and the production web build. The Soft
-benchmark passed all hard gates with 120 fixture rows, 15 stress rows, five
-scope profiles, and three cardinal geometry profiles. Directional and Soft
-small/medium worker profiles completed. `pnpm desktop:check` and
-`pnpm desktop:build` both passed, and the optimized application launched.
-
-Local browser smoke QA opened Modular Preview, switched Soft strength, exposed
-and keyboard-dismissed the guide toolbar, and returned to Directional strips.
-Final real-vault graphical approval is still required; HIER4B remains under
-evaluation and no adoption ADR or PR exists.
-
-The exact HIER4B-FIX1 prompt is archived at
-`history-implementations/HIER4B_FIX1_per_folder_scope_cardinal_file_ports_codex_prompt.md`.
-Its SHA-256 is:
-
-```text
-5BBD71E14BCE2D617547467C7310F68913B279336EA775E85DB1B9AD606F906B
-```
-
-No adoption ADR is recorded at this stage because the repository uses the ADR
-to capture the selected production architecture after graphical approval.
+The exact FIX2 prompt is archived at
+`history-implementations/HIER4B_FIX2_nested_folder_hierarchy_context_menu_codex_prompt.md`.
+Its SHA-256 is
+`97BA5BB86EDB21F22147AB091E386917117E287ACD496738AFA20BDDF3EA0DCE`.

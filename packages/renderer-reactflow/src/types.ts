@@ -52,6 +52,13 @@ export interface GraphViewportPoint {
   readonly y: number;
 }
 
+export interface GraphNodeContextRequest {
+  readonly node: GraphFlowNode;
+  readonly x: number;
+  readonly y: number;
+  readonly origin: HTMLElement | null;
+}
+
 /** Narrow renderer boundary used to preserve a semantic node's screen point. */
 export interface GraphTransitionAnchorApi {
   readonly nodeViewportPoint: (
@@ -225,6 +232,9 @@ export interface GraphCanvasProps {
   readonly onFitRequestConsumed?: (key: number) => void;
   readonly onSelectionChange: (selection: GraphSelection | null) => void;
   readonly onFocusEntity?: (entityId: string) => void;
+  readonly onNodeContextMenuRequest?: (
+    request: GraphNodeContextRequest,
+  ) => void;
   readonly onToggleEntity: (entityId: string, currentlyOpen: boolean) => void;
 }
 

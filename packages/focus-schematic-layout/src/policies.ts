@@ -2,9 +2,12 @@ import type {
   FocusSchematicComputedLayout,
   FocusSchematicEndpointOrderPolicy,
   FocusSchematicInternalLayoutVariant,
-  FocusSchematicSoftFolderScopeOverride,
+  FocusSchematicSoftFolderDisplayIntent,
 } from './types';
-import { canonicalFocusSchematicSoftFolderScopeOverrides } from './soft-folder-scope';
+import {
+  canonicalFocusSchematicSoftFolderDisplayIntent,
+  EMPTY_FOCUS_SCHEMATIC_SOFT_FOLDER_DISPLAY_INTENT,
+} from './soft-folder-display';
 
 export type { FocusSchematicEndpointOrderPolicy } from './types';
 
@@ -20,7 +23,7 @@ export type FocusSchematicProductMacroLayout =
 export interface FocusSchematicProductLayoutPolicies {
   readonly macroLayout: FocusSchematicProductMacroLayout;
   readonly softFolderStrength: number;
-  readonly softFolderScopeOverrides: readonly FocusSchematicSoftFolderScopeOverride[];
+  readonly softFolderDisplayIntent: FocusSchematicSoftFolderDisplayIntent;
   readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
   readonly internalLayoutVariant: FocusSchematicProductInternalLayoutVariant;
 }
@@ -28,7 +31,7 @@ export interface FocusSchematicProductLayoutPolicies {
 export const DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES = {
   macroLayout: 'directional-bands',
   softFolderStrength: 50,
-  softFolderScopeOverrides: [],
+  softFolderDisplayIntent: EMPTY_FOCUS_SCHEMATIC_SOFT_FOLDER_DISPLAY_INTENT,
   endpointOrderPolicy: 'crossing-optimized',
   internalLayoutVariant: 'adaptive-compass',
 } as const satisfies FocusSchematicProductLayoutPolicies;
@@ -47,10 +50,12 @@ export function normalizeFocusSchematicSoftFolderStrength(
     : DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softFolderStrength;
 }
 
-export function normalizeFocusSchematicSoftFolderScopeOverrides(
+export function normalizeFocusSchematicSoftFolderDisplayIntent(
   value: unknown,
-): readonly FocusSchematicSoftFolderScopeOverride[] {
-  return canonicalFocusSchematicSoftFolderScopeOverrides(value ?? []);
+): FocusSchematicSoftFolderDisplayIntent {
+  return canonicalFocusSchematicSoftFolderDisplayIntent(
+    value ?? EMPTY_FOCUS_SCHEMATIC_SOFT_FOLDER_DISPLAY_INTENT,
+  );
 }
 
 export function isFocusSchematicEndpointOrderPolicy(
@@ -81,8 +86,8 @@ export function focusSchematicLayoutMatchesProductPolicies(
         policies.endpointOrderPolicy
     );
   const evidence = computed.internalLayoutEvidence.softClusterPolicyEvidence;
-  const expectedScope = normalizeFocusSchematicSoftFolderScopeOverrides(
-    policies.softFolderScopeOverrides,
+  const expectedIntent = normalizeFocusSchematicSoftFolderDisplayIntent(
+    policies.softFolderDisplayIntent,
   );
   return (
     !computed.folderBandPlan.enabled &&
@@ -90,7 +95,8 @@ export function focusSchematicLayoutMatchesProductPolicies(
     evidence.endpointOrderPolicy === policies.endpointOrderPolicy &&
     evidence.strength ===
       normalizeFocusSchematicSoftFolderStrength(policies.softFolderStrength) &&
-    JSON.stringify(evidence.scopeOverrides) === JSON.stringify(expectedScope) &&
+    JSON.stringify(evidence.displayIntent) === JSON.stringify(expectedIntent) &&
+    evidence.hierarchyForcePolicy === 'normalized-decay' &&
     evidence.fileAttachmentPolicy === 'spatial-cardinal'
   );
 }

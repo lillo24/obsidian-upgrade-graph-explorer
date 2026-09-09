@@ -30,7 +30,7 @@ describe('HIER3B production boundary', () => {
     );
   });
 
-  it('is imported only by the approved renderer, worker/cache, policy, and scope persistence seams', () => {
+  it('is imported only by the approved renderer, worker/cache, policy, display-intent, and persistence seams', () => {
     const repository = fileURLToPath(new URL('../../..', import.meta.url));
     const packageRoot = join(repository, 'packages', 'focus-schematic-layout');
     const roots = ['apps', 'packages']
@@ -48,10 +48,11 @@ describe('HIER3B production boundary', () => {
       [
         'apps/web/src/components/ModularStructuredGraphView.tsx',
         'apps/web/src/focus-schematic-layout-cache.ts',
-        'apps/web/src/persistence/soft-folder-scope.ts',
+        'apps/web/src/persistence/soft-folder-display.ts',
         'apps/web/src/preferences/graph-preferences.ts',
-        'apps/web/src/soft-folder-scope/session.ts',
-        'apps/web/src/soft-folder-scope/use-soft-folder-scope.ts',
+        'apps/web/src/soft-folder-display/context-menu.ts',
+        'apps/web/src/soft-folder-display/session.ts',
+        'apps/web/src/soft-folder-display/use-soft-folder-display.ts',
         'apps/web/src/workers/focus-schematic-layout-worker-client.ts',
         'apps/web/src/workers/focus-schematic-layout.worker.ts',
         'packages/renderer-reactflow/src/focus-schematic/folder-band-strips.tsx',

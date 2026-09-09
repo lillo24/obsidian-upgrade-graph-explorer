@@ -1133,7 +1133,7 @@ and the HIER3A input/module/endpoint/internal/macro/crossing/attachment/
 validation/serialization phases through the existing in-memory performance
 recorder. The recorder does not define a release threshold.
 
-The production benchmark runs the exact version-5 runtime through Node worker
+The production benchmark runs the exact version-6 runtime through Node worker
 threads for EP12, EP22, a synthetic 120-module hub, and a supersession case. It
 accepts Directional Bands or Soft Folder Clusters plus a normalized strength and
 reports payload size, worker compute, round trip, phase timings, Soft solver
@@ -1141,16 +1141,19 @@ time, Compass assignments, collision work, and main-thread responsiveness;
 the browser remains authoritative for Vite Worker startup and render behavior.
 The exact page cache is capped at 24 complete results and has no persistence.
 Secondary-edge visibility is excluded from its key because it cannot influence
-geometry. Stored Soft strength and sparse scope are also excluded while
+geometry. Stored Soft strength and sparse display intent are also excluded while
 Directional Bands is active. Soft results key normalized strength plus canonical
-sparse scope and retain deterministic policy
+sparse display intent and retain deterministic policy
 identity separately from non-deterministic runtime evidence.
 
-HIER4B-FIX1 keeps scope resolution linear through one sparse-rule index per
-batch and derives cardinal File sides in linear time per candidate connection
-set. The Soft benchmark retains 120 fixture rows and 15 stress rows, and adds
-five scope profiles plus three cardinal-geometry profiles. These remain evidence,
-not timing thresholds, and introduce no new global candidate dimension.
+HIER4B-FIX2 builds the displayed folder tree in deterministic linear/tree-order
+passes, with iterative compression bounded by the visible folder count. H1
+normalizes all ancestor weights per File before the fixed solver schedule, so
+folder depth cannot increase the total force budget. The benchmark retains 120
+fixture rows and 15 stress rows, adds five display-intent profiles, 21 HFA1–HFA7
+H0/H1/H2 comparisons, 35 nested strength rows, and three cardinal-geometry
+profiles. These remain evidence rather than timing thresholds and add no product
+selector or unbounded optimization.
 
 The optimized Vite build keeps the Modular component and its A1 worker in
 separate lazy chunks from Classic and W3. The recorded release-candidate build

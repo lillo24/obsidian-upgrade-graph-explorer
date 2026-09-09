@@ -161,7 +161,10 @@ describe('Focus Schematic layout worker protocol', () => {
           const selectedPolicies = {
             macroLayout,
             softFolderStrength: 50,
-            softFolderScopeOverrides: [],
+            softFolderDisplayIntent: {
+              fileParentOverrides: [],
+              flattenedFolderKeys: [],
+            },
             internalLayoutVariant,
             endpointOrderPolicy,
           } as const;
@@ -262,7 +265,7 @@ describe('Focus Schematic layout worker protocol', () => {
     expect(candidates[1]).not.toEqual(candidates[2]);
   });
 
-  it('keeps Directional output byte-identical with non-empty Soft scope state', () => {
+  it('keeps Directional output byte-identical with non-empty Soft display intent', () => {
     const selectedInput = liveInput('directional-bands');
     const request = (requestId: number, withScope: boolean) => ({
       protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
@@ -271,14 +274,14 @@ describe('Focus Schematic layout worker protocol', () => {
       input: selectedInput,
       policies: {
         ...policies,
-        softFolderScopeOverrides: withScope
-          ? [
-              {
-                exactFolderKey: 'alpha/child',
-                spatialGroupKey: 'alpha',
-              },
-            ]
-          : [],
+        softFolderDisplayIntent: withScope
+          ? {
+              fileParentOverrides: [
+                { fileId: 'doc-child', displayParentFolderKey: 'alpha' },
+              ],
+              flattenedFolderKeys: ['alpha/child'],
+            }
+          : { fileParentOverrides: [], flattenedFolderKeys: [] },
       },
     });
     const exact = handleFocusSchematicLayoutWorkerRequest(

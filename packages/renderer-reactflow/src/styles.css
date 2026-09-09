@@ -121,6 +121,23 @@
   stroke: rgb(36 94 116 / 56%);
 }
 
+.focus-schematic-folder-guide--active {
+  fill: rgb(73 126 149 / 10%);
+  stroke: rgb(36 94 116 / 88%);
+  stroke-width: 2.5;
+}
+
+.focus-schematic-folder-guide--parent {
+  fill: rgb(73 126 149 / 7%);
+  stroke: rgb(36 94 116 / 66%);
+  stroke-width: 2;
+}
+
+.focus-schematic-folder-guide--sibling {
+  stroke: rgb(78 123 143 / 70%);
+  stroke-dasharray: 2 5;
+}
+
 .focus-schematic-folder-guide__label {
   fill: rgb(33 79 97 / 84%);
   font-size: 12px;
@@ -157,12 +174,12 @@
   outline-offset: 2px;
 }
 
-.focus-schematic-folder-guide-controls__popover {
+.focus-schematic-folder-guide-controls__context {
   position: absolute;
   top: calc(100% + 0.35rem);
   left: 0;
   display: grid;
-  width: 14.5rem;
+  width: 15rem;
   gap: 0.35rem;
   padding: 0.65rem;
   border: 1px solid #8eb0be;
@@ -170,33 +187,8 @@
   color: #173743;
   background: rgb(255 255 255 / 98%);
   box-shadow: 0 0.65rem 1.5rem rgb(31 58 72 / 20%);
+  pointer-events: none;
   font-size: 12px;
-}
-
-.focus-schematic-folder-guide-controls__popover button {
-  padding: 0.35rem 0.5rem;
-  border: 1px solid #8eb0be;
-  border-radius: 0.45rem;
-  color: #173743;
-  background: #eef7f9;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.focus-schematic-folder-guide-controls__popover button:hover:not(:disabled),
-.focus-schematic-folder-guide-controls__popover button:focus-visible {
-  border-color: #245e74;
-  background: #deeff3;
-}
-
-.focus-schematic-folder-guide-controls__popover button:disabled {
-  cursor: default;
-  opacity: 0.48;
-}
-
-.focus-schematic-folder-guide-controls__popover small {
-  color: #526b75;
   line-height: 1.3;
 }
 

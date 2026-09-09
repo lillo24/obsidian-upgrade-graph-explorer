@@ -1,141 +1,132 @@
 # HIER4B Soft Folder Clusters
 
-Status: **UNDER EVALUATION — live Modular Preview wired for real-vault QA.**
+Status: **UNDER EVALUATION — HIER4B-FIX2 implemented; optimized graphical QA pending.**
 
 HIER4B evaluates a second macro-layout family for Modular Focus Hierarchy.
 Directional Folder Bands remains the Modular Preview default, and Classic Focus
-Hierarchy remains the product default until HIER3C. Soft Folder Clusters is now
-available only through the Sandbox/Experimental Modular macro-layout control so
-real-vault interaction can inform the later adoption decision.
+Hierarchy remains the product default. No adoption ADR or production-default
+change belongs to this branch.
 
-## Semantic model
+## Displayed folder hierarchy
 
-Soft Folder Clusters treats macro position as a two-dimensional visual aid.
-Authored reference arrows still point from source to target, but module `x` and
-`y` do not encode incoming or outgoing direction. Placement aggregates only
-selected-backbone and Focus-path connections into undirected module pairs and
-computes minimum undirected hop distance from the Focus root. Secondary
-connections, Visual Groups, hover state, routing state, camera state, and
-Network state have zero geometry influence.
-
-The solver combines five bounded terms:
-
-1. A primary-topology spring pulls connected module rectangles toward a
-   dimension-aware separation. Parallel connections use
-   `min(4, 1 + log2(count))`, so multiplicity has useful but capped influence.
-2. A soft radial term prefers `minimumHopDistance × 520 px` from the Focus
-   root. This is a preference, not a ring constraint.
-3. A linear-time centroid term attracts modules sharing the same effective Soft
-   group. Without overrides this is the exact `folderKey`. Filtered bridge
-   modules never enter a centroid. Singleton groups have exactly zero folder
-   force.
-4. A weak stable seed and compactness term limits gratuitous movement.
-5. Collision passes use final variable module rectangles and a 72 px target
-   gap. A bounded deterministic spiral pack closes dense-hub collisions.
-
-The Focus File center is translated to `(0, 0)` after packing. This is a global
-translation, so anchoring cannot introduce a collision.
-
-## Strength
-
-The lab exposes `0`, `25`, `50`, `75`, and `100`; the live slider accepts every
-normalized value from 0 through 100 and starts at 50. Strength
-scales only effective-group centroid attraction. At `0`, the solver never uses a
-folder group for seeding, placement, or packing; changing folder identity or
-scope therefore produces byte-identical macro geometry. `100` remains a soft force:
-topology, hop distance, rectangle validity, and the stable anchor can still
-split a folder when the graph requires it.
-
-## Deterministic joint layout
-
-The algorithm is stateless and contains no random source, convergence loop, or
-force-layout dependency. A stable hash of module identity creates the initial
-2D seed. Each module-pair list, folder membership list, collision pair, and
-packing order is sorted by stable ID.
-
-Adaptive Compass and macro placement alternate in two fixed rounds:
+Soft Folder Clusters uses a derived displayed folder tree. Canonical source
+folder identity remains immutable. The pure transformation is:
 
 ```text
-stable seed
-→ Adaptive Compass
-→ 36 relaxation/collision iterations
-→ Adaptive Compass
-→ 18 relaxation/collision iterations
-→ final exact endpoint attachments
+canonical source folders
+→ sparse per-File display-parent overrides
+→ sparse manually flattened folder layers
+→ derived one-child-unit compression
+→ deterministic nested display tree with provenance
 ```
 
-The lab also exposes Vertical Spine as an internal-layout comparator. Adaptive
-Compass with Crossing optimized order is the HIER4B default. Evidence records
-the fixed `36 + 18` schedule, collision checks/corrections, Compass assignment
-count, and branch-region churn between the two rounds. The implementation does
-not perform HIER5 obstacle routing or HIER3C product-default work.
+A File override uses its stable document `EntityId` and a normalized ancestor
+folder key. Moving one File never moves its siblings. Restore removes only that
+File override. A manually flattened folder loses one displayed layer and lifts
+its direct Files and child folders into the displayed parent; grandchildren
+remain nested. Flattening displayed siblings records each sibling layer
+explicitly. Context menus expose affected-layer restore actions and a workspace
+reset, so manual intent is reversible.
 
-## Per-folder spatial scope
+After manual intent, every non-root displayed folder with exactly one direct
+child unit is automatically suppressed. A child unit is one direct File or one
+child folder. Suppression repeats until a useful branching level and is never
+persisted. Two Files, a File plus child folder, or two child folders retain the
+folder guide. File visibility may change this derived compression; Heading
+disclosure cannot because it does not change visible File membership.
 
-HIER4B-FIX1 stores sparse `exactFolderKey → spatialGroupKey` rules under the
-stable workspace ID. The target must be a strict normalized ancestor. No rule
-means exact-folder grouping. Each guide can promote only its represented exact
-folders one level, promote that group plus workspace-known effective siblings,
-or reset every represented override. Repeated promotion can reach workspace
-root, and direct Files in the target parent naturally join the same effective
-group.
+## Hierarchical attraction
 
-Sibling discovery comes from canonical document folder keys already in the
-workspace snapshot, including currently hidden siblings. The renderer performs
-no file I/O and displays membership from visible modules only. Deleted or moved
-exact keys are ignored without guessing rename identity. Stable sessions write
-before adopting; transient/legacy sessions remain memory-only. The independent
-registry is not Graph Preferences, SPATIAL2 intent, or Markdown source state.
+The Soft solver combines primary topology springs, hop-radius preference, weak
+stable seeding, hierarchical folder attraction, and deterministic
+variable-rectangle collision packing. Secondary connections remain at zero
+geometry influence.
 
-## Folder guides
+Each File participates in its visible displayed ancestor scopes. FIX2 compared:
 
-The persisted Folder guides toggle defaults to On and remains renderer-only.
-Directional Bands uses the accepted horizontal strips. Soft Folder Clusters
-instead derives spatial regions from final displayed File-module rectangles and
-effective visible Soft group membership. Singleton groups receive padded rounded
-regions, pairs receive compact rounded capsules, and larger local groups receive
-deterministic convex outlines. Clearly separated same-folder islands render as
-separate regions when joining them would span too much empty space or enclose a
-different folder's module.
+- H0: nearest displayed folder only;
+- H1: normalized decaying ancestor weights;
+- H2: normalized equal ancestor shares.
 
-The overlay is created only after a current layout has been adopted. Its hull is
-pointer-inert; only a small keyboard-accessible label/control chip accepts input.
-Guide visibility is excluded from graph nodes and fit bounds and never enters
-projection, model creation, worker requests, cache identity, convergence, or
-geometry. Filtered modules are excluded before grouping, and no path is reparsed
-to recover folder identity.
+H1 is selected internally. The nearest displayed folder receives the strongest
+share while all shares for one File sum to at most one, so depth cannot amplify
+the global Folder strength. At strength 0 the solver builds no folder-force
+groups. Manually promoted Files leave their former child scope; flattened and
+automatically compressed layers receive no separate force.
 
-## Soft File ports
+The deterministic schedule remains Adaptive Compass, 36 relaxation/collision
+iterations, Adaptive Compass, then 18 iterations. The Focus File is translated
+to `(0, 0)` after packing. HIER4B performs no HIER5 routing.
 
-Soft mode derives each File or module-anchor attachment independently from the
-final two endpoint rectangle centers. The dominant absolute delta chooses
-left/right or top/bottom; horizontal wins an exact 45-degree tie and coincident
-centers fall back to right. Final collision-corrected geometry is always used.
-Heading and Block endpoints retain their precise Adaptive Compass/lane semantics.
-The same selected handles feed Direct and Electronic rendering. The cardinal
-segments also supply the first crossing objective while bounded internal-layout
-candidates are compared. Directional Bands retains its existing signed-rank
-left/right policy byte-for-byte.
+## Nested Folder guides
+
+Folder guides remain a renderer-only overlay derived from the final displayed
+module rectangles and the pure display tree. Child regions are built first;
+their rectangles then enter parent guide geometry along with the parent's
+direct Files. This makes child containment structural. Fixed per-level padding
+keeps deep nesting bounded. Logical folders may retain multiple disconnected
+regions when topology separates their Files, avoiding a misleading hull across
+unrelated modules.
+
+The hull SVG remains pointer-inert and behind graph edges and nodes. Only each
+small folder label is interactive. Hover or keyboard focus emphasizes the
+current folder, its displayed parent, and sibling folder guides without
+changing layout. If automatic compression hid an intermediate parent, the
+passive context text reports that compressed ancestry.
+
+## Context menu
+
+FIX2 removes the former inline `↑ This group`, sibling, and Reset toolbar.
+Right-click, Shift+F10, or the ContextMenu key opens folder-display actions on a
+Modular File card or folder label. Modular uses the same shared nonmodal portal,
+viewport bounding, keyboard traversal, Escape/outside dismissal, and focus
+restoration infrastructure as Network Explorer. Opening, hovering, focusing,
+or closing the menu does not enter projection, model, worker, layout, or cache
+state.
+
+File actions move the one File up one current displayed level or restore exact
+placement. Folder actions flatten one displayed layer, flatten the current
+folder plus displayed siblings, restore applicable hidden layers, or reset Soft
+folder display. Generic Focus, Inspect, Hide File, and Hide folder actions are
+reserved for `MODULAR-CONTEXT1` after HIER4B folder semantics.
+
+## Persistence and privacy
+
+Only manual File-parent overrides and manually flattened folder keys persist
+under the stable workspace identity. Schema 2 reuses the previous Experimental
+storage key. A schema-1 flat grouping registry is narrowly replaced by an empty
+schema-2 display intent; unrelated preferences and workspace records are not
+touched. Stable sessions write before adoption. Transient/legacy sessions are
+memory-only, failed writes retain the last confirmed state, and stale identities
+are dropped without fuzzy rename inference.
+
+No Markdown, source file, absolute path, hidden File membership, geometry,
+hover, menu, or automatic-compression state is stored. Guide membership comes
+only from visible HIER1 modules.
+
+## Directional and attachment isolation
+
+Directional requests erase Soft display intent before worker computation and
+cache identity. Directional exact horizontal strips, HIER4A geometry, endpoint
+ordering, and signed-rank left/right attachments remain unchanged. Returning to
+Soft restores the workspace display intent.
+
+HIER4B-FIX1's four-side Soft File and module-anchor attachments remain accepted.
+They use final relative geometry, participate in crossing scoring, and feed the
+same handles to Direct and Electronic rendering. Precise Heading/Block endpoint
+semantics are unchanged.
 
 ## Ownership
 
-`packages/focus-schematic-layout/src/soft-clusters.ts` owns the renderer-neutral
-solver and evidence. `soft-cluster-fixtures.ts` owns SC1–SC24 and the stability
-pairs. The bakeoff tool continues to own the JSON benchmark and self-contained
-HTML lab. The version-5 Modular worker owns macro dispatch; React supplies the
-persisted macro, normalized strength, sparse Soft scope, internal-layout, and
-Heading-order policies. The exact page cache ignores strength and Soft scope for
-Directional Bands and includes both for Soft Folder Clusters.
+`packages/focus-schematic-layout/src/soft-folder-display.ts` owns validation,
+reconciliation, the pure nested tree, provenance, mutations, and bounded scope
+memberships. `soft-clusters.ts` owns the renderer-neutral solver and H1 policy.
+`packages/renderer-reactflow/src/focus-schematic/folder-cluster-guides.tsx`
+owns nested guide geometry and renderer-only hierarchy emphasis.
+`packages/renderer-reactflow/src/GraphContextMenu.tsx` owns the shared menu
+surface. The web application owns workspace persistence and action dispatch.
 
-The real preview uses the current projection, module dimensions, exact endpoint
-plan, React Flow mapper, disclosure/reroot/filter behavior, and Secondary edge
-presentation. Its Folder guides switch between Directional strips and Soft
-spatial regions without requesting layout. Strength and policy changes replace
-pending worker generations; layout remains stateless and the latest request is
-the only adoptable result.
-No private vault path, name, content, topology, or screenshot is committed.
-
-The adoption decision remains open after HIER4B-FIX1. Graphical review must choose one
-of `ADOPT_SOFT_FOLDER_CLUSTERS`, `SOFT_CLUSTERS_REQUIRE_TUNING`,
-`KEEP_DIRECTIONAL_BANDS_ONLY`, or `SOFT_CLUSTERS_REQUIRE_REDESIGN`, and record a
-preferred strength when relevant.
+The bakeoff records SC1–SC24 at strengths 0/25/50/75/100, stress profiles,
+HFA1–HFA7 across H0/H1/H2, a nested strength matrix, and cardinal attachment
+regressions. HIER4B remains under evaluation until the user completes graphical
+QA.

@@ -5,7 +5,7 @@ import {
   isFocusSchematicEndpointOrderPolicy,
   isFocusSchematicProductMacroLayout,
   isFocusSchematicProductInternalLayoutVariant,
-  normalizeFocusSchematicSoftFolderScopeOverrides,
+  normalizeFocusSchematicSoftFolderDisplayIntent,
   normalizeFocusSchematicSoftFolderStrength,
   type FocusSchematicProductLayoutPolicies,
 } from './policies';
@@ -16,7 +16,7 @@ import type {
   FocusSchematicSoftClusterEvidence,
 } from './types';
 
-export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 5 as const;
+export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 6 as const;
 
 export interface FocusSchematicLayoutWorkerRequest {
   readonly protocolVersion: typeof FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION;
@@ -125,8 +125,13 @@ function validateSoftClusterEvidence(
       'layoutFamily',
       'strength',
       'endpointOrderPolicy',
-      'scopeOverrideCount',
-      'effectiveGroupCount',
+      'fileParentOverrideCount',
+      'flattenedFolderCount',
+      'displayedFolderCount',
+      'automaticallyCompressedFolderCount',
+      'maximumDisplayedDepth',
+      'hierarchyForcePolicy',
+      'maximumPerFileFolderWeight',
       'fileAttachmentPolicy',
       'folderInfluenceEnabled',
       'topologyDirectionality',
@@ -138,15 +143,27 @@ function validateSoftClusterEvidence(
     'Soft Cluster evidence',
   );
   if (
-    evidence.schemaVersion !== 1 ||
+    evidence.schemaVersion !== 2 ||
     evidence.developmentOnly !== true ||
     evidence.layoutFamily !== 'soft-folder-clusters' ||
     evidence.strength !==
       normalizeFocusSchematicSoftFolderStrength(policies.softFolderStrength) ||
     evidence.endpointOrderPolicy !== policies.endpointOrderPolicy ||
-    evidence.scopeOverrideCount !== policies.softFolderScopeOverrides.length ||
-    !Number.isSafeInteger(evidence.effectiveGroupCount) ||
-    Number(evidence.effectiveGroupCount) < 0 ||
+    !Number.isSafeInteger(evidence.fileParentOverrideCount) ||
+    Number(evidence.fileParentOverrideCount) < 0 ||
+    !Number.isSafeInteger(evidence.flattenedFolderCount) ||
+    Number(evidence.flattenedFolderCount) < 0 ||
+    !Number.isSafeInteger(evidence.displayedFolderCount) ||
+    Number(evidence.displayedFolderCount) < 0 ||
+    !Number.isSafeInteger(evidence.automaticallyCompressedFolderCount) ||
+    Number(evidence.automaticallyCompressedFolderCount) < 0 ||
+    !Number.isSafeInteger(evidence.maximumDisplayedDepth) ||
+    Number(evidence.maximumDisplayedDepth) < 0 ||
+    evidence.hierarchyForcePolicy !== 'normalized-decay' ||
+    finiteNonNegative(
+      evidence.maximumPerFileFolderWeight,
+      'maximumPerFileFolderWeight',
+    ) > 1 ||
     evidence.fileAttachmentPolicy !== 'spatial-cardinal' ||
     evidence.folderInfluenceEnabled !== Number(evidence.strength) > 0 ||
     evidence.topologyDirectionality !== 'undirected-primary' ||
@@ -168,6 +185,8 @@ function validateSoftClusterEvidence(
       'repeatedFolderRmsRadiusMean',
       'repeatedFolderRmsRadiusMedian',
       'repeatedFolderRmsRadiusP95',
+      'childFolderCoherenceMean',
+      'parentFolderCoherenceMean',
       'connectedPairCount',
       'connectedPairDistanceMean',
       'connectedPairDistanceP95',
@@ -252,7 +271,7 @@ export function validateFocusSchematicLayoutWorkerRequest(
     [
       'macroLayout',
       'softFolderStrength',
-      'softFolderScopeOverrides',
+      'softFolderDisplayIntent',
       'endpointOrderPolicy',
       'internalLayoutVariant',
     ],
@@ -279,14 +298,14 @@ export function validateFocusSchematicLayoutWorkerRequest(
     throw new FocusSchematicLayoutProtocolError(
       'Focus Schematic macro-layout policy does not match the layout input settings.',
     );
-  let softFolderScopeOverrides;
+  let softFolderDisplayIntent;
   try {
-    softFolderScopeOverrides = normalizeFocusSchematicSoftFolderScopeOverrides(
-      policies.softFolderScopeOverrides,
+    softFolderDisplayIntent = normalizeFocusSchematicSoftFolderDisplayIntent(
+      policies.softFolderDisplayIntent,
     );
   } catch (error: unknown) {
     throw new FocusSchematicLayoutProtocolError(
-      `Focus Schematic Soft folder scope policy is invalid: ${error instanceof Error ? error.message : String(error)}`,
+      `Focus Schematic Soft folder display policy is invalid: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
   return {
@@ -299,7 +318,9 @@ export function validateFocusSchematicLayoutWorkerRequest(
       softFolderStrength: normalizeFocusSchematicSoftFolderStrength(
         policies.softFolderStrength,
       ),
-      softFolderScopeOverrides: directional ? [] : softFolderScopeOverrides,
+      softFolderDisplayIntent: directional
+        ? { fileParentOverrides: [], flattenedFolderKeys: [] }
+        : softFolderDisplayIntent,
       endpointOrderPolicy: policies.endpointOrderPolicy,
       internalLayoutVariant: policies.internalLayoutVariant,
     },

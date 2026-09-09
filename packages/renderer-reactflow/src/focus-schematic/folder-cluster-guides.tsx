@@ -1,18 +1,14 @@
 import { useMemo, useState } from 'react';
 import { ViewportPortal } from '@xyflow/react';
-import type { FocusSchematicModule } from '@icarus-graph-explorer/focus-schematic';
-import {
-  createFocusSchematicSoftFolderGroupResolver,
-  focusSchematicParentFolderKey,
-  type FocusSchematicSoftFolderScopeOverride,
+import type {
+  FocusSchematicSoftFolderDisplayTree,
+  FocusSchematicSoftFolderDisplayNode,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 
 import type { GraphFlowNode } from '../types';
 
-const GUIDE_PADDING = 30;
+const GUIDE_PADDING = 24;
 const GUIDE_CORNER_RADIUS = 18;
-// The Soft solver normally leaves 72px between modules. Three clearances join
-// a coherent local group while allowing widely separated same-folder islands.
 const GUIDE_ISLAND_GAP = 216;
 
 interface Point {
@@ -20,8 +16,9 @@ interface Point {
   readonly y: number;
 }
 
-interface ModuleRectangle {
-  readonly moduleId: string;
+interface GuideUnit {
+  readonly id: string;
+  readonly memberModuleIds: readonly string[];
   readonly x: number;
   readonly y: number;
   readonly width: number;
@@ -29,10 +26,13 @@ interface ModuleRectangle {
 }
 
 export interface FocusSchematicFolderClusterGuide {
-  readonly spatialGroupKey: string;
-  readonly exactFolderKeys: readonly string[];
+  readonly folderKey: string;
+  readonly parentFolderKey: string | null;
+  readonly siblingFolderKeys: readonly string[];
+  readonly suppressedAncestorFolderKeys: readonly string[];
   readonly label: string;
   readonly root: boolean;
+  readonly depth: number;
   readonly regionIndex: number;
   readonly regionCount: number;
   readonly shape: 'singleton' | 'capsule' | 'hull';
@@ -47,9 +47,15 @@ export interface FocusSchematicFolderClusterGuide {
   readonly labelY: number;
 }
 
-function compareText(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
+export interface FocusSchematicFolderGuideContextRequest {
+  readonly folderKey: string;
+  readonly x: number;
+  readonly y: number;
+  readonly origin: HTMLElement | null;
 }
+
+const compareText = (left: string, right: string): number =>
+  left < right ? -1 : left > right ? 1 : 0;
 
 function folderLabel(folderKey: string): string {
   return folderKey === '.' ? 'Root folder' : folderKey;
@@ -70,7 +76,7 @@ function rectangleSize(
     : { width, height };
 }
 
-function rectangleGap(left: ModuleRectangle, right: ModuleRectangle): number {
+function rectangleGap(left: GuideUnit, right: GuideUnit): number {
   const dx = Math.max(
     0,
     left.x - (right.x + right.width),
@@ -82,91 +88,6 @@ function rectangleGap(left: ModuleRectangle, right: ModuleRectangle): number {
     right.y - (left.y + left.height),
   );
   return Math.hypot(dx, dy);
-}
-
-function pointInsidePolygon(point: Point, polygon: readonly Point[]): boolean {
-  let inside = false;
-  for (
-    let index = 0, previous = polygon.length - 1;
-    index < polygon.length;
-    previous = index++
-  ) {
-    const left = polygon[index]!;
-    const right = polygon[previous]!;
-    if (
-      left.y > point.y !== right.y > point.y &&
-      point.x <
-        ((right.x - left.x) * (point.y - left.y)) / (right.y - left.y) + left.x
-    )
-      inside = !inside;
-  }
-  return inside;
-}
-
-function connectionSwallowsBlocker(
-  left: ModuleRectangle,
-  right: ModuleRectangle,
-  blockers: readonly ModuleRectangle[],
-): boolean {
-  const envelope = convexHull([
-    ...paddedCorners(left),
-    ...paddedCorners(right),
-  ]);
-  return blockers.some((blocker) =>
-    pointInsidePolygon(
-      {
-        x: blocker.x + blocker.width / 2,
-        y: blocker.y + blocker.height / 2,
-      },
-      envelope,
-    ),
-  );
-}
-
-function splitIntoIslands(
-  rectangles: readonly ModuleRectangle[],
-  blockers: readonly ModuleRectangle[],
-): readonly (readonly ModuleRectangle[])[] {
-  const ordered = [...rectangles].sort((left, right) =>
-    compareText(left.moduleId, right.moduleId),
-  );
-  const remaining = new Set(ordered.map(({ moduleId }) => moduleId));
-  const byId = new Map(ordered.map((item) => [item.moduleId, item]));
-  const islands: ModuleRectangle[][] = [];
-  for (const seed of ordered) {
-    if (!remaining.delete(seed.moduleId)) continue;
-    const island: ModuleRectangle[] = [];
-    const pending = [seed];
-    while (pending.length > 0) {
-      const current = pending.shift()!;
-      island.push(current);
-      for (const candidateId of [...remaining].sort(compareText)) {
-        const candidate = byId.get(candidateId)!;
-        if (
-          rectangleGap(current, candidate) > GUIDE_ISLAND_GAP ||
-          connectionSwallowsBlocker(current, candidate, blockers)
-        )
-          continue;
-        remaining.delete(candidateId);
-        pending.push(candidate);
-      }
-    }
-    islands.push(
-      island.sort(
-        (left, right) =>
-          left.y - right.y ||
-          left.x - right.x ||
-          compareText(left.moduleId, right.moduleId),
-      ),
-    );
-  }
-  return islands.sort((left, right) => {
-    const leftY = Math.min(...left.map(({ y }) => y));
-    const rightY = Math.min(...right.map(({ y }) => y));
-    const leftX = Math.min(...left.map(({ x }) => x));
-    const rightX = Math.min(...right.map(({ x }) => x));
-    return leftY - rightY || leftX - rightX;
-  });
 }
 
 function cross(origin: Point, left: Point, right: Point): number {
@@ -202,6 +123,104 @@ function convexHull(points: readonly Point[]): readonly Point[] {
   return [...lower.slice(0, -1), ...upper.slice(0, -1)];
 }
 
+function pointInsidePolygon(point: Point, polygon: readonly Point[]): boolean {
+  let inside = false;
+  for (
+    let index = 0, previous = polygon.length - 1;
+    index < polygon.length;
+    previous = index++
+  ) {
+    const left = polygon[index]!;
+    const right = polygon[previous]!;
+    if (
+      left.y > point.y !== right.y > point.y &&
+      point.x <
+        ((right.x - left.x) * (point.y - left.y)) / (right.y - left.y) + left.x
+    )
+      inside = !inside;
+  }
+  return inside;
+}
+
+function paddedCorners(unit: GuideUnit): readonly Point[] {
+  const left = unit.x - GUIDE_PADDING;
+  const top = unit.y - GUIDE_PADDING;
+  const right = unit.x + unit.width + GUIDE_PADDING;
+  const bottom = unit.y + unit.height + GUIDE_PADDING;
+  return [
+    { x: left, y: top },
+    { x: right, y: top },
+    { x: right, y: bottom },
+    { x: left, y: bottom },
+  ];
+}
+
+function connectionSwallowsBlocker(
+  left: GuideUnit,
+  right: GuideUnit,
+  blockers: readonly GuideUnit[],
+): boolean {
+  const envelope = convexHull([
+    ...paddedCorners(left),
+    ...paddedCorners(right),
+  ]);
+  return blockers.some((blocker) =>
+    pointInsidePolygon(
+      {
+        x: blocker.x + blocker.width / 2,
+        y: blocker.y + blocker.height / 2,
+      },
+      envelope,
+    ),
+  );
+}
+
+function splitIntoIslands(
+  units: readonly GuideUnit[],
+  blockers: readonly GuideUnit[],
+): readonly (readonly GuideUnit[])[] {
+  const ordered = [...units].sort((left, right) =>
+    compareText(left.id, right.id),
+  );
+  const remaining = new Set(ordered.map(({ id }) => id));
+  const byId = new Map(ordered.map((item) => [item.id, item]));
+  const islands: GuideUnit[][] = [];
+  for (const seed of ordered) {
+    if (!remaining.delete(seed.id)) continue;
+    const island: GuideUnit[] = [];
+    const pending = [seed];
+    while (pending.length > 0) {
+      const current = pending.shift()!;
+      island.push(current);
+      for (const candidateId of [...remaining].sort(compareText)) {
+        const candidate = byId.get(candidateId)!;
+        if (
+          rectangleGap(current, candidate) > GUIDE_ISLAND_GAP ||
+          connectionSwallowsBlocker(current, candidate, blockers)
+        )
+          continue;
+        remaining.delete(candidateId);
+        pending.push(candidate);
+      }
+    }
+    islands.push(
+      island.sort(
+        (left, right) =>
+          left.y - right.y ||
+          left.x - right.x ||
+          compareText(left.id, right.id),
+      ),
+    );
+  }
+  return islands.sort((left, right) => {
+    const leftY = Math.min(...left.map(({ y }) => y));
+    const rightY = Math.min(...right.map(({ y }) => y));
+    const leftX = Math.min(...left.map(({ x }) => x));
+    const rightX = Math.min(...right.map(({ x }) => x));
+    return leftY - rightY || leftX - rightX;
+  });
+}
+
 function toward(from: Point, to: Point, distance: number): Point {
   const length = Math.hypot(to.x - from.x, to.y - from.y);
   if (length === 0) return from;
@@ -234,46 +253,49 @@ function roundedPolygonPath(points: readonly Point[], radius: number): string {
   ].join(' ');
 }
 
-function paddedCorners(rectangle: ModuleRectangle): readonly Point[] {
-  const left = rectangle.x - GUIDE_PADDING;
-  const top = rectangle.y - GUIDE_PADDING;
-  const right = rectangle.x + rectangle.width + GUIDE_PADDING;
-  const bottom = rectangle.y + rectangle.height + GUIDE_PADDING;
-  return [
-    { x: left, y: top },
-    { x: right, y: top },
-    { x: right, y: bottom },
-    { x: left, y: bottom },
-  ];
+function folderDepth(
+  folder: FocusSchematicSoftFolderDisplayNode,
+  byKey: ReadonlyMap<string, FocusSchematicSoftFolderDisplayNode>,
+): number {
+  let depth = 0;
+  let current = folder.displayParentFolderKey;
+  while (current !== null) {
+    depth += 1;
+    current = byKey.get(current)?.displayParentFolderKey ?? null;
+  }
+  return depth;
 }
 
 function guideForIsland(
-  spatialGroupKey: string,
-  exactFolderKeys: readonly string[],
-  root: boolean,
+  folder: FocusSchematicSoftFolderDisplayNode,
+  byKey: ReadonlyMap<string, FocusSchematicSoftFolderDisplayNode>,
   regionIndex: number,
   regionCount: number,
-  rectangles: readonly ModuleRectangle[],
+  units: readonly GuideUnit[],
 ): FocusSchematicFolderClusterGuide {
-  const memberModuleIds = rectangles
-    .map(({ moduleId }) => moduleId)
-    .sort(compareText);
-  const hull = convexHull(rectangles.flatMap(paddedCorners));
+  const memberModuleIds = [
+    ...new Set(units.flatMap(({ memberModuleIds }) => memberModuleIds)),
+  ].sort(compareText);
+  const hull = convexHull(units.flatMap(paddedCorners));
   const x = Math.min(...hull.map((point) => point.x));
   const y = Math.min(...hull.map((point) => point.y));
   const right = Math.max(...hull.map((point) => point.x));
   const bottom = Math.max(...hull.map((point) => point.y));
   const shape =
-    rectangles.length === 1
-      ? 'singleton'
-      : rectangles.length === 2
-        ? 'capsule'
-        : 'hull';
+    units.length === 1 ? 'singleton' : units.length === 2 ? 'capsule' : 'hull';
+  const siblings = [
+    ...(byKey.get(folder.displayParentFolderKey ?? '')?.childFolderKeys ?? []),
+  ]
+    .filter((key) => key !== folder.folderKey)
+    .sort(compareText);
   return {
-    spatialGroupKey,
-    exactFolderKeys,
-    label: folderLabel(spatialGroupKey),
-    root,
+    folderKey: folder.folderKey,
+    parentFolderKey: folder.displayParentFolderKey,
+    siblingFolderKeys: siblings,
+    suppressedAncestorFolderKeys: folder.suppressedAncestorFolderKeys,
+    label: folderLabel(folder.folderKey),
+    root: folder.folderKey === '.',
+    depth: folderDepth(folder, byKey),
     regionIndex,
     regionCount,
     shape,
@@ -292,107 +314,112 @@ function guideForIsland(
   };
 }
 
-/**
- * Uses exact visible HIER1 membership and final renderer module rectangles.
- * Filtered bridge modules never enter the guide inventory.
- */
+/** Builds child regions first, then encloses them with their logical parent. */
 export function focusSchematicFolderClusterGuides(
-  modules: readonly FocusSchematicModule[],
+  tree: FocusSchematicSoftFolderDisplayTree,
   nodes: readonly GraphFlowNode[],
-  rootModuleId: string,
-  scopeOverrides: readonly FocusSchematicSoftFolderScopeOverride[] = [],
 ): readonly FocusSchematicFolderClusterGuide[] {
-  const rectangleByModuleId = new Map<string, ModuleRectangle>();
+  const rectangleByModuleId = new Map<string, GuideUnit>();
   for (const node of nodes) {
     if (node.type !== 'module') continue;
     const size = rectangleSize(node);
     if (size === undefined) continue;
     rectangleByModuleId.set(node.data.moduleId, {
-      moduleId: node.data.moduleId,
+      id: `file:${node.data.moduleId}`,
+      memberModuleIds: [node.data.moduleId],
       x: node.position.x,
       y: node.position.y,
       ...size,
     });
   }
-  const byFolder = new Map<
-    string,
-    { rectangles: ModuleRectangle[]; exactFolderKeys: Set<string> }
-  >();
-  const resolveGroup =
-    createFocusSchematicSoftFolderGroupResolver(scopeOverrides);
-  for (const module of [...modules].sort((left, right) =>
-    compareText(left.id, right.id),
-  )) {
-    if (module.presentation === 'filtered') continue;
-    const rectangle = rectangleByModuleId.get(module.id);
-    if (rectangle === undefined) continue;
-    const spatialGroupKey = resolveGroup(module.folderKey);
-    const folder = byFolder.get(spatialGroupKey) ?? {
-      rectangles: [],
-      exactFolderKeys: new Set(),
-    };
-    folder.rectangles.push(rectangle);
-    folder.exactFolderKeys.add(module.folderKey);
-    byFolder.set(spatialGroupKey, folder);
-  }
-  return [...byFolder]
-    .sort(([left], [right]) => compareText(left, right))
-    .flatMap(([spatialGroupKey, group]) => {
-      const root = modules.some(
-        (module) =>
-          module.id === rootModuleId &&
-          resolveGroup(module.folderKey) === spatialGroupKey,
-      );
-      const blockers = [...byFolder]
-        .filter(([otherFolderKey]) => otherFolderKey !== spatialGroupKey)
-        .flatMap(([, { rectangles }]) => rectangles);
-      const islands = splitIntoIslands(group.rectangles, blockers);
-      const exactFolderKeys = [...group.exactFolderKeys].sort(compareText);
-      return islands.map((island, regionIndex) =>
-        guideForIsland(
-          spatialGroupKey,
-          exactFolderKeys,
-          root,
-          regionIndex,
-          islands.length,
-          island,
-        ),
-      );
+  const byKey = new Map(
+    tree.folders.map((folder) => [folder.folderKey, folder]),
+  );
+  const guidesByFolder = new Map<string, FocusSchematicFolderClusterGuide[]>();
+  const ordered = [...tree.folders].sort(
+    (left, right) =>
+      folderDepth(right, byKey) - folderDepth(left, byKey) ||
+      compareText(left.folderKey, right.folderKey),
+  );
+  for (const folder of ordered) {
+    const direct = folder.directFileIds.flatMap((fileId) => {
+      const rectangle = rectangleByModuleId.get(fileId);
+      return rectangle === undefined ? [] : [rectangle];
     });
+    const children = folder.childFolderKeys.flatMap((childKey) =>
+      (guidesByFolder.get(childKey) ?? []).map((guide) => ({
+        id: `folder:${childKey}:${guide.regionIndex}`,
+        memberModuleIds: guide.memberModuleIds,
+        x: guide.x,
+        y: guide.y,
+        width: guide.width,
+        height: guide.height,
+      })),
+    );
+    const units = [...direct, ...children];
+    // Workspace root is structural unless it contains a directly displayed File.
+    if (
+      units.length === 0 ||
+      (folder.folderKey === '.' && direct.length === 0)
+    ) {
+      guidesByFolder.set(folder.folderKey, []);
+      continue;
+    }
+    const descendants = new Set(folder.descendantFileIds);
+    const blockers = [...rectangleByModuleId]
+      .filter(([moduleId]) => !descendants.has(moduleId))
+      .map(([, rectangle]) => rectangle);
+    const islands = splitIntoIslands(units, blockers);
+    guidesByFolder.set(
+      folder.folderKey,
+      islands.map((island, regionIndex) =>
+        guideForIsland(folder, byKey, regionIndex, islands.length, island),
+      ),
+    );
+  }
+  return [...guidesByFolder.values()]
+    .flat()
+    .sort(
+      (left, right) =>
+        left.depth - right.depth ||
+        compareText(left.folderKey, right.folderKey) ||
+        left.regionIndex - right.regionIndex,
+    );
+}
+
+function emphasisClass(
+  guide: FocusSchematicFolderClusterGuide,
+  active: FocusSchematicFolderClusterGuide | undefined,
+): string {
+  if (active === undefined) return '';
+  if (guide.folderKey === active.folderKey)
+    return ' focus-schematic-folder-guide--active';
+  if (guide.folderKey === active.parentFolderKey)
+    return ' focus-schematic-folder-guide--parent';
+  if (active.siblingFolderKeys.includes(guide.folderKey))
+    return ' focus-schematic-folder-guide--sibling';
+  return '';
 }
 
 export function FocusSchematicFolderClusterGuides({
-  modules,
+  displayTree,
   nodes,
-  rootModuleId,
-  scopeOverrides,
-  persistenceStatus,
-  persistenceError,
-  onPromoteGroup,
-  onPromoteGroupWithSiblings,
-  onResetGroup,
+  onFolderContextMenu,
 }: {
-  readonly modules: readonly FocusSchematicModule[];
+  readonly displayTree: FocusSchematicSoftFolderDisplayTree;
   readonly nodes: readonly GraphFlowNode[];
-  readonly rootModuleId: string;
-  readonly scopeOverrides: readonly FocusSchematicSoftFolderScopeOverride[];
-  readonly persistenceStatus: string;
-  readonly persistenceError: string | undefined;
-  readonly onPromoteGroup: (spatialGroupKey: string) => void;
-  readonly onPromoteGroupWithSiblings: (spatialGroupKey: string) => void;
-  readonly onResetGroup: (spatialGroupKey: string) => void;
+  readonly onFolderContextMenu: (
+    request: FocusSchematicFolderGuideContextRequest,
+  ) => void;
 }) {
   const guides = useMemo(
-    () =>
-      focusSchematicFolderClusterGuides(
-        modules,
-        nodes,
-        rootModuleId,
-        scopeOverrides,
-      ),
-    [modules, nodes, rootModuleId, scopeOverrides],
+    () => focusSchematicFolderClusterGuides(displayTree, nodes),
+    [displayTree, nodes],
   );
-  const [openGroupKey, setOpenGroupKey] = useState<string | null>(null);
+  const [activeFolderKey, setActiveFolderKey] = useState<string | null>(null);
+  const active = guides.find(
+    (guide) => guide.folderKey === activeFolderKey && guide.regionIndex === 0,
+  );
   if (guides.length === 0) return null;
   return (
     <ViewportPortal>
@@ -401,11 +428,12 @@ export function FocusSchematicFolderClusterGuides({
           aria-hidden="true"
           className="focus-schematic-folder-guides"
           focusable="false"
+          style={{ pointerEvents: 'none' }}
         >
           {guides.map((guide) => {
-            const className = `focus-schematic-folder-guide focus-schematic-folder-guide--${guide.shape}${guide.root ? ' focus-schematic-folder-guide--root' : ''}`;
+            const className = `focus-schematic-folder-guide focus-schematic-folder-guide--${guide.shape}${guide.root ? ' focus-schematic-folder-guide--root' : ''}${emphasisClass(guide, active)}`;
             return (
-              <g key={`${guide.spatialGroupKey}\0${guide.regionIndex}`}>
+              <g key={`${guide.folderKey}\0${guide.regionIndex}`}>
                 {guide.path === null ? (
                   <rect
                     className={className}
@@ -434,102 +462,76 @@ export function FocusSchematicFolderClusterGuides({
         {guides
           .filter(({ regionIndex }) => regionIndex === 0)
           .map((guide) => {
-            const parent = focusSchematicParentFolderKey(guide.spatialGroupKey);
-            const open = openGroupKey === guide.spatialGroupKey;
-            const resettable = scopeOverrides.some(
-              ({ spatialGroupKey }) =>
-                spatialGroupKey === guide.spatialGroupKey,
-            );
             const islandDescription =
               guide.regionCount === 1
                 ? ''
                 : `, ${guide.regionCount} spatial islands`;
+            const parentDescription =
+              guide.suppressedAncestorFolderKeys.length > 0
+                ? `Compressed ancestry: ${guide.suppressedAncestorFolderKeys.map(folderLabel).join(' › ')}`
+                : `Parent: ${guide.parentFolderKey === null ? 'none' : folderLabel(guide.parentFolderKey)}`;
+            const siblingDescription =
+              guide.siblingFolderKeys.length === 0
+                ? 'No displayed sibling folders'
+                : `Siblings: ${guide.siblingFolderKeys.map(folderLabel).join(', ')}`;
             return (
               <div
                 className="focus-schematic-folder-guide-controls nodrag nopan nowheel"
                 data-graph-wheel-ignore
-                key={guide.spatialGroupKey}
+                key={guide.folderKey}
                 onBlur={(event) => {
                   if (!event.currentTarget.contains(event.relatedTarget))
-                    setOpenGroupKey(null);
+                    setActiveFolderKey(null);
                 }}
-                onFocus={() => setOpenGroupKey(guide.spatialGroupKey)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') {
-                    event.stopPropagation();
-                    setOpenGroupKey(null);
-                  }
-                }}
-                onMouseEnter={() => setOpenGroupKey(guide.spatialGroupKey)}
-                onMouseLeave={() => setOpenGroupKey(null)}
+                onFocus={() => setActiveFolderKey(guide.folderKey)}
+                onMouseEnter={() => setActiveFolderKey(guide.folderKey)}
+                onMouseLeave={() => setActiveFolderKey(null)}
                 style={{
                   transform: `translate(${guide.labelX}px, ${guide.labelY - 18}px)`,
                 }}
               >
                 <button
-                  aria-expanded={open}
-                  aria-label={`Spatial group ${guide.label}, ${guide.exactFolderKeys.length} visible source folder${guide.exactFolderKeys.length === 1 ? '' : 's'}${islandDescription}`}
+                  aria-haspopup="menu"
+                  aria-label={`Folder ${guide.label}${islandDescription}. ${parentDescription}. ${siblingDescription}`}
                   className="focus-schematic-folder-guide-controls__chip"
-                  onClick={() =>
-                    setOpenGroupKey(open ? null : guide.spatialGroupKey)
-                  }
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onFolderContextMenu({
+                      folderKey: guide.folderKey,
+                      x: event.clientX,
+                      y: event.clientY,
+                      origin: event.currentTarget,
+                    });
+                  }}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key !== 'ContextMenu' &&
+                      !(event.key === 'F10' && event.shiftKey)
+                    )
+                      return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    onFolderContextMenu({
+                      folderKey: guide.folderKey,
+                      x: rect.left + 16,
+                      y: rect.bottom,
+                      origin: event.currentTarget,
+                    });
+                  }}
+                  title="Right-click for folder display actions"
                   type="button"
                 >
                   {guide.label}
                 </button>
-                {open ? (
+                {activeFolderKey === guide.folderKey ? (
                   <div
-                    aria-label={`Spatial group controls for ${guide.label}`}
-                    className="focus-schematic-folder-guide-controls__popover"
-                    role="group"
+                    className="focus-schematic-folder-guide-controls__context"
+                    role="status"
                   >
-                    <strong>Spatial group</strong>
-                    <span>{guide.label}</span>
-                    <span>
-                      {guide.exactFolderKeys.length} visible source folder
-                      {guide.exactFolderKeys.length === 1 ? '' : 's'}
-                    </span>
-                    {guide.exactFolderKeys.length <= 3 ? (
-                      <small>
-                        {guide.exactFolderKeys.map(folderLabel).join(', ')}
-                      </small>
-                    ) : null}
-                    <span>
-                      {parent === null
-                        ? 'Already at workspace root'
-                        : `Parent: ${folderLabel(parent)}`}
-                    </span>
-                    <button
-                      aria-label={`Promote only this spatial group into ${parent === null ? 'workspace root' : folderLabel(parent)}`}
-                      disabled={parent === null}
-                      onClick={() => onPromoteGroup(guide.spatialGroupKey)}
-                      type="button"
-                    >
-                      ↑ This group
-                    </button>
-                    <button
-                      aria-label={`Promote this group and sibling folders into ${parent === null ? 'workspace root' : folderLabel(parent)}`}
-                      disabled={parent === null}
-                      onClick={() =>
-                        onPromoteGroupWithSiblings(guide.spatialGroupKey)
-                      }
-                      type="button"
-                    >
-                      ↑ This + sibling folders
-                    </button>
-                    <button
-                      aria-label={`Reset this spatial group ${guide.label}`}
-                      disabled={!resettable}
-                      onClick={() => onResetGroup(guide.spatialGroupKey)}
-                      type="button"
-                    >
-                      Reset
-                    </button>
-                    <small>Sibling folders share the same parent.</small>
-                    <small>{persistenceStatus}</small>
-                    {persistenceError === undefined ? null : (
-                      <small role="alert">{persistenceError}</small>
-                    )}
+                    <span>{parentDescription}</span>
+                    <span>{siblingDescription}</span>
                   </div>
                 ) : null}
               </div>

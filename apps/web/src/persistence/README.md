@@ -24,10 +24,10 @@ view contract.
   in-memory migration without writing on read. Session policy, including
   durable write-before-adopt behavior and explicit corrupt-value recovery, is
   in `../spatial-overrides/session.ts`.
-- `soft-folder-scope.ts` owns the independent schema-v1 sparse Soft grouping
-  registry. It stores normalized exact-folder → ancestor-group rules under the
-  stable workspace identity; session and reconciliation policy live in
-  `../soft-folder-scope/`.
+- `soft-folder-display.ts` owns the independent schema-v2 sparse Soft display
+  registry. It stores stable File → ancestor-parent overrides and manually
+  flattened normalized folder layers; session and reconciliation policy live in
+  `../soft-folder-display/`.
 
 Malformed or unsupported values are not overwritten or deleted. Transient and
 legacy reports never read or write cross-session state. The stored record
@@ -106,10 +106,11 @@ blocked-write state. Reset one exact-root rule and the explicitly confirmed
 Reset all use the same transaction. Corrupt recovery deletes only this spatial
 key and is exposed outside the otherwise-disabled Arrange mode.
 
-Soft Folder Cluster scope uses
+Soft folder display intent uses
 `icarus-graph-explorer:soft-folder-scope:<encodeURIComponent(workspaceId)>`.
-Stable workspaces write canonical sparse rules before adopting them; transient
-or legacy reports keep them in memory. Invalid or stale exact-folder rules are
-ignored conservatively with no rename inference. The record contains normalized
-workspace-relative folder keys only and remains separate from Graph Preferences
-and SPATIAL2 folder rules.
+The key is retained for a narrow Experimental schema-1 reset. Stable workspaces
+write canonical sparse intent before adopting it; transient or legacy reports
+keep it in memory. Invalid or stale File/folder identities are ignored with no
+rename inference. Derived singleton compression, visible membership, layout,
+hover, and menu state never persist. This record remains separate from Graph
+Preferences and SPATIAL2 folder rules.

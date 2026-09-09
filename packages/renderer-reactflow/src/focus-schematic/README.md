@@ -13,12 +13,11 @@ renderer-neutral result to validated React Flow data.
   zero-geometry influence.
 - `folder-band-strips.tsx` renders the Directional macro's exact horizontal
   world-space guides.
-- `folder-cluster-guides.tsx` derives singleton, capsule, hull, and disconnected
-  Soft macro regions from effective visible spatial groups and final module
-  rectangles. Its small label chip exposes one-level promotion, promotion with
-  workspace-known siblings, and reset; the hull remains pointer-inert. Tests
-  cover strengths 0, 25, 50, 75, and 100 without geometry mutation plus
-  keyboard interaction and merged-guide identity.
+- `folder-cluster-guides.tsx` builds child regions before parent regions from the
+  nested displayed tree and final module rectangles. It preserves disconnected
+  islands, fixed padding, containment, pointer-inert hulls, keyboard-focusable
+  labels, and renderer-only current/parent/sibling emphasis. Folder management
+  is supplied through the shared context-menu request seam.
 
 The mapper is the sole owner of optional modular entity metadata. It derives
 module membership from HIER1 and direct-File ring visibility from the final
@@ -26,7 +25,7 @@ currently rendered reference edges. Classic mapping never receives these
 fields.
 
 Both guide shapes are pointer-inert viewport overlays behind edges and nodes;
-only the Soft guide's small HTML label/control surface accepts input. Guides are
+only the Soft guide's small HTML label surface accepts input. Guides are
 excluded from graph nodes, fitting, layout, and cache identity.
 
 The package root does not re-export this subpath, keeping it outside Classic

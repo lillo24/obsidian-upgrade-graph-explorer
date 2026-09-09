@@ -4,33 +4,10 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ReactFlow } from '@xyflow/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { FocusSchematicModule } from '@icarus-graph-explorer/focus-schematic';
+import { buildFocusSchematicSoftFolderDisplayTree } from '@icarus-graph-explorer/focus-schematic-layout';
 
 import type { GraphFlowNode } from '../types';
 import { FocusSchematicFolderClusterGuides } from './folder-cluster-guides';
-
-const module = (id: string, folderKey: string): FocusSchematicModule => ({
-  id,
-  documentEntityId: id,
-  sourcePath: `${folderKey}/${id}.md`,
-  folderKey,
-  presentation: 'visible-content',
-  documentProjectionNodeId: id,
-  visibleEntityNodeIds: [id],
-  hierarchyEdgeIds: [],
-  internalReferenceIds: [],
-  diagnosticIds: [],
-  focusDistance: 1,
-  incomingDistance: null,
-  outgoingDistance: 1,
-  placement: {
-    allowedSides: ['right'],
-    preferredSide: 'right',
-    rankMagnitude: 1,
-    preferredSignedRank: 1,
-    reason: 'outgoing-only',
-  },
-});
 
 const node = (moduleId: string, x: number): GraphFlowNode =>
   ({
@@ -43,7 +20,7 @@ const node = (moduleId: string, x: number): GraphFlowNode =>
     data: { projectionNodeId: null, moduleId, root: false },
   }) as GraphFlowNode;
 
-describe('Soft folder guide controls', () => {
+describe('nested Soft folder guide interaction', () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -59,62 +36,78 @@ describe('Soft folder guide controls', () => {
     container.remove();
   });
 
-  it('keeps the hull inert and exposes keyboard-accessible promote/reset actions', () => {
-    const promote = vi.fn();
-    const siblings = vi.fn();
-    const reset = vi.fn();
+  it('G7/C3-C4/C10-C11 keeps hull inert, shows hierarchy context, and opens one folder menu path', () => {
+    const onContext = vi.fn();
+    const displayTree = buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles: [
+        { fileId: 'outer', exactFolderKey: 'Language' },
+        { fileId: 'a', exactFolderKey: 'Language/Pragmatics' },
+        { fileId: 'b', exactFolderKey: 'Language/Pragmatics' },
+        { fileId: 'g1', exactFolderKey: 'Language/Grammar' },
+        { fileId: 'g2', exactFolderKey: 'Language/Grammar' },
+      ],
+    });
     act(() => {
       root.render(
         <ReactFlow edges={[]} nodes={[]}>
           <FocusSchematicFolderClusterGuides
-            modules={[
-              module('parent', 'Language'),
-              module('child', 'Language/Pragmatics'),
+            displayTree={displayTree}
+            nodes={[
+              node('outer', 0),
+              node('a', 180),
+              node('b', 320),
+              node('g1', 480),
+              node('g2', 620),
             ]}
-            nodes={[node('parent', 0), node('child', 180)]}
-            onPromoteGroup={promote}
-            onPromoteGroupWithSiblings={siblings}
-            onResetGroup={reset}
-            persistenceError={undefined}
-            persistenceStatus="Saved for this workspace"
-            rootModuleId="parent"
-            scopeOverrides={[
-              {
-                exactFolderKey: 'Language/Pragmatics',
-                spatialGroupKey: 'Language',
-              },
-            ]}
+            onFolderContextMenu={onContext}
           />
         </ReactFlow>,
       );
     });
     const overlay = document.querySelector('svg');
-    const chip = document.querySelector<HTMLButtonElement>(
-      '.focus-schematic-folder-guide-controls__chip',
-    );
+    const child = [
+      ...document.querySelectorAll<HTMLButtonElement>(
+        '.focus-schematic-folder-guide-controls__chip',
+      ),
+    ].find(({ textContent }) => textContent === 'Language/Pragmatics')!;
     expect(overlay?.getAttribute('aria-hidden')).toBe('true');
-    expect(chip?.getAttribute('aria-label')).toContain('Spatial group');
+    expect(getComputedStyle(overlay!).pointerEvents).toBe('none');
+    expect(document.body.textContent).not.toContain('↑ This group');
 
-    act(() => chip!.focus());
-    const actions = [...document.querySelectorAll<HTMLButtonElement>('button')];
-    expect(actions.map(({ textContent }) => textContent)).toEqual([
-      'Language',
-      '↑ This group',
-      '↑ This + sibling folders',
-      'Reset',
-    ]);
-    act(() => actions[1]!.click());
-    act(() => actions[2]!.click());
-    act(() => actions[3]!.click());
-    expect(promote).toHaveBeenCalledWith('Language');
-    expect(siblings).toHaveBeenCalledWith('Language');
-    expect(reset).toHaveBeenCalledWith('Language');
+    act(() => child.focus());
+    expect(document.querySelector('[role="status"]')?.textContent).toContain(
+      'Parent: Language',
+    );
+    expect(document.querySelector('[role="status"]')?.textContent).toContain(
+      'Language/Grammar',
+    );
 
     act(() =>
-      chip!.dispatchEvent(
-        new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }),
+      child.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          clientX: 20,
+          clientY: 30,
+        }),
       ),
     );
-    expect(document.querySelector('[role="group"]')).toBeNull();
+    expect(onContext).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        folderKey: 'Language/Pragmatics',
+        x: 20,
+        y: 30,
+        origin: child,
+      }),
+    );
+    act(() =>
+      child.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          key: 'F10',
+          shiftKey: true,
+        }),
+      ),
+    );
+    expect(onContext).toHaveBeenCalledTimes(2);
   });
 });

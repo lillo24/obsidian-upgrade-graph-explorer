@@ -320,17 +320,20 @@ geometry-relevant values. Disclosure, reroot, filtering, exact hover, Secondary
 presentation, and camera behavior continue through the existing projection and
 React Flow seams.
 
-HIER4B-FIX1 keeps exact folders as source truth while `GraphExplorer.tsx`
-derives a stable sibling inventory from the current canonical snapshot and owns
-the workspace-keyed sparse scope session. `ModularStructuredGraphView.tsx`
-sends scope rules only for Soft layout requests and passes guide actions to the
-renderer. Directional requests use an empty scope and retain their exact cache
-identity. Soft File and module-anchor handles come from final endpoint geometry;
-Heading and Block attachment semantics remain exact.
+HIER4B-FIX2 keeps exact folders as source truth while `GraphExplorer.tsx`
+derives stable File identity/folder pairs from the canonical snapshot and owns
+the workspace-keyed sparse display-intent session. `ModularStructuredGraphView.tsx`
+builds the shared nested display tree, sends intent only for Soft requests, and
+owns one File/folder context-menu target. Directional requests erase display
+intent and retain their exact cache identity. Soft File and module-anchor
+handles still come from final endpoint geometry; Heading and Block attachment
+semantics remain exact.
 
 The persisted Folder guides toggle is resolved after a current worker result is
 adopted. Directional mode supplies the existing band strips; Soft mode supplies
-renderer-only cluster regions from final module rectangles and effective visible
-scope membership. Only the small Soft guide label opens the keyboard-accessible
-promotion/reset toolbar. Guide visibility remains absent from every model,
-worker, effect, and cache dependency that can request or change layout.
+renderer-only nested cluster regions from final module rectangles and visible
+display-tree membership. Only the small Soft guide label accepts pointer or
+keyboard context requests; large guide regions remain inert. File cards and
+guide labels share Network's bounded context-menu portal. Menu/hover state and
+guide visibility remain absent from every model, worker, effect, and cache
+dependency that can request or change layout.

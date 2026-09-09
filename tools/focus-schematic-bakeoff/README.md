@@ -24,11 +24,14 @@ DB19 is the replacement true-blocked oracle after V1/C1 optimization. Metrics
 remain evidence only until the user explicitly selects one grammar.
 
 HIER4B adds a separate Soft Folder Clusters benchmark and graphical lab. It
-compares the unchanged Directional Bands production reference with a
-development-only 2D solver at strengths 0/25/50/75/100. The lab defaults to
-Soft / 50 / Adaptive Compass / Crossing optimized; SC16 renders all strengths
-side by side. HIER4B remains under evaluation and is not wired into product
-settings or the production worker.
+compares the unchanged Directional Bands production reference with the
+development-only 2D solver at strengths 0/25/50/75/100. HIER4B-FIX2 adds
+HFA1-HFA7 nested-hierarchy cases, five sparse display-intent profiles, and the
+H0 nearest/H1 normalized-decay/H2 normalized-equal force-policy bakeoff. H1 is
+the selected internal policy because it preserves both child and parent
+coherence while keeping each File's total folder-force weight at or below one.
+The lab defaults to Soft / 50 / Adaptive Compass / Crossing optimized; SC16
+renders all strengths side by side. HIER4B remains under graphical evaluation.
 
 The accepted outcome is stateless Strategy A. D0 remains the Classic baseline,
 B is retained as rejected evidence, and C remains honestly unbuilt because A
@@ -121,7 +124,9 @@ adjacent keyboard-accessible list. Generated output is gitignored.
   proof, CP4 width pressure, and the fair CP5 Compass improvement case.
 - `src/soft-cluster-benchmark.ts` measures SC1–SC24 across all strengths,
   Directional Bands references, stability pairs, multiplicity saturation,
-  20/50/100-module hubs, operation counts, runtime, and hard invariants.
+  20/50/100-module hubs, five manual display-intent profiles, HFA1–HFA7 across
+  H0/H1/H2 and all five strengths, operation counts, runtime, and hard
+  invariants including the normalized per-File hierarchy-force budget.
 - `src/soft-cluster-lab.ts` generates the self-contained HIER4B comparison with
   primary arrows, exact-folder hulls/centroids, hop guides, module bounds,
   internal-layout and Heading-order controls, and SC16's five-way view.

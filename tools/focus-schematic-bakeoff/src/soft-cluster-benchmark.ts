@@ -19,7 +19,8 @@ import {
   SOFT_CLUSTER_STABILITY_PAIRS,
   type EndpointFixtureSpec,
   type FocusSchematicEndpointPlan,
-  type FocusSchematicSoftFolderScopeOverride,
+  type FocusSchematicSoftFolderDisplayIntent,
+  type FocusSchematicSoftHierarchyForcePolicy,
   type FocusSchematicSoftClusterStrength,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 
@@ -38,16 +39,22 @@ function inputFor(spec: EndpointFixtureSpec, bands: boolean) {
 function soft(
   spec: EndpointFixtureSpec,
   strength: FocusSchematicSoftClusterStrength,
-  scopeOverrides: readonly FocusSchematicSoftFolderScopeOverride[] = [],
+  displayIntent: FocusSchematicSoftFolderDisplayIntent = {
+    fileParentOverrides: [],
+    flattenedFolderKeys: [],
+  },
+  hierarchyForcePolicy: FocusSchematicSoftHierarchyForcePolicy = 'normalized-decay',
 ) {
   const input = inputFor(spec, false);
   const first = computeFocusSchematicSoftClusterLayoutAttempt(input, {
     strength,
-    scopeOverrides,
+    displayIntent,
+    hierarchyForcePolicy,
   });
   const second = computeFocusSchematicSoftClusterLayoutAttempt(input, {
     strength,
-    scopeOverrides,
+    displayIntent,
+    hierarchyForcePolicy,
   });
   if (first.status !== 'success')
     throw new Error(`${spec.id}/${strength}: ${first.reason}`);
@@ -79,8 +86,13 @@ function soft(
     },
     metrics: first.evidence.metrics,
     runtime: first.evidence.runtime,
-    scopeOverrideCount: first.evidence.scopeOverrideCount,
-    effectiveGroupCount: first.evidence.effectiveGroupCount,
+    fileParentOverrideCount: first.evidence.fileParentOverrideCount,
+    flattenedFolderCount: first.evidence.flattenedFolderCount,
+    displayedFolderCount: first.evidence.displayedFolderCount,
+    automaticallyCompressedFolderCount:
+      first.evidence.automaticallyCompressedFolderCount,
+    hierarchyForcePolicy: first.evidence.hierarchyForcePolicy,
+    maximumPerFileFolderWeight: first.evidence.maximumPerFileFolderWeight,
     attachmentSideCounts: Object.fromEntries(
       ['left', 'right', 'top', 'bottom'].map((side) => [
         side,
@@ -92,12 +104,13 @@ function soft(
   };
 }
 
-const fix1ScopeFixture: EndpointFixtureSpec = {
+const fix2HierarchyFixture: EndpointFixtureSpec = {
   id: 'SC25',
-  label: 'HIER4B-FIX1 scope stress',
-  authored: 'Synthetic nested exact-folder registry for scope benchmarks.',
-  expectation: 'Sparse overrides remain deterministic and bounded.',
-  inspect: 'Compare mixed, sibling, repeated, and high-count scope rules.',
+  label: 'HIER4B-FIX2 nested display stress',
+  authored:
+    'Synthetic nested exact-folder registry for display-intent benchmarks.',
+  expectation: 'Sparse intent remains deterministic and bounded.',
+  inspect: 'Compare File promotion, folder flattening, and high-count intent.',
   rootDocumentId: 'Focus',
   documents: [
     { id: 'Focus', path: 'root/Focus.md' },
@@ -124,61 +137,258 @@ const fix1ScopeFixture: EndpointFixtureSpec = {
   hops: 1,
 };
 
-const fix1ScopeRows = [
+const fix2IntentRows = [
   {
-    profile: 'mixed-spatial-scope',
-    overrides: [
-      {
-        exactFolderKey: 'Language/Pragmatics',
-        spatialGroupKey: 'Language',
-      },
-      {
-        exactFolderKey: 'Pattern Theory/A',
-        spatialGroupKey: 'Pattern Theory',
-      },
-      {
-        exactFolderKey: 'Pattern Theory/B',
-        spatialGroupKey: 'Pattern Theory',
-      },
-    ],
+    profile: 'mixed-display-intent',
+    intent: {
+      fileParentOverrides: [
+        { fileId: 'Pragmatics', displayParentFolderKey: 'Language' },
+      ],
+      flattenedFolderKeys: ['Pattern Theory/A', 'Pattern Theory/B'],
+    },
   },
   {
-    profile: 'promoted-parent',
-    overrides: [
-      {
-        exactFolderKey: 'Language/Pragmatics',
-        spatialGroupKey: 'Language',
-      },
-    ],
+    profile: 'promoted-file',
+    intent: {
+      fileParentOverrides: [
+        { fileId: 'Pragmatics', displayParentFolderKey: 'Language' },
+      ],
+      flattenedFolderKeys: [],
+    },
   },
   {
-    profile: 'promoted-siblings',
-    overrides: [
-      {
-        exactFolderKey: 'Language/Grammar',
-        spatialGroupKey: 'Language',
-      },
-      {
-        exactFolderKey: 'Language/Pragmatics',
-        spatialGroupKey: 'Language',
-      },
-    ],
+    profile: 'flattened-siblings',
+    intent: {
+      fileParentOverrides: [],
+      flattenedFolderKeys: ['Language/Grammar', 'Language/Pragmatics'],
+    },
   },
   {
-    profile: 'deep-repeated-promotion',
-    overrides: [{ exactFolderKey: 'A/B/C', spatialGroupKey: '.' }],
+    profile: 'deep-repeated-file-promotion',
+    intent: {
+      fileParentOverrides: [{ fileId: 'Deep', displayParentFolderKey: '.' }],
+      flattenedFolderKeys: [],
+    },
   },
   {
-    profile: 'many-folder-overrides',
-    overrides: Array.from({ length: 30 }, (_, index) => ({
-      exactFolderKey: `Teams/Team${index}/Child`,
-      spatialGroupKey: `Teams/Team${index}`,
-    })),
+    profile: 'many-flattened-folders',
+    intent: {
+      fileParentOverrides: [],
+      flattenedFolderKeys: Array.from(
+        { length: 30 },
+        (_, index) => `Teams/Team${index}/Child`,
+      ),
+    },
   },
-].map(({ profile, overrides }) => ({
+].map(({ profile, intent }) => ({
   profile,
-  ...soft(fix1ScopeFixture, 50, overrides),
+  ...soft(fix2HierarchyFixture, 50, intent),
 }));
+
+const hierarchyForceFixtures: readonly {
+  readonly id: string;
+  readonly spec: EndpointFixtureSpec;
+  readonly intent: FocusSchematicSoftFolderDisplayIntent;
+}[] = [
+  {
+    id: 'HFA1',
+    spec: {
+      id: 'HFA1',
+      label: 'parent direct File plus two-File child',
+      authored: 'Nested hierarchy force fixture.',
+      expectation: 'Child and parent coherence are both measurable.',
+      inspect: 'Compare bounded hierarchy policies.',
+      rootDocumentId: 'Focus',
+      documents: [
+        { id: 'Focus', path: 'Focus.md' },
+        { id: 'Parent', path: 'A/Parent.md' },
+        { id: 'Child1', path: 'A/B/Child1.md' },
+        { id: 'Child2', path: 'A/B/Child2.md' },
+      ],
+      references: [
+        { sourceEntityId: 'Focus', targetEntityId: 'Parent' },
+        { sourceEntityId: 'Parent', targetEntityId: 'Child1' },
+        { sourceEntityId: 'Parent', targetEntityId: 'Child2' },
+      ],
+      hops: 3,
+    },
+    intent: { fileParentOverrides: [], flattenedFolderKeys: [] },
+  },
+  {
+    id: 'HFA2',
+    spec: {
+      id: 'HFA2',
+      label: 'two sibling nested child folders',
+      authored: 'Nested hierarchy force fixture.',
+      expectation: 'Sibling child coherence remains useful.',
+      inspect: 'Compare both child scopes inside one parent.',
+      rootDocumentId: 'Focus',
+      documents: [
+        { id: 'Focus', path: 'Focus.md' },
+        { id: 'B1', path: 'A/B/B1.md' },
+        { id: 'B2', path: 'A/B/B2.md' },
+        { id: 'C1', path: 'A/C/C1.md' },
+        { id: 'C2', path: 'A/C/C2.md' },
+      ],
+      references: ['B1', 'B2', 'C1', 'C2'].map((targetEntityId) => ({
+        sourceEntityId: 'Focus',
+        targetEntityId,
+      })),
+      hops: 2,
+    },
+    intent: { fileParentOverrides: [], flattenedFolderKeys: [] },
+  },
+  {
+    id: 'HFA3',
+    spec: {
+      id: 'HFA3',
+      label: 'depth-three hierarchy',
+      authored: 'Nested hierarchy force fixture.',
+      expectation: 'Depth does not amplify total force.',
+      inspect: 'Compare Files at each level.',
+      rootDocumentId: 'Focus',
+      documents: [
+        { id: 'Focus', path: 'Focus.md' },
+        { id: 'A', path: 'A/A.md' },
+        { id: 'B', path: 'A/B/B.md' },
+        { id: 'C1', path: 'A/B/C/C1.md' },
+        { id: 'C2', path: 'A/B/C/C2.md' },
+      ],
+      references: ['A', 'B', 'C1', 'C2'].map((targetEntityId) => ({
+        sourceEntityId: 'Focus',
+        targetEntityId,
+      })),
+      hops: 3,
+    },
+    intent: { fileParentOverrides: [], flattenedFolderKeys: [] },
+  },
+  {
+    id: 'HFA4',
+    spec: {
+      id: 'HFA4',
+      label: 'promoted File leaves child folder',
+      authored: 'Nested hierarchy force fixture.',
+      expectation: 'Only one File changes displayed membership.',
+      inspect: 'Compare promoted File with retained siblings.',
+      rootDocumentId: 'Focus',
+      documents: [
+        { id: 'Focus', path: 'Focus.md' },
+        { id: 'Parent', path: 'A/Parent.md' },
+        { id: 'Move', path: 'A/B/Move.md' },
+        { id: 'Stay1', path: 'A/B/Stay1.md' },
+        { id: 'Stay2', path: 'A/B/Stay2.md' },
+      ],
+      references: ['Parent', 'Move', 'Stay1', 'Stay2'].map(
+        (targetEntityId) => ({
+          sourceEntityId: 'Focus',
+          targetEntityId,
+        }),
+      ),
+      hops: 2,
+    },
+    intent: {
+      fileParentOverrides: [{ fileId: 'Move', displayParentFolderKey: 'A' }],
+      flattenedFolderKeys: [],
+    },
+  },
+  {
+    id: 'HFA5',
+    spec: {
+      id: 'HFA5',
+      label: 'flattened folder with surviving grandchild',
+      authored: 'Nested hierarchy force fixture.',
+      expectation: 'Flattened layer loses force while grandchild survives.',
+      inspect: 'Compare parent and surviving child coherence.',
+      rootDocumentId: 'Focus',
+      documents: [
+        { id: 'Focus', path: 'Focus.md' },
+        { id: 'Parent', path: 'A/Parent.md' },
+        { id: 'Lifted', path: 'A/B/Lifted.md' },
+        { id: 'C1', path: 'A/B/C/C1.md' },
+        { id: 'C2', path: 'A/B/C/C2.md' },
+      ],
+      references: ['Parent', 'Lifted', 'C1', 'C2'].map((targetEntityId) => ({
+        sourceEntityId: 'Focus',
+        targetEntityId,
+      })),
+      hops: 2,
+    },
+    intent: { fileParentOverrides: [], flattenedFolderKeys: ['A/B'] },
+  },
+  {
+    id: 'HFA6',
+    spec: {
+      id: 'HFA6',
+      label: 'disconnected same-folder islands',
+      authored: 'Nested hierarchy force fixture.',
+      expectation: 'Topology may keep one logical folder spatially split.',
+      inspect: 'Compare force without forcing a misleading hull.',
+      rootDocumentId: 'Focus',
+      documents: [
+        { id: 'Focus', path: 'Focus.md' },
+        { id: 'A1', path: 'A/A1.md' },
+        { id: 'A2', path: 'A/A2.md' },
+        { id: 'B1', path: 'B/B1.md' },
+        { id: 'B2', path: 'B/B2.md' },
+      ],
+      references: [
+        { sourceEntityId: 'Focus', targetEntityId: 'A1' },
+        { sourceEntityId: 'A1', targetEntityId: 'B1' },
+        { sourceEntityId: 'B1', targetEntityId: 'B2' },
+        { sourceEntityId: 'B2', targetEntityId: 'A2' },
+      ],
+      hops: 3,
+    },
+    intent: { fileParentOverrides: [], flattenedFolderKeys: [] },
+  },
+  {
+    id: 'HFA7',
+    spec: {
+      id: 'HFA7',
+      label: 'topology pulls against nesting',
+      authored: 'Nested hierarchy force fixture.',
+      expectation: 'Hard topology gates remain valid.',
+      inspect: 'Compare crossings and coherence.',
+      rootDocumentId: 'Focus',
+      documents: [
+        { id: 'Focus', path: 'Focus.md' },
+        { id: 'A1', path: 'A/A1.md' },
+        { id: 'A2', path: 'A/A2.md' },
+        { id: 'B1', path: 'A/B/B1.md' },
+        { id: 'B2', path: 'A/B/B2.md' },
+      ],
+      references: [
+        { sourceEntityId: 'Focus', targetEntityId: 'A1' },
+        { sourceEntityId: 'Focus', targetEntityId: 'A2' },
+        { sourceEntityId: 'A1', targetEntityId: 'B2' },
+        { sourceEntityId: 'A2', targetEntityId: 'B1' },
+      ],
+      hops: 2,
+    },
+    intent: { fileParentOverrides: [], flattenedFolderKeys: [] },
+  },
+];
+
+const hierarchyForcePolicies = [
+  'nearest-only',
+  'normalized-decay',
+  'normalized-equal',
+] as const;
+const hierarchyForceRows = hierarchyForceFixtures.flatMap(
+  ({ id, spec, intent }) =>
+    hierarchyForcePolicies.map((policy) => ({
+      id,
+      policy,
+      ...soft(spec, 50, intent, policy),
+    })),
+);
+const hierarchyStrengthRows = hierarchyForceFixtures.flatMap(
+  ({ id, spec, intent }) =>
+    strengths.map((strength) => ({
+      id,
+      ...soft(spec, strength, intent, 'normalized-decay'),
+    })),
+);
 
 function cardinalPlan(
   connections: readonly {
@@ -488,6 +698,14 @@ const hardGatesPass =
   stressRows.every(
     ({ deterministic, hardGates }) => deterministic && hardGates.overlapFree,
   ) &&
+  hierarchyForceRows.every(
+    ({ deterministic, hardGates, maximumPerFileFolderWeight }) =>
+      deterministic && hardGates.overlapFree && maximumPerFileFolderWeight <= 1,
+  ) &&
+  hierarchyStrengthRows.every(
+    ({ deterministic, hardGates, maximumPerFileFolderWeight }) =>
+      deterministic && hardGates.overlapFree && maximumPerFileFolderWeight <= 1,
+  ) &&
   zeroFolderMutation.byteIdentical;
 const completeHardGatesPass =
   hardGatesPass &&
@@ -519,7 +737,14 @@ const report = {
   stabilityRows: stability,
   stressRows,
   multiplicityRows,
-  fix1ScopeRows,
+  fix2IntentRows,
+  hierarchyForceBakeoff: {
+    selectedPolicy: 'normalized-decay',
+    rationale:
+      'Nearest scopes receive more weight while every File has one normalized total folder-force budget.',
+    rows: hierarchyForceRows,
+  },
+  hierarchyStrengthRows,
   cardinalGeometryRows,
 };
 
@@ -535,5 +760,5 @@ const target = isAbsolute(requested)
 mkdirSync(dirname(target), { recursive: true });
 writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 process.stdout.write(
-  `${JSON.stringify({ target, decisionState: report.decisionState, hardGatesPass: completeHardGatesPass, fixtureRows: fixtureRows.length, stressRows: stressRows.length })}\n`,
+  `${JSON.stringify({ target, decisionState: report.decisionState, hardGatesPass: completeHardGatesPass, fixtureRows: fixtureRows.length, stressRows: stressRows.length, hierarchyForceRows: hierarchyForceRows.length, hierarchyStrengthRows: hierarchyStrengthRows.length })}\n`,
 );

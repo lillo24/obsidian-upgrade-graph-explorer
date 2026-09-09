@@ -12,12 +12,15 @@ import {
 import { FOCUS_SCHEMATIC_LAYOUT_SETTINGS } from './settings';
 import { layoutInput } from './test-helpers';
 import type { EndpointFixtureSpec } from './endpoint-fixtures';
-import type { FocusSchematicSoftFolderScopeOverride } from './types';
+import type { FocusSchematicSoftFolderDisplayIntent } from './types';
 
 function run(
   spec: EndpointFixtureSpec,
   strength: 0 | 25 | 50 | 75 | 100 = 50,
-  scopeOverrides: readonly FocusSchematicSoftFolderScopeOverride[] = [],
+  displayIntent: FocusSchematicSoftFolderDisplayIntent = {
+    fileParentOverrides: [],
+    flattenedFolderKeys: [],
+  },
 ) {
   const input = layoutInput(buildEndpointFixture(spec), {
     ...FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
@@ -25,7 +28,7 @@ function run(
   });
   const attempt = computeFocusSchematicSoftClusterLayoutAttempt(input, {
     strength,
-    scopeOverrides,
+    displayIntent,
   });
   if (attempt.status !== 'success')
     throw new Error(`${spec.id}/${strength} failed: ${attempt.reason}`);
@@ -35,7 +38,7 @@ function run(
 const mixedScopeFixture: EndpointFixtureSpec = {
   id: 'SC25',
   label: 'mixed per-folder Soft scope',
-  authored: 'Synthetic exact-folder hierarchy for HIER4B-FIX1.',
+  authored: 'Synthetic exact-folder hierarchy for HIER4B-FIX2.',
   expectation: 'Only explicitly promoted branches share a Soft spatial group.',
   inspect: 'Compare exact, one-child, sibling, and mixed-granularity grouping.',
   rootDocumentId: 'Focus',
@@ -144,50 +147,40 @@ describe('HIER4B Soft Folder Clusters', () => {
     );
   });
 
-  it('keeps strength zero geometry independent of promoted spatial scope', () => {
+  it('keeps strength zero geometry independent of manual display intent', () => {
     const exact = run(mixedScopeFixture, 0).attempt;
-    const promoted = run(mixedScopeFixture, 0, [
-      {
-        exactFolderKey: 'Language/Pragmatics',
-        spatialGroupKey: 'Language',
-      },
-      {
-        exactFolderKey: 'Pattern Theory/A',
-        spatialGroupKey: 'Pattern Theory',
-      },
-      {
-        exactFolderKey: 'Pattern Theory/B',
-        spatialGroupKey: 'Pattern Theory',
-      },
-    ]).attempt;
+    const promoted = run(mixedScopeFixture, 0, {
+      fileParentOverrides: [
+        { fileId: 'PragmaticsA', displayParentFolderKey: 'Language' },
+      ],
+      flattenedFolderKeys: ['Pattern Theory/A'],
+    }).attempt;
     expect(promoted.evidence.folderInfluenceEnabled).toBe(false);
     expect(promoted.result.candidate).toEqual(exact.result.candidate);
   });
 
   it.each([0, 25, 50, 75, 100] as const)(
-    'uses the same mixed effective groups at strength %i',
+    'uses the same nested display hierarchy at strength %i',
     (strength) => {
-      const scopeOverrides = [
-        {
-          exactFolderKey: 'Language/Pragmatics',
-          spatialGroupKey: 'Language',
-        },
-        {
-          exactFolderKey: 'Pattern Theory/A',
-          spatialGroupKey: 'Pattern Theory',
-        },
-        {
-          exactFolderKey: 'Pattern Theory/B',
-          spatialGroupKey: 'Pattern Theory',
-        },
-      ] as const;
-      const result = run(mixedScopeFixture, strength, scopeOverrides).attempt;
+      const displayIntent = {
+        fileParentOverrides: [
+          { fileId: 'PragmaticsA', displayParentFolderKey: 'Language' },
+        ],
+        flattenedFolderKeys: ['Pattern Theory/A'],
+      } as const;
+      const result = run(mixedScopeFixture, strength, displayIntent).attempt;
       expect(
         result.result.internalLayoutEvidence.softClusterPolicyEvidence,
-      ).toMatchObject({ scopeOverrides, strength });
+      ).toMatchObject({
+        displayIntent,
+        strength,
+        hierarchyForcePolicy: 'normalized-decay',
+      });
       expect(result.evidence).toMatchObject({
-        effectiveGroupCount: 4,
-        scopeOverrideCount: 3,
+        fileParentOverrideCount: 1,
+        flattenedFolderCount: 1,
+        hierarchyForcePolicy: 'normalized-decay',
+        maximumPerFileFolderWeight: 1,
       });
     },
     20_000,

@@ -161,7 +161,7 @@ import {
 import { deriveProjectionVisualGroupPresentationMap } from '../visual-groups/presentation';
 import { usePresentationOverrides } from '../presentation-overrides/use-presentation-overrides';
 import { useSpatialOverrides } from '../spatial-overrides/use-spatial-overrides';
-import { useSoftFolderScope } from '../soft-folder-scope/use-soft-folder-scope';
+import { useSoftFolderDisplay } from '../soft-folder-display/use-soft-folder-display';
 import {
   folderArrangementActive,
   folderArrangementActiveFolder,
@@ -617,22 +617,27 @@ export function GraphExplorer({
     eligibility,
     storage: persistenceStorage,
   });
-  const workspaceExactFolderKeys = useMemo(
+  const workspaceSoftFolderFiles = useMemo(
     () =>
-      [
-        ...new Set(
-          snapshot.entities.flatMap((entity) =>
-            entity.kind === 'document'
-              ? [workspaceFolderKeyFromPath(entity.source.path)]
-              : [],
-          ),
-        ),
-      ].sort(),
+      snapshot.entities
+        .flatMap((entity) =>
+          entity.kind === 'document'
+            ? [
+                {
+                  fileId: entity.id,
+                  exactFolderKey: workspaceFolderKeyFromPath(
+                    entity.source.path,
+                  ),
+                },
+              ]
+            : [],
+        )
+        .sort((left, right) => left.fileId.localeCompare(right.fileId)),
     [snapshot.entities],
   );
-  const softFolderScope = useSoftFolderScope({
+  const softFolderDisplay = useSoftFolderDisplay({
     workspaceId,
-    workspaceExactFolderKeys,
+    workspaceFiles: workspaceSoftFolderFiles,
     eligibility,
     storage: persistenceStorage,
   });
@@ -4358,10 +4363,12 @@ export function GraphExplorer({
                 internalLayoutVariant={modularFocusInternalLayout}
                 macroLayout={modularFocusMacroLayout}
                 softFolderStrength={modularFocusSoftFolderStrength}
-                softFolderScopeOverrides={softFolderScope.overrides}
-                softFolderScopePersistenceError={softFolderScope.session.error}
-                softFolderScopePersistenceStatus={
-                  softFolderScope.session.status
+                softFolderDisplayIntent={softFolderDisplay.displayIntent}
+                softFolderDisplayPersistenceError={
+                  softFolderDisplay.session.error
+                }
+                softFolderDisplayPersistenceStatus={
+                  softFolderDisplay.session.status
                 }
                 routeStyle={modularConnectionStyle}
                 {...(localTransitionAnchor === undefined
@@ -4379,11 +4386,8 @@ export function GraphExplorer({
                 onFitRequestConsumed={consumeLocalFitRequest}
                 onFocusEntity={focusLocalEntity}
                 onSelectionChange={changeSelection}
-                onPromoteSoftFolderGroup={softFolderScope.promoteGroup}
-                onPromoteSoftFolderGroupWithSiblings={
-                  softFolderScope.promoteGroupWithSiblings
-                }
-                onResetSoftFolderGroup={softFolderScope.resetGroup}
+                onChangeSoftFolderDisplayIntent={softFolderDisplay.commit}
+                onResetSoftFolderDisplay={softFolderDisplay.reset}
                 onToggleEntity={toggleEntity}
                 onTransitionAnchorApiChange={
                   changeLocalStructuredTransitionAnchorApi

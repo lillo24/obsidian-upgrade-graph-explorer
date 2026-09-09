@@ -1,235 +1,126 @@
 import { describe, expect, it } from 'vitest';
-import type { FocusSchematicModule } from '@icarus-graph-explorer/focus-schematic';
-import {
-  buildEndpointFixture,
-  computeFocusSchematicSoftClusterLayoutAttempt,
-  FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
-  SOFT_CLUSTER_FIXTURES,
-} from '@icarus-graph-explorer/focus-schematic-layout';
+import { buildFocusSchematicSoftFolderDisplayTree } from '@icarus-graph-explorer/focus-schematic-layout';
 
 import type { GraphFlowNode } from '../types';
-import {
-  focusSchematicNodeDimensions,
-  prepareFocusSchematicRendererGraph,
-} from './index';
 import { focusSchematicFolderClusterGuides } from './folder-cluster-guides';
 
-function focusModule(
-  id: string,
-  folderKey: string,
-  presentation: FocusSchematicModule['presentation'] = 'visible-content',
-): FocusSchematicModule {
-  return {
-    id,
-    documentEntityId: id,
-    sourcePath: `${folderKey}/${id}.md`,
-    folderKey,
-    presentation,
-    documentProjectionNodeId: presentation === 'filtered' ? null : id,
-    visibleEntityNodeIds: presentation === 'filtered' ? [] : [id],
-    hierarchyEdgeIds: [],
-    internalReferenceIds: [],
-    diagnosticIds: [],
-    focusDistance: 1,
-    incomingDistance: null,
-    outgoingDistance: 1,
-    placement: {
-      allowedSides: ['right'],
-      preferredSide: 'right',
-      rankMagnitude: 1,
-      preferredSignedRank: 1,
-      reason: 'outgoing-only',
-    },
-  };
-}
-
-function moduleNode(
+const node = (
   moduleId: string,
   x: number,
   y: number,
   width = 120,
   height = 80,
-): GraphFlowNode {
-  return {
+): GraphFlowNode =>
+  ({
     id: `module-${moduleId}`,
     type: 'module',
     position: { x, y },
     width,
     height,
     measured: { width, height },
-    data: { projectionNodeId: null, moduleId, root: moduleId === 'root' },
-  } as GraphFlowNode;
-}
+    data: { projectionNodeId: null, moduleId, root: false },
+  }) as GraphFlowNode;
 
-describe('Soft Folder Cluster renderer guides', () => {
-  it('renders singleton, capsule, and hull regions from exact visible membership', () => {
-    const modules = [
-      focusModule('root', '.'),
-      focusModule('science-a', 'science'),
-      focusModule('science-b', 'science'),
-      focusModule('science-c', 'science'),
-      focusModule('language-a', 'language'),
-      focusModule('language-b', 'language'),
-      focusModule('private', 'private', 'filtered'),
-    ];
-    const nodes = [
-      moduleNode('root', 0, 0),
-      moduleNode('science-a', 240, 0),
-      moduleNode('science-b', 480, 0),
-      moduleNode('science-c', 720, 0),
-      moduleNode('language-a', 0, 260),
-      moduleNode('language-b', 240, 260),
-      moduleNode('private', 480, 260),
-    ];
+const tree = (
+  files: readonly {
+    readonly fileId: string;
+    readonly exactFolderKey: string;
+  }[],
+) => buildFocusSchematicSoftFolderDisplayTree({ visibleFiles: files });
 
-    const guides = focusSchematicFolderClusterGuides(modules, nodes, 'root');
-
-    expect(
-      guides.map(({ spatialGroupKey, shape }) => [spatialGroupKey, shape]),
-    ).toEqual([
-      ['.', 'singleton'],
-      ['language', 'capsule'],
-      ['science', 'hull'],
+describe('nested Soft folder guides', () => {
+  it('G1-G3 contains child guides inside labeled parents with direct Files', () => {
+    const displayTree = tree([
+      { fileId: 'outer', exactFolderKey: 'A' },
+      { fileId: 'b1', exactFolderKey: 'A/B' },
+      { fileId: 'b2', exactFolderKey: 'A/B' },
     ]);
-    expect(
-      guides.find(({ spatialGroupKey }) => spatialGroupKey === '.')?.root,
-    ).toBe(true);
-    expect(
-      guides.find(({ spatialGroupKey }) => spatialGroupKey === '.')?.path,
-    ).toBeNull();
-    expect(
-      guides.find(({ spatialGroupKey }) => spatialGroupKey === 'language')
-        ?.path,
-    ).toContain('Q');
-    expect(
-      guides.find(({ spatialGroupKey }) => spatialGroupKey === 'science'),
-    ).toMatchObject({
-      memberModuleIds: ['science-a', 'science-b', 'science-c'],
-      shape: 'hull',
-    });
-    expect(
-      guides.some(({ spatialGroupKey }) => spatialGroupKey === 'private'),
-    ).toBe(false);
+    const guides = focusSchematicFolderClusterGuides(displayTree, [
+      node('outer', 0, 20),
+      node('b1', 180, 0),
+      node('b2', 320, 0),
+    ]);
+    const parent = guides.find(({ folderKey }) => folderKey === 'A')!;
+    const child = guides.find(({ folderKey }) => folderKey === 'A/B')!;
+    expect(parent.label).toBe('A');
+    expect(child.label).toBe('A/B');
+    expect(parent.memberModuleIds).toEqual(['b1', 'b2', 'outer']);
+    expect(parent.x).toBeLessThanOrEqual(child.x);
+    expect(parent.y).toBeLessThanOrEqual(child.y);
+    expect(parent.x + parent.width).toBeGreaterThanOrEqual(
+      child.x + child.width,
+    );
+    expect(parent.y + parent.height).toBeGreaterThanOrEqual(
+      child.y + child.height,
+    );
   });
 
-  it('splits clearly disconnected same-folder islands deterministically', () => {
-    const modules = [
-      focusModule('root', '.'),
-      focusModule('split-a', 'science'),
-      focusModule('split-b', 'science'),
-      focusModule('between', 'language'),
-    ];
-    const nodes = [
-      moduleNode('root', -300, 0),
-      moduleNode('split-a', 0, 0),
-      moduleNode('between', 150, 0, 120),
-      moduleNode('split-b', 300, 0),
-    ];
-    const expected = focusSchematicFolderClusterGuides(modules, nodes, 'root');
-    const reversed = focusSchematicFolderClusterGuides(
-      [...modules].reverse(),
-      [...nodes].reverse(),
-      'root',
-    );
-
-    expect(
-      expected.filter(({ spatialGroupKey }) => spatialGroupKey === 'science'),
-    ).toHaveLength(2);
-    expect(expected).toEqual(reversed);
+  it('G4 splits truthful same-folder islands around another folder', () => {
+    const displayTree = tree([
+      { fileId: 'a1', exactFolderKey: 'A' },
+      { fileId: 'a2', exactFolderKey: 'A' },
+      { fileId: 'b1', exactFolderKey: 'B' },
+      { fileId: 'b2', exactFolderKey: 'B' },
+    ]);
+    const guides = focusSchematicFolderClusterGuides(displayTree, [
+      node('a1', 0, 0),
+      node('b1', 260, 0),
+      node('b2', 390, 0),
+      node('a2', 680, 0),
+    ]);
+    const a = guides.filter(({ folderKey }) => folderKey === 'A');
+    expect(a).toHaveLength(2);
+    expect(a.map(({ memberModuleIds }) => memberModuleIds)).toEqual([
+      ['a1'],
+      ['a2'],
+    ]);
   });
 
-  it.each([0, 25, 50, 75, 100])(
-    'derives current guides at strength %i without moving nodes or changing convergence',
-    (strength) => {
-      const fixture = buildEndpointFixture(
-        SOFT_CLUSTER_FIXTURES.find(({ id }) => id === 'SC16')!,
-      );
-      const input = {
-        model: fixture.model,
-        projection: fixture.projection,
-        nodeDimensions: focusSchematicNodeDimensions(
-          fixture.projection,
-          fixture.model,
-        ),
-        settings: {
-          ...FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
-          directionalFolderBandsEnabled: false,
-        },
-      };
-      const attempt = computeFocusSchematicSoftClusterLayoutAttempt(input, {
-        strength,
-      });
-      if (attempt.status !== 'success') throw new Error(attempt.reason);
-      const graph = prepareFocusSchematicRendererGraph({
-        projection: fixture.projection,
-        model: fixture.model,
-        layoutInput: input,
-        computedLayout: attempt.result,
-        rootEntityId: fixture.model.rootModuleId,
-        secondaryRelationshipsVisible: false,
-      });
-      const before = graph.nodes.map(({ id, position }) => ({ id, position }));
-      const guides = focusSchematicFolderClusterGuides(
-        fixture.model.modules,
-        graph.nodes,
-        fixture.model.rootModuleId,
-      );
-      const repeated = computeFocusSchematicSoftClusterLayoutAttempt(input, {
-        strength,
-      });
-      if (repeated.status !== 'success') throw new Error(repeated.reason);
-
-      expect(guides.length).toBeGreaterThan(0);
-      expect(
-        new Set(guides.map(({ spatialGroupKey }) => spatialGroupKey)),
-      ).toEqual(
-        new Set(
-          fixture.model.modules
-            .filter(({ presentation }) => presentation !== 'filtered')
-            .map(({ folderKey }) => folderKey),
-        ),
-      );
-      expect(guides.every(({ path }) => path?.includes('NaN') !== true)).toBe(
-        true,
-      );
-      expect(graph.nodes.map(({ id, position }) => ({ id, position }))).toEqual(
-        before,
-      );
-      expect(repeated.result.candidate).toEqual(attempt.result.candidate);
-    },
-    20_000,
-  );
-
-  it('merges promoted exact folders into one effective guide identity', () => {
-    const modules = [
-      focusModule('parent', 'Language'),
-      focusModule('pragmatics', 'Language/Pragmatics'),
-      focusModule('grammar', 'Language/Grammar'),
-    ];
-    const guides = focusSchematicFolderClusterGuides(
-      modules,
-      [
-        moduleNode('parent', 0, 0),
-        moduleNode('pragmatics', 180, 0),
-        moduleNode('grammar', 500, 0),
-      ],
-      'parent',
-      [
-        {
-          exactFolderKey: 'Language/Pragmatics',
-          spatialGroupKey: 'Language',
-        },
-      ],
-    );
-
-    expect(guides.map(({ spatialGroupKey }) => spatialGroupKey)).toEqual([
-      'Language',
-      'Language/Grammar',
+  it('G5 grows deep nesting by fixed padding rather than exponentially', () => {
+    const displayTree = tree([
+      { fileId: 'a', exactFolderKey: 'A' },
+      { fileId: 'b', exactFolderKey: 'A/B' },
+      { fileId: 'c', exactFolderKey: 'A/B/C' },
+      { fileId: 'd1', exactFolderKey: 'A/B/C/D' },
+      { fileId: 'd2', exactFolderKey: 'A/B/C/D' },
     ]);
-    expect(guides[0]).toMatchObject({
-      exactFolderKeys: ['Language', 'Language/Pragmatics'],
-      memberModuleIds: ['parent', 'pragmatics'],
-      shape: 'capsule',
-    });
+    const guides = focusSchematicFolderClusterGuides(displayTree, [
+      node('a', 0, 0),
+      node('b', 130, 0),
+      node('c', 260, 0),
+      node('d1', 390, 0),
+      node('d2', 520, 0),
+    ]);
+    const outer = guides.find(({ folderKey }) => folderKey === 'A')!;
+    const inner = guides.find(({ folderKey }) => folderKey === 'A/B/C/D')!;
+    expect(outer.width - inner.width).toBeLessThanOrEqual(6 * 2 * 24 + 520);
+  });
+
+  it('G8 carries auto-compressed ancestry into the surviving guide context', () => {
+    const displayTree = tree([
+      { fileId: 'outer', exactFolderKey: 'A' },
+      { fileId: 'b1', exactFolderKey: 'A/B/C' },
+      { fileId: 'b2', exactFolderKey: 'A/B/C' },
+    ]);
+    const guides = focusSchematicFolderClusterGuides(displayTree, [
+      node('outer', 0, 0),
+      node('b1', 160, 0),
+      node('b2', 300, 0),
+    ]);
+    expect(
+      guides.find(({ folderKey }) => folderKey === 'A/B/C')
+        ?.suppressedAncestorFolderKeys,
+    ).toContain('A/B');
+  });
+
+  it('G6 remains deterministic from renderer-only inputs', () => {
+    const displayTree = tree([
+      { fileId: 'a', exactFolderKey: 'A' },
+      { fileId: 'b', exactFolderKey: 'A' },
+    ]);
+    const nodes = [node('a', 0, 0), node('b', 150, 0)];
+    expect(focusSchematicFolderClusterGuides(displayTree, nodes)).toEqual(
+      focusSchematicFolderClusterGuides(displayTree, nodes),
+    );
   });
 });
