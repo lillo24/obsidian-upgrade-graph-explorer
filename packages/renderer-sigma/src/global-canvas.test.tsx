@@ -71,7 +71,7 @@ describe('GlobalGraphCanvas empty state', () => {
       />,
     );
 
-    expect(markup).toContain('All Network canvas controls');
+    expect(markup).toContain('All Network viewport controls');
     expect(markup).not.toContain('global-graph-canvas__status');
     expect(markup).not.toContain('layout restored from the in-memory cache');
   });

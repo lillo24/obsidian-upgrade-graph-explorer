@@ -22,6 +22,7 @@ const sessionInstances = vi.hoisted(() => [] as MockSessionApi[]);
 
 vi.mock('./session', () => ({
   GlobalRendererSession: class {
+    commitInitialPresentation = vi.fn(async () => undefined);
     readonly ready = Promise.resolve();
     readonly applyPositions = vi.fn(async () => undefined);
     readonly applySpatialPositions = vi.fn(async () => undefined);

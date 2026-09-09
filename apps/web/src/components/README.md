@@ -176,11 +176,17 @@ canonical truth, or own a platform storage implementation.
   Its narrow document-activation callback sends Global double-click through the
   same `GraphExplorer` Focus/history/transition-anchor path as Inspector;
   Sigma default double-click zoom is already consumed inside the renderer.
+  Fresh-source seeds remain internal until the current layout and spatial
+  generation commits its final normalization frame and Fit All render. The view
+  receives the app shell's existing maximize/restore owner; it does not keep a
+  second maximize state.
 - `LocalGraphView.tsx` owns the separate Local Free worker client and bounded
   page-lifetime layout cache. An exact hit warms the first canvas draw; otherwise
-  it mounts deterministic seed geometry immediately, then adopts only the latest
-  refinement. Its mount boundary reports an invalid renderer input without
-  unmounting the application shell.
+  it mounts deterministic seed geometry internally, then reveals only after the
+  accepted layout owns Sigma normalization and startup Fit. Its mount boundary
+  reports an invalid renderer input without unmounting the application shell.
+  All and Focus Network render the same Sigma-owned icon viewport cluster; the
+  separate Arrange Folders tool remains Global-only.
 - `LocalStructuredGraphView.tsx` owns the lazy React Flow Local schematic,
   caller-owned W3 service, bounded exact memory cache, semantic Structured zoom
   adapter, and explicit mount-failure boundary. It reuses `GraphCanvas` rather

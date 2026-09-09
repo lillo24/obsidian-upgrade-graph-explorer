@@ -21,6 +21,7 @@ vi.mock('./session', () => ({
   GlobalRendererSession: class {
     ready = Promise.resolve();
     applyPositions = vi.fn(async () => undefined);
+    commitInitialPresentation = vi.fn(async () => undefined);
     createLayoutRequest = createGlobalLayoutRequest;
     destroy = vi.fn();
     setControlledSelection = vi.fn();
@@ -34,6 +35,7 @@ vi.mock('./local-session', () => ({
   LocalRendererSession: class {
     ready = Promise.resolve();
     applyPositions = vi.fn(async () => undefined);
+    commitInitialPresentation = vi.fn(async () => undefined);
     createLayoutRequest = (
       input: Parameters<typeof createLocalLayoutRequest>[0],
       networkSettings: Parameters<

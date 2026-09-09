@@ -4638,6 +4638,7 @@ export function GraphExplorer({
                   ? {}
                   : { instrumentation: performance })}
                 layoutRequestKey={globalLayoutRequestKey}
+                maximized={maximized}
                 onFailure={(message) =>
                   setGlobalUnavailable(
                     `All Network renderer failed: ${message} All Hierarchy remains available for this session.`,
@@ -4660,6 +4661,7 @@ export function GraphExplorer({
                 onCenterRequestConsumed={consumeGlobalCenterRequest}
                 onFitRequestConsumed={consumeGlobalFitRequest}
                 onFitRequested={requestGlobalFit}
+                onMaximizedChange={changeMaximized}
                 onNodeActivate={enterFocusScope}
                 onNodeSingleClick={revealGraphNode}
                 onSelectionChange={changeGlobalSelection}
@@ -4750,6 +4752,7 @@ export function GraphExplorer({
                   ? {}
                   : { initialViewport: localViewportBookmark })}
                 layoutRequestKey={localLayoutRequestKey}
+                maximized={maximized}
                 networkSettings={networkSettings}
                 {...(localTransitionAnchor === undefined
                   ? {}
@@ -4781,6 +4784,7 @@ export function GraphExplorer({
                 onCenterRequestConsumed={consumeLocalCenterRequest}
                 onFitRequestConsumed={consumeLocalFitRequest}
                 onFitRequested={requestLocalFit}
+                onMaximizedChange={changeMaximized}
                 onNodeActivate={focusLocalEntity}
                 onNodeSingleClick={revealGraphNode}
                 onSelectionChange={changeLocalSelection}

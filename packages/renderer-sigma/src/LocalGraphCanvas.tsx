@@ -41,9 +41,11 @@ import {
   seedLocalRendererInput,
 } from './local-mapping';
 import { LocalRendererSession } from './local-session';
+import { NetworkViewportControls } from './NetworkViewportControls';
 import type {
   LocalCenterRequest,
   LocalDensityQaDiagnostics,
+  LocalLayoutPosition,
   LocalLayoutService,
   LocalRendererInstrumentation,
   LocalSelection,
@@ -66,6 +68,7 @@ export interface LocalGraphCanvasProps {
   readonly layoutCache?: LocalLayoutCache;
   readonly layoutRequestKey: number;
   readonly layoutService: LocalLayoutService;
+  readonly maximized?: boolean;
   /** PHYSICS1 transport seam; direct File dragging is armed while available. */
   readonly physicsServiceFactory?: NetworkPhysicsServiceFactory;
   readonly temporaryConstraintActive?: boolean;
@@ -95,6 +98,7 @@ export interface LocalGraphCanvasProps {
   readonly onFitRequestConsumed?: (key: number) => void;
   /** Routes the visible Fit action through the committed-layout request gate. */
   readonly onFitRequested?: () => void;
+  readonly onMaximizedChange?: (maximized: boolean) => void;
   readonly onSelectionChange: (selection: LocalSelection | null) => void;
   readonly onNodeSingleClick?: (nodeId: string) => void;
   readonly onNodeActivate?: (entityId: string) => void;
@@ -130,6 +134,7 @@ export function LocalGraphCanvas({
   layoutCache,
   layoutRequestKey,
   layoutService,
+  maximized,
   physicsServiceFactory,
   networkSettings = DEFAULT_RESOLVED_NETWORK_SETTINGS,
   onFailure,
@@ -142,6 +147,7 @@ export function LocalGraphCanvas({
   onCenterRequestConsumed,
   onFitRequestConsumed,
   onFitRequested,
+  onMaximizedChange,
   onSelectionChange,
   onNodeSingleClick,
   onNodeActivate,
@@ -164,6 +170,12 @@ export function LocalGraphCanvas({
   const handledFitRequest = useRef(0);
   const automaticFitRequestKeyRef = useRef(automaticFitRequestKey);
   const userCameraIntentGeneration = useRef(0);
+  const pendingInitialPresentation = useRef<number | 'initial' | undefined>(
+    automaticFitRequestKey ?? 'initial',
+  );
+  const presentationCameraIntentGeneration = useRef(0);
+  const [initialPresentationReady, setInitialPresentationReady] =
+    useState(false);
   const handledLayoutRequest = useRef(layoutRequestKey);
   const initialCacheAccepted = useRef(false);
   const layoutPending = useRef(true);
@@ -221,6 +233,16 @@ export function LocalGraphCanvas({
   ]);
   useLayoutEffect(() => {
     automaticFitRequestKeyRef.current = automaticFitRequestKey;
+    if (
+      automaticFitRequestKey !== undefined &&
+      automaticFitRequestKey > handledFitRequest.current &&
+      pendingInitialPresentation.current !== automaticFitRequestKey
+    ) {
+      pendingInitialPresentation.current = automaticFitRequestKey;
+      presentationCameraIntentGeneration.current =
+        userCameraIntentGeneration.current;
+      setInitialPresentationReady(false);
+    }
   }, [automaticFitRequestKey]);
 
   const topology = useMemo(() => {
@@ -249,6 +271,14 @@ export function LocalGraphCanvas({
     () => localLayoutFingerprint(requestTemplate),
     [requestTemplate],
   );
+  const presentationGeneration = useMemo(
+    () => ({ fingerprint, input, layoutRequestKey }),
+    [fingerprint, input, layoutRequestKey],
+  );
+  const presentationGenerationRef = useRef(presentationGeneration);
+  useLayoutEffect(() => {
+    presentationGenerationRef.current = presentationGeneration;
+  }, [presentationGeneration]);
   const [initial] = useState(() => {
     const cached = cache.get(fingerprint);
     return {
@@ -284,6 +314,40 @@ export function LocalGraphCanvas({
     initial.cached ? undefined : 'Focus Network is ready; refining layout…',
   );
   const [layoutError, setLayoutError] = useState<string>();
+  const commitAcceptedPresentation = useCallback(
+    async (
+      generation: object,
+      session: LocalRendererSession,
+      positions: readonly LocalLayoutPosition[],
+    ): Promise<boolean> => {
+      if (presentationGenerationRef.current !== generation) return false;
+      const pending = pendingInitialPresentation.current;
+      if (pending === undefined) return true;
+      const automaticKey = typeof pending === 'number' ? pending : undefined;
+      const fitAll =
+        automaticKey !== undefined &&
+        automaticFitRequestKeyRef.current === automaticKey &&
+        userCameraIntentGeneration.current ===
+          presentationCameraIntentGeneration.current;
+      await session.commitInitialPresentation(positions, fitAll);
+      if (presentationGenerationRef.current !== generation) return false;
+      pendingInitialPresentation.current = undefined;
+      setInitialPresentationReady(true);
+      if (
+        automaticKey !== undefined &&
+        automaticFitRequestKeyRef.current === automaticKey
+      ) {
+        automaticFitRequestKeyRef.current = undefined;
+        handledFitRequest.current = Math.max(
+          handledFitRequest.current,
+          automaticKey,
+        );
+        callbacks.current.onFitRequestConsumed?.(automaticKey);
+      }
+      return true;
+    },
+    [],
+  );
   const latestTemporaryConstraintActive = useRef(temporaryConstraintActive);
   useLayoutEffect(() => {
     latestTemporaryConstraintActive.current = temporaryConstraintActive;
@@ -465,10 +529,13 @@ export function LocalGraphCanvas({
     if (session === undefined || input === initial.input) return;
     try {
       session.update(input);
+      latestAcceptedPositions.current = requestTemplate.nodes.map(
+        ({ key, x, y }) => ({ key, x, y }),
+      );
     } catch (error: unknown) {
       callbacks.current.onFailure(errorMessage(error));
     }
-  }, [initial.input, input]);
+  }, [initial.input, input, requestTemplate.nodes]);
 
   useEffect(() => {
     sessionRef.current?.updateTrackpadZoomMode(trackpadZoomMode);
@@ -510,6 +577,22 @@ export function LocalGraphCanvas({
     if (explicitRelayout) cache.delete(fingerprint);
     const cached = explicitRelayout ? undefined : cache.get(fingerprint);
     let cancelled = false;
+    const generation = presentationGeneration;
+    const finishAcceptedLayout = async (
+      positions: readonly LocalLayoutPosition[],
+    ): Promise<void> => {
+      const committed = await commitAcceptedPresentation(
+        generation,
+        session,
+        positions,
+      );
+      if (cancelled || !committed) return;
+      latestAcceptedPositions.current = positions;
+      layoutPending.current = false;
+      setLayoutError(undefined);
+      setLayoutStatus(undefined);
+      setLayoutCommitKey((current) => current + 1);
+    };
     if (cached !== undefined) {
       if (
         !initialCacheAccepted.current &&
@@ -517,23 +600,18 @@ export function LocalGraphCanvas({
         fingerprint === initial.fingerprint
       ) {
         initialCacheAccepted.current = true;
-        latestAcceptedPositions.current = initial.cachedPositions;
-        layoutPending.current = false;
-        setLayoutError(undefined);
-        setLayoutStatus(undefined);
-        setLayoutCommitKey((current) => current + 1);
-        return;
+        void finishAcceptedLayout(initial.cachedPositions).catch(
+          (error: unknown) => {
+            if (!cancelled) callbacks.current.onFailure(errorMessage(error));
+          },
+        );
+        return () => {
+          cancelled = true;
+        };
       }
       void session
         .applyPositions(cached)
-        .then(() => {
-          if (cancelled) return;
-          latestAcceptedPositions.current = cached;
-          layoutPending.current = false;
-          setLayoutError(undefined);
-          setLayoutStatus(undefined);
-          setLayoutCommitKey((current) => current + 1);
-        })
+        .then(() => finishAcceptedLayout(cached))
         .catch((error: unknown) => {
           if (!cancelled) callbacks.current.onFailure(errorMessage(error));
         });
@@ -560,16 +638,26 @@ export function LocalGraphCanvas({
           performance.now() - applyStarted,
         );
         if (cancelled) return;
-        latestAcceptedPositions.current = result.positions;
         instrumentation?.record('local-layout-worker', result.computeMs);
         cache.set(fingerprint, result.positions);
-        layoutPending.current = false;
-        setLayoutStatus(undefined);
-        setLayoutCommitKey((current) => current + 1);
+        await finishAcceptedLayout(result.positions);
       })
-      .catch((error: unknown) => {
+      .catch(async (error: unknown) => {
         if (cancelled) return;
         const message = `Focus Network layout failed: ${errorMessage(error)}`;
+        try {
+          const committed = await commitAcceptedPresentation(
+            generation,
+            session,
+            latestAcceptedPositions.current,
+          );
+          if (cancelled || !committed) return;
+        } catch (presentationError: unknown) {
+          if (!cancelled) {
+            callbacks.current.onFailure(errorMessage(presentationError));
+          }
+          return;
+        }
         layoutPending.current = false;
         setLayoutError(message);
         setLayoutStatus(
@@ -582,6 +670,7 @@ export function LocalGraphCanvas({
     };
   }, [
     cache,
+    commitAcceptedPresentation,
     fingerprint,
     initial.cachedPositions,
     initial.fingerprint,
@@ -589,6 +678,7 @@ export function LocalGraphCanvas({
     instrumentation,
     layoutService,
     layoutRequestKey,
+    presentationGeneration,
     ready,
     referencePull,
   ]);
@@ -713,23 +803,19 @@ export function LocalGraphCanvas({
   }, []);
 
   return (
-    <div className="local-graph-canvas">
+    <div
+      className="local-graph-canvas"
+      data-initial-presentation={initialPresentationReady ? 'ready' : 'pending'}
+    >
       <div className="local-graph-canvas__surface" ref={containerRef} />
-      <div
-        aria-label="Focus Network canvas controls"
-        className="local-graph-canvas__controls"
-        role="group"
-      >
-        <button aria-label="Zoom in" onClick={zoomIn} type="button">
-          +
-        </button>
-        <button aria-label="Zoom out" onClick={zoomOut} type="button">
-          −
-        </button>
-        <button onClick={fit} type="button">
-          Fit
-        </button>
-      </div>
+      <NetworkViewportControls
+        label="Focus Network viewport controls"
+        maximized={maximized}
+        onFit={fit}
+        onMaximizedChange={onMaximizedChange}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+      />
       {layoutStatus === undefined ? null : (
         <p
           aria-atomic="true"

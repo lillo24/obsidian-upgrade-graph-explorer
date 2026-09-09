@@ -12,6 +12,22 @@ and resets the camera to the full-view ratio of `1`. Sigma's 24 px stage padding
 matches the maximum supported Network node radius, so node circles remain inside
 the stage. Labels are opportunistic and are not part of the fit guarantee.
 
+Fresh Global and Local mounts use one authoritative initial-presentation
+transaction. Deterministic seeds and intermediate base geometry remain valid
+solver input, but the Sigma surface and its controls stay withheld until the
+current accepted geometry has rendered, replaced any provisional `customBBox`,
+and applied the startup Fit All camera. Global binds that transaction to the
+same topology/layout/Pull/Place generation that gates Center and Fit; Local binds
+it to the accepted layout generation. An exact cache hit takes the same commit
+path without requesting new layout work.
+
+If manual camera input supersedes the startup Fit, the transaction still makes
+the final extent authoritative but restores the raw graph-space center, scale,
+and angle across the normalization change. Once the first presentation is
+committed, later layout, spatial editing, live update, and movement frames keep
+their existing camera-neutral behavior and never rebase merely because geometry
+changed.
+
 Density framing remains a separate composition control. Its 0–150% preview may
 choose a tighter or looser ratio while preserving the current semantic screen
 anchor; Fit never reads that density ratio.
@@ -45,3 +61,9 @@ distances never enter camera `x` or `y`.
   automatic Fit.
 - Pan sensitivity is independent of raw graph extent, camera angle, and wheel
   delta mode.
+- An immediate explicit Fit after untouched startup is idempotent: it reuses the
+  already-authoritative extent and camera target.
+- All and Focus Network use renderer-local icon viewport controls for zoom, Fit,
+  and the app-owned maximize/restore action. Arrange Folders remains a separate
+  tool. The tiny SVG paths are duplicated from the established Hierarchy visual
+  language to avoid a Sigma-to-React-Flow dependency.

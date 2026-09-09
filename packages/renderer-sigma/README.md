@@ -1,6 +1,6 @@
 # Sigma Global/Regional and Local Free Renderer
 
-Status: **QA — atomic All/Focus camera commits and 0–150% density framing are test-backed; native acceptance remains pending.**
+Status: **QA — authoritative All/Focus startup presentation, atomic camera commits, and 0–150% density framing are test-backed.**
 
 This package owns the lazy, direct Sigma 3 renderers for file-level
 Global/Regional exploration and bounded Local Free exploration. Both consume a
@@ -53,6 +53,7 @@ src/
   raw-viewport-frame.ts    Raw graph-space center/scale diagnostics and bounded repair primitive.
   network-camera-intent.ts One-shot initial framing versus camera-neutral position-adoption policy.
   network-position-frame.ts Validates the stable presented-position normalization extent.
+  NetworkViewportControls.tsx  Shared Sigma icon chrome for Zoom, Fit all, and app-owned maximize/restore.
   precision-wheel-zoom.ts  Zoom curve, two-axis wheel-unit normalization, and Sigma default guard.
   session.ts               Imperative Sigma lifecycle and high-frequency interaction ownership.
   node-click.ts            Shared 300 ms single/double-click arbitration; selection stays immediate.
@@ -74,13 +75,14 @@ src/
   local-lifecycle.ts       Idempotent Local renderer mount/session lease.
   local-session.ts         Local Sigma ownership, precision input, anchors, and viewport.
   local-interaction-contract.ts  Local operation-count oracle and Global-isolation proof.
-  LocalGraphCanvas.tsx     Immediate seed mount and latest worker refinement boundary.
+  LocalGraphCanvas.tsx     Internal seed mount, accepted-layout presentation commit, and reveal boundary.
   deterministic.ts        Shared stable hash/unit primitives; no random geometry.
   styles.css               Canvas controls, progress/error surface, and reduced-motion rules.
   core.ts                  DOM-free mapping/layout/settings exports for tests and benchmarks.
   index.ts                 Browser-capable public API.
   canvas-test-harness.ts    Test-only hook/effect driver for the real canvas dependency paths.
   sigma-test-renderer.ts    Test-only reducer cache and process-boundary Sigma double.
+  initial-presentation-session.test.ts  Final-frame, containment, and immediate-Fit idempotence oracle.
   size-canvas-regression.test.tsx  Real canvas/session layout-count and exact-coordinate regression.
   network-wheel-pan-session.test.ts  Extent/rotation/delta-mode invariant Network pan regression.
   arrangement-session.test.ts  Exact-folder pointer ownership, sparse refresh, and commit contract.
@@ -104,6 +106,15 @@ pending reveals. The renderer never scrolls sidebar DOM.
 Network layout progress remains visible while preparing/refining; success clears
 the status, while layout failure retains the error and last-position recovery text.
 
+The initial Network surface is a presentation transaction rather than a first
+Sigma paint. Seed/base coordinates may warm the worker and renderer internally,
+but Global waits for the current layout plus Pull/Place composition and Local
+waits for its accepted layout. The session then replaces any provisional
+`customBBox`, applies Fit All when its startup camera intent is still current,
+waits for that render, and reveals the surface. Subsequent geometry adoption is
+unchanged and camera-neutral. If user input supersedes startup Fit, raw viewport
+framing is preserved while the final normalization extent is still installed.
+
 Network Fit and density framing are intentionally different camera actions. Fit
 rebases the current all-node extent and uses Sigma's ratio `1`; the shared 24 px
 stage padding covers the maximum 24 px Network node radius, while labels remain
@@ -113,6 +124,9 @@ consumed once, and Global waits for the exact current layout plus Pull/Place
 generation before applying either. A queued fresh-source Fit yields to newer
 manual camera ownership. Two-finger pan converts wheel units to CSS pixels and
 uses only framed coordinates, so raw graph scale cannot amplify the gesture.
+The All and Focus canvases share renderer-local icon-only Zoom, Fit, and
+maximize/restore chrome; maximize state remains owned by the app shell and does
+not relayout or fit. Arrange Folders is rendered in a separate tool cluster.
 
 Global is documents-first. A section or block at this boundary is an error;
 headings never enter Global layout. Reference edges remain the only semantic
