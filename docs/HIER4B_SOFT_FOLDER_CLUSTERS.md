@@ -1,6 +1,6 @@
 # HIER4B Soft Folder Clusters
 
-Status: **UNDER EVALUATION — HIER4B-FIX2 implemented; optimized graphical QA pending.**
+Status: **UNDER EVALUATION — HIER4B-FIX3 implemented; optimized graphical QA pending.**
 
 HIER4B evaluates a second macro-layout family for Modular Focus Hierarchy.
 Directional Folder Bands remains the Modular Preview default, and Classic Focus
@@ -68,11 +68,21 @@ keeps deep nesting bounded. Logical folders may retain multiple disconnected
 regions when topology separates their Files, avoiding a misleading hull across
 unrelated modules.
 
-The hull SVG remains pointer-inert and behind graph edges and nodes. Only each
-small folder label is interactive. Hover or keyboard focus emphasizes the
+The hull SVG remains pointer-inert and behind graph edges and nodes. The graph
+pane converts a context-menu point through React Flow's screen-to-world helper
+and tests the actual rounded region geometry. The deepest displayed region
+wins, followed by smallest area and stable folder identity. This enables empty
+guide-area context menus without intercepting ordinary pointer input. Turning
+Folder guides off disables this area hit test.
+
+Visible labels use only the final folder segment plus an optional quiet parent
+segment. The full normalized workspace-relative key remains in title, ARIA,
+menu naming, and development data. Disconnected regions repeat the same short
+name without visible island numbering. Display depth is derived after manual
+flattening and singleton compression: root is 0, top-level folders are 1, and
+CSS styling is capped at `3+`. Hover or keyboard focus still emphasizes the
 current folder, its displayed parent, and sibling folder guides without
-changing layout. If automatic compression hid an intermediate parent, the
-passive context text reports that compressed ancestry.
+changing layout.
 
 ## Context menu
 
@@ -85,10 +95,14 @@ or closing the menu does not enter projection, model, worker, layout, or cache
 state.
 
 File actions move the one File up one current displayed level or restore exact
-placement. Folder actions flatten one displayed layer, flatten the current
-folder plus displayed siblings, restore applicable hidden layers, or reset Soft
-folder display. Generic Focus, Inspect, Hide File, and Hide folder actions are
-reserved for `MODULAR-CONTEXT1` after HIER4B folder semantics.
+placement. The same File menu then uses a strong semantic separator before the
+valid actions for that File's current displayed containing folder. A File at
+display root has no folder section or empty separator. Folder labels and folder
+area hits open folder actions only. Folder actions flatten one displayed layer,
+flatten the current folder plus displayed siblings, restore applicable hidden
+layers, or reset Soft folder display. Generic Focus, Inspect, Hide File, and
+Hide folder actions are reserved for `MODULAR-CONTEXT1` after HIER4B folder
+semantics.
 
 ## Persistence and privacy
 
@@ -130,3 +144,10 @@ The bakeoff records SC1–SC24 at strengths 0/25/50/75/100, stress profiles,
 HFA1–HFA7 across H0/H1/H2, a nested strength matrix, and cardinal attachment
 regressions. HIER4B remains under evaluation until the user completes graphical
 QA.
+
+## Later work
+
+`HIER4B-SPACING` will evaluate wider use of the available canvas and less
+cramped module interiors after folder semantics are frozen. `MODULAR-CONTEXT1`
+will add Network-style Focus, Inspect, Hide File, and Hide Folder actions to the
+same composed menu model. Neither belongs to FIX3.

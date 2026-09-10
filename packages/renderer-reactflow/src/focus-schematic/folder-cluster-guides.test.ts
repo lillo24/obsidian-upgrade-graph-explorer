@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { buildFocusSchematicSoftFolderDisplayTree } from '@icarus-graph-explorer/focus-schematic-layout';
 
 import type { GraphFlowNode } from '../types';
-import { focusSchematicFolderClusterGuides } from './folder-cluster-guides';
+import {
+  focusSchematicFolderClusterGuides,
+  hitTestFocusSchematicFolderGuideRegion,
+} from './folder-cluster-guides';
 
 const node = (
   moduleId: string,
@@ -43,7 +46,8 @@ describe('nested Soft folder guides', () => {
     const parent = guides.find(({ folderKey }) => folderKey === 'A')!;
     const child = guides.find(({ folderKey }) => folderKey === 'A/B')!;
     expect(parent.label).toBe('A');
-    expect(child.label).toBe('A/B');
+    expect(child.label).toBe('B');
+    expect(child.parentLabel).toBe('A');
     expect(parent.memberModuleIds).toEqual(['b1', 'b2', 'outer']);
     expect(parent.x).toBeLessThanOrEqual(child.x);
     expect(parent.y).toBeLessThanOrEqual(child.y);
@@ -94,6 +98,8 @@ describe('nested Soft folder guides', () => {
     const outer = guides.find(({ folderKey }) => folderKey === 'A')!;
     const inner = guides.find(({ folderKey }) => folderKey === 'A/B/C/D')!;
     expect(outer.width - inner.width).toBeLessThanOrEqual(6 * 2 * 24 + 520);
+    expect(inner.depth).toBe(4);
+    expect(inner.depthStyle).toBe('3+');
   });
 
   it('G8 carries auto-compressed ancestry into the surviving guide context', () => {
@@ -122,5 +128,121 @@ describe('nested Soft folder guides', () => {
     expect(focusSchematicFolderClusterGuides(displayTree, nodes)).toEqual(
       focusSchematicFolderClusterGuides(displayTree, nodes),
     );
+  });
+
+  it('HT1-HT6 hits actual guide shapes with depth, area, and stable tie-breaks', () => {
+    const displayTree = tree([
+      { fileId: 'outer', exactFolderKey: 'A' },
+      { fileId: 'b1', exactFolderKey: 'A/B' },
+      { fileId: 'b2', exactFolderKey: 'A/B' },
+    ]);
+    const guides = focusSchematicFolderClusterGuides(displayTree, [
+      node('outer', 0, 0),
+      node('b1', 160, 0),
+      node('b2', 300, 0),
+    ]);
+    const child = guides.find(({ folderKey }) => folderKey === 'A/B')!;
+    const overlapPoint = {
+      x: child.x + child.width / 2,
+      y: child.y + child.height / 2,
+    };
+    expect(
+      hitTestFocusSchematicFolderGuideRegion(guides, overlapPoint)?.folderKey,
+    ).toBe('A/B');
+    const parent = guides.find(({ folderKey }) => folderKey === 'A')!;
+    expect(
+      hitTestFocusSchematicFolderGuideRegion(guides, {
+        x: parent.x + 30,
+        y: parent.y + parent.height / 2,
+      })?.folderKey,
+    ).toBe('A');
+    expect(
+      hitTestFocusSchematicFolderGuideRegion(guides, {
+        x: child.x - 1,
+        y: child.y - 1,
+      }),
+    ).not.toBe(child);
+    expect(hitTestFocusSchematicFolderGuideRegion([], overlapPoint)).toBeNull();
+
+    const sameDepth = [
+      { ...child, folderKey: 'Z', area: child.area + 1 },
+      { ...child, folderKey: 'A', area: child.area },
+    ];
+    expect(
+      hitTestFocusSchematicFolderGuideRegion(sameDepth, overlapPoint)
+        ?.folderKey,
+    ).toBe('A');
+    const sameArea = sameDepth.map((guide) => ({ ...guide, area: 1 }));
+    expect(
+      hitTestFocusSchematicFolderGuideRegion(sameArea, overlapPoint)?.folderKey,
+    ).toBe('A');
+  });
+
+  it('HT1 respects a singleton rounded corner rather than its loose bounds', () => {
+    const guides = focusSchematicFolderClusterGuides(
+      tree([{ fileId: 'root', exactFolderKey: '.' }]),
+      [node('root', 0, 0)],
+    );
+    const guide = guides[0]!;
+    expect(guide.shape).toBe('singleton');
+    expect(
+      hitTestFocusSchematicFolderGuideRegion(guides, {
+        x: guide.x + guide.width / 2,
+        y: guide.y + guide.height / 2,
+      }),
+    ).toBe(guide);
+    expect(
+      hitTestFocusSchematicFolderGuideRegion(guides, {
+        x: guide.x + 1,
+        y: guide.y + 1,
+      }),
+    ).toBeNull();
+  });
+
+  it('HT4 chooses a displayed depth 3+ guide', () => {
+    const displayTree = tree([
+      { fileId: 'a', exactFolderKey: 'A' },
+      { fileId: 'b', exactFolderKey: 'A/B' },
+      { fileId: 'c', exactFolderKey: 'A/B/C' },
+      { fileId: 'd1', exactFolderKey: 'A/B/C/D' },
+      { fileId: 'd2', exactFolderKey: 'A/B/C/D' },
+    ]);
+    const guides = focusSchematicFolderClusterGuides(displayTree, [
+      node('a', 0, 0),
+      node('b', 160, 0),
+      node('c', 320, 0),
+      node('d1', 480, 0),
+      node('d2', 640, 0),
+    ]);
+    const deepest = guides.find(({ folderKey }) => folderKey === 'A/B/C/D')!;
+    expect(
+      hitTestFocusSchematicFolderGuideRegion(guides, {
+        x: deepest.x + deepest.width / 2,
+        y: deepest.y + deepest.height / 2,
+      })?.folderKey,
+    ).toBe('A/B/C/D');
+  });
+
+  it('HT5 resolves disconnected regions to the same folder target', () => {
+    const displayTree = tree([
+      { fileId: 'a1', exactFolderKey: 'A' },
+      { fileId: 'a2', exactFolderKey: 'A' },
+      { fileId: 'b1', exactFolderKey: 'B' },
+      { fileId: 'b2', exactFolderKey: 'B' },
+    ]);
+    const guides = focusSchematicFolderClusterGuides(displayTree, [
+      node('a1', 0, 0),
+      node('b1', 260, 0),
+      node('b2', 390, 0),
+      node('a2', 680, 0),
+    ]).filter(({ folderKey }) => folderKey === 'A');
+    expect(guides).toHaveLength(2);
+    for (const guide of guides)
+      expect(
+        hitTestFocusSchematicFolderGuideRegion(guides, {
+          x: guide.x + guide.width / 2,
+          y: guide.y + guide.height / 2,
+        })?.folderKey,
+      ).toBe('A');
   });
 });

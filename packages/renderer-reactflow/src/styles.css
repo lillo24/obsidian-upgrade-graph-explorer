@@ -105,11 +105,26 @@
 }
 
 .focus-schematic-folder-guide {
-  fill: rgb(73 126 149 / 4%);
-  stroke: rgb(55 109 132 / 42%);
+  fill: var(--folder-guide-fill, rgb(73 126 149 / 4%));
+  stroke: var(--folder-guide-stroke, rgb(55 109 132 / 42%));
   stroke-width: 1.5;
   stroke-dasharray: 5 7;
   stroke-linejoin: round;
+}
+
+.focus-schematic-folder-guides [data-folder-depth-style='1'] {
+  --folder-guide-fill: rgb(73 126 149 / 5%);
+  --folder-guide-stroke: rgb(55 109 132 / 48%);
+}
+
+.focus-schematic-folder-guides [data-folder-depth-style='2'] {
+  --folder-guide-fill: rgb(91 117 155 / 6%);
+  --folder-guide-stroke: rgb(68 92 130 / 55%);
+}
+
+.focus-schematic-folder-guides [data-folder-depth-style='3+'] {
+  --folder-guide-fill: rgb(112 102 151 / 7%);
+  --folder-guide-stroke: rgb(83 70 128 / 62%);
 }
 
 .focus-schematic-folder-guide--capsule {
@@ -153,6 +168,8 @@
 }
 
 .focus-schematic-folder-guide-controls__chip {
+  display: grid;
+  grid-template-columns: auto;
   min-height: 1.65rem;
   padding: 0.18rem 0.55rem;
   border: 1px dashed rgb(55 109 132 / 58%);
@@ -165,6 +182,30 @@
   font-weight: 700;
   letter-spacing: 0.03em;
   cursor: pointer;
+}
+
+.focus-schematic-folder-guide-controls[data-folder-depth-style='2']
+  .focus-schematic-folder-guide-controls__chip {
+  border-color: rgb(68 92 130 / 68%);
+}
+
+.focus-schematic-folder-guide-controls[data-folder-depth-style='3+']
+  .focus-schematic-folder-guide-controls__chip {
+  border-color: rgb(83 70 128 / 72%);
+}
+
+.focus-schematic-folder-guide-controls__name {
+  line-height: 1.15;
+}
+
+.focus-schematic-folder-guide-controls__parent {
+  display: block;
+  margin-top: 0.1rem;
+  color: #60737d;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
 }
 
 .focus-schematic-folder-guide-controls__chip:hover,

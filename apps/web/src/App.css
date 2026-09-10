@@ -1350,6 +1350,14 @@ h2 {
   line-height: 1.4;
 }
 
+.network-explorer-menu__separator {
+  height: 0;
+  margin: 0.4rem 0.25rem;
+  border: 0;
+  border-top: 2px solid #7f9aa7;
+  pointer-events: none;
+}
+
 .network-explorer-menu--editor {
   width: min(19rem, calc(100vw - 1rem));
   padding: 0.65rem;

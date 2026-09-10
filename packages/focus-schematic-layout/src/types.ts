@@ -297,6 +297,8 @@ export interface FocusSchematicSoftFolderDisplayFile {
 export interface FocusSchematicSoftFolderDisplayNode {
   readonly folderKey: WorkspaceFolderKey;
   readonly displayParentFolderKey: WorkspaceFolderKey | null;
+  /** Root is 0; each visible displayed folder layer increments depth by one. */
+  readonly displayDepth: number;
   readonly directFileIds: readonly EntityId[];
   readonly childFolderKeys: readonly WorkspaceFolderKey[];
   readonly descendantFileIds: readonly EntityId[];

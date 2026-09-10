@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ViewportPortal } from '@xyflow/react';
 import type {
   FocusSchematicSoftFolderDisplayTree,
@@ -11,10 +11,12 @@ const GUIDE_PADDING = 24;
 const GUIDE_CORNER_RADIUS = 18;
 const GUIDE_ISLAND_GAP = 216;
 
-interface Point {
+export interface FocusSchematicFolderGuidePoint {
   readonly x: number;
   readonly y: number;
 }
+
+type Point = FocusSchematicFolderGuidePoint;
 
 interface GuideUnit {
   readonly id: string;
@@ -31,8 +33,10 @@ export interface FocusSchematicFolderClusterGuide {
   readonly siblingFolderKeys: readonly string[];
   readonly suppressedAncestorFolderKeys: readonly string[];
   readonly label: string;
+  readonly parentLabel: string | null;
   readonly root: boolean;
   readonly depth: number;
+  readonly depthStyle: '0' | '1' | '2' | '3+';
   readonly regionIndex: number;
   readonly regionCount: number;
   readonly shape: 'singleton' | 'capsule' | 'hull';
@@ -43,6 +47,8 @@ export interface FocusSchematicFolderClusterGuide {
   readonly height: number;
   readonly radius: number;
   readonly path: string | null;
+  readonly hullPoints: readonly FocusSchematicFolderGuidePoint[];
+  readonly area: number;
   readonly labelX: number;
   readonly labelY: number;
 }
@@ -57,8 +63,12 @@ export interface FocusSchematicFolderGuideContextRequest {
 const compareText = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
 
-function folderLabel(folderKey: string): string {
-  return folderKey === '.' ? 'Root folder' : folderKey;
+function shortFolderLabel(folderKey: string): string {
+  return folderKey === '.' ? 'Root folder' : folderKey.split('/').at(-1)!;
+}
+
+function accessibleFolderLabel(folderKey: string): string {
+  return folderKey === '.' ? 'Root folder' : `${folderKey}/`;
 }
 
 function rectangleSize(
@@ -124,6 +134,18 @@ function convexHull(points: readonly Point[]): readonly Point[] {
 }
 
 function pointInsidePolygon(point: Point, polygon: readonly Point[]): boolean {
+  const onSegment = (left: Point, right: Point) => {
+    const crossProduct =
+      (point.x - left.x) * (right.y - left.y) -
+      (point.y - left.y) * (right.x - left.x);
+    return (
+      Math.abs(crossProduct) <= 1e-7 &&
+      point.x >= Math.min(left.x, right.x) &&
+      point.x <= Math.max(left.x, right.x) &&
+      point.y >= Math.min(left.y, right.y) &&
+      point.y <= Math.max(left.y, right.y)
+    );
+  };
   let inside = false;
   for (
     let index = 0, previous = polygon.length - 1;
@@ -132,6 +154,7 @@ function pointInsidePolygon(point: Point, polygon: readonly Point[]): boolean {
   ) {
     const left = polygon[index]!;
     const right = polygon[previous]!;
+    if (onSegment(left, right)) return true;
     if (
       left.y > point.y !== right.y > point.y &&
       point.x <
@@ -140,6 +163,67 @@ function pointInsidePolygon(point: Point, polygon: readonly Point[]): boolean {
       inside = !inside;
   }
   return inside;
+}
+
+function polygonArea(points: readonly Point[]): number {
+  return (
+    Math.abs(
+      points.reduce((sum, point, index) => {
+        const next = points[(index + 1) % points.length]!;
+        return sum + point.x * next.y - next.x * point.y;
+      }, 0),
+    ) / 2
+  );
+}
+
+function pointInsideRoundedRectangle(
+  point: Point,
+  guide: FocusSchematicFolderClusterGuide,
+): boolean {
+  if (
+    point.x < guide.x ||
+    point.x > guide.x + guide.width ||
+    point.y < guide.y ||
+    point.y > guide.y + guide.height
+  )
+    return false;
+  const radius = Math.min(guide.radius, guide.width / 2, guide.height / 2);
+  const nearestX = Math.max(
+    guide.x + radius,
+    Math.min(point.x, guide.x + guide.width - radius),
+  );
+  const nearestY = Math.max(
+    guide.y + radius,
+    Math.min(point.y, guide.y + guide.height - radius),
+  );
+  return Math.hypot(point.x - nearestX, point.y - nearestY) <= radius;
+}
+
+function guideContainsPoint(
+  guide: FocusSchematicFolderClusterGuide,
+  point: Point,
+): boolean {
+  return guide.shape === 'singleton'
+    ? pointInsideRoundedRectangle(point, guide)
+    : pointInsidePolygon(point, guide.hullPoints);
+}
+
+/** Selects the deepest actual rendered region, then the smallest and stable ID. */
+export function hitTestFocusSchematicFolderGuideRegion(
+  guides: readonly FocusSchematicFolderClusterGuide[],
+  point: FocusSchematicFolderGuidePoint,
+): FocusSchematicFolderClusterGuide | null {
+  return (
+    guides
+      .filter((guide) => guideContainsPoint(guide, point))
+      .sort(
+        (left, right) =>
+          right.depth - left.depth ||
+          left.area - right.area ||
+          compareText(left.folderKey, right.folderKey) ||
+          left.regionIndex - right.regionIndex,
+      )[0] ?? null
+  );
 }
 
 function paddedCorners(unit: GuideUnit): readonly Point[] {
@@ -253,17 +337,34 @@ function roundedPolygonPath(points: readonly Point[], radius: number): string {
   ].join(' ');
 }
 
-function folderDepth(
-  folder: FocusSchematicSoftFolderDisplayNode,
-  byKey: ReadonlyMap<string, FocusSchematicSoftFolderDisplayNode>,
-): number {
-  let depth = 0;
-  let current = folder.displayParentFolderKey;
-  while (current !== null) {
-    depth += 1;
-    current = byKey.get(current)?.displayParentFolderKey ?? null;
-  }
-  return depth;
+function roundedPolygonHitPoints(
+  points: readonly Point[],
+  radius: number,
+): readonly Point[] {
+  if (points.length < 3) return points;
+  return points.flatMap((point, index) => {
+    const previous = points[(index + points.length - 1) % points.length]!;
+    const next = points[(index + 1) % points.length]!;
+    const start = toward(point, previous, radius);
+    const end = toward(point, next, radius);
+    return [
+      start,
+      ...Array.from({ length: 6 }, (_, step) => {
+        const t = (step + 1) / 6;
+        const inverse = 1 - t;
+        return {
+          x:
+            inverse * inverse * start.x +
+            2 * inverse * t * point.x +
+            t * t * end.x,
+          y:
+            inverse * inverse * start.y +
+            2 * inverse * t * point.y +
+            t * t * end.y,
+        };
+      }),
+    ];
+  });
 }
 
 function guideForIsland(
@@ -288,14 +389,30 @@ function guideForIsland(
   ]
     .filter((key) => key !== folder.folderKey)
     .sort(compareText);
+  const radius = GUIDE_CORNER_RADIUS;
+  const hitPolygon =
+    shape === 'singleton' ? hull : roundedPolygonHitPoints(hull, radius);
+  const area =
+    shape === 'singleton'
+      ? (right - x) * (bottom - y) - (4 - Math.PI) * radius ** 2
+      : polygonArea(hitPolygon);
   return {
     folderKey: folder.folderKey,
     parentFolderKey: folder.displayParentFolderKey,
     siblingFolderKeys: siblings,
     suppressedAncestorFolderKeys: folder.suppressedAncestorFolderKeys,
-    label: folderLabel(folder.folderKey),
+    label: shortFolderLabel(folder.folderKey),
+    parentLabel:
+      folder.displayParentFolderKey === null ||
+      folder.displayParentFolderKey === '.'
+        ? null
+        : shortFolderLabel(folder.displayParentFolderKey),
     root: folder.folderKey === '.',
-    depth: folderDepth(folder, byKey),
+    depth: folder.displayDepth,
+    depthStyle:
+      folder.displayDepth >= 3
+        ? '3+'
+        : (String(folder.displayDepth) as '0' | '1' | '2'),
     regionIndex,
     regionCount,
     shape,
@@ -304,11 +421,13 @@ function guideForIsland(
     y,
     width: right - x,
     height: bottom - y,
-    radius: GUIDE_CORNER_RADIUS,
+    radius,
     path:
       shape === 'singleton'
         ? null
         : roundedPolygonPath(hull, GUIDE_CORNER_RADIUS),
+    hullPoints: hitPolygon,
+    area,
     labelX: x + 12,
     labelY: y - 9,
   };
@@ -338,7 +457,7 @@ export function focusSchematicFolderClusterGuides(
   const guidesByFolder = new Map<string, FocusSchematicFolderClusterGuide[]>();
   const ordered = [...tree.folders].sort(
     (left, right) =>
-      folderDepth(right, byKey) - folderDepth(left, byKey) ||
+      right.displayDepth - left.displayDepth ||
       compareText(left.folderKey, right.folderKey),
   );
   for (const folder of ordered) {
@@ -402,20 +521,14 @@ function emphasisClass(
 }
 
 export function FocusSchematicFolderClusterGuides({
-  displayTree,
-  nodes,
+  guides,
   onFolderContextMenu,
 }: {
-  readonly displayTree: FocusSchematicSoftFolderDisplayTree;
-  readonly nodes: readonly GraphFlowNode[];
+  readonly guides: readonly FocusSchematicFolderClusterGuide[];
   readonly onFolderContextMenu: (
     request: FocusSchematicFolderGuideContextRequest,
   ) => void;
 }) {
-  const guides = useMemo(
-    () => focusSchematicFolderClusterGuides(displayTree, nodes),
-    [displayTree, nodes],
-  );
   const [activeFolderKey, setActiveFolderKey] = useState<string | null>(null);
   const active = guides.find(
     (guide) => guide.folderKey === activeFolderKey && guide.regionIndex === 0,
@@ -433,7 +546,11 @@ export function FocusSchematicFolderClusterGuides({
           {guides.map((guide) => {
             const className = `focus-schematic-folder-guide focus-schematic-folder-guide--${guide.shape}${guide.root ? ' focus-schematic-folder-guide--root' : ''}${emphasisClass(guide, active)}`;
             return (
-              <g key={`${guide.folderKey}\0${guide.regionIndex}`}>
+              <g
+                data-folder-depth={guide.depth}
+                data-folder-depth-style={guide.depthStyle}
+                key={`${guide.folderKey}\0${guide.regionIndex}`}
+              >
                 {guide.path === null ? (
                   <rect
                     className={className}
@@ -452,7 +569,7 @@ export function FocusSchematicFolderClusterGuides({
                     x={guide.labelX}
                     y={guide.labelY}
                   >
-                    {`${guide.label} — island ${guide.regionIndex + 1} of ${guide.regionCount}`}
+                    {guide.label}
                   </text>
                 )}
               </g>
@@ -462,22 +579,24 @@ export function FocusSchematicFolderClusterGuides({
         {guides
           .filter(({ regionIndex }) => regionIndex === 0)
           .map((guide) => {
-            const islandDescription =
+            const regionDescription =
               guide.regionCount === 1
                 ? ''
-                : `, ${guide.regionCount} spatial islands`;
+                : ` ${guide.regionCount} disconnected regions.`;
             const parentDescription =
               guide.suppressedAncestorFolderKeys.length > 0
-                ? `Compressed ancestry: ${guide.suppressedAncestorFolderKeys.map(folderLabel).join(' › ')}`
-                : `Parent: ${guide.parentFolderKey === null ? 'none' : folderLabel(guide.parentFolderKey)}`;
+                ? `Compressed ancestry: ${guide.suppressedAncestorFolderKeys.map(shortFolderLabel).join(' › ')}`
+                : `Parent: ${guide.parentFolderKey === null ? 'none' : shortFolderLabel(guide.parentFolderKey)}`;
             const siblingDescription =
               guide.siblingFolderKeys.length === 0
                 ? 'No displayed sibling folders'
-                : `Siblings: ${guide.siblingFolderKeys.map(folderLabel).join(', ')}`;
+                : `Siblings: ${guide.siblingFolderKeys.map(shortFolderLabel).join(', ')}`;
             return (
               <div
                 className="focus-schematic-folder-guide-controls nodrag nopan nowheel"
                 data-graph-wheel-ignore
+                data-folder-depth={guide.depth}
+                data-folder-depth-style={guide.depthStyle}
                 key={guide.folderKey}
                 onBlur={(event) => {
                   if (!event.currentTarget.contains(event.relatedTarget))
@@ -492,7 +611,7 @@ export function FocusSchematicFolderClusterGuides({
               >
                 <button
                   aria-haspopup="menu"
-                  aria-label={`Folder ${guide.label}${islandDescription}. ${parentDescription}. ${siblingDescription}`}
+                  aria-label={`Folder ${accessibleFolderLabel(guide.folderKey)}. Display depth ${guide.depth}.${regionDescription} ${parentDescription}. ${siblingDescription}`}
                   className="focus-schematic-folder-guide-controls__chip"
                   onContextMenu={(event) => {
                     event.preventDefault();
@@ -520,10 +639,17 @@ export function FocusSchematicFolderClusterGuides({
                       origin: event.currentTarget,
                     });
                   }}
-                  title="Right-click for folder display actions"
+                  title={`${accessibleFolderLabel(guide.folderKey)} — Right-click for folder display actions`}
                   type="button"
                 >
-                  {guide.label}
+                  <span className="focus-schematic-folder-guide-controls__name">
+                    {guide.label}
+                  </span>
+                  {guide.parentLabel === null ? null : (
+                    <small className="focus-schematic-folder-guide-controls__parent">
+                      {guide.parentLabel}
+                    </small>
+                  )}
                 </button>
                 {activeFolderKey === guide.folderKey ? (
                   <div

@@ -63,7 +63,12 @@ describe('nested Soft folder display tree', () => {
     ).toMatchObject({
       directFileIds: ['a'],
       childFolderKeys: ['Folder1/Folder2'],
+      displayDepth: 1,
     });
+    expect(
+      tree.folders.find(({ folderKey }) => folderKey === 'Folder1/Folder2')
+        ?.displayDepth,
+    ).toBe(2);
   });
 
   it('N2-N4 promotes one File repeatedly and restores only its exact placement', () => {
@@ -111,6 +116,9 @@ describe('nested Soft folder display tree', () => {
       tree.folders.find(({ folderKey }) => folderKey === 'A/B/C')
         ?.displayParentFolderKey,
     ).toBe('A');
+    expect(
+      tree.folders.find(({ folderKey }) => folderKey === 'A/B/C')?.displayDepth,
+    ).toBe(2);
     intent = flattenFocusSchematicSoftFolder(tree, 'A/B/C', true);
     expect(intent.flattenedFolderKeys).toEqual(['A/B', 'A/B/C', 'A/D']);
     intent = restoreFocusSchematicSoftFolderLayer(intent, 'A/B');
@@ -169,6 +177,26 @@ describe('nested Soft folder display tree', () => {
       for (const key of kept) expect(folders(tree)).toContain(key);
     },
   );
+
+  it('L4-L7 derives depth from the current displayed tree after compression', () => {
+    const tree = buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles: [
+        file('outer', 'A'),
+        file('b1', 'A/B/C/D'),
+        file('b2', 'A/B/C/D'),
+      ],
+    });
+    expect(
+      tree.folders.map(({ folderKey, displayDepth }) => ({
+        folderKey,
+        displayDepth,
+      })),
+    ).toEqual([
+      { folderKey: '.', displayDepth: 0 },
+      { folderKey: 'A', displayDepth: 1 },
+      { folderKey: 'A/B/C/D', displayDepth: 2 },
+    ]);
+  });
 
   it('N13 File visibility changes compression while N14 Heading disclosure does not', () => {
     const all = [

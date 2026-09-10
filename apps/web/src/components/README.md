@@ -332,8 +332,10 @@ semantics remain exact.
 The persisted Folder guides toggle is resolved after a current worker result is
 adopted. Directional mode supplies the existing band strips; Soft mode supplies
 renderer-only nested cluster regions from final module rectangles and visible
-display-tree membership. Only the small Soft guide label accepts pointer or
-keyboard context requests; large guide regions remain inert. File cards and
-guide labels share Network's bounded context-menu portal. Menu/hover state and
+display-tree membership. Soft hulls remain inert; pane context requests convert
+to world coordinates and select the deepest actual guide region. File cards and
+guide labels share Network's bounded context-menu portal. File menus compose
+File actions with valid current displayed-folder actions through a strong
+semantic separator. Folder targets remain folder-only. Menu/hover state and
 guide visibility remain absent from every model, worker, effect, and cache
 dependency that can request or change layout.

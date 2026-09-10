@@ -1,6 +1,6 @@
 # HIER4B validation
 
-Status: **HIER4B-FIX2 IMPLEMENTED — optimized graphical decision pending.**
+Status: **HIER4B-FIX3 IMPLEMENTED — optimized graphical decision pending.**
 
 HIER4B evidence remains synthetic and development-only. Directional Folder
 Bands is the unchanged reference and default. No HIER4B adoption PR exists.
@@ -39,15 +39,22 @@ and stores no automatic result.
 ## Guide and interaction cases
 
 Renderer tests prove bottom-up parent containment, direct File plus child-guide
-enclosure, hierarchy labels, disconnected islands, bounded fixed padding,
+enclosure, short hierarchy labels, disconnected islands, bounded fixed padding,
 determinism, parent/sibling emphasis, compressed ancestry text, pointer-inert
-hulls, and removal of the old toolbar.
+hulls, and removal of the old toolbar. HT1–HT10 cover actual rounded-region
+hits, parent/child and depth-3+ priority, parent-only space, disconnected
+regions, area/stable tie-breaks, React Flow screen-to-world conversion, node
+priority, label targeting, and the Guides-off empty input.
 
 Shared-menu and GraphCanvas tests cover right-click plus Shift+F10/ContextMenu
-entry, disabled actions, keyboard traversal, Escape and outside dismissal.
-Application action tests prove one File update, one folder-layer update,
-sibling flatten, restore, root/exact disabled state, and reset availability.
-Menu and hover state are absent from layout policy/cache input.
+entry, semantic separators, disabled actions, keyboard traversal, Escape and
+outside dismissal. MC1–MC7 prove one composed File menu, separator omission,
+folder-only menus, current displayed-parent targeting after promotion and
+compression, root behavior, and pointer/keyboard parity. FM1–FM5 preserve
+folder pointer/keyboard actions and inert hulls. L1–L8 cover short names, parent
+hints, accessible normalized keys, repeated island names, displayed depth
+updates, and the bounded `3+` style. Menu and hover state remain absent from
+layout policy/cache input.
 
 ## Hierarchy-force bakeoff
 
@@ -103,7 +110,7 @@ membership only. Persisted records contain stable File IDs and normalized
 workspace-relative folder keys, never absolute paths, source contents, hidden
 guide membership, geometry, or screenshots.
 
-The exact FIX2 prompt is archived at
-`history-implementations/HIER4B_FIX2_nested_folder_hierarchy_context_menu_codex_prompt.md`.
+The exact FIX3 prompt is archived at
+`history-implementations/HIER4B_FIX3_folder_area_context_labels_codex_prompt.md`.
 Its SHA-256 is
-`97BA5BB86EDB21F22147AB091E386917117E287ACD496738AFA20BDDF3EA0DCE`.
+`ED4E49B0AC25C252B246623740BF9E86D9D400DCD81C3453C52D88B8AE4956A9`.

@@ -20,8 +20,10 @@ export {
 export {
   FocusSchematicFolderClusterGuides,
   focusSchematicFolderClusterGuides,
+  hitTestFocusSchematicFolderGuideRegion,
   type FocusSchematicFolderClusterGuide,
   type FocusSchematicFolderGuideContextRequest,
+  type FocusSchematicFolderGuidePoint,
 } from './folder-cluster-guides';
 import {
   DIAGNOSTIC_NODE_DIMENSIONS,

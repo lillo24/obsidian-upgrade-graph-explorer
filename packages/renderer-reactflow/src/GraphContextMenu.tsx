@@ -13,13 +13,27 @@ export interface GraphContextMenuAction<ActionId extends string = string> {
   readonly disabledReason?: string;
 }
 
+export interface GraphContextMenuSeparator {
+  readonly kind: 'separator';
+  readonly emphasis: 'strong';
+}
+
+export type GraphContextMenuItem<ActionId extends string = string> =
+  GraphContextMenuAction<ActionId> | GraphContextMenuSeparator;
+
+function isSeparator(
+  item: GraphContextMenuItem,
+): item is GraphContextMenuSeparator {
+  return 'kind' in item && item.kind === 'separator';
+}
+
 function menuIndex(
-  actions: readonly GraphContextMenuAction[],
+  items: readonly GraphContextMenuItem[],
   current: number,
   key: string,
 ): number {
-  const enabled = actions.flatMap((action, index) =>
-    action.disabledReason === undefined ? [index] : [],
+  const enabled = items.flatMap((item, index) =>
+    !isSeparator(item) && item.disabledReason === undefined ? [index] : [],
   );
   if (enabled.length === 0) return -1;
   if (key === 'Home') return enabled[0]!;
@@ -33,7 +47,7 @@ function menuIndex(
 
 /** Shared bounded, nonmodal graph menu used by Network and Modular views. */
 export function GraphContextMenu<ActionId extends string>({
-  actions,
+  items,
   name,
   x,
   y,
@@ -41,7 +55,7 @@ export function GraphContextMenu<ActionId extends string>({
   onAction,
   editor,
 }: {
-  readonly actions: readonly GraphContextMenuAction<ActionId>[];
+  readonly items: readonly GraphContextMenuItem<ActionId>[];
   readonly name: string;
   readonly x: number;
   readonly y: number;
@@ -51,7 +65,7 @@ export function GraphContextMenu<ActionId extends string>({
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const buttons = useRef(new Map<number, HTMLButtonElement>());
-  const [active, setActive] = useState(() => menuIndex(actions, -1, 'Home'));
+  const [active, setActive] = useState(() => menuIndex(items, -1, 'Home'));
   const [position, setPosition] = useState({ x, y });
   const editing = editor !== undefined;
   useLayoutEffect(() => {
@@ -73,7 +87,7 @@ export function GraphContextMenu<ActionId extends string>({
         menu.querySelector<HTMLElement>('input[type="range"]:not(:disabled)') ??
         menu.querySelector<HTMLElement>('button')
       )?.focus();
-    else (buttons.current.get(menuIndex(actions, -1, 'Home')) ?? menu).focus();
+    else (buttons.current.get(menuIndex(items, -1, 'Home')) ?? menu).focus();
     const observer =
       typeof ResizeObserver === 'undefined'
         ? undefined
@@ -84,7 +98,7 @@ export function GraphContextMenu<ActionId extends string>({
       observer?.disconnect();
       window.removeEventListener('resize', place);
     };
-  }, [actions, editing, x, y]);
+  }, [items, editing, x, y]);
   useEffect(() => {
     const outside = (event: PointerEvent) => {
       if (
@@ -132,16 +146,20 @@ export function GraphContextMenu<ActionId extends string>({
           onCancel(true);
           return;
         }
-        const next = menuIndex(actions, active, event.key);
+        const next = menuIndex(items, active, event.key);
         if (['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
           event.preventDefault();
           setActive(next);
           buttons.current.get(next)?.focus();
         } else if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          const action = actions[active];
-          if (action !== undefined && action.disabledReason === undefined)
-            onAction(action.id);
+          const item = items[active];
+          if (
+            item !== undefined &&
+            !isSeparator(item) &&
+            item.disabledReason === undefined
+          )
+            onAction(item.id);
         }
       }}
       ref={menuRef}
@@ -150,36 +168,45 @@ export function GraphContextMenu<ActionId extends string>({
       tabIndex={-1}
     >
       {editor === undefined ? (
-        actions.map((action, index) => (
-          <button
-            aria-describedby={
-              action.disabledReason === undefined
-                ? undefined
-                : `graph-menu-${action.id}-reason`
-            }
-            aria-disabled={
-              action.disabledReason === undefined ? undefined : true
-            }
-            disabled={action.disabledReason !== undefined}
-            key={action.id}
-            onClick={() => onAction(action.id)}
-            onFocus={() => setActive(index)}
-            ref={(element) => {
-              if (element === null) buttons.current.delete(index);
-              else buttons.current.set(index, element);
-            }}
-            role="menuitem"
-            tabIndex={index === active ? 0 : -1}
-            type="button"
-          >
-            {action.label}
-            {action.disabledReason === undefined ? null : (
-              <small id={`graph-menu-${action.id}-reason`}>
-                {action.disabledReason}
-              </small>
-            )}
-          </button>
-        ))
+        items.map((item, index) =>
+          isSeparator(item) ? (
+            <div
+              className="network-explorer-menu__separator network-explorer-menu__separator--strong"
+              data-emphasis={item.emphasis}
+              key={`separator-${index}`}
+              role="separator"
+            />
+          ) : (
+            <button
+              aria-describedby={
+                item.disabledReason === undefined
+                  ? undefined
+                  : `graph-menu-${index}-reason`
+              }
+              aria-disabled={
+                item.disabledReason === undefined ? undefined : true
+              }
+              disabled={item.disabledReason !== undefined}
+              key={item.id}
+              onClick={() => onAction(item.id)}
+              onFocus={() => setActive(index)}
+              ref={(element) => {
+                if (element === null) buttons.current.delete(index);
+                else buttons.current.set(index, element);
+              }}
+              role="menuitem"
+              tabIndex={index === active ? 0 : -1}
+              type="button"
+            >
+              {item.label}
+              {item.disabledReason === undefined ? null : (
+                <small id={`graph-menu-${index}-reason`}>
+                  {item.disabledReason}
+                </small>
+              )}
+            </button>
+          ),
+        )
       ) : (
         <>
           <header className="network-explorer-menu__heading">

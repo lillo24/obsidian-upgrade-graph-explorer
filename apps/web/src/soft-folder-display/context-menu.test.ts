@@ -3,7 +3,7 @@ import { buildFocusSchematicSoftFolderDisplayTree } from '@icarus-graph-explorer
 
 import {
   applySoftFolderDisplayMenuAction,
-  softFolderDisplayMenuActions,
+  softFolderDisplayMenuItems,
 } from './context-menu';
 
 const visibleFiles = [
@@ -14,22 +14,114 @@ const visibleFiles = [
   { fileId: 'c2', exactFolderKey: 'A/C' },
 ];
 
+const ids = (
+  items: ReturnType<typeof softFolderDisplayMenuItems>,
+): readonly string[] =>
+  items.map((item) => ('kind' in item ? 'separator' : item.id));
+
 describe('Soft folder display context actions', () => {
-  it('C8 moves one File one displayed level and offers exact restore', () => {
+  it('MC1-MC3 composes a File menu with one strong separator and its current folder actions', () => {
     const tree = buildFocusSchematicSoftFolderDisplayTree({ visibleFiles });
-    const actions = softFolderDisplayMenuActions(tree, {
+    const items = softFolderDisplayMenuItems(tree, {
       kind: 'file',
       fileId: 'move',
     });
-    expect(actions.map(({ id }) => id)).toEqual([
-      'move-file-up',
-      'restore-file',
-      'reset-display',
+    expect(ids(items)).toEqual([
+      'file:move-up',
+      'file:restore-exact',
+      'separator',
+      'folder:flatten',
+      'folder:flatten-siblings',
     ]);
+    expect(items[2]).toEqual({ kind: 'separator', emphasis: 'strong' });
+    expect(
+      applySoftFolderDisplayMenuAction(
+        tree,
+        { kind: 'file', fileId: 'move' },
+        'folder:flatten',
+      ),
+    ).toMatchObject({ value: { flattenedFolderKeys: ['A/B'] } });
+  });
+
+  it('MC4 targets a promoted File current displayed folder', () => {
+    const tree = buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles,
+      intent: {
+        fileParentOverrides: [{ fileId: 'move', displayParentFolderKey: 'A' }],
+        flattenedFolderKeys: [],
+      },
+    });
+    expect(
+      applySoftFolderDisplayMenuAction(
+        tree,
+        { kind: 'file', fileId: 'move' },
+        'folder:flatten',
+      ),
+    ).toMatchObject({ value: { flattenedFolderKeys: ['A'] } });
+  });
+
+  it('MC5-MC6 omits folder actions and divider for top-level Files', () => {
+    const tree = buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles: [{ fileId: 'top', exactFolderKey: '.' }],
+    });
+    expect(
+      ids(softFolderDisplayMenuItems(tree, { kind: 'file', fileId: 'top' })),
+    ).toEqual(['file:move-up', 'file:restore-exact']);
+  });
+
+  it('MC5 uses the surviving displayed parent after singleton compression', () => {
+    const tree = buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles: [
+        { fileId: 'outer', exactFolderKey: 'A' },
+        { fileId: 'only', exactFolderKey: 'A/B/C' },
+      ],
+    });
+    expect(
+      tree.files.find(({ fileId }) => fileId === 'only')
+        ?.displayParentFolderKey,
+    ).toBe('A');
+    expect(
+      ids(
+        softFolderDisplayMenuItems(tree, {
+          kind: 'file',
+          fileId: 'only',
+        }),
+      ),
+    ).toContain('folder:flatten');
+    expect(
+      applySoftFolderDisplayMenuAction(
+        tree,
+        { kind: 'file', fileId: 'only' },
+        'folder:flatten',
+      ),
+    ).toMatchObject({ value: { flattenedFolderKeys: ['A'] } });
+  });
+
+  it('FM1-FM3 folder targets receive folder actions only', () => {
+    const tree = buildFocusSchematicSoftFolderDisplayTree({ visibleFiles });
+    expect(
+      ids(
+        softFolderDisplayMenuItems(tree, {
+          kind: 'folder',
+          folderKey: 'A/B',
+        }),
+      ),
+    ).toEqual(['folder:flatten', 'folder:flatten-siblings', 'folder:reset']);
+    expect(
+      applySoftFolderDisplayMenuAction(
+        tree,
+        { kind: 'folder', folderKey: 'A/B' },
+        'folder:flatten-siblings',
+      ),
+    ).toMatchObject({ value: { flattenedFolderKeys: ['A/B', 'A/C'] } });
+  });
+
+  it('FM4 preserves File promotion and exact restore', () => {
+    const tree = buildFocusSchematicSoftFolderDisplayTree({ visibleFiles });
     const result = applySoftFolderDisplayMenuAction(
       tree,
       { kind: 'file', fileId: 'move' },
-      'move-file-up',
+      'file:move-up',
     );
     expect(result).toEqual({
       kind: 'intent',
@@ -38,55 +130,32 @@ describe('Soft folder display context actions', () => {
         flattenedFolderKeys: [],
       },
     });
-  });
-
-  it('C9 flattens only one layer or the current displayed siblings', () => {
-    const tree = buildFocusSchematicSoftFolderDisplayTree({ visibleFiles });
-    expect(
-      applySoftFolderDisplayMenuAction(
-        tree,
-        { kind: 'folder', folderKey: 'A/B' },
-        'flatten-folder',
-      ),
-    ).toMatchObject({
-      value: { flattenedFolderKeys: ['A/B'] },
-    });
-    expect(
-      applySoftFolderDisplayMenuAction(
-        tree,
-        { kind: 'folder', folderKey: 'A/B' },
-        'flatten-siblings',
-      ),
-    ).toMatchObject({
-      value: { flattenedFolderKeys: ['A/B', 'A/C'] },
-    });
-  });
-
-  it('C12 disables root/exact actions and exposes reset after intent', () => {
-    const exact = buildFocusSchematicSoftFolderDisplayTree({ visibleFiles });
-    expect(
-      softFolderDisplayMenuActions(exact, { kind: 'folder', folderKey: '.' })
-        .slice(0, 2)
-        .every(({ disabledReason }) => disabledReason !== undefined),
-    ).toBe(true);
-    expect(
-      softFolderDisplayMenuActions(exact, {
-        kind: 'file',
-        fileId: 'move',
-      }).find(({ id }) => id === 'restore-file')?.disabledReason,
-    ).toBeDefined();
-    const changed = buildFocusSchematicSoftFolderDisplayTree({
+    if (result.kind !== 'intent') throw new Error('Expected display intent.');
+    const moved = buildFocusSchematicSoftFolderDisplayTree({
       visibleFiles,
-      intent: {
-        fileParentOverrides: [{ fileId: 'move', displayParentFolderKey: 'A' }],
-        flattenedFolderKeys: [],
-      },
+      intent: result.value,
     });
     expect(
-      softFolderDisplayMenuActions(changed, {
-        kind: 'file',
-        fileId: 'move',
-      }).find(({ id }) => id === 'reset-display')?.disabledReason,
-    ).toBeUndefined();
+      applySoftFolderDisplayMenuAction(
+        moved,
+        { kind: 'file', fileId: 'move' },
+        'file:restore-exact',
+      ),
+    ).toMatchObject({ value: { fileParentOverrides: [] } });
+  });
+
+  it('FM5 keeps disabled explanations on direct root actions', () => {
+    const tree = buildFocusSchematicSoftFolderDisplayTree({ visibleFiles });
+    const rootItems = softFolderDisplayMenuItems(tree, {
+      kind: 'folder',
+      folderKey: '.',
+    });
+    expect(
+      rootItems
+        .slice(0, 2)
+        .every(
+          (item) => !('kind' in item) && item.disabledReason !== undefined,
+        ),
+    ).toBe(true);
   });
 });

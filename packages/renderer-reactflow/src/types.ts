@@ -59,6 +59,12 @@ export interface GraphNodeContextRequest {
   readonly origin: HTMLElement | null;
 }
 
+export interface GraphPaneContextRequest {
+  readonly x: number;
+  readonly y: number;
+  readonly world: GraphViewportPoint;
+}
+
 /** Narrow renderer boundary used to preserve a semantic node's screen point. */
 export interface GraphTransitionAnchorApi {
   readonly nodeViewportPoint: (
@@ -235,6 +241,10 @@ export interface GraphCanvasProps {
   readonly onNodeContextMenuRequest?: (
     request: GraphNodeContextRequest,
   ) => void;
+  /** Return true only when the world-space pane point opened a menu. */
+  readonly onPaneContextMenuRequest?: (
+    request: GraphPaneContextRequest,
+  ) => boolean;
   readonly onToggleEntity: (entityId: string, currentlyOpen: boolean) => void;
 }
 

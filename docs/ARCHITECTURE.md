@@ -1279,16 +1279,23 @@ immutable, while only sparse manual display intent persists under stable
 workspace identity. The schema-1 Experimental value resets narrowly to empty
 schema 2. Automatic compression and visible membership never persist. Hover or
 focus emphasizes current, parent, and displayed sibling guides; compressed
-ancestry remains readable as passive context. The hull stays pointer-inert and
-only the small label accepts input.
+ancestry remains readable as passive context. FIX3 derives explicit displayed
+depth after those transformations, uses short folder labels with accessible
+normalized keys, and caps depth styling at `3+`. The hull stays pointer-inert.
+A pane context request uses React Flow's screen-to-world conversion and pure
+actual-region hit testing, choosing deepest depth, smallest area, then stable
+identity. Guide visibility gates that empty-area path.
 
 Modular File cards and folder labels now use the same extracted context-menu
 portal as Network Explorer: pointer/keyboard opening, viewport bounding,
 Escape/outside dismissal, and focus restoration. File actions move one stable
-File up one displayed level or restore it. Folder actions flatten one displayed
-layer, include displayed siblings when requested, restore hidden layers, or
-reset the workspace intent. Menu and hover state remain renderer-only. Generic
-Hide/Focus/Inspect parity is reserved for `MODULAR-CONTEXT1`.
+File up one displayed level or restore it, followed when applicable by a strong
+semantic separator and valid actions for the File's current displayed folder.
+Folder region and label targets receive folder actions only. Those actions
+flatten one displayed layer, include displayed siblings when requested, restore
+hidden layers, or reset the workspace intent. Menu and hover state remain
+renderer-only. Generic Hide/Focus/Inspect parity is reserved for
+`MODULAR-CONTEXT1`.
 
 Soft File and module-anchor endpoints use final-geometry cardinal attachments.
 The dominant delta between exact endpoint rectangle centers chooses left/right
@@ -1335,9 +1342,9 @@ HIER3B-FIX1. The actual-browser HIER4A integration was approved and its optimize
 desktop check/build passed on September 8, 2026. PRE-HIER4B then added approved
 visible strips and Direct rendering without reopening HIER4A geometry. HIER4B
 is under real-vault graphical evaluation through the live Modular Preview;
-HIER4B-FIX2 replaces the flat grouping override with nested display hierarchy,
-singleton compression, hierarchical H1 attraction, and shared context-menu
-editing while retaining FIX1's cardinal File ports in that unmerged evaluation;
+HIER4B-FIX3 adds empty-guide area targeting, composed File/current-folder menus,
+short accessible labels, and displayed-depth styling to FIX2 while retaining
+FIX1's cardinal File ports in that unmerged evaluation;
 HIER5 follows HIER4B, and HIER3C follows HIER5.
 
 ## HIER0 product exposure and geometry

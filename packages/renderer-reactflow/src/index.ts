@@ -1,6 +1,10 @@
 export { GraphCanvas } from './GraphCanvas';
 export { GraphContextMenu } from './GraphContextMenu';
-export type { GraphContextMenuAction } from './GraphContextMenu';
+export type {
+  GraphContextMenuAction,
+  GraphContextMenuItem,
+  GraphContextMenuSeparator,
+} from './GraphContextMenu';
 export { resolveGraphCenterRequest } from './center-request';
 export type {
   GraphCenterInstruction,
@@ -76,6 +80,7 @@ export type {
   GraphLayoutResult,
   GraphLayoutService,
   GraphNodeContextRequest,
+  GraphPaneContextRequest,
   GraphSelection,
   GraphTransitionAnchor,
   GraphTransitionAnchorApi,

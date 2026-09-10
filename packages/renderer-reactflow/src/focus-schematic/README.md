@@ -15,18 +15,21 @@ renderer-neutral result to validated React Flow data.
   world-space guides.
 - `folder-cluster-guides.tsx` builds child regions before parent regions from the
   nested displayed tree and final module rectangles. It preserves disconnected
-  islands, fixed padding, containment, pointer-inert hulls, keyboard-focusable
-  labels, and renderer-only current/parent/sibling emphasis. Folder management
-  is supplied through the shared context-menu request seam.
+  islands, fixed padding, containment, pointer-inert hulls, short accessible
+  labels, displayed-depth styling, and renderer-only current/parent/sibling
+  emphasis. Its pure actual-shape helper resolves pane context points by depth,
+  area, and stable identity. Folder management is supplied through the shared
+  context-menu request seam.
 
 The mapper is the sole owner of optional modular entity metadata. It derives
 module membership from HIER1 and direct-File ring visibility from the final
 currently rendered reference edges. Classic mapping never receives these
 fields.
 
-Both guide shapes are pointer-inert viewport overlays behind edges and nodes;
-only the Soft guide's small HTML label surface accepts input. Guides are
-excluded from graph nodes, fitting, layout, and cache identity.
+Both guide shapes are pointer-inert viewport overlays behind edges and nodes.
+The Soft guide's small HTML label accepts pointer and keyboard input; empty-area
+context targeting is handled separately by world-space graph-pane hit testing.
+Guides are excluded from graph nodes, fitting, layout, and cache identity.
 
 The package root does not re-export this subpath, keeping it outside Classic
 startup. Node/module geometry remains independent from future HIER4 folder

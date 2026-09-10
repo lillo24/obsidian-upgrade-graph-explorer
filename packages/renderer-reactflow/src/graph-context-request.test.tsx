@@ -8,7 +8,7 @@ import { GraphCanvas } from './GraphCanvas';
 import { prepareRendererGraph } from './prepare';
 import { rendererTestProjection } from './test-fixture';
 
-it('C1-C2 sends pointer and keyboard context requests for one Modular File target', async () => {
+it('HT7/MC7 sends exclusive node requests and converts pane requests to world space', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1200);
   vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(800);
@@ -37,6 +37,7 @@ it('C1-C2 sends pointer and keyboard context requests for one Modular File targe
     ),
   };
   const request = vi.fn();
+  const paneRequest = vi.fn(() => true);
   try {
     await act(() =>
       root.render(
@@ -45,6 +46,7 @@ it('C1-C2 sends pointer and keyboard context requests for one Modular File targe
           focusAppearance="outline"
           layoutMode="local-structured"
           onNodeContextMenuRequest={request}
+          onPaneContextMenuRequest={paneRequest}
           onSelectionChange={vi.fn()}
           onToggleEntity={vi.fn()}
           preparedGraph={graph}
@@ -73,6 +75,7 @@ it('C1-C2 sends pointer and keyboard context requests for one Modular File targe
         y: 50,
       }),
     );
+    expect(paneRequest).not.toHaveBeenCalled();
     act(() => {
       flowNode.focus();
       flowNode.dispatchEvent(
@@ -83,6 +86,25 @@ it('C1-C2 sends pointer and keyboard context requests for one Modular File targe
       );
     });
     expect(request).toHaveBeenCalledTimes(2);
+    const pane = container.querySelector<HTMLElement>('.react-flow__pane')!;
+    act(() =>
+      pane.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 140,
+          clientY: 150,
+        }),
+      ),
+    );
+    expect(paneRequest).toHaveBeenCalledWith({
+      x: 140,
+      y: 150,
+      world: expect.objectContaining({
+        x: expect.any(Number),
+        y: expect.any(Number),
+      }),
+    });
   } finally {
     await act(() => root.unmount());
     container.remove();

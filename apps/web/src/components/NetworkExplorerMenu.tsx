@@ -25,7 +25,7 @@ export function NetworkExplorerMenu({
   readonly editor?: { readonly label: string; readonly content: ReactNode };
 }) {
   return GraphContextMenu<NetworkExplorerAction>({
-    actions,
+    items: actions,
     name,
     onAction,
     onCancel,

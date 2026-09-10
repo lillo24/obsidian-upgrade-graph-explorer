@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
 } from 'react';
 import {
   Background,
@@ -140,6 +141,7 @@ function GraphCanvasInner({
   onMaximizedChange,
   onFocusEntity,
   onNodeContextMenuRequest,
+  onPaneContextMenuRequest,
   onSelectionChange,
   onTransitionAnchorApiChange,
   onTransitionAnchorConsumed,
@@ -159,8 +161,14 @@ function GraphCanvasInner({
   const [hovered, setHovered] = useState<GraphSelection | null>(null);
   const [documentDirectHover, setDocumentDirectHoverTarget] =
     useState<GraphHoverTarget | null>(null);
-  const { fitView, getInternalNode, getViewport, setCenter, setViewport } =
-    useReactFlow<GraphFlowNode, GraphFlowEdge>();
+  const {
+    fitView,
+    getInternalNode,
+    getViewport,
+    screenToFlowPosition,
+    setCenter,
+    setViewport,
+  } = useReactFlow<GraphFlowNode, GraphFlowEdge>();
   const nodesInitialized = useNodesInitialized();
   const previousFitRequest = useRef(fitRequestKey);
   const previousCenterRequest = useRef<number | null>(null);
@@ -1044,6 +1052,20 @@ function GraphCanvasInner({
     },
     [onNodeContextMenuRequest],
   );
+  const openPaneContextMenu = useCallback(
+    (event: ReactMouseEvent | MouseEvent) => {
+      if (onPaneContextMenuRequest === undefined) return;
+      const opened = onPaneContextMenuRequest({
+        x: event.clientX,
+        y: event.clientY,
+        world: screenToFlowPosition({ x: event.clientX, y: event.clientY }),
+      });
+      if (!opened) return;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    [onPaneContextMenuRequest, screenToFlowPosition],
+  );
 
   if (projection.nodes.length === 0) {
     return (
@@ -1144,6 +1166,7 @@ function GraphCanvasInner({
             onNodesChange={syncNodeChanges}
             onMoveEnd={observeViewport}
             onPaneClick={clearSelection}
+            onPaneContextMenu={openPaneContextMenu}
             panOnDrag
             panOnScroll={trackpadZoomMode === 'pinch-zoom'}
             proOptions={{ hideAttribution: false }}

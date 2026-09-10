@@ -33,6 +33,7 @@ import {
   type GraphCenterRequest,
   type GraphSelection,
   type GraphNodeContextRequest,
+  type GraphPaneContextRequest,
   type GraphTransitionAnchor,
   type GraphTransitionAnchorApi,
   type GraphViewportObservation,
@@ -42,7 +43,9 @@ import {
 import {
   FocusSchematicFolderBandStrips,
   FocusSchematicFolderClusterGuides,
+  focusSchematicFolderClusterGuides,
   focusSchematicNodeDimensions,
+  hitTestFocusSchematicFolderGuideRegion,
   prepareFocusSchematicRendererGraph,
 } from '@icarus-graph-explorer/renderer-reactflow/focus-schematic';
 import type {
@@ -58,7 +61,8 @@ import {
 } from '../focus-schematic-layout-cache';
 import {
   applySoftFolderDisplayMenuAction,
-  softFolderDisplayMenuActions,
+  softFolderDisplayMenuItems,
+  type SoftFolderDisplayMenuActionId,
 } from '../soft-folder-display/context-menu';
 import { createFocusSchematicLayoutWorkerService } from '../workers/focus-schematic-layout-worker-client';
 import type { SemanticLocalStructuredViewport } from './LocalStructuredGraphView';
@@ -622,6 +626,14 @@ export default function ModularStructuredGraphView(
     secondaryRelationshipsVisible,
     routeStyle,
   ]);
+  const softFolderGuides = useMemo(
+    () =>
+      focusSchematicFolderClusterGuides(
+        softFolderDisplayTree,
+        displayedGraph.nodes,
+      ),
+    [displayedGraph.nodes, softFolderDisplayTree],
+  );
   const activeSoftFolderContext =
     softFolderContext === null ||
     (softFolderContext.kind === 'file'
@@ -661,18 +673,49 @@ export default function ModularStructuredGraphView(
     },
     [macroLayout],
   );
-  const softFolderContextActions = useMemo(
+  const openSoftFolderAreaContext = useCallback(
+    ({ x, y, world }: GraphPaneContextRequest): boolean => {
+      if (
+        macroLayout !== 'soft-folder-clusters' ||
+        !folderGuidesVisible ||
+        lifecycle.adopted === undefined ||
+        lifecycle.adopted.key !== layoutKey
+      )
+        return false;
+      const guide = hitTestFocusSchematicFolderGuideRegion(
+        softFolderGuides,
+        world,
+      );
+      if (guide === null) return false;
+      setSoftFolderContext({
+        kind: 'folder',
+        folderKey: guide.folderKey,
+        x,
+        y,
+        origin: null,
+      });
+      return true;
+    },
+    [
+      folderGuidesVisible,
+      layoutKey,
+      lifecycle.adopted,
+      macroLayout,
+      softFolderGuides,
+    ],
+  );
+  const softFolderContextItems = useMemo(
     () =>
       activeSoftFolderContext === null
         ? []
-        : softFolderDisplayMenuActions(
+        : softFolderDisplayMenuItems(
             softFolderDisplayTree,
             activeSoftFolderContext,
           ),
     [activeSoftFolderContext, softFolderDisplayTree],
   );
   const runSoftFolderContextAction = useCallback(
-    (action: string) => {
+    (action: SoftFolderDisplayMenuActionId) => {
       if (activeSoftFolderContext === null) return;
       const result = applySoftFolderDisplayMenuAction(
         softFolderDisplayTree,
@@ -710,8 +753,7 @@ export default function ModularStructuredGraphView(
       />
     ) : (
       <FocusSchematicFolderClusterGuides
-        displayTree={softFolderDisplayTree}
-        nodes={displayedGraph.nodes}
+        guides={softFolderGuides}
         onFolderContextMenu={(request) =>
           setSoftFolderContext({ kind: 'folder', ...request })
         }
@@ -723,7 +765,7 @@ export default function ModularStructuredGraphView(
     layoutKey,
     lifecycle.adopted,
     macroLayout,
-    softFolderDisplayTree,
+    softFolderGuides,
   ]);
   const pending =
     lifecycle.phase === 'idle' ||
@@ -764,6 +806,7 @@ export default function ModularStructuredGraphView(
             ? {}
             : { performance: instrumentation })}
           onNodeContextMenuRequest={openSoftFileContext}
+          onPaneContextMenuRequest={openSoftFolderAreaContext}
           preparedGraph={displayedGraph}
           viewportOverlay={viewportOverlay}
           preparedGraphPending={pending}
@@ -771,7 +814,7 @@ export default function ModularStructuredGraphView(
         />
         {activeSoftFolderContext === null ? null : (
           <GraphContextMenu
-            actions={softFolderContextActions}
+            items={softFolderContextItems}
             name={
               activeSoftFolderContext.kind === 'file'
                 ? `Folder display for ${

@@ -28,13 +28,14 @@ describe('shared graph context menu', () => {
     act(() => {
       root.render(
         <GraphContextMenu
-          actions={[
+          items={[
             { id: 'first', label: 'First' },
             {
               id: 'disabled',
               label: 'Disabled',
               disabledReason: 'Unavailable',
             },
+            { kind: 'separator', emphasis: 'strong' },
             { id: 'last', label: 'Last' },
           ]}
           name="Folder display"
@@ -46,6 +47,8 @@ describe('shared graph context menu', () => {
       );
     });
     const menu = document.querySelector<HTMLElement>('[role="menu"]')!;
+    expect(menu.querySelector('[role="separator"]')).not.toBeNull();
+    expect(menu.textContent).not.toContain('Folder actions');
     expect(document.activeElement?.textContent).toBe('First');
     act(() =>
       menu.dispatchEvent(
@@ -66,7 +69,7 @@ describe('shared graph context menu', () => {
     act(() => {
       root.render(
         <GraphContextMenu
-          actions={[{ id: 'one', label: 'One' }]}
+          items={[{ id: 'one', label: 'One' }]}
           name="Folder display"
           onAction={vi.fn()}
           onCancel={cancel}
@@ -95,7 +98,7 @@ describe('shared graph context menu', () => {
     act(() => {
       root.render(
         <GraphContextMenu
-          actions={[{ id: 'one', label: 'One', disabledReason: 'Unavailable' }]}
+          items={[{ id: 'one', label: 'One', disabledReason: 'Unavailable' }]}
           name="Folder display"
           onAction={vi.fn()}
           onCancel={cancel}

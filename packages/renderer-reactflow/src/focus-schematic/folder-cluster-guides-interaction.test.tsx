@@ -7,7 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildFocusSchematicSoftFolderDisplayTree } from '@icarus-graph-explorer/focus-schematic-layout';
 
 import type { GraphFlowNode } from '../types';
-import { FocusSchematicFolderClusterGuides } from './folder-cluster-guides';
+import {
+  FocusSchematicFolderClusterGuides,
+  focusSchematicFolderClusterGuides,
+} from './folder-cluster-guides';
 
 const node = (moduleId: string, x: number): GraphFlowNode =>
   ({
@@ -47,18 +50,18 @@ describe('nested Soft folder guide interaction', () => {
         { fileId: 'g2', exactFolderKey: 'Language/Grammar' },
       ],
     });
+    const guides = focusSchematicFolderClusterGuides(displayTree, [
+      node('outer', 0),
+      node('a', 180),
+      node('b', 320),
+      node('g1', 480),
+      node('g2', 620),
+    ]);
     act(() => {
       root.render(
         <ReactFlow edges={[]} nodes={[]}>
           <FocusSchematicFolderClusterGuides
-            displayTree={displayTree}
-            nodes={[
-              node('outer', 0),
-              node('a', 180),
-              node('b', 320),
-              node('g1', 480),
-              node('g2', 620),
-            ]}
+            guides={guides}
             onFolderContextMenu={onContext}
           />
         </ReactFlow>,
@@ -69,17 +72,21 @@ describe('nested Soft folder guide interaction', () => {
       ...document.querySelectorAll<HTMLButtonElement>(
         '.focus-schematic-folder-guide-controls__chip',
       ),
-    ].find(({ textContent }) => textContent === 'Language/Pragmatics')!;
+    ].find(({ textContent }) => textContent?.includes('Pragmatics'))!;
     expect(overlay?.getAttribute('aria-hidden')).toBe('true');
     expect(getComputedStyle(overlay!).pointerEvents).toBe('none');
     expect(document.body.textContent).not.toContain('↑ This group');
+    expect(document.body.textContent).not.toContain('Island');
+    expect(child.textContent).toContain('Pragmatics');
+    expect(child.textContent).toContain('Language');
+    expect(child.title).toContain('Language/Pragmatics/');
 
     act(() => child.focus());
     expect(document.querySelector('[role="status"]')?.textContent).toContain(
       'Parent: Language',
     );
     expect(document.querySelector('[role="status"]')?.textContent).toContain(
-      'Language/Grammar',
+      'Siblings: Grammar',
     );
 
     act(() =>

@@ -456,6 +456,16 @@ export function buildFocusSchematicSoftFolderDisplayTree({
     descendantMemo.set(folderKey, value);
     return value;
   };
+  const displayDepthMemo = new Map<WorkspaceFolderKey, number>();
+  const displayDepth = (folderKey: WorkspaceFolderKey): number => {
+    const cached = displayDepthMemo.get(folderKey);
+    if (cached !== undefined) return cached;
+    const parent = folders.get(folderKey)?.displayParentFolderKey;
+    const value =
+      parent === null || parent === undefined ? 0 : displayDepth(parent) + 1;
+    displayDepthMemo.set(folderKey, value);
+    return value;
+  };
   const folderValues: FocusSchematicSoftFolderDisplayNode[] = [
     ...folders.values(),
   ]
@@ -467,6 +477,7 @@ export function buildFocusSchematicSoftFolderDisplayTree({
     .map((folder) => ({
       folderKey: folder.folderKey,
       displayParentFolderKey: folder.displayParentFolderKey,
+      displayDepth: displayDepth(folder.folderKey),
       directFileIds: [...folder.directFileIds].sort(compareText),
       childFolderKeys: [...folder.childFolderKeys].sort(compareText),
       descendantFileIds: descendants(folder.folderKey),
