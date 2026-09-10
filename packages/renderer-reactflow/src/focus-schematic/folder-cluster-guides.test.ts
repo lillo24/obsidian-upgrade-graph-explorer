@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildFocusSchematicSoftFolderDisplayTree } from '@icarus-graph-explorer/focus-schematic-layout';
+import {
+  buildFocusSchematicSoftFolderDisplayTree,
+  type FocusSchematicSoftFolderDisplayNode,
+  type FocusSchematicSoftFolderDisplayTree,
+} from '@icarus-graph-explorer/focus-schematic-layout';
 
 import type { GraphFlowNode } from '../types';
 import {
@@ -31,6 +35,34 @@ const tree = (
   }[],
 ) => buildFocusSchematicSoftFolderDisplayTree({ visibleFiles: files });
 
+const manualTree = (
+  folders: readonly FocusSchematicSoftFolderDisplayNode[],
+): FocusSchematicSoftFolderDisplayTree => ({
+  rootFolderKey: '.',
+  folders,
+  files: [],
+  reconciledIntent: { fileParentOverrides: [], flattenedFolderKeys: [] },
+  automaticallyCompressedFolderKeys: [],
+});
+
+const folder = (
+  folderKey: string,
+  displayParentFolderKey: string | null,
+  displayDepth: number,
+  directFileIds: readonly string[],
+  childFolderKeys: readonly string[],
+  descendantFileIds: readonly string[],
+): FocusSchematicSoftFolderDisplayNode => ({
+  folderKey,
+  displayParentFolderKey,
+  displayDepth,
+  directFileIds,
+  childFolderKeys,
+  descendantFileIds,
+  suppressedAncestorFolderKeys: [],
+  provenance: ['exact'],
+});
+
 describe('nested Soft folder guides', () => {
   it('G1-G3 contains child guides inside labeled parents with direct Files', () => {
     const displayTree = tree([
@@ -59,7 +91,7 @@ describe('nested Soft folder guides', () => {
     );
   });
 
-  it('G4 splits truthful same-folder islands around another folder', () => {
+  it('LR3 suppresses far same-folder islands that each contain one File', () => {
     const displayTree = tree([
       { fileId: 'a1', exactFolderKey: 'A' },
       { fileId: 'a2', exactFolderKey: 'A' },
@@ -72,13 +104,175 @@ describe('nested Soft folder guides', () => {
       node('b2', 390, 0),
       node('a2', 680, 0),
     ]);
-    const a = guides.filter(({ folderKey }) => folderKey === 'A');
-    expect(a).toHaveLength(2);
-    expect(a.map(({ memberModuleIds }) => memberModuleIds)).toEqual([
-      ['a1'],
-      ['a2'],
+    expect(guides.filter(({ folderKey }) => folderKey === 'A')).toEqual([]);
+  });
+
+  it('LR1 suppresses a parent region around one useful child guide', () => {
+    const displayTree = manualTree([
+      folder('.', null, 0, [], ['A'], ['one', 'two']),
+      folder('A', '.', 1, [], ['A/B'], ['one', 'two']),
+      folder('A/B', 'A', 2, ['one', 'two'], [], ['one', 'two']),
     ]);
-    expect(a.map(({ label }) => label)).toEqual(['A', 'A']);
+    const guides = focusSchematicFolderClusterGuides(displayTree, [
+      node('one', 0, 0),
+      node('two', 150, 0),
+    ]);
+    expect(guides.map(({ folderKey }) => folderKey)).toEqual(['A/B']);
+    expect(guides[0]?.suppressedAncestorFolderKeys).toEqual(['A']);
+  });
+
+  it('LR6 recursively suppresses local one-child guide chains', () => {
+    const displayTree = manualTree([
+      folder('.', null, 0, [], ['A'], ['one', 'two']),
+      folder('A', '.', 1, [], ['A/B'], ['one', 'two']),
+      folder('A/B', 'A', 2, [], ['A/B/C'], ['one', 'two']),
+      folder('A/B/C', 'A/B', 3, ['one', 'two'], [], ['one', 'two']),
+    ]);
+    const guides = focusSchematicFolderClusterGuides(displayTree, [
+      node('one', 0, 0),
+      node('two', 150, 0),
+    ]);
+    expect(guides.map(({ folderKey }) => folderKey)).toEqual(['A/B/C']);
+    expect(guides[0]).toMatchObject({
+      directVisualUnitCount: 2,
+      suppressedAncestorFolderKeys: ['A', 'A/B'],
+    });
+  });
+
+  it('LR2/LR9 regresses the screenshot wrapper and hit-tests only the surviving child', () => {
+    const displayTree = tree([
+      {
+        fileId: 'principles-are-malleable',
+        exactFolderKey: 'Integrating the ideas/Cure Framework',
+      },
+      {
+        fileId: 'cure-companion',
+        exactFolderKey: 'Integrating the ideas/Cure Framework',
+      },
+      {
+        fileId: 'far-one',
+        exactFolderKey: 'Integrating the ideas/Other',
+      },
+      {
+        fileId: 'far-two',
+        exactFolderKey: 'Integrating the ideas/Other',
+      },
+    ]);
+    const guides = focusSchematicFolderClusterGuides(displayTree, [
+      node('principles-are-malleable', 0, 0),
+      node('cure-companion', 140, 0),
+      node('far-one', 760, 0),
+      node('far-two', 900, 0),
+    ]);
+    expect(
+      guides.filter(({ folderKey }) => folderKey === 'Integrating the ideas'),
+    ).toEqual([]);
+    const cure = guides.find(
+      ({ folderKey }) => folderKey === 'Integrating the ideas/Cure Framework',
+    )!;
+    expect(cure).toMatchObject({
+      memberModuleIds: ['cure-companion', 'principles-are-malleable'],
+      suppressedAncestorFolderKeys: ['Integrating the ideas'],
+    });
+    expect(
+      hitTestFocusSchematicFolderGuideRegion(guides, {
+        x: cure.x + cure.width / 2,
+        y: cure.y + cure.height / 2,
+      })?.folderKey,
+    ).toBe('Integrating the ideas/Cure Framework');
+  });
+
+  it('LR4 keeps a parent that locally groups one File and one child guide', () => {
+    const displayTree = tree([
+      { fileId: 'outer', exactFolderKey: 'A' },
+      { fileId: 'b1', exactFolderKey: 'A/B' },
+      { fileId: 'b2', exactFolderKey: 'A/B' },
+    ]);
+    const guides = focusSchematicFolderClusterGuides(displayTree, [
+      node('outer', 0, 0),
+      node('b1', 160, 0),
+      node('b2', 300, 0),
+    ]);
+    expect(guides.find(({ folderKey }) => folderKey === 'A')).toMatchObject({
+      directVisualUnitCount: 2,
+    });
+    expect(guides.map(({ folderKey }) => folderKey)).toContain('A/B');
+  });
+
+  it('LR5 keeps a parent that locally groups two child guides', () => {
+    const displayTree = tree([
+      { fileId: 'b1', exactFolderKey: 'A/B' },
+      { fileId: 'b2', exactFolderKey: 'A/B' },
+      { fileId: 'c1', exactFolderKey: 'A/C' },
+      { fileId: 'c2', exactFolderKey: 'A/C' },
+    ]);
+    const guides = focusSchematicFolderClusterGuides(displayTree, [
+      node('b1', 0, 0),
+      node('b2', 130, 0),
+      node('c1', 300, 0),
+      node('c2', 430, 0),
+    ]);
+    expect(guides.find(({ folderKey }) => folderKey === 'A')).toMatchObject({
+      directVisualUnitCount: 2,
+    });
+  });
+
+  it('LR7/LR10 keeps only a useful mixed island deterministically', () => {
+    const displayTree = tree([
+      { fileId: 'b1', exactFolderKey: 'A/B' },
+      { fileId: 'b2', exactFolderKey: 'A/B' },
+      { fileId: 'c1', exactFolderKey: 'A/C' },
+      { fileId: 'c2', exactFolderKey: 'A/C' },
+      { fileId: 'd1', exactFolderKey: 'A/D' },
+      { fileId: 'd2', exactFolderKey: 'A/D' },
+    ]);
+    const guides = focusSchematicFolderClusterGuides(displayTree, [
+      node('b1', 0, 0),
+      node('b2', 130, 0),
+      node('c1', 300, 0),
+      node('c2', 430, 0),
+      node('d1', 900, 0),
+      node('d2', 1030, 0),
+    ]);
+    const parent = guides.filter(({ folderKey }) => folderKey === 'A');
+    expect(parent).toHaveLength(1);
+    expect(parent[0]).toMatchObject({
+      directVisualUnitCount: 2,
+      memberModuleIds: ['b1', 'b2', 'c1', 'c2'],
+      regionIndex: 0,
+      regionCount: 1,
+    });
+    expect(
+      guides.find(({ folderKey }) => folderKey === 'A/D')
+        ?.suppressedAncestorFolderKeys,
+    ).toContain('A');
+    expect(
+      focusSchematicFolderClusterGuides(displayTree, [
+        node('b1', 0, 0),
+        node('b2', 130, 0),
+        node('c1', 300, 0),
+        node('c2', 430, 0),
+        node('d1', 900, 0),
+        node('d2', 1030, 0),
+      ]),
+    ).toEqual(guides);
+  });
+
+  it('LR8 passes a suppressed child File unit into useful ancestor geometry', () => {
+    const displayTree = manualTree([
+      folder('.', null, 0, [], ['A'], ['outer', 'inner']),
+      folder('A', '.', 1, ['outer'], ['A/B'], ['outer', 'inner']),
+      folder('A/B', 'A', 2, ['inner'], [], ['inner']),
+    ]);
+    const guides = focusSchematicFolderClusterGuides(displayTree, [
+      node('outer', 0, 0),
+      node('inner', 150, 0),
+    ]);
+    expect(guides.map(({ folderKey }) => folderKey)).toEqual(['A']);
+    expect(guides[0]).toMatchObject({
+      directVisualUnitCount: 2,
+      memberModuleIds: ['inner', 'outer'],
+    });
   });
 
   it('G5 grows deep nesting by fixed padding rather than exponentially', () => {
@@ -228,14 +422,18 @@ describe('nested Soft folder guides', () => {
     const displayTree = tree([
       { fileId: 'a1', exactFolderKey: 'A' },
       { fileId: 'a2', exactFolderKey: 'A' },
+      { fileId: 'a3', exactFolderKey: 'A' },
+      { fileId: 'a4', exactFolderKey: 'A' },
       { fileId: 'b1', exactFolderKey: 'B' },
       { fileId: 'b2', exactFolderKey: 'B' },
     ]);
     const guides = focusSchematicFolderClusterGuides(displayTree, [
       node('a1', 0, 0),
+      node('a2', 130, 0),
       node('b1', 260, 0),
       node('b2', 390, 0),
-      node('a2', 680, 0),
+      node('a3', 680, 0),
+      node('a4', 810, 0),
     ]).filter(({ folderKey }) => folderKey === 'A');
     expect(guides).toHaveLength(2);
     for (const guide of guides)

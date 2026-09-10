@@ -1,6 +1,6 @@
 # HIER4B validation
 
-Status: **HIER4B-POLISH1 IMPLEMENTED — optimized graphical decision pending.**
+Status: **HIER4B-FIX4 IMPLEMENTED — optimized graphical decision pending.**
 
 HIER4B evidence remains synthetic and development-only. Directional Folder
 Bands is the unchanged reference and default. No HIER4B adoption PR exists.
@@ -63,6 +63,15 @@ quiet parent hints, matching repeated-region typography, keyboard focusability,
 focus-visible styling, and both Shift+F10 and ContextMenu-key entry. The existing
 HT, MC, FM, and L suites continue to cover empty guide-area targeting, deepest
 nested hits, label right-click, focus restoration, and split-region labels.
+
+FIX4 adds LR1–LR10 renderer cases for one-child-folder suppression, the reported
+`Integrating the ideas/Cure Framework` split, two far same-folder singleton
+islands, File-plus-child and two-child useful parents, recursive local chains,
+mixed visible/suppressed islands, pass-through parent geometry, surviving-child
+hit testing, and cold determinism. Every named rendered region records at least
+two direct visual units. Suppressed regions never enter the returned guide list,
+so renderer labels, hover/context controls, and area hit testing cannot select
+them. The existing root-direct-File policy remains covered separately.
 
 ## Hierarchy-force bakeoff
 
@@ -127,3 +136,8 @@ The exact POLISH1 prompt is archived at
 `history-implementations/HIER4B_POLISH1_empty_module_boundaries_passive_folder_labels_codex_prompt.md`.
 Its SHA-256 is
 `98F59BE92FB9CD6CF04057909692D802900AE2350F556751A723AD3436EA7620`.
+
+The exact FIX4 prompt is archived at
+`history-implementations/HIER4B_FIX4_post_island_redundant_wrapper_suppression_codex_prompt.md`.
+Its SHA-256 is
+`1F37791ACB26EB860419F5533299DD9DBAFACF4BF55546451C7F6F0A167EE08A`.

@@ -1,6 +1,6 @@
 # HIER4B Soft Folder Clusters
 
-Status: **UNDER EVALUATION — HIER4B-POLISH1 implemented; optimized graphical QA pending.**
+Status: **UNDER EVALUATION — HIER4B-FIX4 implemented; optimized graphical QA pending.**
 
 HIER4B evaluates a second macro-layout family for Modular Focus Hierarchy.
 Directional Folder Bands remains the Modular Preview default, and Classic Focus
@@ -91,6 +91,17 @@ focus restoration keep the established menu behavior. Hover adds text emphasis
 only and keyboard focus gets a temporary visible outline. Repeated SVG labels
 use the same restrained text weight and size.
 
+FIX4 applies a second, renderer-local compression after spatial island
+splitting. A named folder region is rendered only when its island contains at
+least two direct visual units: direct File rectangles or immediate rendered
+child-folder regions. A one-unit region emits no shape, label, hover target, or
+area hit target. Its one surviving visual unit passes into the parent candidate
+set before parent geometry is built, so recursive local wrapper chains compress
+without losing descendant Files. Useful File-plus-child and two-child regions
+remain. The logical display tree, persisted intent, promotion, flattening,
+forces, spacing, ports, and routing do not change. The workspace root retains
+its existing direct-File-only structural exception.
+
 ## Context menu
 
 FIX2 removes the former inline `↑ This group`, sibling, and Reset toolbar.
@@ -149,7 +160,8 @@ guide geometry, and cache identity unchanged.
 reconciliation, the pure nested tree, provenance, mutations, and bounded scope
 memberships. `soft-clusters.ts` owns the renderer-neutral solver and H1 policy.
 `packages/renderer-reactflow/src/focus-schematic/folder-cluster-guides.tsx`
-owns nested guide geometry and renderer-only hierarchy emphasis.
+owns nested guide geometry, post-island local compression/pass-through, and
+renderer-only hierarchy emphasis.
 `packages/renderer-reactflow/src/GraphContextMenu.tsx` owns the shared menu
 surface. The web application owns workspace persistence and action dispatch.
 
@@ -163,4 +175,4 @@ QA.
 `HIER4B-SPACING` will evaluate wider use of the available canvas and less
 cramped module interiors after folder semantics are frozen. `MODULAR-CONTEXT1`
 will add Network-style Focus, Inspect, Hide File, and Hide Folder actions to the
-same composed menu model. Neither belongs to POLISH1.
+same composed menu model. Neither belongs to FIX4.
