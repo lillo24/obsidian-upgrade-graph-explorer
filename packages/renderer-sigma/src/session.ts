@@ -37,6 +37,10 @@ import type { TemporaryNodeConstraintEndReason } from './temporary-node-constrai
 import { atomicAnchoredGraphMutation } from './anchored-refresh';
 import { NetworkPositionCameraIntentPolicy } from './network-camera-intent';
 import { networkPositionExtent } from './network-position-frame';
+import {
+  captureRawViewportFrame,
+  restoreRawViewportFrame,
+} from './raw-viewport-frame';
 
 import {
   buildGlobalGraph,
@@ -1749,6 +1753,49 @@ export class GlobalRendererSession {
     this.renderer.setCustomBBox(this.renderer.getBBox());
     this.positionFrameEstablished = true;
     this.renderer.refresh({ schedule: true });
+  }
+
+  /**
+   * Commits the exact final startup geometry as Sigma's normalization owner.
+   * Provisional seed/base frames may exist before this transaction, but the
+   * canvas is not revealed until the resulting render completes.
+   */
+  commitInitialPresentation(
+    positions: readonly GlobalLayoutPosition[],
+    fitAll: boolean,
+  ): Promise<void> {
+    const preservedViewport = fitAll
+      ? undefined
+      : captureRawViewportFrame(this.renderer);
+    return new Promise((resolve, reject) => {
+      const afterRender = (): void => {
+        this.renderer.off('afterRender', afterRender);
+        this.emitDensityQaDiagnostics();
+        resolve();
+      };
+      this.renderer.on('afterRender', afterRender);
+      try {
+        this.renderer.setCustomBBox(networkPositionExtent(positions));
+        this.positionFrameEstablished = true;
+        if (fitAll) {
+          this.cameraOwnership = 'auto';
+          this.positionCameraIntent.claimCamera();
+          this.semanticAnchorNodeKey = undefined;
+          this.renderer.getCamera().setState({
+            x: 0.5,
+            y: 0.5,
+            ratio: 1,
+            angle: 0,
+          });
+        } else if (preservedViewport !== undefined) {
+          restoreRawViewportFrame(this.renderer, preservedViewport);
+        }
+        this.renderer.refresh({ schedule: true });
+      } catch (error: unknown) {
+        this.renderer.off('afterRender', afterRender);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
   }
 
   private emitDensityQaDiagnostics(): void {

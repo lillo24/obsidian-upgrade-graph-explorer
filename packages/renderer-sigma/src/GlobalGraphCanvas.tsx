@@ -49,6 +49,7 @@ import {
   warmGlobalRendererInput,
 } from './layout';
 import { GlobalGraphEmptyState } from './GlobalGraphEmptyState';
+import { NetworkViewportControls } from './NetworkViewportControls';
 import { mountGlobalRendererSession } from './lifecycle';
 import {
   mapProjectionToGlobal,
@@ -169,6 +170,7 @@ export interface GlobalGraphCanvasProps {
   /** Optional session cache owner; the lazy web module keeps this across mode switches. */
   readonly layoutCache?: GlobalLayoutCache;
   readonly layoutService: GlobalLayoutService;
+  readonly maximized?: boolean;
   /** PHYSICS1 transport seam; direct File dragging is armed while available. */
   readonly physicsServiceFactory?: NetworkPhysicsServiceFactory;
   readonly temporaryConstraintActive?: boolean;
@@ -198,6 +200,7 @@ export interface GlobalGraphCanvasProps {
   readonly onFitRequestConsumed?: (key: number) => void;
   /** Routes the visible Fit action through the final-geometry request gate. */
   readonly onFitRequested?: () => void;
+  readonly onMaximizedChange?: (maximized: boolean) => void;
   readonly onNodeActivate: (entityId: string) => void;
   readonly onNodeSingleClick?: (nodeId: string) => void;
   readonly onSelectionChange: (selection: GlobalSelection | null) => void;
@@ -393,7 +396,7 @@ function applyDisplayedPositions(
   instrumentation: GlobalRendererInstrumentation | undefined,
   forceSpatialOperation = false,
   rules?: readonly FolderSpatialRule[],
-): Promise<void> {
+): Promise<readonly GlobalLayoutPosition[]> {
   const positions = displayedPositions(
     automaticPositions,
     input,
@@ -408,7 +411,7 @@ function applyDisplayedPositions(
     anchors,
     instrumentation,
     forceSpatialOperation || rules !== undefined,
-  );
+  ).then(() => positions);
 }
 
 function applyComposedPositions(
@@ -442,6 +445,7 @@ export function GlobalGraphCanvas({
   layoutRequestKey,
   layoutCache,
   layoutService,
+  maximized,
   physicsServiceFactory,
   spatialInfluenceService,
   spatialInfluenceCache,
@@ -456,6 +460,7 @@ export function GlobalGraphCanvas({
   onCenterRequestConsumed,
   onFitRequestConsumed,
   onFitRequested,
+  onMaximizedChange,
   onNodeActivate,
   onNodeSingleClick,
   onSelectionChange,
@@ -485,6 +490,13 @@ export function GlobalGraphCanvas({
   const handledFitRequest = useRef(0);
   const automaticFitRequestKeyRef = useRef(automaticFitRequestKey);
   const userCameraIntentGeneration = useRef(0);
+  const pendingInitialPresentation = useRef<number | 'initial' | undefined>(
+    automaticFitRequestKey ?? 'initial',
+  );
+  const presentationCameraIntentGeneration = useRef(0);
+  const presentationCommitGeneration = useRef<object | undefined>(undefined);
+  const [initialPresentationReady, setInitialPresentationReady] =
+    useState(false);
   const handledLayoutRequest = useRef(layoutRequestKey);
   const layoutPending = useRef(true);
   const callbacks = useRef({
@@ -538,6 +550,16 @@ export function GlobalGraphCanvas({
   ]);
   useLayoutEffect(() => {
     automaticFitRequestKeyRef.current = automaticFitRequestKey;
+    if (
+      automaticFitRequestKey !== undefined &&
+      automaticFitRequestKey > handledFitRequest.current &&
+      pendingInitialPresentation.current !== automaticFitRequestKey
+    ) {
+      pendingInitialPresentation.current = automaticFitRequestKey;
+      presentationCameraIntentGeneration.current =
+        userCameraIntentGeneration.current;
+      setInitialPresentationReady(false);
+    }
   }, [automaticFitRequestKey]);
   const resolvedPhysics = resolveGlobalPhysicsSettings(settings);
   const {
@@ -585,6 +607,18 @@ export function GlobalGraphCanvas({
     () => globalLayoutFingerprint(requestTemplate),
     [requestTemplate],
   );
+  const layoutGeneration = useMemo(
+    () => ({ fingerprint, input, layoutRequestKey }),
+    [fingerprint, input, layoutRequestKey],
+  );
+  const layoutGenerationRef = useRef(layoutGeneration);
+  useLayoutEffect(() => {
+    if (layoutGenerationRef.current === layoutGeneration) return;
+    layoutGenerationRef.current = layoutGeneration;
+    // Establish pending ownership before ordinary effects can start spatial
+    // work for a new source/layout generation.
+    layoutPending.current = true;
+  }, [layoutGeneration]);
   const [initial] = useState(() => {
     const cached = cache.get(fingerprint);
     const automaticPositions = cached ?? globalLayoutPositionsFromInput(input);
@@ -640,12 +674,59 @@ export function GlobalGraphCanvas({
   useLayoutEffect(() => {
     finalGeometryGenerationRef.current = finalGeometryGeneration;
   }, [finalGeometryGeneration]);
-  const commitFinalGeometry = useCallback((generation: object) => {
-    if (finalGeometryGenerationRef.current !== generation) return;
-    setCommittedFinalGeometryGeneration((current) =>
-      current === generation ? current : generation,
-    );
-  }, []);
+  const commitFinalGeometry = useCallback(
+    (generation: object, positions: readonly GlobalLayoutPosition[]): void => {
+      if (finalGeometryGenerationRef.current !== generation) return;
+      const pending = pendingInitialPresentation.current;
+      if (pending === undefined) {
+        setCommittedFinalGeometryGeneration((current) =>
+          current === generation ? current : generation,
+        );
+        return;
+      }
+      if (presentationCommitGeneration.current === generation) return;
+      const session = sessionRef.current;
+      if (session === undefined) return;
+      presentationCommitGeneration.current = generation;
+      const automaticKey = typeof pending === 'number' ? pending : undefined;
+      const fitAll =
+        automaticKey !== undefined &&
+        automaticFitRequestKeyRef.current === automaticKey &&
+        userCameraIntentGeneration.current ===
+          presentationCameraIntentGeneration.current;
+      void session
+        .commitInitialPresentation(positions, fitAll)
+        .then(() => {
+          if (presentationCommitGeneration.current === generation) {
+            presentationCommitGeneration.current = undefined;
+          }
+          if (finalGeometryGenerationRef.current !== generation) return;
+          pendingInitialPresentation.current = undefined;
+          setInitialPresentationReady(true);
+          setCommittedFinalGeometryGeneration(generation);
+          if (
+            automaticKey !== undefined &&
+            automaticFitRequestKeyRef.current === automaticKey
+          ) {
+            automaticFitRequestKeyRef.current = undefined;
+            handledFitRequest.current = Math.max(
+              handledFitRequest.current,
+              automaticKey,
+            );
+            callbacks.current.onFitRequestConsumed?.(automaticKey);
+          }
+        })
+        .catch((error: unknown) => {
+          if (presentationCommitGeneration.current === generation) {
+            presentationCommitGeneration.current = undefined;
+          }
+          callbacks.current.onFailure(
+            `Could not establish the initial All Network presentation: ${errorMessage(error)}`,
+          );
+        });
+    },
+    [],
+  );
   const appliedVisualGroupStyles = useRef(initial.visualGroupStyles);
   const appliedPresentationOverrides = useRef(initial.presentationOverrides);
   const appliedSpatialOverrides = useRef(initial.spatialOverrides);
@@ -1453,6 +1534,7 @@ export function GlobalGraphCanvas({
         clearingAnchors,
         latestSpatialRules.current,
       );
+      latestDisplayedPositions.current = positions;
       appliedSpatialOverrides.current = anchors;
       session.update(
         anchors === undefined || anchors.size === 0
@@ -1506,9 +1588,19 @@ export function GlobalGraphCanvas({
   }, [presentationOverrides]);
 
   useEffect(() => {
-    if (spatialRules !== undefined) return;
+    if (
+      spatialRules !== undefined ||
+      !ready ||
+      layoutPending.current ||
+      layoutPendingState
+    ) {
+      return;
+    }
     if (appliedSpatialOverrides.current === spatialOverrides) {
-      commitFinalGeometry(finalGeometryGeneration);
+      commitFinalGeometry(
+        finalGeometryGeneration,
+        latestDisplayedPositions.current,
+      );
       return;
     }
     const generation = finalGeometryGeneration;
@@ -1535,11 +1627,12 @@ export function GlobalGraphCanvas({
         previousSpatialOverrides !== undefined &&
         previousSpatialOverrides.size > 0,
     )
-      .then(() => {
+      .then((positions) => {
         if (cancelled || finalGeometryGenerationRef.current !== generation) {
           return;
         }
-        commitFinalGeometry(generation);
+        latestDisplayedPositions.current = positions;
+        commitFinalGeometry(generation, positions);
         if (pending === undefined) return;
         if (pendingArrangementCommit.current !== pending) return;
         pendingArrangementCommit.current = undefined;
@@ -1567,6 +1660,8 @@ export function GlobalGraphCanvas({
     finalGeometryGeneration,
     input,
     instrumentation,
+    layoutPendingState,
+    ready,
     spatialOverrides,
     spatialRules,
   ]);
@@ -1580,6 +1675,7 @@ export function GlobalGraphCanvas({
     if (
       spatialRules === undefined ||
       !ready ||
+      layoutPending.current ||
       layoutPendingState ||
       sessionRef.current === undefined
     ) {
@@ -1633,7 +1729,7 @@ export function GlobalGraphCanvas({
       appliedSpatialOverrides.current = spatialOverrides;
       setSpatialError(undefined);
       setSpatialCommitKey((current) => current + 1);
-      commitFinalGeometry(finalGeometryGeneration);
+      commitFinalGeometry(finalGeometryGeneration, positions);
       const pending = pendingArrangementCommit.current;
       if (pending === undefined) return;
       const incomingRule = spatialRules.find(
@@ -1796,15 +1892,16 @@ export function GlobalGraphCanvas({
         false,
         latestSpatialRules.current,
       )
-        .then(() => {
+        .then((positions) => {
           if (cancelled) return;
+          latestDisplayedPositions.current = positions;
           layoutPending.current = false;
           setLayoutPendingState(false);
           setLayoutError(undefined);
           setLayoutStatus(undefined);
           setLayoutCommitKey((current) => current + 1);
           if (latestSpatialRules.current === undefined) {
-            commitFinalGeometry(finalGeometryGenerationRef.current);
+            commitFinalGeometry(finalGeometryGenerationRef.current, positions);
           }
         })
         .catch((error: unknown) => {
@@ -1848,8 +1945,9 @@ export function GlobalGraphCanvas({
               ? apply()
               : instrumentation.measure('layout-apply', undefined, apply)
             : apply();
-        await rendered;
+        const positions = await rendered;
         if (cancelled) return;
+        latestDisplayedPositions.current = positions;
         instrumentation?.record('global-layout-worker', result.computeMs);
         instrumentation?.record('folder-prior', result.folderPriorMs);
         cache.set(fingerprint, result.positions);
@@ -1858,7 +1956,7 @@ export function GlobalGraphCanvas({
         setLayoutStatus(undefined);
         setLayoutCommitKey((current) => current + 1);
         if (latestSpatialRules.current === undefined) {
-          commitFinalGeometry(finalGeometryGenerationRef.current);
+          commitFinalGeometry(finalGeometryGenerationRef.current, positions);
         }
       })
       .catch((error: unknown) => {
@@ -1870,7 +1968,10 @@ export function GlobalGraphCanvas({
         setLayoutStatus('The last valid All Network positions remain visible.');
         setLayoutCommitKey((current) => current + 1);
         if (latestSpatialRules.current === undefined) {
-          commitFinalGeometry(finalGeometryGenerationRef.current);
+          commitFinalGeometry(
+            finalGeometryGenerationRef.current,
+            latestDisplayedPositions.current,
+          );
         }
       });
     return () => {
@@ -2445,6 +2546,7 @@ export function GlobalGraphCanvas({
     <div
       className={`global-graph-canvas${folderArrangement?.active === true ? ' global-graph-canvas--arranging' : ''}`}
       data-arrangement-phase={arrangementGesturePhase}
+      data-initial-presentation={initialPresentationReady ? 'ready' : 'pending'}
     >
       <div
         aria-hidden="true"
@@ -2482,52 +2584,45 @@ export function GlobalGraphCanvas({
         <GlobalGraphEmptyState />
       ) : (
         <>
-          <div
-            aria-label="All Network canvas controls"
-            className="global-graph-canvas__controls"
-            role="group"
-          >
-            <button aria-label="Zoom in" onClick={zoomIn} type="button">
-              +
-            </button>
-            <button aria-label="Zoom out" onClick={zoomOut} type="button">
-              −
-            </button>
-            <button onClick={fit} type="button">
-              Fit
-            </button>
-            {folderArrangement === undefined ? null : (
-              <>
+          <NetworkViewportControls
+            label="All Network viewport controls"
+            maximized={maximized}
+            onFit={fit}
+            onMaximizedChange={onMaximizedChange}
+            onZoomIn={zoomIn}
+            onZoomOut={zoomOut}
+          />
+          {folderArrangement === undefined ? null : (
+            <div className="global-graph-canvas__arrangement-tools">
+              <button
+                aria-label="Arrange folders"
+                aria-pressed={folderArrangement.active}
+                disabled={!folderArrangement.active && !arrangementAvailable}
+                onClick={() => {
+                  if (folderArrangement.active) finishArrangement();
+                  else folderArrangement.onActiveChange(true);
+                }}
+                title={
+                  folderArrangement.active
+                    ? 'Done arranging folders'
+                    : (arrangementUnavailableReason ?? 'Arrange folders')
+                }
+                type="button"
+              >
+                {folderArrangement.active ? 'Done' : 'Arrange folders'}
+              </button>
+              {folderArrangement.canRecoverCorrupt === true &&
+              !folderArrangement.active ? (
                 <button
-                  aria-label="Arrange folders"
-                  aria-pressed={folderArrangement.active}
-                  disabled={!folderArrangement.active && !arrangementAvailable}
-                  onClick={() => {
-                    if (folderArrangement.active) finishArrangement();
-                    else folderArrangement.onActiveChange(true);
-                  }}
-                  title={
-                    folderArrangement.active
-                      ? 'Done arranging folders'
-                      : (arrangementUnavailableReason ?? 'Arrange folders')
-                  }
+                  onClick={recoverCorruptArrangement}
+                  title="Clear invalid saved folder positions"
                   type="button"
                 >
-                  {folderArrangement.active ? 'Done' : 'Arrange folders'}
+                  Recover positions
                 </button>
-                {folderArrangement.canRecoverCorrupt === true &&
-                !folderArrangement.active ? (
-                  <button
-                    onClick={recoverCorruptArrangement}
-                    title="Clear invalid saved folder positions"
-                    type="button"
-                  >
-                    Recover positions
-                  </button>
-                ) : null}
-              </>
-            )}
-          </div>
+              ) : null}
+            </div>
+          )}
           {layoutStatus === undefined ? null : (
             <p
               className="global-graph-canvas__status"

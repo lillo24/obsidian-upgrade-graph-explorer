@@ -97,6 +97,7 @@ export class SigmaTestRenderer {
     readonly settings: {
       nodeReducer: (key: string, attributes: Attributes) => Attributes;
       edgeReducer?: (key: string, attributes: Attributes) => Attributes;
+      stagePadding?: number;
     },
   ) {
     SigmaTestRenderer.instances.push(this);
@@ -219,6 +220,9 @@ export class SigmaTestRenderer {
       y: [extent.minY, extent.maxY] as [number, number],
     };
   }
+  getCustomBBox() {
+    return this.customBBox;
+  }
   setCustomBBox(
     extent: {
       readonly x: [number, number];
@@ -237,8 +241,12 @@ export class SigmaTestRenderer {
   ) {
     const camera = override?.cameraState ?? this.camera;
     const dimensions = this.getDimensions();
+    const padding = this.settings.stagePadding ?? 0;
     const scale = this.normalizeDisplayCoordinates
-      ? Math.min(dimensions.width, dimensions.height)
+      ? Math.min(
+          dimensions.width - padding * 2,
+          dimensions.height - padding * 2,
+        )
       : 1;
     const translatedX = point.x - camera.x;
     const translatedY = point.y - camera.y;
@@ -261,8 +269,12 @@ export class SigmaTestRenderer {
   ) {
     const camera = override?.cameraState ?? this.camera;
     const dimensions = this.getDimensions();
+    const padding = this.settings.stagePadding ?? 0;
     const scale = this.normalizeDisplayCoordinates
-      ? Math.min(dimensions.width, dimensions.height)
+      ? Math.min(
+          dimensions.width - padding * 2,
+          dimensions.height - padding * 2,
+        )
       : 1;
     const viewportX = ((point.x - dimensions.width / 2) * camera.ratio) / scale;
     const viewportY =

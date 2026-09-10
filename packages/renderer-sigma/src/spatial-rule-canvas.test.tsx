@@ -465,9 +465,9 @@ describe('production spatial rule adoption', () => {
     await harness.flush();
     expect(layout).not.toHaveBeenCalled();
     expect(pull).toHaveBeenCalledTimes(1);
-    // Cache adoption, Pull settlement, and the layout-commit re-evaluation are
-    // distinct existing transactions; all must use the raw-frame path.
-    expect(spatialApply).toHaveBeenCalledTimes(3);
+    // Cache adoption and Pull settlement remain distinct transactions. The
+    // authoritative presentation commit no longer re-applies the same frame.
+    expect(spatialApply).toHaveBeenCalledTimes(2);
     expect(plainApply).not.toHaveBeenCalled();
     expect(fit).not.toHaveBeenCalled();
     expect(center).not.toHaveBeenCalled();
@@ -476,6 +476,10 @@ describe('production spatial rule adoption', () => {
 
   it('waits to fit a fresh source until spatial-rule positions are authoritative', async () => {
     const projection = globalTestProjection();
+    const commitInitialPresentation = vi.spyOn(
+      GlobalRendererSession.prototype,
+      'commitInitialPresentation',
+    );
     const fit = vi
       .spyOn(GlobalRendererSession.prototype, 'fit')
       .mockImplementation(noop);
@@ -532,6 +536,7 @@ describe('production spatial rule adoption', () => {
     const onFailure = vi.fn();
     const harness = new CanvasTestHarness(() =>
       GlobalGraphCanvas({
+        automaticFitRequestKey: 1,
         projection,
         settings,
         spatialRules,
@@ -551,6 +556,7 @@ describe('production spatial rule adoption', () => {
     await harness.flush();
     expect(layout).toHaveBeenCalledTimes(1);
     expect(spatialInfluenceService.layout).toHaveBeenCalledTimes(1);
+    expect(commitInitialPresentation).not.toHaveBeenCalled();
     expect(fit).not.toHaveBeenCalled();
     if (pendingRequest === undefined || resolvePull === undefined) {
       throw new Error('Expected a pending Dynamic Pull request.');
@@ -576,7 +582,12 @@ describe('production spatial rule adoption', () => {
     });
     await harness.flush();
 
-    expect(fit).toHaveBeenCalledTimes(1);
+    expect(commitInitialPresentation).toHaveBeenCalledTimes(1);
+    expect(commitInitialPresentation).toHaveBeenCalledWith(
+      expect.any(Array),
+      true,
+    );
+    expect(fit).not.toHaveBeenCalled();
     expect(layout).toHaveBeenCalledTimes(1);
     harness.destroy();
   });
@@ -718,6 +729,10 @@ describe('production spatial rule adoption', () => {
 
   it('cancels a queued automatic Fit when wheel navigation is newer', async () => {
     const projection = globalTestProjection();
+    const commitInitialPresentation = vi.spyOn(
+      GlobalRendererSession.prototype,
+      'commitInitialPresentation',
+    );
     let resolveLayout: ((result: GlobalLayoutResult) => void) | undefined;
     let pendingRequest: Omit<GlobalLayoutRequest, 'requestId'> | undefined;
     const layout = vi.fn(
@@ -795,6 +810,10 @@ describe('production spatial rule adoption', () => {
     });
     await harness.flush();
 
+    expect(commitInitialPresentation).toHaveBeenCalledWith(
+      expect.any(Array),
+      false,
+    );
     expect(fit).not.toHaveBeenCalled();
     harness.destroy();
   });

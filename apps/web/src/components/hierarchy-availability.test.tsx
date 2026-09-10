@@ -266,6 +266,18 @@ describe('GraphExplorer experimental availability integration', () => {
     expect(captured.global?.centerRequest).toBeUndefined();
   });
 
+  it('routes the shared maximized workspace owner into both Network renderers', async () => {
+    await mount('global');
+    expect(captured.global?.maximized).toBe(false);
+    expect(captured.global?.onMaximizedChange).toEqual(expect.any(Function));
+
+    await act(() => root.unmount());
+    root = createRoot(container);
+    await mount('local', false, undefined, 'free');
+    expect(captured.local?.maximized).toBe(false);
+    expect(captured.local?.onMaximizedChange).toEqual(expect.any(Function));
+  });
+
   it('keeps All density strength transient and camera-only', async () => {
     await mount('global');
     expect(mode()).toBe('global');
