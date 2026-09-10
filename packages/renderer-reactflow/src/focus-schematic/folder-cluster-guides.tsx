@@ -613,6 +613,7 @@ export function FocusSchematicFolderClusterGuides({
                   aria-haspopup="menu"
                   aria-label={`Folder ${accessibleFolderLabel(guide.folderKey)}. Display depth ${guide.depth}.${regionDescription} ${parentDescription}. ${siblingDescription}`}
                   className="focus-schematic-folder-guide-controls__chip"
+                  data-folder-label-presentation="passive"
                   onContextMenu={(event) => {
                     event.preventDefault();
                     event.stopPropagation();

@@ -16,6 +16,7 @@ import {
   validateFocusSchematicRendererGraph,
 } from './index';
 import { applyRendererHighlight } from '../highlight';
+import type { ModuleBoundaryFlowNode } from '../types';
 
 function projectedEntityId(
   fixture: ReturnType<typeof buildEndpointFixture>,
@@ -107,6 +108,19 @@ function highlightedReferenceIds(
       }),
     ),
   ].sort();
+}
+
+function moduleBoundary(
+  graph: ReturnType<typeof prepareFocusSchematicRendererGraph>,
+  moduleId: string,
+): ModuleBoundaryFlowNode {
+  const node = graph.nodes.find(
+    (candidate) =>
+      candidate.type === 'module' && candidate.data.moduleId === moduleId,
+  );
+  if (node?.type !== 'module')
+    throw new Error(`Missing module boundary ${moduleId}.`);
+  return node;
 }
 
 describe('production Focus Schematic React Flow mapping', () => {
@@ -513,6 +527,76 @@ describe('production Focus Schematic React Flow mapping', () => {
           node.type === 'entity' &&
           node.data.hasDirectFileConnectionRing === true,
       ),
+    ).toBe(false);
+    expect(
+      moduleBoundary(collapsed.graph, 'Atlas').data
+        .hasVisibleStructuralDescendants,
+    ).toBe(false);
+    expect(
+      moduleBoundary(expanded.graph, 'Atlas').data
+        .hasVisibleStructuralDescendants,
+    ).toBe(true);
+    for (const value of [collapsed, expanded]) {
+      for (const geometry of value.computedLayout.candidate.modules) {
+        expect(moduleBoundary(value.graph, geometry.moduleId)).toMatchObject({
+          position: { x: geometry.x, y: geometry.y },
+          width: geometry.width,
+          height: geometry.height,
+        });
+      }
+    }
+  });
+
+  it('hides root and non-root File-only module boundaries', () => {
+    const value = preparedSpec({
+      id: 'CS92',
+      label: 'File-only boundaries',
+      authored: 'Atlas.md → Beacon.md',
+      expectation: 'Neither File-only module paints a visual boundary.',
+      inspect: 'Root and non-root modules keep their computed geometry.',
+      rootDocumentId: 'Atlas',
+      documents: [{ id: 'Atlas' }, { id: 'Beacon' }],
+      references: [{ sourceEntityId: 'Atlas', targetEntityId: 'Beacon' }],
+      direction: 'outgoing',
+    });
+    expect(moduleBoundary(value.graph, 'Atlas').data).toMatchObject({
+      root: true,
+      hasVisibleStructuralDescendants: false,
+    });
+    expect(moduleBoundary(value.graph, 'Beacon').data).toMatchObject({
+      root: false,
+      hasVisibleStructuralDescendants: false,
+    });
+  });
+
+  it('shows a module boundary for a directly visible Block', () => {
+    const value = preparedSpec({
+      id: 'CS93',
+      label: 'Visible Block boundary',
+      authored: 'Atlas block ^detail → Beacon.md',
+      expectation: 'The visible Block makes the Atlas boundary visible.',
+      inspect: 'No Heading is required by the presentation criterion.',
+      rootDocumentId: 'Atlas',
+      documents: [{ id: 'Atlas' }, { id: 'Beacon' }],
+      entities: [
+        {
+          id: 'Atlas-block',
+          kind: 'block',
+          documentId: 'Atlas',
+          parentId: 'Atlas',
+          line: 2,
+        },
+      ],
+      references: [{ sourceEntityId: 'Atlas-block', targetEntityId: 'Beacon' }],
+      direction: 'outgoing',
+      expandedEntityIds: ['Atlas'],
+    });
+    expect(
+      moduleBoundary(value.graph, 'Atlas').data.hasVisibleStructuralDescendants,
+    ).toBe(true);
+    expect(
+      moduleBoundary(value.graph, 'Beacon').data
+        .hasVisibleStructuralDescendants,
     ).toBe(false);
   });
 

@@ -134,6 +134,8 @@ export interface ModuleBoundaryNodeData extends Record<string, unknown> {
   readonly projectionNodeId: null;
   readonly moduleId: string;
   readonly root: boolean;
+  /** Presentation-only; true only for currently visible Heading/Block nodes. */
+  readonly hasVisibleStructuralDescendants: boolean;
 }
 
 export interface FilteredBridgeNodeData extends Record<string, unknown> {

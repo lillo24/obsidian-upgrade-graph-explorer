@@ -1286,6 +1286,12 @@ A pane context request uses React Flow's screen-to-world conversion and pure
 actual-region hit testing, choosing deepest depth, smallest area, then stable
 identity. Guide visibility gates that empty-area path.
 
+HIER4B-POLISH1 keeps the folder-label button as the keyboard and context-menu
+primitive while presenting it as passive text. Its normal state has no pill,
+background, border, shadow, or pointer cursor; hover changes text emphasis and
+keyboard focus supplies a visible outline. Repeated disconnected-region labels
+retain the same restrained typography.
+
 Modular File cards and folder labels now use the same extracted context-menu
 portal as Network Explorer: pointer/keyboard opening, viewport bounding,
 Escape/outside dismissal, and focus restoration. File actions move one stable
@@ -1305,6 +1311,13 @@ these same cardinal segment crossings, and final attachments are recomputed
 after collision movement. Direct and Electronic consume the same handles;
 route style remains renderer-only. Directional Bands preserves its signed-rank
 attachment output byte-for-byte.
+
+The renderer derives a typed visible-structure marker for each unfiltered module
+after layout. Modules with only a currently visible File paint a transparent
+boundary, including the root; any visible Heading or Block paints the normal
+boundary. The module node, dimensions, coordinates, z-order, and eight handles
+remain present, so disclosure presentation cannot enter the worker request,
+layout/cache identity, endpoint attachments, or guide geometry.
 
 Secondary edges, hover, and Visual Groups remain geometry-neutral. HIER4B owns
 Soft Folder Clusters, HIER5 retains Electronic orthogonal routing, rounded
@@ -1344,7 +1357,9 @@ visible strips and Direct rendering without reopening HIER4A geometry. HIER4B
 is under real-vault graphical evaluation through the live Modular Preview;
 HIER4B-FIX3 adds empty-guide area targeting, composed File/current-folder menus,
 short accessible labels, and displayed-depth styling to FIX2 while retaining
-FIX1's cardinal File ports in that unmerged evaluation;
+FIX1's cardinal File ports. POLISH1 then hides empty painted module boundaries
+and makes folder labels visually passive without changing that unmerged
+evaluation's geometry or menu behavior;
 HIER5 follows HIER4B, and HIER3C follows HIER5.
 
 ## HIER0 product exposure and geometry

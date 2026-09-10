@@ -170,28 +170,29 @@
 .focus-schematic-folder-guide-controls__chip {
   display: grid;
   grid-template-columns: auto;
-  min-height: 1.65rem;
-  padding: 0.18rem 0.55rem;
-  border: 1px dashed rgb(55 109 132 / 58%);
-  border-radius: 999px;
+  min-height: 0;
+  padding: 0.12rem 0.18rem;
+  border: 0;
+  border-radius: 0;
   color: #214f61;
-  background: rgb(248 253 254 / 94%);
-  box-shadow: 0 0.25rem 0.7rem rgb(31 58 72 / 10%);
+  background: transparent;
+  box-shadow: none;
   font: inherit;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.03em;
-  cursor: pointer;
+  cursor: default;
+  text-align: left;
 }
 
 .focus-schematic-folder-guide-controls[data-folder-depth-style='2']
   .focus-schematic-folder-guide-controls__chip {
-  border-color: rgb(68 92 130 / 68%);
+  color: #445c7d;
 }
 
 .focus-schematic-folder-guide-controls[data-folder-depth-style='3+']
   .focus-schematic-folder-guide-controls__chip {
-  border-color: rgb(83 70 128 / 72%);
+  color: #55477c;
 }
 
 .focus-schematic-folder-guide-controls__name {
@@ -208,11 +209,18 @@
   line-height: 1.1;
 }
 
-.focus-schematic-folder-guide-controls__chip:hover,
+.focus-schematic-folder-guide-controls__chip:hover {
+  color: #173c4a;
+  text-decoration: underline;
+  text-decoration-color: rgb(36 94 116 / 45%);
+  text-underline-offset: 3px;
+}
+
 .focus-schematic-folder-guide-controls__chip:focus-visible {
-  border-style: solid;
-  outline: 2px solid rgb(36 94 116 / 28%);
-  outline-offset: 2px;
+  border-radius: 2px;
+  outline: 2px solid rgb(36 94 116 / 68%);
+  outline-offset: 3px;
+  text-decoration: none;
 }
 
 .focus-schematic-folder-guide-controls__context {
@@ -926,6 +934,13 @@
 .react-flow__node.is-highlighted .focus-module-boundary {
   border-color: rgba(36, 94, 116, 0.82);
   background: rgba(232, 243, 246, 0.72);
+}
+
+.focus-module-boundary--empty,
+.react-flow__node.is-highlighted .focus-module-boundary--empty {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 
 .focus-filtered-bridge {

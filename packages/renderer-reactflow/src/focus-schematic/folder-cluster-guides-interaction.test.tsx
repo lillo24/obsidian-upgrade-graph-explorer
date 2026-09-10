@@ -39,7 +39,7 @@ describe('nested Soft folder guide interaction', () => {
     container.remove();
   });
 
-  it('G7/C3-C4/C10-C11 keeps hull inert, shows hierarchy context, and opens one folder menu path', () => {
+  it('G7/C3-C4/C10-C11 keeps hull inert, presents a passive label, and opens one folder menu path', () => {
     const onContext = vi.fn();
     const displayTree = buildFocusSchematicSoftFolderDisplayTree({
       visibleFiles: [
@@ -80,6 +80,8 @@ describe('nested Soft folder guide interaction', () => {
     expect(child.textContent).toContain('Pragmatics');
     expect(child.textContent).toContain('Language');
     expect(child.title).toContain('Language/Pragmatics/');
+    expect(child.dataset.folderLabelPresentation).toBe('passive');
+    expect(child.tabIndex).toBe(0);
 
     act(() => child.focus());
     expect(document.querySelector('[role="status"]')?.textContent).toContain(
@@ -116,5 +118,14 @@ describe('nested Soft folder guide interaction', () => {
       ),
     );
     expect(onContext).toHaveBeenCalledTimes(2);
+    act(() =>
+      child.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          key: 'ContextMenu',
+        }),
+      ),
+    );
+    expect(onContext).toHaveBeenCalledTimes(3);
   });
 });

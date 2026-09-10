@@ -1,6 +1,6 @@
 # HIER4B validation
 
-Status: **HIER4B-FIX3 IMPLEMENTED — optimized graphical decision pending.**
+Status: **HIER4B-POLISH1 IMPLEMENTED — optimized graphical decision pending.**
 
 HIER4B evidence remains synthetic and development-only. Directional Folder
 Bands is the unchanged reference and default. No HIER4B adoption PR exists.
@@ -55,6 +55,14 @@ folder pointer/keyboard actions and inert hulls. L1–L8 cover short names, pare
 hints, accessible normalized keys, repeated island names, displayed depth
 updates, and the bounded `3+` style. Menu and hover state remain absent from
 layout policy/cache input.
+
+POLISH1 renderer tests cover File-only root and non-root boundaries, currently
+visible Heading and Block structure, collapsed-to-expanded boundary changes,
+unchanged worker geometry, retained hidden handles, passive primary-label CSS,
+quiet parent hints, matching repeated-region typography, keyboard focusability,
+focus-visible styling, and both Shift+F10 and ContextMenu-key entry. The existing
+HT, MC, FM, and L suites continue to cover empty guide-area targeting, deepest
+nested hits, label right-click, focus restoration, and split-region labels.
 
 ## Hierarchy-force bakeoff
 
@@ -114,3 +122,8 @@ The exact FIX3 prompt is archived at
 `history-implementations/HIER4B_FIX3_folder_area_context_labels_codex_prompt.md`.
 Its SHA-256 is
 `ED4E49B0AC25C252B246623740BF9E86D9D400DCD81C3453C52D88B8AE4956A9`.
+
+The exact POLISH1 prompt is archived at
+`history-implementations/HIER4B_POLISH1_empty_module_boundaries_passive_folder_labels_codex_prompt.md`.
+Its SHA-256 is
+`98F59BE92FB9CD6CF04057909692D802900AE2350F556751A723AD3436EA7620`.

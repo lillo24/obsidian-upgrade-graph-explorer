@@ -78,6 +78,7 @@ describe('nested Soft folder guides', () => {
       ['a1'],
       ['a2'],
     ]);
+    expect(a.map(({ label }) => label)).toEqual(['A', 'A']);
   });
 
   it('G5 grows deep nesting by fixed padding rather than exponentially', () => {

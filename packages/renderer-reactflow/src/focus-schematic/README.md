@@ -9,8 +9,8 @@ renderer-neutral result to validated React Flow data.
   diagnostics, and validates the complete prepared graph.
 - `focus-schematic.test.ts` covers exact File/Heading/Block geometry, fallback
   identity, filtered anonymity, diagnostic clearance, module-aware aggregate
-  hover, direct-ring predicates, provenance continuity, and secondary
-  zero-geometry influence.
+  hover, direct-ring predicates, visible-structure boundary presentation,
+  provenance continuity, and secondary zero-geometry influence.
 - `folder-band-strips.tsx` renders the Directional macro's exact horizontal
   world-space guides.
 - `folder-cluster-guides.tsx` builds child regions before parent regions from the
@@ -27,9 +27,18 @@ currently rendered reference edges. Classic mapping never receives these
 fields.
 
 Both guide shapes are pointer-inert viewport overlays behind edges and nodes.
-The Soft guide's small HTML label accepts pointer and keyboard input; empty-area
-context targeting is handled separately by world-space graph-pane hit testing.
-Guides are excluded from graph nodes, fitting, layout, and cache identity.
+The Soft guide's small HTML label uses passive text presentation while retaining
+keyboard focus, a focus-visible outline, and pointer/keyboard context-menu
+entry. Empty-area context targeting is handled separately by world-space
+graph-pane hit testing. Guides are excluded from graph nodes, fitting, layout,
+and cache identity.
+
+Module boundary visibility is also renderer-only. `index.ts` derives the typed
+`hasVisibleStructuralDescendants` marker from the module's currently visible
+Heading/Block projection nodes. `nodes.tsx` makes a File-only boundary
+transparent without removing its computed rectangle or attachment handles, so
+root status, collapsed authored structure, references, and rings cannot keep an
+empty boundary visible or perturb geometry.
 
 The package root does not re-export this subpath, keeping it outside Classic
 startup. Node/module geometry remains independent from future HIER4 folder

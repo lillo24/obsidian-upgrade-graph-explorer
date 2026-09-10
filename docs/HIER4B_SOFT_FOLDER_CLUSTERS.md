@@ -1,6 +1,6 @@
 # HIER4B Soft Folder Clusters
 
-Status: **UNDER EVALUATION — HIER4B-FIX3 implemented; optimized graphical QA pending.**
+Status: **UNDER EVALUATION — HIER4B-POLISH1 implemented; optimized graphical QA pending.**
 
 HIER4B evaluates a second macro-layout family for Modular Focus Hierarchy.
 Directional Folder Bands remains the Modular Preview default, and Classic Focus
@@ -84,6 +84,13 @@ CSS styling is capped at `3+`. Hover or keyboard focus still emphasizes the
 current folder, its displayed parent, and sibling folder guides without
 changing layout.
 
+POLISH1 presents the primary HTML label as plain text with a transparent
+background, no persistent border, pill, shadow, or pointer cursor. It remains a
+focusable button internally so Shift+F10, the ContextMenu key, right-click, and
+focus restoration keep the established menu behavior. Hover adds text emphasis
+only and keyboard focus gets a temporary visible outline. Repeated SVG labels
+use the same restrained text weight and size.
+
 ## Context menu
 
 FIX2 removes the former inline `↑ This group`, sibling, and Reset toolbar.
@@ -130,6 +137,12 @@ They use final relative geometry, participate in crossing scoring, and feed the
 same handles to Direct and Electronic rendering. Precise Heading/Block endpoint
 semantics are unchanged.
 
+POLISH1 also hides the painted module boundary whenever a module currently has
+only its File visible. A visible Heading or Block restores the boundary. Root
+Files follow the same rule, and revealable-but-collapsed structure does not
+count. The renderer keeps the module rectangle, handles, layout result, folder
+guide geometry, and cache identity unchanged.
+
 ## Ownership
 
 `packages/focus-schematic-layout/src/soft-folder-display.ts` owns validation,
@@ -150,4 +163,4 @@ QA.
 `HIER4B-SPACING` will evaluate wider use of the available canvas and less
 cramped module interiors after folder semantics are frozen. `MODULAR-CONTEXT1`
 will add Network-style Focus, Inspect, Hide File, and Hide Folder actions to the
-same composed menu model. Neither belongs to FIX3.
+same composed menu model. Neither belongs to POLISH1.
