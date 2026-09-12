@@ -1,7 +1,15 @@
 // @vitest-environment happy-dom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type Mock,
+} from 'vitest';
 
 import { validateObsidianDiagnosticReport } from '@icarus-graph-explorer/diagnostics-obsidian';
 import { createRuntimePerformanceRecorder } from '@icarus-graph-explorer/performance';
@@ -114,6 +122,7 @@ describe('GraphExplorer Named Saved Views integration', () => {
   let values: Map<string, string>;
   let writes: string[];
   let performance: ReturnType<typeof createRuntimePerformanceRecorder>;
+  let openArguments: Mock<(trigger: HTMLElement) => void>;
   const storage = {
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => {
@@ -136,6 +145,7 @@ describe('GraphExplorer Named Saved Views integration', () => {
       now: () => 0,
       markNextPaint: () => undefined,
     });
+    openArguments = vi.fn();
     captured.global = undefined;
     captured.local = undefined;
     captured.hierarchy = undefined;
@@ -184,6 +194,7 @@ describe('GraphExplorer Named Saved Views integration', () => {
           identityStability="stable"
           maximized={maximized}
           onMaximizedChange={() => undefined}
+          onOpenArguments={openArguments}
           performance={performance}
           snapshot={snapshot}
           storage={storage}
@@ -360,6 +371,47 @@ describe('GraphExplorer Named Saved Views integration', () => {
     expect(
       JSON.parse(values.get(savedViewStorageKey(snapshot.workspace.id))!).views,
     ).toHaveLength(2);
+  });
+
+  it.each([false, true])(
+    'opens Arguments from the shared toolbar without graph work in %s maximized mode',
+    async (maximized) => {
+      await mount(maximized);
+      const workspace = container.querySelector('.graph-workspace');
+      const before = performance.snapshot().operations;
+      if (maximized) await click('Tools');
+
+      await click('Arguments');
+
+      expect(openArguments).toHaveBeenCalledOnce();
+      expect(openArguments.mock.calls[0]?.[0]).toBeInstanceOf(
+        HTMLButtonElement,
+      );
+      expect(container.querySelector('.graph-workspace')).toBe(workspace);
+      const after = performance.snapshot().operations;
+      expect(after['global-projections']).toBe(before['global-projections']);
+      expect(after['global-layouts']).toBe(before['global-layouts']);
+      expect(after['local-projections']).toBe(before['local-projections']);
+      if (maximized) {
+        expect(
+          document.getElementById('graph-tools-panel')?.hasAttribute('hidden'),
+        ).toBe(true);
+      }
+    },
+  );
+
+  it('retains an unsaved Arrange Folders draft instead of opening Arguments', async () => {
+    await mount();
+    await act(() =>
+      captured.global!.folderArrangement?.onDraftDirtyChange?.(true),
+    );
+
+    await click('Arguments');
+
+    expect(openArguments).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain(
+      'Apply or cancel the current spatial rule changes before leaving Arrange Folders.',
+    );
   });
 
   it('avoids projection, layout, and viewport work for an exact semantic match', async () => {

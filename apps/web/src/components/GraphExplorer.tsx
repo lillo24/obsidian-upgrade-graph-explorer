@@ -382,6 +382,7 @@ export function GraphExplorer({
   maximized,
   networkStartupCapabilityDelayMs = 0,
   onMaximizedChange,
+  onOpenArguments,
   networkStartupTrace,
   performance,
   performanceUpdateKey,
@@ -397,6 +398,7 @@ export function GraphExplorer({
   /** QA-only delayed capability adoption; zero in ordinary production. */
   readonly networkStartupCapabilityDelayMs?: number;
   readonly onMaximizedChange: (maximized: boolean) => void;
+  readonly onOpenArguments?: (trigger: HTMLElement) => void;
   /** Explicit QA trace; absent from ordinary production sessions. */
   readonly networkStartupTrace?: NetworkStartupTrace;
   /** Optional memory-only KG12 instrumentation, enabled by the app boundary. */
@@ -3599,6 +3601,34 @@ export function GraphExplorer({
   const closeTools = useCallback(() => {
     dispatchWorkspaceOverlay({ type: 'close-tools' });
   }, []);
+  const openArguments = useCallback(
+    (event: ReactMouseEvent<HTMLButtonElement>) => {
+      if (retainDirtyFolderDraft()) return;
+      if (
+        temporaryFileMovePresentation !== 'idle' ||
+        keyboardFileMoveNodeId !== undefined
+      ) {
+        setNavigationAnnouncement(
+          'Finish or cancel the active File movement before opening Arguments.',
+        );
+        return;
+      }
+      if (networkEditingState.phase === 'editing') {
+        transitionNetworkEditing({ type: 'exit' });
+        dispatchFolderArrangementMode({ type: 'exit' });
+      }
+      dispatchWorkspaceOverlay({ type: 'close-all' });
+      onOpenArguments?.(event.currentTarget);
+    },
+    [
+      keyboardFileMoveNodeId,
+      networkEditingState.phase,
+      onOpenArguments,
+      retainDirtyFolderDraft,
+      temporaryFileMovePresentation,
+      transitionNetworkEditing,
+    ],
+  );
   const closeInspector = useCallback(() => {
     setInspectorOpen(false);
     queueMicrotask(() => {
@@ -4539,6 +4569,7 @@ export function GraphExplorer({
             aria-controls="graph-tools-panel"
             aria-expanded={activeOverlay === 'tools'}
             className="graph-tools-trigger"
+            id="graph-tools-trigger"
             onClick={toggleTools}
             type="button"
           >
@@ -4740,6 +4771,21 @@ export function GraphExplorer({
               savedFiltersWritable={savedFilterSession.writable}
               state={activeViewState}
             />
+            {onOpenArguments === undefined ? null : (
+              <div
+                aria-label="Argument workspace"
+                className="control-group"
+                role="group"
+              >
+                <button
+                  aria-haspopup="dialog"
+                  onClick={openArguments}
+                  type="button"
+                >
+                  Arguments
+                </button>
+              </div>
+            )}
             <VisualGroups
               {...(activeViewState.filters?.query === undefined
                 ? {}

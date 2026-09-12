@@ -19,6 +19,7 @@ import type {
   VaultSelection,
   WorkspaceIdentityRecovery,
 } from '@icarus-graph-explorer/source-provider-tauri';
+import type { ArgumentLibraryStore } from '@icarus-graph-explorer/argument-workspace';
 
 import './App.css';
 import { DeveloperSettingsSection } from './components/DeveloperSettingsSection';
@@ -27,6 +28,7 @@ import { DiagnosticEvidenceDialog } from './components/DiagnosticEvidenceDialog'
 import { GraphExplorer } from './components/GraphExplorer';
 import { SourceSettingsSection } from './components/SourceSettingsSection';
 import { WorkspaceNotice } from './components/WorkspaceNotice';
+import { ArgumentWorkspaceOwner } from './features/arguments/ArgumentsWorkspace';
 import {
   buildReferenceViews,
   filterReferenceViews,
@@ -75,9 +77,14 @@ function liveSourceStatus(snapshot: DesktopLiveVaultSnapshot): string {
 export interface AppProps {
   /** Tests may inject the native provider; ordinary browser mode detects lazily. */
   readonly desktopSourceProvider?: TauriSourceProvider;
+  /** Standalone/integration hosts may inject a disposable profile store. */
+  readonly argumentLibraryStore?: ArgumentLibraryStore;
 }
 
-export function App({ desktopSourceProvider }: AppProps = {}) {
+export function App({
+  argumentLibraryStore,
+  desktopSourceProvider,
+}: AppProps = {}) {
   const [report, setReport] = useState<ObsidianDiagnosticReport>(SAMPLE_REPORT);
   const [reportName, setReportName] = useState('Synthetic Sample');
   const [sourceSessionKey, setSourceSessionKey] = useState(0);
@@ -100,6 +107,9 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
   const [livePhase, setLivePhase] = useState<DesktopLiveVaultPhase>();
   const [vaultOpening, setVaultOpening] = useState(false);
   const [diagnosticEvidenceOpen, setDiagnosticEvidenceOpen] = useState(false);
+  const [argumentsOpen, setArgumentsOpen] = useState(false);
+  const [argumentsRestoreFocus, setArgumentsRestoreFocus] =
+    useState<HTMLElement>();
   const [statusFilter, setStatusFilter] = useState<ResolutionFilter>('all');
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
@@ -445,6 +455,11 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     () => setDiagnosticEvidenceOpen(false),
     [],
   );
+  const openArguments = useCallback((trigger: HTMLElement) => {
+    setArgumentsRestoreFocus(trigger);
+    setArgumentsOpen(true);
+  }, []);
+  const closeArguments = useCallback(() => setArgumentsOpen(false), []);
 
   const currentSourceStatus = vaultOpening
     ? 'Opening'
@@ -503,11 +518,12 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
           Icarus Graph Explorer
         </h1>
         <GraphExplorer
-          applicationOverlayOpen={diagnosticEvidenceOpen}
+          applicationOverlayOpen={diagnosticEvidenceOpen || argumentsOpen}
           initialViewport="fit"
           key={sourceSessionKey}
           maximized={graphMaximized}
           onMaximizedChange={setGraphMaximized}
+          onOpenArguments={openArguments}
           {...(browserNetworkStartupTrace === undefined
             ? {}
             : { networkStartupTrace: browserNetworkStartupTrace.trace })}
@@ -579,6 +595,16 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
           />
         </DiagnosticEvidenceDialog>
       ) : null}
+      <ArgumentWorkspaceOwner
+        onRequestClose={closeArguments}
+        open={argumentsOpen}
+        {...(argumentLibraryStore === undefined
+          ? {}
+          : { store: argumentLibraryStore })}
+        {...(argumentsRestoreFocus === undefined
+          ? {}
+          : { restoreFocus: argumentsRestoreFocus })}
+      />
     </div>
   );
 }

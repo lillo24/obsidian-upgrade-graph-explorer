@@ -530,6 +530,35 @@ export function detachAnsweringAxiom(
   );
 }
 
+/**
+ * Records an explicit human reassessment against the current revisions of every
+ * attached answering Axiom. Response prose and outcome remain unchanged.
+ */
+export function reassessCounterArgumentResponse(
+  library: ArgumentLibrary,
+  counterArgumentId: string,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  const axiomRevisions = new Map(
+    library.axioms.map((axiom) => [axiom.id, axiom.revision]),
+  );
+  return updateCounterArgument(
+    library,
+    counterArgumentId,
+    runtime,
+    (previous) => ({
+      ...previous,
+      response: {
+        ...previous.response,
+        answeringAxioms: previous.response.answeringAxioms.map((reference) => ({
+          ...reference,
+          reliedOnRevision: axiomRevisions.get(reference.axiomId)!,
+        })),
+      },
+    }),
+  );
+}
+
 export function setTopicMembership(
   library: ArgumentLibrary,
   topicId: string,

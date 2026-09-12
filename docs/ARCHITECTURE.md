@@ -178,6 +178,20 @@ adapter behind the Argument Workspace's narrow registered-reference reader; it
 must reuse authorized source infrastructure rather than introduce another vault
 scanner.
 
+`apps/web/src/features/arguments` is the outer application UI for that domain.
+`App.tsx` owns exactly one profile-level repository/session above the
+report-keyed `GraphExplorer`, so source switches and graph remounts do not reset
+the library or protected drafts. The feature composes pure core operations into
+one serialized commit per Save, replaces its UI reader only after persistence
+confirms the exact new snapshot, and keeps search/import/export/context state
+outside canonical data. Its platform store is chosen once: browser localStorage
+or the dedicated Tauri app-local adapter, with no cross-platform fallback.
+`GraphExplorer` owns only the normal/maximized Arguments launcher and graph-tool
+arbitration; opening the native modal never enters projection, layout, camera,
+selection, filter, history, or canvas identity. Source locators remain recorded,
+copyable, explicitly unverified data because no live provider is installed by
+this feature.
+
 `apps/web/src/desktop-live-vault.ts` is the non-React application orchestration
 boundary between that provider and the W1 processor. It owns one live runtime, watcher
 subscription, serialized operation queue, buffered bootstrap, paused/dirty

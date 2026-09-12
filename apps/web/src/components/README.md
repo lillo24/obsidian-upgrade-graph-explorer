@@ -64,6 +64,11 @@ canonical truth, or own a platform storage implementation.
   screens both side drawers may coexist; at the existing 900 px breakpoint the
   most recently opened drawer owns the overlay and the other closes without
   stealing focus.
+  The **Arguments** launcher is the sole integration with the application-level
+  Argument Workspace. It appears beside Filters/Groups in the normal toolbar
+  and inside maximized Tools, blocks opening while a movement or unsaved folder
+  arrangement is active, and otherwise closes transient toolbar chrome before
+  invoking the App-owned modal. It does not pass graph state into the library.
   In All Network it exposes `Arrange folder` for canonical folders including
   container-only folders, a root-folder fallback, and exact-root badges that
   summarize Pull/Place, scope, and strength. Exact-root rules can be edited or
@@ -303,9 +308,13 @@ canonical truth, or own a platform storage implementation.
 - `EvidencePanel.tsx` keeps diagnostics and non-canonical probes visibly separate.
 
 `App.tsx` owns source/live status, source-session switching, report identity
-provenance, maximized shell state, diagnostic-dialog state, and transient
-secondary diagnostic filters. Presentation-only Settings sections receive this
-state through a narrow composition seam. `desktop-live-vault.ts` owns non-React
+provenance, maximized shell state, diagnostic-dialog state, transient secondary
+diagnostic filters, and the single profile-level Arguments session/modal owner.
+The Arguments owner is outside the keyed `GraphExplorer`, preserving its draft
+and confirmed library across report/vault switches while the graph receives only
+open-state arbitration and a launcher callback. Presentation-only Settings
+sections receive app state through a narrow composition seam.
+`desktop-live-vault.ts` owns non-React
 serialized live transactions, pause/recovery, and watcher lifecycle.
 `graph-state.ts` owns pure KG6 interaction transitions and web-boundary
 normalization that keeps legacy entity-kind filters internally eligible for

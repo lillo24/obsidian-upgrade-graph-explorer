@@ -2,14 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { captureArgumentLibrarySnapshot } from './canonical';
 import {
-  attachAnsweringAxiom,
   createAxiom,
   createCounterArgument,
   createTopic,
-  detachAnsweringAxiom,
   editAxiom,
   editCounterArgument,
   editTopic,
+  reassessCounterArgumentResponse,
   responseStaleness,
   setRecordArchived,
   setRecordReviewState,
@@ -212,16 +211,9 @@ describe('Argument Library domain operations', () => {
       axiomIds: ['AX-NEUTRAL'],
     });
     expect(after.response.outcome).toBe(before.response.outcome);
-    const refreshed = detachAnsweringAxiom(
+    const reattached = reassessCounterArgumentResponse(
       library,
       after.id,
-      'AX-NEUTRAL',
-      runtime,
-    );
-    const reattached = attachAnsweringAxiom(
-      refreshed,
-      after.id,
-      'AX-NEUTRAL',
       runtime,
     );
     expect(
@@ -229,6 +221,16 @@ describe('Argument Library domain operations', () => {
     ).toEqual({
       stale: false,
       axiomIds: [],
+    });
+    expect(reattached.counterArguments[0]!.response).toMatchObject({
+      explanation: before.response.explanation,
+      outcome: before.response.outcome,
+      answeringAxioms: [
+        {
+          axiomId: 'AX-NEUTRAL',
+          reliedOnRevision: library.axioms[0]!.revision,
+        },
+      ],
     });
   });
 
