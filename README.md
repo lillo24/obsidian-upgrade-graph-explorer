@@ -210,7 +210,7 @@ Current architecture has:
 - no telemetry pipeline;
 - no Markdown write path.
 
-The repository also contains a headless, provider-neutral AI Review infrastructure package. It freezes explicitly supplied material, runs independent Negative and Positive analyses before a constrained Integrator, and supports optional read-only compiler checks. It currently uses injected/scripted providers only—there is no live model adapter, source-capture UI, or durable review history. See [`packages/ai-review`](packages/ai-review/README.md) and the [`AI Review / AI Compiler integration contract`](docs/AI_REVIEW_COMPILER_INTEGRATION.md).
+The repository also contains a headless, provider-neutral AI Review infrastructure package. It freezes explicitly supplied material, runs independent Negative and Positive analyses before a constrained Integrator, and supports optional read-only compiler checks. The desktop-only [`Git review-source adapter`](packages/review-source-tauri/README.md) can now prepare and capture authorized, pinned local commit evidence for that engine. Providers remain injected/scripted—there is no live model adapter, source-capture UI, or durable review history. See [`packages/ai-review`](packages/ai-review/README.md) and the [`AI Review / AI Compiler integration contract`](docs/AI_REVIEW_COMPILER_INTEGRATION.md).
 
 Workspace identity and saved graph state stay local to the application.
 

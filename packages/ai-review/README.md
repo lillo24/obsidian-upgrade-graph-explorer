@@ -78,7 +78,7 @@ Defaults are stored in every run and may be lowered or raised deliberately by th
 | Compiler calls per attempt |              12 |
 | Compiler result per call   |   262,144 bytes |
 
-No required content is silently truncated. Incomplete input requires `acceptIncomplete: true`. Captured Git inputs require exact retained source/diff text, base/head/commit IDs, and a count from 1 through 10; this package does not fetch Git.
+No required content is silently truncated. Incomplete input requires `acceptIncomplete: true`. Captured Git inputs require exact retained source/diff text, base/head/commit IDs, and a count from 1 through 10; this package does not fetch Git. Legitimate empty or whitespace-only source material is accepted, while a diff must remain non-empty. REVIEW2 captures may include a validated version-1 Git manifest whose first-parent ordering, parent/status/blob provenance, byte limits, and freshness survive prompts and exports.
 
 The fingerprint is deterministic FNV-1a-style identity for inspection/deduplication, not a cryptographic integrity or secrecy guarantee. It includes the frozen configuration and, when opened, the compiler snapshot descriptor. Raw source and exact rendered prompts remain in the run record.
 
@@ -101,7 +101,7 @@ pnpm check
 ## Deliberate limitations
 
 - No live Agents API/SDK adapter or credentials.
-- No Git/filesystem capture or full-vault extraction.
+- No Git/filesystem capture inside this package; the desktop-only outer adapter lives in [`../review-source-tauri`](../review-source-tauri/README.md).
 - In-memory storage only; JSON import cannot reconnect an unfinished remote session and marks it interrupted.
 - No compiler implementation, writes, embeddings, MCP server, or knowledge-library prepopulation.
 - No overlay, comparison tabs, rendered chat, or live Obsidian synchronization.

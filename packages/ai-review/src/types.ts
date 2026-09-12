@@ -48,6 +48,55 @@ export interface ReviewMaterial {
   provenance: SuppliedMaterialProvenance | GitMaterialProvenance;
 }
 
+export type GitCaptureChangeStatus =
+  'added' | 'modified' | 'deleted' | 'type-changed';
+
+export interface GitCaptureCommit {
+  commitId: string;
+  parentIds: string[];
+  firstParentId: string;
+}
+
+export interface GitCaptureFileChange {
+  commitId: string;
+  parentCommitId: string;
+  status: GitCaptureChangeStatus;
+  oldPath?: string;
+  newPath?: string;
+}
+
+export interface GitCaptureFile {
+  relativePath: string;
+  role: 'changed' | 'context';
+  availability: 'available' | 'deleted-at-head';
+  headBlob?: {
+    commitId: string;
+    objectId: string;
+    byteLength: number;
+  };
+  changes: GitCaptureFileChange[];
+}
+
+/** Retained Git acquisition facts; opaque IDs are evidence identity, not roots. */
+export interface GitCaptureManifest {
+  schemaVersion: 1;
+  preparationId: string;
+  historyPolicy: 'first-parent';
+  commitOrder: 'oldest-to-newest';
+  headAdvanced: boolean;
+  workingTreeWarning?: string;
+  baseCommitId: string;
+  headCommitId: string;
+  commits: GitCaptureCommit[];
+  files: GitCaptureFile[];
+  capturedByteCount: number;
+  limits: {
+    maxBlobBytes: number;
+    maxPatchBytes: number;
+    maxCaptureBytes: number;
+  };
+}
+
 interface ReviewSourceBase {
   selectedPaths: string[];
   materials: ReviewMaterial[];
@@ -67,6 +116,8 @@ export interface GitHistoryReviewSource extends ReviewSourceBase {
   headCommitId: string;
   commitIds: string[];
   commitCount: number;
+  /** Present for captures produced by the REVIEW2 desktop adapter. */
+  captureManifest?: GitCaptureManifest;
 }
 
 export type ReviewSource = SuppliedReviewSource | GitHistoryReviewSource;

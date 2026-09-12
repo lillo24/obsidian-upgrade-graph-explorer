@@ -1,6 +1,8 @@
 use tauri::Manager;
 use tauri_plugin_fs::FsExt;
 
+mod review_source;
+
 fn allow_private_state_scope<R: tauri::Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     let private_state_directory = app.path().app_local_data_dir()?;
     std::fs::create_dir_all(&private_state_directory)?;
@@ -29,12 +31,21 @@ fn allow_private_state_scope<R: tauri::Runtime>(app: &tauri::App<R>) -> tauri::R
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(review_source::ReviewSourceState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             allow_private_state_scope(app)?;
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![
+            review_source::open_review_source_session,
+            review_source::prepare_review_source_history,
+            review_source::list_review_source_files,
+            review_source::capture_review_source,
+            review_source::cancel_review_source_capture,
+            review_source::dispose_review_source_session,
+        ])
         .run(tauri::generate_context!())
         .expect("failed to run the Icarus Graph Explorer desktop shell");
 }
