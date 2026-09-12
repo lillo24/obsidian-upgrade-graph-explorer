@@ -15,4 +15,14 @@ export type {
   LocalRendererReady,
   LocalRendererSessionOptions,
 } from './local-session';
+export type {
+  NetworkStartupCameraState,
+  NetworkStartupExtent,
+  NetworkStartupNetworkState,
+  NetworkStartupNodeSample,
+  NetworkStartupRect,
+  NetworkStartupTrace,
+  NetworkStartupTraceEntry,
+  NetworkStartupTraceReason,
+} from './startup-trace';
 export * from './core';

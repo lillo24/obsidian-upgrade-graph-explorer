@@ -114,6 +114,11 @@ waits for its accepted layout. The session then replaces any provisional
 waits for that render, and reveals the surface. Subsequent geometry adoption is
 unchanged and camera-neutral. If user input supersedes startup Fit, raw viewport
 framing is preserved while the final normalization extent is still installed.
+An optional startup trace callback samples the shell rects, Sigma dimensions,
+camera, normalization extents, representative raw/screen node positions, and
+LOD through 500 ms after reveal. It is absent from ordinary sessions and exists
+only to let the web/native QA boundary prove that the one-shot transaction stays
+stable after it becomes visible.
 
 Network Fit and density framing are intentionally different camera actions. Fit
 rebases the current all-node extent and uses Sigma's ratio `1`; the shared 24 px
@@ -122,7 +127,10 @@ opportunistic. The density sliders retain their explicit anchor-preserving ratio
 preview and may omit peripheral nodes. Parent-issued Center/Fit commands are
 consumed once, and Global waits for the exact current layout plus Pull/Place
 generation before applying either. A queued fresh-source Fit yields to newer
-manual camera ownership. Two-finger pan converts wheel units to CSS pixels and
+manual camera ownership. When an initial semantic viewport already applies the
+same anchor and ratio as a pending Center request, the canvas consumes that
+one-shot request instead of replaying it after reveal. Two-finger pan converts
+wheel units to CSS pixels and
 uses only framed coordinates, so raw graph scale cannot amplify the gesture.
 The All and Focus canvases share renderer-local icon-only Zoom, Fit, and
 maximize/restore chrome; maximize state remains owned by the app shell and does

@@ -41,6 +41,10 @@ import type {
   DesktopLiveVaultSnapshot,
 } from './desktop-live-vault';
 import { browserPerformanceSession } from './performance';
+import {
+  browserNetworkStartupCapabilityDelayMs,
+  browserNetworkStartupTrace,
+} from './network-startup-trace';
 import { browserStorage, clearWorkspaceView } from './persistence/storage';
 
 const sampleValidation = validateObsidianDiagnosticReport(sampleReportJson);
@@ -504,6 +508,12 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
           key={sourceSessionKey}
           maximized={graphMaximized}
           onMaximizedChange={setGraphMaximized}
+          {...(browserNetworkStartupTrace === undefined
+            ? {}
+            : { networkStartupTrace: browserNetworkStartupTrace.trace })}
+          networkStartupCapabilityDelayMs={
+            browserNetworkStartupCapabilityDelayMs
+          }
           {...(performanceSession === undefined
             ? {}
             : { performance: performanceSession.instrumentation })}
