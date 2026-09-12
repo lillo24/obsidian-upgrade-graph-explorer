@@ -12,8 +12,11 @@ import type { LocalLayoutMode } from '@icarus-graph-explorer/view-state';
 import {
   DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
   isFocusSchematicEndpointOrderPolicy,
+  isFocusSchematicProductMacroLayout,
   isFocusSchematicProductInternalLayoutVariant,
+  normalizeFocusSchematicSoftFolderStrength,
   type FocusSchematicEndpointOrderPolicy,
+  type FocusSchematicProductMacroLayout,
   type FocusSchematicProductInternalLayoutVariant,
 } from '@icarus-graph-explorer/focus-schematic-layout/policies';
 
@@ -34,7 +37,11 @@ export interface GraphPreferences {
   readonly modularFocusInternalLayout: FocusSchematicProductInternalLayoutVariant;
   /** Modular Preview visual Heading/Block ordering policy. */
   readonly modularFocusHeadingOrder: FocusSchematicEndpointOrderPolicy;
-  /** Modular Preview overlay only; never enters model, worker, or cache input. */
+  /** Modular Preview macro-layout policy; Directional Bands remains default. */
+  readonly modularFocusMacroLayout: FocusSchematicProductMacroLayout;
+  /** Experimental Soft Folder Clusters strength, normalized to [0, 100]. */
+  readonly modularFocusSoftFolderStrength: number;
+  /** Historical storage key for both macro-specific Folder guide overlays. */
   readonly modularFolderStripsVisible: boolean;
   /** Modular Preview edge drawing only; omitted from the Classic renderer. */
   readonly modularConnectionStyle: GraphEdgePathStyle;
@@ -52,6 +59,10 @@ export const DEFAULT_GRAPH_PREFERENCES: GraphPreferences = {
     DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.internalLayoutVariant,
   modularFocusHeadingOrder:
     DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.endpointOrderPolicy,
+  modularFocusMacroLayout:
+    DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.macroLayout,
+  modularFocusSoftFolderStrength:
+    DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softFolderStrength,
   modularFolderStripsVisible: true,
   modularConnectionStyle: 'direct',
   showExperimentalAllHierarchy: false,
@@ -97,6 +108,12 @@ function defaultLoadResult(
   return { preferences: DEFAULT_GRAPH_PREFERENCES, warning };
 }
 
+export function normalizeModularFocusSoftFolderStrength(
+  value: unknown,
+): number {
+  return normalizeFocusSchematicSoftFolderStrength(value);
+}
+
 export function loadGraphPreferences(
   storage: StorageLike | undefined,
 ): GraphPreferencesLoadResult {
@@ -122,6 +139,8 @@ export function loadGraphPreferences(
         readonly localLayoutMode?: unknown;
         readonly modularFocusInternalLayout?: unknown;
         readonly modularFocusHeadingOrder?: unknown;
+        readonly modularFocusMacroLayout?: unknown;
+        readonly modularFocusSoftFolderStrength?: unknown;
         readonly modularFolderStripsVisible?: unknown;
         readonly modularConnectionStyle?: unknown;
         readonly showExperimentalAllHierarchy?: unknown;
@@ -164,6 +183,15 @@ export function loadGraphPreferences(
           )
             ? stored.modularFocusHeadingOrder
             : DEFAULT_GRAPH_PREFERENCES.modularFocusHeadingOrder,
+          modularFocusMacroLayout: isFocusSchematicProductMacroLayout(
+            stored.modularFocusMacroLayout,
+          )
+            ? stored.modularFocusMacroLayout
+            : DEFAULT_GRAPH_PREFERENCES.modularFocusMacroLayout,
+          modularFocusSoftFolderStrength:
+            normalizeModularFocusSoftFolderStrength(
+              stored.modularFocusSoftFolderStrength,
+            ),
           modularFolderStripsVisible:
             typeof stored.modularFolderStripsVisible === 'boolean'
               ? stored.modularFolderStripsVisible

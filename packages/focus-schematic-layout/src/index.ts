@@ -1,5 +1,6 @@
 export * from './types';
 export * from './policies';
+export * from './soft-folder-display';
 export {
   FILTERED_MODULE_DIMENSIONS,
   FOCUS_SCHEMATIC_LAYOUT_CLEARANCE,
@@ -48,7 +49,6 @@ export {
   type FocusSchematicInternalLayoutRunStats,
 } from './internal-layout-variants';
 export {
-  createFocusSchematicEndpointAttachments,
   computeFocusSchematicComputedLayout,
   computeFocusSchematicComputedLayoutAttempt,
   computeFocusSchematicRevision2LayoutAttempt,
@@ -56,6 +56,13 @@ export {
   FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION,
   validateFocusSchematicComputedLayout,
 } from './endpoint-facing';
+export {
+  createFocusSchematicEndpointAttachments,
+  focusSchematicSpatialCardinalSide,
+  measureFocusSchematicAttachmentCrossings,
+  measureFocusSchematicCandidateAttachmentCrossings,
+  type FocusSchematicEndpointAttachmentPolicy,
+} from './attachments';
 export {
   applyFocusSchematicFolderBands,
   evaluateFocusSchematicFolderBandQuality,
@@ -70,6 +77,12 @@ export {
   type FocusSchematicFolderBandTimings,
 } from './folder-bands';
 export {
+  computeFocusSchematicSoftClusterLayout,
+  computeFocusSchematicSoftClusterLayoutAttempt,
+  FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION,
+  FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE,
+} from './soft-clusters';
+export {
   buildEndpointFixture,
   CENTER_SPINE_FIXTURES,
   ENDPOINT_FIXTURES,
@@ -77,6 +90,13 @@ export {
   type EndpointFixtureSpec,
   type EndpointStabilityPair,
 } from './endpoint-fixtures';
+export {
+  SOFT_CLUSTER_FIXTURES,
+  SOFT_CLUSTER_STABILITY_PAIRS,
+  createSoftClusterHubFixture,
+  createSoftClusterMultiplicityFixture,
+  type SoftClusterStabilityPair,
+} from './soft-cluster-fixtures';
 export {
   DIRECTIONAL_FOLDER_BAND_FIXTURES,
   FOLDER_FIXTURES,

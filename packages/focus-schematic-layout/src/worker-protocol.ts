@@ -3,16 +3,20 @@ import { validateFocusSchematicLayoutInput } from './input';
 import {
   focusSchematicLayoutMatchesProductPolicies,
   isFocusSchematicEndpointOrderPolicy,
+  isFocusSchematicProductMacroLayout,
   isFocusSchematicProductInternalLayoutVariant,
+  normalizeFocusSchematicSoftFolderDisplayIntent,
+  normalizeFocusSchematicSoftFolderStrength,
   type FocusSchematicProductLayoutPolicies,
 } from './policies';
 import type {
   FocusSchematicComputedLayout,
   FocusSchematicEndpointLayoutPhaseTimings,
   FocusSchematicLayoutInput,
+  FocusSchematicSoftClusterEvidence,
 } from './types';
 
-export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 3 as const;
+export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 6 as const;
 
 export interface FocusSchematicLayoutWorkerRequest {
   readonly protocolVersion: typeof FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION;
@@ -31,6 +35,7 @@ export type FocusSchematicLayoutWorkerResponse =
       readonly requestId: number;
       readonly kind: 'success';
       readonly result: FocusSchematicComputedLayout;
+      readonly softClusterEvidence: FocusSchematicSoftClusterEvidence | null;
       readonly timings: FocusSchematicEndpointLayoutPhaseTimings;
       readonly computeMs: number;
     }
@@ -92,6 +97,144 @@ function finiteNonNegative(value: unknown, label: string): number {
   return value;
 }
 
+function finiteNumber(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value))
+    throw new FocusSchematicLayoutProtocolError(
+      `${label} must be a finite number.`,
+    );
+  return value;
+}
+
+function validateSoftClusterEvidence(
+  value: unknown,
+  policies: FocusSchematicProductLayoutPolicies,
+): FocusSchematicSoftClusterEvidence | null {
+  if (policies.macroLayout === 'directional-bands') {
+    if (value !== null)
+      throw new FocusSchematicLayoutProtocolError(
+        'Directional layout responses cannot include Soft Cluster evidence.',
+      );
+    return null;
+  }
+  const evidence = record(value, 'Soft Cluster evidence');
+  exactKeys(
+    evidence,
+    [
+      'schemaVersion',
+      'developmentOnly',
+      'layoutFamily',
+      'strength',
+      'endpointOrderPolicy',
+      'fileParentOverrideCount',
+      'flattenedFolderCount',
+      'displayedFolderCount',
+      'automaticallyCompressedFolderCount',
+      'maximumDisplayedDepth',
+      'hierarchyForcePolicy',
+      'maximumPerFileFolderWeight',
+      'fileAttachmentPolicy',
+      'folderInfluenceEnabled',
+      'topologyDirectionality',
+      'secondaryGeometryInfluence',
+      'fixedIterationSchedule',
+      'metrics',
+      'runtime',
+    ],
+    'Soft Cluster evidence',
+  );
+  if (
+    evidence.schemaVersion !== 2 ||
+    evidence.developmentOnly !== true ||
+    evidence.layoutFamily !== 'soft-folder-clusters' ||
+    evidence.strength !==
+      normalizeFocusSchematicSoftFolderStrength(policies.softFolderStrength) ||
+    evidence.endpointOrderPolicy !== policies.endpointOrderPolicy ||
+    !Number.isSafeInteger(evidence.fileParentOverrideCount) ||
+    Number(evidence.fileParentOverrideCount) < 0 ||
+    !Number.isSafeInteger(evidence.flattenedFolderCount) ||
+    Number(evidence.flattenedFolderCount) < 0 ||
+    !Number.isSafeInteger(evidence.displayedFolderCount) ||
+    Number(evidence.displayedFolderCount) < 0 ||
+    !Number.isSafeInteger(evidence.automaticallyCompressedFolderCount) ||
+    Number(evidence.automaticallyCompressedFolderCount) < 0 ||
+    !Number.isSafeInteger(evidence.maximumDisplayedDepth) ||
+    Number(evidence.maximumDisplayedDepth) < 0 ||
+    evidence.hierarchyForcePolicy !== 'normalized-decay' ||
+    finiteNonNegative(
+      evidence.maximumPerFileFolderWeight,
+      'maximumPerFileFolderWeight',
+    ) > 1 ||
+    evidence.fileAttachmentPolicy !== 'spatial-cardinal' ||
+    evidence.folderInfluenceEnabled !== Number(evidence.strength) > 0 ||
+    evidence.topologyDirectionality !== 'undirected-primary' ||
+    evidence.secondaryGeometryInfluence !== 0 ||
+    !Array.isArray(evidence.fixedIterationSchedule) ||
+    evidence.fixedIterationSchedule.length !== 2 ||
+    evidence.fixedIterationSchedule[0] !== 36 ||
+    evidence.fixedIterationSchedule[1] !== 18
+  )
+    throw new FocusSchematicLayoutProtocolError(
+      'Soft Cluster evidence does not match the requested policy.',
+    );
+  const metrics = record(evidence.metrics, 'Soft Cluster metrics');
+  exactKeys(
+    metrics,
+    [
+      'repeatedFolderCount',
+      'repeatedFolderModuleCount',
+      'repeatedFolderRmsRadiusMean',
+      'repeatedFolderRmsRadiusMedian',
+      'repeatedFolderRmsRadiusP95',
+      'childFolderCoherenceMean',
+      'parentFolderCoherenceMean',
+      'connectedPairCount',
+      'connectedPairDistanceMean',
+      'connectedPairDistanceP95',
+      'exactPrimaryEndpointSpanMean',
+      'exactPrimaryEndpointSpanP95',
+      'exactEndpointCrossingCount',
+      'hopMeanAbsoluteRadiusError',
+      'hopRadiusCorrelation',
+      'boundsWidth',
+      'boundsHeight',
+      'boundsArea',
+      'overlapCount',
+      'minimumModuleGap',
+    ],
+    'Soft Cluster metrics',
+  );
+  for (const [key, metric] of Object.entries(metrics))
+    if (metric !== null) finiteNumber(metric, `Soft Cluster metrics.${key}`);
+  const runtime = record(evidence.runtime, 'Soft Cluster runtime');
+  exactKeys(
+    runtime,
+    [
+      'moduleCount',
+      'primaryPairCount',
+      'repeatedFolderCount',
+      'iterationCount',
+      'jointRoundCount',
+      'compassAssignmentCount',
+      'compassBranchRegionChurn',
+      'collisionCheckCount',
+      'collisionCorrectionCount',
+      'layoutMs',
+    ],
+    'Soft Cluster runtime',
+  );
+  for (const [key, metric] of Object.entries(runtime))
+    finiteNonNegative(metric, `Soft Cluster runtime.${key}`);
+  if (
+    metrics.overlapCount !== 0 ||
+    runtime.iterationCount !== 54 ||
+    runtime.jointRoundCount !== 2
+  )
+    throw new FocusSchematicLayoutProtocolError(
+      'Soft Cluster bounded-runtime or collision evidence is invalid.',
+    );
+  return value as FocusSchematicSoftClusterEvidence;
+}
+
 export function validateFocusSchematicLayoutWorkerRequest(
   value: unknown,
 ): FocusSchematicLayoutWorkerRequest {
@@ -122,16 +265,22 @@ export function validateFocusSchematicLayoutWorkerRequest(
         .join('; ')}`,
     );
   }
-  if (!validation.value.settings.directionalFolderBandsEnabled)
-    throw new FocusSchematicLayoutProtocolError(
-      'Production Focus Schematic worker requests require Directional Folder Bands.',
-    );
   const policies = record(candidate.policies, 'Focus Schematic policies');
   exactKeys(
     policies,
-    ['endpointOrderPolicy', 'internalLayoutVariant'],
+    [
+      'macroLayout',
+      'softFolderStrength',
+      'softFolderDisplayIntent',
+      'endpointOrderPolicy',
+      'internalLayoutVariant',
+    ],
     'Focus Schematic policies',
   );
+  if (!isFocusSchematicProductMacroLayout(policies.macroLayout))
+    throw new FocusSchematicLayoutProtocolError(
+      'Focus Schematic macro-layout policy is invalid.',
+    );
   if (!isFocusSchematicEndpointOrderPolicy(policies.endpointOrderPolicy))
     throw new FocusSchematicLayoutProtocolError(
       'Focus Schematic endpoint order policy is invalid.',
@@ -144,12 +293,34 @@ export function validateFocusSchematicLayoutWorkerRequest(
     throw new FocusSchematicLayoutProtocolError(
       'Focus Schematic internal layout policy is invalid.',
     );
+  const directional = policies.macroLayout === 'directional-bands';
+  if (validation.value.settings.directionalFolderBandsEnabled !== directional)
+    throw new FocusSchematicLayoutProtocolError(
+      'Focus Schematic macro-layout policy does not match the layout input settings.',
+    );
+  let softFolderDisplayIntent;
+  try {
+    softFolderDisplayIntent = normalizeFocusSchematicSoftFolderDisplayIntent(
+      policies.softFolderDisplayIntent,
+    );
+  } catch (error: unknown) {
+    throw new FocusSchematicLayoutProtocolError(
+      `Focus Schematic Soft folder display policy is invalid: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
   return {
     protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
     requestId: id,
     kind: 'layout',
     input: validation.value,
     policies: {
+      macroLayout: policies.macroLayout,
+      softFolderStrength: normalizeFocusSchematicSoftFolderStrength(
+        policies.softFolderStrength,
+      ),
+      softFolderDisplayIntent: directional
+        ? { fileParentOverrides: [], flattenedFolderKeys: [] }
+        : softFolderDisplayIntent,
       endpointOrderPolicy: policies.endpointOrderPolicy,
       internalLayoutVariant: policies.internalLayoutVariant,
     },
@@ -183,6 +354,7 @@ export function validateFocusSchematicLayoutWorkerResponse(
         'requestId',
         'kind',
         'result',
+        'softClusterEvidence',
         'timings',
         'computeMs',
       ],
@@ -204,6 +376,7 @@ export function validateFocusSchematicLayoutWorkerResponse(
       throw new FocusSchematicLayoutProtocolError(
         'Computed layout does not match the requested product policies.',
       );
+    validateSoftClusterEvidence(candidate.softClusterEvidence, policies);
     // Phase timings are part of the attempt API. JSON cloning plus this exact
     // finite-number check prevents partial or embellished timing payloads.
     const timings = record(candidate.timings, 'Focus Schematic timings');

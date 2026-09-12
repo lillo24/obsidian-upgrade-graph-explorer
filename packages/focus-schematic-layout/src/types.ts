@@ -74,6 +74,8 @@ export interface FocusSchematicInternalLayoutEvidence {
   readonly largeModuleFallbackCount: number;
   readonly moduleMetrics: readonly FocusSchematicInternalLayoutModuleMetrics[];
   readonly metrics: FocusSchematicInternalLayoutQualityMetrics;
+  /** Deterministic policy identity for the experimental HIER4B macro layout. */
+  readonly softClusterPolicyEvidence?: FocusSchematicSoftClusterPolicyEvidence;
 }
 
 export interface FocusSchematicNodeDimension {
@@ -261,6 +263,153 @@ export interface FocusSchematicComputedLayoutOptions {
   /** Internal layout; Current is retained only for lab comparison evidence. */
   readonly internalLayoutVariant?: FocusSchematicInternalLayoutVariant;
 }
+
+/** Normalized development-only HIER4B macro-layout strength in [0, 100]. */
+export type FocusSchematicSoftClusterStrength = number;
+
+export interface FocusSchematicSoftFileDisplayParentOverride {
+  /** Stable canonical document identity, never a projection node id. */
+  readonly fileId: EntityId;
+  readonly displayParentFolderKey: WorkspaceFolderKey;
+}
+
+/** Sparse workspace intent. Automatic singleton compression is derived. */
+export interface FocusSchematicSoftFolderDisplayIntent {
+  readonly fileParentOverrides: readonly FocusSchematicSoftFileDisplayParentOverride[];
+  readonly flattenedFolderKeys: readonly WorkspaceFolderKey[];
+}
+
+export type FocusSchematicSoftFolderPlacementProvenance =
+  | 'exact'
+  | 'manual-file-promotion'
+  | 'manual-folder-flatten'
+  | 'automatic-singleton-compression';
+
+export interface FocusSchematicSoftFolderDisplayFile {
+  readonly fileId: EntityId;
+  readonly exactFolderKey: WorkspaceFolderKey;
+  readonly displayParentFolderKey: WorkspaceFolderKey;
+  readonly manualDisplayParentFolderKey: WorkspaceFolderKey;
+  readonly suppressedAncestorFolderKeys: readonly WorkspaceFolderKey[];
+  readonly provenance: readonly FocusSchematicSoftFolderPlacementProvenance[];
+}
+
+export interface FocusSchematicSoftFolderDisplayNode {
+  readonly folderKey: WorkspaceFolderKey;
+  readonly displayParentFolderKey: WorkspaceFolderKey | null;
+  /** Root is 0; each visible displayed folder layer increments depth by one. */
+  readonly displayDepth: number;
+  readonly directFileIds: readonly EntityId[];
+  readonly childFolderKeys: readonly WorkspaceFolderKey[];
+  readonly descendantFileIds: readonly EntityId[];
+  readonly suppressedAncestorFolderKeys: readonly WorkspaceFolderKey[];
+  readonly provenance: readonly FocusSchematicSoftFolderPlacementProvenance[];
+}
+
+export interface FocusSchematicSoftFolderDisplayTree {
+  readonly rootFolderKey: '.';
+  readonly folders: readonly FocusSchematicSoftFolderDisplayNode[];
+  readonly files: readonly FocusSchematicSoftFolderDisplayFile[];
+  readonly reconciledIntent: FocusSchematicSoftFolderDisplayIntent;
+  readonly automaticallyCompressedFolderKeys: readonly WorkspaceFolderKey[];
+}
+
+export type FocusSchematicSoftHierarchyForcePolicy =
+  'nearest-only' | 'normalized-decay' | 'normalized-equal';
+
+export interface FocusSchematicSoftClusterPolicyEvidence {
+  readonly schemaVersion: 2;
+  readonly layoutFamily: 'soft-folder-clusters';
+  readonly strength: FocusSchematicSoftClusterStrength;
+  readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
+  readonly displayIntent: FocusSchematicSoftFolderDisplayIntent;
+  readonly hierarchyForcePolicy: FocusSchematicSoftHierarchyForcePolicy;
+  readonly fileAttachmentPolicy: 'spatial-cardinal';
+}
+
+export interface FocusSchematicSoftClusterOptions {
+  readonly strength?: FocusSchematicSoftClusterStrength;
+  readonly endpointOrderPolicy?: FocusSchematicEndpointOrderPolicy;
+  readonly displayIntent?: FocusSchematicSoftFolderDisplayIntent;
+  /** Development-benchmark comparator; production uses normalized-decay. */
+  readonly hierarchyForcePolicy?: FocusSchematicSoftHierarchyForcePolicy;
+  /** Development-lab comparator; Adaptive Compass is the HIER4B default. */
+  readonly internalLayoutVariant?: 'adaptive-compass' | 'vertical-spine';
+}
+
+export interface FocusSchematicSoftClusterMetrics {
+  readonly repeatedFolderCount: number;
+  readonly repeatedFolderModuleCount: number;
+  readonly repeatedFolderRmsRadiusMean: number | null;
+  readonly repeatedFolderRmsRadiusMedian: number | null;
+  readonly repeatedFolderRmsRadiusP95: number | null;
+  readonly childFolderCoherenceMean: number | null;
+  readonly parentFolderCoherenceMean: number | null;
+  readonly connectedPairCount: number;
+  readonly connectedPairDistanceMean: number | null;
+  readonly connectedPairDistanceP95: number | null;
+  readonly exactPrimaryEndpointSpanMean: number | null;
+  readonly exactPrimaryEndpointSpanP95: number | null;
+  readonly exactEndpointCrossingCount: number;
+  readonly hopMeanAbsoluteRadiusError: number | null;
+  readonly hopRadiusCorrelation: number | null;
+  readonly boundsWidth: number;
+  readonly boundsHeight: number;
+  readonly boundsArea: number;
+  readonly overlapCount: number;
+  readonly minimumModuleGap: number | null;
+}
+
+export interface FocusSchematicSoftClusterRuntimeEvidence {
+  readonly moduleCount: number;
+  readonly primaryPairCount: number;
+  readonly repeatedFolderCount: number;
+  readonly iterationCount: 54;
+  readonly jointRoundCount: 2;
+  readonly compassAssignmentCount: number;
+  readonly compassBranchRegionChurn: number;
+  readonly collisionCheckCount: number;
+  readonly collisionCorrectionCount: number;
+  readonly layoutMs: number;
+}
+
+export interface FocusSchematicSoftClusterEvidence {
+  readonly schemaVersion: 2;
+  readonly developmentOnly: true;
+  readonly layoutFamily: 'soft-folder-clusters';
+  readonly strength: FocusSchematicSoftClusterStrength;
+  readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
+  readonly fileParentOverrideCount: number;
+  readonly flattenedFolderCount: number;
+  readonly displayedFolderCount: number;
+  readonly automaticallyCompressedFolderCount: number;
+  readonly maximumDisplayedDepth: number;
+  readonly hierarchyForcePolicy: FocusSchematicSoftHierarchyForcePolicy;
+  readonly maximumPerFileFolderWeight: number;
+  readonly fileAttachmentPolicy: 'spatial-cardinal';
+  readonly folderInfluenceEnabled: boolean;
+  readonly topologyDirectionality: 'undirected-primary';
+  readonly secondaryGeometryInfluence: 0;
+  readonly fixedIterationSchedule: readonly [36, 18];
+  readonly metrics: FocusSchematicSoftClusterMetrics;
+  readonly runtime: FocusSchematicSoftClusterRuntimeEvidence;
+}
+
+export type FocusSchematicSoftClusterLayoutAttempt =
+  | {
+      readonly status: 'success';
+      readonly strategyId: 'HIER4B-soft-folder-clusters';
+      readonly configId: string;
+      readonly result: FocusSchematicComputedLayout;
+      readonly evidence: FocusSchematicSoftClusterEvidence;
+      readonly timings: FocusSchematicEndpointLayoutPhaseTimings;
+    }
+  | {
+      readonly status: 'failure';
+      readonly strategyId: 'HIER4B-soft-folder-clusters';
+      readonly configId: string;
+      readonly reason: string;
+    };
 
 export interface FocusSchematicLayoutPlanModule {
   readonly moduleId: EntityId;

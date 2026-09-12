@@ -63,6 +63,13 @@ Synthetic module/bridge elements have no canonical identity, and a fallback edge
 has no fabricated projection-edge identity. Secondary relationships change edges
 only and cannot change node coordinates.
 
+The Focus mapper also marks whether each module currently contains a visible
+Heading or Block. The renderer paints a module boundary only when that marker is
+true; a File-only module retains the same React Flow rectangle, z-order, and
+eight attachment handles with a transparent boundary. The marker is derived
+after worker layout from visible HIER1 membership and is absent from layout and
+cache identity.
+
 Prepared modular entity data includes exact module ownership and a hover policy.
 File hover aggregates the module boundary/entities, displayed module reference
 edges, their opposite endpoints, and internal hierarchy edges. Heading, Block,

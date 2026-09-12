@@ -713,6 +713,10 @@ h2 {
   background: #f9fbfc;
 }
 
+.graph-settings__choice-group > .global-layout-strength {
+  display: grid;
+}
+
 .global-layout-strength > span,
 .global-layout-strength > small {
   display: flex;
@@ -1435,6 +1439,14 @@ h2 {
   margin-top: 0.25rem;
   font-size: 0.7rem;
   line-height: 1.4;
+}
+
+.network-explorer-menu__separator {
+  height: 0;
+  margin: 0.4rem 0.25rem;
+  border: 0;
+  border-top: 2px solid #7f9aa7;
+  pointer-events: none;
 }
 
 .network-explorer-menu--editor {

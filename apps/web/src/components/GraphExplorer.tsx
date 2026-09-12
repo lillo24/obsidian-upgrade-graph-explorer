@@ -156,6 +156,7 @@ import {
 } from '../persistence/storage';
 import {
   loadGraphPreferences,
+  normalizeModularFocusSoftFolderStrength,
   saveGraphPreferences,
   type FocusHierarchyImplementation,
   type GraphPreferences,
@@ -168,6 +169,7 @@ import {
 import { deriveProjectionVisualGroupPresentationMap } from '../visual-groups/presentation';
 import { usePresentationOverrides } from '../presentation-overrides/use-presentation-overrides';
 import { useSpatialOverrides } from '../spatial-overrides/use-spatial-overrides';
+import { useSoftFolderDisplay } from '../soft-folder-display/use-soft-folder-display';
 import {
   folderArrangementActive,
   folderArrangementActiveFolder,
@@ -512,6 +514,8 @@ export function GraphExplorer({
     localLayoutMode,
     modularFocusHeadingOrder,
     modularFocusInternalLayout,
+    modularFocusMacroLayout,
+    modularFocusSoftFolderStrength,
     modularFolderStripsVisible,
     modularConnectionStyle,
     trackpadZoomMode,
@@ -625,6 +629,30 @@ export function GraphExplorer({
   });
   const spatialOverrides = useSpatialOverrides({
     workspaceId,
+    eligibility,
+    storage: persistenceStorage,
+  });
+  const workspaceSoftFolderFiles = useMemo(
+    () =>
+      snapshot.entities
+        .flatMap((entity) =>
+          entity.kind === 'document'
+            ? [
+                {
+                  fileId: entity.id,
+                  exactFolderKey: workspaceFolderKeyFromPath(
+                    entity.source.path,
+                  ),
+                },
+              ]
+            : [],
+        )
+        .sort((left, right) => left.fileId.localeCompare(right.fileId)),
+    [snapshot.entities],
+  );
+  const softFolderDisplay = useSoftFolderDisplay({
+    workspaceId,
+    workspaceFiles: workspaceSoftFolderFiles,
     eligibility,
     storage: persistenceStorage,
   });
@@ -3117,6 +3145,21 @@ export function GraphExplorer({
     },
     [updateGraphPreferences],
   );
+  const changeModularFocusMacroLayout = useCallback(
+    (layout: GraphPreferences['modularFocusMacroLayout']) => {
+      updateGraphPreferences({ modularFocusMacroLayout: layout });
+    },
+    [updateGraphPreferences],
+  );
+  const changeModularFocusSoftFolderStrength = useCallback(
+    (strength: number) => {
+      updateGraphPreferences({
+        modularFocusSoftFolderStrength:
+          normalizeModularFocusSoftFolderStrength(strength),
+      });
+    },
+    [updateGraphPreferences],
+  );
   const changeModularFolderStripsVisible = useCallback(
     (visible: GraphPreferences['modularFolderStripsVisible']) => {
       updateGraphPreferences({ modularFolderStripsVisible: visible });
@@ -4206,6 +4249,8 @@ export function GraphExplorer({
             focusHierarchyImplementation={focusHierarchyImplementation}
             modularFocusHeadingOrder={modularFocusHeadingOrder}
             modularFocusInternalLayout={modularFocusInternalLayout}
+            modularFocusMacroLayout={modularFocusMacroLayout}
+            modularFocusSoftFolderStrength={modularFocusSoftFolderStrength}
             modularFolderStripsVisible={modularFolderStripsVisible}
             modularConnectionStyle={modularConnectionStyle}
             showExperimentalAllHierarchy={showExperimentalAllHierarchy}
@@ -4227,6 +4272,10 @@ export function GraphExplorer({
             onModularFocusHeadingOrderChange={changeModularFocusHeadingOrder}
             onModularFocusInternalLayoutChange={
               changeModularFocusInternalLayout
+            }
+            onModularFocusMacroLayoutChange={changeModularFocusMacroLayout}
+            onModularFocusSoftFolderStrengthChange={
+              changeModularFocusSoftFolderStrength
             }
             onModularFolderStripsVisibleChange={
               changeModularFolderStripsVisible
@@ -4466,6 +4515,10 @@ export function GraphExplorer({
                   focusHierarchyImplementation={focusHierarchyImplementation}
                   modularFocusHeadingOrder={modularFocusHeadingOrder}
                   modularFocusInternalLayout={modularFocusInternalLayout}
+                  modularFocusMacroLayout={modularFocusMacroLayout}
+                  modularFocusSoftFolderStrength={
+                    modularFocusSoftFolderStrength
+                  }
                   modularFolderStripsVisible={modularFolderStripsVisible}
                   modularConnectionStyle={modularConnectionStyle}
                   showExperimentalAllHierarchy={showExperimentalAllHierarchy}
@@ -4489,6 +4542,12 @@ export function GraphExplorer({
                   }
                   onModularFocusInternalLayoutChange={
                     changeModularFocusInternalLayout
+                  }
+                  onModularFocusMacroLayoutChange={
+                    changeModularFocusMacroLayout
+                  }
+                  onModularFocusSoftFolderStrengthChange={
+                    changeModularFocusSoftFolderStrength
                   }
                   onModularFolderStripsVisibleChange={
                     changeModularFolderStripsVisible
@@ -4810,8 +4869,17 @@ export function GraphExplorer({
                 fitRequestKey={localFitRequestKey ?? 0}
                 focusAppearance={focusAppearance}
                 endpointOrderPolicy={modularFocusHeadingOrder}
-                folderStripsVisible={modularFolderStripsVisible}
+                folderGuidesVisible={modularFolderStripsVisible}
                 internalLayoutVariant={modularFocusInternalLayout}
+                macroLayout={modularFocusMacroLayout}
+                softFolderStrength={modularFocusSoftFolderStrength}
+                softFolderDisplayIntent={softFolderDisplay.displayIntent}
+                softFolderDisplayPersistenceError={
+                  softFolderDisplay.session.error
+                }
+                softFolderDisplayPersistenceStatus={
+                  softFolderDisplay.session.status
+                }
                 routeStyle={modularConnectionStyle}
                 {...(localTransitionAnchor === undefined
                   ? {}
@@ -4828,6 +4896,8 @@ export function GraphExplorer({
                 onFitRequestConsumed={consumeLocalFitRequest}
                 onFocusEntity={focusLocalEntity}
                 onSelectionChange={changeSelection}
+                onChangeSoftFolderDisplayIntent={softFolderDisplay.commit}
+                onResetSoftFolderDisplay={softFolderDisplay.reset}
                 onToggleEntity={toggleEntity}
                 onTransitionAnchorApiChange={
                   changeLocalStructuredTransitionAnchorApi

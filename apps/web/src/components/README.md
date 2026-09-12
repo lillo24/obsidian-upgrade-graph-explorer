@@ -329,3 +329,32 @@ longer in the current projection. A fatal first result asks GraphExplorer for a
 session-only Classic fallback without changing the persisted preview choice.
 `GraphExplorer.tsx` owns the presentation switch and semantic transition anchor;
 switching implementations creates no navigation-history entry.
+
+HIER4B-LIVE keeps Directional Bands as that preview's default and adds Soft
+Folder Clusters as a Sandbox-only macro policy. `GraphSettings.tsx` exposes the
+conditional 0–100 Folder strength slider alongside the existing Compass/Spine
+and Crossing/Document controls. `ModularStructuredGraphView.tsx` sends the
+normalized policy to the dedicated worker and keys the bounded cache by only
+geometry-relevant values. Disclosure, reroot, filtering, exact hover, Secondary
+presentation, and camera behavior continue through the existing projection and
+React Flow seams.
+
+HIER4B-FIX2 keeps exact folders as source truth while `GraphExplorer.tsx`
+derives stable File identity/folder pairs from the canonical snapshot and owns
+the workspace-keyed sparse display-intent session. `ModularStructuredGraphView.tsx`
+builds the shared nested display tree, sends intent only for Soft requests, and
+owns one File/folder context-menu target. Directional requests erase display
+intent and retain their exact cache identity. Soft File and module-anchor
+handles still come from final endpoint geometry; Heading and Block attachment
+semantics remain exact.
+
+The persisted Folder guides toggle is resolved after a current worker result is
+adopted. Directional mode supplies the existing band strips; Soft mode supplies
+renderer-only nested cluster regions from final module rectangles and visible
+display-tree membership. Soft hulls remain inert; pane context requests convert
+to world coordinates and select the deepest actual guide region. File cards and
+guide labels share Network's bounded context-menu portal. File menus compose
+File actions with valid current displayed-folder actions through a strong
+semantic separator. Folder targets remain folder-only. Menu/hover state and
+guide visibility remain absent from every model, worker, effect, and cache
+dependency that can request or change layout.

@@ -88,15 +88,15 @@ sibling-branch pass; module X, dimensions, ownership, lanes, and exact endpoint
 identity stay fixed. The default remains Off until graphical approval selects
 the HIER4A candidate and visual Heading-order policy.
 
-Physical sides derive only from relative signed module ranks: a counterpart
-at a smaller rank attaches left, a counterpart at a larger rank attaches
-right, and same-rank secondary display uses `auto`. Authored source and target
-never swap. Secondary connections retain exact provenance but create no lane
-demand or coordinate change. A document stays central even when it exposes
-attachments; left-only and right-only subtrees use their respective lanes,
-mixed ancestors stay central, and neutral descendants inherit a side only
-when their parent already owns that side. One dual-demand entity remains one
-central node with two attachments.
+Directional physical sides retain HIER4A's signed-rank policy: a counterpart at
+a smaller rank attaches left, a counterpart at a larger rank attaches right,
+and same-rank secondary display uses `auto`. Soft Folder Clusters instead chooses
+each File or module-anchor side independently from the final two endpoint
+rectangle centers. The larger absolute delta selects the horizontal or vertical
+axis, with horizontal winning an exact 45-degree tie and right winning a
+coincident-center fallback. Heading and Block endpoints keep their precise
+Compass/lane side. Authored source and target never swap. Secondary connections
+retain exact provenance but create no lane demand or coordinate change.
 
 The frozen comparison profile uses Dagre 3.1.1, LR internal and macro graphs,
 24/48 px internal node/rank separation, 36/80 px macro separation, 28 px
@@ -115,6 +115,9 @@ the bakeoff evidence if changed.
 - `src/endpoint-plan.ts` maps every visible endpoint group once, accounts for
   fallback provenance, classifies presentation roles, derives physical sides,
   and collects direct node demands.
+- `src/attachments.ts` applies either the preserved Directional attachment
+  policy or Soft spatial-cardinal File/module-anchor policy and measures the
+  exact attachment segments used by bounded Soft candidate scoring.
 - `src/lane-plan.ts` validates each module hierarchy forest, propagates subtree
   demand, assigns internal lanes, and suggests quiet hierarchy attachments.
 - `src/internal-layout-variants.ts` owns the development-only M0/V1/C1 branch
@@ -135,13 +138,25 @@ the bakeoff evidence if changed.
 - `src/folder-fixtures.ts` owns the inherited FB1–FB18 and FS1–FS8 evidence plus
   DB1–DB19, VS1–VS7, and CP1–CP5 categorical folder, internal grammar,
   true-block, span, Secondary, and reroot review cases.
+- `src/soft-clusters.ts` owns the experimental HIER4B 2D macro
+  solver: undirected primary springs, hop-radius preference, normalized-decay
+  nested-folder attraction, deterministic seeding, variable-rectangle collision
+  packing, and bounded two-round internal-layout evidence. The Modular worker
+  calls it only when the persisted Sandbox macro policy selects Soft Folder
+  Clusters; Directional Bands remains the default.
+- `src/soft-folder-display.ts` owns strict sparse File-parent and flattened-layer
+  intent, conservative reconciliation, the pure nested displayed tree,
+  one-child-unit compression/provenance, action mutations, and bounded H0/H1/H2
+  membership weights. It contains no storage, renderer, or source-provider logic.
+- `src/soft-cluster-fixtures.ts` owns SC1–SC24 plus SC17–SC19 stability pairs.
 - `src/source-order.ts` derives public Dagre adjacent-sibling constraints from
   canonical source order.
 - `src/settings.ts` owns the frozen spacing, reserve, clearance, and filtered
   placeholder policy.
 - `src/selected.ts` maps the accepted A1 computed result to the compatible
   selected candidate/attempt API.
-- `src/worker-protocol.ts` owns the version-2 exact-shape production messages
+- `src/worker-protocol.ts` owns the version-6 exact-shape production messages,
+  macro/strength/display-intent policy normalization, cardinal attachment evidence,
   and originating-input result validation.
 - `src/worker-runtime.ts` validates requests, computes A1, records phase
   timings, and returns either a complete validated result or an explicit

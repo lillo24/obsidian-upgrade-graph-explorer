@@ -23,6 +23,16 @@ bounded candidate counts, and runtime. DB12 is neutral internal-layout pressure;
 DB19 is the replacement true-blocked oracle after V1/C1 optimization. Metrics
 remain evidence only until the user explicitly selects one grammar.
 
+HIER4B adds a separate Soft Folder Clusters benchmark and graphical lab. It
+compares the unchanged Directional Bands production reference with the
+development-only 2D solver at strengths 0/25/50/75/100. HIER4B-FIX2 adds
+HFA1-HFA7 nested-hierarchy cases, five sparse display-intent profiles, and the
+H0 nearest/H1 normalized-decay/H2 normalized-equal force-policy bakeoff. H1 is
+the selected internal policy because it preserves both child and parent
+coherence while keeping each File's total folder-force weight at or below one.
+The lab defaults to Soft / 50 / Adaptive Compass / Crossing optimized; SC16
+renders all strengths side by side. HIER4B remains under graphical evaluation.
+
 The accepted outcome is stateless Strategy A. D0 remains the Classic baseline,
 B is retained as rejected evidence, and C remains honestly unbuilt because A
 did not expose a defect meeting its material-improvement prerequisite.
@@ -49,10 +59,14 @@ pnpm benchmark:focus-schematic-production-worker -- --profile small
 pnpm benchmark:focus-schematic-production-worker -- --profile medium
 pnpm benchmark:focus-schematic-production-worker -- --profile hub
 pnpm benchmark:focus-schematic-production-worker -- --profile supersession
+pnpm benchmark:focus-schematic-production-worker -- --profile medium --macro soft-folder-clusters --strength 50
 
 pnpm benchmark:focus-schematic-directional-folder-bands -- --profile all --out output/hier4a-directional-folder-bands-benchmark.json
 pnpm benchmark:focus-schematic-internal-layout -- --out output/hier4a-fix2-internal-layout-benchmark.json
 pnpm generate:focus-schematic-folder-lab -- --out output/hier4a-fix2-internal-layout-lab
+
+pnpm benchmark:focus-schematic-soft-clusters
+pnpm generate:focus-schematic-soft-cluster-lab -- --out output/hier4b-soft-clusters-lab
 ```
 
 Medium and hub attempts run in disposable worker threads with hard timeouts.
@@ -90,9 +104,10 @@ adjacent keyboard-accessible list. Generated output is gitignored.
 - `src/endpoint-attempt-worker.ts` bounds the 500-module A1 hub attempt.
 - `src/endpoint-lab.ts` generates the focused self-contained HIER3A review
   surface with EP1–EP26 and ES1–ES8.
-- `src/production-worker-benchmark.ts` measures the production HIER3B protocol
-  through real Node worker threads for small, medium, hub, and supersession
-  profiles without defining a timing gate.
+- `src/production-worker-benchmark.ts` measures the production HIER3B/HIER4B
+  protocol through real Node worker threads for small, medium, hub, and
+  supersession profiles under either macro policy without defining a timing
+  gate.
 - `src/production-worker-thread.ts` hosts the production runtime for that
   worker-thread benchmark.
 - `src/folder-benchmark.ts` compares categorical Off/On across FB1–FB18,
@@ -107,6 +122,14 @@ adjacent keyboard-accessible list. Generated output is gitignored.
 - `src/internal-layout-benchmark.ts` reports the M0/V1/C1 trade-off table,
   bounded search counts, determinism, hard gates, DB12 reinterpretation, DB19
   proof, CP4 width pressure, and the fair CP5 Compass improvement case.
+- `src/soft-cluster-benchmark.ts` measures SC1–SC24 across all strengths,
+  Directional Bands references, stability pairs, multiplicity saturation,
+  20/50/100-module hubs, five manual display-intent profiles, HFA1–HFA7 across
+  H0/H1/H2 and all five strengths, operation counts, runtime, and hard
+  invariants including the normalized per-File hierarchy-force budget.
+- `src/soft-cluster-lab.ts` generates the self-contained HIER4B comparison with
+  primary arrows, exact-folder hulls/centroids, hop guides, module bounds,
+  internal-layout and Heading-order controls, and SC16's five-way view.
 - `src/folder-lab.test.ts` verifies the required graphical-review cases,
   accessibility labels, and offline output.
 - `src/endpoint-*.test.ts` covers the inherited HIER2 corpus and review-lab

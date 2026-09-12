@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ENDPOINT_FIXTURES,
+  SOFT_CLUSTER_FIXTURES,
   FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
   buildEndpointFixture,
   computeFocusSchematicComputedLayout,
+  computeFocusSchematicSoftClusterLayoutAttempt,
   type EndpointFixtureSpec,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 
@@ -14,6 +16,7 @@ import {
   validateFocusSchematicRendererGraph,
 } from './index';
 import { applyRendererHighlight } from '../highlight';
+import type { ModuleBoundaryFlowNode } from '../types';
 
 function projectedEntityId(
   fixture: ReturnType<typeof buildEndpointFixture>,
@@ -107,7 +110,80 @@ function highlightedReferenceIds(
   ].sort();
 }
 
+function moduleBoundary(
+  graph: ReturnType<typeof prepareFocusSchematicRendererGraph>,
+  moduleId: string,
+): ModuleBoundaryFlowNode {
+  const node = graph.nodes.find(
+    (candidate) =>
+      candidate.type === 'module' && candidate.data.moduleId === moduleId,
+  );
+  if (node?.type !== 'module')
+    throw new Error(`Missing module boundary ${moduleId}.`);
+  return node;
+}
+
 describe('production Focus Schematic React Flow mapping', () => {
+  it('maps the worker-selected Soft Cluster geometry while Secondary remains presentation-only', () => {
+    const fixture = buildEndpointFixture(
+      SOFT_CLUSTER_FIXTURES.find(({ id }) => id === 'SC20')!,
+    );
+    const layoutInput = {
+      model: fixture.model,
+      projection: fixture.projection,
+      nodeDimensions: focusSchematicNodeDimensions(
+        fixture.projection,
+        fixture.model,
+      ),
+      settings: {
+        ...FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+        directionalFolderBandsEnabled: false,
+      },
+    };
+    const attempt = computeFocusSchematicSoftClusterLayoutAttempt(layoutInput, {
+      strength: 50,
+      internalLayoutVariant: 'adaptive-compass',
+      endpointOrderPolicy: 'crossing-optimized',
+    });
+    if (attempt.status !== 'success') throw new Error(attempt.reason);
+    const render = (
+      secondaryRelationshipsVisible: boolean,
+      routeStyle: 'direct' | 'electronic' = 'direct',
+    ) =>
+      prepareFocusSchematicRendererGraph({
+        projection: fixture.projection,
+        model: fixture.model,
+        layoutInput,
+        computedLayout: attempt.result,
+        rootEntityId: fixture.model.rootModuleId,
+        secondaryRelationshipsVisible,
+        routeStyle,
+      });
+    const hidden = render(false);
+    const visible = render(true);
+    const electronic = render(false, 'electronic');
+    expect(visible.edges.length).toBeGreaterThan(hidden.edges.length);
+    expect(visible.nodes.map(({ id, position }) => ({ id, position }))).toEqual(
+      hidden.nodes.map(({ id, position }) => ({ id, position })),
+    );
+    expect(
+      electronic.edges.map(({ id, sourceHandle, targetHandle }) => ({
+        id,
+        sourceHandle,
+        targetHandle,
+      })),
+    ).toEqual(
+      hidden.edges.map(({ id, sourceHandle, targetHandle }) => ({
+        id,
+        sourceHandle,
+        targetHandle,
+      })),
+    );
+    expect(
+      new Set(attempt.result.attachments.map(({ side }) => side)).size,
+    ).toBeGreaterThan(1);
+  });
+
   it('changes only Modular Preview route drawing between Direct and Electronic', () => {
     const { graph: direct, input } = prepared('EP12');
     const electronic = prepareFocusSchematicRendererGraph({
@@ -451,6 +527,76 @@ describe('production Focus Schematic React Flow mapping', () => {
           node.type === 'entity' &&
           node.data.hasDirectFileConnectionRing === true,
       ),
+    ).toBe(false);
+    expect(
+      moduleBoundary(collapsed.graph, 'Atlas').data
+        .hasVisibleStructuralDescendants,
+    ).toBe(false);
+    expect(
+      moduleBoundary(expanded.graph, 'Atlas').data
+        .hasVisibleStructuralDescendants,
+    ).toBe(true);
+    for (const value of [collapsed, expanded]) {
+      for (const geometry of value.computedLayout.candidate.modules) {
+        expect(moduleBoundary(value.graph, geometry.moduleId)).toMatchObject({
+          position: { x: geometry.x, y: geometry.y },
+          width: geometry.width,
+          height: geometry.height,
+        });
+      }
+    }
+  });
+
+  it('hides root and non-root File-only module boundaries', () => {
+    const value = preparedSpec({
+      id: 'CS92',
+      label: 'File-only boundaries',
+      authored: 'Atlas.md → Beacon.md',
+      expectation: 'Neither File-only module paints a visual boundary.',
+      inspect: 'Root and non-root modules keep their computed geometry.',
+      rootDocumentId: 'Atlas',
+      documents: [{ id: 'Atlas' }, { id: 'Beacon' }],
+      references: [{ sourceEntityId: 'Atlas', targetEntityId: 'Beacon' }],
+      direction: 'outgoing',
+    });
+    expect(moduleBoundary(value.graph, 'Atlas').data).toMatchObject({
+      root: true,
+      hasVisibleStructuralDescendants: false,
+    });
+    expect(moduleBoundary(value.graph, 'Beacon').data).toMatchObject({
+      root: false,
+      hasVisibleStructuralDescendants: false,
+    });
+  });
+
+  it('shows a module boundary for a directly visible Block', () => {
+    const value = preparedSpec({
+      id: 'CS93',
+      label: 'Visible Block boundary',
+      authored: 'Atlas block ^detail → Beacon.md',
+      expectation: 'The visible Block makes the Atlas boundary visible.',
+      inspect: 'No Heading is required by the presentation criterion.',
+      rootDocumentId: 'Atlas',
+      documents: [{ id: 'Atlas' }, { id: 'Beacon' }],
+      entities: [
+        {
+          id: 'Atlas-block',
+          kind: 'block',
+          documentId: 'Atlas',
+          parentId: 'Atlas',
+          line: 2,
+        },
+      ],
+      references: [{ sourceEntityId: 'Atlas-block', targetEntityId: 'Beacon' }],
+      direction: 'outgoing',
+      expandedEntityIds: ['Atlas'],
+    });
+    expect(
+      moduleBoundary(value.graph, 'Atlas').data.hasVisibleStructuralDescendants,
+    ).toBe(true);
+    expect(
+      moduleBoundary(value.graph, 'Beacon').data
+        .hasVisibleStructuralDescendants,
     ).toBe(false);
   });
 

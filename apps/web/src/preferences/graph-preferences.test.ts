@@ -64,6 +64,8 @@ describe('graph preferences', () => {
       localLayoutMode: 'free',
       modularFocusInternalLayout: 'adaptive-compass',
       modularFocusHeadingOrder: 'crossing-optimized',
+      modularFocusMacroLayout: 'directional-bands',
+      modularFocusSoftFolderStrength: 50,
       modularFolderStripsVisible: true,
       modularConnectionStyle: 'direct',
       showExperimentalAllHierarchy: false,
@@ -78,6 +80,8 @@ describe('graph preferences', () => {
         localLayoutMode: 'free',
         modularFocusInternalLayout: 'vertical-spine',
         modularFocusHeadingOrder: 'document-order',
+        modularFocusMacroLayout: 'soft-folder-clusters',
+        modularFocusSoftFolderStrength: 75,
         modularFolderStripsVisible: false,
         modularConnectionStyle: 'electronic',
         showExperimentalAllHierarchy: false,
@@ -85,7 +89,7 @@ describe('graph preferences', () => {
       }),
     ).toEqual({ ok: true });
     expect(storage.value).toBe(
-      '{"focusAppearance":"minimal","focusHierarchyImplementation":"modular-preview","globalLayoutSettings":{"folderClustering":true,"spacingPreset":"normal"},"localLayoutMode":"free","modularFocusInternalLayout":"vertical-spine","modularFocusHeadingOrder":"document-order","modularFolderStripsVisible":false,"modularConnectionStyle":"electronic","showExperimentalAllHierarchy":false,"trackpadZoomMode":"scroll-zoom"}',
+      '{"focusAppearance":"minimal","focusHierarchyImplementation":"modular-preview","globalLayoutSettings":{"folderClustering":true,"spacingPreset":"normal"},"localLayoutMode":"free","modularFocusInternalLayout":"vertical-spine","modularFocusHeadingOrder":"document-order","modularFocusMacroLayout":"soft-folder-clusters","modularFocusSoftFolderStrength":75,"modularFolderStripsVisible":false,"modularConnectionStyle":"electronic","showExperimentalAllHierarchy":false,"trackpadZoomMode":"scroll-zoom"}',
     );
   });
 
@@ -121,6 +125,8 @@ describe('graph preferences', () => {
       localLayoutMode: 'free',
       modularFocusInternalLayout: 'adaptive-compass',
       modularFocusHeadingOrder: 'crossing-optimized',
+      modularFocusMacroLayout: 'directional-bands',
+      modularFocusSoftFolderStrength: 50,
       modularFolderStripsVisible: true,
       modularConnectionStyle: 'direct',
       showExperimentalAllHierarchy: false,
@@ -139,6 +145,8 @@ describe('graph preferences', () => {
       localLayoutMode: 'free',
       modularFocusInternalLayout: 'adaptive-compass',
       modularFocusHeadingOrder: 'crossing-optimized',
+      modularFocusMacroLayout: 'directional-bands',
+      modularFocusSoftFolderStrength: 50,
       modularFolderStripsVisible: true,
       modularConnectionStyle: 'direct',
       showExperimentalAllHierarchy: false,
@@ -290,6 +298,8 @@ describe('graph preferences', () => {
         localLayoutMode: 'free',
         modularFocusInternalLayout: 'adaptive-compass',
         modularFocusHeadingOrder: 'crossing-optimized',
+        modularFocusMacroLayout: 'directional-bands',
+        modularFocusSoftFolderStrength: 50,
         modularFolderStripsVisible: true,
         modularConnectionStyle: 'direct',
         showExperimentalAllHierarchy: false,
@@ -365,7 +375,7 @@ describe('Modular Focus Hierarchy preview preference compatibility', () => {
 });
 
 describe('Modular Focus Hierarchy production layout policies', () => {
-  it('defaults, persists, and isolates renderer-only strips and connection style', () => {
+  it('defaults, persists, and isolates renderer-only guides and connection style', () => {
     const storage = memoryStorage();
     expect(loadGraphPreferences(storage).preferences).toMatchObject({
       modularFolderStripsVisible: true,
@@ -394,8 +404,10 @@ describe('Modular Focus Hierarchy production layout policies', () => {
     });
   });
 
-  it('defaults to Adaptive Compass with crossing-optimized Heading order', () => {
+  it('defaults to Directional Bands at strength 50 with the accepted internal policies', () => {
     expect(loadGraphPreferences(memoryStorage()).preferences).toMatchObject({
+      modularFocusMacroLayout: 'directional-bands',
+      modularFocusSoftFolderStrength: 50,
       modularFocusInternalLayout: 'adaptive-compass',
       modularFocusHeadingOrder: 'crossing-optimized',
       modularFolderStripsVisible: true,
@@ -427,26 +439,59 @@ describe('Modular Focus Hierarchy production layout policies', () => {
     },
   );
 
-  it('persists all four supported policy combinations under the v1 key', () => {
+  it.each([undefined, null, 'clusters', 1, {}, []])(
+    'defaults invalid macro layout %j to Directional Bands',
+    (value) => {
+      const storage = memoryStorage(
+        JSON.stringify({ modularFocusMacroLayout: value }),
+      );
+      expect(
+        loadGraphPreferences(storage).preferences.modularFocusMacroLayout,
+      ).toBe('directional-bands');
+    },
+  );
+
+  it.each([
+    [-10, 0],
+    [250, 100],
+    [42.5, 42.5],
+    [Number.NaN, 50],
+    ['banana', 50],
+  ])('normalizes stored Soft Folder strength %j to %j', (value, expected) => {
+    const storage = memoryStorage(
+      JSON.stringify({ modularFocusSoftFolderStrength: value }),
+    );
+    expect(
+      loadGraphPreferences(storage).preferences.modularFocusSoftFolderStrength,
+    ).toBe(expected);
+  });
+
+  it('persists all eight supported policy combinations under the v1 key', () => {
     const storage = memoryStorage();
-    for (const modularFocusInternalLayout of [
-      'adaptive-compass',
-      'vertical-spine',
+    for (const modularFocusMacroLayout of [
+      'directional-bands',
+      'soft-folder-clusters',
     ] as const)
-      for (const modularFocusHeadingOrder of [
-        'crossing-optimized',
-        'document-order',
-      ] as const) {
-        saveGraphPreferences(storage, {
-          ...DEFAULT_GRAPH_PREFERENCES,
-          modularFocusInternalLayout,
-          modularFocusHeadingOrder,
-        });
-        expect(loadGraphPreferences(storage).preferences).toMatchObject({
-          modularFocusInternalLayout,
-          modularFocusHeadingOrder,
-        });
-      }
+      for (const modularFocusInternalLayout of [
+        'adaptive-compass',
+        'vertical-spine',
+      ] as const)
+        for (const modularFocusHeadingOrder of [
+          'crossing-optimized',
+          'document-order',
+        ] as const) {
+          saveGraphPreferences(storage, {
+            ...DEFAULT_GRAPH_PREFERENCES,
+            modularFocusMacroLayout,
+            modularFocusInternalLayout,
+            modularFocusHeadingOrder,
+          });
+          expect(loadGraphPreferences(storage).preferences).toMatchObject({
+            modularFocusMacroLayout,
+            modularFocusInternalLayout,
+            modularFocusHeadingOrder,
+          });
+        }
   });
 });
 

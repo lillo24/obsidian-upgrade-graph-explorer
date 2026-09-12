@@ -17,6 +17,14 @@ export {
   FocusSchematicFolderBandStrips,
   focusSchematicFolderStrips,
 } from './folder-band-strips';
+export {
+  FocusSchematicFolderClusterGuides,
+  focusSchematicFolderClusterGuides,
+  hitTestFocusSchematicFolderGuideRegion,
+  type FocusSchematicFolderClusterGuide,
+  type FocusSchematicFolderGuideContextRequest,
+  type FocusSchematicFolderGuidePoint,
+} from './folder-cluster-guides';
 import {
   DIAGNOSTIC_NODE_DIMENSIONS,
   ENTITY_NODE_DIMENSIONS,
@@ -382,6 +390,16 @@ export function prepareFocusSchematicRendererGraph(
       .filter(({ presentation }) => presentation === 'filtered')
       .map(({ id }) => id),
   );
+  const structuredModuleIds = new Set(
+    input.model.modules
+      .filter((module) =>
+        module.visibleEntityNodeIds.some(
+          (projectionNodeId) =>
+            projectionNodeId !== module.documentProjectionNodeId,
+        ),
+      )
+      .map(({ id }) => id),
+  );
   const moduleNodes: (ModuleBoundaryFlowNode | FilteredBridgeFlowNode)[] = [
     ...input.computedLayout.candidate.modules,
   ]
@@ -426,6 +444,9 @@ export function prepareFocusSchematicRendererGraph(
           projectionNodeId: null,
           moduleId: module.moduleId,
           root: module.moduleId === input.model.rootModuleId,
+          hasVisibleStructuralDescendants: structuredModuleIds.has(
+            module.moduleId,
+          ),
         },
         zIndex: -1,
       } satisfies ModuleBoundaryFlowNode;
@@ -567,16 +588,6 @@ export function prepareFocusSchematicRendererGraph(
     mappedProjectionEdgeIds.add(projectionEdgeId);
   }
 
-  const structuredModuleIds = new Set(
-    input.model.modules
-      .filter((module) =>
-        module.visibleEntityNodeIds.some(
-          (projectionNodeId) =>
-            projectionNodeId !== module.documentProjectionNodeId,
-        ),
-      )
-      .map(({ id }) => id),
-  );
   const directDocumentNodeIds = new Set<string>();
   const nodeByRendererId = new Map(nodes.map((node) => [node.id, node]));
   for (const edge of edges) {

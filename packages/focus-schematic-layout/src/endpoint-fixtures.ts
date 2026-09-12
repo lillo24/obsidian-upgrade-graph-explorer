@@ -39,6 +39,9 @@ export interface EndpointFixtureSpec {
     | `DB${number}`
     | `VS${number}`
     | `CP${number}`
+    | `SC${number}`
+    | `HFA${number}`
+    | `SS${number}-${'before' | 'after'}`
     | `FS${number}-${'before' | 'after'}`;
   readonly label: string;
   readonly authored: string;

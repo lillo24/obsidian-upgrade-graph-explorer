@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
 } from 'react';
 import {
   Background,
@@ -139,6 +140,8 @@ function GraphCanvasInner({
   onFitRequestConsumed,
   onMaximizedChange,
   onFocusEntity,
+  onNodeContextMenuRequest,
+  onPaneContextMenuRequest,
   onSelectionChange,
   onTransitionAnchorApiChange,
   onTransitionAnchorConsumed,
@@ -158,8 +161,14 @@ function GraphCanvasInner({
   const [hovered, setHovered] = useState<GraphSelection | null>(null);
   const [documentDirectHover, setDocumentDirectHoverTarget] =
     useState<GraphHoverTarget | null>(null);
-  const { fitView, getInternalNode, getViewport, setCenter, setViewport } =
-    useReactFlow<GraphFlowNode, GraphFlowEdge>();
+  const {
+    fitView,
+    getInternalNode,
+    getViewport,
+    screenToFlowPosition,
+    setCenter,
+    setViewport,
+  } = useReactFlow<GraphFlowNode, GraphFlowEdge>();
   const nodesInitialized = useNodesInitialized();
   const previousFitRequest = useRef(fitRequestKey);
   const previousCenterRequest = useRef<number | null>(null);
@@ -970,7 +979,6 @@ function GraphCanvasInner({
 
   const activateFocusedNode = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
-      if (onFocusEntity === undefined) return;
       const target = event.target;
       if (!(target instanceof Element)) return;
       const originatesInControl =
@@ -978,6 +986,29 @@ function GraphCanvasInner({
           'button, input, select, textarea, a[href], [contenteditable]:not([contenteditable="false"])',
         ) !== null;
       const flowNode = target.closest('.react-flow__node');
+      if (
+        onNodeContextMenuRequest !== undefined &&
+        (event.key === 'ContextMenu' ||
+          (event.key === 'F10' && event.shiftKey)) &&
+        flowNode instanceof HTMLElement
+      ) {
+        const node = nodes.find(
+          (candidate) => candidate.id === flowNode.dataset.id,
+        );
+        if (node !== undefined) {
+          const rect = flowNode.getBoundingClientRect();
+          event.preventDefault();
+          event.stopPropagation();
+          onNodeContextMenuRequest({
+            node,
+            x: rect.left + Math.min(32, rect.width / 2),
+            y: rect.top + Math.min(32, rect.height / 2),
+            origin: flowNode,
+          });
+          return;
+        }
+      }
+      if (onFocusEntity === undefined) return;
       const entityCard = flowNode?.querySelector<HTMLElement>(
         '.entity-card[data-entity-id][data-projection-node-id]',
       );
@@ -1002,7 +1033,38 @@ function GraphCanvasInner({
       onSelectionChange({ kind: 'node', id: projectionNodeId });
       onFocusEntity(entityId);
     },
-    [onFocusEntity, onSelectionChange],
+    [nodes, onFocusEntity, onNodeContextMenuRequest, onSelectionChange],
+  );
+  const openNodeContextMenu = useCallback<NodeMouseHandler<GraphFlowNode>>(
+    (event, node) => {
+      if (onNodeContextMenuRequest === undefined) return;
+      event.preventDefault();
+      event.stopPropagation();
+      onNodeContextMenuRequest({
+        node,
+        x: event.clientX,
+        y: event.clientY,
+        origin:
+          event.currentTarget instanceof HTMLElement
+            ? event.currentTarget
+            : null,
+      });
+    },
+    [onNodeContextMenuRequest],
+  );
+  const openPaneContextMenu = useCallback(
+    (event: ReactMouseEvent | MouseEvent) => {
+      if (onPaneContextMenuRequest === undefined) return;
+      const opened = onPaneContextMenuRequest({
+        x: event.clientX,
+        y: event.clientY,
+        world: screenToFlowPosition({ x: event.clientX, y: event.clientY }),
+      });
+      if (!opened) return;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    [onPaneContextMenuRequest, screenToFlowPosition],
   );
 
   if (projection.nodes.length === 0) {
@@ -1097,12 +1159,14 @@ function GraphCanvasInner({
             onEdgesChange={syncEdgeChanges}
             onInit={initializeViewport}
             onNodeClick={selectNode}
+            onNodeContextMenu={openNodeContextMenu}
             onNodeDoubleClick={focusNode}
             onNodeMouseEnter={hoverNode}
             onNodeMouseLeave={clearHover}
             onNodesChange={syncNodeChanges}
             onMoveEnd={observeViewport}
             onPaneClick={clearSelection}
+            onPaneContextMenu={openPaneContextMenu}
             panOnDrag
             panOnScroll={trackpadZoomMode === 'pinch-zoom'}
             proOptions={{ hideAttribution: false }}

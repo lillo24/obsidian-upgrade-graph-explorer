@@ -46,6 +46,12 @@ interface GraphSettingsProps {
   readonly onModularFocusHeadingOrderChange?: (
     order: GraphPreferences['modularFocusHeadingOrder'],
   ) => void;
+  readonly modularFocusMacroLayout?: GraphPreferences['modularFocusMacroLayout'];
+  readonly onModularFocusMacroLayoutChange?: (
+    layout: GraphPreferences['modularFocusMacroLayout'],
+  ) => void;
+  readonly modularFocusSoftFolderStrength?: number;
+  readonly onModularFocusSoftFolderStrengthChange?: (strength: number) => void;
   readonly modularFolderStripsVisible?: GraphPreferences['modularFolderStripsVisible'];
   readonly onModularFolderStripsVisibleChange?: (visible: boolean) => void;
   readonly modularConnectionStyle?: GraphPreferences['modularConnectionStyle'];
@@ -158,6 +164,10 @@ export const GraphSettings = memo(function GraphSettings({
   onModularFocusInternalLayoutChange,
   modularFocusHeadingOrder = 'crossing-optimized',
   onModularFocusHeadingOrderChange,
+  modularFocusMacroLayout = 'directional-bands',
+  onModularFocusMacroLayoutChange,
+  modularFocusSoftFolderStrength = 50,
+  onModularFocusSoftFolderStrengthChange,
   modularFolderStripsVisible = true,
   onModularFolderStripsVisibleChange,
   modularConnectionStyle = 'direct',
@@ -665,6 +675,93 @@ export const GraphSettings = memo(function GraphSettings({
                         focusHierarchyImplementation !== 'modular-preview'
                       }
                     >
+                      <legend>Macro layout</legend>
+                      <label>
+                        <input
+                          checked={
+                            modularFocusMacroLayout === 'directional-bands'
+                          }
+                          name="modular-focus-macro-layout"
+                          onChange={() =>
+                            onModularFocusMacroLayoutChange?.(
+                              'directional-bands',
+                            )
+                          }
+                          type="radio"
+                          value="directional-bands"
+                        />
+                        <span>
+                          <strong>Directional Bands</strong>
+                          <small>
+                            Keeps incoming, root, and outgoing folder ranks.
+                          </small>
+                        </span>
+                      </label>
+                      <label>
+                        <input
+                          checked={
+                            modularFocusMacroLayout === 'soft-folder-clusters'
+                          }
+                          name="modular-focus-macro-layout"
+                          onChange={() =>
+                            onModularFocusMacroLayoutChange?.(
+                              'soft-folder-clusters',
+                            )
+                          }
+                          type="radio"
+                          value="soft-folder-clusters"
+                        />
+                        <span>
+                          <strong>Soft Folder Clusters</strong>
+                          <small>
+                            Gently groups repeated folders around the Focus
+                            topology.
+                          </small>
+                        </span>
+                      </label>
+                      {modularFocusMacroLayout === 'soft-folder-clusters' ? (
+                        <label className="global-layout-strength">
+                          <span>
+                            Folder strength{' '}
+                            <output>{modularFocusSoftFolderStrength}</output>
+                          </span>
+                          <input
+                            aria-label="Folder strength"
+                            list="modular-focus-folder-strength-marks"
+                            max={100}
+                            min={0}
+                            onChange={(event) =>
+                              onModularFocusSoftFolderStrengthChange?.(
+                                event.currentTarget.valueAsNumber,
+                              )
+                            }
+                            step={1}
+                            type="range"
+                            value={modularFocusSoftFolderStrength}
+                          />
+                          <datalist id="modular-focus-folder-strength-marks">
+                            <option value="0" />
+                            <option value="25" />
+                            <option value="50" />
+                            <option value="75" />
+                            <option value="100" />
+                          </datalist>
+                          <small>
+                            <span>0</span>
+                            <span>25</span>
+                            <span>50</span>
+                            <span>75</span>
+                            <span>100</span>
+                          </small>
+                        </label>
+                      ) : null}
+                    </fieldset>
+                    <fieldset
+                      className="graph-settings__choice-group"
+                      disabled={
+                        focusHierarchyImplementation !== 'modular-preview'
+                      }
+                    >
                       <legend>Internal layout</legend>
                       <label>
                         <input
@@ -783,11 +880,11 @@ export const GraphSettings = memo(function GraphSettings({
                         focusHierarchyImplementation !== 'modular-preview'
                       }
                     >
-                      <legend>Folder strips</legend>
+                      <legend>Folder guides</legend>
                       <label>
                         <input
                           checked={modularFolderStripsVisible}
-                          name="modular-folder-strips"
+                          name="modular-folder-guides"
                           onChange={(event) =>
                             onModularFolderStripsVisibleChange?.(
                               event.currentTarget.checked,
@@ -796,10 +893,10 @@ export const GraphSettings = memo(function GraphSettings({
                           type="checkbox"
                         />
                         <span>
-                          <strong>Show folder strips</strong>
+                          <strong>Show folder guides</strong>
                           <small>
-                            Shows the exact directional folder-band plan without
-                            changing layout.
+                            Shows exact-folder strips or cluster regions for the
+                            selected macro layout without changing geometry.
                           </small>
                         </span>
                       </label>

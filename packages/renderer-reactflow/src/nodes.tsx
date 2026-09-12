@@ -75,7 +75,10 @@ function ModuleBoundaryNodeComponent({
   return (
     <div
       aria-hidden="true"
-      className={`focus-module-boundary${data.root ? ' focus-module-boundary--root' : ''}`}
+      className={`focus-module-boundary${data.root ? ' focus-module-boundary--root' : ''}${data.hasVisibleStructuralDescendants ? '' : ' focus-module-boundary--empty'}`}
+      data-visual-boundary={
+        data.hasVisibleStructuralDescendants ? 'visible' : 'hidden'
+      }
     >
       <NodeHandles />
     </div>

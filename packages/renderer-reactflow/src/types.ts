@@ -52,6 +52,19 @@ export interface GraphViewportPoint {
   readonly y: number;
 }
 
+export interface GraphNodeContextRequest {
+  readonly node: GraphFlowNode;
+  readonly x: number;
+  readonly y: number;
+  readonly origin: HTMLElement | null;
+}
+
+export interface GraphPaneContextRequest {
+  readonly x: number;
+  readonly y: number;
+  readonly world: GraphViewportPoint;
+}
+
 /** Narrow renderer boundary used to preserve a semantic node's screen point. */
 export interface GraphTransitionAnchorApi {
   readonly nodeViewportPoint: (
@@ -121,6 +134,8 @@ export interface ModuleBoundaryNodeData extends Record<string, unknown> {
   readonly projectionNodeId: null;
   readonly moduleId: string;
   readonly root: boolean;
+  /** Presentation-only; true only for currently visible Heading/Block nodes. */
+  readonly hasVisibleStructuralDescendants: boolean;
 }
 
 export interface FilteredBridgeNodeData extends Record<string, unknown> {
@@ -225,6 +240,13 @@ export interface GraphCanvasProps {
   readonly onFitRequestConsumed?: (key: number) => void;
   readonly onSelectionChange: (selection: GraphSelection | null) => void;
   readonly onFocusEntity?: (entityId: string) => void;
+  readonly onNodeContextMenuRequest?: (
+    request: GraphNodeContextRequest,
+  ) => void;
+  /** Return true only when the world-space pane point opened a menu. */
+  readonly onPaneContextMenuRequest?: (
+    request: GraphPaneContextRequest,
+  ) => boolean;
   readonly onToggleEntity: (entityId: string, currentlyOpen: boolean) => void;
 }
 

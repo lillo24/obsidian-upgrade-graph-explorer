@@ -11,20 +11,29 @@ import {
 import { createFocusSchematicModel } from '@icarus-graph-explorer/focus-schematic';
 import {
   FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
+  DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+  buildFocusSchematicSoftFolderDisplayTree,
+  normalizeFocusSchematicSoftFolderStrength,
   type FocusSchematicComputedLayout,
   type FocusSchematicEndpointLayoutPhaseTimings,
   type FocusSchematicLayoutInput,
   type FocusSchematicProductInternalLayoutVariant,
   type FocusSchematicProductLayoutPolicies,
+  type FocusSchematicProductMacroLayout,
+  type FocusSchematicSoftFolderDisplayIntent,
+  type FocusSchematicSoftClusterEvidence,
   type FocusSchematicEndpointOrderPolicy,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performance';
 import {
   GraphCanvas,
+  GraphContextMenu,
   type GraphEdgePathStyle,
   type FocusAppearance,
   type GraphCenterRequest,
   type GraphSelection,
+  type GraphNodeContextRequest,
+  type GraphPaneContextRequest,
   type GraphTransitionAnchor,
   type GraphTransitionAnchorApi,
   type GraphViewportObservation,
@@ -32,9 +41,12 @@ import {
   type TrackpadZoomMode,
 } from '@icarus-graph-explorer/renderer-reactflow';
 import {
-  focusSchematicNodeDimensions,
-  prepareFocusSchematicRendererGraph,
   FocusSchematicFolderBandStrips,
+  FocusSchematicFolderClusterGuides,
+  focusSchematicFolderClusterGuides,
+  focusSchematicNodeDimensions,
+  hitTestFocusSchematicFolderGuideRegion,
+  prepareFocusSchematicRendererGraph,
 } from '@icarus-graph-explorer/renderer-reactflow/focus-schematic';
 import type {
   ProjectionWorkspace,
@@ -47,6 +59,11 @@ import {
   exactFocusSchematicLayoutCacheKey,
   focusSchematicLayoutCache,
 } from '../focus-schematic-layout-cache';
+import {
+  applySoftFolderDisplayMenuAction,
+  softFolderDisplayMenuItems,
+  type SoftFolderDisplayMenuActionId,
+} from '../soft-folder-display/context-menu';
 import { createFocusSchematicLayoutWorkerService } from '../workers/focus-schematic-layout-worker-client';
 import type { SemanticLocalStructuredViewport } from './LocalStructuredGraphView';
 import { useWorkerServiceDisposal } from './use-worker-service-disposal';
@@ -56,14 +73,23 @@ export interface ModularStructuredGraphViewProps {
   readonly fitRequestKey: number;
   readonly focusAppearance: FocusAppearance;
   readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
-  readonly folderStripsVisible?: boolean;
+  readonly folderGuidesVisible?: boolean;
   readonly initialTransitionAnchor?: GraphTransitionAnchor;
   readonly internalLayoutVariant: FocusSchematicProductInternalLayoutVariant;
+  readonly macroLayout: FocusSchematicProductMacroLayout;
+  readonly softFolderStrength: number;
+  readonly softFolderDisplayIntent: FocusSchematicProductLayoutPolicies['softFolderDisplayIntent'];
+  readonly softFolderDisplayPersistenceStatus: string;
+  readonly softFolderDisplayPersistenceError: string | undefined;
   readonly instrumentation?: PerformanceInstrumentation;
   readonly onFatalFailure: (message: string) => void;
   readonly onFitRequestConsumed?: (key: number) => void;
   readonly onFocusEntity: (entityId: string) => void;
   readonly onSelectionChange: (selection: GraphSelection | null) => void;
+  readonly onChangeSoftFolderDisplayIntent: (
+    intent: FocusSchematicSoftFolderDisplayIntent,
+  ) => string | undefined;
+  readonly onResetSoftFolderDisplay: () => string | undefined;
   readonly onToggleEntity: (entityId: string, currentlyOpen: boolean) => void;
   readonly onTransitionAnchorApiChange?: (
     api: GraphTransitionAnchorApi | undefined,
@@ -176,6 +202,7 @@ function recordAttemptTimings(
 function recordAttemptEvidence(
   instrumentation: PerformanceInstrumentation | undefined,
   computed: FocusSchematicComputedLayout,
+  soft: FocusSchematicSoftClusterEvidence | undefined,
 ): void {
   const internal = computed.internalLayoutEvidence;
   const folder = computed.folderBandPlan.optimization;
@@ -195,6 +222,20 @@ function recordAttemptEvidence(
     'focus-schematic-crossing-evaluations',
     folder?.crossingMetricEvaluations ?? 0,
   );
+  if (soft !== undefined) {
+    instrumentation?.record(
+      'focus-schematic-soft-cluster-layout',
+      soft.runtime.layoutMs,
+    );
+    instrumentation?.record(
+      'focus-schematic-soft-cluster-collision-checks',
+      soft.runtime.collisionCheckCount,
+    );
+    instrumentation?.record(
+      'focus-schematic-soft-cluster-collision-corrections',
+      soft.runtime.collisionCorrectionCount,
+    );
+  }
 }
 
 function currentSafeGraph(
@@ -245,15 +286,22 @@ export default function ModularStructuredGraphView(
 ) {
   const {
     endpointOrderPolicy,
-    folderStripsVisible = true,
+    folderGuidesVisible = true,
     instrumentation,
     internalLayoutVariant,
+    macroLayout,
     onFatalFailure,
     onViewportObservation,
     projection,
     projectionState,
     projectionWorkspace,
     rootEntityId,
+    softFolderStrength,
+    softFolderDisplayIntent,
+    softFolderDisplayPersistenceStatus,
+    softFolderDisplayPersistenceError,
+    onChangeSoftFolderDisplayIntent,
+    onResetSoftFolderDisplay,
     routeStyle = 'direct',
   } = props;
   const workerService = useMemo(
@@ -264,11 +312,49 @@ export default function ModularStructuredGraphView(
   const [secondaryRelationshipsVisible, setSecondaryRelationshipsVisible] =
     useState(false);
   const [retryKey, setRetryKey] = useState(0);
+  const [softFolderDisplayMutationError, setSoftFolderDisplayMutationError] =
+    useState<string | undefined>();
+  const [softFolderContext, setSoftFolderContext] = useState<
+    | {
+        readonly kind: 'file';
+        readonly fileId: string;
+        readonly x: number;
+        readonly y: number;
+        readonly origin: HTMLElement | null;
+      }
+    | {
+        readonly kind: 'folder';
+        readonly folderKey: string;
+        readonly x: number;
+        readonly y: number;
+        readonly origin: HTMLElement | null;
+      }
+    | null
+  >(null);
   const [lifecycle, setLifecycle] = useState<LifecycleState>({ phase: 'idle' });
   const fatalReported = useRef(false);
+  const effectiveSoftFolderStrength =
+    macroLayout === 'soft-folder-clusters'
+      ? normalizeFocusSchematicSoftFolderStrength(softFolderStrength)
+      : DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softFolderStrength;
   const layoutPolicies = useMemo<FocusSchematicProductLayoutPolicies>(
-    () => ({ endpointOrderPolicy, internalLayoutVariant }),
-    [endpointOrderPolicy, internalLayoutVariant],
+    () => ({
+      macroLayout,
+      softFolderStrength: effectiveSoftFolderStrength,
+      softFolderDisplayIntent:
+        macroLayout === 'soft-folder-clusters'
+          ? softFolderDisplayIntent
+          : { fileParentOverrides: [], flattenedFolderKeys: [] },
+      endpointOrderPolicy,
+      internalLayoutVariant,
+    }),
+    [
+      effectiveSoftFolderStrength,
+      endpointOrderPolicy,
+      internalLayoutVariant,
+      macroLayout,
+      softFolderDisplayIntent,
+    ],
   );
 
   const model = useMemo(() => {
@@ -282,6 +368,19 @@ export default function ModularStructuredGraphView(
       ? build()
       : instrumentation.measure('focus-schematic-model', undefined, build);
   }, [instrumentation, projection, projectionState, projectionWorkspace]);
+  const softFolderDisplayTree = useMemo(
+    () =>
+      buildFocusSchematicSoftFolderDisplayTree({
+        visibleFiles: model.modules
+          .filter(({ presentation }) => presentation !== 'filtered')
+          .map(({ id, folderKey }) => ({
+            fileId: id,
+            exactFolderKey: folderKey,
+          })),
+        intent: softFolderDisplayIntent,
+      }),
+    [model.modules, softFolderDisplayIntent],
+  );
   const nodeDimensions = useMemo(() => {
     const derive = () => focusSchematicNodeDimensions(projection, model);
     return instrumentation === undefined
@@ -297,7 +396,10 @@ export default function ModularStructuredGraphView(
       model,
       projection,
       nodeDimensions,
-      settings: FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
+      settings: {
+        ...FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
+        directionalFolderBandsEnabled: macroLayout === 'directional-bands',
+      },
     });
 
     return instrumentation === undefined
@@ -307,7 +409,7 @@ export default function ModularStructuredGraphView(
           undefined,
           prepare,
         );
-  }, [instrumentation, model, nodeDimensions, projection]);
+  }, [instrumentation, macroLayout, model, nodeDimensions, projection]);
   const layoutKey = useMemo(() => {
     const serialize = () =>
       exactFocusSchematicLayoutCacheKey(layoutInput, layoutPolicies);
@@ -438,7 +540,11 @@ export default function ModularStructuredGraphView(
             return;
           }
           try {
-            recordAttemptEvidence(instrumentation, result.result);
+            recordAttemptEvidence(
+              instrumentation,
+              result.result,
+              result.metrics.softClusterEvidence,
+            );
             const graph = prepareGraph(result.result, false, routeStyle);
             focusSchematicLayoutCache.set(
               layoutInput,
@@ -520,20 +626,147 @@ export default function ModularStructuredGraphView(
     secondaryRelationshipsVisible,
     routeStyle,
   ]);
+  const softFolderGuides = useMemo(
+    () =>
+      focusSchematicFolderClusterGuides(
+        softFolderDisplayTree,
+        displayedGraph.nodes,
+      ),
+    [displayedGraph.nodes, softFolderDisplayTree],
+  );
+  const activeSoftFolderContext =
+    softFolderContext === null ||
+    (softFolderContext.kind === 'file'
+      ? !softFolderDisplayTree.files.some(
+          ({ fileId }) => fileId === softFolderContext.fileId,
+        )
+      : !softFolderDisplayTree.folders.some(
+          ({ folderKey }) => folderKey === softFolderContext.folderKey,
+        ))
+      ? null
+      : softFolderContext;
+  const closeSoftFolderContext = useCallback(
+    (restoreFocus: boolean) => {
+      const origin = activeSoftFolderContext?.origin;
+      setSoftFolderContext(null);
+      if (restoreFocus)
+        queueMicrotask(() => origin?.focus({ preventScroll: true }));
+    },
+    [activeSoftFolderContext],
+  );
+  const openSoftFileContext = useCallback(
+    ({ node, x, y, origin }: GraphNodeContextRequest) => {
+      if (
+        macroLayout !== 'soft-folder-clusters' ||
+        node.type !== 'entity' ||
+        node.data.entityKind !== 'document' ||
+        node.data.focusSchematicModuleId === undefined
+      )
+        return;
+      setSoftFolderContext({
+        kind: 'file',
+        fileId: node.data.focusSchematicModuleId,
+        x,
+        y,
+        origin,
+      });
+    },
+    [macroLayout],
+  );
+  const openSoftFolderAreaContext = useCallback(
+    ({ x, y, world }: GraphPaneContextRequest): boolean => {
+      if (
+        macroLayout !== 'soft-folder-clusters' ||
+        !folderGuidesVisible ||
+        lifecycle.adopted === undefined ||
+        lifecycle.adopted.key !== layoutKey
+      )
+        return false;
+      const guide = hitTestFocusSchematicFolderGuideRegion(
+        softFolderGuides,
+        world,
+      );
+      if (guide === null) return false;
+      setSoftFolderContext({
+        kind: 'folder',
+        folderKey: guide.folderKey,
+        x,
+        y,
+        origin: null,
+      });
+      return true;
+    },
+    [
+      folderGuidesVisible,
+      layoutKey,
+      lifecycle.adopted,
+      macroLayout,
+      softFolderGuides,
+    ],
+  );
+  const softFolderContextItems = useMemo(
+    () =>
+      activeSoftFolderContext === null
+        ? []
+        : softFolderDisplayMenuItems(
+            softFolderDisplayTree,
+            activeSoftFolderContext,
+          ),
+    [activeSoftFolderContext, softFolderDisplayTree],
+  );
+  const runSoftFolderContextAction = useCallback(
+    (action: SoftFolderDisplayMenuActionId) => {
+      if (activeSoftFolderContext === null) return;
+      const result = applySoftFolderDisplayMenuAction(
+        softFolderDisplayTree,
+        activeSoftFolderContext,
+        action,
+      );
+      const error =
+        result.kind === 'reset'
+          ? onResetSoftFolderDisplay()
+          : onChangeSoftFolderDisplayIntent(result.value);
+      setSoftFolderDisplayMutationError(error);
+      closeSoftFolderContext(true);
+    },
+    [
+      closeSoftFolderContext,
+      onChangeSoftFolderDisplayIntent,
+      onResetSoftFolderDisplay,
+      activeSoftFolderContext,
+      softFolderDisplayTree,
+    ],
+  );
+  // This overlay is derived after layout adoption. Its visibility never enters
+  // projection, model, worker request, layout key, or cached geometry.
   const viewportOverlay = useMemo(() => {
     if (
-      !folderStripsVisible ||
+      !folderGuidesVisible ||
       lifecycle.adopted === undefined ||
       lifecycle.adopted.key !== layoutKey
     )
       return undefined;
-    return (
+    return macroLayout === 'directional-bands' ? (
       <FocusSchematicFolderBandStrips
         bands={lifecycle.adopted.computed.folderBandPlan.bands}
         nodes={displayedGraph.nodes}
       />
+    ) : (
+      <FocusSchematicFolderClusterGuides
+        guides={softFolderGuides}
+        onFolderContextMenu={(request) =>
+          setSoftFolderContext({ kind: 'folder', ...request })
+        }
+      />
     );
-  }, [displayedGraph.nodes, folderStripsVisible, layoutKey, lifecycle.adopted]);
+  }, [
+    displayedGraph.nodes,
+    folderGuidesVisible,
+    layoutKey,
+    lifecycle.adopted,
+    macroLayout,
+    softFolderGuides,
+  ]);
   const pending =
     lifecycle.phase === 'idle' ||
     lifecycle.phase === 'preparing-model' ||
@@ -572,11 +805,35 @@ export default function ModularStructuredGraphView(
           {...(instrumentation === undefined
             ? {}
             : { performance: instrumentation })}
+          onNodeContextMenuRequest={openSoftFileContext}
+          onPaneContextMenuRequest={openSoftFolderAreaContext}
           preparedGraph={displayedGraph}
           viewportOverlay={viewportOverlay}
           preparedGraphPending={pending}
           {...(status === undefined ? {} : { preparedGraphStatus: status })}
         />
+        {activeSoftFolderContext === null ? null : (
+          <GraphContextMenu
+            items={softFolderContextItems}
+            name={
+              activeSoftFolderContext.kind === 'file'
+                ? `Folder display for ${
+                    model.modules.find(
+                      ({ id }) => id === activeSoftFolderContext.fileId,
+                    )?.sourcePath ?? 'File'
+                  }`
+                : `Folder display for ${
+                    activeSoftFolderContext.folderKey === '.'
+                      ? 'Root folder'
+                      : `${activeSoftFolderContext.folderKey}/`
+                  }`
+            }
+            onAction={runSoftFolderContextAction}
+            onCancel={closeSoftFolderContext}
+            x={activeSoftFolderContext.x}
+            y={activeSoftFolderContext.y}
+          />
+        )}
         <div
           aria-label="Modular Focus Hierarchy preview controls"
           className="modular-focus-hierarchy__controls nowheel"
@@ -595,6 +852,12 @@ export default function ModularStructuredGraphView(
           </label>
           {lifecycle.message === undefined ? null : (
             <span role="alert">{lifecycle.message}</span>
+          )}
+          {macroLayout !== 'soft-folder-clusters' ? null : (
+            <span title={softFolderDisplayPersistenceStatus}>
+              {softFolderDisplayMutationError ??
+                softFolderDisplayPersistenceError}
+            </span>
           )}
           {lifecycle.phase === 'warning-with-last-valid' ? (
             <button

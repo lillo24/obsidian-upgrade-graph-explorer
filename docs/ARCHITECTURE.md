@@ -1218,7 +1218,7 @@ Classic Focus Hierarchy remains the default. The application dynamically loads
 the modular component only for Focus + Hierarchy + Modular Preview. That
 component owns HIER1 construction, renderer-dimension adaptation, an exact
 24-entry page cache, and a dedicated latest-result-wins worker. The layout
-package owns the strict version-1 plain-data protocol/runtime; the renderer owns
+package owns the strict version-5 plain-data protocol/runtime; the renderer owns
 the lazy computed-layout mapper; neither layer reads workspace persistence or
 source-provider state.
 
@@ -1253,11 +1253,11 @@ direct-File hover target and narrow nested context own the non-geometric ring.
 remain unchanged by hover.
 
 HIER4A supersedes the original center-spine production geometry for Modular
-Preview. Its strict protocol-v3 worker receives persisted internal-layout and
-Heading-order policies. Adaptive Compass plus Crossing optimized are the
-defaults; Vertical Spine and Document order remain Sandbox alternatives. The
-exact cache keys all four combinations and algorithm revision 3. Current/Mosaic
-remains development-only.
+Preview. Its Directional Folder Bands geometry remains the default. The strict
+protocol-v6 worker now receives persisted macro-layout, normalized Soft
+strength, sparse workspace Soft display intent, internal-layout, and Heading-order policies. Adaptive Compass plus
+Crossing optimized remain the defaults; Vertical Spine and Document order
+remain Sandbox alternatives. Current/Mosaic remains development-only.
 
 The same worker runs categorical Directional Folder Bands after signed-rank
 placement and in a bounded two-round refinement with module-local Compass. Final
@@ -1280,10 +1280,85 @@ These two persisted Sandbox preferences never enter HIER1, the worker request,
 computed-layout protocol, or cache fingerprint. Omitted route style continues to
 mean SmoothStep for Classic and every unrelated renderer.
 
+HIER4B extends that same persisted Folder guides toggle without changing its
+layout isolation. Directional Bands still renders accepted exact strips. Soft
+uses a pure displayed hierarchy derived from canonical source folders, stable
+per-File parent overrides, manually flattened folder layers, and iterative
+one-child-unit compression. Child regions enter parent guide geometry, so
+containment is structural; fixed padding stays bounded and disconnected islands
+remain truthful. Filtered modules are excluded from visible guide membership.
+
+HIER4B-FIX2 supersedes FIX1's flat effective groups. Exact folder identity stays
+immutable, while only sparse manual display intent persists under stable
+workspace identity. The schema-1 Experimental value resets narrowly to empty
+schema 2. Automatic compression and visible membership never persist. Hover or
+focus emphasizes current, parent, and displayed sibling guides; compressed
+ancestry remains readable as passive context. FIX3 derives explicit displayed
+depth after those transformations, uses short folder labels with accessible
+normalized keys, and caps depth styling at `3+`. The hull stays pointer-inert.
+A pane context request uses React Flow's screen-to-world conversion and pure
+actual-region hit testing, choosing deepest depth, smallest area, then stable
+identity. Guide visibility gates that empty-area path.
+
+HIER4B-POLISH1 keeps the folder-label button as the keyboard and context-menu
+primitive while presenting it as passive text. Its normal state has no pill,
+background, border, shadow, or pointer cursor; hover changes text emphasis and
+keyboard focus supplies a visible outline. Repeated disconnected-region labels
+retain the same restrained typography.
+
+Modular File cards and folder labels now use the same extracted context-menu
+portal as Network Explorer: pointer/keyboard opening, viewport bounding,
+Escape/outside dismissal, and focus restoration. File actions move one stable
+File up one displayed level or restore it, followed when applicable by a strong
+semantic separator and valid actions for the File's current displayed folder.
+Folder region and label targets receive folder actions only. Those actions
+flatten one displayed layer, include displayed siblings when requested, restore
+hidden layers, or reset the workspace intent. Menu and hover state remain
+renderer-only. Generic Hide/Focus/Inspect parity is reserved for
+`MODULAR-CONTEXT1`.
+
+Soft File and module-anchor endpoints use final-geometry cardinal attachments.
+The dominant delta between exact endpoint rectangle centers chooses left/right
+or top/bottom, with a stable horizontal tie. Heading and Block endpoints keep
+their precise internal-side semantics. Bounded Compass candidate scoring uses
+these same cardinal segment crossings, and final attachments are recomputed
+after collision movement. Direct and Electronic consume the same handles;
+route style remains renderer-only. Directional Bands preserves its signed-rank
+attachment output byte-for-byte.
+
+The renderer derives a typed visible-structure marker for each unfiltered module
+after layout. Modules with only a currently visible File paint a transparent
+boundary, including the root; any visible Heading or Block paints the normal
+boundary. The module node, dimensions, coordinates, z-order, and eight handles
+remain present, so disclosure presentation cannot enter the worker request,
+layout/cache identity, endpoint attachments, or guide geometry.
+
 Secondary edges, hover, and Visual Groups remain geometry-neutral. HIER4B owns
 Soft Folder Clusters, HIER5 retains Electronic orthogonal routing, rounded
 styling, channels, obstacle avoidance, and overlapping-path hit-target
 separation, and HIER3C retains any product-default change.
+
+The HIER4B bakeoff and lab retain the separate renderer-neutral Soft Folder
+Clusters API. The same solver is also available as a Sandbox-only macro choice
+inside the real Modular Preview for live-vault evaluation. It aggregates
+selected-backbone and Focus-path connections as undirected module pairs, uses
+minimum undirected Focus hops as a soft radial prior, and applies H1 normalized
+decaying attraction across visible displayed ancestor scopes. Each File's total
+folder-force weight is at most one, preventing depth amplification. A stable identity seed,
+fixed 36 + 18 relaxation schedule, bounded variable-rectangle collision pack,
+and two internal-layout rounds make the result stateless and reproducible.
+Authored arrows preserve direction while macro coordinates carry no incoming/
+outgoing meaning.
+
+The 24-entry exact cache includes macro family plus normalized strength and
+canonical sparse display intent only for Soft Clusters, so changing stored Soft state
+cannot miss or perturb a Directional layout. Policy changes use the existing terminating
+latest-result-wins worker lifecycle. The worker response carries aggregate Soft
+solver, Compass, and collision evidence while computed geometry carries only a
+deterministic policy identity. The real projection continues to own disclosure,
+reroot, filters, hidden modules, and watcher updates; the renderer continues to
+own exact hover, Secondary edge presentation, and the camera. No Classic/
+Modular default changes until graphical review selects an outcome.
 
 Optimized desktop graphical QA approved the preview with visible module
 boundaries and confirmed exact endpoints, root/rank positioning, multi-hop
@@ -1292,8 +1367,14 @@ invariance, Inspector behavior, and current touchpad navigation. This completes
 HIER3B. Optimized desktop graphical approval on September 4, 2026, completes
 HIER3B-FIX1. The actual-browser HIER4A integration was approved and its optimized
 desktop check/build passed on September 8, 2026. PRE-HIER4B then added approved
-visible strips and Direct rendering without reopening HIER4A geometry. HIER4B is
-next; HIER5 follows HIER4B, and HIER3C follows HIER5.
+visible strips and Direct rendering without reopening HIER4A geometry. HIER4B
+is under real-vault graphical evaluation through the live Modular Preview;
+HIER4B-FIX3 adds empty-guide area targeting, composed File/current-folder menus,
+short accessible labels, and displayed-depth styling to FIX2 while retaining
+FIX1's cardinal File ports. POLISH1 then hides empty painted module boundaries
+and makes folder labels visually passive without changing that unmerged
+evaluation's geometry or menu behavior;
+HIER5 follows HIER4B, and HIER3C follows HIER5.
 
 ## HIER0 product exposure and geometry
 
