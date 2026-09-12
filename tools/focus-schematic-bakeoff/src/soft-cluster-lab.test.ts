@@ -11,9 +11,11 @@ describe('HIER4B Soft Folder Clusters lab', () => {
     const directory = await mkdtemp(join(tmpdir(), 'hier4b-lab-'));
     const path = await writeSoftClusterLab(directory);
     const html = await readFile(path, 'utf8');
-    expect(html).toContain('HIER4B Soft Folder Clusters Lab');
+    expect(html).toContain('HIER4B PATCH1 Soft Compass Lab');
     for (let index = 1; index <= 24; index += 1)
       expect(html).toContain(`SC${index}`);
+    for (let index = 1; index <= 8; index += 1)
+      expect(html).toContain(`AC-S${index}`);
     expect(html).toContain('Directional Bands reference');
     expect(html).toContain('Soft Clusters');
     expect(html).toContain('Crossing optimized');

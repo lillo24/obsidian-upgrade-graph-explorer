@@ -1,11 +1,11 @@
 # HIER4B Soft Folder Clusters
 
-Status: **UNDER EVALUATION — HIER4B-FIX4 implemented; optimized graphical QA pending.**
+Status: **MERGED IMPLEMENTATION — accepted folder behavior is on `main`; PATCH1 Adaptive Compass compatibility awaits graphical QA.**
 
 HIER4B evaluates a second macro-layout family for Modular Focus Hierarchy.
 Directional Folder Bands remains the Modular Preview default, and Classic Focus
-Hierarchy remains the product default. No adoption ADR or production-default
-change belongs to this branch.
+Hierarchy remains the product default. The merged Soft implementation does not
+change either default.
 
 ## Displayed folder hierarchy
 
@@ -57,6 +57,41 @@ automatically compressed layers receive no separate force.
 The deterministic schedule remains Adaptive Compass, 36 relaxation/collision
 iterations, Adaptive Compass, then 18 iterations. The Focus File is translated
 to `(0, 0)` after packing. HIER4B performs no HIER5 routing.
+
+## Adaptive Compass in Soft geometry
+
+PATCH1 corrects a demand-model mismatch in the shared internal-layout engine.
+Directional Bands keeps the accepted `directional-horizontal` policy, which
+classifies counterpart modules by X position. Soft explicitly supplies
+`spatial-cardinal`: each primary authored external reference is classified from
+the current counterpart rectangle relative to the File center as left, right,
+top, or bottom. The shared bounded Compass search still considers at most two
+plausible regions per top-level branch, with the existing 64 complete-assignment
+cap and four local relocation sweeps.
+
+The D0/S1/S2 comparison retained S1, dominant cardinal count. It follows the
+majority of authored references and is less sensitive to diagonal vector sums;
+the mixed two-above/one-right fixture remains above at the production strength,
+with lower primary span and bounds area than aggregate vector. Exact crossings,
+order inversions, and hierarchy quality remain ahead of demand alignment, so a
+branch may stay vertical when a lateral candidate would add a crossing.
+
+Both Compass applications remain. The AC-S8 adaptation case changes three
+branch regions after the first Soft relaxation, improves demand matches from
+four to seven, reduces the immediate exact crossing count from eleven to zero,
+and reduces primary Manhattan span. An unchanged candidate participates in each
+spatial search and wins exact ties, preventing region or module-size churn that
+has no quality benefit.
+
+Development evidence records final cardinal branch counts per module, modules
+with lateral or vertical-only branches, demand matches, hard-guard overrides,
+pass-one/pass-two region and bounds churn, and before/after pass-two crossings
+and span. The macro perturbation diagnostic distinguishes visible region,
+internal rectangle, and module-bound changes from a true geometric no-op. When
+Adaptive and Vertical input rectangles are identical, the downstream Soft
+candidate is byte-identical. Soft cache algorithm version 4 and worker protocol
+version 7 isolate the changed evidence and geometry without invalidating the
+Directional algorithm version.
 
 ## Nested Folder guides
 
@@ -167,12 +202,21 @@ surface. The web application owns workspace persistence and action dispatch.
 
 The bakeoff records SC1–SC24 at strengths 0/25/50/75/100, stress profiles,
 HFA1–HFA7 across H0/H1/H2, a nested strength matrix, and cardinal attachment
-regressions. HIER4B remains under evaluation until the user completes graphical
-QA.
+regressions. PATCH1 adds AC-S1–AC-S8, D0/S1/S2 demand rows, a five-strength
+matrix, and Adaptive/Vertical macro-perturbation evidence.
+
+Before PATCH1, graphical review accepted the nested hierarchy, singleton-chain
+compression, promotion and flattening semantics, passive labels, File-only
+module-boundary suppression, redundant region-wrapper suppression, folder-area
+and composed File/folder context menus, and four-side File ports. PATCH1 does
+not reopen those decisions. Adaptive Compass compatibility is the current
+graphical question.
 
 ## Later work
 
 `HIER4B-SPACING` will evaluate wider use of the available canvas and less
-cramped module interiors after folder semantics are frozen. `MODULAR-CONTEXT1`
-will add Network-style Focus, Inspect, Hide File, and Hide Folder actions to the
-same composed menu model. Neither belongs to FIX4.
+cramped module interiors after folder semantics are frozen.
+`HIER4B-UNIFIED-REGIONS` will separately compare the current split-when-needed
+policy with a policy that prioritizes spatially unified displayed folders.
+`MODULAR-CONTEXT1` will add Network-style Focus, Inspect, Hide File, and Hide
+Folder actions to the same composed menu model. None belongs to PATCH1.

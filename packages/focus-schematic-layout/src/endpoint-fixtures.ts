@@ -39,6 +39,7 @@ export interface EndpointFixtureSpec {
     | `DB${number}`
     | `VS${number}`
     | `CP${number}`
+    | `AC-S${number}`
     | `SC${number}`
     | `HFA${number}`
     | `SS${number}-${'before' | 'after'}`

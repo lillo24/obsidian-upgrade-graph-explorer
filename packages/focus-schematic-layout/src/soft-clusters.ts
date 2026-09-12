@@ -7,7 +7,9 @@ import {
   applyFocusSchematicInternalLayoutVariant,
   createFocusSchematicInternalLayoutEvidence,
   createFocusSchematicInternalLayoutRunStats,
+  measureFocusSchematicCompassDemandAlignment,
 } from './internal-layout-variants';
+import { measureFocusSchematicCandidateAttachmentCrossings } from './attachments';
 import {
   computeFocusSchematicRevision2LayoutAttempt,
   createFocusSchematicEndpointAttachments,
@@ -30,15 +32,17 @@ import type {
   FocusSchematicSoftClusterMetrics,
   FocusSchematicSoftClusterOptions,
   FocusSchematicSoftClusterStrength,
+  FocusSchematicCompassDemandPolicy,
   FocusSchematicSoftFolderDisplayIntent,
   FocusSchematicSoftFolderDisplayTree,
   FocusSchematicSoftHierarchyForcePolicy,
+  FocusSchematicSpatialDemandSummary,
 } from './types';
 
 export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE = [
   36, 18,
 ] as const;
-export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 3 as const;
+export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 4 as const;
 
 const STRATEGY_ID = 'HIER4B-soft-folder-clusters' as const;
 const HOP_SPACING = 520;
@@ -80,6 +84,41 @@ function center(rectangle: FocusSchematicRectangle): Position {
     x: rectangle.x + rectangle.width / 2,
     y: rectangle.y + rectangle.height / 2,
   };
+}
+
+function rectangleForEndpoint(
+  candidate: FocusSchematicLayoutCandidate,
+  endpoint: FocusSchematicEndpointPlan['connections'][number]['source'],
+) {
+  return endpoint.kind === 'visible-entity'
+    ? candidate.nodes.find(
+        ({ projectionNodeId }) =>
+          projectionNodeId === endpoint.projectionNodeId,
+      )
+    : candidate.modules.find(({ moduleId }) => moduleId === endpoint.moduleId);
+}
+
+function totalPrimaryReferenceManhattanSpan(
+  endpointPlan: FocusSchematicEndpointPlan,
+  candidate: FocusSchematicLayoutCandidate,
+) {
+  return endpointPlan.connections.reduce((total, connection) => {
+    if (
+      connection.role === 'secondary' ||
+      connection.sourceModuleId === connection.targetModuleId
+    )
+      return total;
+    const source = rectangleForEndpoint(candidate, connection.source);
+    const target = rectangleForEndpoint(candidate, connection.target);
+    if (source === undefined || target === undefined) return total;
+    const sourceCenter = center(source);
+    const targetCenter = center(target);
+    return (
+      total +
+      Math.abs(targetCenter.x - sourceCenter.x) +
+      Math.abs(targetCenter.y - sourceCenter.y)
+    );
+  }, 0);
 }
 
 function primaryPairs(endpointPlan: FocusSchematicEndpointPlan): Pair[] {
@@ -528,10 +567,18 @@ function branchRegions(
     const file = nodeById.get(module.documentProjectionNodeId);
     if (file === undefined) continue;
     const fileCenter = center(file);
-    for (const node of candidate.nodes.filter(
-      ({ moduleId, projectionNodeId }) =>
-        moduleId === module.id &&
-        projectionNodeId !== module.documentProjectionNodeId,
+    const hierarchyIds = new Set(module.hierarchyEdgeIds);
+    const branchRootIds = new Set(
+      input.projection.edges.flatMap((edge) =>
+        edge.kind === 'hierarchy' &&
+        hierarchyIds.has(edge.id) &&
+        edge.sourceNodeId === module.documentProjectionNodeId
+          ? [edge.targetNodeId]
+          : [],
+      ),
+    );
+    for (const node of candidate.nodes.filter(({ projectionNodeId }) =>
+      branchRootIds.has(projectionNodeId),
     )) {
       const point = center(node);
       const dx = point.x - fileCenter.x;
@@ -548,6 +595,66 @@ function branchRegions(
     }
   }
   return values;
+}
+
+function moduleBoundsChangeCount(
+  before: FocusSchematicLayoutCandidate,
+  after: FocusSchematicLayoutCandidate,
+) {
+  const beforeById = new Map(
+    before.modules.map((module) => [module.moduleId, module]),
+  );
+  return after.modules.filter((module) => {
+    const previous = beforeById.get(module.moduleId);
+    return (
+      previous === undefined ||
+      Math.abs(previous.width - module.width) > EPSILON ||
+      Math.abs(previous.height - module.height) > EPSILON
+    );
+  }).length;
+}
+
+function rectangleGeometryDifferenceCount<
+  Rectangle extends FocusSchematicRectangle,
+>(
+  before: readonly Rectangle[],
+  after: readonly Rectangle[],
+  key: (rectangle: Rectangle) => string,
+) {
+  const beforeById = new Map(
+    before.map((rectangle) => [key(rectangle), rectangle]),
+  );
+  return after.filter((rectangle) => {
+    const previous = beforeById.get(key(rectangle));
+    return (
+      previous === undefined ||
+      Math.abs(previous.x - rectangle.x) > EPSILON ||
+      Math.abs(previous.y - rectangle.y) > EPSILON ||
+      Math.abs(previous.width - rectangle.width) > EPSILON ||
+      Math.abs(previous.height - rectangle.height) > EPSILON
+    );
+  }).length;
+}
+
+function regionDifferenceCount(
+  before: ReadonlyMap<string, string>,
+  after: ReadonlyMap<string, string>,
+) {
+  const ids = new Set([...before.keys(), ...after.keys()]);
+  return [...ids].filter((id) => before.get(id) !== after.get(id)).length;
+}
+
+export interface FocusSchematicSoftMacroPerturbationDiagnostic {
+  readonly internalRegionAssignmentDifferenceCount: number;
+  readonly internalNodeGeometryDifferenceCount: number;
+  readonly moduleBoundsDifferenceCount: number;
+  readonly finalNodeGeometryDifferenceCount: number;
+  readonly finalModuleGeometryDifferenceCount: number;
+  readonly macroFileCenterTotalDisplacement: number;
+  readonly macroFileCenterMaximumDisplacement: number;
+  readonly initialInternalGeometryIdentical: boolean;
+  readonly finalGeometryIdentical: boolean;
+  readonly semanticNoOpSatisfied: boolean;
 }
 
 function percentile(
@@ -725,6 +832,10 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
   const strength = normalizeFocusSchematicSoftFolderStrength(options.strength);
   const internalLayoutVariant =
     options.internalLayoutVariant ?? 'adaptive-compass';
+  const compassDemandPolicy: FocusSchematicCompassDemandPolicy =
+    options.compassDemandPolicy ?? 'spatial-cardinal';
+  const spatialDemandSummary: FocusSchematicSpatialDemandSummary =
+    options.spatialDemandSummary ?? 'dominant-cardinal';
   const endpointOrderPolicy =
     options.endpointOrderPolicy ?? 'crossing-optimized';
   const displayIntent = canonicalFocusSchematicSoftFolderDisplayIntent(
@@ -737,7 +848,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
   )
     .toString(16)
     .padStart(8, '0');
-  const configId = `HIER4B-soft-clusters-s${strength}-${internalLayoutVariant}-${endpointOrderPolicy}-${hierarchyForcePolicy}-intent-${displayIntent.fileParentOverrides.length}-${displayIntent.flattenedFolderKeys.length}-${intentFingerprint}`;
+  const configId = `HIER4Bv${FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION}-soft-clusters-s${strength}-${internalLayoutVariant}-${endpointOrderPolicy}-${hierarchyForcePolicy}-${compassDemandPolicy}-${spatialDemandSummary}-intent-${displayIntent.fileParentOverrides.length}-${displayIntent.flattenedFolderKeys.length}-${intentFingerprint}`;
   const started = performance.now();
   try {
     const baseAttempt = computeFocusSchematicRevision2LayoutAttempt(input);
@@ -770,7 +881,10 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       endpointOrderPolicy,
       stats,
       'soft-cardinal-files',
+      compassDemandPolicy,
+      spatialDemandSummary,
     );
+    const firstInternalCandidate = candidate;
     const firstRegions = branchRegions(input, candidate);
     positions = new Map(
       candidate.modules.map((module) => [module.moduleId, center(module)]),
@@ -788,6 +902,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       relaxation,
     );
     candidate = placeAtCenters(candidate, positions);
+    const secondPassDemandCandidate = candidate;
     candidate = applyFocusSchematicInternalLayoutVariant(
       input,
       base.modulePlan,
@@ -797,7 +912,10 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       endpointOrderPolicy,
       stats,
       'soft-cardinal-files',
+      compassDemandPolicy,
+      spatialDemandSummary,
     );
+    const secondInternalCandidate = candidate;
     const secondRegions = branchRegions(input, candidate);
     positions = new Map(
       candidate.modules.map((module) => [module.moduleId, center(module)]),
@@ -844,8 +962,56 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       base.quality,
       quality,
     );
+    const internalLayoutEvidence = createFocusSchematicInternalLayoutEvidence(
+      input,
+      base.endpointPlan,
+      candidate,
+      base.candidate,
+      internalLayoutVariant,
+      stats,
+    );
+    const alignment = measureFocusSchematicCompassDemandAlignment(
+      input,
+      base.endpointPlan,
+      secondPassDemandCandidate,
+      candidate,
+      compassDemandPolicy,
+      spatialDemandSummary,
+    );
+    const pass2BeforeAlignment = measureFocusSchematicCompassDemandAlignment(
+      input,
+      base.endpointPlan,
+      secondPassDemandCandidate,
+      secondPassDemandCandidate,
+      compassDemandPolicy,
+      spatialDemandSummary,
+    );
+    const pass2AfterAlignment = measureFocusSchematicCompassDemandAlignment(
+      input,
+      base.endpointPlan,
+      secondPassDemandCandidate,
+      secondInternalCandidate,
+      compassDemandPolicy,
+      spatialDemandSummary,
+    );
+    const topBranchCount = internalLayoutEvidence.moduleMetrics.reduce(
+      (sum, module) => sum + module.branchesAboveFile,
+      0,
+    );
+    const bottomBranchCount = internalLayoutEvidence.moduleMetrics.reduce(
+      (sum, module) => sum + module.branchesBelowFile,
+      0,
+    );
+    const leftBranchCount = internalLayoutEvidence.moduleMetrics.reduce(
+      (sum, module) => sum + module.branchesLeftOfFile,
+      0,
+    );
+    const rightBranchCount = internalLayoutEvidence.moduleMetrics.reduce(
+      (sum, module) => sum + module.branchesRightOfFile,
+      0,
+    );
     const evidence: FocusSchematicSoftClusterEvidence = {
-      schemaVersion: 2,
+      schemaVersion: 3,
       developmentOnly: true,
       layoutFamily: 'soft-folder-clusters',
       strength,
@@ -871,6 +1037,60 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       topologyDirectionality: 'undirected-primary',
       secondaryGeometryInfluence: 0,
       fixedIterationSchedule: FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE,
+      compass: {
+        demandPolicy: compassDemandPolicy,
+        spatialDemandSummary,
+        topBranchCount,
+        bottomBranchCount,
+        leftBranchCount,
+        rightBranchCount,
+        modulesWithLateralBranches: internalLayoutEvidence.moduleMetrics.filter(
+          (module) =>
+            module.branchesLeftOfFile + module.branchesRightOfFile > 0,
+        ).length,
+        modulesWithOnlyVerticalBranches:
+          internalLayoutEvidence.moduleMetrics.filter(
+            (module) =>
+              module.topLevelBranchCount > 0 &&
+              module.branchesLeftOfFile + module.branchesRightOfFile === 0,
+          ).length,
+        ...alignment,
+        demandOverriddenByCrossingCount:
+          stats.spatialDemandCrossingOverrideCount,
+        demandOverriddenByInversionCount:
+          stats.spatialDemandInversionOverrideCount,
+        demandOverriddenByHierarchyCount:
+          stats.spatialDemandHierarchyOverrideCount,
+        pass2DemandMatchedBeforeCount:
+          pass2BeforeAlignment.demandMatchedBranchCount,
+        pass2DemandMatchedAfterCount:
+          pass2AfterAlignment.demandMatchedBranchCount,
+        pass2ExactEndpointCrossingBeforeCount:
+          measureFocusSchematicCandidateAttachmentCrossings(
+            base.endpointPlan,
+            secondPassDemandCandidate,
+            'soft-cardinal-files',
+          ),
+        pass2ExactEndpointCrossingAfterCount:
+          measureFocusSchematicCandidateAttachmentCrossings(
+            base.endpointPlan,
+            secondInternalCandidate,
+            'soft-cardinal-files',
+          ),
+        pass2PrimaryManhattanSpanBefore: totalPrimaryReferenceManhattanSpan(
+          base.endpointPlan,
+          secondPassDemandCandidate,
+        ),
+        pass2PrimaryManhattanSpanAfter: totalPrimaryReferenceManhattanSpan(
+          base.endpointPlan,
+          secondInternalCandidate,
+        ),
+        pass1ToPass2BranchRegionChangeCount: churn,
+        pass1ToPass2ModuleBoundsChangeCount: moduleBoundsChangeCount(
+          firstInternalCandidate,
+          secondInternalCandidate,
+        ),
+      },
       metrics: metrics(
         input,
         candidate,
@@ -906,22 +1126,17 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       quality,
       folderBandQuality,
       internalLayoutEvidence: {
-        ...createFocusSchematicInternalLayoutEvidence(
-          input,
-          base.endpointPlan,
-          candidate,
-          base.candidate,
-          internalLayoutVariant,
-          stats,
-        ),
+        ...internalLayoutEvidence,
         softClusterPolicyEvidence: {
-          schemaVersion: 2,
+          schemaVersion: 3,
           layoutFamily: 'soft-folder-clusters',
           strength,
           endpointOrderPolicy,
           displayIntent,
           hierarchyForcePolicy,
           fileAttachmentPolicy: 'spatial-cardinal',
+          compassDemandPolicy,
+          spatialDemandSummary,
         },
       },
     };
@@ -948,6 +1163,131 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       reason: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+/** Development-only explanation of Adaptive/Vertical Soft macro movement. */
+export function compareFocusSchematicSoftInternalVariants(
+  input: FocusSchematicLayoutInput,
+  options: Omit<FocusSchematicSoftClusterOptions, 'internalLayoutVariant'> = {},
+): FocusSchematicSoftMacroPerturbationDiagnostic {
+  const baseAttempt = computeFocusSchematicRevision2LayoutAttempt(input);
+  if (baseAttempt.status !== 'success') throw new Error(baseAttempt.reason);
+  const base = baseAttempt.result;
+  const pairs = primaryPairs(base.endpointPlan);
+  const moduleIds = base.candidate.modules
+    .map(({ moduleId }) => moduleId)
+    .sort(compareText);
+  const hops = hopDistances(input.model.rootModuleId, moduleIds, pairs);
+  const common = placeAtCenters(
+    base.candidate,
+    initialPositions(input, base.candidate, hops),
+  );
+  const demandPolicy = options.compassDemandPolicy ?? 'spatial-cardinal';
+  const spatialDemandSummary =
+    options.spatialDemandSummary ?? 'dominant-cardinal';
+  const adaptiveInitial = applyFocusSchematicInternalLayoutVariant(
+    input,
+    base.modulePlan,
+    base.endpointPlan,
+    common,
+    'adaptive-compass',
+    options.endpointOrderPolicy ?? 'crossing-optimized',
+    createFocusSchematicInternalLayoutRunStats(),
+    'soft-cardinal-files',
+    demandPolicy,
+    spatialDemandSummary,
+  );
+  const verticalInitial = applyFocusSchematicInternalLayoutVariant(
+    input,
+    base.modulePlan,
+    base.endpointPlan,
+    common,
+    'vertical-spine',
+    options.endpointOrderPolicy ?? 'crossing-optimized',
+    createFocusSchematicInternalLayoutRunStats(),
+    'soft-cardinal-files',
+    demandPolicy,
+    spatialDemandSummary,
+  );
+  const adaptiveAttempt = computeFocusSchematicSoftClusterLayoutAttempt(input, {
+    ...options,
+    internalLayoutVariant: 'adaptive-compass',
+  });
+  const verticalAttempt = computeFocusSchematicSoftClusterLayoutAttempt(input, {
+    ...options,
+    internalLayoutVariant: 'vertical-spine',
+  });
+  if (adaptiveAttempt.status !== 'success')
+    throw new Error(adaptiveAttempt.reason);
+  if (verticalAttempt.status !== 'success')
+    throw new Error(verticalAttempt.reason);
+  const internalRegionAssignmentDifferenceCount = regionDifferenceCount(
+    branchRegions(input, adaptiveInitial),
+    branchRegions(input, verticalInitial),
+  );
+  const internalNodeGeometryDifferenceCount = rectangleGeometryDifferenceCount(
+    adaptiveInitial.nodes,
+    verticalInitial.nodes,
+    (node) => node.projectionNodeId,
+  );
+  const moduleBoundsDifferenceCount = moduleBoundsChangeCount(
+    adaptiveInitial,
+    verticalInitial,
+  );
+  const finalNodeGeometryDifferenceCount = rectangleGeometryDifferenceCount(
+    adaptiveAttempt.result.candidate.nodes,
+    verticalAttempt.result.candidate.nodes,
+    (node) => node.projectionNodeId,
+  );
+  const finalModuleGeometryDifferenceCount = rectangleGeometryDifferenceCount(
+    adaptiveAttempt.result.candidate.modules,
+    verticalAttempt.result.candidate.modules,
+    (module) => module.moduleId,
+  );
+  const verticalFileCenterByModuleId = new Map(
+    input.model.modules.flatMap((module) => {
+      if (module.documentProjectionNodeId === null) return [];
+      const node = verticalAttempt.result.candidate.nodes.find(
+        ({ projectionNodeId }) =>
+          projectionNodeId === module.documentProjectionNodeId,
+      );
+      return node === undefined ? [] : [[module.id, center(node)] as const];
+    }),
+  );
+  const displacements = input.model.modules.flatMap((module) => {
+    if (module.documentProjectionNodeId === null) return [];
+    const before = verticalFileCenterByModuleId.get(module.id);
+    const afterNode = adaptiveAttempt.result.candidate.nodes.find(
+      ({ projectionNodeId }) =>
+        projectionNodeId === module.documentProjectionNodeId,
+    );
+    if (before === undefined || afterNode === undefined) return [];
+    const after = center(afterNode);
+    return [Math.hypot(after.x - before.x, after.y - before.y)];
+  });
+  const initialInternalGeometryIdentical =
+    internalNodeGeometryDifferenceCount === 0 &&
+    moduleBoundsDifferenceCount === 0;
+  const finalGeometryIdentical =
+    finalNodeGeometryDifferenceCount === 0 &&
+    finalModuleGeometryDifferenceCount === 0;
+  return {
+    internalRegionAssignmentDifferenceCount,
+    internalNodeGeometryDifferenceCount,
+    moduleBoundsDifferenceCount,
+    finalNodeGeometryDifferenceCount,
+    finalModuleGeometryDifferenceCount,
+    macroFileCenterTotalDisplacement: displacements.reduce(
+      (sum, value) => sum + value,
+      0,
+    ),
+    macroFileCenterMaximumDisplacement:
+      displacements.length === 0 ? 0 : Math.max(...displacements),
+    initialInternalGeometryIdentical,
+    finalGeometryIdentical,
+    semanticNoOpSatisfied:
+      !initialInternalGeometryIdentical || finalGeometryIdentical,
+  };
 }
 
 export function computeFocusSchematicSoftClusterLayout(

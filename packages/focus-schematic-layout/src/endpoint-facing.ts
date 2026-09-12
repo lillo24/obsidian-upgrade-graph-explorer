@@ -978,7 +978,7 @@ function validSoftClusterPolicyEvidence(
     evidence.displayIntent,
   );
   return (
-    evidence.schemaVersion === 2 &&
+    evidence.schemaVersion === 3 &&
     evidence.layoutFamily === 'soft-folder-clusters' &&
     Number.isFinite(evidence.strength) &&
     evidence.strength >= 0 &&
@@ -991,7 +991,11 @@ function validSoftClusterPolicyEvidence(
     (evidence.hierarchyForcePolicy === 'nearest-only' ||
       evidence.hierarchyForcePolicy === 'normalized-decay' ||
       evidence.hierarchyForcePolicy === 'normalized-equal') &&
-    evidence.fileAttachmentPolicy === 'spatial-cardinal'
+    evidence.fileAttachmentPolicy === 'spatial-cardinal' &&
+    (evidence.compassDemandPolicy === 'directional-horizontal' ||
+      evidence.compassDemandPolicy === 'spatial-cardinal') &&
+    (evidence.spatialDemandSummary === 'dominant-cardinal' ||
+      evidence.spatialDemandSummary === 'aggregate-vector')
   );
 }
 

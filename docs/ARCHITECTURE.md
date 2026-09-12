@@ -1254,7 +1254,7 @@ remain unchanged by hover.
 
 HIER4A supersedes the original center-spine production geometry for Modular
 Preview. Its Directional Folder Bands geometry remains the default. The strict
-protocol-v6 worker now receives persisted macro-layout, normalized Soft
+protocol-v7 worker now receives persisted macro-layout, normalized Soft
 strength, sparse workspace Soft display intent, internal-layout, and Heading-order policies. Adaptive Compass plus
 Crossing optimized remain the defaults; Vertical Spine and Document order
 remain Sandbox alternatives. Current/Mosaic remains development-only.
@@ -1326,6 +1326,25 @@ after collision movement. Direct and Electronic consume the same handles;
 route style remains renderer-only. Directional Bands preserves its signed-rank
 attachment output byte-for-byte.
 
+HIER4B-PATCH1 makes the shared Compass demand model explicit. Directional Bands
+continues to call `directional-horizontal`, preserving the accepted X-based
+classifier and output bytes. Soft calls `spatial-cardinal`, classifying every
+primary authored external reference from its current counterpart rectangle
+relative to the File center. The selected dominant-cardinal summary supplies a
+preferred region plus one deterministic fallback to the existing bounded
+assignment search. Exact crossings, adjacent-rank inversions, and internal
+hierarchy crossings precede demand alignment in the candidate score.
+
+Soft still applies Compass before each fixed relaxation round. The second search
+also considers its input geometry as an unchanged candidate, which wins an exact
+tie and prevents unproductive branch or module-bound churn. Development evidence
+records per-module cardinal counts, demand matches and hard-guard overrides,
+pass-to-pass region and bounds changes, and pass-two crossing/span deltas. A
+separate perturbation diagnostic compares Adaptive and Vertical internal
+rectangles with final File-center displacement; identical internal geometry must
+produce identical downstream Soft geometry. Soft algorithm version 4 and worker
+protocol 7 isolate the change while the Directional algorithm version remains 3.
+
 The renderer derives a typed visible-structure marker for each unfiltered module
 after layout. Modules with only a currently visible File paint a transparent
 boundary, including the root; any visible Heading or Block paints the normal
@@ -1367,13 +1386,16 @@ invariance, Inspector behavior, and current touchpad navigation. This completes
 HIER3B. Optimized desktop graphical approval on September 4, 2026, completes
 HIER3B-FIX1. The actual-browser HIER4A integration was approved and its optimized
 desktop check/build passed on September 8, 2026. PRE-HIER4B then added approved
-visible strips and Direct rendering without reopening HIER4A geometry. HIER4B
-is under real-vault graphical evaluation through the live Modular Preview;
+visible strips and Direct rendering without reopening HIER4A geometry. HIER4B's
+implementation is merged and its folder semantics, guides, cleanup, menus, and
+four-side ports have graphical approval. Adaptive Compass compatibility remains
+under real-vault evaluation through PATCH1 in the live Modular Preview;
 HIER4B-FIX3 adds empty-guide area targeting, composed File/current-folder menus,
 short accessible labels, and displayed-depth styling to FIX2 while retaining
 FIX1's cardinal File ports. POLISH1 then hides empty painted module boundaries
-and makes folder labels visually passive without changing that unmerged
-evaluation's geometry or menu behavior;
+and makes folder labels visually passive without changing geometry or menu
+behavior. HIER4B-SPACING, unified folder-region policy, and MODULAR-CONTEXT1
+remain separate later work;
 HIER5 follows HIER4B, and HIER3C follows HIER5.
 
 ## HIER0 product exposure and geometry

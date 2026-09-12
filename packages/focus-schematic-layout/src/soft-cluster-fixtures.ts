@@ -31,7 +31,7 @@ const heading = (
 });
 
 function fixture(
-  id: `SC${number}` | `SS${number}-${'before' | 'after'}`,
+  id: `SC${number}` | `AC-S${number}` | `SS${number}-${'before' | 'after'}`,
   label: string,
   documents: readonly EndpointFixtureDocument[],
   references: readonly EndpointFixtureReference[],
@@ -588,6 +588,153 @@ export const SOFT_CLUSTER_FIXTURES: readonly EndpointFixtureSpec[] = [
       hops: 2,
       expectation:
         'The result uses the full plane and does not recreate directional rank bands.',
+    },
+  ),
+];
+
+const cardinalDocuments = [
+  root,
+  doc('LeftTarget262', 'left'),
+  doc('RightTarget24', 'right'),
+  doc('TopTarget943', 'top'),
+  doc('BottomTarget708', 'bottom'),
+] as const;
+
+/** Synthetic HIER4B-PATCH1 cases that isolate Soft Compass demand. */
+export const SOFT_ADAPTIVE_COMPASS_FIXTURES: readonly EndpointFixtureSpec[] = [
+  fixture(
+    'AC-S1',
+    'four-cardinal Soft Compass fan',
+    cardinalDocuments,
+    [
+      ref('HLeft', 'LeftTarget262'),
+      ref('HRight', 'RightTarget24'),
+      ref('HTop', 'TopTarget943'),
+      ref('HBottom', 'BottomTarget708'),
+    ],
+    {
+      entities: [
+        heading('HLeft', 'Focus', 2),
+        heading('HRight', 'Focus', 4),
+        heading('HTop', 'Focus', 6),
+        heading('HBottom', 'Focus', 8),
+      ],
+      hops: 1,
+      expectation:
+        'Adaptive Compass may use all four regions when exact-crossing guards permit it.',
+    },
+  ),
+  fixture(
+    'AC-S2',
+    'vertical Soft Compass demand',
+    [root, doc('TopTarget943', 'vertical'), doc('BottomTarget708', 'vertical')],
+    [ref('HTop', 'TopTarget943'), ref('HBottom', 'BottomTarget708')],
+    {
+      entities: [heading('HTop', 'Focus', 2), heading('HBottom', 'Focus', 4)],
+      hops: 1,
+      expectation: 'True vertical demand stays above and below the File.',
+    },
+  ),
+  fixture(
+    'AC-S3',
+    'horizontal Soft Compass demand',
+    [
+      root,
+      doc('LeftTarget262', 'horizontal'),
+      doc('RightTarget24', 'horizontal'),
+    ],
+    [ref('HLeft', 'LeftTarget262'), ref('HRight', 'RightTarget24')],
+    {
+      entities: [heading('HLeft', 'Focus', 2), heading('HRight', 'Focus', 4)],
+      hops: 1,
+      expectation: 'Lateral demand produces lateral branch candidates.',
+    },
+  ),
+  fixture(
+    'AC-S4',
+    'mixed spatial demand summary',
+    [
+      root,
+      doc('MixTarget3578', 'mixed'),
+      doc('MixTarget5612', 'mixed'),
+      doc('MixTarget11576', 'mixed'),
+    ],
+    [
+      ref('HMixed', 'MixTarget3578'),
+      ref('HMixed', 'MixTarget5612'),
+      ref('HMixed', 'MixTarget11576'),
+    ],
+    {
+      entities: [heading('HMixed', 'Focus', 2)],
+      hops: 1,
+      expectation:
+        'Two above references outweigh one right reference under bounded summaries.',
+    },
+  ),
+  fixture('AC-S5', 'neutral Soft Compass branch', [root], [], {
+    entities: [heading('HNeutral', 'Focus', 2)],
+    hops: 1,
+    expectation: 'No external demand uses deterministic vertical fallback.',
+  }),
+  fixture(
+    'AC-S6',
+    'crossing guard over lateral demand',
+    [
+      root,
+      doc('LeftTarget262', 'a'),
+      doc('LeftTarget278', 'b'),
+      doc('LeftTarget209', 'b'),
+    ],
+    [
+      ref('H0', 'LeftTarget278'),
+      ref('H0', 'LeftTarget209'),
+      ref('H1', 'LeftTarget262'),
+      ref('H1', 'LeftTarget278'),
+      ref('H2', 'LeftTarget278'),
+      ref('H2', 'LeftTarget262'),
+    ],
+    {
+      entities: [
+        heading('H0', 'Focus', 2),
+        heading('H1', 'Focus', 4),
+        heading('H2', 'Focus', 6),
+      ],
+      hops: 1,
+      expectation:
+        'Exact endpoint crossing quality may keep a demanded branch vertical.',
+    },
+  ),
+  fixture(
+    'AC-S7',
+    'semantic no-op internal variants',
+    [root, doc('TopTarget943', 'vertical'), doc('BottomTarget708', 'vertical')],
+    [ref('HTop', 'TopTarget943'), ref('HBottom', 'BottomTarget708')],
+    {
+      entities: [heading('HTop', 'Focus', 2), heading('HBottom', 'Focus', 4)],
+      hops: 1,
+      expectation:
+        'Adaptive and Vertical select identical rectangles for matched vertical demand.',
+    },
+  ),
+  fixture(
+    'AC-S8',
+    'second-pass spatial adaptation',
+    [
+      root,
+      ...Array.from({ length: 7 }, (_, index) =>
+        doc(`Target${index + 1}`, `moving-${index % 3}`),
+      ),
+    ],
+    Array.from({ length: 7 }, (_, index) =>
+      ref(`H${index + 1}`, `Target${index + 1}`),
+    ),
+    {
+      entities: Array.from({ length: 7 }, (_, index) =>
+        heading(`H${index + 1}`, 'Focus', index * 2 + 2),
+      ),
+      hops: 1,
+      expectation:
+        'The second Compass pass records bounded region and module-size adaptation.',
     },
   ),
 ];

@@ -44,6 +44,7 @@ export {
   FOCUS_SCHEMATIC_COMPASS_LOCAL_RELOCATION_SWEEP_LIMIT,
   FOCUS_SCHEMATIC_INTERNAL_FOLDER_JOINT_ROUND_LIMIT,
   FOCUS_SCHEMATIC_VERTICAL_SPINE_PLACEMENT_CANDIDATE_CAP,
+  measureFocusSchematicCompassDemandAlignment,
   measureFocusSchematicInternalHierarchyCrossings,
   refineFocusSchematicInternalLayoutOrder,
   type FocusSchematicInternalLayoutRunStats,
@@ -77,10 +78,12 @@ export {
   type FocusSchematicFolderBandTimings,
 } from './folder-bands';
 export {
+  compareFocusSchematicSoftInternalVariants,
   computeFocusSchematicSoftClusterLayout,
   computeFocusSchematicSoftClusterLayoutAttempt,
   FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION,
   FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE,
+  type FocusSchematicSoftMacroPerturbationDiagnostic,
 } from './soft-clusters';
 export {
   buildEndpointFixture,
@@ -92,6 +95,7 @@ export {
 } from './endpoint-fixtures';
 export {
   SOFT_CLUSTER_FIXTURES,
+  SOFT_ADAPTIVE_COMPASS_FIXTURES,
   SOFT_CLUSTER_STABILITY_PAIRS,
   createSoftClusterHubFixture,
   createSoftClusterMultiplicityFixture,

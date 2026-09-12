@@ -37,8 +37,8 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     const key = exactFocusSchematicLayoutCacheKey(input);
     expect(key).toContain('modular-focus-hierarchy');
     expect(key).toContain('"algorithmVersion":3');
-    expect(key).toContain('"protocolVersion":6');
-    expect(key.replace('"protocolVersion":6', '"protocolVersion":5')).not.toBe(
+    expect(key).toContain('"protocolVersion":7');
+    expect(key.replace('"protocolVersion":7', '"protocolVersion":6')).not.toBe(
       key,
     );
     expect(exactFocusSchematicLayoutCacheKey(input, 1)).not.toBe(key);
@@ -173,6 +173,9 @@ describe('page-lifetime Focus Schematic layout cache', () => {
         macroLayout: 'soft-folder-clusters',
         softFolderStrength,
       }) as const;
+    expect(
+      exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)),
+    ).toContain('"algorithmVersion":4');
     const at25 = computeFocusSchematicSoftClusterLayoutAttempt(softInput, {
       strength: 25,
     });

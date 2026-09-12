@@ -30,6 +30,14 @@ export type FocusSchematicEndpointOrderPolicy =
 export type FocusSchematicInternalLayoutVariant =
   'current' | 'vertical-spine' | 'adaptive-compass';
 
+/** Macro-specific evidence used by the shared Adaptive Compass search. */
+export type FocusSchematicCompassDemandPolicy =
+  'directional-horizontal' | 'spatial-cardinal';
+
+/** Development comparator for aggregating several spatial branch references. */
+export type FocusSchematicSpatialDemandSummary =
+  'dominant-cardinal' | 'aggregate-vector';
+
 export interface FocusSchematicInternalLayoutModuleMetrics {
   readonly moduleId: EntityId;
   readonly topLevelBranchCount: number;
@@ -318,13 +326,15 @@ export type FocusSchematicSoftHierarchyForcePolicy =
   'nearest-only' | 'normalized-decay' | 'normalized-equal';
 
 export interface FocusSchematicSoftClusterPolicyEvidence {
-  readonly schemaVersion: 2;
+  readonly schemaVersion: 3;
   readonly layoutFamily: 'soft-folder-clusters';
   readonly strength: FocusSchematicSoftClusterStrength;
   readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
   readonly displayIntent: FocusSchematicSoftFolderDisplayIntent;
   readonly hierarchyForcePolicy: FocusSchematicSoftHierarchyForcePolicy;
   readonly fileAttachmentPolicy: 'spatial-cardinal';
+  readonly compassDemandPolicy: FocusSchematicCompassDemandPolicy;
+  readonly spatialDemandSummary: FocusSchematicSpatialDemandSummary;
 }
 
 export interface FocusSchematicSoftClusterOptions {
@@ -335,6 +345,34 @@ export interface FocusSchematicSoftClusterOptions {
   readonly hierarchyForcePolicy?: FocusSchematicSoftHierarchyForcePolicy;
   /** Development-lab comparator; Adaptive Compass is the HIER4B default. */
   readonly internalLayoutVariant?: 'adaptive-compass' | 'vertical-spine';
+  /** Development-benchmark comparator; production Soft always uses spatial-cardinal. */
+  readonly compassDemandPolicy?: FocusSchematicCompassDemandPolicy;
+  /** Development-benchmark comparator; production uses dominant-cardinal. */
+  readonly spatialDemandSummary?: FocusSchematicSpatialDemandSummary;
+}
+
+export interface FocusSchematicSoftCompassEvidence {
+  readonly demandPolicy: FocusSchematicCompassDemandPolicy;
+  readonly spatialDemandSummary: FocusSchematicSpatialDemandSummary;
+  readonly topBranchCount: number;
+  readonly bottomBranchCount: number;
+  readonly leftBranchCount: number;
+  readonly rightBranchCount: number;
+  readonly modulesWithLateralBranches: number;
+  readonly modulesWithOnlyVerticalBranches: number;
+  readonly demandedBranchCount: number;
+  readonly demandMatchedBranchCount: number;
+  readonly demandOverriddenByCrossingCount: number;
+  readonly demandOverriddenByInversionCount: number;
+  readonly demandOverriddenByHierarchyCount: number;
+  readonly pass2DemandMatchedBeforeCount: number;
+  readonly pass2DemandMatchedAfterCount: number;
+  readonly pass2ExactEndpointCrossingBeforeCount: number;
+  readonly pass2ExactEndpointCrossingAfterCount: number;
+  readonly pass2PrimaryManhattanSpanBefore: number;
+  readonly pass2PrimaryManhattanSpanAfter: number;
+  readonly pass1ToPass2BranchRegionChangeCount: number;
+  readonly pass1ToPass2ModuleBoundsChangeCount: number;
 }
 
 export interface FocusSchematicSoftClusterMetrics {
@@ -374,7 +412,7 @@ export interface FocusSchematicSoftClusterRuntimeEvidence {
 }
 
 export interface FocusSchematicSoftClusterEvidence {
-  readonly schemaVersion: 2;
+  readonly schemaVersion: 3;
   readonly developmentOnly: true;
   readonly layoutFamily: 'soft-folder-clusters';
   readonly strength: FocusSchematicSoftClusterStrength;
@@ -391,6 +429,7 @@ export interface FocusSchematicSoftClusterEvidence {
   readonly topologyDirectionality: 'undirected-primary';
   readonly secondaryGeometryInfluence: 0;
   readonly fixedIterationSchedule: readonly [36, 18];
+  readonly compass: FocusSchematicSoftCompassEvidence;
   readonly metrics: FocusSchematicSoftClusterMetrics;
   readonly runtime: FocusSchematicSoftClusterRuntimeEvidence;
 }

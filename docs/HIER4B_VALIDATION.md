@@ -1,9 +1,22 @@
 # HIER4B validation
 
-Status: **HIER4B-FIX4 IMPLEMENTED — optimized graphical decision pending.**
+Status: **MERGED HIER4B IMPLEMENTATION — PATCH1 Adaptive Compass compatibility implemented and awaiting graphical approval.**
 
 HIER4B evidence remains synthetic and development-only. Directional Folder
-Bands is the unchanged reference and default. No HIER4B adoption PR exists.
+Bands is the unchanged reference and default. Soft Folder Clusters is merged on
+`main`; remaining work is tracked as focused graphical-quality patches.
+
+## QA state before PATCH1
+
+Graphical review accepted the nested Soft hierarchy, singleton-chain
+compression, File promotion and folder flattening, passive folder labels,
+File-only module-boundary suppression, redundant region-wrapper suppression,
+folder-area right-click, composed File plus containing-folder menus, and
+four-side File ports. Those items are no longer pending.
+
+Adaptive Compass compatibility with Soft Folder Clusters is awaiting review of
+PATCH1. `HIER4B-SPACING`, `HIER4B-UNIFIED-REGIONS`, and `MODULAR-CONTEXT1` remain
+separate later work.
 
 ## Hard regression boundaries
 
@@ -99,8 +112,55 @@ The current benchmark passed:
 - 21 HFA1–HFA7 policy rows;
 - 35 HFA1–HFA7 strength rows;
 - three cardinal attachment geometry profiles.
+- 32 AC-S1–AC-S8 demand/control rows;
+- 40 AC-S1–AC-S8 strength rows;
+- eight Adaptive/Vertical macro-perturbation rows.
 
 Decision state remains `REQUIRES_GRAPHICAL_REVIEW`.
+
+## PATCH1 Adaptive Compass consistency
+
+AC-S1–AC-S8 isolate four-cardinal, vertical, horizontal, mixed, neutral,
+crossing-guard, semantic no-op, and second-pass adaptation cases. The D0
+directional-horizontal classifier can treat an above or below counterpart as a
+left/right demand because it only compares module X. S1 and S2 instead classify
+the current counterpart rectangle in four deterministic cardinal sectors.
+
+S1 dominant-cardinal count is selected over S2 aggregate vector. AC-S4 places
+two diagonally-above authored targets and one right target: S1 selects top,
+while S2 selects right. At strength 50 both have zero crossings, but S1 has the
+lower primary Manhattan span and bounds area. Reference multiplicity is read
+from the endpoint connection's authored reference IDs, so coalescing does not
+erase the majority signal.
+
+Across the eight strength-50 patch fixtures, D0, S1, and S2 all retain zero
+crossings and zero adjacent-rank inversions. Spatial demand matches improve from
+13/21 in D0 to 19/21 in both spatial strategies. S1 then beats S2 on aggregate
+primary Manhattan span (`13632.431` vs `13681.537`) and bounds area
+(`5084021.965` vs `5157012.856`) with the same 138 Compass assignments and five
+pass-to-pass region changes. The two unmatched S1 branches are recorded hard
+guard overrides rather than unexplained misses.
+
+The candidate score keeps exact crossings, adjacent-rank inversions, and
+internal hierarchy crossings ahead of cardinal-demand matching. AC-S6 records
+one crossing-driven demand override: the second pass replaces a fully matched
+lateral arrangement with one exact crossing by a partly vertical zero-crossing
+arrangement. AC-S8 records three region changes and improves pass-two demand
+matches from 4 to 7, crossings from 11 to 0, and primary Manhattan span from
+6607.329 to 4519.329. This evidence supports retaining both bounded passes.
+
+AC-S7 produces identical Adaptive and Vertical internal regions, node
+rectangles, and module bounds. Its final Soft node/module rectangles and every
+File center are also identical, proving that variant/config labels alone do not
+perturb the macro layout. AC-S1 supplies the contrasting legitimate case:
+regions, node rectangles, and root-module bounds differ, so non-root File-center
+movement is expected.
+
+The Directional isolation oracle hashes candidate geometry, attachments,
+folder bands, and quality for DB5, DB11, DB12, FB4, DB14, and DB19 against the
+merged `bfc4b1c` baseline. All six SHA-256 values remain byte-identical. The
+shared Compass engine still owns both policies; no algorithm copy or dependency
+was added.
 
 ## Commands
 
@@ -112,8 +172,8 @@ pnpm exec vitest run packages/renderer-reactflow
 pnpm --filter @icarus-graph-explorer/web typecheck
 pnpm exec vitest run apps/web
 pnpm benchmark:focus-schematic-soft-clusters
-pnpm benchmark:focus-schematic-production-worker -- --profile small
-pnpm benchmark:focus-schematic-production-worker -- --profile medium
+pnpm benchmark:focus-schematic-production-worker -- --profile small --macro soft-folder-clusters
+pnpm benchmark:focus-schematic-production-worker -- --profile medium --macro soft-folder-clusters
 pnpm check
 pnpm desktop:check
 pnpm desktop:build
@@ -141,3 +201,8 @@ The exact FIX4 prompt is archived at
 `history-implementations/HIER4B_FIX4_post_island_redundant_wrapper_suppression_codex_prompt.md`.
 Its SHA-256 is
 `1F37791ACB26EB860419F5533299DD9DBAFACF4BF55546451C7F6F0A167EE08A`.
+
+The exact PATCH1 prompt is archived at
+`history-implementations/HIER4B_PATCH1_soft_adaptive_compass_consistency_codex_prompt.md`.
+Its SHA-256 is
+`9C43FC2C51C0F71D9F3E862BB7EF5377868D17202B319010BC3D8E5D684A8458`.

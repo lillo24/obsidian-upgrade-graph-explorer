@@ -16,7 +16,7 @@ import type {
   FocusSchematicSoftClusterEvidence,
 } from './types';
 
-export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 6 as const;
+export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 7 as const;
 
 export interface FocusSchematicLayoutWorkerRequest {
   readonly protocolVersion: typeof FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION;
@@ -137,13 +137,14 @@ function validateSoftClusterEvidence(
       'topologyDirectionality',
       'secondaryGeometryInfluence',
       'fixedIterationSchedule',
+      'compass',
       'metrics',
       'runtime',
     ],
     'Soft Cluster evidence',
   );
   if (
-    evidence.schemaVersion !== 2 ||
+    evidence.schemaVersion !== 3 ||
     evidence.developmentOnly !== true ||
     evidence.layoutFamily !== 'soft-folder-clusters' ||
     evidence.strength !==
@@ -175,6 +176,52 @@ function validateSoftClusterEvidence(
   )
     throw new FocusSchematicLayoutProtocolError(
       'Soft Cluster evidence does not match the requested policy.',
+    );
+  const compass = record(evidence.compass, 'Soft Compass evidence');
+  exactKeys(
+    compass,
+    [
+      'demandPolicy',
+      'spatialDemandSummary',
+      'topBranchCount',
+      'bottomBranchCount',
+      'leftBranchCount',
+      'rightBranchCount',
+      'modulesWithLateralBranches',
+      'modulesWithOnlyVerticalBranches',
+      'demandedBranchCount',
+      'demandMatchedBranchCount',
+      'demandOverriddenByCrossingCount',
+      'demandOverriddenByInversionCount',
+      'demandOverriddenByHierarchyCount',
+      'pass2DemandMatchedBeforeCount',
+      'pass2DemandMatchedAfterCount',
+      'pass2ExactEndpointCrossingBeforeCount',
+      'pass2ExactEndpointCrossingAfterCount',
+      'pass2PrimaryManhattanSpanBefore',
+      'pass2PrimaryManhattanSpanAfter',
+      'pass1ToPass2BranchRegionChangeCount',
+      'pass1ToPass2ModuleBoundsChangeCount',
+    ],
+    'Soft Compass evidence',
+  );
+  if (
+    compass.demandPolicy !== 'spatial-cardinal' ||
+    (compass.spatialDemandSummary !== 'dominant-cardinal' &&
+      compass.spatialDemandSummary !== 'aggregate-vector')
+  )
+    throw new FocusSchematicLayoutProtocolError(
+      'Soft Compass evidence does not match the production demand policy.',
+    );
+  for (const [key, metric] of Object.entries(compass))
+    if (key !== 'demandPolicy' && key !== 'spatialDemandSummary')
+      finiteNonNegative(metric, `Soft Compass evidence.${key}`);
+  if (
+    Number(compass.demandMatchedBranchCount) >
+    Number(compass.demandedBranchCount)
+  )
+    throw new FocusSchematicLayoutProtocolError(
+      'Soft Compass demand matches exceed demanded branches.',
     );
   const metrics = record(evidence.metrics, 'Soft Cluster metrics');
   exactKeys(

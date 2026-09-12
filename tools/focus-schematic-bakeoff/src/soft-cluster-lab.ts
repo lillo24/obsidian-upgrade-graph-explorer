@@ -9,6 +9,7 @@ import {
   createSoftClusterHubFixture,
   createSoftClusterMultiplicityFixture,
   FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+  SOFT_ADAPTIVE_COMPASS_FIXTURES,
   SOFT_CLUSTER_FIXTURES,
   SOFT_CLUSTER_STABILITY_PAIRS,
   type EndpointFixtureSpec,
@@ -28,10 +29,12 @@ interface ScenarioGroup {
 
 function scenarios(): Readonly<Record<string, ScenarioGroup>> {
   const groups = Object.fromEntries(
-    SOFT_CLUSTER_FIXTURES.map((spec) => [
-      spec.id,
-      { label: `${spec.id} — ${spec.label}`, revisions: { base: spec } },
-    ]),
+    [...SOFT_CLUSTER_FIXTURES, ...SOFT_ADAPTIVE_COMPASS_FIXTURES].map(
+      (spec) => [
+        spec.id,
+        { label: `${spec.id} — ${spec.label}`, revisions: { base: spec } },
+      ],
+    ),
   ) as Record<string, ScenarioGroup>;
   groups.SC11 = {
     label: 'SC11 — hub scale 20 / 50 / 100',
@@ -208,10 +211,10 @@ export async function writeSoftClusterLab(
   const serialized = JSON.stringify(data).replaceAll('<', '\\u003c');
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HIER4B Soft Folder Clusters Lab</title>
+<title>HIER4B PATCH1 Soft Compass Lab</title>
 <style>
 :root{color-scheme:dark;font:14px/1.45 Inter,system-ui,sans-serif;background:#08101a;color:#e8f0fb}*{box-sizing:border-box}body{margin:0}.top{position:sticky;top:0;z-index:3;background:#0e1825f2;border-bottom:1px solid #2a3b50;padding:13px 18px;backdrop-filter:blur(12px)}h1{font-size:18px;margin:0 0 9px}.controls{display:flex;flex-wrap:wrap;align-items:end;gap:9px 15px}label{display:grid;gap:3px;color:#b5c5d9;font-size:11px}select{font:inherit;color:#f3f7fc;background:#17263a;border:1px solid #3b526d;border-radius:7px;padding:6px 8px}.checks{display:flex;flex-wrap:wrap;gap:9px}.checks label{display:flex;align-items:center;gap:4px}.content{padding:15px 18px 28px}.notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-bottom:12px}.note{border:1px solid #273a50;background:#0d1723;border-radius:8px;padding:9px}.note b{display:block;color:#86bdff;margin-bottom:2px}.views{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:12px}.panel{border:1px solid #2a3d53;background:#0b141f;border-radius:10px;overflow:hidden;min-width:0}.panel h2{font-size:13px;margin:0;padding:8px 11px;background:#121f2e;border-bottom:1px solid #2a3d53}.canvas{display:block;width:100%;height:660px}.module{fill:#13253acc;stroke:#6d8aad;stroke-width:2}.module.root{stroke:#ffc867;stroke-width:3}.module.filtered{stroke-dasharray:6 5;fill:#181d25}.bounds{fill:none;stroke:#ffcf7555;stroke-dasharray:5 4}.node{fill:#23415e;stroke:#8bb3dc;stroke-width:1.4}.node.section{fill:#1d344c}.node.block{fill:#172b3f}.label{fill:#f0f6ff;font-size:10px;text-anchor:middle;dominant-baseline:middle}.module-label{fill:#a9bdd3;font-size:10px;font-weight:700}.edge{fill:none;stroke:#b3c8df;stroke-width:2;opacity:.78}.edge.secondary{stroke:#73849a;stroke-dasharray:5 5;opacity:.38}.hierarchy{fill:none;stroke:#66819e;stroke-width:1.3;opacity:.65}.hull{fill:#63a8ff12;stroke:#63a8ff77;stroke-dasharray:9 6}.centroid{fill:#7ac0ff;stroke:#07101a;stroke-width:2}.hop{fill:none;stroke:#f4c96e40;stroke-dasharray:4 7}.metrics{white-space:pre-wrap;font:11px/1.45 ui-monospace,Consolas,monospace;padding:9px 11px;margin:0;color:#bcd0e6;border-top:1px solid #23364b}.decision{margin-top:13px;border:1px solid #35506f;background:#101d2c;border-radius:9px;padding:11px}.decision b{color:#8fc4ff}.legend{color:#9db1c7;margin:8px 0 0}.warning{color:#ffcb77}.hidden{display:none}
-</style></head><body><div class="top"><h1>HIER4B Soft Folder Clusters Lab</h1><div class="controls">
+</style></head><body><div class="top"><h1>HIER4B PATCH1 Soft Compass Lab</h1><div class="controls">
 <label>Scenario<select id="scenario"></select></label><label>Revision<select id="revision"></select></label>
 <label>Macro layout<select id="macro"><option value="soft">Soft Clusters</option><option value="directional">Directional Bands reference</option></select></label>
 <label>Strength<select id="strength">${strengths.map((value) => `<option${value === 50 ? ' selected' : ''}>${value}</option>`).join('')}</select></label>
@@ -249,7 +252,7 @@ const edges=q('links').checked?current().connections.map(c=>{const s=at.get(c.id
 const hierarchy=model.hierarchyEdges.map(e=>{const s=nodes.get(e.sourceNodeId),t=nodes.get(e.targetNodeId);if(!s||!t)return'';return '<path class="hierarchy" d="M '+(s.x+s.width/2)+' '+(s.y+s.height)+' L '+(t.x+t.width/2)+' '+t.y+'"/>'}).join('');
 const modules=candidate.modules.map(m=>{const meta=model.modules.find(x=>x.id===m.moduleId);const root=m.moduleId===model.rootModuleId;return '<g><rect class="module '+(root?'root ':'')+(meta.presentation==='filtered'?'filtered':'')+'" x="'+m.x+'" y="'+m.y+'" width="'+m.width+'" height="'+m.height+'" rx="16"/><text class="module-label" x="'+(m.x+10)+'" y="'+(m.y+16)+'">'+esc(m.moduleId)+(meta.folderKey?' · '+esc(meta.folderKey):' · filtered')+'</text>'+(q('bounds').checked?'<rect class="bounds" x="'+m.x+'" y="'+m.y+'" width="'+m.width+'" height="'+m.height+'"/>':'')+'</g>'}).join('');
 const nodeShapes=candidate.nodes.map(n=>'<g><rect class="node '+model.nodeKinds[n.projectionNodeId]+'" x="'+n.x+'" y="'+n.y+'" width="'+n.width+'" height="'+n.height+'" rx="8"/><text class="label" x="'+(n.x+n.width/2)+'" y="'+(n.y+n.height/2)+'">'+esc(n.projectionNodeId)+'</text></g>').join('');
-const evidence=data.evidence;const metrics=evidence.metrics??evidence.folderBandQuality;const summary={family:evidence.layoutFamily,strength:evidence.strength??'categorical',crossings:data.quality.exactEndpointCrossingCount,overlaps:data.quality.moduleOverlapPairs.length,boundsArea:Math.round(data.quality.totalBoundsArea),folderRmsMean:metrics.repeatedFolderRmsRadiusMean??null,connectedDistanceMean:metrics.connectedPairDistanceMean??null,hopError:metrics.hopMeanAbsoluteRadiusError??null,compassChurn:evidence.runtime?.compassBranchRegionChurn??null,layoutMs:evidence.runtime?.layoutMs??evidence.runtimeMs};
+const evidence=data.evidence;const metrics=evidence.metrics??evidence.folderBandQuality;const summary={family:evidence.layoutFamily,strength:evidence.strength??'categorical',crossings:data.quality.exactEndpointCrossingCount,overlaps:data.quality.moduleOverlapPairs.length,boundsArea:Math.round(data.quality.totalBoundsArea),folderRmsMean:metrics.repeatedFolderRmsRadiusMean??null,connectedDistanceMean:metrics.connectedPairDistanceMean??null,hopError:metrics.hopMeanAbsoluteRadiusError??null,compass:evidence.compass??null,layoutMs:evidence.runtime?.layoutMs??evidence.runtimeMs};
 return '<section class="panel"><h2>'+esc(title)+'</h2><svg class="canvas" viewBox="'+box.l+' '+box.t+' '+width+' '+height+'"><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#b3c8df"/></marker></defs>'+hopGuides+hulls+edges+hierarchy+modules+nodeShapes+centroids+'</svg><pre class="metrics">'+esc(JSON.stringify(summary,null,2))+'</pre></section>'}
 function current(){return DATA[q('scenario').value].revisions[q('revision').value]}
 function render(){const d=current();q('authored').textContent=d.explanation.authored;q('expected').textContent=d.explanation.expectation;q('inspect').textContent=d.explanation.inspect;let panels=[];if(q('macro').value==='directional')panels=[renderPanel(d.directional,'Directional Bands reference')];else{const selected=d.soft[q('order').value][q('internal').value];const values=q('scenario').value==='SC16'?[0,25,50,75,100]:[Number(q('strength').value)];panels=values.map(v=>renderPanel(selected[v],'Soft Clusters · strength '+v))}q('views').innerHTML=panels.join('')}
@@ -259,7 +262,7 @@ q('scenario').addEventListener('change',()=>{revisions();render()});for(const id
   await writeFile(indexPath, html, 'utf8');
   await writeFile(
     resolve(outputDirectory, 'README.txt'),
-    'HIER4B development-only graphical bakeoff. Production settings are unchanged.\n',
+    'HIER4B-PATCH1 development-only Soft Compass graphical QA. Directional settings are unchanged.\n',
     'utf8',
   );
   return indexPath;

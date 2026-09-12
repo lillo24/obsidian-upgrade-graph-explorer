@@ -8,6 +8,7 @@ import {
 } from '@icarus-graph-explorer/focus-schematic';
 import {
   buildEndpointFixture,
+  compareFocusSchematicSoftInternalVariants,
   computeFocusSchematicComputedLayoutAttempt,
   computeFocusSchematicSoftClusterLayoutAttempt,
   createFocusSchematicEndpointAttachments,
@@ -15,6 +16,7 @@ import {
   createSoftClusterHubFixture,
   createSoftClusterMultiplicityFixture,
   FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+  SOFT_ADAPTIVE_COMPASS_FIXTURES,
   SOFT_CLUSTER_FIXTURES,
   SOFT_CLUSTER_STABILITY_PAIRS,
   type EndpointFixtureSpec,
@@ -22,6 +24,7 @@ import {
   type FocusSchematicSoftFolderDisplayIntent,
   type FocusSchematicSoftHierarchyForcePolicy,
   type FocusSchematicSoftClusterStrength,
+  type FocusSchematicSoftClusterOptions,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 
 import { createLayoutInput } from './dimensions';
@@ -44,14 +47,20 @@ function soft(
     flattenedFolderKeys: [],
   },
   hierarchyForcePolicy: FocusSchematicSoftHierarchyForcePolicy = 'normalized-decay',
+  layoutOptions: Omit<
+    FocusSchematicSoftClusterOptions,
+    'strength' | 'displayIntent' | 'hierarchyForcePolicy'
+  > = {},
 ) {
   const input = inputFor(spec, false);
   const first = computeFocusSchematicSoftClusterLayoutAttempt(input, {
+    ...layoutOptions,
     strength,
     displayIntent,
     hierarchyForcePolicy,
   });
   const second = computeFocusSchematicSoftClusterLayoutAttempt(input, {
+    ...layoutOptions,
     strength,
     displayIntent,
     hierarchyForcePolicy,
@@ -86,6 +95,8 @@ function soft(
     },
     metrics: first.evidence.metrics,
     runtime: first.evidence.runtime,
+    compass: first.evidence.compass,
+    internalMetrics: first.result.internalLayoutEvidence.metrics,
     fileParentOverrideCount: first.evidence.fileParentOverrideCount,
     flattenedFolderCount: first.evidence.flattenedFolderCount,
     displayedFolderCount: first.evidence.displayedFolderCount,
@@ -670,6 +681,43 @@ function stabilityRows() {
 const fixtureRows = SOFT_CLUSTER_FIXTURES.flatMap((spec) =>
   strengths.map((strength) => soft(spec, strength)),
 );
+const compassDemandBakeoffRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.flatMap(
+  (spec) => [
+    {
+      strategy: 'D0-directional-horizontal',
+      ...soft(spec, 50, undefined, undefined, {
+        compassDemandPolicy: 'directional-horizontal',
+      }),
+    },
+    {
+      strategy: 'S1-dominant-cardinal',
+      ...soft(spec, 50, undefined, undefined, {
+        compassDemandPolicy: 'spatial-cardinal',
+        spatialDemandSummary: 'dominant-cardinal',
+      }),
+    },
+    {
+      strategy: 'S2-aggregate-vector',
+      ...soft(spec, 50, undefined, undefined, {
+        compassDemandPolicy: 'spatial-cardinal',
+        spatialDemandSummary: 'aggregate-vector',
+      }),
+    },
+    {
+      strategy: 'V-vertical-control',
+      ...soft(spec, 50, undefined, undefined, {
+        internalLayoutVariant: 'vertical-spine',
+      }),
+    },
+  ],
+);
+const compassStrengthRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.flatMap((spec) =>
+  strengths.map((strength) => soft(spec, strength)),
+);
+const macroPerturbationRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.map((spec) => ({
+  fixtureId: spec.id,
+  ...compareFocusSchematicSoftInternalVariants(inputFor(spec, false)),
+}));
 const stressRows = [20, 50, 100].flatMap((count) =>
   strengths.map((strength) => ({
     profile: `hub-${count}`,
@@ -705,6 +753,15 @@ const hardGatesPass =
   hierarchyStrengthRows.every(
     ({ deterministic, hardGates, maximumPerFileFolderWeight }) =>
       deterministic && hardGates.overlapFree && maximumPerFileFolderWeight <= 1,
+  ) &&
+  compassDemandBakeoffRows.every(
+    ({ deterministic, hardGates }) => deterministic && hardGates.overlapFree,
+  ) &&
+  compassStrengthRows.every(
+    ({ deterministic, hardGates }) => deterministic && hardGates.overlapFree,
+  ) &&
+  macroPerturbationRows.every(({ semanticNoOpSatisfied }) =>
+    Boolean(semanticNoOpSatisfied),
   ) &&
   zeroFolderMutation.byteIdentical;
 const completeHardGatesPass =
@@ -746,6 +803,15 @@ const report = {
   },
   hierarchyStrengthRows,
   cardinalGeometryRows,
+  adaptiveCompassPatch: {
+    selectedDemandPolicy: 'spatial-cardinal',
+    selectedDemandSummary: 'dominant-cardinal',
+    rationale:
+      'Dominant cardinal count follows authored-reference majority, stays stable near sector boundaries, and retains the bounded two-choice Compass search.',
+    demandBakeoffRows: compassDemandBakeoffRows,
+    strengthRows: compassStrengthRows,
+    macroPerturbationRows,
+  },
 };
 
 const outIndex = process.argv.indexOf('--out');
@@ -760,5 +826,5 @@ const target = isAbsolute(requested)
 mkdirSync(dirname(target), { recursive: true });
 writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 process.stdout.write(
-  `${JSON.stringify({ target, decisionState: report.decisionState, hardGatesPass: completeHardGatesPass, fixtureRows: fixtureRows.length, stressRows: stressRows.length, hierarchyForceRows: hierarchyForceRows.length, hierarchyStrengthRows: hierarchyStrengthRows.length })}\n`,
+  `${JSON.stringify({ target, decisionState: report.decisionState, hardGatesPass: completeHardGatesPass, fixtureRows: fixtureRows.length, compassDemandRows: compassDemandBakeoffRows.length, compassStrengthRows: compassStrengthRows.length, stressRows: stressRows.length, hierarchyForceRows: hierarchyForceRows.length, hierarchyStrengthRows: hierarchyStrengthRows.length })}\n`,
 );
