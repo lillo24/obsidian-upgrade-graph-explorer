@@ -158,6 +158,8 @@ importers:
         specifier: 24.13.3
         version: 24.13.3
 
+  packages/ai-review: {}
+
   packages/core: {}
 
   packages/dagre-layout:

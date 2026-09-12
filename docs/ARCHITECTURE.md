@@ -123,6 +123,17 @@ Worker builds, the web build boundary explicitly resolves the Markdown
 named-reference decoder's worker-safe entry and rejects emitted worker chunks
 that construct DOM values.
 
+`packages/ai-review` is a separate provider-neutral, headless orchestration
+boundary. It freezes explicitly supplied review material and configuration,
+starts isolated Negative and Positive executions concurrently, validates their
+terminal results before a constrained Integrator, and optionally runs a
+read-only compiler-aware post-check. It owns immutable run evidence, lifecycle,
+result validation, and exports—not Git/filesystem capture, React/graph UI,
+provider SDK transport, durable storage, or the compiler's knowledge model.
+Compiler access is an injected retained-snapshot session with four bounded read
+operations; placement and authorization stay application-owned. See
+[`AI_REVIEW_COMPILER_INTEGRATION.md`](AI_REVIEW_COMPILER_INTEGRATION.md).
+
 `packages/dagre-layout` owns the versioned plain-data W3 protocol, strict
 input/output validation, and the only synchronous Dagre compute/configuration
 implementation. It is stateless and knows nothing about React, React Flow,
