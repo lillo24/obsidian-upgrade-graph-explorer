@@ -3,6 +3,14 @@
 This folder owns browser adapters for the automatic KG9B Current View and the
 independent workspace registries that compose the graph product.
 
+It also contains `argument-library.ts`, the independent profile-level browser
+adapter for `@icarus-graph-explorer/argument-workspace`. That adapter uses one
+`icarus-graph-explorer:argument-library:v1` key rather than a workspace-scoped
+graph key, validates before adoption, preserves corrupt/future values, performs
+expected-snapshot checks, and surfaces implementation-dependent browser quota
+failures. It stores prose-sized Argument Library JSON only; source bodies and
+live source observations are not added to it.
+
 - `storage.ts` maps encoded stable workspace IDs to small `localStorage`
   records and returns explicit, non-fatal read/write/delete failures.
 - `session.ts` applies report identity eligibility and hydrates a reconciled KG6

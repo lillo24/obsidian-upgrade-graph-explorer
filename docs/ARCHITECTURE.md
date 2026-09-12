@@ -159,6 +159,25 @@ rendering, live subscriptions, or full resync orchestration. An injectable
 narrow bridge and scheduler keep all provider tests independent of a native
 runtime.
 
+`packages/argument-workspace` is an independent source-neutral domain and
+application boundary for one local Argument Library. Its schema-v1
+Topic/Axiom/Counter-Argument data is not added to the canonical Markdown graph.
+The package owns strict validation, stable record/library revisions, portable
+source locators, stale-response detection, deterministic descriptive indexing,
+JSON/Markdown interchange, serialized expected-snapshot authoring commits, and
+immutable snapshot-bound read/bundle/source-dispatch contracts. Authoring and
+consumer facades are separate. The consumer has no store access, agent role,
+review stage, graph/view state, or model dependency.
+
+`apps/web/src/persistence/argument-library.ts` adapts that store contract to one
+profile-level localStorage key. `packages/argument-workspace-tauri` adapts it to
+dedicated private app-local JSON using validated temporary-sibling replacement.
+Neither adapter uses the graph view registry, selected-vault Markdown, or
+workspace identity catalog. Live theory-source acquisition remains a later host
+adapter behind the Argument Workspace's narrow registered-reference reader; it
+must reuse authorized source infrastructure rather than introduce another vault
+scanner.
+
 `apps/web/src/desktop-live-vault.ts` is the non-React application orchestration
 boundary between that provider and the W1 processor. It owns one live runtime, watcher
 subscription, serialized operation queue, buffered bootstrap, paused/dirty

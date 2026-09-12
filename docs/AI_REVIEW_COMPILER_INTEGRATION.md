@@ -4,7 +4,12 @@
 
 `packages/ai-review` is a headless orchestration package. It owns immutable review inputs, stage execution/history, run-local evidence, result validation, and exports. It does not own the compiler's Topics, Axioms, Counter-Arguments, responses, statuses, indexes, or durable storage.
 
-The future AI Compiler owns those records and exposes a retained, read-only snapshot through `CompilerProvider.openSnapshot`. A run binds the returned protocol version, snapshot ID, revision, and capabilities before a model receives tools. Tool arguments cannot select another workspace, snapshot, revision, root, or path.
+`packages/argument-workspace` now owns those records and exposes an immutable,
+retained `KnowledgeReader`. A composition adapter still needs to present that
+reader through `CompilerProvider.openSnapshot`. A run binds the returned
+protocol version, snapshot ID, revision, and capabilities before a model
+receives tools. Tool arguments cannot select another workspace, snapshot,
+revision, root, or path.
 
 ```text
 application source capture ── exact text/diffs ──► AI Review run
@@ -39,9 +44,46 @@ The dispatcher enforces exact input shapes, available capabilities, per-attempt 
 
 Repository/source/model/tool content remains untrusted evidence. It cannot enable compiler access, change placement, add stages, rewrite the source, accept an argument, or edit an Axiom.
 
+## Argument Workspace adapter fit
+
+The two packages deliberately do not import each other. Their current public
+contracts require a small application-owned translation:
+
+- `CompilerProvider.openSnapshot` captures the application's current confirmed
+  `ArgumentLibrarySnapshot` and constructs one `KnowledgeReader`; it must not
+  initialize, seed, repair, or expose `ArgumentLibraryRepository` or
+  `ArgumentLibraryAuthoringService`.
+- Review's `workspaceId` is an authorization/source-capture context. It is not
+  the Argument Library's `libraryId`, and an adapter must not derive or replace
+  one identity with the other.
+- Review's string `snapshotId`/`revision` must losslessly identify the core
+  descriptor (`libraryId`, schema version, library revision, and SHA-256 content
+  fingerprint), or the host must retain an immutable mapping for the run. Never
+  map revision alone and silently open the latest library.
+- `listIndex`, `searchIndex`, and `readBundle` map directly to the reader's
+  bounded operations. The adapter maps returned record IDs/revisions and keeps
+  the core consultation receipt in the result artifact rather than flattening
+  away snapshot or completeness evidence.
+- Review's `readSource({sourceId})` maps `sourceId` only to the registered
+  `sourceReferenceId`. Because Review's v1 tool input carries no source-version
+  selector, a historically strict Review adapter should request an exact
+  recorded version from `readLinkedTheorySource`. Unknown/unretained versions
+  become unavailable/stale; newly fetched changed text must not be presented as
+  retained historical content. A non-Review overlay may instead show current
+  text with the core reader's explicit freshness result.
+- Abort/cancellation, per-call byte limits, placement, model-visible shaping,
+  and saving Review artifacts remain Review/adapter responsibilities. Live
+  source acquisition remains the host's authorized source-provider
+  responsibility.
+
+This is an adapter-shape difference, not a competing knowledge model. No shared
+domain type, agent stage, prompt, or review run ID should be added to Argument
+Workspace to erase it.
+
 ## Integration checklist for the compiler task
 
-1. Implement `CompilerProvider` against the compiler's real public API without importing compiler storage internals into Review.
+1. Implement `CompilerProvider` against `KnowledgeReader` without importing
+   Argument Workspace storage internals into Review.
 2. Guarantee snapshot and linked-source retention for the session lifetime, or return an explicit stale/unavailable envelope.
 3. Map compiler records to the minimal Markdown-rich envelope while retaining full Counter-Argument context and omissions.
 4. Enforce workspace authorization outside tool arguments.
