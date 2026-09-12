@@ -144,6 +144,18 @@ import {
   saveSavedGraphFilterRegistry,
   type SavedGraphFilterRegistry,
 } from '../persistence/saved-filters';
+import {
+  addSavedView,
+  deleteSavedView,
+  renameSavedView,
+  updateSavedView,
+  type SavedViewRegistry,
+} from '../persistence/saved-views';
+import {
+  commitSavedViewSessionMutation,
+  createSavedViewSession,
+  resetSavedViewSession,
+} from '../persistence/saved-views-session';
 import type { VisualGroupRegistry } from '../persistence/visual-groups';
 import {
   hydrateGraphView,
@@ -168,6 +180,11 @@ import {
   resetGraphSandbox,
 } from '../preferences/sandbox-settings';
 import { deriveProjectionVisualGroupPresentationMap } from '../visual-groups/presentation';
+import {
+  captureSavedView,
+  planSavedViewApply,
+  sameSavedViewSnapshot,
+} from '../saved-view';
 import { usePresentationOverrides } from '../presentation-overrides/use-presentation-overrides';
 import { useSpatialOverrides } from '../spatial-overrides/use-spatial-overrides';
 import { useSoftFolderDisplay } from '../soft-folder-display/use-soft-folder-display';
@@ -205,6 +222,8 @@ import { ProvenanceInspector } from './ProvenanceInspector';
 import { NetworkExplorer } from './NetworkExplorer';
 import { NetworkEditingControls } from './NetworkEditingControls';
 import type { SavedGraphQueriesState } from './SavedGraphQueries';
+import type { SavedViewsState } from './SavedViews';
+import { SavedViewsPopover } from './SavedViewsPopover';
 import { StructureDepthControl } from './StructureDepthControl';
 import { VisualGroups } from './VisualGroups';
 import type { GlobalGraphViewProps } from './GlobalGraphView';
@@ -480,6 +499,13 @@ export function GraphExplorer({
             : 'No Saved Filters have been stored for this stable workspace.',
       };
     });
+  const [savedViewSession, setSavedViewSession] = useState(() =>
+    createSavedViewSession({
+      eligibility,
+      storage: persistenceStorage,
+      workspaceId,
+    }),
+  );
   const [hydration] = useState(() =>
     hydrateGraphView({
       eligibility,
@@ -1095,6 +1121,9 @@ export function GraphExplorer({
   );
   const [savedFilterError, setSavedFilterError] = useState<string | undefined>(
     savedFilterSession.error,
+  );
+  const [savedViewError, setSavedViewError] = useState<string | undefined>(
+    savedViewSession.error,
   );
   const [transientResetKey, setTransientResetKey] = useState(0);
   const [navigationAnnouncement, setNavigationAnnouncement] = useState(
@@ -2714,7 +2743,7 @@ export function GraphExplorer({
       persistenceWritable.current = false;
       queueMicrotask(() =>
         setPersistenceError(
-          `Could not prepare the saved graph view: ${message} The graph remains usable in memory.`,
+          `Could not prepare the current view: ${message} The graph remains usable in memory.`,
         ),
       );
     }
@@ -2775,6 +2804,250 @@ export function GraphExplorer({
     commitQuery,
   );
   const { adoptQuery, mutateExactPath, mutateFolder } = queryEditor;
+  const captureCurrentNamedView = useCallback(
+    (name: string) =>
+      captureSavedView({
+        name,
+        workspace: projectionWorkspace,
+        state: activeViewStateRef.current,
+        presentationMode: rendererModeRef.current,
+        layout: explorationLayout(
+          rendererModeRef.current,
+          localLayoutModeRef.current,
+        ),
+        viewports: {
+          ...(viewportBookmarkRef.current === undefined
+            ? {}
+            : { structure: viewportBookmarkRef.current }),
+          ...(globalViewportBookmarkRef.current === undefined
+            ? {}
+            : { global: globalViewportBookmarkRef.current }),
+          ...(localViewportBookmarkRef.current === undefined
+            ? {}
+            : { local: localViewportBookmarkRef.current }),
+        },
+      }),
+    [projectionWorkspace],
+  );
+  const commitNamedViewRegistry = useCallback(
+    (
+      candidate: SavedViewRegistry,
+      announcement: string,
+    ): string | undefined => {
+      const committed = commitSavedViewSessionMutation(
+        savedViewSession,
+        candidate,
+        persistenceStorage,
+      );
+      setSavedViewSession(committed.session);
+      setSavedViewError(committed.session.error);
+      if (!committed.ok) return committed.message;
+      setPersistenceAnnouncement(announcement);
+      return undefined;
+    },
+    [persistenceStorage, savedViewSession],
+  );
+  const saveCurrentNamedView = useCallback(
+    (name: string): string | undefined => {
+      if (!savedViewSession.writable) return savedViewSession.status;
+      try {
+        const entry = captureCurrentNamedView(name);
+        const candidate = addSavedView(savedViewSession.registry, entry);
+        return candidate.ok
+          ? commitNamedViewRegistry(
+              candidate.value,
+              `Saved current view as "${entry.name}".`,
+            )
+          : candidate.message;
+      } catch (error: unknown) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    },
+    [captureCurrentNamedView, commitNamedViewRegistry, savedViewSession],
+  );
+  const updateNamedView = useCallback(
+    (name: string): string | undefined => {
+      if (!savedViewSession.writable) return savedViewSession.status;
+      try {
+        const entry = captureCurrentNamedView(name);
+        const candidate = updateSavedView(
+          savedViewSession.registry,
+          name,
+          entry,
+        );
+        return candidate.ok
+          ? commitNamedViewRegistry(
+              candidate.value,
+              `Updated Saved View "${name}" from the current graph.`,
+            )
+          : candidate.message;
+      } catch (error: unknown) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    },
+    [captureCurrentNamedView, commitNamedViewRegistry, savedViewSession],
+  );
+  const renameNamedView = useCallback(
+    (name: string, nextName: string): string | undefined => {
+      const candidate = renameSavedView(
+        savedViewSession.registry,
+        name,
+        nextName,
+      );
+      return candidate.ok
+        ? commitNamedViewRegistry(
+            candidate.value,
+            `Renamed Saved View "${name}" to "${nextName.trim()}".`,
+          )
+        : candidate.message;
+    },
+    [commitNamedViewRegistry, savedViewSession.registry],
+  );
+  const deleteNamedView = useCallback(
+    (name: string): string | undefined => {
+      const candidate = deleteSavedView(savedViewSession.registry, name);
+      return candidate.ok
+        ? commitNamedViewRegistry(
+            candidate.value,
+            `Deleted Saved View "${name}".`,
+          )
+        : candidate.message;
+    },
+    [commitNamedViewRegistry, savedViewSession.registry],
+  );
+  const resetNamedViews = useCallback((): string | undefined => {
+    const reset = resetSavedViewSession(savedViewSession, persistenceStorage);
+    setSavedViewSession(reset.session);
+    setSavedViewError(reset.session.error);
+    if (!reset.ok) return reset.message;
+    setPersistenceAnnouncement(
+      "Reset this workspace's Saved Views registry. The current view was unchanged.",
+    );
+    return undefined;
+  }, [persistenceStorage, savedViewSession]);
+  const applyNamedView = useCallback(
+    (name: string): string | undefined => {
+      const entry = savedViewSession.registry.views.find(
+        (candidate) => candidate.name === name,
+      );
+      if (entry === undefined) return `Saved View "${name}" does not exist.`;
+      if (retainDirtyFolderDraft()) {
+        return 'Apply or cancel the current spatial rule changes before applying a Saved View.';
+      }
+      try {
+        const plan = planSavedViewApply({
+          entry,
+          workspace: projectionWorkspace,
+          availability: availabilityRef.current,
+        });
+        const current = captureCurrentNamedView(entry.name);
+        const equivalent = sameSavedViewSnapshot(current, entry);
+
+        temporaryFileMoveController?.cancel('scope-changed');
+        setKeyboardFileMoveNodeId(undefined);
+        transitionNetworkEditing({ type: 'exit' }, 'scope-changed');
+        dispatchFolderArrangementMode({ type: 'exit' });
+        // Applying a named graph context establishes a new navigation baseline.
+        clearNavigationHistory();
+        if (
+          plan.presentationMode === 'local' &&
+          localLayoutModeRef.current !== plan.localLayoutMode
+        ) {
+          // Focus layout is owned by Graph Preferences, so this is the only
+          // preference field a Saved View may update during application.
+          localLayoutModeRef.current = plan.localLayoutMode;
+          updateGraphPreferences({ localLayoutMode: plan.localLayoutMode });
+        }
+        if (!sameGraphViewState(activeViewStateRef.current, plan.state)) {
+          activeViewStateRef.current = plan.state;
+          dispatch({ type: 'replace-state', state: plan.state });
+        }
+        rendererModeRef.current = plan.presentationMode;
+        setRendererMode(plan.presentationMode);
+        setSemanticViewportBookmark(plan.viewports.structure);
+        setGlobalSemanticViewportBookmark(plan.viewports.global);
+        setLocalSemanticViewportBookmark(plan.viewports.local);
+        setCenterRequest(undefined);
+        setGlobalCenterRequest(undefined);
+        setGlobalFitRequest(undefined);
+        setLocalCenterRequest(undefined);
+        setLocalStructuredCenterRequest(undefined);
+        setLocalTransitionAnchor(undefined);
+        setAutomaticLocalFitRequestKey(undefined);
+        setLocalFitRequestKey(undefined);
+        if (!equivalent) {
+          requestHistoryViewportRestore(plan.presentationMode, plan.viewports);
+        }
+        setSelection(null);
+        setGraphClickSelection(null);
+        setNetworkExplorerRevealRequest(undefined);
+        adoptQuery(plan.state.filters?.query ?? '');
+        setNavigationError(undefined);
+        setNavigationAnnouncement(
+          `Applied Saved View "${entry.name}" as ${
+            plan.presentationMode === 'local' ? 'Focus' : 'All'
+          } ${
+            plan.presentationMode === 'local'
+              ? plan.localLayoutMode === 'free'
+                ? 'Network'
+                : 'Hierarchy'
+              : plan.presentationMode === 'global'
+                ? 'Network'
+                : 'Hierarchy'
+          }.${
+            plan.issues.length === 0
+              ? ''
+              : ` ${plan.issues.length} stale saved item${
+                  plan.issues.length === 1 ? ' was' : 's were'
+                } removed for this application only.`
+          }${plan.adjustment === undefined ? '' : ` ${plan.adjustment}`}`,
+        );
+        return undefined;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        setNavigationError(`Could not apply Saved View "${name}": ${message}`);
+        return message;
+      }
+    },
+    [
+      adoptQuery,
+      captureCurrentNamedView,
+      clearNavigationHistory,
+      projectionWorkspace,
+      requestHistoryViewportRestore,
+      retainDirtyFolderDraft,
+      savedViewSession.registry.views,
+      setGlobalSemanticViewportBookmark,
+      setLocalSemanticViewportBookmark,
+      setSemanticViewportBookmark,
+      temporaryFileMoveController,
+      transitionNetworkEditing,
+      updateGraphPreferences,
+    ],
+  );
+  const namedSavedViews = useMemo<SavedViewsState>(
+    () => ({
+      views: savedViewSession.registry.views,
+      status: savedViewSession.status,
+      writable: savedViewSession.writable,
+      recoveryAvailable: savedViewSession.recoveryAvailable,
+      onApply: applyNamedView,
+      onDelete: deleteNamedView,
+      onRename: renameNamedView,
+      onReset: resetNamedViews,
+      onSave: saveCurrentNamedView,
+      onUpdate: updateNamedView,
+    }),
+    [
+      applyNamedView,
+      deleteNamedView,
+      renameNamedView,
+      resetNamedViews,
+      saveCurrentNamedView,
+      savedViewSession,
+      updateNamedView,
+    ],
+  );
   const hiddenFileResult = useMemo(
     () => listExactPathExclusions(activeViewState.filters?.query),
     [activeViewState.filters?.query],
@@ -4142,7 +4415,7 @@ export function GraphExplorer({
   function resetSavedView(): void {
     if (persistenceStorage === undefined) {
       setPersistenceError(
-        'Could not reset the saved view because browser storage is unavailable.',
+        'Could not reset the current view because browser storage is unavailable.',
       );
       return;
     }
@@ -4192,10 +4465,10 @@ export function GraphExplorer({
     setLocalFitRequestKey(undefined);
     persistenceWritable.current = true;
     setPersistenceError(undefined);
-    setPersistenceAnnouncement('Saved graph view reset.');
+    setPersistenceAnnouncement('Current graph view reset.');
     setNavigationError(undefined);
     setNavigationAnnouncement(
-      'Saved view reset to Files only; search and selection were cleared.',
+      'Current view reset to Files only; search and selection were cleared. Named Saved Views were unchanged.',
     );
   }
 
@@ -4261,6 +4534,7 @@ export function GraphExplorer({
             onBack={goBack}
             onForward={goForward}
           />
+          <SavedViewsPopover {...namedSavedViews} />
           <button
             aria-controls="graph-tools-panel"
             aria-expanded={activeOverlay === 'tools'}
@@ -4375,6 +4649,7 @@ export function GraphExplorer({
               onScopeChange={changeExplorationScope}
               scope={activeScope}
             />
+            {maximized ? null : <SavedViewsPopover {...namedSavedViews} />}
             {networkLayoutActive ? (
               <NetworkEditingControls
                 {...(activeScope !== 'all' ||
@@ -4531,7 +4806,7 @@ export function GraphExplorer({
               )}
               {eligibility === 'stable' ? (
                 <button onClick={resetSavedView} type="button">
-                  Reset saved view
+                  Reset current view
                 </button>
               ) : null}
               {maximized ? null : (
@@ -4661,6 +4936,11 @@ export function GraphExplorer({
         {savedFilterError === undefined ? null : (
           <p className="graph-alert" role="alert">
             {savedFilterError}
+          </p>
+        )}
+        {savedViewError === undefined ? null : (
+          <p className="graph-alert" role="alert">
+            {savedViewError}
           </p>
         )}
         {visualGroupError === undefined ? null : (

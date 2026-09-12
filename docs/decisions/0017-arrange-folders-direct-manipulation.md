@@ -56,7 +56,7 @@ pointer movement into projection, topology, or ForceAtlas2 work.
     Reset all are keyboard reachable and announce results.
 12. Reset and corrupt recovery mutate only the independent spatial registry.
     Graph Preferences, KG9 view state, navigation history, queries, Visual
-    Groups, per-File size overrides, automatic caches, and future Saved Views
+    Groups, per-File size overrides, automatic caches, and Named Saved Views
     are neither cleared nor merged.
 13. The operation oracle requires zero KG6 projection, mapping, topology
     reconciliation, full spatial composition, and automatic layout per preview.

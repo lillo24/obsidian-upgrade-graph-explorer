@@ -347,7 +347,7 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     const confirmed = window.confirm(
       registryReset
         ? 'Replace the corrupt local workspace registry? Existing catalog files will remain private but their associations may need to be recreated.'
-        : 'Reset local identity for this vault? Stable IDs and its saved graph view continuity will change.',
+        : 'Reset local identity for this vault? Stable IDs and current-view or Named Saved View continuity may change.',
     );
     if (!confirmed) return;
     setVaultOpening(true);

@@ -44,7 +44,7 @@ and surface the existing warning.
 | All Network failure       | Exposes Hierarchy for recovery, disables/explains Network, and leaves the experimental preference unchanged.                                                                                                    |
 | Focus renderer failure    | Offers the available other Focus layout and Return to All; full Hierarchy appears only when available.                                                                                                          |
 | Disable active experiment | Uses the ordinary anchored transition to Network once, retaining disclosure and the Hierarchy viewport; failed Network keeps recovery Hierarchy with an explanation.                                            |
-| Reset saved view          | Uses available All Network, or recovery Hierarchy when necessary.                                                                                                                                               |
+| Reset current view        | Uses available All Network, or recovery Hierarchy when necessary.                                                                                                                                               |
 
 Enabling and disabling while inactive cause zero new projections in the DOM
 interaction tests. Structure projection is now computed only when Structure

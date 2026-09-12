@@ -89,6 +89,9 @@ describe('graph-first explorer shell', () => {
       'aria-label="Forward in graph history" disabled=""',
     );
     expect(markup).toContain('aria-label="Scope"');
+    expect(markup).toContain('aria-label="Saved Views"');
+    expect(markup).toContain('>Reset current view</button>');
+    expect(markup).not.toContain('Reset saved view');
     expect(markup).toContain(
       '<button aria-pressed="true" type="button">All</button>',
     );

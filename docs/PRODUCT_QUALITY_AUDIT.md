@@ -33,9 +33,10 @@ mode.
 Search spans canonical entities even when a result is outside the current
 projection. Selecting a result reveals or centers it and establishes the file
 needed to enter Focus. Back/Forward traverses semantic graph navigation.
-Saved view state restores Scope, Layout, disclosure, filters, and semantic
-viewports for a stable workspace. Graph preferences, Saved Filters, and Visual
-Groups are separate persisted systems.
+Current View restores the last Scope, Layout, disclosure, filters, and semantic
+viewports for a stable workspace. SAVED1A adds explicit Named Saved Views over
+that same semantic graph contract. Graph Preferences, Saved Filters, Visual
+Groups, size overrides, and spatial rules remain separate persisted systems.
 
 ## 2. Overall readiness
 
@@ -403,27 +404,28 @@ and continued assistive-technology feedback remain appropriate in KG14B.
 “Inspected” below means deterministic code/test evidence rather than a browser
 fault injected into a production session.
 
-| Failure/state                          | Last valid graph                | Explicit failure                      | Recovery / stale-result policy                               | Evidence                                   |
-| -------------------------------------- | ------------------------------- | ------------------------------------- | ------------------------------------------------------------ | ------------------------------------------ |
-| Corrupt/unsupported report             | Yes                             | Validation path + actionable location | Current source preserved                                     | App report tests and report validator      |
-| Corrupt saved view                     | Default in memory               | Visible alert                         | Stored bytes untouched; explicit Reset saved view            | persistence storage/session tests          |
-| Corrupt graph preferences              | Usable defaults                 | Visible warning                       | Session continues; write failures do not masquerade as saved | graph-preferences tests                    |
-| Corrupt Saved Filters                  | Graph unaffected                | Visible blocked state                 | Stored bytes untouched; repair outside app                   | saved-filter persistence tests             |
-| Corrupt Visual Groups                  | Graph unchanged                 | Visible blocked state                 | Explicit two-step reset clears only group key                | Visual Group session/component tests       |
-| Storage read/write/remove failure      | Yes                             | Alert/warning                         | Memory stays usable; failed candidate not adopted            | App, storage, preferences, group tests     |
-| WebGL/Sigma mount failure              | Projection companion remains    | Named renderer failure                | Network Explorer remains usable; Hierarchy fallback remains  | Sigma lifecycle, model, and App tests      |
-| All Network layout-worker failure      | Seed/current graph remains      | Renderer status                       | Explicit Re-layout can retry; latest request owns adoption   | Global worker/client tests                 |
-| Focus Network layout-worker failure    | Deterministic seed remains      | Renderer failure/status               | Structured/All Hierarchy fallback; stale result rejected     | Local worker/client/session tests          |
-| W3 Hierarchy failure                   | Deterministic grid/seed remains | Layout warning                        | No synchronous Dagre fallback; newest valid result only      | React Flow layout and W3 client tests      |
-| W1 workspace failure                   | Yes                             | Paused/source error                   | Failed candidate discarded; replacement on Rescan            | workspace worker/live-vault tests          |
-| Watch resync-required                  | Yes                             | Resyncing status                      | Queued events retained around full replacement               | watch-burst/live-vault tests               |
-| Catalog persistence failure            | Yes                             | Live updates paused                   | Prepare discarded before adoption; manual recovery           | live-vault transaction tests               |
-| Focused root deleted                   | Yes                             | Focus exits/selection clears          | No fuzzy reassignment                                        | view-state and live reconciliation tests   |
-| Permission/read/watch failure          | Current source preserved        | Selected-vault context                | Reselect/Rescan; no empty success report                     | source-provider and App tests              |
-| Vault moved/reselected                 | Current source until success    | Open failure is explicit              | Exact root selection creates/reuses scoped identity          | source-provider tests; manual gate pending |
-| Source switch while work pending       | New session isolated            | No stale paint adopted                | Correlation/session keys reject old work                     | performance and App session tests          |
-| Renderer disposal while worker pending | Yes/next renderer seed          | Request settles/rejects               | Worker termination and stale message rejection               | Global/Local/W3 worker tests               |
-| Network topology + style overlap       | Yes after fix                   | Regression would fail test            | Style refresh waits for indexed topology                     | KG14A regression test                      |
+| Failure/state                          | Last valid graph                 | Explicit failure                      | Recovery / stale-result policy                               | Evidence                                   |
+| -------------------------------------- | -------------------------------- | ------------------------------------- | ------------------------------------------------------------ | ------------------------------------------ |
+| Corrupt/unsupported report             | Yes                              | Validation path + actionable location | Current source preserved                                     | App report tests and report validator      |
+| Corrupt Current View                   | Default in memory                | Visible alert                         | Stored bytes untouched; explicit Reset current view          | persistence storage/session tests          |
+| Corrupt Named Saved Views              | Graph and Current View unchanged | Visible blocked state                 | Two-step reset clears only the Named Saved Views key         | Saved Views session/component tests        |
+| Corrupt graph preferences              | Usable defaults                  | Visible warning                       | Session continues; write failures do not masquerade as saved | graph-preferences tests                    |
+| Corrupt Saved Filters                  | Graph unaffected                 | Visible blocked state                 | Stored bytes untouched; repair outside app                   | saved-filter persistence tests             |
+| Corrupt Visual Groups                  | Graph unchanged                  | Visible blocked state                 | Explicit two-step reset clears only group key                | Visual Group session/component tests       |
+| Storage read/write/remove failure      | Yes                              | Alert/warning                         | Memory stays usable; failed candidate not adopted            | App, storage, preferences, group tests     |
+| WebGL/Sigma mount failure              | Projection companion remains     | Named renderer failure                | Network Explorer remains usable; Hierarchy fallback remains  | Sigma lifecycle, model, and App tests      |
+| All Network layout-worker failure      | Seed/current graph remains       | Renderer status                       | Explicit Re-layout can retry; latest request owns adoption   | Global worker/client tests                 |
+| Focus Network layout-worker failure    | Deterministic seed remains       | Renderer failure/status               | Structured/All Hierarchy fallback; stale result rejected     | Local worker/client/session tests          |
+| W3 Hierarchy failure                   | Deterministic grid/seed remains  | Layout warning                        | No synchronous Dagre fallback; newest valid result only      | React Flow layout and W3 client tests      |
+| W1 workspace failure                   | Yes                              | Paused/source error                   | Failed candidate discarded; replacement on Rescan            | workspace worker/live-vault tests          |
+| Watch resync-required                  | Yes                              | Resyncing status                      | Queued events retained around full replacement               | watch-burst/live-vault tests               |
+| Catalog persistence failure            | Yes                              | Live updates paused                   | Prepare discarded before adoption; manual recovery           | live-vault transaction tests               |
+| Focused root deleted                   | Yes                              | Focus exits/selection clears          | No fuzzy reassignment                                        | view-state and live reconciliation tests   |
+| Permission/read/watch failure          | Current source preserved         | Selected-vault context                | Reselect/Rescan; no empty success report                     | source-provider and App tests              |
+| Vault moved/reselected                 | Current source until success     | Open failure is explicit              | Exact root selection creates/reuses scoped identity          | source-provider tests; manual gate pending |
+| Source switch while work pending       | New session isolated             | No stale paint adopted                | Correlation/session keys reject old work                     | performance and App session tests          |
+| Renderer disposal while worker pending | Yes/next renderer seed           | Request settles/rejects               | Worker termination and stale message rejection               | Global/Local/W3 worker tests               |
+| Network topology + style overlap       | Yes after fix                    | Regression would fail test            | Style refresh waits for indexed topology                     | KG14A regression test                      |
 
 The matrix supports a strong reliability assessment: failures are normally
 failure-shaped, the last committed graph stays visible, and recovery is
@@ -443,8 +445,8 @@ communicated, not silent data corruption.
 - The steady active source and live state are visible only after opening
   Settings (KG14A-05). The first-run graph does not explain that its realistic
   unresolved/ambiguous/invalid nodes are sample diagnostics.
-- Identity recovery correctly warns that it changes continuity and does not
-  reset the saved graph view. This is accurate but also exposes the need for a
+- Identity recovery correctly warns that it changes stable-ID continuity and
+  does not reset Current View or Named Saved Views. This is accurate but also exposes the need for a
   short explanation of the product's separate persistence layers.
 
 ## 7. Scope × Layout consistency
@@ -522,20 +524,27 @@ surface differentiates or groups them.
 
 - Back/Forward records semantic graph actions, including depth and manual
   disclosure; no-op actions do not pollute history.
-- Stable-workspace saved view restores Scope, Layout, focus, filters,
+- Stable-workspace Current View restores Scope, Layout, focus, filters,
   disclosure, and renderer-specific semantic viewport anchors under schema v3.
+- Named Saved Views retain explicit immutable snapshots in a separate schema-v1
+  workspace registry. Apply reconciles current canonical IDs, clears
+  Back/Forward and selection, synchronizes the query editor, and restores the
+  semantic viewport as one graph transaction.
 - Graph preferences persist focus appearance, Network layout/strength/spacing,
   trackpad mode, and preferred Focus layout independently from view history.
-- Saved Filters and Visual Groups are separate named workspace registries.
+- Saved Filters, Visual Groups, size overrides, and spatial rules remain
+  independent. Applying a Focus Saved View may update only the preferred Focus
+  layout because Graph Preferences own that live renderer choice.
 - Live updates reconcile by stable identity; stale disclosure/viewports are
   dropped explicitly, and deletion of the focused root exits Focus rather than
   choosing a fuzzy replacement.
-- Reset saved view deletes only the view-state key. Identity recovery, Saved
-  Filters, Visual Groups, and preferences remain separate.
+- Reset current view deletes only the view-state key. Reset Saved Views registry
+  deletes only the named registry key. Identity recovery and every other
+  persistence layer remain separate.
 
 This implementation is robust but requires product explanation. The current UI
-names each system accurately at its point of use; it does not provide one place
-that explains what Back, reload, Reset saved view, and recovery each affect.
+names each system accurately at its point of use; its documentation now
+distinguishes Back, reload, Reset current view, and Saved Views recovery.
 
 ## 12. Settings
 
@@ -694,7 +703,7 @@ local investigative run, not portable promises or CI thresholds.
 | Done     | KG14A-02                                         | Equivalent Network exploration      | Adds a virtualized DOM path for projected discovery, adjacency traversal, selection, and centering      | High        | KG14B2                                                  | No                   |
 | Done     | KG14A-01, KG14A-11, KG14A-12, KG14A-13, KG14A-14 | Audit-enabling fixes                | Prevents critical graph failures, restores query/empty-result feedback, and removes terminology leakage | High        | KG14A                                                   | No                   |
 
-Future Saved Views, manual positions, cluster dragging, multi-focus,
+Future SAVED1B presentation/spatial profiles, manual positions, cluster dragging, multi-focus,
 analytics/community detection, semantic similarity, source editing, cloud sync,
 and a new renderer are deliberately absent from this issue queue.
 

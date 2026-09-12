@@ -385,7 +385,8 @@ KG9B adds one interaction-end semantic viewport observation. The renderer uses
 the current React Flow transform and actual container dimensions to find the
 nearest visible entity node, then reports only its canonical entity ID plus
 zoom. Diagnostic nodes never become bookmarks. Raw x/y, renderer node IDs,
-Dagre coordinates, and per-frame movement never cross into saved view state.
+Dagre coordinates, and per-frame movement never cross into Current View or
+Named Saved View state.
 Restoration reuses the KG8 center request after layout; missing or filtered
 anchors use normal fit without widening the restored view.
 
@@ -689,14 +690,23 @@ and explicit resolution results. Later source-backed fields may be added only
 for concrete requirements. KG6 renderer-independent projection state now covers
 structural disclosure, block inclusion, focus root/hops/direction/context, and
 path/projected-text/entity-kind/resolution filters. KG9 persists the user-facing
-subset: disclosure, block inclusion, focus, path/entity/status filters, and a
-semantic canonical-entity-plus-zoom viewport bookmark. The internal projected
-text filter is deliberately excluded because the current UI does not expose it.
-Selection, hover, search, inspector pagination, renderer graph data, raw
-viewport transforms, manual positions/pins, named saved views, timestamps, and
-renderer preferences are not persisted. A UI action such as hiding or focusing
-an entity never mutates source truth. Early releases remain read-only with
-respect to Markdown.
+subset as one automatic Current View per workspace: disclosure, block inclusion,
+focus, path/entity/status filters, presentation mode, and semantic
+canonical-entity-plus-zoom viewport bookmarks. The internal projected text
+filter is deliberately excluded because the current UI does not expose it.
+SAVED1A stores immutable copies of that same source-neutral subset in a separate
+schema-v1 Named Saved Views registry, adding only a trimmed name and the explicit
+user-facing Network/Hierarchy layout. Applying an entry reconciles it against the
+current report, establishes a fresh Back/Forward baseline, clears selection,
+adopts its query into the editor, and lets ordinary KG9 autosave record the
+reconciled result as the new Current View. A Focus entry may update only the
+independently persisted preferred Focus layout because that preference owns the
+live Free/Structured renderer choice. Selection, hover, search, inspector
+pagination, renderer graph data, raw viewport transforms, manual positions/pins,
+timestamps, all other renderer preferences, Visual Groups, size overrides, and
+spatial rules are not captured. A UI action such as hiding or focusing an entity
+never mutates source truth. Early releases remain read-only with respect to
+Markdown.
 
 KG5 search, resolution filters, disclosure state, and pagination are transient
 diagnostic UI state. They are not KG6 projection contracts or KG9 persisted view
@@ -711,10 +721,18 @@ provenance. The browser synchronously loads, validates, and reconciles the
 workspace-keyed record before autosave is enabled. Stale disclosure IDs, focus
 roots, path scopes, and viewport anchors are removed with visible non-fatal
 status; collapsed disclosure wins conflicts. Corrupt or unsupported records are
-not overwritten or deleted. Reset removes only that workspace view, restores
+not overwritten or deleted. Reset current view removes only that workspace view, restores
 documents-only defaults, clears transient selection/search, and fits the graph;
 it never resets the KG9A identity catalog. A selected report file itself must
 still be re-selected after browser reload because file handles are out of scope.
+
+SAVED1A uses
+`icarus-graph-explorer:saved-views:<encodeURIComponent(workspaceId)>` for its
+strictly validated registry. It is eligible only for the same stable,
+writable-storage workspaces as Current View persistence. Writes happen before
+the in-memory registry is adopted; corruption blocks mutations and leaves stored
+bytes intact until a separate two-step registry reset deletes only this key.
+Reset current view and Reset Saved Views registry are deliberately independent.
 
 Renderers receive `ViewProjection` plain data formed from canonical source truth
 plus renderer-independent state. Structural disclosure happens before each
@@ -746,8 +764,8 @@ Markdown body text they may contain paths, headings, fingerprints, and raw
 targets, so they must stay in ignored/app-local storage outside the selected
 vault and must not be logged or included in browser reports.
 
-KG9B/KG13 browser saved views are also private local application data, but
-their scope is intentionally small: stable workspace/entity IDs,
+KG9B/KG13 Current Views and SAVED1A Named Saved Views are also private local
+application data, but their scope is intentionally small: stable workspace/entity IDs,
 disclosure/focus, workspace-relative path filters, enum filters, presentation
 mode, and semantic Structure/Global/Local zoom or ratio. They contain no report,
 catalog, source body, absolute path, renderer layout, raw transform, search,
@@ -920,11 +938,11 @@ moves only the marker and commits one full rule before the existing SPATIAL2A
 settlement path adopts authoritative geometry. Place retains the transient rigid
 preview over effective members and relevant edges, or restores confirmed state
 on cancel/failure. This is folder-rule authoring, not MOVE1A individual-File
-movement or the final PHYSICS1 reaction lifecycle. A
-later Saved View may
-reference, copy, or selectively override an independently serializable spatial
-profile alongside query, scope, layout, hierarchy detail, settings, and
-viewport; no Saved View schema is introduced here.
+movement or the final PHYSICS1 reaction lifecycle. SAVED1A Named Saved Views
+deliberately do not reference, copy, or override this independently serializable
+spatial profile. A later SAVED1B design may compose spatial or presentation
+profiles with a named semantic bookmark, but no such composition schema is
+introduced here.
 
 Every schema-v2 rule mutation is a spatial coordinate transaction, including
 the transition from one rule to an empty registry. `GlobalGraphCanvas` carries
