@@ -1,9 +1,13 @@
 # SAVED1B implementation report
 
-Status: **implemented and validated locally and in a production browser; draft
-PR and native acceptance are pending.**
+Status: **implemented and validated locally and in a production browser; the
+draft PR is open and native acceptance is pending.**
 
 Implementation branch: `codex/saved1b-profiles-quick-switch`
+
+[Draft PR #92](https://github.com/lillo24/obsidian-upgrade-graph-explorer/pull/92)
+is the isolated integration vehicle and remains deliberately unmerged pending
+the native acceptance gate.
 
 ## Summary
 
