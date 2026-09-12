@@ -27,12 +27,13 @@ the reconciled result as the Current View. Reapplying an exact semantic match
 skips projection/layout and viewport work while retaining the explicit
 selection/history reset.
 
-Graph Preferences, Saved Filters, Visual Groups, File size overrides, folder
-spatial rules, exact renderer coordinates, search, selection, history stacks,
-and transient editing state do not enter a Named Saved View. Focus's live
-Network/Hierarchy choice is owned by the preferred Focus layout in Graph
-Preferences, so applying a Focus entry may update only that one preference
-field. All other preference fields remain unchanged.
+For schema-v1 SAVED1A entries, Graph Preferences, Saved Filters, Visual Groups,
+File size overrides, folder spatial rules, exact renderer coordinates, search,
+selection, history stacks, and transient editing state do not enter a Named
+Saved View. Focus's live Network/Hierarchy choice is owned by the preferred
+Focus layout in Graph Preferences, so applying a Focus entry may update only
+that one preference field. Decision 0026 extends new schema-v2 entries with
+narrow layout-appropriate profiles while preserving these other boundaries.
 
 Save is a snapshot operation only. It writes the Named Saved Views registry and
 does not change current projection, layout, camera, selection, history, or
@@ -62,5 +63,5 @@ only its name; Delete removes only that entry.
 - Stored snapshots remain immutable until an explicit Update.
 - Source evolution may remove stale entities or make a presentation unavailable;
   reconciliation is visible and never uses fuzzy identity replacement.
-- SAVED1B remains the separate future decision for optional presentation or
-  spatial profile composition.
+- SAVED1B profile composition is specified separately by decision 0026 without
+  changing the semantic-bookmark and Current View boundaries decided here.

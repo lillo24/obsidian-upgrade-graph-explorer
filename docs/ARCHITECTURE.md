@@ -750,18 +750,25 @@ focus, path/entity/status filters, presentation mode, and semantic
 canonical-entity-plus-zoom viewport bookmarks. The internal projected text
 filter is deliberately excluded because the current UI does not expose it.
 SAVED1A stores immutable copies of that same source-neutral subset in a separate
-schema-v1 Named Saved Views registry, adding only a trimmed name and the explicit
-user-facing Network/Hierarchy layout. Applying an entry reconciles it against the
-current report, establishes a fresh Back/Forward baseline, clears selection,
-adopts its query into the editor, and lets ordinary KG9 autosave record the
-reconciled result as the new Current View. A Focus entry may update only the
-independently persisted preferred Focus layout because that preference owns the
-live Free/Structured renderer choice. Selection, hover, search, inspector
-pagination, renderer graph data, raw viewport transforms, manual positions/pins,
-timestamps, all other renderer preferences, Visual Groups, size overrides, and
-spatial rules are not captured. A UI action such as hiding or focusing an entity
-never mutates source truth. Early releases remain read-only with respect to
-Markdown.
+Named Saved Views registry, adding a trimmed name and explicit user-facing
+Network/Hierarchy layout. SAVED1B advances that registry to schema v2 with a
+strict discriminated profile: All Network owns complete Global Layout Settings
+plus committed normalized folder spatial rules; Focus Network owns only its four
+shared Network controls; Focus Hierarchy owns only its presentation policies;
+All Hierarchy is an explicit no-op. Schema-v1 data migrates in memory without a
+read-time write and remains semantic-only until explicit Update.
+
+Applying an entry reconciles it against the current report, commits changed
+profile owners through a cross-key write-before-adopt transaction with exact-byte
+rollback, establishes a fresh Back/Forward baseline, clears selection, adopts its
+query into the editor, and lets ordinary KG9 autosave record the reconciled result
+as the new Current View. Trackpad and exposure preferences, selection, hover,
+search, inspector pagination, renderer graph data, raw viewport transforms,
+individual File movement/positions, timestamps, Visual Groups, Saved Filters,
+and size overrides are not captured. Exact current matching is derived from
+canonical semantic/profile snapshots; no active Saved View identity is stored or
+replayed at startup. A UI action such as hiding or focusing an entity never
+mutates source truth. Early releases remain read-only with respect to Markdown.
 
 KG5 search, resolution filters, disclosure state, and pagination are transient
 diagnostic UI state. They are not KG6 projection contracts or KG9 persisted view
@@ -781,9 +788,9 @@ documents-only defaults, clears transient selection/search, and fits the graph;
 it never resets the KG9A identity catalog. A selected report file itself must
 still be re-selected after browser reload because file handles are out of scope.
 
-SAVED1A uses
+SAVED1B uses
 `icarus-graph-explorer:saved-views:<encodeURIComponent(workspaceId)>` for its
-strictly validated registry. It is eligible only for the same stable,
+strictly validated schema-v2 registry. It is eligible only for the same stable,
 writable-storage workspaces as Current View persistence. Writes happen before
 the in-memory registry is adopted; corruption blocks mutations and leaves stored
 bytes intact until a separate two-step registry reset deletes only this key.

@@ -9,11 +9,12 @@ canonical truth, or own a platform storage implementation.
   overlays, shared canonical navigation, graph selection, the transient unified
   Inspector drawer, and the transient Network Explorer drawer,
   Current View hydration/alert/reset orchestration, Named Saved Views session
-  mutations and single-transaction application, transient graph Back/Forward
+  mutations and cross-key profile application, transient graph Back/Forward
   checkpoints, and semantic renderer viewport requests. Applying a named view
-  cancels movement/Arrange state, establishes a fresh history baseline, clears
-  selection, reconciles the snapshot, adopts its query draft, and restores its
-  semantic viewport. Across live snapshots it
+  cancels movement/Arrange state, validates and durably commits any owned Graph
+  Preferences/All-Network spatial profile before in-memory adoption, establishes
+  a fresh history baseline, clears selection, reconciles the snapshot, adopts
+  its query draft, and restores its semantic viewport. Across live snapshots it
   reconciles current KG6 state before
   projection, rebuilds inspection/search indexes, preserves surviving selection
   and semantic viewport context, and safely clears missing selections. It keeps
@@ -89,8 +90,10 @@ canonical truth, or own a platform storage implementation.
 - `SavedViews.tsx` owns the product content for creating, applying, updating,
   renaming, deleting, and recovering Named Saved Views. It owns only local form
   and confirmation drafts; registry validation and persistence remain outside.
-- `SavedViewsPopover.tsx` owns the one bookmark trigger rendered in either the
-  normal toolbar or maximized control stack, plus the viewport-bounded portal,
+- `SavedViewsPopover.tsx` owns the compact native quick switch plus adjacent
+  management trigger rendered in either the normal toolbar or maximized control
+  stack. The selected label is derived from exact semantic/profile matching,
+  never persisted identity. It also owns the viewport-bounded management portal,
   Escape/outside-pointer policy, initial input focus, and trigger focus return.
 - `ExplorationControls.tsx` owns the accessible Scope and Layout button groups,
   focused-root text, and explained disabled Focus state. `../exploration-model.ts`

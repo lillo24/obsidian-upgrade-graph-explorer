@@ -4,6 +4,7 @@ import type { SavedViewEntry } from '../persistence/saved-views';
 
 export interface SavedViewsState {
   readonly views: readonly SavedViewEntry[];
+  readonly activeName?: string;
   readonly status: string;
   readonly writable: boolean;
   readonly recoveryAvailable: boolean;
@@ -19,7 +20,8 @@ function savedViewSummary(entry: SavedViewEntry): string {
   const scope = entry.view.presentationMode === 'local' ? 'Focus' : 'All';
   const layout = entry.layout === 'network' ? 'Network' : 'Hierarchy';
   const query = entry.view.projection.filters?.query;
-  return `${scope} · ${layout}${query === undefined ? '' : ` · ${query}`}`;
+  const ownership = entry.profile === undefined ? 'View only' : 'Profile';
+  return `${scope} · ${layout} · ${ownership}${query === undefined ? '' : ` · ${query}`}`;
 }
 
 /** Registry management presentation; storage and graph transactions stay with the owner. */

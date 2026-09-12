@@ -16,6 +16,12 @@ import { createRuntimePerformanceRecorder } from '@icarus-graph-explorer/perform
 import type { GraphCanvasProps } from '@icarus-graph-explorer/renderer-reactflow';
 import type { TemporaryFileMoveController } from '@icarus-graph-explorer/renderer-sigma';
 import {
+  createEmptySpatialOverrideRegistry,
+  serializeSpatialOverrideRegistry,
+  setFolderSpatialRule,
+} from '@icarus-graph-explorer/spatial-overrides';
+import { customGlobalLayoutSettings } from '@icarus-graph-explorer/renderer-sigma/settings';
+import {
   createPersistedWorkspaceView,
   serializePersistedWorkspaceView,
 } from '@icarus-graph-explorer/view-state';
@@ -24,13 +30,18 @@ import {
   documentOnlyProjectionState,
 } from '@icarus-graph-explorer/view-projection';
 
-import { GRAPH_PREFERENCES_STORAGE_KEY } from '../preferences/graph-preferences';
+import {
+  DEFAULT_GRAPH_PREFERENCES,
+  GRAPH_PREFERENCES_STORAGE_KEY,
+  serializeGraphPreferences,
+} from '../preferences/graph-preferences';
 import { captureSavedView } from '../saved-view';
 import {
   savedViewStorageKey,
   serializeSavedViewRegistry,
 } from '../persistence/saved-views';
 import { workspaceViewStorageKey } from '../persistence/storage';
+import { spatialOverrideStorageKey } from '../persistence/spatial-overrides';
 import sampleReport from '../sample-report.json';
 import type { GlobalGraphViewProps } from './GlobalGraphView';
 import { GraphExplorer } from './GraphExplorer';
@@ -82,6 +93,7 @@ const workspace = createProjectionWorkspace(snapshot);
 const source = snapshot.entities.find(
   (candidate) => candidate.kind === 'document',
 )!;
+const emptySpatial = createEmptySpatialOverrideRegistry(snapshot.workspace.id);
 const currentState = {
   ...documentOnlyProjectionState(),
   filters: { query: 'kind:document' },
@@ -114,6 +126,8 @@ const namedTarget = captureSavedView({
       structuredZoom: 0.88,
     },
   },
+  preferences: DEFAULT_GRAPH_PREFERENCES,
+  spatial: emptySpatial,
 });
 
 describe('GraphExplorer Named Saved Views integration', () => {
@@ -141,6 +155,10 @@ describe('GraphExplorer Named Saved Views integration', () => {
     root = createRoot(container);
     values = new Map();
     writes = [];
+    storage.setItem = (key: string, value: string) => {
+      writes.push(key);
+      values.set(key, value);
+    };
     performance = createRuntimePerformanceRecorder({
       now: () => 0,
       markNextPaint: () => undefined,
@@ -174,7 +192,7 @@ describe('GraphExplorer Named Saved Views integration', () => {
     values.set(
       savedViewStorageKey(snapshot.workspace.id),
       serializeSavedViewRegistry({
-        schemaVersion: 1,
+        schemaVersion: 2,
         workspaceId: snapshot.workspace.id,
         views: [namedTarget],
       }),
@@ -226,6 +244,29 @@ describe('GraphExplorer Named Saved Views integration', () => {
     });
   }
 
+  function quickSwitch() {
+    const result = container.querySelector<HTMLSelectElement>(
+      '[aria-label="Quick switch Saved View"]',
+    );
+    if (result === null) throw new Error('Missing Saved View quick switch.');
+    return result;
+  }
+
+  async function quickApply(name: string) {
+    const select = quickSwitch();
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLSelectElement.prototype,
+      'value',
+    )?.set;
+    if (setter === undefined) throw new Error('Missing select value setter.');
+    await act(async () => {
+      setter.call(select, name);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+
   function setControlValue(
     control: HTMLInputElement | HTMLTextAreaElement,
     value: string,
@@ -241,7 +282,7 @@ describe('GraphExplorer Named Saved Views integration', () => {
   }
 
   async function applyNamedTarget() {
-    await click('Saved Views');
+    await click('Manage Saved Views');
     await click('Apply');
     await act(async () => {
       await Promise.resolve();
@@ -311,7 +352,7 @@ describe('GraphExplorer Named Saved Views integration', () => {
     expect(
       JSON.parse(values.get(savedViewStorageKey(snapshot.workspace.id))!),
     ).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       workspaceId: snapshot.workspace.id,
       views: [namedTarget],
     });
@@ -328,7 +369,7 @@ describe('GraphExplorer Named Saved Views integration', () => {
     await act(() =>
       captured.global!.folderArrangement?.onDraftDirtyChange?.(true),
     );
-    await click('Saved Views');
+    await click('Manage Saved Views');
     await click('Apply');
     expect(mode()).toBe('global');
     expect(document.body.querySelector('.saved-views-popover')).not.toBeNull();
@@ -337,12 +378,133 @@ describe('GraphExplorer Named Saved Views integration', () => {
     );
   });
 
+  it('quick-switches from derived matching, falls back to Current View after an edit, and matches again after Update', async () => {
+    await mount();
+    expect(quickSwitch().value).toBe('');
+
+    await quickApply('Focus hierarchy');
+    expect(mode()).toBe('local-structured');
+    expect(quickSwitch().value).toBe('Focus hierarchy');
+    expect(document.body.querySelector('.saved-views-popover')).toBeNull();
+
+    await click('Filters');
+    const query = document.body.querySelector<HTMLTextAreaElement>(
+      '#filters-query-input',
+    )!;
+    await act(() => setControlValue(query, 'kind:block'));
+    await click('Apply query');
+    expect(quickSwitch().value).toBe('');
+    expect(quickSwitch().title).toBe('Current View');
+
+    await click('Manage Saved Views');
+    await click('Update');
+    expect(quickSwitch().value).toBe('Focus hierarchy');
+    expect(
+      JSON.parse(values.get(savedViewStorageKey(snapshot.workspace.id))!)
+        .views[0].view.projection.filters.query,
+    ).toBe('kind:block');
+  });
+
+  it('does not adopt semantic, presentation, selection, history, or preferences when profile persistence fails', async () => {
+    const failedSpatial = setFolderSpatialRule(emptySpatial, {
+      folderKey: 'Architecture',
+      behavior: 'place',
+      scope: { kind: 'exact' },
+      anchor: { x: -0.4, y: 0.5 },
+    });
+    const failedPreferences = {
+      ...DEFAULT_GRAPH_PREFERENCES,
+      globalLayoutSettings: {
+        folderClustering: false,
+        spacingPreset: 'normal' as const,
+        custom: {
+          ...customGlobalLayoutSettings('normal'),
+          linkForce: 1.65,
+        },
+      },
+    };
+    const failedTarget = captureSavedView({
+      name: 'Failed profile',
+      workspace,
+      state: { ...currentState, filters: { query: 'kind:section' } },
+      presentationMode: 'global',
+      layout: 'network',
+      viewports: {
+        global: { anchorEntityId: source.id, ratio: 0.35 },
+      },
+      preferences: failedPreferences,
+      spatial: failedSpatial,
+    });
+    const spatialKey = spatialOverrideStorageKey(snapshot.workspace.id);
+    values.set(spatialKey, serializeSpatialOverrideRegistry(emptySpatial));
+    values.set(
+      savedViewStorageKey(snapshot.workspace.id),
+      serializeSavedViewRegistry({
+        schemaVersion: 2,
+        workspaceId: snapshot.workspace.id,
+        views: [failedTarget],
+      }),
+    );
+    await mount();
+    const selectedId = captured.global!.projection.nodes[0]!.id;
+    await act(() =>
+      captured.global!.onSelectionChange({ kind: 'node', id: selectedId }),
+    );
+    await click('Hierarchy');
+    expect(mode()).toBe('structure');
+    expect(captured.structure?.selection).toEqual({
+      kind: 'node',
+      id: selectedId,
+    });
+    const back = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Back in graph history"]',
+    )!;
+    expect(back.disabled).toBe(false);
+    const beforePreferences = values.get(GRAPH_PREFERENCES_STORAGE_KEY);
+    const beforeSpatial = values.get(spatialKey);
+    const beforeCurrentView = values.get(
+      workspaceViewStorageKey(snapshot.workspace.id),
+    );
+    let failOnce = true;
+    storage.setItem = (key, value) => {
+      writes.push(key);
+      if (key === GRAPH_PREFERENCES_STORAGE_KEY && failOnce) {
+        failOnce = false;
+        throw new Error('quota exceeded');
+      }
+      values.set(key, value);
+    };
+
+    await click('Manage Saved Views');
+    await click('Apply');
+
+    expect(mode()).toBe('structure');
+    expect(captured.structure?.selection).toEqual({
+      kind: 'node',
+      id: selectedId,
+    });
+    expect(back.disabled).toBe(false);
+    expect(values.get(GRAPH_PREFERENCES_STORAGE_KEY)).toBe(beforePreferences);
+    expect(values.get(spatialKey)).toBe(beforeSpatial);
+    expect(values.get(workspaceViewStorageKey(snapshot.workspace.id))).toBe(
+      beforeCurrentView,
+    );
+    expect(quickSwitch().value).toBe('');
+    expect(document.body.textContent).toContain('quota exceeded');
+
+    await click('Network');
+    expect(captured.global?.spatialRules).toEqual([]);
+    expect(captured.global?.settings).toEqual(
+      DEFAULT_GRAPH_PREFERENCES.globalLayoutSettings,
+    );
+  });
+
   it.each([false, true])(
     'exposes one accessible trigger with unique controls in %s maximized mode',
     async (maximized) => {
       await mount(maximized);
       const triggers = document.body.querySelectorAll(
-        'button[aria-label="Saved Views"]',
+        'button[aria-label="Manage Saved Views"]',
       );
       expect(triggers).toHaveLength(1);
       const controls = triggers[0]!.getAttribute('aria-controls');
@@ -356,7 +518,7 @@ describe('GraphExplorer Named Saved Views integration', () => {
     await mount();
     const before = performance.snapshot().operations;
     writes = [];
-    await click('Saved Views');
+    await click('Manage Saved Views');
     const input =
       document.body.querySelector<HTMLInputElement>('.saved-views input')!;
     await act(() => {
@@ -424,17 +586,20 @@ describe('GraphExplorer Named Saved Views integration', () => {
       viewports: {
         global: { anchorEntityId: source.id, ratio: 0.35 },
       },
+      preferences: DEFAULT_GRAPH_PREFERENCES,
+      spatial: emptySpatial,
     });
     values.set(
       savedViewStorageKey(snapshot.workspace.id),
       serializeSavedViewRegistry({
-        schemaVersion: 1,
+        schemaVersion: 2,
         workspaceId: snapshot.workspace.id,
         views: [exact],
       }),
     );
     await mount();
     const before = performance.snapshot().operations;
+    writes = [];
 
     await applyNamedTarget();
 
@@ -443,5 +608,213 @@ describe('GraphExplorer Named Saved Views integration', () => {
     expect(after['global-layouts']).toBe(before['global-layouts']);
     expect(after['local-projections']).toBe(before['local-projections']);
     expect(captured.global?.centerRequest).toBeUndefined();
+    expect(writes).toEqual([]);
+  });
+
+  it('derives an exact startup label without applying or writing a Saved View', async () => {
+    const exact = captureSavedView({
+      name: 'Startup exact',
+      workspace,
+      state: currentState,
+      presentationMode: 'global',
+      layout: 'network',
+      viewports: {
+        global: { anchorEntityId: source.id, ratio: 0.35 },
+      },
+      preferences: DEFAULT_GRAPH_PREFERENCES,
+      spatial: emptySpatial,
+    });
+    values.set(
+      savedViewStorageKey(snapshot.workspace.id),
+      serializeSavedViewRegistry({
+        schemaVersion: 2,
+        workspaceId: snapshot.workspace.id,
+        views: [exact],
+      }),
+    );
+    writes = [];
+
+    await mount();
+
+    expect(mode()).toBe('global');
+    expect(quickSwitch().value).toBe('Startup exact');
+    expect(writes).toEqual([]);
+  });
+
+  it('preserves a modified Current View at startup instead of reapplying a Saved View', async () => {
+    const saved = captureSavedView({
+      name: 'Older view',
+      workspace,
+      state: { ...currentState, filters: { query: 'kind:section' } },
+      presentationMode: 'global',
+      layout: 'network',
+      viewports: {
+        global: { anchorEntityId: source.id, ratio: 0.35 },
+      },
+      preferences: DEFAULT_GRAPH_PREFERENCES,
+      spatial: emptySpatial,
+    });
+    values.set(
+      savedViewStorageKey(snapshot.workspace.id),
+      serializeSavedViewRegistry({
+        schemaVersion: 2,
+        workspaceId: snapshot.workspace.id,
+        views: [saved],
+      }),
+    );
+    const persistedCurrent = values.get(
+      workspaceViewStorageKey(snapshot.workspace.id),
+    );
+    writes = [];
+
+    await mount();
+
+    expect(mode()).toBe('global');
+    expect(quickSwitch().value).toBe('');
+    expect(values.get(workspaceViewStorageKey(snapshot.workspace.id))).toBe(
+      persistedCurrent,
+    );
+    expect(writes).toEqual([]);
+  });
+
+  it('commits an All Network preference and spatial profile before adopting it and leaves independent registries unchanged', async () => {
+    const spatialKey = spatialOverrideStorageKey(snapshot.workspace.id);
+    const targetSpatial = setFolderSpatialRule(emptySpatial, {
+      folderKey: 'Architecture',
+      behavior: 'pull',
+      scope: {
+        kind: 'subtree',
+        includeRootFiles: true,
+        excludedSubtrees: [],
+      },
+      anchor: { x: 0.5, y: -0.4 },
+      strength: 76,
+    });
+    const currentPreferences = {
+      ...DEFAULT_GRAPH_PREFERENCES,
+      focusAppearance: 'outline' as const,
+      showExperimentalAllHierarchy: true,
+      trackpadZoomMode: 'pinch-zoom' as const,
+    };
+    const targetPreferences = {
+      ...DEFAULT_GRAPH_PREFERENCES,
+      globalLayoutSettings: {
+        folderClustering: false,
+        spacingPreset: 'spacious' as const,
+        custom: {
+          ...customGlobalLayoutSettings('spacious'),
+          linkForce: 1.7,
+          betweenFolderSpacing: 6.2,
+          nodeSize: 7,
+        },
+      },
+    };
+    const target = captureSavedView({
+      name: 'Spatial profile',
+      workspace,
+      state: currentState,
+      presentationMode: 'global',
+      layout: 'network',
+      viewports: {
+        global: { anchorEntityId: source.id, ratio: 0.35 },
+      },
+      preferences: targetPreferences,
+      spatial: targetSpatial,
+    });
+    values.set(
+      GRAPH_PREFERENCES_STORAGE_KEY,
+      serializeGraphPreferences(currentPreferences),
+    );
+    values.set(spatialKey, serializeSpatialOverrideRegistry(emptySpatial));
+    const independent = new Map([
+      ['icarus-graph-explorer:visual-groups:test', 'groups'],
+      ['icarus-graph-explorer:saved-filters:test', 'queries'],
+      ['icarus-graph-explorer:presentation-overrides:test', 'sizes'],
+    ]);
+    for (const [key, value] of independent) values.set(key, value);
+    values.set(
+      savedViewStorageKey(snapshot.workspace.id),
+      serializeSavedViewRegistry({
+        schemaVersion: 2,
+        workspaceId: snapshot.workspace.id,
+        views: [target],
+      }),
+    );
+    await mount();
+    const beforeLayoutRequest = captured.global!.layoutRequestKey;
+    writes = [];
+
+    await quickApply('Spatial profile');
+
+    expect(writes).toEqual([spatialKey, GRAPH_PREFERENCES_STORAGE_KEY]);
+    expect(captured.global?.layoutRequestKey).toBe(beforeLayoutRequest + 1);
+    expect(JSON.parse(values.get(spatialKey)!)).toEqual(targetSpatial);
+    const persistedPreferences = JSON.parse(
+      values.get(GRAPH_PREFERENCES_STORAGE_KEY)!,
+    );
+    expect(persistedPreferences.globalLayoutSettings).toEqual(
+      targetPreferences.globalLayoutSettings,
+    );
+    expect(persistedPreferences.focusAppearance).toBe('outline');
+    expect(persistedPreferences.showExperimentalAllHierarchy).toBe(true);
+    expect(persistedPreferences.trackpadZoomMode).toBe('pinch-zoom');
+    for (const [key, value] of independent) expect(values.get(key)).toBe(value);
+    expect(quickSwitch().value).toBe('Spatial profile');
+  });
+
+  it('applies a visual-only All Network profile without projection, layout, or camera work', async () => {
+    const visualPreferences = {
+      ...DEFAULT_GRAPH_PREFERENCES,
+      globalLayoutSettings: {
+        folderClustering: true,
+        spacingPreset: 'normal' as const,
+        custom: {
+          ...customGlobalLayoutSettings('normal'),
+          nodeSize: 8,
+          linkThickness: 1.6,
+          labelThreshold: 11,
+        },
+      },
+    };
+    const visual = captureSavedView({
+      name: 'Visual profile',
+      workspace,
+      state: currentState,
+      presentationMode: 'global',
+      layout: 'network',
+      viewports: {
+        global: { anchorEntityId: source.id, ratio: 0.35 },
+      },
+      preferences: visualPreferences,
+      spatial: emptySpatial,
+    });
+    values.set(
+      savedViewStorageKey(snapshot.workspace.id),
+      serializeSavedViewRegistry({
+        schemaVersion: 2,
+        workspaceId: snapshot.workspace.id,
+        views: [visual],
+      }),
+    );
+    await mount();
+    const before = performance.snapshot().operations;
+    const beforeLayoutRequest = captured.global!.layoutRequestKey;
+    writes = [];
+
+    await quickApply('Visual profile');
+
+    const after = performance.snapshot().operations;
+    expect(after['global-projections']).toBe(before['global-projections']);
+    expect(after['global-layouts']).toBe(before['global-layouts']);
+    expect(after['spatial-pull-requests']).toBe(
+      before['spatial-pull-requests'],
+    );
+    expect(captured.global?.layoutRequestKey).toBe(beforeLayoutRequest);
+    expect(captured.global?.centerRequest).toBeUndefined();
+    expect(writes).toEqual([GRAPH_PREFERENCES_STORAGE_KEY]);
+    expect(
+      JSON.parse(values.get(GRAPH_PREFERENCES_STORAGE_KEY)!)
+        .globalLayoutSettings.custom.nodeSize,
+    ).toBe(8);
   });
 });
