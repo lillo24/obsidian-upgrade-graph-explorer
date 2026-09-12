@@ -1,8 +1,38 @@
 import { describe, expect, it } from 'vitest';
 
-import { shouldApplyGlobalViewportRequest } from './viewport-request';
+import {
+  initialViewportSatisfiesGlobalCenterRequest,
+  shouldApplyGlobalViewportRequest,
+} from './viewport-request';
 
 describe('Global semantic viewport requests', () => {
+  it('does not replay a matching initial semantic viewport after reveal', () => {
+    const request = { key: 3, nodeId: 'node-a', ratio: 0.32 };
+    const initialViewport = { anchorEntityId: 'entity-a', ratio: 0.32 };
+
+    expect(
+      initialViewportSatisfiesGlobalCenterRequest({
+        initialViewport,
+        request,
+        requestEntityId: 'entity-a',
+      }),
+    ).toBe(true);
+    expect(
+      initialViewportSatisfiesGlobalCenterRequest({
+        initialViewport,
+        request,
+        requestEntityId: 'entity-b',
+      }),
+    ).toBe(false);
+    expect(
+      initialViewportSatisfiesGlobalCenterRequest({
+        initialViewport,
+        request: { ...request, ratio: 0.4 },
+        requestEntityId: 'entity-a',
+      }),
+    ).toBe(false);
+  });
+
   it('waits for the worker layout commit before consuming an entry anchor', () => {
     const request = {
       handledKey: 0,

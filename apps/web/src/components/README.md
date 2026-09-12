@@ -84,7 +84,11 @@ canonical truth, or own a platform storage implementation.
 - `NetworkEditingControls.tsx` exposes Arrange Folders directly in All Network
   and its Done/saved-rule meaning only while active. Focus renders this surface
   only for actionable movement status or recovery. File dragging has no toolbar
-  mode; GraphExplorer owns Arrange arbitration and cancellation order.
+  mode; GraphExplorer owns Arrange arbitration and cancellation order. Transient
+  readiness/settling text remains an accessible `aria-live` status, but is a
+  bounded overlay below the stable toolbar shell rather than toolbar-flow content,
+  so capability adoption cannot resize the graph stage after its startup Fit or
+  cover wrapped controls.
 - `StructureDepthControl.tsx` owns the labeled Hierarchy depth select and
   compact Custom override indicator, and
   `structure-depth-selection.ts` maps its four options onto the existing
@@ -179,7 +183,8 @@ canonical truth, or own a platform storage implementation.
   Fresh-source seeds remain internal until the current layout and spatial
   generation commits its final normalization frame and Fit All render. The view
   receives the app shell's existing maximize/restore owner; it does not keep a
-  second maximize state.
+  second maximize state. The optional NETWORKVIEW1B callback is forwarded only
+  for explicit QA traces; ordinary sessions allocate no trace collector.
 - `LocalGraphView.tsx` owns the separate Local Free worker client and bounded
   page-lifetime layout cache. An exact hit warms the first canvas draw; otherwise
   it mounts deterministic seed geometry internally, then reveals only after the

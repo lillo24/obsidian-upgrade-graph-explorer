@@ -41,6 +41,13 @@ import {
   captureRawViewportFrame,
   restoreRawViewportFrame,
 } from './raw-viewport-frame';
+import type {
+  NetworkStartupNetworkState,
+  NetworkStartupRect,
+  NetworkStartupTrace,
+  NetworkStartupTraceEntry,
+  NetworkStartupTraceReason,
+} from './startup-trace';
 
 import {
   buildGlobalGraph,
@@ -118,6 +125,8 @@ export interface GlobalRendererSessionOptions {
   /** Development harness override; production keeps expensive edge events off. */
   readonly edgeEvents?: boolean;
   readonly instrumentation?: GlobalRendererInstrumentation;
+  /** Opt-in, bounded startup diagnostics; ordinary production omits it. */
+  readonly startupTrace?: NetworkStartupTrace;
   readonly visualGroupStyles?: VisualGroupPresentationMap;
   readonly presentationOverrides?: EntityPresentationOverrideMap;
   readonly onNodeSelected?: (
@@ -255,6 +264,13 @@ export class GlobalRendererSession {
   private suppressFileMoveDoubleClick = false;
   private fileMoveLifecycleAttached = false;
   private readonly container?: HTMLElement;
+  private startupTraceFrame = 0;
+  private startupTraceComplete = false;
+  private startupTraceNetworkState: NetworkStartupNetworkState | undefined;
+  private startupRepresentativeNodeKeys: readonly string[] = [];
+  private startupObservationFrame: number | undefined;
+  private startupObservationDeadline = 0;
+  private startupResizeObserver: ResizeObserver | undefined;
 
   private readonly fileMoveKeyDownHandler = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') this.cancelTemporaryFileMove('cancelled');
@@ -289,6 +305,7 @@ export class GlobalRendererSession {
     const next = resolveGlobalVisualLod(this.renderer.getCamera().ratio);
     if (next !== this.visualLod) {
       this.visualLod = next;
+      this.traceStartup('lod-transition');
       this.options.instrumentation?.count('global-style-updates');
       // Sigma 3 caches reducer output. Render-only leaves old edge visibility
       // until an unrelated topology change (such as Hide) refreshes that cache.
@@ -299,6 +316,7 @@ export class GlobalRendererSession {
         performance.now() - started,
       );
     }
+    this.traceStartup('camera-changed');
     if (this.viewportObservationTimer !== undefined) {
       window.clearTimeout(this.viewportObservationTimer);
     }
@@ -402,6 +420,9 @@ export class GlobalRendererSession {
       nodeReducer: (key, attributes) => this.reduceNode(key, attributes),
       edgeReducer: (key, attributes) => this.reduceEdge(key, attributes),
     });
+    this.startupRepresentativeNodeKeys =
+      this.selectStartupRepresentativeNodes();
+    this.traceStartup('session-created');
     if (options.initialAcceptedPositions !== undefined) {
       this.establishPositionFrame(options.initialAcceptedPositions);
     } else if (options.initialViewport !== undefined) {
@@ -447,6 +468,197 @@ export class GlobalRendererSession {
     });
   }
 
+  private startupRect(
+    element: Element | null | undefined,
+  ): NetworkStartupRect | undefined {
+    if (element === null || element === undefined) return undefined;
+    const rect = element.getBoundingClientRect();
+    return {
+      x: Number(rect.x.toFixed(3)),
+      y: Number(rect.y.toFixed(3)),
+      width: Number(rect.width.toFixed(3)),
+      height: Number(rect.height.toFixed(3)),
+    };
+  }
+
+  private selectStartupRepresentativeNodes(): readonly string[] {
+    const nodes = this.graph.mapNodes((key, attributes) => ({
+      key,
+      x: attributes.x,
+      y: attributes.y,
+    }));
+    if (nodes.length <= 5) return nodes.map(({ key }) => key);
+    const center = nodes.reduce(
+      (value, node) => ({
+        x: value.x + node.x / nodes.length,
+        y: value.y + node.y / nodes.length,
+      }),
+      { x: 0, y: 0 },
+    );
+    const candidates = [
+      [...nodes].sort((left, right) => left.x + left.y - right.x - right.y)[0],
+      [...nodes].sort(
+        (left, right) =>
+          Math.hypot(left.x - center.x, left.y - center.y) -
+          Math.hypot(right.x - center.x, right.y - center.y),
+      )[0],
+      [...nodes].sort((left, right) => right.x + right.y - left.x - left.y)[0],
+      [...nodes].sort(
+        (left, right) =>
+          Math.hypot(right.x - center.x, right.y - center.y) -
+          Math.hypot(left.x - center.x, left.y - center.y),
+      )[0],
+      [...nodes].sort((left, right) => left.key.localeCompare(right.key))[0],
+    ];
+    return [
+      ...new Set(
+        candidates.flatMap((candidate) =>
+          candidate === undefined ? [] : [candidate.key],
+        ),
+      ),
+    ];
+  }
+
+  private traceStartup(reason: NetworkStartupTraceReason): void {
+    const trace = this.options.startupTrace;
+    if (trace === undefined || this.startupTraceComplete) return;
+    const canvas = this.container?.closest('.global-graph-canvas');
+    const stage = canvas?.closest('.graph-stage');
+    const workspace = stage?.closest('.graph-workspace');
+    const toolbar = workspace?.querySelector('.graph-toolbar');
+    const surface = this.container;
+    const toolbarRowCenters =
+      toolbar === null || toolbar === undefined
+        ? []
+        : [...toolbar.children].map((child) => {
+            const rect = child.getBoundingClientRect();
+            return Math.round((rect.top + rect.height / 2) * 2) / 2;
+          });
+    const camera = this.renderer.getCamera().getState();
+    const customBBox = this.renderer.getCustomBBox();
+    const liveBBox = this.renderer.getBBox();
+    const workspaceRect = this.startupRect(workspace);
+    const toolbarRect = this.startupRect(toolbar);
+    const stageRect = this.startupRect(stage);
+    const canvasRect = this.startupRect(canvas);
+    const surfaceRect = this.startupRect(surface);
+    const toolbarStatus = toolbar
+      ?.querySelector('.network-editing-controls__status')
+      ?.textContent?.trim();
+    const entry: NetworkStartupTraceEntry = {
+      timestampMs: Number(performance.now().toFixed(3)),
+      frame: this.startupTraceFrame,
+      reason,
+      ...(typeof window === 'undefined'
+        ? {}
+        : {
+            window: {
+              width: window.innerWidth,
+              height: window.innerHeight,
+              devicePixelRatio: window.devicePixelRatio,
+            },
+          }),
+      dom: {
+        ...(workspaceRect === undefined ? {} : { workspace: workspaceRect }),
+        ...(toolbarRect === undefined ? {} : { toolbar: toolbarRect }),
+        ...(toolbarRowCenters.length === 0
+          ? {}
+          : {
+              toolbarRows: new Set(toolbarRowCenters).size,
+            }),
+        ...(stageRect === undefined ? {} : { stage: stageRect }),
+        ...(canvasRect === undefined ? {} : { canvas: canvasRect }),
+        ...(surfaceRect === undefined ? {} : { surface: surfaceRect }),
+        ...(toolbarStatus === undefined ? {} : { toolbarStatus }),
+      },
+      rendererDimensions: this.renderer.getDimensions(),
+      camera: {
+        x: camera.x,
+        y: camera.y,
+        ratio: camera.ratio,
+        angle: camera.angle,
+      },
+      cameraOwnership: this.cameraOwnership,
+      ...(customBBox == null ? {} : { customBBox }),
+      liveBBox,
+      nodes: this.startupRepresentativeNodeKeys.map((key) => {
+        const attributes = this.graph.getNodeAttributes(key);
+        const viewport = this.renderer.graphToViewport({
+          x: attributes.x,
+          y: attributes.y,
+        });
+        const radius = this.renderer.getNodeDisplayData(key)?.size;
+        return {
+          key,
+          raw: { x: attributes.x, y: attributes.y },
+          viewport: { x: viewport.x, y: viewport.y },
+          ...(typeof radius === 'number' ? { radius } : {}),
+        };
+      }),
+      lod: this.visualLod,
+      ...(this.startupTraceNetworkState === undefined
+        ? {}
+        : { network: this.startupTraceNetworkState }),
+    };
+    trace(entry);
+  }
+
+  traceStartupEvent(
+    reason: NetworkStartupTraceReason,
+    networkState: NetworkStartupNetworkState,
+  ): void {
+    this.startupTraceNetworkState = networkState;
+    this.traceStartup(reason);
+  }
+
+  markInitialPresentationRevealed(
+    networkState: NetworkStartupNetworkState,
+  ): void {
+    if (this.options.startupTrace === undefined) return;
+    this.startupTraceNetworkState = networkState;
+    this.startupObservationDeadline = performance.now() + 500;
+    this.traceStartup('surface-reveal');
+    const sample = (): void => {
+      this.startupTraceFrame += 1;
+      this.traceStartup('animation-frame');
+      if (performance.now() < this.startupObservationDeadline) {
+        this.startupObservationFrame = requestAnimationFrame(sample);
+        return;
+      }
+      this.traceStartup('observation-complete');
+      this.startupTraceComplete = true;
+      this.stopStartupObservation();
+    };
+    this.startupObservationFrame = requestAnimationFrame(sample);
+    if (typeof ResizeObserver !== 'undefined' && this.container !== undefined) {
+      this.startupResizeObserver = new ResizeObserver(() =>
+        this.traceStartup('resize-observer'),
+      );
+      this.startupResizeObserver.observe(this.container);
+    }
+    window.addEventListener('resize', this.startupWindowResizeHandler);
+  }
+
+  private readonly startupWindowResizeHandler = (): void => {
+    this.traceStartup('window-resize');
+  };
+
+  private stopStartupObservation(): void {
+    if (this.options.startupTrace === undefined) return;
+    if (this.startupObservationFrame !== undefined) {
+      cancelAnimationFrame(this.startupObservationFrame);
+      this.startupObservationFrame = undefined;
+    }
+    this.startupResizeObserver?.disconnect();
+    this.startupResizeObserver = undefined;
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.removeEventListener === 'function'
+    ) {
+      window.removeEventListener('resize', this.startupWindowResizeHandler);
+    }
+  }
+
   private applyWheelZoom(
     x: number,
     y: number,
@@ -455,6 +667,7 @@ export class GlobalRendererSession {
   ): void {
     const camera = this.renderer.getCamera();
     const ratio = ratioAfterWheelDelta(camera.ratio, deltaPixels, ctrlKey);
+    this.traceStartup('camera-command:wheel-zoom');
     camera.setState(this.renderer.getViewportZoomedState({ x, y }, ratio));
   }
 
@@ -468,6 +681,7 @@ export class GlobalRendererSession {
       y: center.y + delta.y,
     });
     const camera = this.renderer.getCamera();
+    this.traceStartup('camera-command:wheel-pan');
     camera.setState({
       x: camera.x + before.x - after.x,
       y: camera.y + before.y - after.y,
@@ -1326,6 +1540,7 @@ export class GlobalRendererSession {
       anchorKey === undefined ? undefined : this.nodeViewportPoint(anchorKey);
     this.densityFramingStrength = strengthPercentage;
     this.claimUserCamera();
+    this.traceStartup('camera-command:density-strength');
     const ratio = this.effectiveDensityRatio();
     if (anchorKey === undefined || anchor === undefined) {
       this.renderer.getCamera().setState({ ratio });
@@ -1601,6 +1816,7 @@ export class GlobalRendererSession {
     const started = performance.now();
     const gapProbe = startRafGapProbe();
     const camera = this.renderer.getCamera();
+    this.traceStartup('camera-command:exercise');
     await camera.animate(
       {
         x: camera.x + 0.015,
@@ -1732,6 +1948,7 @@ export class GlobalRendererSession {
       angle: 0,
       ratio: this.effectiveDensityRatio(),
     });
+    this.traceStartup('camera-write:density-framing');
     this.emitDensityQaDiagnostics();
   }
 
@@ -1740,17 +1957,20 @@ export class GlobalRendererSession {
   ): void {
     if (this.positionFrameEstablished) return;
     this.renderer.setCustomBBox(networkPositionExtent(positions));
+    this.traceStartup('custom-bbox-write');
     this.positionFrameEstablished = true;
   }
 
   private establishCurrentPositionFrame(): void {
     if (this.positionFrameEstablished) return;
     this.renderer.setCustomBBox(this.renderer.getBBox());
+    this.traceStartup('custom-bbox-write');
     this.positionFrameEstablished = true;
   }
 
   private rebaseCurrentPositionFrame(): void {
     this.renderer.setCustomBBox(this.renderer.getBBox());
+    this.traceStartup('custom-bbox-write');
     this.positionFrameEstablished = true;
     this.renderer.refresh({ schedule: true });
   }
@@ -1764,18 +1984,23 @@ export class GlobalRendererSession {
     positions: readonly GlobalLayoutPosition[],
     fitAll: boolean,
   ): Promise<void> {
+    this.startupRepresentativeNodeKeys =
+      this.selectStartupRepresentativeNodes();
+    this.traceStartup('initial-presentation-begin');
     const preservedViewport = fitAll
       ? undefined
       : captureRawViewportFrame(this.renderer);
     return new Promise((resolve, reject) => {
       const afterRender = (): void => {
         this.renderer.off('afterRender', afterRender);
+        this.traceStartup('sigma-after-render');
         this.emitDensityQaDiagnostics();
         resolve();
       };
       this.renderer.on('afterRender', afterRender);
       try {
         this.renderer.setCustomBBox(networkPositionExtent(positions));
+        this.traceStartup('custom-bbox-write');
         this.positionFrameEstablished = true;
         if (fitAll) {
           this.cameraOwnership = 'auto';
@@ -1787,9 +2012,12 @@ export class GlobalRendererSession {
             ratio: 1,
             angle: 0,
           });
+          this.traceStartup('camera-write:initial-fit');
         } else if (preservedViewport !== undefined) {
           restoreRawViewportFrame(this.renderer, preservedViewport);
+          this.traceStartup('camera-write:raw-viewport-restore');
         }
+        this.traceStartup('sigma-before-render');
         this.renderer.refresh({ schedule: true });
       } catch (error: unknown) {
         this.renderer.off('afterRender', afterRender);
@@ -2036,6 +2264,7 @@ export class GlobalRendererSession {
 
   private centerReplacedScene(ratio: number): void {
     this.renderer.getCamera().setState({ x: 0.5, y: 0.5, angle: 0, ratio });
+    this.traceStartup('camera-write:scene-replacement');
   }
 
   private anchorNodeAtViewport(
@@ -2056,6 +2285,7 @@ export class GlobalRendererSession {
       y: cameraState.y + Number(node.y) - current.y,
       ratio,
     });
+    this.traceStartup('camera-write:viewport-anchor');
   }
 
   async center(request: GlobalCenterRequest): Promise<void> {
@@ -2064,6 +2294,7 @@ export class GlobalRendererSession {
       throw new Error(`Cannot center missing Global node ${request.nodeId}.`);
     }
     this.claimUserCamera();
+    this.traceStartup('camera-command:center');
     this.semanticAnchorNodeKey = request.nodeId;
     const started = performance.now();
     await this.renderer
@@ -2087,10 +2318,12 @@ export class GlobalRendererSession {
       y: display.y,
       ratio,
     });
+    this.traceStartup('camera-write:initial-viewport-center');
   }
 
   zoomBy(factor: number): void {
     this.claimUserCamera();
+    this.traceStartup('camera-command:zoom');
     const camera = this.renderer.getCamera();
     camera.animate(
       { ratio: Math.max(0.02, Math.min(6, camera.ratio * factor)) },
@@ -2099,6 +2332,7 @@ export class GlobalRendererSession {
   }
 
   fit(): void {
+    this.traceStartup('camera-command:fit');
     this.cameraOwnership = 'auto';
     this.positionCameraIntent.claimCamera();
     this.semanticAnchorNodeKey = undefined;
@@ -2157,6 +2391,7 @@ export class GlobalRendererSession {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.stopStartupObservation();
     this.cancelFolderArrangementGesture();
     this.cancelTemporaryFileMove('disposed');
     this.detachFileMoveLifecycle();

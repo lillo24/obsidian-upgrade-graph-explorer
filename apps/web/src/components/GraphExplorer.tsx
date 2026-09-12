@@ -72,6 +72,7 @@ import type {
 } from '@icarus-graph-explorer/renderer-sigma/types';
 import type {
   NetworkPhysicsLifecycleState,
+  NetworkStartupTrace,
   TemporaryFileMoveController,
   TemporaryNodeConstraintCapability,
   TemporaryNodeConstraintEndReason,
@@ -360,7 +361,9 @@ export function GraphExplorer({
   identityStability,
   initialViewport = 'restore',
   maximized,
+  networkStartupCapabilityDelayMs = 0,
   onMaximizedChange,
+  networkStartupTrace,
   performance,
   performanceUpdateKey,
   settingsContent,
@@ -372,7 +375,11 @@ export function GraphExplorer({
   /** Source-session camera policy; later navigation and live updates are unaffected. */
   readonly initialViewport?: 'fit' | 'restore';
   readonly maximized: boolean;
+  /** QA-only delayed capability adoption; zero in ordinary production. */
+  readonly networkStartupCapabilityDelayMs?: number;
   readonly onMaximizedChange: (maximized: boolean) => void;
+  /** Explicit QA trace; absent from ordinary production sessions. */
+  readonly networkStartupTrace?: NetworkStartupTrace;
   /** Optional memory-only KG12 instrumentation, enabled by the app boundary. */
   readonly performance?: PerformanceInstrumentation;
   /** Runtime-only live-update correlation token; never persisted. */
@@ -669,6 +676,9 @@ export function GraphExplorer({
   const temporaryFileMoveControllerRef = useRef<
     TemporaryFileMoveController | undefined
   >(undefined);
+  const temporaryFileMoveCapabilityTimerRef = useRef<number | undefined>(
+    undefined,
+  );
   const [temporaryFileMoveCapability, setTemporaryFileMoveCapability] =
     useState<TemporaryNodeConstraintCapability>({
       status: 'unavailable',
@@ -1296,14 +1306,40 @@ export function GraphExplorer({
   }, [temporaryFileMoveController]);
   const changeTemporaryFileMoveCapability = useCallback(
     (capability: TemporaryNodeConstraintCapability) => {
-      setTemporaryFileMoveCapability((current) =>
-        current.status === capability.status &&
-        (current.status === 'available' ||
-          (capability.status === 'unavailable' &&
-            current.reason === capability.reason))
-          ? current
-          : capability,
-      );
+      const adopt = () => {
+        temporaryFileMoveCapabilityTimerRef.current = undefined;
+        setTemporaryFileMoveCapability((current) =>
+          current.status === capability.status &&
+          (current.status === 'available' ||
+            (capability.status === 'unavailable' &&
+              current.reason === capability.reason))
+            ? current
+            : capability,
+        );
+      };
+      if (temporaryFileMoveCapabilityTimerRef.current !== undefined) {
+        window.clearTimeout(temporaryFileMoveCapabilityTimerRef.current);
+        temporaryFileMoveCapabilityTimerRef.current = undefined;
+      }
+      if (
+        capability.status === 'available' &&
+        networkStartupCapabilityDelayMs > 0
+      ) {
+        temporaryFileMoveCapabilityTimerRef.current = window.setTimeout(
+          adopt,
+          networkStartupCapabilityDelayMs,
+        );
+        return;
+      }
+      adopt();
+    },
+    [networkStartupCapabilityDelayMs],
+  );
+  useEffect(
+    () => () => {
+      if (temporaryFileMoveCapabilityTimerRef.current !== undefined) {
+        window.clearTimeout(temporaryFileMoveCapabilityTimerRef.current);
+      }
     },
     [],
   );
@@ -4698,6 +4734,9 @@ export function GraphExplorer({
                   : { instrumentation: performance })}
                 layoutRequestKey={globalLayoutRequestKey}
                 maximized={maximized}
+                {...(networkStartupTrace === undefined
+                  ? {}
+                  : { startupTrace: networkStartupTrace })}
                 onFailure={(message) =>
                   setGlobalUnavailable(
                     `All Network renderer failed: ${message} All Hierarchy remains available for this session.`,
