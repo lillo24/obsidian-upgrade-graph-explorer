@@ -1,12 +1,14 @@
 # SAVED1A implementation report
 
-Status: **implemented and locally validated in draft PR; CI/native acceptance pending.**
+Status: **implemented, locally/browser validated, and accepted by PR CI; native acceptance pending.**
 
 Implementation branch: `codex/saved1a-named-saved-views`
 
 [PR #85](https://github.com/lillo24/obsidian-upgrade-graph-explorer/pull/85)
 is the isolated integration vehicle and intentionally remains draft until
 fresh optimized native product interaction is explicitly accepted.
+PR head `35d7132` passed the required `validate` and `desktop` jobs before the
+status-only follow-up that records that result.
 
 ## Summary
 
@@ -151,6 +153,7 @@ center request.
 - `pnpm desktop:build`: optimized Windows no-bundle build passed.
 - Optimized executable startup smoke: remained alive for five seconds without
   early exit, then the exact smoke process was stopped.
+- PR #85 CI: `validate` passed in 2m22s and `desktop` passed in 4m48s.
 
 Production-browser QA used the real minified build and Synthetic Sample. It
 saved and reloaded three entries (All Network, Focus Network, Focus Hierarchy),
@@ -190,7 +193,7 @@ No dependency was added or removed.
 ## Remaining work
 
 - Explicit optimized native product QA acceptance before merge.
-- PR CI and post-merge CI after that acceptance.
+- Post-merge CI after that acceptance.
 - Worktree and branch cleanup after merge.
 - SAVED1B settings/spatial profile composition, PIN1 persistent individual File
   placement, and AUTO1 adaptive layout selection remain separate future work and
