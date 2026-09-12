@@ -1,6 +1,10 @@
+import { createHash } from 'node:crypto';
+
 import { describe, expect, it } from 'vitest';
 
 import { buildEndpointFixture } from './endpoint-fixtures';
+import { computeFocusSchematicComputedLayoutAttempt } from './endpoint-facing';
+import { DIRECTIONAL_FOLDER_BAND_FIXTURES } from './folder-fixtures';
 import {
   computeFocusSchematicSoftClusterLayoutAttempt,
   FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE,
@@ -9,6 +13,7 @@ import {
   SOFT_CLUSTER_FIXTURES,
   createSoftClusterMultiplicityFixture,
 } from './soft-cluster-fixtures';
+import { buildFocusSchematicSoftFolderDisplayTree } from './soft-folder-display';
 import { FOCUS_SCHEMATIC_LAYOUT_SETTINGS } from './settings';
 import { layoutInput } from './test-helpers';
 import type { EndpointFixtureSpec } from './endpoint-fixtures';
@@ -63,6 +68,74 @@ const mixedScopeFixture: EndpointFixtureSpec = {
   ],
   hops: 2,
 };
+
+const rootAndOneSameFolderFixture: EndpointFixtureSpec = {
+  id: 'SC26',
+  label: 'root plus one same-folder File',
+  authored: 'Synthetic PATCH2 root-folder force exclusion case.',
+  expectation: 'The root and one peer do not form an attraction group.',
+  inspect: 'Strength zero and one hundred must produce identical geometry.',
+  rootDocumentId: 'Focus',
+  documents: [
+    { id: 'Focus', path: 'shared/Focus.md' },
+    { id: 'Peer', path: 'shared/Peer.md' },
+  ],
+  references: [{ sourceEntityId: 'Focus', targetEntityId: 'Peer' }],
+  hops: 1,
+};
+
+const rootAndTwoSameFolderFixture: EndpointFixtureSpec = {
+  id: 'SC27',
+  label: 'root plus two same-folder Files',
+  authored: 'Synthetic PATCH2 root-centroid and descendant exclusion case.',
+  expectation: 'Only the two non-root Files attract toward their centroid.',
+  inspect:
+    'Root display membership remains while force membership excludes it.',
+  rootDocumentId: 'Focus',
+  documents: [
+    { id: 'Focus', path: 'shared/Focus.md' },
+    { id: 'B', path: 'shared/B.md' },
+    { id: 'C', path: 'shared/C.md' },
+  ],
+  entities: [
+    {
+      id: 'Focus-Heading',
+      kind: 'section',
+      documentId: 'Focus',
+      parentId: 'Focus',
+      line: 2,
+    },
+    {
+      id: 'Focus-Block',
+      kind: 'block',
+      documentId: 'Focus',
+      parentId: 'Focus-Heading',
+      line: 3,
+    },
+  ],
+  references: [
+    { sourceEntityId: 'Focus-Block', targetEntityId: 'B' },
+    { sourceEntityId: 'Focus-Heading', targetEntityId: 'C' },
+  ],
+  hops: 1,
+};
+
+function moduleDistance(
+  attempt: ReturnType<typeof run>['attempt'],
+  firstId: string,
+  secondId: string,
+) {
+  const first = attempt.result.candidate.modules.find(
+    ({ moduleId }) => moduleId === firstId,
+  )!;
+  const second = attempt.result.candidate.modules.find(
+    ({ moduleId }) => moduleId === secondId,
+  )!;
+  return Math.hypot(
+    second.x + second.width / 2 - (first.x + first.width / 2),
+    second.y + second.height / 2 - (first.y + first.height / 2),
+  );
+}
 
 function fixture(id: `SC${number}`) {
   const value = SOFT_CLUSTER_FIXTURES.find((item) => item.id === id);
@@ -199,6 +272,120 @@ describe('HIER4B Soft Folder Clusters', () => {
     expect(cohesive.repeatedFolderRmsRadiusMean!).toBeLessThan(
       loose.repeatedFolderRmsRadiusMean!,
     );
+  });
+
+  it('excludes the root before a same-folder pair can become an attraction group', () => {
+    const withoutFolderForce = run(rootAndOneSameFolderFixture, 0).attempt;
+    const fullStrength = run(rootAndOneSameFolderFixture, 100).attempt;
+
+    expect(fullStrength.result.candidate).toEqual(
+      withoutFolderForce.result.candidate,
+    );
+    expect(fullStrength.evidence.metrics).toMatchObject({
+      repeatedFolderCount: 0,
+      repeatedFolderModuleCount: 0,
+    });
+    expect(fullStrength.evidence.runtime.repeatedFolderCount).toBe(0);
+    expect(fullStrength.evidence.maximumPerFileFolderWeight).toBe(0);
+  });
+
+  it('computes same-folder attraction from non-root Files while preserving root display membership', () => {
+    const withoutFolderForce = run(rootAndTwoSameFolderFixture, 0);
+    const fullStrength = run(rootAndTwoSameFolderFixture, 100);
+    const coldRepeat = run(rootAndTwoSameFolderFixture, 100);
+    const rootInAnotherFolder = run(
+      {
+        ...rootAndTwoSameFolderFixture,
+        documents: rootAndTwoSameFolderFixture.documents.map((document) =>
+          document.id === 'Focus'
+            ? { ...document, path: 'focus-only/Focus.md' }
+            : document,
+        ),
+      },
+      100,
+    );
+
+    expect(fullStrength.attempt.result.candidate).toEqual(
+      rootInAnotherFolder.attempt.result.candidate,
+    );
+    expect(coldRepeat.attempt.result.candidate).toEqual(
+      fullStrength.attempt.result.candidate,
+    );
+    expect(moduleDistance(fullStrength.attempt, 'B', 'C')).toBeLessThan(
+      moduleDistance(withoutFolderForce.attempt, 'B', 'C'),
+    );
+    expect(fullStrength.attempt.evidence.metrics).toMatchObject({
+      repeatedFolderCount: 1,
+      repeatedFolderModuleCount: 2,
+    });
+    expect(fullStrength.attempt.evidence.maximumPerFileFolderWeight).toBe(1);
+
+    const tree = buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles: fullStrength.input.model.modules.map(
+        ({ id, folderKey }) => ({
+          fileId: id,
+          exactFolderKey: folderKey,
+        }),
+      ),
+    });
+    expect(tree.files.find(({ fileId }) => fileId === 'Focus')).toMatchObject({
+      exactFolderKey: 'shared',
+      displayParentFolderKey: 'shared',
+    });
+    expect(
+      fullStrength.attempt.result.candidate.nodes.filter(
+        ({ moduleId }) => moduleId === 'Focus',
+      ),
+    ).toHaveLength(3);
+    expect(fullStrength.attempt.result.candidate.modules).toHaveLength(3);
+  });
+
+  it('keeps non-root repeated-folder geometry byte-identical', () => {
+    const attempt = run(fixture('SC16'), 100).attempt;
+    expect(
+      createHash('sha256')
+        .update(JSON.stringify(attempt.result.candidate))
+        .digest('hex'),
+    ).toBe('009d2186c301d41dfeacd7a015f9158cd17ec2025b0dcb311db39a635a1bc6a9');
+  });
+
+  it('keeps representative Directional layouts byte-identical', () => {
+    const expected = new Map([
+      [
+        'DB5',
+        'd1a29e0f58549855c30f77e0453f163aac1ced1cccc00e203905a2db1df7768c',
+      ],
+      [
+        'DB11',
+        'fda189a732b2e00746699e2635e10ab58e2fc73a8a1c46d183abfd400a2106d5',
+      ],
+      [
+        'DB12',
+        '71a889c446f481ce6c373ddd0ceca16d87aedd108981a6574abb4572ddd4c946',
+      ],
+    ]);
+    for (const [id, hash] of expected) {
+      const spec = DIRECTIONAL_FOLDER_BAND_FIXTURES.find(
+        (item) => item.id === id,
+      )!;
+      const input = layoutInput(buildEndpointFixture(spec), {
+        ...FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+        directionalFolderBandsEnabled: true,
+      });
+      const attempt = computeFocusSchematicComputedLayoutAttempt(input, {
+        endpointOrderPolicy: 'crossing-optimized',
+        internalLayoutVariant: 'adaptive-compass',
+      });
+      expect(attempt.status, id).toBe('success');
+      if (attempt.status !== 'success') continue;
+      const payload = JSON.stringify({
+        candidate: attempt.result.candidate,
+        attachments: attempt.result.attachments,
+        folderBandPlan: attempt.result.folderBandPlan,
+        quality: attempt.result.quality,
+      });
+      expect(createHash('sha256').update(payload).digest('hex'), id).toBe(hash);
+    }
   });
 
   it('excludes filtered bridge identity from folder centroids', () => {

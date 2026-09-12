@@ -54,6 +54,11 @@ the global Folder strength. At strength 0 the solver builds no folder-force
 groups. Manually promoted Files leave their former child scope; flattened and
 automatically compressed layers receive no separate force.
 
+In Focus Soft Folder Clusters, the Focus/root File remains a topology anchor
+and visible folder member but is excluded from folder-attraction centroids and
+force membership. Root Headings and Blocks remain internal module geometry and
+never become folder-force members.
+
 The deterministic schedule remains Adaptive Compass, 36 relaxation/collision
 iterations, Adaptive Compass, then 18 iterations. The Focus File is translated
 to `(0, 0)` after packing. HIER4B performs no HIER5 routing.

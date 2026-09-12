@@ -348,7 +348,7 @@ export const SOFT_CLUSTER_FIXTURES: readonly EndpointFixtureSpec[] = [
     {
       hops: 2,
       expectation:
-        'Root-folder peers attract softly while the root File remains centered.',
+        'Root-folder peers attract each other while the visible root File remains a neutral centered anchor.',
     },
   ),
   fixture(

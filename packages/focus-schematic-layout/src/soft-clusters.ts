@@ -38,7 +38,7 @@ import type {
 export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE = [
   36, 18,
 ] as const;
-export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 3 as const;
+export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 4 as const;
 
 const STRATEGY_ID = 'HIER4B-soft-folder-clusters' as const;
 const HOP_SPACING = 520;
@@ -269,6 +269,7 @@ function hierarchyFolderGroups(
   tree: FocusSchematicSoftFolderDisplayTree,
   strength: FocusSchematicSoftClusterStrength,
   policy: FocusSchematicSoftHierarchyForcePolicy,
+  rootModuleId: string,
 ) {
   if (strength === 0)
     return new Map<
@@ -279,17 +280,34 @@ function hierarchyFolderGroups(
   for (const [id, memberships] of focusSchematicSoftFolderScopeMemberships(
     tree,
     policy,
-  ))
+  )) {
+    // The Focus File remains a displayed folder member, but it is the neutral
+    // topology anchor and must not bias Soft folder-attraction centroids.
+    if (id === rootModuleId) continue;
     for (const { folderKey, weight } of memberships) {
       const members = groups.get(folderKey) ?? [];
       members.push({ id, weight });
       groups.set(folderKey, members);
     }
+  }
   return new Map(
     [...groups.entries()]
       .filter(([, members]) => members.length > 1)
       .sort(([a], [b]) => compareText(a, b)),
   );
+}
+
+function maximumFolderForceWeight(
+  groups: ReadonlyMap<
+    string,
+    readonly { readonly id: string; readonly weight: number }[]
+  >,
+) {
+  const weights = new Map<string, number>();
+  for (const members of groups.values())
+    for (const { id, weight } of members)
+      weights.set(id, (weights.get(id) ?? 0) + weight);
+  return Math.max(0, ...weights.values());
 }
 
 function collisionPass(
@@ -421,6 +439,7 @@ function relax(
     tree,
     strength,
     hierarchyForcePolicy,
+    input.model.rootModuleId,
   );
   const folderFactor = strength / 100;
   for (let iteration = 0; iteration < iterations; iteration += 1) {
@@ -602,7 +621,12 @@ function metrics(
   const positions = new Map(
     candidate.modules.map((module) => [module.moduleId, center(module)]),
   );
-  const repeated = hierarchyFolderGroups(tree, 100, hierarchyForcePolicy);
+  const repeated = hierarchyFolderGroups(
+    tree,
+    100,
+    hierarchyForcePolicy,
+    input.model.rootModuleId,
+  );
   const folderRadiiByKey = [...repeated].map(([folderKey, members]) => {
     const centroid = members.reduce(
       (sum, { id }) => {
@@ -749,6 +773,12 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       tree,
       hierarchyForcePolicy,
     );
+    const forceGroups = hierarchyFolderGroups(
+      tree,
+      100,
+      hierarchyForcePolicy,
+      input.model.rootModuleId,
+    );
     const pairs = primaryPairs(base.endpointPlan);
     const moduleIds = base.candidate.modules
       .map(({ moduleId }) => moduleId)
@@ -860,12 +890,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
         ...tree.files.map(({ fileId }) => memberships.get(fileId)?.length ?? 0),
       ),
       hierarchyForcePolicy,
-      maximumPerFileFolderWeight: Math.max(
-        0,
-        ...[...memberships.values()].map((items) =>
-          items.reduce((sum, item) => sum + item.weight, 0),
-        ),
-      ),
+      maximumPerFileFolderWeight: maximumFolderForceWeight(forceGroups),
       fileAttachmentPolicy: 'spatial-cardinal',
       folderInfluenceEnabled: strength > 0,
       topologyDirectionality: 'undirected-primary',
@@ -885,11 +910,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       runtime: {
         moduleCount: candidate.modules.length,
         primaryPairCount: pairs.length,
-        repeatedFolderCount: hierarchyFolderGroups(
-          tree,
-          100,
-          hierarchyForcePolicy,
-        ).size,
+        repeatedFolderCount: forceGroups.size,
         iterationCount: 54,
         jointRoundCount: 2,
         compassAssignmentCount: stats.completeCompassAssignmentsEvaluated,
