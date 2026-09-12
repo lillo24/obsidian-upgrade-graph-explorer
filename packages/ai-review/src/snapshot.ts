@@ -52,13 +52,149 @@ function assertRelativePath(path: string): void {
 function validateMaterial(material: ReviewMaterial): void {
   assertNonEmpty(material.id, 'Material ID');
   assertRelativePath(material.relativePath);
-  assertNonEmpty(material.content, `Material ${material.id} content`);
+  // A pinned Git source blob may be a legitimate empty/whitespace-only file.
+  // Patches still require substantive text so a failed diff cannot look valid.
+  if (material.kind === 'diff' || material.provenance.kind === 'supplied') {
+    assertNonEmpty(material.content, `Material ${material.id} content`);
+  }
   assertNonEmpty(
     material.provenance.kind === 'supplied'
       ? material.provenance.label
       : material.provenance.commitId,
     'Provenance',
   );
+}
+
+function validateGitCaptureManifest(
+  source: Extract<StartReviewInput['source'], { mode: 'captured-git-history' }>,
+): void {
+  const manifest = source.captureManifest;
+  if (manifest === undefined) return;
+  const assertObjectId = (value: string, label: string): void => {
+    if (
+      !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(value) ||
+      /^0+$/u.test(value)
+    ) {
+      throw new Error(`${label} must be a full Git object ID.`);
+    }
+  };
+  assertNonEmpty(manifest.preparationId, 'Git capture preparation ID');
+  if (
+    manifest.schemaVersion !== 1 ||
+    manifest.historyPolicy !== 'first-parent' ||
+    manifest.commitOrder !== 'oldest-to-newest'
+  ) {
+    throw new Error('Git capture manifest policy/version is unsupported.');
+  }
+  if (
+    manifest.baseCommitId !== source.baseCommitId ||
+    manifest.headCommitId !== source.headCommitId ||
+    manifest.commits.length !== source.commitCount ||
+    manifest.commits.some(
+      (commit, index) =>
+        commit.commitId !== source.commitIds[index] ||
+        commit.firstParentId !== commit.parentIds[0],
+    )
+  ) {
+    throw new Error('Git capture manifest does not match the pinned range.');
+  }
+  assertObjectId(manifest.baseCommitId, 'Git capture base');
+  assertObjectId(manifest.headCommitId, 'Git capture head');
+  if (new Set(source.commitIds).size !== source.commitIds.length) {
+    throw new Error('Git capture commit IDs must be unique.');
+  }
+  for (const commit of manifest.commits) {
+    assertObjectId(commit.commitId, 'Git capture commit');
+    commit.parentIds.forEach((parent) =>
+      assertObjectId(parent, 'Git capture parent'),
+    );
+    if (commit.parentIds.length === 0) {
+      throw new Error('Git capture commits must retain a real first parent.');
+    }
+  }
+  const selectedPaths = new Set(source.selectedPaths);
+  if (
+    manifest.files.length !== selectedPaths.size ||
+    new Set(manifest.files.map((file) => file.relativePath)).size !==
+      manifest.files.length ||
+    manifest.files.some((file) => !selectedPaths.has(file.relativePath))
+  ) {
+    throw new Error('Git capture manifest does not match selected paths.');
+  }
+  for (const file of manifest.files) {
+    assertRelativePath(file.relativePath);
+    if (
+      (file.availability === 'available') !== (file.headBlob !== undefined) ||
+      (file.role === 'context' && file.changes.length !== 0) ||
+      (file.role === 'changed' && file.changes.length === 0)
+    ) {
+      throw new Error('Git capture file role/availability is inconsistent.');
+    }
+    if (file.headBlob !== undefined) {
+      assertNonEmpty(file.headBlob.objectId, 'Git blob object ID');
+      assertObjectId(file.headBlob.objectId, 'Git blob object ID');
+      if (
+        file.headBlob.commitId !== source.headCommitId ||
+        !Number.isSafeInteger(file.headBlob.byteLength) ||
+        file.headBlob.byteLength < 0
+      ) {
+        throw new Error('Git capture head blob provenance is invalid.');
+      }
+      const sourceMaterial = source.materials.find(
+        (material) =>
+          material.kind === 'source' &&
+          material.relativePath === file.relativePath &&
+          material.provenance.kind === 'git' &&
+          material.provenance.commitId === source.headCommitId,
+      );
+      if (
+        sourceMaterial === undefined ||
+        utf8Bytes(sourceMaterial.content) !== file.headBlob.byteLength
+      ) {
+        throw new Error(
+          'Git capture blob metadata does not match source text.',
+        );
+      }
+    }
+    for (const change of file.changes) {
+      if (
+        !['added', 'modified', 'deleted', 'type-changed'].includes(
+          change.status,
+        )
+      ) {
+        throw new Error('Git capture file change status is invalid.');
+      }
+      if (
+        !source.commitIds.includes(change.commitId) ||
+        !manifest.commits.some(
+          (commit) =>
+            commit.commitId === change.commitId &&
+            commit.firstParentId === change.parentCommitId,
+        )
+      ) {
+        throw new Error('Git capture file change is outside the pinned range.');
+      }
+      if (change.oldPath !== undefined) assertRelativePath(change.oldPath);
+      if (change.newPath !== undefined) assertRelativePath(change.newPath);
+    }
+  }
+  for (const [name, value] of Object.entries({
+    capturedByteCount: manifest.capturedByteCount,
+    ...manifest.limits,
+  })) {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error(
+        `Git capture ${name} must be a non-negative safe integer.`,
+      );
+    }
+  }
+  const retainedBytes = source.materials.reduce(
+    (total, material) => total + utf8Bytes(material.content),
+    0,
+  );
+  if (retainedBytes !== manifest.capturedByteCount) {
+    throw new Error('Git capture byte count does not match retained material.');
+  }
 }
 
 function renderSharedMaterial(input: StartReviewInput): string {
@@ -76,6 +212,12 @@ function renderSharedMaterial(input: StartReviewInput): string {
       `Commit count: ${source.commitCount}`,
       `Commit IDs: ${source.commitIds.join(', ')}`,
     );
+    if (source.captureManifest !== undefined) {
+      lines.push(
+        'Git capture manifest:',
+        JSON.stringify(source.captureManifest, null, 2),
+      );
+    }
   }
   lines.push(
     `Missing material: ${source.missingMaterial.join('; ') || 'none declared'}`,
@@ -195,6 +337,7 @@ function validateSource(input: StartReviewInput): void {
         );
       }
     }
+    validateGitCaptureManifest(input.source);
   } else if (
     input.source.materials.some(
       (material) => material.provenance.kind !== 'supplied',

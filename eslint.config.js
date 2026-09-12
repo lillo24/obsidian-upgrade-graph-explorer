@@ -1028,6 +1028,39 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/review-source-tauri/**/*.{ts,tsx}'],
+    ignores: ['packages/review-source-tauri/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@icarus-graph-explorer/*',
+                '!@icarus-graph-explorer/ai-review',
+                '!@icarus-graph-explorer/source-provider-tauri',
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                '@xyflow/*',
+                '@react-sigma/*',
+                'sigma*',
+                'graphology*',
+                'obsidian*',
+                '@obsidian/*',
+                'node:*',
+              ],
+              message:
+                'The Git review-source adapter may depend only on REVIEW1, the selected-vault contract, and Tauri invoke APIs.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['packages/dagre-layout/**/*.{ts,tsx}'],
     ignores: ['packages/dagre-layout/**/*.test.{ts,tsx}'],
     rules: {

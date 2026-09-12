@@ -1024,6 +1024,39 @@ describe('snapshot, persistence, and exports', () => {
       omissions: [],
     };
     expect(() => prepareReviewInput(git)).toThrow(/1 through 10/);
+    const emptySource = baseInput();
+    emptySource.source = {
+      mode: 'captured-git-history',
+      selectedPaths: ['theory/example.md'],
+      materials: [
+        {
+          id: 'empty-source',
+          relativePath: 'theory/example.md',
+          kind: 'source',
+          content: '',
+          provenance: {
+            kind: 'git',
+            commitId: 'head',
+            baseCommitId: 'base',
+            headCommitId: 'head',
+          },
+        },
+      ],
+      baseCommitId: 'base',
+      headCommitId: 'head',
+      commitIds: ['head'],
+      commitCount: 1,
+      completeness: 'complete',
+      missingMaterial: [],
+      omissions: [],
+    };
+    expect(
+      prepareReviewInput(emptySource).frozenInput.source.materials[0]!.content,
+    ).toBe('');
+    const emptyDiff = baseInput();
+    emptyDiff.source.materials[0]!.kind = 'diff';
+    emptyDiff.source.materials[0]!.content = '   ';
+    expect(() => prepareReviewInput(emptyDiff)).toThrow(/content/);
     const traversal = baseInput();
     traversal.source.selectedPaths = ['../secret.md'];
     expect(() => prepareReviewInput(traversal)).toThrow(

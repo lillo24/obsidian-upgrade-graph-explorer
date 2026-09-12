@@ -374,6 +374,18 @@ importers:
         specifier: 24.13.3
         version: 24.13.3
 
+  packages/review-source-tauri:
+    dependencies:
+      '@icarus-graph-explorer/ai-review':
+        specifier: workspace:*
+        version: link:../ai-review
+      '@icarus-graph-explorer/source-provider-tauri':
+        specifier: workspace:*
+        version: link:../source-provider-tauri
+      '@tauri-apps/api':
+        specifier: 2.11.1
+        version: 2.11.1
+
   packages/snapshot-delta:
     dependencies:
       '@icarus-graph-explorer/core':

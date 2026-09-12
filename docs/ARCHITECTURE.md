@@ -134,6 +134,17 @@ Compiler access is an injected retained-snapshot session with four bounded read
 operations; placement and authorization stay application-owned. See
 [`AI_REVIEW_COMPILER_INTEGRATION.md`](AI_REVIEW_COMPILER_INTEGRATION.md).
 
+`packages/review-source-tauri` is the REVIEW2 outer adapter between an
+already-authorized KG11 vault session and `packages/ai-review`. Its TypeScript
+surface owns opaque session/preparation/request lifecycles, native-envelope
+validation, cancellation, and mapping into `GitHistoryReviewSource`. The Rust
+module in `apps/desktop/src-tauri` alone resolves and invokes Git. It captures
+strict-UTF-8 Markdown blobs and per-first-parent-commit patches from pinned
+objects, never from working-tree content, and retains a versioned provenance
+manifest. Absolute roots are accepted only at native session opening and are
+not placed in review data. This adapter has no graph, React, provider SDK,
+compiler-store, general process, or repository-write responsibility.
+
 `packages/dagre-layout` owns the versioned plain-data W3 protocol, strict
 input/output validation, and the only synchronous Dagre compute/configuration
 implementation. It is stateless and knows nothing about React, React Flow,

@@ -82,6 +82,13 @@ export function exportReviewRunMarkdown(run: ReviewRunRecord): string {
       `- Git base/head: ${source.baseCommitId} / ${source.headCommitId}`,
       `- Commits (${source.commitCount}): ${source.commitIds.join(', ')}`,
     );
+    if (source.captureManifest !== undefined) {
+      lines.push(
+        `- Capture policy/order: ${source.captureManifest.historyPolicy} / ${source.captureManifest.commitOrder}`,
+        `- Captured bytes: ${source.captureManifest.capturedByteCount}`,
+        `- HEAD advanced after preparation: ${source.captureManifest.headAdvanced ? 'yes' : 'no'}`,
+      );
+    }
   }
   lines.push(
     '',

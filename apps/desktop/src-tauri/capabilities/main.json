@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Selected-vault reads, recursive watch acquisition, and private app-local identity state for the main window.",
+  "description": "Selected-vault reads, recursive watch acquisition, dedicated local Git review capture, and private app-local identity state for the main window.",
   "windows": ["main"],
   "permissions": [
     "core:default",
