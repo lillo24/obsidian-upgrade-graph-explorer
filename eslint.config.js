@@ -931,6 +931,34 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/ai-review/**/*.{ts,tsx}'],
+    ignores: ['packages/ai-review/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                '@xyflow/*',
+                '@dagrejs/*',
+                '@tauri-apps/*',
+                '@icarus-graph-explorer/*',
+                'node:*',
+              ],
+              message:
+                'AI Review is a provider-neutral plain-data orchestration boundary; UI, graph, platform, filesystem, provider SDK, and compiler-store concerns belong outside it.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['packages/dagre-layout/**/*.{ts,tsx}'],
     ignores: ['packages/dagre-layout/**/*.test.{ts,tsx}'],
     rules: {
