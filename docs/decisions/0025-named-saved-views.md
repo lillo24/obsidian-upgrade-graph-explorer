@@ -1,6 +1,7 @@
 # 0025 — Named Saved Views are semantic bookmarks
 
-Status: accepted for implementation; merge remains gated on native acceptance.
+Status: accepted; the residual native interaction gate was explicitly accepted
+for merge on 2026-09-12.
 
 ## Decision
 

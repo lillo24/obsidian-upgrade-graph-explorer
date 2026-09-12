@@ -1,14 +1,13 @@
 # SAVED1A implementation report
 
-Status: **implemented, locally/browser validated, and accepted by PR CI; native acceptance pending.**
+Status: **implemented, locally/browser validated, accepted by PR CI, and explicitly accepted for merge.**
 
 Implementation branch: `codex/saved1a-named-saved-views`
 
 [PR #85](https://github.com/lillo24/obsidian-upgrade-graph-explorer/pull/85)
-is the isolated integration vehicle and intentionally remains draft until
-fresh optimized native product interaction is explicitly accepted.
-PR head `35d7132` passed the required `validate` and `desktop` jobs before the
-status-only follow-up that records that result.
+is the isolated integration vehicle. PR head `e166846` passed the required
+`validate` and `desktop` jobs before the acceptance-only follow-up that records
+the user's explicit merge instruction on 2026-09-12.
 
 ## Summary
 
@@ -167,10 +166,12 @@ mode, reflowed with an internal scrollbar at 320×640, and remained visible over
 the maximized canvas after the stacking fix. The browser console had no warnings
 or errors.
 
-Fresh optimized native product interaction remains an explicit merge gate. The
-release executable exists and passed startup smoke, but restart persistence,
-physical keyboard/pointer interaction, and physical pan/zoom → Save → Apply
-accuracy still require accepted native QA under the repository policy.
+Fresh optimized native product interaction was not executed. The release
+executable exists and passed startup smoke, but restart persistence, physical
+keyboard/pointer interaction, and physical pan/zoom → Save → Apply accuracy
+were not recorded as passing. The user explicitly requested merge on
+2026-09-12, accepting that residual risk after the optimized build/startup and
+production-browser evidence.
 
 ## Files changed
 
@@ -192,8 +193,7 @@ No dependency was added or removed.
 
 ## Remaining work
 
-- Explicit optimized native product QA acceptance before merge.
-- Post-merge CI after that acceptance.
+- Post-merge CI.
 - Worktree and branch cleanup after merge.
 - SAVED1B settings/spatial profile composition, PIN1 persistent individual File
   placement, and AUTO1 adaptive layout selection remain separate future work and
