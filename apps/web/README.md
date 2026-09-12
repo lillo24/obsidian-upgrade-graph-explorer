@@ -399,6 +399,18 @@ controller correlation tokens are monotonic within one controller, survive
 only long enough to join I16/I17/I18 processing to the matching paint, and
 never enter reports or persistence.
 
+NETWORKVIEW1B startup diagnostics are a separate bounded QA path. Add
+`?network-startup-trace=1` to an optimized browser/native URL to expose the
+memory-only `window.icarusNetworkStartupTrace` API and a non-rendering
+`#network-startup-trace` JSON script. The trace records shell and Sigma physical
+dimensions, camera/customBBox/live extent, five representative raw and viewport
+node positions, LOD, and startup state until 500 ms after All Network reveal;
+its `summary.pass` is the no-input stability oracle. The collector and DOM sink
+do not exist without the flag. To reproduce the former fast race without a
+production sleep, QA may also add `&network-startup-capability-delay-ms=150`
+(bounded to 0–2000 ms); this delays only app adoption of the renderer's
+`available` capability. It is ignored unless tracing is enabled.
+
 ## Graph interaction boundary
 
 The default All Hierarchy view is **Files only**. Outside Focus, **1 level**, **2

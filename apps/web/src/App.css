@@ -374,8 +374,20 @@ h2 {
 }
 
 .network-editing-controls__status {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 0.35rem);
+  left: 0.75rem;
+  width: max-content;
+  max-width: min(15rem, calc(100vw - 1.5rem));
+  padding: 0.28rem 0.42rem;
+  border: 1px solid #b7cbd2;
+  border-radius: 0.42rem;
   color: #175f70;
+  background: #f4fbfc;
+  box-shadow: 0 0.3rem 0.8rem rgb(25 62 76 / 12%);
   font-weight: 800;
+  pointer-events: none;
 }
 
 .network-editing-controls__failure {
