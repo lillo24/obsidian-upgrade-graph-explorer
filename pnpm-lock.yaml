@@ -50,6 +50,9 @@ importers:
       '@icarus-graph-explorer/argument-workspace':
         specifier: workspace:*
         version: link:../../packages/argument-workspace
+      '@icarus-graph-explorer/argument-workspace-tauri':
+        specifier: workspace:*
+        version: link:../../packages/argument-workspace-tauri
       '@icarus-graph-explorer/core':
         specifier: workspace:*
         version: link:../../packages/core

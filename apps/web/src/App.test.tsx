@@ -83,6 +83,7 @@ describe('graph-first explorer shell', () => {
     expect(markup).not.toContain('Open Vault');
     expect(markup).toContain('Search');
     expect(markup).toContain('>Filters<');
+    expect(markup).toContain('>Arguments<');
     expect(markup).toContain('aria-label="Graph navigation history"');
     expect(markup).toContain('aria-label="Back in graph history" disabled=""');
     expect(markup).toContain(

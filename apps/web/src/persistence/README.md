@@ -11,6 +11,13 @@ expected-snapshot checks, and surfaces implementation-dependent browser quota
 failures. It stores prose-sized Argument Library JSON only; source bodies and
 live source observations are not added to it.
 
+`../features/arguments/platform-store.ts` chooses this adapter in a browser and
+dynamically chooses `@icarus-graph-explorer/argument-workspace-tauri` only when
+the Tauri runtime marker is present. That decision is cached on first access and
+never falls back from failed desktop I/O to localStorage. Missing storage remains
+an explicit unreadable state. The UI limits explicitly selected JSON imports to
+5 MiB before parsing; that practical interaction limit does not alter schema v1.
+
 - `storage.ts` maps encoded stable workspace IDs to small `localStorage`
   records and returns explicit, non-fatal read/write/delete failures.
 - `session.ts` applies report identity eligibility and hydrates a reconciled KG6

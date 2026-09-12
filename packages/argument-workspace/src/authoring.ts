@@ -7,6 +7,7 @@ import {
   editAxiom,
   editCounterArgument,
   editTopic,
+  reassessCounterArgumentResponse,
   setRecordArchived,
   setRecordReviewState,
   setTopicMembership,
@@ -156,6 +157,15 @@ export class ArgumentLibraryAuthoringService {
         input,
         this.runtime,
       ),
+    );
+  }
+
+  reassessResponse(
+    expected: SnapshotDescriptor,
+    counterArgumentId: string,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      reassessCounterArgumentResponse(library, counterArgumentId, this.runtime),
     );
   }
 
