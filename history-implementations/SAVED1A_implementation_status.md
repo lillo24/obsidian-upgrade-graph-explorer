@@ -1,8 +1,12 @@
 # SAVED1A implementation report
 
-Status: **implemented and locally validated; PR/native acceptance pending.**
+Status: **implemented and locally validated in draft PR; CI/native acceptance pending.**
 
 Implementation branch: `codex/saved1a-named-saved-views`
+
+[PR #85](https://github.com/lillo24/obsidian-upgrade-graph-explorer/pull/85)
+is the isolated integration vehicle and intentionally remains draft until
+fresh optimized native product interaction is explicitly accepted.
 
 ## Summary
 
