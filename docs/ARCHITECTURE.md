@@ -116,6 +116,13 @@ EMPTY/COMMITTED/PENDING transaction state machine. In desktop production its
 dedicated worker owns the KG10 engine/cache and diagnostic construction. Large
 initialization/resync and prepared-result arrays are split into ordered native
 structured-clone frames so one transfer does not monopolize the UI event loop.
+Window and Dedicated Worker hosts yield between those frames through the same
+MessageChannel task scheduler. This preserves bounded cloning without making a
+stateful startup transaction depend on background-throttled WebView timers; a
+zero-delay timer remains only as the compatibility fallback when
+MessageChannel is unavailable. Request batches contain 32 values after the
+measured transport correction, while frame validation, correlation, and
+transaction ordering remain unchanged.
 The package has no Worker global, Tauri handle, filesystem access, React value,
 or synchronous production fallback; the Vite worker entry/client live in the
 web application. Because Vite 8 applies browser export conditions to Dedicated

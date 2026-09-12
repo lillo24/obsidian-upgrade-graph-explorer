@@ -30,12 +30,19 @@ export {
   isWorkspaceWorkerResponse,
 } from './validation';
 export {
+  WORKSPACE_WORKER_REQUEST_CHUNK_SIZE,
+  WORKSPACE_WORKER_REQUEST_CHUNK_THRESHOLD,
   chunkWorkspaceWorkerRequest,
   chunkWorkspaceWorkerResponse,
   createWorkspaceWorkerRequestAssembler,
   createWorkspaceWorkerResponseAssembler,
   isWorkspaceWorkerTransportResponse,
 } from './transport';
+export {
+  createWorkspaceWorkerTransportScheduler,
+  type WorkspaceWorkerTransportScheduler,
+  type WorkspaceWorkerTransportSchedulerKind,
+} from './transport-scheduler';
 export type {
   WorkspaceWorkerAssemblyResult,
   WorkspaceWorkerChunkCollection,

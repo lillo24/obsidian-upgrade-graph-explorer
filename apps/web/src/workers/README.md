@@ -9,7 +9,7 @@ owns Worker lifecycle and literal Vite worker construction.
 ```text
 workspace.worker.ts          Dedicated Worker entry and localized worker-global typing.
 workspace-worker-client.ts   Promise client, response validation, and fatal transport cleanup.
-workspace-worker-client.test.ts  Fake-transport correlation and failure tests.
+workspace-worker-client.test.ts  Framing, scheduling, correlation, cancellation, and failure tests.
 dagre-layout.worker.ts       Stateless W3 request/response entry.
 dagre-layout-worker-client.ts  Lazy latest-layout-wins lifecycle and instrumentation.
 dagre-layout-worker-client.test.ts  Supersession, stale-result, failure, and reuse tests.
@@ -32,6 +32,12 @@ network-physics-worker-client.test.ts  Laziness, ordering, continuity, refresh-r
 
 The worker is instantiated only after a local-vault open starts. Sample and
 imported-report browser paths do not create it.
+
+W1 request and response frames yield through the shared workspace-worker
+MessageChannel scheduler. This keeps each structured-clone batch bounded while
+allowing a critical vault-open transaction to progress when WebView window
+timers are throttled in the background. The timer fallback is used only where
+MessageChannel is unavailable.
 
 The Vite worker build uses the Markdown named-reference decoder's worker-safe
 entry. `vite.config.ts` enforces that exact transitive boundary and rejects an

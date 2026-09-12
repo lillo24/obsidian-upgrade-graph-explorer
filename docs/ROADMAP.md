@@ -123,10 +123,13 @@ should move whole-workspace KG10/diagnostic transactions and large Dagre layout
 off the main thread, while projection and inspection remain on the main thread
 and existing caches remain unchanged. KG12B1 implements W1 with ordered
 prepare → persist → commit transactions, replacement-worker recovery, and
-chunked structured-clone transport. KG12B2 implements W3 as a separate
-stateless latest-layout-wins worker with active supersession and stale-result
-rejection. Automated responsiveness, browser, and release desktop gates passed;
-KG12 is complete. KG13A separated the Global product question from the remaining
+chunked structured-clone transport. W1 frame pacing now uses a background-safe
+MessageChannel task boundary with measured 32-value request batches, preserving
+bounded progress without depending on minimized-window timer wake-ups. KG12B2
+implements W3 as a separate stateless latest-layout-wins worker with active
+supersession and stale-result rejection. Automated responsiveness, browser, and
+release desktop gates passed; KG12 is complete. KG13A separated the Global product
+question from the remaining
 Dagre structural-scale cliff and selected direct Sigma/Graphology while React
 Flow remains Structure. KG13B1 now provides the lazy production documents-only
 Global renderer, Regional visual LOD, off-main reference/folder layout,

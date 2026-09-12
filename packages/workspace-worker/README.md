@@ -27,6 +27,8 @@ src/
   protocol.ts     Versioned structured-clone request, response, and processor contracts.
   validation.ts   Shallow boundary validation for untrusted worker messages.
   transport.ts    Ordered bounded request/response framing and reassembly.
+  transport-scheduler.ts  Background-safe inter-frame task scheduling shared by Window and Worker hosts.
+  transport-scheduler.test.ts  MessageChannel ordering, fallback, and disposal coverage.
   runtime.ts      EMPTY/COMMITTED/PENDING state machine and KG10/diagnostics ownership.
   in-process.ts   Asynchronous test transport using the same protocol runtime.
   index.test.ts   State, failures, cloneability, and direct-pipeline correctness oracles.

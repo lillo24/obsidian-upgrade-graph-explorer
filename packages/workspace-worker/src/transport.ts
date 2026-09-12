@@ -42,6 +42,9 @@ const REQUEST_COLLECTIONS: readonly WorkspaceWorkerRequestChunkCollection[] = [
   'request-catalog-references',
 ];
 
+export const WORKSPACE_WORKER_REQUEST_CHUNK_SIZE = 32;
+export const WORKSPACE_WORKER_REQUEST_CHUNK_THRESHOLD = 128;
+
 export function chunkWorkspaceWorkerRequest(
   request: WorkspaceWorkerRequest,
   options: { readonly chunkSize?: number; readonly threshold?: number } = {},
@@ -52,8 +55,9 @@ export function chunkWorkspaceWorkerRequest(
   ) {
     return [request];
   }
-  const chunkSize = options.chunkSize ?? 8;
-  const threshold = options.threshold ?? 128;
+  const chunkSize = options.chunkSize ?? WORKSPACE_WORKER_REQUEST_CHUNK_SIZE;
+  const threshold =
+    options.threshold ?? WORKSPACE_WORKER_REQUEST_CHUNK_THRESHOLD;
   if (!Number.isInteger(chunkSize) || chunkSize < 1) {
     throw new Error('Workspace worker request chunkSize must be positive.');
   }

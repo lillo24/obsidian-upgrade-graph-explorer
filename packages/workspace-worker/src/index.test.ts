@@ -17,6 +17,7 @@ import {
   createWorkspaceWorkerResponseAssembler,
   createWorkspaceWorkerRuntime,
   isWorkspaceWorkerResponse,
+  type WorkspaceWorkerRequest,
   type WorkspaceWorkerRequestPayload,
   type WorkspaceWorkerResponse,
   type WorkspaceWorkerRuntimeDependencies,
@@ -76,6 +77,90 @@ function initializePayload(): WorkspaceWorkerRequestPayload {
     },
   };
 }
+
+describe('workspace worker chunk transport', () => {
+  it('rejects incomplete, out-of-order, and duplicate request completion', () => {
+    const original = {
+      ...initializePayload(),
+      protocolVersion: WORKSPACE_WORKER_PROTOCOL_VERSION,
+      requestId: 'chunked-request',
+    } as WorkspaceWorkerRequest;
+    const frames = chunkWorkspaceWorkerRequest(original, {
+      chunkSize: 1,
+      threshold: 1,
+    });
+    const start = frames[0];
+    const firstChunk = frames[1];
+    const secondChunk = frames[2];
+    const end = frames.at(-1);
+    if (
+      start === undefined ||
+      firstChunk === undefined ||
+      secondChunk === undefined ||
+      end === undefined
+    ) {
+      throw new Error('Expected a multi-frame request.');
+    }
+
+    const incomplete = createWorkspaceWorkerRequestAssembler();
+    expect(incomplete.accept(start).status).toBe('pending');
+    expect(incomplete.accept(end)).toMatchObject({ status: 'invalid' });
+
+    const reordered = createWorkspaceWorkerRequestAssembler();
+    expect(reordered.accept(start).status).toBe('pending');
+    expect(reordered.accept(secondChunk)).toMatchObject({ status: 'invalid' });
+
+    const complete = createWorkspaceWorkerRequestAssembler();
+    let reconstructed: WorkspaceWorkerRequest | undefined;
+    for (const frame of frames) {
+      const result = complete.accept(frame);
+      if (result.status === 'complete') reconstructed = result.request;
+    }
+    expect(reconstructed).toEqual(original);
+    expect(complete.accept(end)).toMatchObject({ status: 'invalid' });
+  });
+
+  it('rejects incomplete, out-of-order, and duplicate response completion', () => {
+    const original = runtime().handle({
+      ...initializePayload(),
+      protocolVersion: WORKSPACE_WORKER_PROTOCOL_VERSION,
+      requestId: 'chunked-response',
+    });
+    const frames = chunkWorkspaceWorkerResponse(original, {
+      chunkSize: 1,
+      threshold: 1,
+    });
+    const start = frames[0];
+    const firstChunk = frames[1];
+    const secondChunk = frames[2];
+    const end = frames.at(-1);
+    if (
+      start === undefined ||
+      firstChunk === undefined ||
+      secondChunk === undefined ||
+      end === undefined
+    ) {
+      throw new Error('Expected a multi-frame response.');
+    }
+
+    const incomplete = createWorkspaceWorkerResponseAssembler();
+    expect(incomplete.accept(start).status).toBe('pending');
+    expect(incomplete.accept(end)).toMatchObject({ status: 'invalid' });
+
+    const reordered = createWorkspaceWorkerResponseAssembler();
+    expect(reordered.accept(start).status).toBe('pending');
+    expect(reordered.accept(secondChunk)).toMatchObject({ status: 'invalid' });
+
+    const complete = createWorkspaceWorkerResponseAssembler();
+    let reconstructed: WorkspaceWorkerResponse | undefined;
+    for (const frame of frames) {
+      const result = complete.accept(frame);
+      if (result.status === 'complete') reconstructed = result.response;
+    }
+    expect(reconstructed).toEqual(original);
+    expect(complete.accept(end)).toMatchObject({ status: 'invalid' });
+  });
+});
 
 describe('workspace worker transactional runtime', () => {
   it('prepares initialization without committing, then commits exactly once', () => {

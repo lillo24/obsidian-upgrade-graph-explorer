@@ -2,6 +2,7 @@
 
 import {
   chunkWorkspaceWorkerResponse,
+  createWorkspaceWorkerTransportScheduler,
   createWorkspaceWorkerRequestAssembler,
   createWorkspaceWorkerRuntime,
   type WorkspaceWorkerTransportResponse,
@@ -15,6 +16,7 @@ interface WorkspaceWorkerHost {
 const host: WorkspaceWorkerHost = self;
 const runtime = createWorkspaceWorkerRuntime();
 const requestAssembler = createWorkspaceWorkerRequestAssembler();
+const transportScheduler = createWorkspaceWorkerTransportScheduler();
 
 host.onmessage = async (event) => {
   const assembly = requestAssembler.accept(event.data);
@@ -31,9 +33,7 @@ host.onmessage = async (event) => {
   for (let index = 0; index < frames.length; index += 1) {
     host.postMessage(frames[index]!);
     if (index + 1 < frames.length) {
-      await new Promise<void>((continueSending) =>
-        setTimeout(continueSending, 0),
-      );
+      await transportScheduler.yieldToNextTask();
     }
   }
 };

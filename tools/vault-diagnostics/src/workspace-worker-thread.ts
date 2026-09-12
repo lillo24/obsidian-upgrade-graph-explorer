@@ -2,6 +2,7 @@ import { parentPort } from 'node:worker_threads';
 
 import {
   chunkWorkspaceWorkerResponse,
+  createWorkspaceWorkerTransportScheduler,
   createWorkspaceWorkerRequestAssembler,
   createWorkspaceWorkerRuntime,
 } from '@icarus-graph-explorer/workspace-worker';
@@ -15,6 +16,7 @@ if (port === null) {
 
 const runtime = createWorkspaceWorkerRuntime();
 const requestAssembler = createWorkspaceWorkerRequestAssembler();
+const transportScheduler = createWorkspaceWorkerTransportScheduler();
 port.on('message', async (request: unknown) => {
   const assembly = requestAssembler.accept(request);
   if (assembly.status === 'pending') return;
@@ -30,9 +32,7 @@ port.on('message', async (request: unknown) => {
   for (let index = 0; index < frames.length; index += 1) {
     port.postMessage(frames[index]);
     if (index + 1 < frames.length) {
-      await new Promise<void>((continueSending) =>
-        setTimeout(continueSending, 1),
-      );
+      await transportScheduler.yieldToNextTask();
     }
   }
 });

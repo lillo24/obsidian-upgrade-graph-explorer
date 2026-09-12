@@ -4,8 +4,11 @@ import { Worker } from 'node:worker_threads';
 import { generateSyntheticWorkspace } from '@icarus-graph-explorer/diagnostics-obsidian';
 import { createStableIdentityCatalog } from '@icarus-graph-explorer/stable-identity';
 import {
+  WORKSPACE_WORKER_REQUEST_CHUNK_SIZE,
   WORKSPACE_WORKER_PROTOCOL_VERSION,
   chunkWorkspaceWorkerRequest,
+  chunkWorkspaceWorkerResponse,
+  createWorkspaceWorkerTransportScheduler,
   createWorkspaceWorkerRuntime,
   createWorkspaceWorkerResponseAssembler,
   type WorkspaceWorkerRequest,
@@ -18,6 +21,11 @@ import {
   type BenchmarkProfile,
 } from './benchmark-config';
 
+interface BenchmarkArguments {
+  readonly profile: BenchmarkProfile;
+  readonly requestChunkSize: number;
+}
+
 interface Measured<T> {
   readonly value: T;
   readonly elapsedMs: number;
@@ -26,13 +34,21 @@ interface Measured<T> {
   readonly maximumGapAtMs: number;
 }
 
-function profileFromArguments(): BenchmarkProfile {
+function benchmarkArguments(): BenchmarkArguments {
   const flag = process.argv.indexOf('--profile');
   const value = flag < 0 ? 'medium' : process.argv[flag + 1];
   if (value === undefined || !isBenchmarkProfile(value)) {
     throw new Error('--profile must be smoke, small, medium, or large.');
   }
-  return value;
+  const chunkSizeFlag = process.argv.indexOf('--request-chunk-size');
+  const chunkSizeValue =
+    chunkSizeFlag < 0
+      ? WORKSPACE_WORKER_REQUEST_CHUNK_SIZE
+      : Number(process.argv[chunkSizeFlag + 1]);
+  if (!Number.isInteger(chunkSizeValue) || chunkSizeValue < 1) {
+    throw new Error('--request-chunk-size must be a positive integer.');
+  }
+  return { profile: value, requestChunkSize: chunkSizeValue };
 }
 
 async function measureWithEventLoopProbe<T>(
@@ -82,7 +98,9 @@ async function measureWithEventLoopProbe<T>(
 function send(
   worker: Worker,
   request: WorkspaceWorkerRequest,
+  requestChunkSize: number,
 ): Promise<WorkspaceWorkerResponse> {
+  const transportScheduler = createWorkspaceWorkerTransportScheduler();
   return new Promise((resolve, reject) => {
     const assembler = createWorkspaceWorkerResponseAssembler();
     const onMessage = (response: unknown) => {
@@ -100,6 +118,7 @@ function send(
       reject(error);
     };
     const cleanup = () => {
+      transportScheduler.dispose();
       worker.off('message', onMessage);
       worker.off('error', onError);
     };
@@ -107,13 +126,13 @@ function send(
     worker.on('error', onError);
     void (async () => {
       try {
-        const frames = chunkWorkspaceWorkerRequest(request);
+        const frames = chunkWorkspaceWorkerRequest(request, {
+          chunkSize: requestChunkSize,
+        });
         for (let index = 0; index < frames.length; index += 1) {
           worker.postMessage(frames[index]);
           if (index + 1 < frames.length) {
-            await new Promise<void>((continueSending) =>
-              setImmediate(continueSending),
-            );
+            await transportScheduler.yieldToNextTask();
           }
         }
       } catch (error: unknown) {
@@ -124,7 +143,10 @@ function send(
   });
 }
 
-const profile = profileFromArguments();
+const { profile, requestChunkSize } = benchmarkArguments();
+const schedulerProbe = createWorkspaceWorkerTransportScheduler();
+const schedulerKind = schedulerProbe.kind;
+schedulerProbe.dispose();
 const documents = generateSyntheticWorkspace(BENCHMARK_PROFILES[profile]);
 const request: WorkspaceWorkerRequest = {
   protocolVersion: WORKSPACE_WORKER_PROTOCOL_VERSION,
@@ -145,13 +167,19 @@ let offThread: Measured<WorkspaceWorkerResponse>;
 try {
   // Exclude tsx/worker module startup from the transaction comparison. The
   // production worker is likewise reusable for every update in one vault.
-  await send(worker, {
-    protocolVersion: WORKSPACE_WORKER_PROTOCOL_VERSION,
-    requestId: 'responsiveness-warmup',
-    kind: 'build-committed-report',
-    input: { nonMarkdownPaths: [] },
-  });
-  offThread = await measureWithEventLoopProbe(() => send(worker, request));
+  await send(
+    worker,
+    {
+      protocolVersion: WORKSPACE_WORKER_PROTOCOL_VERSION,
+      requestId: 'responsiveness-warmup',
+      kind: 'build-committed-report',
+      input: { nonMarkdownPaths: [] },
+    },
+    requestChunkSize,
+  );
+  offThread = await measureWithEventLoopProbe(() =>
+    send(worker, request, requestChunkSize),
+  );
 } finally {
   await worker.terminate();
 }
@@ -172,6 +200,14 @@ const output = {
     documents: documents.length,
     entities: offThread.value.prepared.report.snapshot.entities.length,
     references: offThread.value.prepared.report.snapshot.references.length,
+  },
+  transport: {
+    scheduler: schedulerKind,
+    requestChunkSize,
+    requestFrames: chunkWorkspaceWorkerRequest(request, {
+      chunkSize: requestChunkSize,
+    }).length,
+    responseFrames: chunkWorkspaceWorkerResponse(offThread.value).length,
   },
   direct: {
     roundTripMs: direct.elapsedMs,

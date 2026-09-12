@@ -182,6 +182,64 @@ version/request correlation, the receiving side validates order/completeness,
 and both sides yield between frames. No JSON serialization, parsed documents,
 engine object, full delta, source path, or identifier enters the result.
 
+### W1 background-startup transport correction
+
+A Windows release run exposed a scheduling failure when a selected vault was
+immediately backgrounded or minimized: the application could remain in
+`Opening` until focus returned, or advance extremely slowly. PATCH2 commit
+`35e891e5c7218a64cd88d1bbd9acb3b3781bb0aa` changed only Focus Schematic Soft
+Folder Cluster behavior. Its W1 client, worker entry, transport, live-vault
+controller, source provider, and Tauri configuration matched their merge-base
+versions and had no material startup difference from current `main`.
+
+The blocking boundary was the inter-frame scheduler. Both production frame
+loops awaited `setTimeout(..., 0)` before sending the next frame. WebView2
+places an invisible WebView in a background state and normally permits timer
+wake-ups only at a much longer interval; [Microsoft documents a usual 1,000 ms
+background timer interval](https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2settings.preferredbackgroundtimerwakeinterval).
+A medium synthetic request produced 65 frames at
+the former eight-value request size, and its response produced 60 frames. A
+timer-throttled transfer could therefore add roughly two minutes of scheduling
+delay even though source discovery, worker compute, and protocol assembly were
+healthy.
+
+Production Window and Dedicated Worker hosts now share a MessageChannel task
+scheduler. Port messages retain event-loop task boundaries and deterministic
+frame order without relying on background timer wake-ups. Runtimes without
+MessageChannel retain an explicit timer fallback. Protocol version, frame
+shape, response chunks (`1,024` values), the `128`-value request threshold,
+candidate persistence/commit ordering, and source-generation guards are
+unchanged.
+
+The current benchmark accepts `--request-chunk-size` and records only aggregate
+counts, scheduler kind, timings, gaps, and equality. The 2026-09-12 medium
+candidate pass used the same 500-document / 8,500-entity / 16,000-reference
+input:
+
+| Request values/frame | Request frames | Worker round trip | Main-thread gap p95 |
+| -------------------: | -------------: | ----------------: | ------------------: |
+|                    8 |             65 |        1,791.7 ms |             32.5 ms |
+|                   16 |             34 |        1,668.3 ms |             33.6 ms |
+|                   32 |             18 |        1,499.9 ms |             36.5 ms |
+|                   64 |             10 |        3,659.2 ms |             40.3 ms |
+
+Machine load moved compute and wall time between sequential samples, so timing
+is not a CI gate. The deterministic frame count and payload equality are the
+selection evidence: 32 values removes 47 of the former 64 request yields while
+keeping p95 near the existing one-to-two-frame responsiveness reference. The
+2,000-document large pass used 65 request and 284 response frames, kept report
+and catalog equality exact, completed in 9,793.0 ms, and measured a 32.7 ms
+main-thread p95. Chunking therefore remains in place; the change does not
+restore one multi-second main-thread clone.
+
+Release QA for this boundary must use the optimized Windows artifact and a
+realistically large vault. It covers foreground open, immediate Alt-Tab,
+immediate minimize, backgrounding after ten seconds, repeated source switching,
+an external Markdown live update, and Rescan. The immediate-background cases
+must finish before the window is focused or restored. Automated DOM tests cover
+framing and lifecycle contracts but are not substitutes for these native
+visibility gates.
+
 ## KG12B2 W3 responsiveness evidence
 
 `pnpm benchmark:dagre-worker -- --profile small` and `--profile medium` derive

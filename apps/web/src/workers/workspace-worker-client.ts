@@ -2,6 +2,7 @@ import {
   WORKSPACE_WORKER_PROTOCOL_VERSION,
   WorkspaceProcessorError,
   chunkWorkspaceWorkerRequest,
+  createWorkspaceWorkerTransportScheduler,
   createWorkspaceWorkerResponseAssembler,
   type BuildCommittedReportInput,
   type DesktopWorkspaceProcessor,
@@ -12,6 +13,7 @@ import {
   type WorkspaceWorkerRequestPayload,
   type WorkspaceWorkerResponse,
   type WorkspaceWorkerTransportRequest,
+  type WorkspaceWorkerTransportScheduler,
 } from '@icarus-graph-explorer/workspace-worker';
 
 export interface WorkspaceWorkerTransport {
@@ -48,6 +50,7 @@ export function createWorkspaceWorkerClient(
   worker: WorkspaceWorkerTransport,
   now: () => number = () => performance.now(),
   measureResponsiveness = false,
+  transportScheduler: WorkspaceWorkerTransportScheduler = createWorkspaceWorkerTransportScheduler(),
 ): DesktopWorkspaceProcessor {
   let requestSequence = 0;
   let disposed = false;
@@ -65,6 +68,7 @@ export function createWorkspaceWorkerClient(
   function failTransport(error: WorkspaceProcessorError): void {
     if (disposed) return;
     disposed = true;
+    transportScheduler.dispose();
     worker.terminate();
     responseAssembler.clear();
     rejectAll(error);
@@ -192,9 +196,7 @@ export function createWorkspaceWorkerClient(
             if (disposed) return;
             worker.postMessage(frames[index]!);
             if (index + 1 < frames.length) {
-              await new Promise<void>((continueSending) =>
-                setTimeout(continueSending, 0),
-              );
+              await transportScheduler.yieldToNextTask();
             }
           }
         } catch (error: unknown) {
@@ -279,6 +281,7 @@ export function createWorkspaceWorkerClient(
     terminate() {
       if (disposed) return;
       disposed = true;
+      transportScheduler.dispose();
       worker.terminate();
       responseAssembler.clear();
       rejectAll(
