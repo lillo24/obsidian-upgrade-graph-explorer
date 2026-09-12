@@ -27,7 +27,7 @@ Focus
 incoming / outgoing / both
 ```
 
-The important part is that Focus is not a separate disposable view. The same focused neighborhood can then be shown as a network or as a structured hierarchy, while navigation, inspection, and saved view state continue to refer to the same underlying entities.
+The important part is that Focus is not a separate disposable view. The same focused neighborhood can then be shown as a network or as a structured hierarchy, while navigation, inspection, Current View, and Named Saved Views continue to refer to the same underlying entities.
 
 This makes the graph useful for questions like:
 
@@ -226,7 +226,7 @@ The project already has working foundations for:
 - canonical search and navigation;
 - backlinks and provenance inspection;
 - live filesystem updates;
-- local saved view state;
+- automatic local Current View plus explicit Named Saved Views;
 - worker-backed expensive layout / workspace processing;
 - QUERY1 filtering and Visual Groups;
 - folder-aware Network placement;

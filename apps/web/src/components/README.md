@@ -8,8 +8,12 @@ canonical truth, or own a platform storage implementation.
   compact structural/focus/workspace controls, controlled Filters and Settings
   overlays, shared canonical navigation, graph selection, the transient unified
   Inspector drawer, and the transient Network Explorer drawer,
-  saved-view hydration/alert/reset orchestration, transient graph Back/Forward
-  checkpoints, and semantic renderer viewport requests. Across live snapshots it
+  Current View hydration/alert/reset orchestration, Named Saved Views session
+  mutations and single-transaction application, transient graph Back/Forward
+  checkpoints, and semantic renderer viewport requests. Applying a named view
+  cancels movement/Arrange state, establishes a fresh history baseline, clears
+  selection, reconciles the snapshot, adopts its query draft, and restores its
+  semantic viewport. Across live snapshots it
   reconciles current KG6 state before
   projection, rebuilds inspection/search indexes, preserves surviving selection
   and semantic viewport context, and safely clears missing selections. It keeps
@@ -77,6 +81,12 @@ canonical truth, or own a platform storage implementation.
   group shared by the normal toolbar and maximized floating controls. It receives
   only availability and callbacks; graph state, semantic viewport, keyboard
   policy, and storage remain outside the component.
+- `SavedViews.tsx` owns the product content for creating, applying, updating,
+  renaming, deleting, and recovering Named Saved Views. It owns only local form
+  and confirmation drafts; registry validation and persistence remain outside.
+- `SavedViewsPopover.tsx` owns the one bookmark trigger rendered in either the
+  normal toolbar or maximized control stack, plus the viewport-bounded portal,
+  Escape/outside-pointer policy, initial input focus, and trigger focus return.
 - `ExplorationControls.tsx` owns the accessible Scope and Layout button groups,
   focused-root text, and explained disabled Focus state. `../exploration-model.ts`
   owns the pure four-way mapping to existing internal modes plus the hierarchy
@@ -118,7 +128,7 @@ canonical truth, or own a platform storage implementation.
   and Sandbox-only Stronger amplification (101–150); both still default to 100.
   All-only physics/visual controls remain grouped and
   explicitly scoped. Reset Sandbox deliberately excludes Trackpad Zoom, source
-  settings, spatial folder intent, and saved view state. Temporary SPACING1B QA
+  settings, spatial folder intent, Current View, and Named Saved Views. Temporary SPACING1B QA
   readouts mirror the mounted renderer sessions' ratios and fallback evidence;
   they are not product state and clear when their Network renderer unmounts.
 - `SourceSettingsSection.tsx` presents safe current-source metadata, browser

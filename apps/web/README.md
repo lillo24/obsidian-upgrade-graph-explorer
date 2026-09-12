@@ -295,14 +295,15 @@ The secondary KG5 evidence explorer is launched from **Settings → Developer**
 and uses a modal, internally scrolling surface. Opening or closing it does not
 resize or remount the graph workspace.
 
-## Saved graph view
+## Current View and Named Saved Views
 
 Cross-session persistence activates only when a report explicitly declares
 `identity.stability: "stable"`. Transient and legacy schema-v1 reports remain
-usable in memory and never read or write saved state. The schema-v3 saved record
-is keyed by encoded stable workspace ID and contains only structural disclosure,
-the optional literal heading ceiling, focus, user-facing path/entity/status
-filters, explicit presentation mode, and canonical renderer viewport bookmarks.
+usable in memory and never read or write persistent graph state. The automatic
+**Current View** is the one schema-v3 resume record keyed by encoded stable
+workspace ID. It contains only structural disclosure, the optional literal
+heading ceiling, focus, user-facing path/entity/status filters, explicit
+presentation mode, and canonical renderer viewport bookmarks.
 Internally those bookmarks remain named Structure/Global/Local for schema-v3
 compatibility. Schema v1 migrates to Structure; schema v2 preserves its explicit
 Structure/Global mode and does not infer Local from an active focus. The Local
@@ -319,10 +320,35 @@ eligibility cannot contradict the single visible **Blocks** choice; the saved
 schema version does not change. `disclosure.includeBlocks` remains the user
 intent that decides whether blocks may be projected.
 Corrupt, inaccessible, or unsupported stored values are not overwritten or
-silently deleted. Writes stop after one failure. **Reset saved view** deletes
-only that workspace's view, restores **Files only**, clears transient
-search/selection and both navigation-history stacks, and fits the graph. It
-never resets the KG9A catalog.
+silently deleted. Writes stop after one failure. **Reset current view** deletes
+only that workspace's automatic resume record, restores **Files only**, clears
+transient search/selection and both navigation-history stacks, and fits the
+graph. It never resets the KG9A catalog or Named Saved Views.
+
+**Saved Views** is a separate explicit registry under
+`icarus-graph-explorer:saved-views:<encodeURIComponent(workspaceId)>`. Each
+schema-v1 entry adds a unique trimmed name and Network/Hierarchy choice to an
+immutable snapshot of the same persisted semantic view contract. Up to 50
+entries are sorted deterministically. Names are at most 64 characters and are
+unique case-insensitively. Save, Update, Rename, Delete, and Apply write only
+this registry; Save does not trigger projection, layout, or viewport work.
+
+Apply performs one reconciled graph-state transaction against the current
+workspace. It switches Scope/Layout, disclosure, Focus, filters/query, and
+semantic viewport; cancels temporary movement; exits Arrange Folders; clears
+selection; adopts the applied query into its editor; and deliberately starts a
+new Back/Forward baseline. Current availability may safely adjust an unavailable
+presentation and announces that adjustment. The only preference it may change
+is the preferred Focus layout when a Focus entry selects Network versus
+Hierarchy; Graph Preferences, Visual Groups, File size overrides, and folder
+spatial rules otherwise remain independent. Ordinary Current View autosave then
+records the reconciled result. Exact reapplication skips projection/layout and
+viewport work while retaining the explicit history/selection reset semantics.
+
+The registry follows write-before-adopt behavior. Invalid bytes stay untouched
+and block mutations until the two-step **Reset Saved Views registry** action
+deletes only that key. This recovery never deletes Current View, Saved Filters,
+Visual Groups, preferences, size overrides, or spatial rules.
 
 Back/Forward history is never persisted. Meaningful presentation, disclosure,
 Focus, filter, and Search/Inspector navigation actions record the current
@@ -348,7 +374,7 @@ QUERY1 adds one optional canonical advanced-query string to that saved
 active view. Draft text never projects, enters history, or persists. Saved
 Filters are a separate stable-workspace registry containing only `{name,
 query}` definitions; applying one changes only the active query, deleting one
-does not change graph history, and Reset saved view leaves definitions intact.
+does not change graph history, and Reset current view leaves definitions intact.
 All Network applies that same canonical query to its files-only topology, so
 document-compatible clauses filter files while Section-only clauses correctly
 produce no matches instead of promoting parent files.

@@ -272,7 +272,7 @@ export function restorePersistedWorkspaceView(
   const workspaceId = workspace.snapshot().workspace.id;
   if (persisted.workspaceId !== workspaceId) {
     throw new Error(
-      `Cannot restore saved view for workspace "${persisted.workspaceId}" into "${workspaceId}".`,
+      `Cannot restore persisted workspace view for workspace "${persisted.workspaceId}" into "${workspaceId}".`,
     );
   }
 

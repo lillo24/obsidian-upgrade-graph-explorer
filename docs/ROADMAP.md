@@ -58,7 +58,9 @@ reorder KG14.
 | **MOVE1A — Constraint/gesture foundation**          | Display-to-dynamic coordinate inverse, serializable consumer port, pure gesture/coalescing, session seams, and lifecycle/arbitration tests.                      | **Complete.**                                                                               |
 | **MOVE1B — Production direct movement**             | Direct Network File dragging and real PHYSICS1 integration with bounded transport, guarded cooling, and an explicit supported-size limit.                        | **Implemented in draft — mandatory optimized Windows pointer/touchpad acceptance pending.** |
 | **PIN1 — Persistent individual placement**          | Explicit durable single-File placement semantics, storage, reconciliation, and authoring controls.                                                               | **Later; no schema is defined.**                                                            |
-| **SAVED1 — Saved Views**                            | Later composition of query, Scope/Layout, hierarchy detail, settings, viewport, and spatial profile/reference.                                                   | **Later** — no schema is defined.                                                           |
+| **SAVED1 — Saved Views**                            | Explicit named graph-context bookmarks now; optional presentation/spatial profile composition later.                                                             | **Split into SAVED1A and SAVED1B.**                                                         |
+| **SAVED1A — Named semantic bookmarks**              | Workspace-scoped names over query, Scope/Layout, hierarchy detail, Focus, and semantic viewport bookmarks, with strict independent persistence.                  | **Implemented — automated/browser evidence complete; native acceptance pending.**           |
+| **SAVED1B — Presentation/spatial profiles**         | Optional composition with independently owned Graph Preferences, Visual Groups, size overrides, and spatial profiles.                                            | **Later; no schema is defined.**                                                            |
 
 ### ForceAtlas2 convergence track
 
@@ -104,9 +106,10 @@ supported normal edits through conservative post-resolution reconciliation,
 plus versioned renderer-independent persistence for disclosure, focus,
 user-facing filters, and a semantic entity-plus-zoom viewport bookmark. The
 browser localStorage adapter activates only for explicitly stable reports.
-Search, inspector selection, and graph selection remain transient. Manual
-positions/pins and named saved views have no supported interaction or evidence
-to implement. KG10 now reparses changed files only while retaining complete
+Search, inspector selection, and graph selection remain transient. SAVED1A
+adds a separate immutable registry of named semantic graph contexts without
+capturing manual positions, Graph Preferences, Visual Groups, size overrides,
+or spatial rules. KG10 now reparses changed files only while retaining complete
 resolution and reconciliation, then emits exact source-neutral deltas. KG11A
 now provides Tauri-selected, one-shot product-local acquisition plus app-local
 workspace/catalog identity behind that engine. KG11B1 now adds recursive
@@ -174,7 +177,8 @@ All/Focus Network interaction and accessible Network Explorer controller, with
 Arrange Folders remaining an explicit All-only owner. That implementation
 remains a draft until the mandatory optimized Windows pointer/touchpad acceptance
 passes. PIN1 remains a separate later persistence feature rather than a side
-effect of Move. Named Saved Views remain later derived presentation work.
+effect of Move. SAVED1A Named Saved Views are implemented as semantic bookmarks;
+the wider presentation/spatial composition question remains SAVED1B.
 
 Post-MVP analytics—typed conceptual relations, pathfinding variants,
 centrality, betweenness, communities, connected components, co-citation,

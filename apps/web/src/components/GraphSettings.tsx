@@ -952,7 +952,8 @@ export const GraphSettings = memo(function GraphSettings({
                 </button>
                 <small>
                   Restores only graph-presentation experiments. Preferences,
-                  source configuration, and saved views stay unchanged.
+                  source configuration, the current view, and Named Saved Views
+                  stay unchanged.
                 </small>
               </section>
             </div>
