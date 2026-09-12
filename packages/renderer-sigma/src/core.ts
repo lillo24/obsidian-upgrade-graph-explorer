@@ -154,6 +154,7 @@ export {
   sameGlobalPhysicsSettings,
   sameGlobalVisualSettings,
   validateGlobalLayoutSettings,
+  validateGlobalPhysicsSettings,
   withFolderClusteringStrength,
   withGlobalSpacingPreset,
 } from './settings';
@@ -195,6 +196,8 @@ export type {
   FileMoveFrameScheduler,
   FileMoveInstrumentationOperation,
   PrimeFileMoveInput,
+  TemporaryFileMoveController,
+  TemporaryFileMoveControllerStartResult,
   TemporaryFileMoveCoordinatorOptions,
   TemporaryFileMoveSessionContext,
 } from './file-move';

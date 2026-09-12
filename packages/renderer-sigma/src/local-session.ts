@@ -10,12 +10,17 @@ import {
 import {
   isAvailableTemporaryFileMoveContext,
   TemporaryFileMoveCoordinator,
+  type TemporaryFileMoveControllerStartResult,
   type TemporaryFileMoveSessionContext,
 } from './file-move';
 import type { TemporaryNodeConstraintEndReason } from './temporary-node-constraint';
 import { atomicAnchoredGraphMutation } from './anchored-refresh';
 import { NetworkPositionCameraIntentPolicy } from './network-camera-intent';
 import { networkPositionExtent } from './network-position-frame';
+import {
+  captureRawViewportFrame,
+  restoreRawViewportFrame,
+} from './raw-viewport-frame';
 
 import {
   buildLocalGraph,
@@ -45,6 +50,7 @@ import {
 import {
   isCoarseWheelDelta,
   normalizeWheelDeltaPixels,
+  normalizeWheelPanDeltaPixels,
   preventSigmaWheelDefault,
   ratioAfterWheelDelta,
   WheelDirectionStabilizer,
@@ -95,6 +101,8 @@ export interface LocalRendererSessionOptions {
   readonly onDensityQaDiagnosticsChange?: (
     diagnostics: LocalDensityQaDiagnostics,
   ) => void;
+  /** Reports a manual or semantic camera claim so queued automatic Fit can yield. */
+  readonly onUserCameraIntent?: () => void;
 }
 
 export interface LocalRendererReady {
@@ -155,8 +163,10 @@ export class LocalRendererSession {
   private fileMoveContext: TemporaryFileMoveSessionContext | undefined;
   private fileMoveCoordinator: TemporaryFileMoveCoordinator | undefined;
   private fileMoveGestureSequence = 0;
+  private keyboardFileMoveViewportPoint: SpatialPoint | undefined;
   private suppressFileMoveDoubleClick = false;
   private fileMoveLifecycleAttached = false;
+  private readonly container?: HTMLElement;
 
   private readonly fileMoveKeyDownHandler = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') this.cancelTemporaryFileMove('cancelled');
@@ -178,14 +188,12 @@ export class LocalRendererSession {
 
   private readonly mouseDragHandler = (): void => {
     if (this.renderer.getMouseCaptor().isMouseDown) {
-      this.cameraOwnership = 'user';
-      this.positionCameraIntent.claimCamera();
+      this.claimUserCamera();
     }
   };
 
   private readonly touchMoveHandler = (): void => {
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
   };
 
   private readonly cameraUpdatedHandler = (): void => {
@@ -224,8 +232,7 @@ export class LocalRendererSession {
       original,
       this.renderer.getDimensions().height,
     );
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     if (this.trackpadZoomMode === 'pinch-zoom' && !original.ctrlKey) {
       this.applyWheelPan(original);
       return;
@@ -260,6 +267,7 @@ export class LocalRendererSession {
     input: LocalRendererInput,
     options: LocalRendererSessionOptions,
   ) {
+    this.container = container;
     this.options = options;
     this.rootNodeKey = options.rootNodeKey;
     this.densityInput = input;
@@ -358,16 +366,23 @@ export class LocalRendererSession {
   private applyWheelPan(event: WheelEvent): void {
     const dimensions = this.renderer.getDimensions();
     const center = { x: dimensions.width / 2, y: dimensions.height / 2 };
-    const before = this.renderer.viewportToGraph(center);
-    const after = this.renderer.viewportToGraph({
-      x: center.x + event.deltaX,
-      y: center.y + event.deltaY,
+    const delta = normalizeWheelPanDeltaPixels(event, dimensions);
+    const before = this.renderer.viewportToFramedGraph(center);
+    const after = this.renderer.viewportToFramedGraph({
+      x: center.x + delta.x,
+      y: center.y + delta.y,
     });
     const camera = this.renderer.getCamera();
     camera.setState({
       x: camera.x + before.x - after.x,
       y: camera.y + before.y - after.y,
     });
+  }
+
+  private claimUserCamera(): void {
+    this.cameraOwnership = 'user';
+    this.positionCameraIntent.claimCamera();
+    this.options.onUserCameraIntent?.();
   }
 
   private reduceNode(key: string, attributes: LocalNodeAttributes) {
@@ -420,6 +435,22 @@ export class LocalRendererSession {
     );
   }
 
+  private updateTemporaryFileMoveCursor(): void {
+    const eligibleHover =
+      this.hoveredNode !== undefined &&
+      this.fileMoveContext?.active === true &&
+      this.fileMoveContext.capability.status === 'available' &&
+      this.eligibleFileMoveNode(this.hoveredNode);
+    this.container?.setAttribute(
+      'data-file-move-cursor',
+      this.fileMoveCoordinator?.ownsPointerSequence === true
+        ? 'grabbing'
+        : eligibleHover
+          ? 'grab'
+          : 'idle',
+    );
+  }
+
   private viewportToGraphPoint(point: SpatialPoint): SpatialPoint {
     if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
       throw new Error('Viewport point must contain finite x/y coordinates.');
@@ -448,6 +479,7 @@ export class LocalRendererSession {
       startGraphPoint: graphPoint,
       displayedNodePoint: { x: attributes.x, y: attributes.y },
     });
+    this.updateTemporaryFileMoveCursor();
   }
 
   private moveTemporaryFileMove(
@@ -468,12 +500,62 @@ export class LocalRendererSession {
       this.nodeClicks?.cancel();
       this.suppressFileMoveDoubleClick = true;
     }
+    this.keyboardFileMoveViewportPoint = undefined;
+    this.updateTemporaryFileMoveCursor();
   }
 
-  private cancelTemporaryFileMove(
+  cancelTemporaryFileMove(
     reason: Exclude<TemporaryNodeConstraintEndReason, 'released'>,
   ): boolean {
-    return this.fileMoveCoordinator?.cancel(reason) ?? false;
+    const cancelled = this.fileMoveCoordinator?.cancel(reason) ?? false;
+    this.keyboardFileMoveViewportPoint = undefined;
+    this.updateTemporaryFileMoveCursor();
+    return cancelled;
+  }
+
+  startKeyboardTemporaryFileMove(
+    nodeKey: string,
+  ): TemporaryFileMoveControllerStartResult {
+    if (
+      this.fileMoveContext?.active !== true ||
+      this.fileMoveContext.capability.status !== 'available'
+    ) {
+      return { status: 'unavailable', reason: 'simulation-unavailable' };
+    }
+    if (!this.eligibleFileMoveNode(nodeKey)) {
+      return { status: 'unavailable', reason: 'node-unavailable' };
+    }
+    const point = this.nodeViewportPoint(nodeKey);
+    if (point === undefined) {
+      return { status: 'unavailable', reason: 'node-unavailable' };
+    }
+    this.cancelTemporaryFileMove('cancelled');
+    this.beginTemporaryFileMove(nodeKey, point);
+    if (this.fileMoveCoordinator?.ownsPointerSequence !== true) {
+      return { status: 'unavailable', reason: 'simulation-unavailable' };
+    }
+    this.keyboardFileMoveViewportPoint = point;
+    this.updateTemporaryFileMoveCursor();
+    return { status: 'started' };
+  }
+
+  nudgeKeyboardTemporaryFileMove(delta: SpatialPoint): boolean {
+    const point = this.keyboardFileMoveViewportPoint;
+    const coordinator = this.fileMoveCoordinator;
+    if (point === undefined || coordinator?.ownsPointerSequence !== true) {
+      return false;
+    }
+    const next = { x: point.x + delta.x, y: point.y + delta.y };
+    this.keyboardFileMoveViewportPoint = next;
+    coordinator.move(next, this.viewportToGraphPoint(next));
+    this.updateTemporaryFileMoveCursor();
+    return true;
+  }
+
+  releaseKeyboardTemporaryFileMove(): boolean {
+    if (this.keyboardFileMoveViewportPoint === undefined) return false;
+    this.finishTemporaryFileMove();
+    return true;
   }
 
   private attachFileMoveLifecycle(): void {
@@ -519,6 +601,7 @@ export class LocalRendererSession {
       this.hoveredNode = node;
       this.options.instrumentation?.count('local-hover-applications');
       this.renderer.scheduleRender();
+      this.updateTemporaryFileMoveCursor();
       this.options.instrumentation?.record(
         'local-hover',
         performance.now() - started,
@@ -528,6 +611,7 @@ export class LocalRendererSession {
       this.hoveredNode = undefined;
       this.options.instrumentation?.count('local-hover-applications');
       this.renderer.scheduleRender();
+      this.updateTemporaryFileMoveCursor();
     });
     this.renderer.on('clickNode', ({ node }) => {
       if (this.fileMoveCoordinator?.consumeReleasedDragClick() === true) {
@@ -588,7 +672,7 @@ export class LocalRendererSession {
     });
   }
 
-  /** Temporary file movement seam; callers decide when an Edit/Move mode exists. */
+  /** Temporary File movement seam; callers suspend it for competing tools. */
   setTemporaryFileMoveContext(
     context: TemporaryFileMoveSessionContext | undefined,
     cancellationReason: Exclude<
@@ -600,7 +684,9 @@ export class LocalRendererSession {
     this.fileMoveCoordinator?.cancel(cancellationReason);
     this.fileMoveCoordinator = undefined;
     this.fileMoveContext = context;
+    this.keyboardFileMoveViewportPoint = undefined;
     this.suppressFileMoveDoubleClick = false;
+    this.updateTemporaryFileMoveCursor();
     if (context === undefined) return;
     if (isAvailableTemporaryFileMoveContext(context)) {
       this.fileMoveCoordinator = new TemporaryFileMoveCoordinator({
@@ -614,6 +700,7 @@ export class LocalRendererSession {
       });
     }
     this.attachFileMoveLifecycle();
+    this.updateTemporaryFileMoveCursor();
   }
 
   updateTrackpadZoomMode(mode: LocalTrackpadZoomMode): void {
@@ -630,8 +717,7 @@ export class LocalRendererSession {
     // Moving the Sandbox slider is an explicit camera action. Preview the
     // accepted density decision immediately, then protect that viewport from
     // later topology/layout completion exactly like wheel, pinch, or drag.
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     const ratio = this.effectiveDensityRatio();
     if (anchor === undefined) {
       this.renderer.getCamera().setState({ ratio });
@@ -903,6 +989,47 @@ export class LocalRendererSession {
     this.renderer.refresh({ schedule: true });
   }
 
+  /**
+   * Commits the accepted startup layout as Sigma's normalization owner and
+   * resolves only after the authoritative frame has rendered.
+   */
+  commitInitialPresentation(
+    positions: readonly LocalLayoutPosition[],
+    fitAll: boolean,
+  ): Promise<void> {
+    const preservedViewport = fitAll
+      ? undefined
+      : captureRawViewportFrame(this.renderer);
+    return new Promise((resolve, reject) => {
+      const afterRender = (): void => {
+        this.renderer.off('afterRender', afterRender);
+        this.emitDensityQaDiagnostics();
+        resolve();
+      };
+      this.renderer.on('afterRender', afterRender);
+      try {
+        this.renderer.setCustomBBox(networkPositionExtent(positions));
+        this.positionFrameEstablished = true;
+        if (fitAll) {
+          this.cameraOwnership = 'auto';
+          this.positionCameraIntent.claimCamera();
+          this.renderer.getCamera().setState({
+            x: 0.5,
+            y: 0.5,
+            ratio: 1,
+            angle: 0,
+          });
+        } else if (preservedViewport !== undefined) {
+          restoreRawViewportFrame(this.renderer, preservedViewport);
+        }
+        this.renderer.refresh({ schedule: true });
+      } catch (error: unknown) {
+        this.renderer.off('afterRender', afterRender);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
+  }
+
   private emitDensityQaDiagnostics(): void {
     const diagnostics: LocalDensityQaDiagnostics = {
       rawDecisionRatio: this.latestDensityDecision.ratio,
@@ -1149,8 +1276,7 @@ export class LocalRendererSession {
     if (display === undefined) {
       throw new Error(`Cannot center missing Local node ${request.nodeId}.`);
     }
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     const started = performance.now();
     await this.renderer
       .getCamera()
@@ -1166,8 +1292,7 @@ export class LocalRendererSession {
   }
 
   zoomBy(factor: number): void {
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     const camera = this.renderer.getCamera();
     void camera.animate(
       { ratio: Math.max(0.02, Math.min(6, camera.ratio * factor)) },
@@ -1184,7 +1309,7 @@ export class LocalRendererSession {
         x: 0.5,
         y: 0.5,
         angle: 0,
-        ratio: this.effectiveDensityRatio(),
+        ratio: 1,
       },
       { duration: preferredMotionDuration() },
     );

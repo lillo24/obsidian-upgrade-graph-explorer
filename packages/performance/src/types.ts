@@ -163,6 +163,7 @@ export const PERFORMANCE_OPERATIONS = [
   'spatial-pull-cache-hits',
   'spatial-fixed-compositions',
   'global-style-updates',
+  'global-visual-refreshes',
   'global-hover-applications',
   'global-selection-applications',
   'global-centers',
@@ -236,6 +237,7 @@ export interface PerformanceOperationCounts {
   readonly 'spatial-pull-cache-hits': number;
   readonly 'spatial-fixed-compositions': number;
   readonly 'global-style-updates': number;
+  readonly 'global-visual-refreshes': number;
   readonly 'global-hover-applications': number;
   readonly 'global-selection-applications': number;
   readonly 'global-centers': number;
@@ -369,6 +371,7 @@ export function emptyPerformanceOperationCounts(): PerformanceOperationCounts {
     'spatial-pull-cache-hits': 0,
     'spatial-fixed-compositions': 0,
     'global-style-updates': 0,
+    'global-visual-refreshes': 0,
     'global-hover-applications': 0,
     'global-selection-applications': 0,
     'global-centers': 0,

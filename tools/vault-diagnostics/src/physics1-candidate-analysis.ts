@@ -4,12 +4,21 @@ import { fileURLToPath } from 'node:url';
 import { MultiDirectedGraph } from 'graphology';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import {
+  applyNetworkPhysicsPullIteration,
   ContinuousNetworkSimulation,
-  NETWORK_PHYSICS_SCHEMA_VERSION,
+  createAllNetworkPhysicsSeed,
+  createFocusNetworkPhysicsSeed,
+  NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT,
   type NetworkPhysicsAttractor,
   type NetworkPhysicsFrameResponse,
   type NetworkPhysicsSeed,
 } from '@icarus-graph-explorer/renderer-sigma/physics';
+import {
+  createGlobalConvergencePolicy,
+  createGlobalFolderMacroPolicy,
+  createLocalConvergencePolicy,
+  resolveGlobalPhysicsSettings,
+} from '@icarus-graph-explorer/renderer-sigma/core';
 
 type Position = {
   readonly key: string;
@@ -29,12 +38,23 @@ type Fixture = {
 
 const PUBLIC_QUANTA = [1, 2, 4, 8] as const;
 const TARGET = { x: 38, y: -27 } as const;
-const PULL_STRENGTH = 0.7;
+const PULL_STRENGTH = 70;
 
 function mean(values: readonly number[]): number {
   return values.length === 0
     ? 0
     : values.reduce((total, value) => total + value, 0) / values.length;
+}
+
+function percentile(values: readonly number[], fraction: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((left, right) => left - right);
+  const index = (sorted.length - 1) * fraction;
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  if (lower === upper) return sorted[lower]!;
+  const weight = index - lower;
+  return sorted[lower]! * (1 - weight) + sorted[upper]! * weight;
 }
 
 function seededPosition(index: number, count: number): Position {
@@ -203,52 +223,73 @@ function hardConstraintTrial(value: Fixture, quantum: number) {
   };
 }
 
-function rmsRadius(graph: PhysicsGraph): number {
-  const values = positions(graph);
-  const center = {
-    x: values.reduce((sum, value) => sum + value.x, 0) / values.length,
-    y: values.reduce((sum, value) => sum + value.y, 0) / values.length,
-  };
-  return Math.max(
-    1e-6,
-    Math.sqrt(
-      values.reduce(
-        (sum, value) =>
-          sum + (value.x - center.x) ** 2 + (value.y - center.y) ** 2,
-        0,
-      ) / values.length,
-    ),
-  );
-}
-
-function applyPullIteration(graph: PhysicsGraph): void {
-  const scale = rmsRadius(graph);
-  const gain = 1 - (1 - 0.55 * PULL_STRENGTH) ** (1 / 4);
-  const cap = (0.6 * scale * PULL_STRENGTH) / 4;
-  for (const key of graph.nodes()) {
-    const attributes = graph.getNodeAttributes(key);
-    const dx = -attributes.x;
-    const dy = -attributes.y;
-    const length = Math.hypot(dx, dy);
-    const applied = Math.min(length * gain, cap);
-    if (length > 0) {
-      graph.mergeNodeAttributes(key, {
-        x: attributes.x + (dx / length) * applied,
-        y: attributes.y + (dy / length) * applied,
-      });
-    }
-  }
-}
-
-function pullCadenceTrial(value: Fixture, publishQuantum: number) {
+function pullCadenceTrial(
+  value: Fixture,
+  publishQuantum: number,
+  attractors: readonly NetworkPhysicsAttractor[],
+) {
   const graph = buildGraph(value);
   let frames = 0;
   for (let iteration = 0; iteration < 48; iteration += 1) {
     assign(graph, 1);
-    applyPullIteration(graph);
+    applyNetworkPhysicsPullIteration(graph, attractors);
     if ((iteration + 1) % publishQuantum === 0 || iteration === 47) frames += 1;
   }
   return { publishQuantum, frames, positions: positions(graph) };
+}
+
+function productionPullScenarios(value: Fixture) {
+  const firstGroup = value.nodes.slice(0, 60).map(({ key }) => key);
+  const secondGroup = value.nodes.slice(60, 120).map(({ key }) => key);
+  const firstCenter = {
+    x: mean(value.nodes.slice(0, 60).map(({ x }) => x)),
+    y: mean(value.nodes.slice(0, 60).map(({ y }) => y)),
+  };
+  return [
+    {
+      id: 'near-single-group',
+      attractors: [
+        {
+          ruleFolderKey: 'near',
+          memberNodeKeys: firstGroup,
+          targetX: firstCenter.x + 0.25,
+          targetY: firstCenter.y - 0.25,
+          strength: PULL_STRENGTH,
+        },
+      ],
+    },
+    {
+      id: 'far-single-group',
+      attractors: [
+        {
+          ruleFolderKey: 'far',
+          memberNodeKeys: firstGroup,
+          targetX: 500,
+          targetY: -400,
+          strength: PULL_STRENGTH,
+        },
+      ],
+    },
+    {
+      id: 'displaced-multiple-groups',
+      attractors: [
+        {
+          ruleFolderKey: 'left',
+          memberNodeKeys: firstGroup,
+          targetX: -42,
+          targetY: 18,
+          strength: 65,
+        },
+        {
+          ruleFolderKey: 'right',
+          memberNodeKeys: secondGroup,
+          targetX: 44,
+          targetY: -16,
+          strength: 80,
+        },
+      ],
+    },
+  ] as const;
 }
 
 function maximumPositionDifference(
@@ -266,37 +307,59 @@ function simulationSeed(
   mode: 'focus' | 'all',
   attractors: readonly NetworkPhysicsAttractor[] = [],
 ): NetworkPhysicsSeed {
-  return {
-    schemaVersion: NETWORK_PHYSICS_SCHEMA_VERSION,
-    kind: 'initialize',
-    mode,
-    sessionGeneration: `analysis:${value.id}`,
-    simulationGeneration: `analysis:${value.id}:simulation`,
-    ...(mode === 'focus' ? { rootKey: 'n0' } : {}),
-    nodes: value.nodes.map((node) => ({
-      ...node,
-      size: 4,
-      constraintEligible: true,
-    })),
-    edges: value.edges,
-    settings:
-      mode === 'focus'
-        ? {
-            edgeWeightInfluence: 1,
-            scalingRatio: 1.35,
-            strongGravityMode: true,
-            gravity: 0.08,
-            barnesHutThreshold: 600,
-          }
-        : {
-            edgeWeightInfluence: 1,
-            scalingRatio: 1,
-            strongGravityMode: false,
-            gravity: 1,
-            barnesHutThreshold: 1_000,
-          },
+  const sessionGeneration = `analysis:${value.id}`;
+  const simulationGeneration = `analysis:${value.id}:simulation`;
+  if (mode === 'focus') {
+    return createFocusNetworkPhysicsSeed({
+      request: {
+        schemaVersion: 2,
+        rootKey: 'n0',
+        policy: createLocalConvergencePolicy(value.nodes.length),
+        settings: {
+          hierarchyWeight: 1,
+          referenceWeight: 1,
+          scalingRatio: 1.35,
+        },
+        nodes: value.nodes.map((node) => ({
+          ...node,
+          size: 4,
+          kind: 'document' as const,
+        })),
+        edges: value.edges.map((edge) => ({
+          ...edge,
+          kind: 'reference' as const,
+        })),
+      },
+      positions: value.nodes,
+      sessionGeneration,
+      simulationGeneration,
+    });
+  }
+  const nodes = value.nodes.map((node) => ({
+    ...node,
+    size: 4,
+    folderKey: 'analysis',
+  }));
+  const settings = resolveGlobalPhysicsSettings({
+    folderClustering: false,
+    spacingPreset: 'normal',
+  });
+  return createAllNetworkPhysicsSeed({
+    request: {
+      schemaVersion: 3,
+      algorithm: 'reference-only',
+      policy: createGlobalConvergencePolicy(nodes.length),
+      macro: createGlobalFolderMacroPolicy(nodes, settings),
+      settings,
+      nodes,
+      edges: value.edges,
+    },
+    dynamicPositions: value.nodes,
     attractors,
-  };
+    constraintEligibleNodeKeys: new Set(value.nodes.map(({ key }) => key)),
+    sessionGeneration,
+    simulationGeneration,
+  });
 }
 
 function lifecycleTrial(input: {
@@ -304,6 +367,7 @@ function lifecycleTrial(input: {
   readonly fixture: Fixture;
   readonly mode: 'focus' | 'all';
   readonly attractors?: readonly NetworkPhysicsAttractor[];
+  readonly hotTurns?: number;
 }) {
   const seed = simulationSeed(input.fixture, input.mode, input.attractors);
   const simulation = new ContinuousNetworkSimulation(seed);
@@ -323,7 +387,7 @@ function lifecycleTrial(input: {
   });
   const hotFrames: NetworkPhysicsFrameResponse[] = [];
   const started = performance.now();
-  for (let index = 0; index < 12; index += 1) {
+  for (let index = 0; index < (input.hotTurns ?? 12); index += 1) {
     const frame = simulation.advance().frame;
     if (frame !== undefined) hotFrames.push(frame);
   }
@@ -378,13 +442,13 @@ function lifecycleTrial(input: {
       hotMs === 0
         ? null
         : Number(((finalHot.iterationsCompleted / hotMs) * 1_000).toFixed(2)),
-    publishedFramesPerSecond:
+    inProcessSimulationFramesPerSecond:
       hotMs === 0
         ? null
         : Number(((hotFrames.length / hotMs) * 1_000).toFixed(2)),
     meanNeighborFrameMovement: mean(neighborFrameMovements),
     maximumNeighborFrameMovement: Math.max(0, ...neighborFrameMovements),
-    meanPublishedMessageBytes:
+    meanJsonEstimatedFrameBytes:
       hotFrames.length === 0 ? 0 : Math.round(messageBytes / hotFrames.length),
     coolingFrames,
     coolingIterations,
@@ -412,51 +476,72 @@ function main(): void {
   const hardConstraint = values.flatMap((value) =>
     PUBLIC_QUANTA.map((quantum) => hardConstraintTrial(value, quantum)),
   );
-  const pullRuns = PUBLIC_QUANTA.map((quantum) =>
-    pullCadenceTrial(
-      values.find(({ id }) => id === 'medium-mixed')!,
-      quantum,
-    ),
-  );
-  const pullReference = pullRuns[0]!.positions;
-  const pullCadence = pullRuns.map(
-    ({ publishQuantum, frames, positions: output }) => ({
-      publishQuantum,
-      frames,
-      maximumDifferenceFromQuantum1: maximumPositionDifference(
-        pullReference,
-        output,
+  const pullCadence = productionPullScenarios(
+    values.find(({ id }) => id === 'medium-mixed')!,
+  ).map((scenario) => {
+    const runs = PUBLIC_QUANTA.map((quantum) =>
+      pullCadenceTrial(
+        values.find(({ id }) => id === 'medium-mixed')!,
+        quantum,
+        scenario.attractors,
       ),
-    }),
-  );
+    );
+    const reference = runs[0]!.positions;
+    return {
+      id: scenario.id,
+      runs: runs.map(({ publishQuantum, frames, positions: output }) => ({
+        publishQuantum,
+        frames,
+        maximumDifferenceFromQuantum1: maximumPositionDifference(
+          reference,
+          output,
+        ),
+      })),
+    };
+  });
   const scale = [100, 500, 1_000, 5_000].map((count) => {
     const graph = buildGraph(scaleFixture(count));
-    const started = performance.now();
-    assign(graph, 4);
-    const elapsedMs = performance.now() - started;
+    for (let warmup = 0; warmup < 3; warmup += 1) assign(graph, 4);
+    const assignSamples: number[] = [];
+    const arrayToMapSamples: number[] = [];
+    for (let sample = 0; sample < 12; sample += 1) {
+      const started = performance.now();
+      assign(graph, 4);
+      assignSamples.push(performance.now() - started);
+      const positionSnapshot = positions(graph);
+      const adoptionStarted = performance.now();
+      new Map(
+        positionSnapshot.map((position) => [position.key, position] as const),
+      );
+      arrayToMapSamples.push(performance.now() - adoptionStarted);
+    }
     const output = positions(graph);
-    const adoptionStarted = performance.now();
-    new Map(output.map((position) => [position.key, position]));
-    const mainThreadAdoptionMs = performance.now() - adoptionStarted;
+    const p50Ms = percentile(assignSamples, 0.5);
     const messageBytes = Buffer.byteLength(JSON.stringify(output));
-    const publishedFramesPerSecond = elapsedMs === 0 ? null : 1_000 / elapsedMs;
+    const theoreticalCallsPerSecond = p50Ms === 0 ? null : 1_000 / p50Ms;
     return {
       nodes: count,
       edges: graph.size,
       iterations: 4,
-      workerStepMs: Number(elapsedMs.toFixed(3)),
-      iterationsPerSecond:
-        elapsedMs === 0 ? null : Number(((4 / elapsedMs) * 1_000).toFixed(2)),
-      publishedFramesPerSecond:
-        publishedFramesPerSecond === null
+      warmupSamples: 3,
+      measuredSamples: assignSamples.length,
+      assignFourIterationP50Ms: Number(p50Ms.toFixed(3)),
+      assignFourIterationP95Ms: Number(
+        percentile(assignSamples, 0.95).toFixed(3),
+      ),
+      theoreticalIterationsPerSecondFromP50:
+        p50Ms === 0 ? null : Number(((4 / p50Ms) * 1_000).toFixed(2)),
+      theoreticalCallsPerSecond:
+        theoreticalCallsPerSecond === null
           ? null
-          : Number(publishedFramesPerSecond.toFixed(2)),
-      messageBytes,
-      messageBytesPerSecond:
-        publishedFramesPerSecond === null
+          : Number(theoreticalCallsPerSecond.toFixed(2)),
+      jsonEstimatedPositionBytes: messageBytes,
+      theoreticalJsonBytesPerSecond:
+        theoreticalCallsPerSecond === null
           ? null
-          : Math.round(messageBytes * publishedFramesPerSecond),
-      mainThreadAdoptionMs: Number(mainThreadAdoptionMs.toFixed(3)),
+          : Math.round(messageBytes * theoreticalCallsPerSecond),
+      arrayToMapP50Ms: Number(percentile(arrayToMapSamples, 0.5).toFixed(3)),
+      arrayToMapP95Ms: Number(percentile(arrayToMapSamples, 0.95).toFixed(3)),
       finite: output.every(
         ({ x, y }) => Number.isFinite(x) && Number.isFinite(y),
       ),
@@ -522,6 +607,77 @@ function main(): void {
     void finalPositions;
     return { ...result, deterministicMaximumDifference };
   });
+  const scale500 = scaleFixture(500);
+  const scale100 = scaleFixture(100);
+  const largeReleaseInputs = [
+    {
+      id: 'focus-supported-release-100',
+      fixture: scale100,
+      mode: 'focus' as const,
+    },
+    {
+      id: 'all-supported-release-100',
+      fixture: scale100,
+      mode: 'all' as const,
+    },
+    {
+      id: 'all-supported-release-100-pull',
+      fixture: scale100,
+      mode: 'all' as const,
+      attractors: [
+        {
+          ruleFolderKey: 'supported-left',
+          memberNodeKeys: scale100.nodes.slice(0, 40).map(({ key }) => key),
+          targetX: -42,
+          targetY: 18,
+          strength: 70,
+        },
+      ],
+    },
+    {
+      id: 'focus-large-release-500',
+      fixture: scale500,
+      mode: 'focus' as const,
+    },
+    { id: 'all-large-release-500', fixture: scale500, mode: 'all' as const },
+    {
+      id: 'all-large-release-500-pull',
+      fixture: scale500,
+      mode: 'all' as const,
+      attractors: [
+        {
+          ruleFolderKey: 'large-left',
+          memberNodeKeys: scale500.nodes.slice(0, 160).map(({ key }) => key),
+          targetX: -42,
+          targetY: 18,
+          strength: 70,
+        },
+      ],
+    },
+    {
+      id: 'focus-large-release-1000',
+      fixture: scaleFixture(1_000),
+      mode: 'focus' as const,
+    },
+    {
+      id: 'all-large-release-1000',
+      fixture: scaleFixture(1_000),
+      mode: 'all' as const,
+    },
+    {
+      id: 'all-large-release-5000',
+      fixture: scaleFixture(5_000),
+      mode: 'all' as const,
+    },
+  ];
+  const largeRelease = largeReleaseInputs.map((input) => {
+    const { finalPositions, ...result } = lifecycleTrial({
+      ...input,
+      hotTurns: 2,
+    });
+    void finalPositions;
+    return result;
+  });
   const selected = hardConstraint
     .filter(({ quantum }) => quantum === 1)
     .every(
@@ -534,8 +690,9 @@ function main(): void {
     );
   }
   const report = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedBy: 'pnpm analyze:physics1',
+    productionSupportedNodeLimit: NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT,
     dependencyVersions: {
       graphology: '0.26.0',
       graphologyForceAtlas2: '0.10.1',
@@ -555,17 +712,24 @@ function main(): void {
         'One public physical iteration is the smallest supported boundary at which the moving target can be reasserted. Published frames are exact, and adjacent nodes react on every fixture.',
       hardConstraint,
     },
-    pullCadence: {
-      canonicalIterationsPerLegacyPullStep: 4,
+    pullPublicationIndependence: {
+      liveReferenceIterations: 4,
       strength: PULL_STRENGTH,
-      runs: pullCadence,
-      accepted: pullCadence.every(
-        ({ maximumDifferenceFromQuantum1 }) =>
-          maximumDifferenceFromQuantum1 === 0,
+      scenarios: pullCadence,
+      accepted: pullCadence.every(({ runs }) =>
+        runs.every(
+          ({ maximumDifferenceFromQuantum1 }) =>
+            maximumDifferenceFromQuantum1 === 0,
+        ),
       ),
-      note: 'Pull is applied per physical iteration; publish cadence does not enter the simulation.',
+      note: 'The production group-centroid Pull function is applied per physical iteration, so publish cadence does not enter the simulation. This does not claim numerical identity with the static Pull pipeline.',
     },
     productionLifecycle: lifecycle,
+    retainedSimulationLargeReleaseProbe: {
+      results: largeRelease,
+      limitation:
+        'Direct retained-simulation probe only; it does not measure browser Worker transport, structured cloning, requestAnimationFrame adoption, Sigma, or rendering.',
+    },
     placeComposition: {
       simulationTarget: TARGET,
       fixedTranslation: { x: 18, y: -10 },
@@ -574,8 +738,9 @@ function main(): void {
       fixedTranslationApplications: 1,
       simulationSeedIncludesPlace: false,
     },
-    scale,
-    scaleTimingIsInformationalOnly: true,
+    assignScaleMicrobenchmark: scale,
+    scaleTimingLimitations:
+      'Warm repeated synchronous public assign(graph, 4) samples. No Worker scheduling, structured-clone measurement, client validation/coalescing, Sigma adoption, rendering, or sustained displayed-frame distribution is measured.',
     decision: 'candidate-b-public-assign-single-iteration',
   };
   const outputDirectory = fileURLToPath(
@@ -588,7 +753,8 @@ function main(): void {
     `${JSON.stringify(
       {
         decision: report.decision,
-        pullCadence: report.pullCadence.accepted,
+        pullPublicationIndependence:
+          report.pullPublicationIndependence.accepted,
         lifecycle: lifecycle.map(
           ({ id, finalState, failure, targetError }) => ({
             id,
@@ -597,7 +763,16 @@ function main(): void {
             targetError,
           }),
         ),
-        scale,
+        largeRelease: largeRelease.map(
+          ({ id, finalState, failure, coolingIterations, coolingMs }) => ({
+            id,
+            finalState,
+            failure,
+            coolingIterations,
+            coolingMs,
+          }),
+        ),
+        assignScaleMicrobenchmark: scale,
         outputPath,
       },
       null,

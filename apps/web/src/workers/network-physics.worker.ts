@@ -18,6 +18,7 @@ interface NetworkPhysicsWorkerHost {
 const host: NetworkPhysicsWorkerHost = self;
 let simulation: ContinuousNetworkSimulation | undefined;
 let scheduled: number | undefined;
+const HOT_TURN_INTERVAL_MS = 16;
 
 function cancelScheduled(): void {
   if (scheduled === undefined) return;
@@ -33,7 +34,12 @@ function schedule(): void {
   ) {
     return;
   }
-  scheduled = host.setTimeout(step, 0);
+  // Do not allocate and clone hot whole-graph frames faster than a display can
+  // normally consume them. Cooling remains eager so release can settle/sleep.
+  scheduled = host.setTimeout(
+    step,
+    simulation.state === 'hot-constrained' ? HOT_TURN_INTERVAL_MS : 0,
+  );
 }
 
 function step(): void {

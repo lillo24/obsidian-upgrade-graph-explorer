@@ -8,7 +8,7 @@ import {
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
   resolveGlobalLayoutSettings,
 } from './settings';
-import { createGlobalLayoutRequest, globalLayoutFingerprint } from './layout';
+import { createGlobalLayoutRequest } from './layout';
 import {
   createLocalLayoutRequest,
   localLayoutFingerprint,
@@ -168,7 +168,7 @@ describe('render-only per-File size composition', () => {
     ).toBe(attributes.size);
   });
 
-  it('excludes Global display radius but keeps Focus semantic size in layout identity', () => {
+  it('omits Global display radius but keeps Focus semantic size in layout identity', () => {
     const global = mapProjectionToGlobal(globalTestProjection());
     const local = mapProjectionToLocalTopology(localTestProjection(), 'root');
     const globalRequest = createGlobalLayoutRequest(
@@ -177,15 +177,7 @@ describe('render-only per-File size composition', () => {
       1,
     );
     const localRequest = createLocalLayoutRequest(local);
-    expect(
-      globalLayoutFingerprint({
-        ...globalRequest,
-        nodes: globalRequest.nodes.map((node) => ({
-          ...node,
-          size: node.size + 1,
-        })),
-      }),
-    ).toBe(globalLayoutFingerprint(globalRequest));
+    expect(globalRequest.nodes.every((node) => !('size' in node))).toBe(true);
     expect(
       localLayoutFingerprint({
         ...localRequest,

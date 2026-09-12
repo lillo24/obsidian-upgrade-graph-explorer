@@ -22,8 +22,15 @@ import {
   seedLocalRendererInput,
 } from './local-mapping';
 import { localTestProjection } from './local-test-fixture';
+import { LocalRendererSession } from './local-session';
 import { SigmaTestRenderer } from './sigma-test-renderer';
-import type { LocalRendererInstrumentation } from './local-types';
+import type {
+  LocalLayoutRequest,
+  LocalLayoutResult,
+  LocalRendererInstrumentation,
+} from './local-types';
+
+const noop = () => undefined;
 
 beforeEach(() => {
   SigmaTestRenderer.instances = [];
@@ -150,4 +157,76 @@ it('installs an exact cache-hit density frame before first render without a work
   expect(counts.get('local-layouts')).toBeUndefined();
   harness.destroy();
   expect(onDensityQaDiagnosticsChange).toHaveBeenLastCalledWith(undefined);
+});
+
+it('cancels a queued automatic Fit when Local wheel navigation is newer', async () => {
+  let resolveLayout: ((result: LocalLayoutResult) => void) | undefined;
+  let pendingRequest: Omit<LocalLayoutRequest, 'requestId'> | undefined;
+  const layout = vi.fn(
+    (request: Omit<LocalLayoutRequest, 'requestId'>) =>
+      new Promise<LocalLayoutResult>((resolve) => {
+        pendingRequest = request;
+        resolveLayout = resolve;
+      }),
+  );
+  const fit = vi
+    .spyOn(LocalRendererSession.prototype, 'fit')
+    .mockImplementation(noop);
+  const onFitRequestConsumed = vi.fn();
+  const layoutService = { layout, dispose: noop };
+  const projection = localTestProjection();
+  const harness = new CanvasTestHarness(() =>
+    LocalGraphCanvas({
+      automaticFitRequestKey: 1,
+      fitRequestKey: 1,
+      layoutRequestKey: 0,
+      layoutService,
+      onFailure: vi.fn(),
+      onFitRequestConsumed,
+      onSelectionChange: noop,
+      onViewportObservation: noop,
+      projection,
+      rootEntityId: 'root',
+      selection: null,
+      trackpadZoomMode: 'pinch-zoom',
+    }),
+  );
+
+  await harness.flush();
+  const renderer = SigmaTestRenderer.instances[0]!;
+  const wheel = renderer.captor.on.mock.calls.find(
+    ([event]) => event === 'wheel',
+  )?.[1] as ((coordinates: Record<string, unknown>) => void) | undefined;
+  wheel?.({
+    x: 400,
+    y: 300,
+    original: {
+      ctrlKey: false,
+      deltaMode: 0,
+      deltaX: 0,
+      deltaY: 4,
+    },
+    preventSigmaDefault: vi.fn(),
+  });
+  expect(onFitRequestConsumed).toHaveBeenCalledWith(1);
+  if (pendingRequest === undefined || resolveLayout === undefined) {
+    throw new Error('Expected a pending Local layout request.');
+  }
+  resolveLayout({
+    schemaVersion: 2,
+    kind: 'result',
+    requestId: 1,
+    stopReason: 'stable',
+    policyVersion: pendingRequest.policy.version,
+    iterationsCompleted: 0,
+    batchesCompleted: 0,
+    stableBatches: 0,
+    finalMovement: null,
+    computeMs: 0,
+    positions: pendingRequest.nodes.map(({ key, x, y }) => ({ key, x, y })),
+  });
+  await harness.flush();
+
+  expect(fit).not.toHaveBeenCalled();
+  harness.destroy();
 });

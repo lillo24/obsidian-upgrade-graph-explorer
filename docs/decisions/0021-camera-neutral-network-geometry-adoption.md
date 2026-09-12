@@ -1,6 +1,7 @@
 # 0021 — Camera-neutral Network geometry adoption
 
-Status: accepted for implementation and native QA; CONVERGENCE1C remains separate.
+Status: accepted for camera-neutral coordinate adoption; its density-based Fit
+policy is superseded by ADR 0024.
 
 ## Decision
 
@@ -19,8 +20,8 @@ FLICKER1's existing pre-mutation atomic transaction. The first accepted
 presentation establishes a Sigma custom bounding box. Later coordinate
 adoption keeps that presented normalization extent and camera x/y/ratio/angle
 unchanged, so preserving the raw frame requires no derived camera write and
-cannot run into Sigma's bounded ratio. Explicit Fit rebases the extent to the
-current graph bounds before applying the latest density decision.
+cannot run into Sigma's bounded ratio. ADR 0024 now defines explicit and startup
+Fit as a full-view ratio after rebasing the extent; Density remains separate.
 
 ## Consequences
 

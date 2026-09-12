@@ -7,12 +7,15 @@ import {
   type NetworkPhysicsFrameResponse,
   type NetworkPhysicsInvalidateMessage,
   type NetworkPhysicsLifecycleState,
+  type NetworkPhysicsPosition,
+  type NetworkPhysicsPresentationState,
   type NetworkPhysicsSeed,
   type NetworkPhysicsService,
   type NetworkPhysicsServiceFactoryOptions,
   type NetworkPhysicsWorkerRequest,
   type TemporaryNodeConstraintCommand,
   type TemporaryNodeConstraintCommandBase,
+  type UpdateTemporaryNodeConstraintCommand,
 } from '@icarus-graph-explorer/renderer-sigma/core';
 
 export interface NetworkPhysicsWorkerTransport {
@@ -26,6 +29,85 @@ export interface NetworkPhysicsWorkerTransport {
 interface FrameScheduler {
   readonly request: (callback: FrameRequestCallback) => number;
   readonly cancel: (handle: number) => void;
+}
+
+const RELEASE_PRESENTATION_MAX_DURATION_MS = 120;
+const RELEASE_PRESENTATION_FULL_DURATION_DISTANCE = 0.5;
+const REGRAB_HANDOFF_DURATION_MS = 80;
+
+interface CoolingPresentation {
+  readonly frame: NetworkPhysicsFrameResponse;
+  readonly start: readonly NetworkPhysicsPosition[];
+  readonly startedAt: number;
+  readonly durationMs: number;
+}
+
+interface HotHandoff {
+  readonly start: readonly NetworkPhysicsPosition[];
+  readonly startedAt?: number;
+}
+
+function copyPositions(
+  positions: readonly NetworkPhysicsPosition[],
+): readonly NetworkPhysicsPosition[] {
+  return positions.map((position) => ({ ...position }));
+}
+
+function positionScale(positions: readonly NetworkPhysicsPosition[]): number {
+  let centerX = 0;
+  let centerY = 0;
+  for (const position of positions) {
+    centerX += position.x / positions.length;
+    centerY += position.y / positions.length;
+  }
+  let squaredDistance = 0;
+  for (const position of positions) {
+    squaredDistance +=
+      (position.x - centerX) ** 2 + (position.y - centerY) ** 2;
+  }
+  return Math.max(1e-6, Math.sqrt(squaredDistance / positions.length));
+}
+
+function maximumDisplacement(
+  start: readonly NetworkPhysicsPosition[],
+  target: readonly NetworkPhysicsPosition[],
+): number {
+  const startByKey = new Map(start.map((position) => [position.key, position]));
+  let maximum = 0;
+  for (const position of target) {
+    const prior = startByKey.get(position.key);
+    if (prior === undefined) continue;
+    maximum = Math.max(
+      maximum,
+      Math.hypot(position.x - prior.x, position.y - prior.y),
+    );
+  }
+  return maximum;
+}
+
+function interpolatePositions(
+  start: readonly NetworkPhysicsPosition[],
+  target: readonly NetworkPhysicsPosition[],
+  progress: number,
+  exactNode?: { readonly key: string; readonly x: number; readonly y: number },
+): readonly NetworkPhysicsPosition[] {
+  const startByKey = new Map(start.map((position) => [position.key, position]));
+  return target.map((position) => {
+    if (position.key === exactNode?.key) return { ...exactNode };
+    const prior = startByKey.get(position.key) ?? position;
+    return progress >= 1
+      ? { ...position }
+      : {
+          key: position.key,
+          x: prior.x + (position.x - prior.x) * progress,
+          y: prior.y + (position.y - prior.y) * progress,
+        };
+  });
+}
+
+function easedProgress(progress: number): number {
+  const bounded = Math.max(0, Math.min(1, progress));
+  return bounded * bounded * (3 - 2 * bounded);
 }
 
 function sameConstraint(
@@ -44,6 +126,7 @@ export function createNetworkPhysicsWorkerService(
   options: NetworkPhysicsServiceFactoryOptions & {
     readonly createWorker?: () => NetworkPhysicsWorkerTransport;
     readonly scheduler?: FrameScheduler;
+    readonly reducedMotion?: boolean;
   },
 ): NetworkPhysicsService {
   const createWorker =
@@ -58,16 +141,32 @@ export function createNetworkPhysicsWorkerService(
       request: (callback) => requestAnimationFrame(callback),
       cancel: (handle) => cancelAnimationFrame(handle),
     } satisfies FrameScheduler);
+  const reducedMotion =
+    options.reducedMotion ??
+    globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ===
+      true;
   let seed: NetworkPhysicsSeed | undefined;
   let worker: NetworkPhysicsWorkerTransport | undefined;
   let active: TemporaryNodeConstraintCommandBase | undefined;
   let lastSequence = -1;
   let lastEnd: EndTemporaryNodeConstraintCommand | undefined;
+  let latestTarget: { readonly x: number; readonly y: number } | undefined;
+  let interactionRevision = 0;
+  let inFlightSequence: number | undefined;
+  let pendingUpdate: UpdateTemporaryNodeConstraintCommand | undefined;
   let latestFrame: NetworkPhysicsFrameResponse | undefined;
   let scheduledFrame: number | undefined;
+  let lastPresentedPositions: readonly NetworkPhysicsPosition[] | undefined;
+  let coolingPresentation: CoolingPresentation | undefined;
+  let hotHandoff: HotHandoff | undefined;
+  let presentationState: NetworkPhysicsPresentationState = 'idle';
+  let simulationPositionScale = 1;
   let disposed = false;
   let reportedState: NetworkPhysicsLifecycleState | undefined;
   let lastFrameSequence = 0;
+  let expectedNodeIndex: ReadonlyMap<string, number> = new Map();
+  let seenNodeMarks = new Uint32Array();
+  let validationPass = 0;
 
   function emitState(state: NetworkPhysicsLifecycleState): void {
     if (reportedState === state) return;
@@ -75,11 +174,56 @@ export function createNetworkPhysicsWorkerService(
     options.onStateChange?.(state);
   }
 
+  function emitPresentationState(state: NetworkPhysicsPresentationState): void {
+    if (presentationState === state) return;
+    presentationState = state;
+    options.onPresentationStateChange?.(state);
+  }
+
   function cancelFrame(): void {
-    if (scheduledFrame === undefined) return;
-    scheduler.cancel(scheduledFrame);
-    scheduledFrame = undefined;
+    if (scheduledFrame !== undefined) {
+      scheduler.cancel(scheduledFrame);
+      scheduledFrame = undefined;
+    }
     latestFrame = undefined;
+    coolingPresentation = undefined;
+    hotHandoff = undefined;
+    emitPresentationState('idle');
+  }
+
+  function scheduleFrame(): void {
+    if (scheduledFrame !== undefined) return;
+    scheduledFrame = scheduler.request(adoptLatestFrame);
+  }
+
+  function prepareHotHandoff(): void {
+    const presentationWasBehind =
+      coolingPresentation !== undefined ||
+      (latestFrame !== undefined && latestFrame.state !== 'hot-constrained');
+    if (scheduledFrame !== undefined) {
+      scheduler.cancel(scheduledFrame);
+      scheduledFrame = undefined;
+    }
+    latestFrame = undefined;
+    coolingPresentation = undefined;
+    emitPresentationState('idle');
+    hotHandoff =
+      presentationWasBehind &&
+      !reducedMotion &&
+      lastPresentedPositions !== undefined
+        ? { start: copyPositions(lastPresentedPositions) }
+        : undefined;
+  }
+
+  function recordImmediateConstraintTarget(
+    command: TemporaryNodeConstraintCommand,
+  ): void {
+    if (command.kind === 'end' || lastPresentedPositions === undefined) return;
+    lastPresentedPositions = lastPresentedPositions.map((position) =>
+      position.key === command.nodeKey
+        ? { key: position.key, ...command.target }
+        : position,
+    );
   }
 
   function terminate(): void {
@@ -96,6 +240,9 @@ export function createNetworkPhysicsWorkerService(
     terminate();
     cancelFrame();
     active = undefined;
+    latestTarget = undefined;
+    inFlightSequence = undefined;
+    pendingUpdate = undefined;
     if (current !== undefined) {
       emitState('failed');
       options.onFailure({
@@ -112,19 +259,170 @@ export function createNetworkPhysicsWorkerService(
     return new Error(message);
   }
 
-  function adoptLatestFrame(): void {
+  function frameMatchesCurrentInteraction(
+    frame: NetworkPhysicsFrameResponse,
+  ): boolean {
+    const interaction = active ?? lastEnd;
+    if (
+      interaction === undefined ||
+      frame.interactionRevision !== interactionRevision ||
+      frame.gestureId !== interaction.gestureId ||
+      frame.constraintNodeKey !== interaction.nodeKey ||
+      frame.commandSequence > lastSequence
+    ) {
+      return false;
+    }
+    if (active !== undefined) {
+      return (
+        frame.state === 'hot-constrained' &&
+        frame.constraintSequence !== null &&
+        frame.constraintSequence <= lastSequence
+      );
+    }
+    return (
+      frame.state !== 'hot-constrained' && frame.constraintSequence === null
+    );
+  }
+
+  function frameWithLatestConstraintTarget(
+    frame: NetworkPhysicsFrameResponse,
+  ): NetworkPhysicsFrameResponse {
+    if (active === undefined || latestTarget === undefined) return frame;
+    const nodeKey = active.nodeKey;
+    const target = latestTarget;
+    return {
+      ...frame,
+      positions: frame.positions.map((position) =>
+        position.key === nodeKey
+          ? { key: position.key, x: target.x, y: target.y }
+          : position,
+      ),
+    };
+  }
+
+  function present(frame: NetworkPhysicsFrameResponse): void {
+    lastPresentedPositions = copyPositions(frame.positions);
+    options.onFrame(frame);
+    emitState(frame.state);
+  }
+
+  function coolingDuration(
+    start: readonly NetworkPhysicsPosition[],
+    target: readonly NetworkPhysicsPosition[],
+  ): number {
+    if (reducedMotion) return 0;
+    const normalized =
+      maximumDisplacement(start, target) / simulationPositionScale;
+    return Math.min(
+      RELEASE_PRESENTATION_MAX_DURATION_MS,
+      (normalized / RELEASE_PRESENTATION_FULL_DURATION_DISTANCE) *
+        RELEASE_PRESENTATION_MAX_DURATION_MS,
+    );
+  }
+
+  function presentedCoolingPositions(
+    presentation: CoolingPresentation,
+    timestamp: number,
+  ): readonly NetworkPhysicsPosition[] {
+    const progress =
+      presentation.durationMs === 0
+        ? 1
+        : Math.min(
+            1,
+            Math.max(0, timestamp - presentation.startedAt) /
+              presentation.durationMs,
+          );
+    return interpolatePositions(
+      presentation.start,
+      presentation.frame.positions,
+      easedProgress(progress),
+    );
+  }
+
+  function adoptLatestFrame(timestamp: number): void {
     scheduledFrame = undefined;
     const frame = latestFrame;
     latestFrame = undefined;
-    if (frame === undefined || seed === undefined) return;
-    if (
-      frame.sessionGeneration !== seed.sessionGeneration ||
-      frame.simulationGeneration !== seed.simulationGeneration
-    ) {
+    if (frame !== undefined) {
+      if (seed === undefined) return;
+      if (
+        frame.sessionGeneration !== seed.sessionGeneration ||
+        frame.simulationGeneration !== seed.simulationGeneration ||
+        !frameMatchesCurrentInteraction(frame)
+      ) {
+        return;
+      }
+      const adopted = frameWithLatestConstraintTarget(frame);
+      if (adopted.state === 'hot-constrained') {
+        coolingPresentation = undefined;
+        emitPresentationState('idle');
+        const handoff = hotHandoff;
+        if (handoff === undefined || reducedMotion) {
+          hotHandoff = undefined;
+          present(adopted);
+          return;
+        }
+        const startedAt = handoff.startedAt ?? timestamp;
+        if (handoff.startedAt === undefined) {
+          hotHandoff = { ...handoff, startedAt };
+        }
+        const progress = Math.min(
+          1,
+          Math.max(0, timestamp - startedAt) / REGRAB_HANDOFF_DURATION_MS,
+        );
+        const target = latestTarget;
+        const positions = interpolatePositions(
+          handoff.start,
+          adopted.positions,
+          easedProgress(progress),
+          target === undefined || active === undefined
+            ? undefined
+            : { key: active.nodeKey, ...target },
+        );
+        if (progress >= 1) hotHandoff = undefined;
+        present({ ...adopted, positions });
+        return;
+      }
+      const start = coolingPresentation
+        ? presentedCoolingPositions(coolingPresentation, timestamp)
+        : (lastPresentedPositions ??
+          seed.nodes.map(({ key, x, y }) => ({ key, x, y })));
+      coolingPresentation = {
+        frame: adopted,
+        start: copyPositions(start),
+        startedAt: timestamp,
+        durationMs: coolingDuration(start, adopted.positions),
+      };
+      if (coolingPresentation.durationMs > 0) {
+        emitPresentationState('settling');
+        present({ ...adopted, positions: start });
+        scheduleFrame();
+        return;
+      }
+    }
+    const presentation = coolingPresentation;
+    if (presentation === undefined) return;
+    if (!frameMatchesCurrentInteraction(presentation.frame)) {
+      coolingPresentation = undefined;
+      emitPresentationState('idle');
       return;
     }
-    options.onFrame(frame);
-    emitState(frame.state);
+    const progress =
+      presentation.durationMs === 0
+        ? 1
+        : Math.min(
+            1,
+            Math.max(0, timestamp - presentation.startedAt) /
+              presentation.durationMs,
+          );
+    present({
+      ...presentation.frame,
+      positions: presentedCoolingPositions(presentation, timestamp),
+    });
+    if (progress >= 1) {
+      coolingPresentation = undefined;
+      emitPresentationState('idle');
+    } else scheduleFrame();
   }
 
   function validateFrameNodeSet(frame: NetworkPhysicsFrameResponse): boolean {
@@ -134,20 +432,44 @@ export function createNetworkPhysicsWorkerService(
       );
       return false;
     }
-    const expected = new Set(seed.nodes.map(({ key }) => key));
+    if (validationPass === 0xffff_ffff) {
+      seenNodeMarks.fill(0);
+      validationPass = 0;
+    }
+    validationPass += 1;
     for (const position of frame.positions) {
-      if (!expected.delete(position.key)) {
+      const index = expectedNodeIndex.get(position.key);
+      if (index === undefined || seenNodeMarks[index] === validationPass) {
         reportFailure(
           `Network physics worker frame has an unknown or duplicate node ${position.key}.`,
         );
         return false;
       }
-    }
-    if (expected.size !== 0) {
-      reportFailure('Network physics worker frame omitted initialized nodes.');
-      return false;
+      seenNodeMarks[index] = validationPass;
     }
     return true;
+  }
+
+  function postConstraint(command: TemporaryNodeConstraintCommand): void {
+    ensureWorker().postMessage({
+      schemaVersion: NETWORK_PHYSICS_SCHEMA_VERSION,
+      kind: 'constraint',
+      command,
+    });
+    inFlightSequence = command.sequence;
+  }
+
+  function acknowledgeAndFlush(frame: NetworkPhysicsFrameResponse): void {
+    if (
+      inFlightSequence === undefined ||
+      frame.commandSequence < inFlightSequence
+    ) {
+      return;
+    }
+    inFlightSequence = undefined;
+    const update = pendingUpdate;
+    pendingUpdate = undefined;
+    if (active !== undefined && update !== undefined) postConstraint(update);
   }
 
   function ensureWorker(): NetworkPhysicsWorkerTransport {
@@ -183,18 +505,13 @@ export function createNetworkPhysicsWorkerService(
       }
       if (response.kind === 'frame') {
         if (response.frameSequence <= lastFrameSequence) return;
-        if (
-          (active === undefined && response.constraintSequence !== null) ||
-          (active !== undefined && response.constraintSequence !== lastSequence)
-        ) {
-          return;
-        }
+        if (!frameMatchesCurrentInteraction(response)) return;
         if (!validateFrameNodeSet(response)) return;
         lastFrameSequence = response.frameSequence;
+        acknowledgeAndFlush(response);
+        options.onRawFrame?.(response);
         latestFrame = response;
-        if (scheduledFrame === undefined) {
-          scheduledFrame = scheduler.request(adoptLatestFrame);
-        }
+        scheduleFrame();
       } else if (response.kind === 'failure') {
         terminate();
         cancelFrame();
@@ -236,9 +553,14 @@ export function createNetworkPhysicsWorkerService(
           'A temporary node constraint must begin at sequence 0.',
         );
       }
+      prepareHotHandoff();
       active = { ...command };
       lastSequence = 0;
       lastEnd = undefined;
+      latestTarget = { ...command.target };
+      interactionRevision += 1;
+      pendingUpdate = undefined;
+      inFlightSequence = undefined;
     } else if (command.kind === 'update') {
       if (active === undefined || !sameConstraint(active, command)) {
         throw new Error(
@@ -248,8 +570,8 @@ export function createNetworkPhysicsWorkerService(
       if (command.sequence <= lastSequence) {
         throw new Error('Temporary constraint update sequence is stale.');
       }
-      cancelFrame();
       lastSequence = command.sequence;
+      latestTarget = { ...command.target };
     } else {
       if (
         active === undefined &&
@@ -274,17 +596,24 @@ export function createNetworkPhysicsWorkerService(
       if (command.sequence <= lastSequence) {
         throw new Error('Temporary constraint end sequence is stale.');
       }
-      cancelFrame();
       active = undefined;
       lastSequence = command.sequence;
       lastEnd = { ...command };
+      latestTarget = undefined;
     }
+    recordImmediateConstraintTarget(command);
     options.onConstraint(command);
-    ensureWorker().postMessage({
-      schemaVersion: NETWORK_PHYSICS_SCHEMA_VERSION,
-      kind: 'constraint',
-      command,
-    });
+    if (command.kind === 'begin') {
+      postConstraint(command);
+    } else if (command.kind === 'update') {
+      if (inFlightSequence === undefined) postConstraint(command);
+      else pendingUpdate = { ...command, target: { ...command.target } };
+    } else {
+      const update = pendingUpdate;
+      pendingUpdate = undefined;
+      if (update !== undefined) postConstraint(update);
+      postConstraint(command);
+    }
   }
 
   return {
@@ -297,7 +626,23 @@ export function createNetworkPhysicsWorkerService(
       active = undefined;
       lastSequence = -1;
       lastEnd = undefined;
+      latestTarget = undefined;
+      interactionRevision = 0;
+      inFlightSequence = undefined;
+      pendingUpdate = undefined;
       lastFrameSequence = 0;
+      lastPresentedPositions = nextSeed.nodes.map(({ key, x, y }) => ({
+        key,
+        x,
+        y,
+      }));
+      simulationPositionScale = positionScale(lastPresentedPositions);
+      expectedNodeIndex = new Map(
+        nextSeed.nodes.map(({ key }, index) => [key, index] as const),
+      );
+      seenNodeMarks = new Uint32Array(nextSeed.nodes.length);
+      validationPass = 0;
+      emitPresentationState('idle');
       emitState('sleeping');
     },
     invalidate(reason: NetworkPhysicsInvalidateMessage['reason']) {
@@ -305,8 +650,17 @@ export function createNetworkPhysicsWorkerService(
       active = undefined;
       lastSequence = -1;
       lastEnd = undefined;
+      latestTarget = undefined;
+      interactionRevision = 0;
+      inFlightSequence = undefined;
+      pendingUpdate = undefined;
       lastFrameSequence = 0;
       cancelFrame();
+      lastPresentedPositions = seed?.nodes.map(({ key, x, y }) => ({
+        key,
+        x,
+        y,
+      }));
       if (worker !== undefined) {
         worker.postMessage({
           schemaVersion: NETWORK_PHYSICS_SCHEMA_VERSION,
@@ -332,7 +686,11 @@ export function createNetworkPhysicsWorkerService(
       }
       terminate();
       active = undefined;
+      latestTarget = undefined;
+      inFlightSequence = undefined;
+      pendingUpdate = undefined;
       seed = undefined;
+      lastPresentedPositions = undefined;
       emitState('disposed');
     },
   };

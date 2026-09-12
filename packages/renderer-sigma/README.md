@@ -1,6 +1,6 @@
 # Sigma Global/Regional and Local Free Renderer
 
-Status: **QA — atomic All/Focus camera commits and 0–150% density framing are test-backed; native acceptance remains pending.**
+Status: **QA — authoritative All/Focus startup presentation, atomic camera commits, and 0–150% density framing are test-backed.**
 
 This package owns the lazy, direct Sigma 3 renderers for file-level
 Global/Regional exploration and bounded Local Free exploration. Both consume a
@@ -38,7 +38,7 @@ src/
   spatial-influence.ts     Pure soft-attractor request, fingerprint, compute, validation, metrics.
   spatial-influence-cache.ts  Four-entry memory-only LRU of dynamic positions.
   arrangement.ts           Pure thresholded prime/drag/commit/cancel gesture reducer.
-  temporary-node-constraint.ts  Serializable fake-backed PHYSICS1 consumer port.
+  temporary-node-constraint.ts  Serializable PHYSICS1 consumer port and strict test fake.
   file-move.ts             Pure File gesture reducer and frame-coalesced coordinator.
   node-size.ts             Per-File multiplier composition and final display-only bounds.
   node-size-presentation.ts  Sparse override diff and topology-owned File-to-node key index.
@@ -53,7 +53,8 @@ src/
   raw-viewport-frame.ts    Raw graph-space center/scale diagnostics and bounded repair primitive.
   network-camera-intent.ts One-shot initial framing versus camera-neutral position-adoption policy.
   network-position-frame.ts Validates the stable presented-position normalization extent.
-  precision-wheel-zoom.ts  Fine-linear/coarse-compressed wheel curve and Sigma default guard.
+  NetworkViewportControls.tsx  Shared Sigma icon chrome for Zoom, Fit all, and app-owned maximize/restore.
+  precision-wheel-zoom.ts  Zoom curve, two-axis wheel-unit normalization, and Sigma default guard.
   session.ts               Imperative Sigma lifecycle and high-frequency interaction ownership.
   node-click.ts            Shared 300 ms single/double-click arbitration; selection stays immediate.
   viewport-request.ts      Layout-commit gate for semantic center and Fit requests.
@@ -74,14 +75,16 @@ src/
   local-lifecycle.ts       Idempotent Local renderer mount/session lease.
   local-session.ts         Local Sigma ownership, precision input, anchors, and viewport.
   local-interaction-contract.ts  Local operation-count oracle and Global-isolation proof.
-  LocalGraphCanvas.tsx     Immediate seed mount and latest worker refinement boundary.
+  LocalGraphCanvas.tsx     Internal seed mount, accepted-layout presentation commit, and reveal boundary.
   deterministic.ts        Shared stable hash/unit primitives; no random geometry.
   styles.css               Canvas controls, progress/error surface, and reduced-motion rules.
   core.ts                  DOM-free mapping/layout/settings exports for tests and benchmarks.
   index.ts                 Browser-capable public API.
   canvas-test-harness.ts    Test-only hook/effect driver for the real canvas dependency paths.
   sigma-test-renderer.ts    Test-only reducer cache and process-boundary Sigma double.
+  initial-presentation-session.test.ts  Final-frame, containment, and immediate-Fit idempotence oracle.
   size-canvas-regression.test.tsx  Real canvas/session layout-count and exact-coordinate regression.
+  network-wheel-pan-session.test.ts  Extent/rotation/delta-mode invariant Network pan regression.
   arrangement-session.test.ts  Exact-folder pointer ownership, sparse refresh, and commit contract.
   file-move-session.test.ts  All/Focus eligibility, arbitration, lifecycle, and fake-port contract.
   arrangement-canvas.test.tsx  Accessible nudge/save and write-failure rollback contract.
@@ -102,6 +105,28 @@ pending reveals. The renderer never scrolls sidebar DOM.
 
 Network layout progress remains visible while preparing/refining; success clears
 the status, while layout failure retains the error and last-position recovery text.
+
+The initial Network surface is a presentation transaction rather than a first
+Sigma paint. Seed/base coordinates may warm the worker and renderer internally,
+but Global waits for the current layout plus Pull/Place composition and Local
+waits for its accepted layout. The session then replaces any provisional
+`customBBox`, applies Fit All when its startup camera intent is still current,
+waits for that render, and reveals the surface. Subsequent geometry adoption is
+unchanged and camera-neutral. If user input supersedes startup Fit, raw viewport
+framing is preserved while the final normalization extent is still installed.
+
+Network Fit and density framing are intentionally different camera actions. Fit
+rebases the current all-node extent and uses Sigma's ratio `1`; the shared 24 px
+stage padding covers the maximum 24 px Network node radius, while labels remain
+opportunistic. The density sliders retain their explicit anchor-preserving ratio
+preview and may omit peripheral nodes. Parent-issued Center/Fit commands are
+consumed once, and Global waits for the exact current layout plus Pull/Place
+generation before applying either. A queued fresh-source Fit yields to newer
+manual camera ownership. Two-finger pan converts wheel units to CSS pixels and
+uses only framed coordinates, so raw graph scale cannot amplify the gesture.
+The All and Focus canvases share renderer-local icon-only Zoom, Fit, and
+maximize/restore chrome; maximize state remains owned by the app shell and does
+not relayout or fit. Arrange Folders is rendered in a separate tool cluster.
 
 Global is documents-first. A section or block at this boundary is an error;
 headings never enter Global layout. Reference edges remain the only semantic
@@ -241,19 +266,21 @@ zero dynamic workers; no rule edit enters the automatic layout fingerprint.
 The SPATIAL2A worker still performs its existing whole-graph ForceAtlas2
 refinement, so disconnected geometry movement is layout evidence rather than a
 camera fit. SPATIAL2B does not introduce a competing simulation lifecycle;
-PHYSICS1 owns future reheating, convergence, and reaction policy, including
+PHYSICS1 owns runtime reheating, convergence, and reaction policy, including
 reactive neighbors around hard Place constraints.
 
-MOVE1A adds a separate, fake-backed temporary File constraint seam to both
-Network Sigma sessions without exposing a production control. One canonical
-document may own a pointer sequence after the same 3 px threshold; Focus
+MOVE1A adds a separate temporary File constraint seam to both Network Sigma
+sessions, and MOVE1B connects it directly to the real PHYSICS1 service whenever
+a supported Network is ready and Arrange Folders does not own input. One
+canonical document may own a pointer sequence after the same 3 px threshold; Focus
 headings, blocks, and diagnostics remain ineligible. The reducer captures the
 pointer-to-node offset and winning fixed Place translation, converts every live
 viewport sample through Sigma, and sends the dynamic target through a plain
 begin/update/end port. Raw updates coalesce to the latest animation frame;
 release flushes the latest update before one end command.
 
-Folder arrangement and File movement are mutually exclusive. Below threshold,
+Folder arrangement and File movement are mutually exclusive; no global File
+editing mode exists. Below threshold,
 selection, confirmed reveal, and document double-click keep their existing
 meaning. A real drag suppresses its trailing click/double-click. Escape,
 capture/stage loss, blur, visibility loss, topology/layout/scope/spatial or
@@ -261,8 +288,15 @@ workspace invalidation, service failure, mode exit, and disposal remove the
 temporary constraint. The port carries stable node key, session/simulation
 generation, gesture ID, monotonic sequence, simulation-space target, and end
 reason only; it owns no alpha/cooling values, Graphology/Sigma instances,
-worker handles, source text, or persisted coordinates. PHYSICS1 owns the future
-real adapter and MOVE1B owns the visible Edit/Move mode.
+worker handles, source text, or persisted coordinates. The same session exposes
+a coarse keyboard controller: it primes a visible File at its current viewport
+point, sends 8/32 px nudges through the identical coordinator, and releases into
+cooling. The canvases report only capability and lifecycle transitions to React;
+whole-graph frames remain imperative and camera-neutral. Raw Worker coordinates
+remain the authoritative seed while the browser may present a bounded,
+time-based release catch-up; eased coordinates never enter finite-layout,
+dynamic-Pull, or physics caches. Physics failure clears the gesture, retains the
+last valid graph, and leaves explicit retry to the app.
 
 VISUAL1A's reference-degree boost applies only to All Network. Ordinary document nodes add a bounded
 reference-degree boost to the configured base size. At the persisted
@@ -282,6 +316,15 @@ layers. Edge reducers likewise recompute displayed thickness from reference
 count without changing layout edge weight. Radius refreshes retain Sigma's
 indexed processing for labels/programs/picking; thickness and label changes do
 not submit ForceAtlas2 or reapply coordinates.
+
+VISUAL1C makes that boundary structural. The finite All layout worker's
+schema-v3 request carries only folder clustering, folder cohesion, reference
+link force, within-folder spacing, and between-folder spacing. Worker nodes no
+longer carry display radius; ForceAtlas2 continues to run with
+`adjustSizes: false`. Node size, reference-degree size influence, link
+thickness, and label threshold stay in Sigma reducers. Rapid Visual updates are
+coalesced into one presentation refresh on the next animation frame without
+projection, mapping, reconciliation, worker, cache, coordinate, or camera work.
 
 NETWORKSETTINGS1 extends Base node size, Link thickness, and Label threshold to
 Focus without moving those values into Local topology or layout. Base size
@@ -565,14 +608,14 @@ claim mathematical equilibrium. PHYSICS1 still owns any future continuous
 interactive lifecycle, reheating/cooling, and real temporary-constraint
 adapter.
 
-All Network uses the separate `global-fa2-folder-convergence-v1` schema-v2
+All Network uses the separate `global-fa2-folder-convergence-v1` schema-v3
 policy. `global-convergence.ts` owns centroid-aligned movement, the low-degree
 and centroid-drift guards, three-step stability, 32-iteration batches, the
 640/120/80 caps, and 5 s safety boundary. `global-folder-macro.ts` owns the
 duration-independent `global-folder-fixed-field-v1` output adapter. It applies
 one current-prior-equivalent transform to snapshots only and never feeds folder
 coordinates back into the reused FA2 graph. `layout.ts` owns strict request,
-result, failure, rounding, metric, and `global-layout-v2` fingerprint contracts.
+result, failure, rounding, metric, and `global-layout-v3` fingerprint contracts.
 
 The same GROUP1A map feeds Local Free. File, Heading, and Block base fills may
 use the accent; diagnostic colors and all edges remain unchanged. Root/LOD,

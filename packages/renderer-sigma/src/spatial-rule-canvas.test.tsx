@@ -80,7 +80,7 @@ describe('production spatial rule adoption', () => {
       const layout = vi.fn(
         async (request: Omit<GlobalLayoutRequest, 'requestId'>) =>
           ({
-            schemaVersion: 2,
+            schemaVersion: 3,
             kind: 'result',
             requestId: 1,
             algorithm: 'reference-only',
@@ -210,7 +210,7 @@ describe('production spatial rule adoption', () => {
     const layout = vi.fn(
       async (request: Omit<GlobalLayoutRequest, 'requestId'>) =>
         ({
-          schemaVersion: 2,
+          schemaVersion: 3,
           kind: 'result',
           requestId: layout.mock.calls.length,
           algorithm: 'reference-only',
@@ -465,9 +465,9 @@ describe('production spatial rule adoption', () => {
     await harness.flush();
     expect(layout).not.toHaveBeenCalled();
     expect(pull).toHaveBeenCalledTimes(1);
-    // Cache adoption, Pull settlement, and the layout-commit re-evaluation are
-    // distinct existing transactions; all must use the raw-frame path.
-    expect(spatialApply).toHaveBeenCalledTimes(3);
+    // Cache adoption and Pull settlement remain distinct transactions. The
+    // authoritative presentation commit no longer re-applies the same frame.
+    expect(spatialApply).toHaveBeenCalledTimes(2);
     expect(plainApply).not.toHaveBeenCalled();
     expect(fit).not.toHaveBeenCalled();
     expect(center).not.toHaveBeenCalled();
@@ -476,6 +476,10 @@ describe('production spatial rule adoption', () => {
 
   it('waits to fit a fresh source until spatial-rule positions are authoritative', async () => {
     const projection = globalTestProjection();
+    const commitInitialPresentation = vi.spyOn(
+      GlobalRendererSession.prototype,
+      'commitInitialPresentation',
+    );
     const fit = vi
       .spyOn(GlobalRendererSession.prototype, 'fit')
       .mockImplementation(noop);
@@ -496,7 +500,7 @@ describe('production spatial rule adoption', () => {
     const layout = vi.fn(
       async (request: Omit<GlobalLayoutRequest, 'requestId'>) =>
         ({
-          schemaVersion: 2,
+          schemaVersion: 3,
           kind: 'result',
           requestId: 1,
           algorithm: 'reference-only',
@@ -532,6 +536,7 @@ describe('production spatial rule adoption', () => {
     const onFailure = vi.fn();
     const harness = new CanvasTestHarness(() =>
       GlobalGraphCanvas({
+        automaticFitRequestKey: 1,
         projection,
         settings,
         spatialRules,
@@ -551,6 +556,7 @@ describe('production spatial rule adoption', () => {
     await harness.flush();
     expect(layout).toHaveBeenCalledTimes(1);
     expect(spatialInfluenceService.layout).toHaveBeenCalledTimes(1);
+    expect(commitInitialPresentation).not.toHaveBeenCalled();
     expect(fit).not.toHaveBeenCalled();
     if (pendingRequest === undefined || resolvePull === undefined) {
       throw new Error('Expected a pending Dynamic Pull request.');
@@ -576,8 +582,239 @@ describe('production spatial rule adoption', () => {
     });
     await harness.flush();
 
-    expect(fit).toHaveBeenCalledTimes(1);
+    expect(commitInitialPresentation).toHaveBeenCalledTimes(1);
+    expect(commitInitialPresentation).toHaveBeenCalledWith(
+      expect.any(Array),
+      true,
+    );
+    expect(fit).not.toHaveBeenCalled();
     expect(layout).toHaveBeenCalledTimes(1);
+    harness.destroy();
+  });
+
+  it('waits for a newer Pull generation even after an older spatial commit exists', async () => {
+    const projection = globalTestProjection();
+    let rules: readonly FolderSpatialRule[] = [
+      {
+        folderKey: 'alpha',
+        behavior: 'pull',
+        scope: { kind: 'exact' },
+        anchor: { x: -0.5, y: 0 },
+        strength: 70,
+      },
+    ];
+    const viewportRequests: {
+      fitKey: number;
+      center?: {
+        readonly key: number;
+        readonly nodeId: string;
+        readonly ratio: number;
+      };
+    } = { fitKey: 0 };
+    const pending: {
+      readonly request: Omit<GlobalSpatialInfluenceRequest, 'requestId'>;
+      readonly resolve: (result: GlobalSpatialInfluenceResult) => void;
+    }[] = [];
+    const spatialInfluenceService = {
+      dispose: noop,
+      layout: vi.fn(
+        (request: Omit<GlobalSpatialInfluenceRequest, 'requestId'>) =>
+          new Promise<GlobalSpatialInfluenceResult>((resolve) => {
+            pending.push({ request, resolve });
+          }),
+      ),
+    };
+    const layout = vi.fn(
+      async (request: Omit<GlobalLayoutRequest, 'requestId'>) =>
+        ({
+          schemaVersion: 3,
+          kind: 'result',
+          requestId: 1,
+          algorithm: 'reference-only',
+          policyVersion: request.policy.version,
+          macroVersion: request.macro.version,
+          stopReason: 'max-iterations',
+          iterationsCompleted: request.policy.maxIterations,
+          macroStepsCompleted: Math.ceil(request.policy.maxIterations / 32),
+          stableMacroSteps: 0,
+          finalMacroStepIterations: 32,
+          finalMovement: null,
+          computeMs: 0,
+          folderPriorMs: 0,
+          positions: request.nodes.map(({ key, x, y }) => ({ key, x, y })),
+          metrics: {
+            meanWithinFolderDistance: 0,
+            meanCrossFolderDistance: 0,
+            meanCrossFolderReferenceLength: 0,
+            meanDisplacementFromInput: 0,
+          },
+        }) as GlobalLayoutResult,
+    );
+    const fit = vi
+      .spyOn(GlobalRendererSession.prototype, 'fit')
+      .mockImplementation(noop);
+    const center = vi
+      .spyOn(GlobalRendererSession.prototype, 'center')
+      .mockResolvedValue(undefined);
+    const layoutService = { layout, dispose: noop };
+    const onFailure = vi.fn();
+    const harness = new CanvasTestHarness(() =>
+      GlobalGraphCanvas({
+        ...(viewportRequests.center === undefined
+          ? {}
+          : { centerRequest: viewportRequests.center }),
+        projection,
+        settings,
+        spatialRules: rules,
+        fitRequestKey: viewportRequests.fitKey,
+        layoutRequestKey: 0,
+        layoutService,
+        spatialInfluenceService,
+        onFailure,
+        onNodeActivate: noop,
+        onSelectionChange: noop,
+        onViewportObservation: noop,
+        selection: null,
+        trackpadZoomMode: 'pinch-zoom',
+      }),
+    );
+    await harness.flush();
+    expect(pending).toHaveLength(1);
+    const settle = (index: number) => {
+      const entry = pending[index]!;
+      entry.resolve({
+        schemaVersion: 1,
+        kind: 'result',
+        requestId: index + 1,
+        algorithm: entry.request.algorithm,
+        computeMs: 0,
+        forceAtlasMs: 0,
+        attractorMs: 0,
+        positions: entry.request.nodes.map(({ key, x, y }) => ({ key, x, y })),
+        metrics: {
+          meanTargetError: 0,
+          maxTargetError: 0,
+          meanAffectedDisplacement: 0,
+          meanUnaffectedDisplacement: 0,
+          meanCrossBoundaryReferenceLength: 0,
+          meanReferenceLength: 0,
+        },
+      });
+    };
+    settle(0);
+    await harness.flush();
+
+    rules = [{ ...rules[0]!, anchor: { x: 0.45, y: -0.2 } }];
+    viewportRequests.fitKey = 1;
+    viewportRequests.center = {
+      key: 1,
+      nodeId: 'entity:doc-a',
+      ratio: 0.3,
+    };
+    harness.invalidate();
+    await harness.flush();
+
+    expect(pending).toHaveLength(2);
+    expect(fit).not.toHaveBeenCalled();
+    expect(center).not.toHaveBeenCalled();
+
+    settle(1);
+    await harness.flush();
+
+    expect(fit).toHaveBeenCalledTimes(1);
+    expect(center).toHaveBeenCalledWith(viewportRequests.center);
+    expect(layout).toHaveBeenCalledTimes(1);
+    harness.destroy();
+  });
+
+  it('cancels a queued automatic Fit when wheel navigation is newer', async () => {
+    const projection = globalTestProjection();
+    const commitInitialPresentation = vi.spyOn(
+      GlobalRendererSession.prototype,
+      'commitInitialPresentation',
+    );
+    let resolveLayout: ((result: GlobalLayoutResult) => void) | undefined;
+    let pendingRequest: Omit<GlobalLayoutRequest, 'requestId'> | undefined;
+    const layout = vi.fn(
+      (request: Omit<GlobalLayoutRequest, 'requestId'>) =>
+        new Promise<GlobalLayoutResult>((resolve) => {
+          pendingRequest = request;
+          resolveLayout = resolve;
+        }),
+    );
+    const fit = vi
+      .spyOn(GlobalRendererSession.prototype, 'fit')
+      .mockImplementation(noop);
+    const onFitRequestConsumed = vi.fn();
+    const layoutService = { layout, dispose: noop };
+    const onFailure = vi.fn();
+    const harness = new CanvasTestHarness(() =>
+      GlobalGraphCanvas({
+        automaticFitRequestKey: 1,
+        projection,
+        settings,
+        fitRequestKey: 1,
+        layoutRequestKey: 0,
+        layoutService,
+        onFailure,
+        onFitRequestConsumed,
+        onNodeActivate: noop,
+        onSelectionChange: noop,
+        onViewportObservation: noop,
+        selection: null,
+        trackpadZoomMode: 'pinch-zoom',
+      }),
+    );
+    await harness.flush();
+    const renderer = SigmaTestRenderer.instances[0]!;
+    const wheel = renderer.captor.on.mock.calls.find(
+      ([event]) => event === 'wheel',
+    )?.[1] as ((coordinates: Record<string, unknown>) => void) | undefined;
+    wheel?.({
+      x: 400,
+      y: 300,
+      original: {
+        ctrlKey: false,
+        deltaMode: 0,
+        deltaX: 0,
+        deltaY: 4,
+      },
+      preventSigmaDefault: vi.fn(),
+    });
+    expect(onFitRequestConsumed).toHaveBeenCalledWith(1);
+    if (pendingRequest === undefined || resolveLayout === undefined) {
+      throw new Error('Expected a pending Global layout request.');
+    }
+    resolveLayout({
+      schemaVersion: 3,
+      kind: 'result',
+      requestId: 1,
+      algorithm: 'reference-only',
+      policyVersion: pendingRequest.policy.version,
+      macroVersion: pendingRequest.macro.version,
+      stopReason: 'max-iterations',
+      iterationsCompleted: pendingRequest.policy.maxIterations,
+      macroStepsCompleted: Math.ceil(pendingRequest.policy.maxIterations / 32),
+      stableMacroSteps: 0,
+      finalMacroStepIterations: 32,
+      finalMovement: null,
+      computeMs: 0,
+      folderPriorMs: 0,
+      positions: pendingRequest.nodes.map(({ key, x, y }) => ({ key, x, y })),
+      metrics: {
+        meanWithinFolderDistance: 0,
+        meanCrossFolderDistance: 0,
+        meanCrossFolderReferenceLength: 0,
+        meanDisplacementFromInput: 0,
+      },
+    });
+    await harness.flush();
+
+    expect(commitInitialPresentation).toHaveBeenCalledWith(
+      expect.any(Array),
+      false,
+    );
+    expect(fit).not.toHaveBeenCalled();
     harness.destroy();
   });
 
@@ -602,7 +839,7 @@ describe('production spatial rule adoption', () => {
       layout: vi.fn(
         async (request: Omit<GlobalLayoutRequest, 'requestId'>) =>
           ({
-            schemaVersion: 2,
+            schemaVersion: 3,
             kind: 'result',
             requestId: 1,
             algorithm: 'reference-only',

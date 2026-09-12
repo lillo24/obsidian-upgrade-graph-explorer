@@ -310,6 +310,26 @@ export interface TemporaryFileMoveCoordinatorOptions {
   readonly frameScheduler?: FileMoveFrameScheduler;
 }
 
+export type TemporaryFileMoveControllerStartResult =
+  | { readonly status: 'started' }
+  | {
+      readonly status: 'unavailable';
+      readonly reason: 'simulation-unavailable' | 'node-unavailable';
+    };
+
+/**
+ * Coarse product-facing controller. Pointer and keyboard callers both enter the
+ * same MOVE1A coordinator; viewport samples never pass through React state.
+ */
+export interface TemporaryFileMoveController {
+  readonly start: (nodeKey: string) => TemporaryFileMoveControllerStartResult;
+  readonly nudge: (delta: SpatialPoint) => boolean;
+  readonly release: () => boolean;
+  readonly cancel: (
+    reason: Exclude<TemporaryNodeConstraintEndReason, 'released'>,
+  ) => boolean;
+}
+
 export interface PrimeFileMoveInput {
   readonly gestureId: string;
   readonly nodeKey: string;

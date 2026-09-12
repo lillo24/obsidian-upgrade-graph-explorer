@@ -49,6 +49,7 @@ import {
   warmGlobalRendererInput,
 } from './layout';
 import { GlobalGraphEmptyState } from './GlobalGraphEmptyState';
+import { NetworkViewportControls } from './NetworkViewportControls';
 import { mountGlobalRendererSession } from './lifecycle';
 import {
   mapProjectionToGlobal,
@@ -57,9 +58,17 @@ import {
 import { GlobalRendererSession } from './session';
 import {
   createAllNetworkPhysicsSeed,
+  networkPhysicsNodeCountIsSupported,
+  type NetworkPhysicsLifecycleState,
+  type NetworkPhysicsPresentationState,
   type NetworkPhysicsService,
   type NetworkPhysicsServiceFactory,
 } from './physics';
+import type { TemporaryFileMoveController } from './file-move';
+import type {
+  TemporaryNodeConstraintCapability,
+  TemporaryNodeConstraintEndReason,
+} from './temporary-node-constraint';
 import {
   globalLayoutSettingsFromPhysics,
   resolveGlobalPhysicsSettings,
@@ -148,6 +157,8 @@ export interface GlobalFolderScopeTreeNode {
 }
 
 export interface GlobalGraphCanvasProps {
+  /** Identifies a startup Fit that must yield to newer manual camera input. */
+  readonly automaticFitRequestKey?: number;
   readonly folderArrangement?: GlobalFolderArrangementProps;
   readonly centerRequest?: GlobalCenterRequest;
   readonly fitRequestKey: number;
@@ -159,17 +170,37 @@ export interface GlobalGraphCanvasProps {
   /** Optional session cache owner; the lazy web module keeps this across mode switches. */
   readonly layoutCache?: GlobalLayoutCache;
   readonly layoutService: GlobalLayoutService;
-  /** PHYSICS1 transport seam. Inactive until a later Edit/Move mode opts in. */
+  readonly maximized?: boolean;
+  /** PHYSICS1 transport seam; direct File dragging is armed while available. */
   readonly physicsServiceFactory?: NetworkPhysicsServiceFactory;
   readonly temporaryConstraintActive?: boolean;
+  readonly temporaryConstraintRetryKey?: number;
   /** Separate latest-result worker for schema-v2 dynamic pull rules. */
   readonly spatialInfluenceService?: GlobalSpatialInfluenceService;
   readonly spatialInfluenceCache?: GlobalSpatialInfluenceCache;
   readonly spatialSourceKey?: string;
   readonly onFailure: (message: string) => void;
+  readonly onTemporaryFileMoveCapabilityChange?: (
+    capability: TemporaryNodeConstraintCapability,
+  ) => void;
+  readonly onTemporaryFileMoveControllerChange?: (
+    controller: TemporaryFileMoveController | undefined,
+  ) => void;
+  readonly onTemporaryFileMoveFailure?: (message: string) => void;
+  readonly onTemporaryFileMoveLifecycleChange?: (
+    state: NetworkPhysicsLifecycleState,
+  ) => void;
+  readonly onTemporaryFileMovePresentationChange?: (
+    state: NetworkPhysicsPresentationState,
+  ) => void;
   readonly onDensityQaDiagnosticsChange?: (
     diagnostics: GlobalDensityQaDiagnostics | undefined,
   ) => void;
+  readonly onCenterRequestConsumed?: (key: number) => void;
+  readonly onFitRequestConsumed?: (key: number) => void;
+  /** Routes the visible Fit action through the final-geometry request gate. */
+  readonly onFitRequested?: () => void;
+  readonly onMaximizedChange?: (maximized: boolean) => void;
   readonly onNodeActivate: (entityId: string) => void;
   readonly onNodeSingleClick?: (nodeId: string) => void;
   readonly onSelectionChange: (selection: GlobalSelection | null) => void;
@@ -365,7 +396,7 @@ function applyDisplayedPositions(
   instrumentation: GlobalRendererInstrumentation | undefined,
   forceSpatialOperation = false,
   rules?: readonly FolderSpatialRule[],
-): Promise<void> {
+): Promise<readonly GlobalLayoutPosition[]> {
   const positions = displayedPositions(
     automaticPositions,
     input,
@@ -380,7 +411,7 @@ function applyDisplayedPositions(
     anchors,
     instrumentation,
     forceSpatialOperation || rules !== undefined,
-  );
+  ).then(() => positions);
 }
 
 function applyComposedPositions(
@@ -404,6 +435,7 @@ function applyComposedPositions(
 }
 
 export function GlobalGraphCanvas({
+  automaticFitRequestKey,
   centerRequest,
   densityFramingStrength,
   fitRequestKey,
@@ -413,12 +445,22 @@ export function GlobalGraphCanvas({
   layoutRequestKey,
   layoutCache,
   layoutService,
+  maximized,
   physicsServiceFactory,
   spatialInfluenceService,
   spatialInfluenceCache,
   spatialSourceKey,
   onFailure,
+  onTemporaryFileMoveCapabilityChange,
+  onTemporaryFileMoveControllerChange,
+  onTemporaryFileMoveFailure,
+  onTemporaryFileMoveLifecycleChange,
+  onTemporaryFileMovePresentationChange,
   onDensityQaDiagnosticsChange,
+  onCenterRequestConsumed,
+  onFitRequestConsumed,
+  onFitRequested,
+  onMaximizedChange,
   onNodeActivate,
   onNodeSingleClick,
   onSelectionChange,
@@ -430,6 +472,7 @@ export function GlobalGraphCanvas({
   spatialOverrides,
   spatialRules,
   temporaryConstraintActive = false,
+  temporaryConstraintRetryKey = 0,
   trackpadZoomMode,
   visualGroupStyles,
   presentationOverrides,
@@ -445,12 +488,28 @@ export function GlobalGraphCanvas({
   );
   const handledCenterRequest = useRef(0);
   const handledFitRequest = useRef(0);
+  const automaticFitRequestKeyRef = useRef(automaticFitRequestKey);
+  const userCameraIntentGeneration = useRef(0);
+  const pendingInitialPresentation = useRef<number | 'initial' | undefined>(
+    automaticFitRequestKey ?? 'initial',
+  );
+  const presentationCameraIntentGeneration = useRef(0);
+  const presentationCommitGeneration = useRef<object | undefined>(undefined);
+  const [initialPresentationReady, setInitialPresentationReady] =
+    useState(false);
   const handledLayoutRequest = useRef(layoutRequestKey);
   const layoutPending = useRef(true);
   const callbacks = useRef({
     folderArrangement,
     onFailure,
+    onTemporaryFileMoveCapabilityChange,
+    onTemporaryFileMoveFailure,
+    onTemporaryFileMoveLifecycleChange,
+    onTemporaryFileMovePresentationChange,
     onDensityQaDiagnosticsChange,
+    onCenterRequestConsumed,
+    onFitRequestConsumed,
+    onFitRequested,
     onNodeActivate,
     onNodeSingleClick,
     onSelectionChange,
@@ -460,7 +519,14 @@ export function GlobalGraphCanvas({
     callbacks.current = {
       folderArrangement,
       onFailure,
+      onTemporaryFileMoveCapabilityChange,
+      onTemporaryFileMoveFailure,
+      onTemporaryFileMoveLifecycleChange,
+      onTemporaryFileMovePresentationChange,
       onDensityQaDiagnosticsChange,
+      onCenterRequestConsumed,
+      onFitRequestConsumed,
+      onFitRequested,
       onNodeActivate,
       onNodeSingleClick,
       onSelectionChange,
@@ -469,12 +535,32 @@ export function GlobalGraphCanvas({
   }, [
     folderArrangement,
     onFailure,
+    onTemporaryFileMoveCapabilityChange,
+    onTemporaryFileMoveFailure,
+    onTemporaryFileMoveLifecycleChange,
+    onTemporaryFileMovePresentationChange,
     onDensityQaDiagnosticsChange,
+    onCenterRequestConsumed,
+    onFitRequestConsumed,
+    onFitRequested,
     onNodeActivate,
     onNodeSingleClick,
     onSelectionChange,
     onViewportObservation,
   ]);
+  useLayoutEffect(() => {
+    automaticFitRequestKeyRef.current = automaticFitRequestKey;
+    if (
+      automaticFitRequestKey !== undefined &&
+      automaticFitRequestKey > handledFitRequest.current &&
+      pendingInitialPresentation.current !== automaticFitRequestKey
+    ) {
+      pendingInitialPresentation.current = automaticFitRequestKey;
+      presentationCameraIntentGeneration.current =
+        userCameraIntentGeneration.current;
+      setInitialPresentationReady(false);
+    }
+  }, [automaticFitRequestKey]);
   const resolvedPhysics = resolveGlobalPhysicsSettings(settings);
   const {
     folderClustering,
@@ -484,14 +570,13 @@ export function GlobalGraphCanvas({
     betweenFolderSpacing,
   } = resolvedPhysics;
   const layoutSettings = useMemo(
-    () =>
-      globalLayoutSettingsFromPhysics({
-        folderClustering,
-        folderCohesion,
-        linkForce,
-        withinFolderSpacing,
-        betweenFolderSpacing,
-      }),
+    () => ({
+      folderClustering,
+      folderCohesion,
+      linkForce,
+      withinFolderSpacing,
+      betweenFolderSpacing,
+    }),
     [
       betweenFolderSpacing,
       folderClustering,
@@ -499,6 +584,13 @@ export function GlobalGraphCanvas({
       linkForce,
       withinFolderSpacing,
     ],
+  );
+  // The separate schema-v1 soft-attractor worker still accepts the persisted
+  // shape. Freeze its visual fields to the baseline while its protocol remains
+  // backward compatible; the finite Global layout worker is spatial-only.
+  const spatialInfluenceSettings = useMemo(
+    () => globalLayoutSettingsFromPhysics(layoutSettings),
+    [layoutSettings],
   );
   const input = useMemo(() => {
     const map = () => mapProjectionToGlobalTopology(projection);
@@ -510,10 +602,23 @@ export function GlobalGraphCanvas({
     () => createGlobalLayoutRequest(input, layoutSettings),
     [input, layoutSettings],
   );
+  const physicsNodeCount = requestTemplate.nodes.length;
   const fingerprint = useMemo(
     () => globalLayoutFingerprint(requestTemplate),
     [requestTemplate],
   );
+  const layoutGeneration = useMemo(
+    () => ({ fingerprint, input, layoutRequestKey }),
+    [fingerprint, input, layoutRequestKey],
+  );
+  const layoutGenerationRef = useRef(layoutGeneration);
+  useLayoutEffect(() => {
+    if (layoutGenerationRef.current === layoutGeneration) return;
+    layoutGenerationRef.current = layoutGeneration;
+    // Establish pending ownership before ordinary effects can start spatial
+    // work for a new source/layout generation.
+    layoutPending.current = true;
+  }, [layoutGeneration]);
   const [initial] = useState(() => {
     const cached = cache.get(fingerprint);
     const automaticPositions = cached ?? globalLayoutPositionsFromInput(input);
@@ -543,6 +648,85 @@ export function GlobalGraphCanvas({
       presentationOverrides,
     };
   });
+  const finalGeometryGeneration = useMemo(
+    () => ({
+      fingerprint,
+      input,
+      layoutRequestKey,
+      spatialOverrides,
+      spatialRules,
+      spatialSourceKey,
+    }),
+    [
+      fingerprint,
+      input,
+      layoutRequestKey,
+      spatialOverrides,
+      spatialRules,
+      spatialSourceKey,
+    ],
+  );
+  const finalGeometryGenerationRef = useRef(finalGeometryGeneration);
+  const [
+    committedFinalGeometryGeneration,
+    setCommittedFinalGeometryGeneration,
+  ] = useState<object>();
+  useLayoutEffect(() => {
+    finalGeometryGenerationRef.current = finalGeometryGeneration;
+  }, [finalGeometryGeneration]);
+  const commitFinalGeometry = useCallback(
+    (generation: object, positions: readonly GlobalLayoutPosition[]): void => {
+      if (finalGeometryGenerationRef.current !== generation) return;
+      const pending = pendingInitialPresentation.current;
+      if (pending === undefined) {
+        setCommittedFinalGeometryGeneration((current) =>
+          current === generation ? current : generation,
+        );
+        return;
+      }
+      if (presentationCommitGeneration.current === generation) return;
+      const session = sessionRef.current;
+      if (session === undefined) return;
+      presentationCommitGeneration.current = generation;
+      const automaticKey = typeof pending === 'number' ? pending : undefined;
+      const fitAll =
+        automaticKey !== undefined &&
+        automaticFitRequestKeyRef.current === automaticKey &&
+        userCameraIntentGeneration.current ===
+          presentationCameraIntentGeneration.current;
+      void session
+        .commitInitialPresentation(positions, fitAll)
+        .then(() => {
+          if (presentationCommitGeneration.current === generation) {
+            presentationCommitGeneration.current = undefined;
+          }
+          if (finalGeometryGenerationRef.current !== generation) return;
+          pendingInitialPresentation.current = undefined;
+          setInitialPresentationReady(true);
+          setCommittedFinalGeometryGeneration(generation);
+          if (
+            automaticKey !== undefined &&
+            automaticFitRequestKeyRef.current === automaticKey
+          ) {
+            automaticFitRequestKeyRef.current = undefined;
+            handledFitRequest.current = Math.max(
+              handledFitRequest.current,
+              automaticKey,
+            );
+            callbacks.current.onFitRequestConsumed?.(automaticKey);
+          }
+        })
+        .catch((error: unknown) => {
+          if (presentationCommitGeneration.current === generation) {
+            presentationCommitGeneration.current = undefined;
+          }
+          callbacks.current.onFailure(
+            `Could not establish the initial All Network presentation: ${errorMessage(error)}`,
+          );
+        });
+    },
+    [],
+  );
   const appliedVisualGroupStyles = useRef(initial.visualGroupStyles);
   const appliedPresentationOverrides = useRef(initial.presentationOverrides);
   const appliedSpatialOverrides = useRef(initial.spatialOverrides);
@@ -561,6 +745,30 @@ export function GlobalGraphCanvas({
     undefined,
   );
   const physicsServiceGeneration = useRef(0);
+  const latestTemporaryConstraintActive = useRef(temporaryConstraintActive);
+  useLayoutEffect(() => {
+    latestTemporaryConstraintActive.current = temporaryConstraintActive;
+  }, [temporaryConstraintActive]);
+  const temporaryFileMoveController = useMemo<TemporaryFileMoveController>(
+    () => ({
+      start: (nodeKey) =>
+        sessionRef.current?.startKeyboardTemporaryFileMove(nodeKey) ?? {
+          status: 'unavailable',
+          reason: 'simulation-unavailable',
+        },
+      nudge: (delta) =>
+        sessionRef.current?.nudgeKeyboardTemporaryFileMove(delta) ?? false,
+      release: () =>
+        sessionRef.current?.releaseKeyboardTemporaryFileMove() ?? false,
+      cancel: (reason: Exclude<TemporaryNodeConstraintEndReason, 'released'>) =>
+        sessionRef.current?.cancelTemporaryFileMove(reason) ?? false,
+    }),
+    [],
+  );
+  useEffect(() => {
+    onTemporaryFileMoveControllerChange?.(temporaryFileMoveController);
+    return () => onTemporaryFileMoveControllerChange?.(undefined);
+  }, [onTemporaryFileMoveControllerChange, temporaryFileMoveController]);
   const applyPhysicsDisplayTranslation = useCallback(
     (positions: readonly GlobalLayoutPosition[]) =>
       positions.map((position) => {
@@ -580,9 +788,12 @@ export function GlobalGraphCanvas({
   useEffect(() => {
     const generation = ++physicsServiceGeneration.current;
     const service = physicsServiceFactory?.({
-      onFrame: (frame) => {
+      onRawFrame: (frame) => {
         if (physicsServiceGeneration.current !== generation) return;
         latestDynamicPositions.current = frame.positions;
+      },
+      onFrame: (frame) => {
+        if (physicsServiceGeneration.current !== generation) return;
         const displayed = applyPhysicsDisplayTranslation(frame.positions);
         latestDisplayedPositions.current = displayed;
         sessionRef.current?.applyPartialPositions(displayed);
@@ -601,9 +812,27 @@ export function GlobalGraphCanvas({
           },
         ]);
       },
+      onStateChange: (state) => {
+        if (physicsServiceGeneration.current === generation) {
+          callbacks.current.onTemporaryFileMoveLifecycleChange?.(state);
+        }
+      },
+      onPresentationStateChange: (state) => {
+        if (physicsServiceGeneration.current === generation) {
+          callbacks.current.onTemporaryFileMovePresentationChange?.(state);
+        }
+      },
       onFailure: (failure) => {
         if (physicsServiceGeneration.current === generation) {
-          callbacks.current.onFailure(failure.message);
+          callbacks.current.onTemporaryFileMoveFailure?.(failure.message);
+          queueMicrotask(() => {
+            if (physicsServiceGeneration.current === generation) {
+              sessionRef.current?.setTemporaryFileMoveContext(
+                undefined,
+                'error',
+              );
+            }
+          });
         }
       },
     });
@@ -615,6 +844,7 @@ export function GlobalGraphCanvas({
       queueMicrotask(() => service?.dispose());
     };
   }, [applyPhysicsDisplayTranslation, physicsServiceFactory]);
+
   const pendingArrangementCommit = useRef<
     | {
         readonly folderKey: string;
@@ -638,6 +868,17 @@ export function GlobalGraphCanvas({
   const [layoutPendingState, setLayoutPendingState] = useState(!initial.cached);
   const [spatialCommitKey, setSpatialCommitKey] = useState(0);
   const spatialGeneration = useRef(0);
+  useEffect(() => {
+    const capability: TemporaryNodeConstraintCapability =
+      physicsServiceFactory === undefined
+        ? { status: 'unavailable', reason: 'simulation-unavailable' }
+        : !ready || layoutPendingState
+          ? { status: 'unavailable', reason: 'simulation-not-running' }
+          : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+            ? { status: 'unavailable', reason: 'graph-too-large' }
+            : { status: 'available' };
+    callbacks.current.onTemporaryFileMoveCapabilityChange?.(capability);
+  }, [layoutPendingState, physicsNodeCount, physicsServiceFactory, ready]);
   const [arrangementGesturePhase, setArrangementGesturePhase] = useState<
     'idle' | 'primed' | 'dragging' | 'committing'
   >('idle');
@@ -1011,6 +1252,17 @@ export function GlobalGraphCanvas({
             callbacks.current.onViewportObservation(viewport),
           onDensityQaDiagnosticsChange: (diagnostics) =>
             callbacks.current.onDensityQaDiagnosticsChange?.(diagnostics),
+          onUserCameraIntent: () => {
+            userCameraIntentGeneration.current += 1;
+            const key = automaticFitRequestKeyRef.current;
+            if (key === undefined) return;
+            automaticFitRequestKeyRef.current = undefined;
+            handledFitRequest.current = Math.max(
+              handledFitRequest.current,
+              key,
+            );
+            callbacks.current.onFitRequestConsumed?.(key);
+          },
         }),
     );
     if (!mounted.ok) {
@@ -1282,6 +1534,7 @@ export function GlobalGraphCanvas({
         clearingAnchors,
         latestSpatialRules.current,
       );
+      latestDisplayedPositions.current = positions;
       appliedSpatialOverrides.current = anchors;
       session.update(
         anchors === undefined || anchors.size === 0
@@ -1335,8 +1588,23 @@ export function GlobalGraphCanvas({
   }, [presentationOverrides]);
 
   useEffect(() => {
-    if (spatialRules !== undefined) return;
-    if (appliedSpatialOverrides.current === spatialOverrides) return;
+    if (
+      spatialRules !== undefined ||
+      !ready ||
+      layoutPending.current ||
+      layoutPendingState
+    ) {
+      return;
+    }
+    if (appliedSpatialOverrides.current === spatialOverrides) {
+      commitFinalGeometry(
+        finalGeometryGeneration,
+        latestDisplayedPositions.current,
+      );
+      return;
+    }
+    const generation = finalGeometryGeneration;
+    let cancelled = false;
     const previousSpatialOverrides = appliedSpatialOverrides.current;
     appliedSpatialOverrides.current = spatialOverrides;
     const session = sessionRef.current;
@@ -1359,7 +1627,12 @@ export function GlobalGraphCanvas({
         previousSpatialOverrides !== undefined &&
         previousSpatialOverrides.size > 0,
     )
-      .then(() => {
+      .then((positions) => {
+        if (cancelled || finalGeometryGenerationRef.current !== generation) {
+          return;
+        }
+        latestDisplayedPositions.current = positions;
+        commitFinalGeometry(generation, positions);
         if (pending === undefined) return;
         if (pendingArrangementCommit.current !== pending) return;
         pendingArrangementCommit.current = undefined;
@@ -1377,9 +1650,21 @@ export function GlobalGraphCanvas({
         );
       })
       .catch((error: unknown) => {
-        callbacks.current.onFailure(errorMessage(error));
+        if (!cancelled) callbacks.current.onFailure(errorMessage(error));
       });
-  }, [input, instrumentation, spatialOverrides, spatialRules]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    commitFinalGeometry,
+    finalGeometryGeneration,
+    input,
+    instrumentation,
+    layoutPendingState,
+    ready,
+    spatialOverrides,
+    spatialRules,
+  ]);
 
   useEffect(() => {
     dynamicCache.clear();
@@ -1390,6 +1675,7 @@ export function GlobalGraphCanvas({
     if (
       spatialRules === undefined ||
       !ready ||
+      layoutPending.current ||
       layoutPendingState ||
       sessionRef.current === undefined
     ) {
@@ -1410,7 +1696,7 @@ export function GlobalGraphCanvas({
           );
     const request = createGlobalSpatialInfluenceRequest(
       input,
-      layoutSettings,
+      spatialInfluenceSettings,
       spatialInfluenceIterations(input.nodes.length),
       basePositions,
       fingerprint,
@@ -1443,6 +1729,7 @@ export function GlobalGraphCanvas({
       appliedSpatialOverrides.current = spatialOverrides;
       setSpatialError(undefined);
       setSpatialCommitKey((current) => current + 1);
+      commitFinalGeometry(finalGeometryGeneration, positions);
       const pending = pendingArrangementCommit.current;
       if (pending === undefined) return;
       const incomingRule = spatialRules.find(
@@ -1555,12 +1842,14 @@ export function GlobalGraphCanvas({
     };
   }, [
     dynamicCache,
+    commitFinalGeometry,
+    finalGeometryGeneration,
     fingerprint,
     input,
     instrumentation,
     layoutCommitKey,
     layoutPendingState,
-    layoutSettings,
+    spatialInfluenceSettings,
     ready,
     spatialInfluenceService,
     spatialOverrides,
@@ -1603,13 +1892,17 @@ export function GlobalGraphCanvas({
         false,
         latestSpatialRules.current,
       )
-        .then(() => {
+        .then((positions) => {
           if (cancelled) return;
+          latestDisplayedPositions.current = positions;
           layoutPending.current = false;
           setLayoutPendingState(false);
           setLayoutError(undefined);
           setLayoutStatus(undefined);
           setLayoutCommitKey((current) => current + 1);
+          if (latestSpatialRules.current === undefined) {
+            commitFinalGeometry(finalGeometryGenerationRef.current, positions);
+          }
         })
         .catch((error: unknown) => {
           if (!cancelled) callbacks.current.onFailure(errorMessage(error));
@@ -1652,8 +1945,9 @@ export function GlobalGraphCanvas({
               ? apply()
               : instrumentation.measure('layout-apply', undefined, apply)
             : apply();
-        await rendered;
+        const positions = await rendered;
         if (cancelled) return;
+        latestDisplayedPositions.current = positions;
         instrumentation?.record('global-layout-worker', result.computeMs);
         instrumentation?.record('folder-prior', result.folderPriorMs);
         cache.set(fingerprint, result.positions);
@@ -1661,6 +1955,9 @@ export function GlobalGraphCanvas({
         setLayoutPendingState(false);
         setLayoutStatus(undefined);
         setLayoutCommitKey((current) => current + 1);
+        if (latestSpatialRules.current === undefined) {
+          commitFinalGeometry(finalGeometryGenerationRef.current, positions);
+        }
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -1670,6 +1967,12 @@ export function GlobalGraphCanvas({
         setLayoutError(message);
         setLayoutStatus('The last valid All Network positions remain visible.');
         setLayoutCommitKey((current) => current + 1);
+        if (latestSpatialRules.current === undefined) {
+          commitFinalGeometry(
+            finalGeometryGenerationRef.current,
+            latestDisplayedPositions.current,
+          );
+        }
       });
     return () => {
       cancelled = true;
@@ -1677,6 +1980,7 @@ export function GlobalGraphCanvas({
   }, [
     cache,
     cancelArrangementPreview,
+    commitFinalGeometry,
     fingerprint,
     input,
     instrumentation,
@@ -1692,7 +1996,12 @@ export function GlobalGraphCanvas({
     if (!temporaryConstraintActive || session === undefined) {
       return;
     }
-    if (physicsService === undefined || !ready || layoutPendingState) {
+    if (
+      physicsService === undefined ||
+      !ready ||
+      layoutPendingState ||
+      !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+    ) {
       session.setTemporaryFileMoveContext({
         active: true,
         capability: {
@@ -1700,7 +2009,9 @@ export function GlobalGraphCanvas({
           reason:
             physicsService === undefined
               ? 'simulation-unavailable'
-              : 'simulation-not-running',
+              : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+                ? 'graph-too-large'
+                : 'simulation-not-running',
         },
         sessionGeneration: physicsSessionGeneration.current,
         simulationGeneration: 'unavailable',
@@ -1723,7 +2034,7 @@ export function GlobalGraphCanvas({
       attractors = [
         ...createGlobalSpatialInfluenceRequest(
           latestInput.current,
-          layoutSettings,
+          spatialInfluenceSettings,
           spatialInfluenceIterations(latestInput.current.nodes.length),
           basePositions,
           fingerprint,
@@ -1775,7 +2086,12 @@ export function GlobalGraphCanvas({
       fixedTranslationByNodeKey,
     });
     return () => {
-      session.setTemporaryFileMoveContext(undefined, 'layout-changed');
+      session.setTemporaryFileMoveContext(
+        undefined,
+        latestTemporaryConstraintActive.current
+          ? 'layout-changed'
+          : 'mode-exit',
+      );
       physicsService.invalidate('layout-changed');
       physicsFixedTranslationByNodeKey.current = new Map();
     };
@@ -1784,18 +2100,24 @@ export function GlobalGraphCanvas({
     layoutCommitKey,
     layoutPendingState,
     layoutSettings,
+    physicsNodeCount,
     physicsServiceFactory,
     ready,
     requestTemplate,
     spatialCommitKey,
     spatialOverrides,
     spatialRules,
+    spatialInfluenceSettings,
     temporaryConstraintActive,
+    temporaryConstraintRetryKey,
   ]);
 
   useEffect(() => {
+    const geometryReady =
+      committedFinalGeometryGeneration === finalGeometryGeneration;
     if (
       !shouldApplyGlobalViewportRequest({
+        geometryReady,
         handledKey: handledCenterRequest.current,
         layoutPending: layoutPending.current,
         ready,
@@ -1805,18 +2127,45 @@ export function GlobalGraphCanvas({
     ) {
       return;
     }
-    handledCenterRequest.current = centerRequest.key;
-    void sessionRef.current?.center(centerRequest).catch((error: unknown) => {
-      setLayoutError(`Could not center Global: ${errorMessage(error)}`);
-    });
-  }, [centerRequest, layoutCommitKey, ready]);
+    const session = sessionRef.current;
+    if (session === undefined) return;
+    let cancelled = false;
+    const request = centerRequest;
+    void session
+      .center(request)
+      .then(() => {
+        if (
+          cancelled ||
+          finalGeometryGenerationRef.current !== finalGeometryGeneration
+        ) {
+          return;
+        }
+        handledCenterRequest.current = request.key;
+        callbacks.current.onCenterRequestConsumed?.(request.key);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        handledCenterRequest.current = request.key;
+        callbacks.current.onCenterRequestConsumed?.(request.key);
+        setLayoutError(`Could not center Global: ${errorMessage(error)}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    centerRequest,
+    committedFinalGeometryGeneration,
+    finalGeometryGeneration,
+    layoutCommitKey,
+    ready,
+  ]);
 
   useEffect(() => {
-    const spatialViewportReady =
-      spatialRules === undefined || spatialCommitKey > 0;
+    const geometryReady =
+      committedFinalGeometryGeneration === finalGeometryGeneration;
     if (
-      !spatialViewportReady ||
       !shouldApplyGlobalViewportRequest({
+        geometryReady,
         handledKey: handledFitRequest.current,
         layoutPending: layoutPending.current,
         ready,
@@ -1826,12 +2175,29 @@ export function GlobalGraphCanvas({
       return;
     }
     handledFitRequest.current = fitRequestKey;
-    sessionRef.current?.fit();
-  }, [fitRequestKey, layoutCommitKey, ready, spatialCommitKey, spatialRules]);
+    const automaticRequestSuperseded =
+      automaticFitRequestKey === fitRequestKey &&
+      userCameraIntentGeneration.current > 0;
+    if (!automaticRequestSuperseded) sessionRef.current?.fit();
+    callbacks.current.onFitRequestConsumed?.(fitRequestKey);
+  }, [
+    automaticFitRequestKey,
+    committedFinalGeometryGeneration,
+    finalGeometryGeneration,
+    fitRequestKey,
+    layoutCommitKey,
+    ready,
+  ]);
 
   const zoomIn = useCallback(() => sessionRef.current?.zoomBy(0.82), []);
   const zoomOut = useCallback(() => sessionRef.current?.zoomBy(1.22), []);
-  const fit = useCallback(() => sessionRef.current?.fit(), []);
+  const fit = useCallback(() => {
+    if (callbacks.current.onFitRequested !== undefined) {
+      callbacks.current.onFitRequested();
+      return;
+    }
+    sessionRef.current?.fit();
+  }, []);
   const activeArrangementFolderKey = folderArrangement?.activeFolderKey;
 
   const nudgeActiveFolder = useCallback(
@@ -2180,6 +2546,7 @@ export function GlobalGraphCanvas({
     <div
       className={`global-graph-canvas${folderArrangement?.active === true ? ' global-graph-canvas--arranging' : ''}`}
       data-arrangement-phase={arrangementGesturePhase}
+      data-initial-presentation={initialPresentationReady ? 'ready' : 'pending'}
     >
       <div
         aria-hidden="true"
@@ -2217,52 +2584,45 @@ export function GlobalGraphCanvas({
         <GlobalGraphEmptyState />
       ) : (
         <>
-          <div
-            aria-label="All Network canvas controls"
-            className="global-graph-canvas__controls"
-            role="group"
-          >
-            <button aria-label="Zoom in" onClick={zoomIn} type="button">
-              +
-            </button>
-            <button aria-label="Zoom out" onClick={zoomOut} type="button">
-              −
-            </button>
-            <button onClick={fit} type="button">
-              Fit
-            </button>
-            {folderArrangement === undefined ? null : (
-              <>
+          <NetworkViewportControls
+            label="All Network viewport controls"
+            maximized={maximized}
+            onFit={fit}
+            onMaximizedChange={onMaximizedChange}
+            onZoomIn={zoomIn}
+            onZoomOut={zoomOut}
+          />
+          {folderArrangement === undefined ? null : (
+            <div className="global-graph-canvas__arrangement-tools">
+              <button
+                aria-label="Arrange folders"
+                aria-pressed={folderArrangement.active}
+                disabled={!folderArrangement.active && !arrangementAvailable}
+                onClick={() => {
+                  if (folderArrangement.active) finishArrangement();
+                  else folderArrangement.onActiveChange(true);
+                }}
+                title={
+                  folderArrangement.active
+                    ? 'Done arranging folders'
+                    : (arrangementUnavailableReason ?? 'Arrange folders')
+                }
+                type="button"
+              >
+                {folderArrangement.active ? 'Done' : 'Arrange folders'}
+              </button>
+              {folderArrangement.canRecoverCorrupt === true &&
+              !folderArrangement.active ? (
                 <button
-                  aria-label="Arrange folders"
-                  aria-pressed={folderArrangement.active}
-                  disabled={!folderArrangement.active && !arrangementAvailable}
-                  onClick={() => {
-                    if (folderArrangement.active) finishArrangement();
-                    else folderArrangement.onActiveChange(true);
-                  }}
-                  title={
-                    folderArrangement.active
-                      ? 'Done arranging folders'
-                      : (arrangementUnavailableReason ?? 'Arrange folders')
-                  }
+                  onClick={recoverCorruptArrangement}
+                  title="Clear invalid saved folder positions"
                   type="button"
                 >
-                  {folderArrangement.active ? 'Done' : 'Arrange folders'}
+                  Recover positions
                 </button>
-                {folderArrangement.canRecoverCorrupt === true &&
-                !folderArrangement.active ? (
-                  <button
-                    onClick={recoverCorruptArrangement}
-                    title="Clear invalid saved folder positions"
-                    type="button"
-                  >
-                    Recover positions
-                  </button>
-                ) : null}
-              </>
-            )}
-          </div>
+              ) : null}
+            </div>
+          )}
           {layoutStatus === undefined ? null : (
             <p
               className="global-graph-canvas__status"

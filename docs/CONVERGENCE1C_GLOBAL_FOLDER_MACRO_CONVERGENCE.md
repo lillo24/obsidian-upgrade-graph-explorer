@@ -70,13 +70,16 @@ partial display.
 
 ## Worker, cache, and composition
 
-Global request/result/failure schema 2 carries convergence and macro versions,
+Global request/result/failure schema 3 carries convergence and macro versions,
 lifecycle counters, stop reason, final movement evidence, and timings. The
-client validates the complete response against the originating request.
-`global-layout-v2` fingerprints include topology, edge weights, resolved
-physics, the full policy, and macro identity. They exclude warm coordinates,
-visual-only settings, camera/density state, timings, dynamic Pull, and fixed
-Place. Old fixed-budget cache keys therefore cannot collide.
+request's settings are restricted to folder clustering, folder cohesion,
+reference link force, within-folder spacing, and between-folder spacing; its
+nodes carry no display radius. The client validates the complete response
+against the originating request. `global-layout-v3` fingerprints include
+topology, edge weights, resolved physics, the full policy, and macro identity.
+They exclude warm coordinates, visual-only settings, camera/density state,
+timings, dynamic Pull, and fixed Place. Older cache keys therefore cannot
+collide.
 
 Exact hits still restore settled base coordinates without a worker. Explicit
 Re-layout evicts the exact key and warm-starts from current base automatic

@@ -25,12 +25,13 @@ canonical truth, or own a platform storage implementation.
   lost. Exact in-memory layout coordinates and saved semantic viewports remain
   available for within-session mode/history restoration. The app marks each
   fresh source-session mount as `initialViewport="fit"`, so startup, report
-  upload, vault open, and sample restoration issue one Fit after authoritative
-  layout and spatial-rule adoption instead of reopening onto a stale camera.
+  upload, vault open, and sample restoration issue one fit-all after the latest
+  authoritative layout and spatial-rule generation instead of reopening onto a
+  stale camera. Manual navigation cancels that automatic request.
   Live revisions do not remount the source session and therefore do not refit.
-  Local hop/direction changes preserve that camera. Transition anchors and Local
-  Fit requests are consumed once, preventing remount or Back/Forward from
-  replaying stale camera work.
+  Local hop/direction changes preserve that camera. Global/Local Network Center
+  and Fit requests are consumed once, preventing remount or Back/Forward from
+  replaying stale camera work; newer Center and Fit intents supersede older ones.
   Graphology, worker positions, and transition points are never persisted.
   SPATIAL1 also owns the independent workspace spatial-override session and
   passes its resolved map only to All Network. SPATIAL2B expands the web-owned
@@ -39,6 +40,10 @@ canonical truth, or own a platform storage implementation.
   separately annotates current query visibility, and passes that tree to the
   editor without adding folder entities to KG6. Per-pointer gesture state remains
   inside Sigma.
+  MOVE1B also owns the transient Network editing shell, renderer capability and
+  lifecycle transitions, explicit retry, and the single keyboard Move target.
+  It passes only an active flag/retry generation and coarse callbacks to the
+  mounted Network canvas; physics frames and pointer samples never enter React.
   GLOBALVIS1 compares the canonical resolved physics subset before incrementing
   the explicit All Network layout generation. Visual-only preference edits are
   still saved immediately but reach only Sigma's presentation refresh path;
@@ -76,6 +81,10 @@ canonical truth, or own a platform storage implementation.
   focused-root text, and explained disabled Focus state. `../exploration-model.ts`
   owns the pure four-way mapping to existing internal modes plus the hierarchy
   density decision: All uses `compact-schematic`, Focus uses `extended`.
+- `NetworkEditingControls.tsx` exposes Arrange Folders directly in All Network
+  and its Done/saved-rule meaning only while active. Focus renders this surface
+  only for actionable movement status or recovery. File dragging has no toolbar
+  mode; GraphExplorer owns Arrange arbitration and cancellation order.
 - `StructureDepthControl.tsx` owns the labeled Hierarchy depth select and
   compact Custom override indicator, and
   `structure-depth-selection.ts` maps its four options onto the existing
@@ -167,11 +176,17 @@ canonical truth, or own a platform storage implementation.
   Its narrow document-activation callback sends Global double-click through the
   same `GraphExplorer` Focus/history/transition-anchor path as Inspector;
   Sigma default double-click zoom is already consumed inside the renderer.
+  Fresh-source seeds remain internal until the current layout and spatial
+  generation commits its final normalization frame and Fit All render. The view
+  receives the app shell's existing maximize/restore owner; it does not keep a
+  second maximize state.
 - `LocalGraphView.tsx` owns the separate Local Free worker client and bounded
   page-lifetime layout cache. An exact hit warms the first canvas draw; otherwise
-  it mounts deterministic seed geometry immediately, then adopts only the latest
-  refinement. Its mount boundary reports an invalid renderer input without
-  unmounting the application shell.
+  it mounts deterministic seed geometry internally, then reveals only after the
+  accepted layout owns Sigma normalization and startup Fit. Its mount boundary
+  reports an invalid renderer input without unmounting the application shell.
+  All and Focus Network render the same Sigma-owned icon viewport cluster; the
+  separate Arrange Folders tool remains Global-only.
 - `LocalStructuredGraphView.tsx` owns the lazy React Flow Local schematic,
   caller-owned W3 service, bounded exact memory cache, semantic Structured zoom
   adapter, and explicit mount-failure boundary. It reuses `GraphCanvas` rather
@@ -213,7 +228,11 @@ canonical truth, or own a platform storage implementation.
   remains in accessible names and node tooltips, without a secondary text line.
   Every projected node exposes one shared Actions surface for Focus, Inspect,
   and supported Hide behavior. Canonical Files add Size and show their custom
-  multiplier when set. Button, right-click, and keyboard invocation share one
+  multiplier when set. MOVE1B also adds Move File only for canonical Files.
+  Its one relocated controller above the virtual tree uses 8 px Arrow nudges,
+  32 px Shift+Arrow nudges, release-and-settle, and cancel; it never creates a
+  hidden editor per row or issues a semantic center request. Button, right-click,
+  and keyboard invocation share one
   logical action target. Opening Size or changing its value never selects or
   centers the node.
 - `GraphQueryEditor.tsx` is the controlled QUERY1 presentation reused in Network

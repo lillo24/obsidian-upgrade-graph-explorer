@@ -354,6 +354,43 @@ h2 {
   opacity: 0.52;
 }
 
+.network-editing-controls {
+  flex: 0 1 auto;
+}
+
+.network-editing-controls--active {
+  padding: 0.2rem;
+  border: 1px solid #b7c8cf;
+  border-radius: 0.55rem;
+  background: #eaf1f3;
+}
+
+.network-editing-controls__meaning,
+.network-editing-controls__status {
+  max-width: 15rem;
+  color: #49636e;
+  font-size: 0.68rem;
+  line-height: 1.25;
+}
+
+.network-editing-controls__status {
+  color: #175f70;
+  font-weight: 800;
+}
+
+.network-editing-controls__failure {
+  display: inline-flex;
+  min-width: 0;
+  gap: 0.35rem;
+  align-items: center;
+  color: #8a2f2f;
+}
+
+.network-editing-controls__failure small {
+  max-width: 14rem;
+  line-height: 1.25;
+}
+
 .control-group--workspace {
   margin-left: auto;
 }
@@ -1148,6 +1185,60 @@ h2 {
 .network-explorer__root-arrangement > span:first-child {
   flex: 1;
   font-weight: 700;
+}
+
+.network-explorer__file-move {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.55rem 0.75rem;
+  border-top: 1px solid #e3e9ec;
+  border-bottom: 1px solid #d6e2e6;
+  background: #eef6f7;
+  color: #244d5a;
+}
+
+.network-explorer__file-move:focus-visible {
+  outline: 3px solid rgb(40 120 141 / 35%);
+  outline-offset: -3px;
+}
+
+.network-explorer__file-move > strong {
+  overflow: hidden;
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.network-explorer__file-move > small {
+  color: #526b75;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.network-explorer__file-move > [role='group'],
+.network-explorer__file-move-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.network-explorer__file-move button {
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #91abb4;
+  border-radius: 0.4rem;
+  background: #fff;
+  color: #1d5363;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.network-explorer__file-move button:hover,
+.network-explorer__file-move button:focus-visible {
+  border-color: #1c5267;
+  background: #deedef;
 }
 
 .network-explorer__arrange-folder {

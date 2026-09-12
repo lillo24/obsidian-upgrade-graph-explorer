@@ -163,7 +163,7 @@ describe('All Network density camera ownership', () => {
     session.destroy();
   });
 
-  it('preserves a user-owned camera through confirmed geometry and lets Fit reclaim it', async () => {
+  it('preserves a user-owned camera through geometry and keeps Fit distinct from density', async () => {
     const input = rendererInput();
     const { session, renderer } = mount(
       { initialAcceptedPositions: basePositions },
@@ -192,12 +192,13 @@ describe('All Network density camera ownership', () => {
       8,
     );
     const changedDecision = resolveGlobalDensityFit(changedInput, changed);
+    expect(changedDecision.ratio).not.toBe(1);
     session.fit();
     expect(renderer.camera).toMatchObject({
       x: 0.5,
       y: 0.5,
       angle: 0,
-      ratio: changedDecision.ratio,
+      ratio: 1,
     });
     session.updateDensityFramingStrength(0);
     session.fit();

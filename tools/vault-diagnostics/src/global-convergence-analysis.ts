@@ -8,6 +8,7 @@ import {
   createGlobalFolderMacroPolicy,
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
   deterministicGlobalPosition,
+  resolveGlobalPhysicsSettings,
 } from '@icarus-graph-explorer/renderer-sigma/core';
 import type {
   GlobalLayoutEdge,
@@ -146,16 +147,15 @@ function overlaySvg(
 
 function productionBenchmarks() {
   return [100, 500, 1_000, 5_000, 5_001].map((nodeCount) => {
-    const settings = {
+    const settings = resolveGlobalPhysicsSettings({
       ...DEFAULT_GLOBAL_LAYOUT_SETTINGS,
       folderClustering: true,
-    };
+    });
     const nodes: GlobalLayoutNode[] = Array.from(
       { length: nodeCount },
       (_, index) => ({
         key: `benchmark-node-${index}`,
         ...deterministicGlobalPosition(`benchmark-node-${index}`),
-        size: 4.5,
         folderKey: `synthetic/folder-${Math.floor(index / 50)}`,
       }),
     );
@@ -170,7 +170,7 @@ function productionBenchmarks() {
     );
     const macro = createGlobalFolderMacroPolicy(nodes, settings);
     const request: GlobalLayoutRequest = {
-      schemaVersion: 2,
+      schemaVersion: 3,
       requestId: 1,
       algorithm: macro.algorithm,
       policy: createGlobalConvergencePolicy(nodeCount),

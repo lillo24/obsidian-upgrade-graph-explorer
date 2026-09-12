@@ -35,6 +35,7 @@ import { NodeSizeControl } from './NodeSizeControl';
 import { NetworkExplorerHiddenItems } from './NetworkExplorerHiddenItems';
 import { SavedQueriesPopover } from './SavedQueriesPopover';
 import type { SavedGraphQueriesState } from './SavedGraphQueries';
+import { networkFileMoveKeyboardAction } from '../network-editing';
 
 import {
   flattenNetworkExplorerRows,
@@ -63,8 +64,20 @@ export interface NetworkExplorerArrangementProps {
   readonly onRemoveFolderRule?: (folderKey: WorkspaceFolderKey) => void;
 }
 
+export interface NetworkExplorerFileMoveProps {
+  readonly activeNodeId?: ProjectionNodeId;
+  readonly available: boolean;
+  readonly unavailableReason?: string;
+  readonly onCancel: () => void;
+  readonly onNudge: (x: number, y: number) => void;
+  readonly onRelease: () => void;
+  readonly onStart: (nodeId: ProjectionNodeId) => void;
+  readonly onTargetUnavailable: () => void;
+}
+
 interface NetworkExplorerProps {
   readonly arrangement?: NetworkExplorerArrangementProps;
+  readonly fileMove?: NetworkExplorerFileMoveProps;
   readonly presentationOverrides: EntityPresentationOverrideMap;
   readonly sizePersistenceStatus: string;
   readonly sizeEditingDisabled: boolean;
@@ -137,6 +150,7 @@ function spatialRuleLabel(rule: FolderSpatialRule): string {
 
 export const NetworkExplorer = memo(function NetworkExplorer({
   arrangement,
+  fileMove,
   presentationOverrides,
   sizePersistenceStatus,
   sizeEditingDisabled,
@@ -178,6 +192,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef(new Map<string, HTMLElement>());
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const moveControllerRef = useRef<HTMLDivElement>(null);
   const [context, setContext] = useState<NetworkExplorerContext | null>(null);
   const [sizeError, setSizeError] = useState<string>();
   const hiddenPathSet = useMemo(() => new Set(hiddenPaths), [hiddenPaths]);
@@ -213,8 +228,22 @@ export const NetworkExplorer = memo(function NetworkExplorer({
             focusedSourcePath,
             hiddenPathSet,
             hiddenFolderKeySet,
+            fileMove === undefined
+              ? undefined
+              : {
+                  available: fileMove.available,
+                  ...(fileMove.unavailableReason === undefined
+                    ? {}
+                    : { reason: fileMove.unavailableReason }),
+                },
           ),
-    [contextTarget, focusedSourcePath, hiddenFolderKeySet, hiddenPathSet],
+    [
+      contextTarget,
+      fileMove,
+      focusedSourcePath,
+      hiddenFolderKeySet,
+      hiddenPathSet,
+    ],
   );
   const closeContextMenu = useCallback(
     (restoreFocus: boolean) => {
@@ -275,6 +304,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
       if (action === 'focus') onFocusNode(contextTarget.node.id);
       else if (action === 'inspect')
         onInspectNode(contextTarget.node.id, origin);
+      else if (action === 'move-file') fileMove?.onStart(contextTarget.node.id);
       else if (contextTarget.node.sourcePath !== undefined)
         onHideFile(contextTarget.node.sourcePath);
     },
@@ -282,6 +312,7 @@ export const NetworkExplorer = memo(function NetworkExplorer({
       closeContextMenu,
       context,
       contextTarget,
+      fileMove,
       menuActions,
       onFocusNode,
       onHideFile,
@@ -289,6 +320,21 @@ export const NetworkExplorer = memo(function NetworkExplorer({
       onInspectNode,
     ],
   );
+
+  const activeMoveNode =
+    fileMove?.activeNodeId === undefined
+      ? undefined
+      : model.nodeById.get(fileMove.activeNodeId);
+  const activeMoveFile =
+    activeMoveNode?.kindLabel === 'File' ? activeMoveNode : undefined;
+  useEffect(() => {
+    if (fileMove?.activeNodeId === undefined) return;
+    if (activeMoveFile === undefined) {
+      fileMove.onTargetUnavailable();
+      return;
+    }
+    moveControllerRef.current?.focus({ preventScroll: true });
+  }, [activeMoveFile, fileMove]);
 
   const activeIndex =
     activeRowId === undefined ? 0 : (rowIndexById.get(activeRowId) ?? 0);
@@ -541,6 +587,81 @@ export const NetworkExplorer = memo(function NetworkExplorer({
             onRestoreFile={onRestoreFile}
             onRestoreFolder={onRestoreFolder}
           />
+        )}
+        {fileMove === undefined || activeMoveFile === undefined ? null : (
+          <div
+            aria-label={`Move File ${activeMoveFile.name}`}
+            className="network-explorer__file-move"
+            data-network-editing-escape="handled"
+            onKeyDown={(event) => {
+              const action = networkFileMoveKeyboardAction(event);
+              if (action.kind === 'nudge') {
+                event.preventDefault();
+                event.stopPropagation();
+                fileMove.onNudge(action.x, action.y);
+                return;
+              }
+              if (
+                action.kind === 'release' &&
+                event.target === event.currentTarget
+              ) {
+                event.preventDefault();
+                event.stopPropagation();
+                fileMove.onRelease();
+              } else if (action.kind === 'cancel') {
+                event.preventDefault();
+                event.stopPropagation();
+                fileMove.onCancel();
+              }
+            }}
+            ref={moveControllerRef}
+            role="group"
+            tabIndex={0}
+          >
+            <strong>{activeMoveFile.name}</strong>
+            <small>
+              Arrow keys move 8 px; hold Shift for 32 px. Release settles and
+              does not save a position.
+            </small>
+            <div aria-label="Move File direction" role="group">
+              <button
+                aria-label="Move File left"
+                onClick={() => fileMove.onNudge(-8, 0)}
+                type="button"
+              >
+                ←
+              </button>
+              <button
+                aria-label="Move File up"
+                onClick={() => fileMove.onNudge(0, -8)}
+                type="button"
+              >
+                ↑
+              </button>
+              <button
+                aria-label="Move File down"
+                onClick={() => fileMove.onNudge(0, 8)}
+                type="button"
+              >
+                ↓
+              </button>
+              <button
+                aria-label="Move File right"
+                onClick={() => fileMove.onNudge(8, 0)}
+                type="button"
+              >
+                →
+              </button>
+            </div>
+            <div className="network-explorer__file-move-actions">
+              <button onClick={fileMove.onRelease} type="button">
+                Release &amp; settle
+              </button>
+              <button onClick={fileMove.onCancel} type="button">
+                Cancel
+              </button>
+            </div>
+          </div>
         )}
         {arrangement === undefined ? null : (
           <div className="network-explorer__root-arrangement">

@@ -25,8 +25,10 @@ function graphScale(graph: PullGraph): number {
 }
 
 /**
- * Applies one physical-iteration share of the existing four-iteration Pull
- * quantum. Publish frequency therefore cannot change Pull strength.
+ * Applies one physical-iteration share of the PHYSICS1 four-iteration Pull
+ * reference quantum. Publish frequency therefore cannot change Pull strength;
+ * numerical identity with the static five-iteration correction cadence is not
+ * implied.
  */
 export function applyNetworkPhysicsPullIteration(
   graph: PullGraph,

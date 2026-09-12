@@ -206,6 +206,49 @@ export function resolveGlobalPhysicsSettings(
   };
 }
 
+/** Strict clone-safe validator for the finite layout worker's spatial input. */
+export function validateGlobalPhysicsSettings(
+  value: unknown,
+): ResolvedGlobalPhysicsSettings {
+  if (!isPlainRecord(value)) {
+    throw new Error('Global physics settings must be a plain object.');
+  }
+  const keys = [
+    'folderClustering',
+    'folderCohesion',
+    'linkForce',
+    'withinFolderSpacing',
+    'betweenFolderSpacing',
+  ] as const satisfies readonly (keyof ResolvedGlobalPhysicsSettings)[];
+  const allowed = new Set<string>(keys);
+  const unexpected = Object.keys(value).find((key) => !allowed.has(key));
+  if (unexpected !== undefined) {
+    throw new Error(
+      `Global physics settings contain unexpected field ${unexpected}.`,
+    );
+  }
+  const missing = keys.find((key) => !Object.hasOwn(value, key));
+  if (missing !== undefined) {
+    throw new Error(`Global physics setting ${missing} is required.`);
+  }
+  if (typeof value.folderClustering !== 'boolean') {
+    throw new Error('Global physics setting folderClustering must be boolean.');
+  }
+  return {
+    folderClustering: value.folderClustering,
+    folderCohesion: boundedNumber(value.folderCohesion, 'folderCohesion'),
+    linkForce: boundedNumber(value.linkForce, 'linkForce'),
+    withinFolderSpacing: boundedNumber(
+      value.withinFolderSpacing,
+      'withinFolderSpacing',
+    ),
+    betweenFolderSpacing: boundedNumber(
+      value.betweenFolderSpacing,
+      'betweenFolderSpacing',
+    ),
+  };
+}
+
 /** Canonical runtime boundary for values that affect Sigma presentation only. */
 export function resolveGlobalVisualSettings(
   settings: GlobalLayoutSettings,
@@ -265,8 +308,8 @@ export function sameGlobalVisualSettings(
 }
 
 /**
- * Adapts the physics subset to the existing schema-v1 worker protocol. Visual
- * fields use a fixed baseline because current ForceAtlas2 runs with
+ * Adapts the physics subset to the legacy schema-v1 soft-attractor protocol.
+ * Visual fields use a fixed baseline because current ForceAtlas2 runs with
  * `adjustSizes: false` and must not derive layout identity from presentation.
  */
 export function globalLayoutSettingsFromPhysics(

@@ -30,12 +30,17 @@ import {
 import {
   isAvailableTemporaryFileMoveContext,
   TemporaryFileMoveCoordinator,
+  type TemporaryFileMoveControllerStartResult,
   type TemporaryFileMoveSessionContext,
 } from './file-move';
 import type { TemporaryNodeConstraintEndReason } from './temporary-node-constraint';
 import { atomicAnchoredGraphMutation } from './anchored-refresh';
 import { NetworkPositionCameraIntentPolicy } from './network-camera-intent';
 import { networkPositionExtent } from './network-position-frame';
+import {
+  captureRawViewportFrame,
+  restoreRawViewportFrame,
+} from './raw-viewport-frame';
 
 import {
   buildGlobalGraph,
@@ -63,6 +68,7 @@ import {
 import {
   isCoarseWheelDelta,
   normalizeWheelDeltaPixels,
+  normalizeWheelPanDeltaPixels,
   preventSigmaWheelDefault,
   ratioAfterWheelDelta,
   WheelDirectionStabilizer,
@@ -147,6 +153,8 @@ export interface GlobalRendererSessionOptions {
   readonly onDensityQaDiagnosticsChange?: (
     diagnostics: GlobalDensityQaDiagnostics,
   ) => void;
+  /** Reports a manual or semantic camera claim so queued automatic Fit can yield. */
+  readonly onUserCameraIntent?: () => void;
 }
 
 export interface GlobalFolderArrangementContext {
@@ -228,6 +236,7 @@ export class GlobalRendererSession {
   private globalNodeStyleRefreshPending = false;
   private globalNodeIndexationPending = false;
   private globalEdgeStyleRefreshPending = false;
+  private globalVisualRefreshFrame: number | undefined;
   private destroyed = false;
   private nodeClicks: NodeClickArbitrator | undefined;
   private readonly wheelDirection = new WheelDirectionStabilizer();
@@ -242,8 +251,10 @@ export class GlobalRendererSession {
   private fileMoveContext: TemporaryFileMoveSessionContext | undefined;
   private fileMoveCoordinator: TemporaryFileMoveCoordinator | undefined;
   private fileMoveGestureSequence = 0;
+  private keyboardFileMoveViewportPoint: SpatialPoint | undefined;
   private suppressFileMoveDoubleClick = false;
   private fileMoveLifecycleAttached = false;
+  private readonly container?: HTMLElement;
 
   private readonly fileMoveKeyDownHandler = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') this.cancelTemporaryFileMove('cancelled');
@@ -265,14 +276,12 @@ export class GlobalRendererSession {
 
   private readonly mouseDragHandler = (): void => {
     if (this.renderer.getMouseCaptor().isMouseDown) {
-      this.cameraOwnership = 'user';
-      this.positionCameraIntent.claimCamera();
+      this.claimUserCamera();
     }
   };
 
   private readonly touchMoveHandler = (): void => {
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
   };
 
   private readonly cameraUpdatedHandler = (): void => {
@@ -313,8 +322,7 @@ export class GlobalRendererSession {
     }
     const original = coordinates.original as WheelEvent;
     preventSigmaWheelDefault(coordinates);
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     const deltaPixels = normalizeWheelDeltaPixels(
       original,
       this.renderer.getDimensions().height,
@@ -352,6 +360,7 @@ export class GlobalRendererSession {
     input: GlobalRendererInput,
     options: GlobalRendererSessionOptions,
   ) {
+    this.container = container;
     this.options = options;
     this.settings = resolveGlobalLayoutSettings(options.settings);
     this.visualSettings = resolveGlobalVisualSettings(options.settings);
@@ -452,16 +461,23 @@ export class GlobalRendererSession {
   private applyWheelPan(event: WheelEvent): void {
     const dimensions = this.renderer.getDimensions();
     const center = { x: dimensions.width / 2, y: dimensions.height / 2 };
-    const before = this.renderer.viewportToGraph(center);
-    const after = this.renderer.viewportToGraph({
-      x: center.x + event.deltaX,
-      y: center.y + event.deltaY,
+    const delta = normalizeWheelPanDeltaPixels(event, dimensions);
+    const before = this.renderer.viewportToFramedGraph(center);
+    const after = this.renderer.viewportToFramedGraph({
+      x: center.x + delta.x,
+      y: center.y + delta.y,
     });
     const camera = this.renderer.getCamera();
     camera.setState({
       x: camera.x + before.x - after.x,
       y: camera.y + before.y - after.y,
     });
+  }
+
+  private claimUserCamera(): void {
+    this.cameraOwnership = 'user';
+    this.positionCameraIntent.claimCamera();
+    this.options.onUserCameraIntent?.();
   }
 
   private reduceNode(key: string, attributes: GlobalNodeAttributes) {
@@ -740,6 +756,22 @@ export class GlobalRendererSession {
     );
   }
 
+  private updateTemporaryFileMoveCursor(): void {
+    const eligibleHover =
+      this.hoveredNode !== undefined &&
+      this.fileMoveContext?.active === true &&
+      this.fileMoveContext.capability.status === 'available' &&
+      this.eligibleFileMoveNode(this.hoveredNode);
+    this.container?.setAttribute(
+      'data-file-move-cursor',
+      this.fileMoveCoordinator?.ownsPointerSequence === true
+        ? 'grabbing'
+        : eligibleHover
+          ? 'grab'
+          : 'idle',
+    );
+  }
+
   private beginTemporaryFileMove(key: string, point: SpatialPoint): void {
     const context = this.fileMoveContext;
     if (context?.active !== true || !this.eligibleFileMoveNode(key)) return;
@@ -757,6 +789,7 @@ export class GlobalRendererSession {
       startGraphPoint: graphPoint,
       displayedNodePoint: { x: attributes.x, y: attributes.y },
     });
+    this.updateTemporaryFileMoveCursor();
   }
 
   private moveTemporaryFileMove(
@@ -777,12 +810,62 @@ export class GlobalRendererSession {
       this.nodeClicks?.cancel();
       this.suppressFileMoveDoubleClick = true;
     }
+    this.keyboardFileMoveViewportPoint = undefined;
+    this.updateTemporaryFileMoveCursor();
   }
 
-  private cancelTemporaryFileMove(
+  cancelTemporaryFileMove(
     reason: Exclude<TemporaryNodeConstraintEndReason, 'released'>,
   ): boolean {
-    return this.fileMoveCoordinator?.cancel(reason) ?? false;
+    const cancelled = this.fileMoveCoordinator?.cancel(reason) ?? false;
+    this.keyboardFileMoveViewportPoint = undefined;
+    this.updateTemporaryFileMoveCursor();
+    return cancelled;
+  }
+
+  startKeyboardTemporaryFileMove(
+    nodeKey: string,
+  ): TemporaryFileMoveControllerStartResult {
+    if (
+      this.fileMoveContext?.active !== true ||
+      this.fileMoveContext.capability.status !== 'available'
+    ) {
+      return { status: 'unavailable', reason: 'simulation-unavailable' };
+    }
+    if (!this.eligibleFileMoveNode(nodeKey)) {
+      return { status: 'unavailable', reason: 'node-unavailable' };
+    }
+    const point = this.nodeViewportPoint(nodeKey);
+    if (point === undefined) {
+      return { status: 'unavailable', reason: 'node-unavailable' };
+    }
+    this.cancelTemporaryFileMove('cancelled');
+    this.beginTemporaryFileMove(nodeKey, point);
+    if (this.fileMoveCoordinator?.ownsPointerSequence !== true) {
+      return { status: 'unavailable', reason: 'simulation-unavailable' };
+    }
+    this.keyboardFileMoveViewportPoint = point;
+    this.updateTemporaryFileMoveCursor();
+    return { status: 'started' };
+  }
+
+  nudgeKeyboardTemporaryFileMove(delta: SpatialPoint): boolean {
+    const point = this.keyboardFileMoveViewportPoint;
+    const coordinator = this.fileMoveCoordinator;
+    if (point === undefined || coordinator?.ownsPointerSequence !== true) {
+      return false;
+    }
+    const next = { x: point.x + delta.x, y: point.y + delta.y };
+    this.keyboardFileMoveViewportPoint = next;
+    coordinator.move(next, this.viewportToGraphPoint(next));
+    this.updateTemporaryFileMoveCursor();
+    return true;
+  }
+
+  releaseKeyboardTemporaryFileMove(): boolean {
+    if (this.keyboardFileMoveViewportPoint === undefined) return false;
+    this.finishTemporaryFileMove();
+    return true;
   }
 
   private attachFileMoveLifecycle(): void {
@@ -830,6 +913,7 @@ export class GlobalRendererSession {
       this.options.onNodeHovered?.(node);
       this.options.instrumentation?.count('global-hover-applications');
       this.refreshNodeStyles(previous, node);
+      this.updateTemporaryFileMoveCursor();
       this.options.instrumentation?.record(
         'global-hover',
         performance.now() - started,
@@ -844,6 +928,7 @@ export class GlobalRendererSession {
       this.options.instrumentation?.count('global-hover-applications');
       if (arrangementActive) this.refreshArrangementStyles();
       else this.refreshNodeStyles(previous);
+      this.updateTemporaryFileMoveCursor();
     });
     this.renderer.on('clickNode', ({ node }) => {
       if (this.fileMoveCoordinator?.consumeReleasedDragClick() === true) {
@@ -971,7 +1056,7 @@ export class GlobalRendererSession {
     }
   }
 
-  /** Temporary file movement seam; callers decide when an Edit/Move mode exists. */
+  /** Temporary File movement seam; callers suspend it for competing tools. */
   setTemporaryFileMoveContext(
     context: TemporaryFileMoveSessionContext | undefined,
     cancellationReason: Exclude<
@@ -983,7 +1068,9 @@ export class GlobalRendererSession {
     this.fileMoveCoordinator?.cancel(cancellationReason);
     this.fileMoveCoordinator = undefined;
     this.fileMoveContext = undefined;
+    this.keyboardFileMoveViewportPoint = undefined;
     this.suppressFileMoveDoubleClick = false;
+    this.updateTemporaryFileMoveCursor();
     if (context === undefined) return;
     if (this.arrangementContext?.active === true) {
       this.setFolderArrangementContext(undefined);
@@ -1001,6 +1088,7 @@ export class GlobalRendererSession {
       });
     }
     this.attachFileMoveLifecycle();
+    this.updateTemporaryFileMoveCursor();
   }
 
   currentFolderAnchor(folderKey: string): NormalizedFolderAnchor | undefined {
@@ -1023,8 +1111,7 @@ export class GlobalRendererSession {
     }
     // Pointer and keyboard arrangement are explicit navigation. Confirmed
     // geometry may update density later, but it must not steal this viewport.
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     const geometry = this.folderPreviewGeometry(folderKey);
     const preview = previewFolderClusterAtAnchor({
       geometry,
@@ -1079,8 +1166,7 @@ export class GlobalRendererSession {
     if (context?.active !== true) {
       throw new Error('Arrange folders is not active.');
     }
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     const frame = computeAutomaticGraphFrame(
       context.automaticPositions,
       globalFolderKeyByNodeKey(context.input).keys(),
@@ -1225,7 +1311,7 @@ export class GlobalRendererSession {
     this.globalNodeStyleRefreshPending ||= nodeSizeChanged || labelChanged;
     this.globalNodeIndexationPending ||= nodeSizeChanged;
     this.globalEdgeStyleRefreshPending ||= edgeSizeChanged;
-    if (this.topologyRefreshPending === undefined) this.refreshPendingStyles();
+    this.scheduleGlobalVisualRefresh();
   }
 
   updateTrackpadZoomMode(mode: GlobalTrackpadZoomMode): void {
@@ -1239,8 +1325,7 @@ export class GlobalRendererSession {
     const anchor =
       anchorKey === undefined ? undefined : this.nodeViewportPoint(anchorKey);
     this.densityFramingStrength = strengthPercentage;
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     const ratio = this.effectiveDensityRatio();
     if (anchorKey === undefined || anchor === undefined) {
       this.renderer.getCamera().setState({ ratio });
@@ -1288,12 +1373,19 @@ export class GlobalRendererSession {
     const edges = this.globalEdgeStyleRefreshPending ? this.graph.edges() : [];
     const needsNodeIndexation =
       this.globalNodeIndexationPending || sizeKeys.length > 0;
+    const globalVisualRefresh =
+      this.globalNodeStyleRefreshPending ||
+      this.globalNodeIndexationPending ||
+      this.globalEdgeStyleRefreshPending;
     this.visualStyleRefreshPending = false;
     this.globalNodeStyleRefreshPending = false;
     this.globalNodeIndexationPending = false;
     this.globalEdgeStyleRefreshPending = false;
     this.sizeStyleRefreshPending = undefined;
     if (nodes.length === 0 && edges.length === 0) return;
+    if (globalVisualRefresh) {
+      this.options.instrumentation?.count('global-visual-refreshes');
+    }
     // Sigma 3.0.3 refresh reruns only these reducers. Radius changes must also
     // process label/program/picking indices (skipIndexation=false), but never
     // submit a layout or change Graphology coordinates. Color-only stays fast.
@@ -1304,6 +1396,22 @@ export class GlobalRendererSession {
       },
       skipIndexation: !needsNodeIndexation,
       schedule: true,
+    });
+  }
+
+  private scheduleGlobalVisualRefresh(): void {
+    if (
+      this.destroyed ||
+      this.topologyRefreshPending !== undefined ||
+      this.globalVisualRefreshFrame !== undefined
+    ) {
+      return;
+    }
+    this.globalVisualRefreshFrame = requestAnimationFrame(() => {
+      this.globalVisualRefreshFrame = undefined;
+      if (this.topologyRefreshPending === undefined) {
+        this.refreshPendingStyles();
+      }
     });
   }
 
@@ -1446,6 +1554,22 @@ export class GlobalRendererSession {
     return this.measureNextRender(
       enabled ? 'edge-events-on' : 'edge-events-off',
       () => this.renderer.setSetting('enableEdgeEvents', enabled),
+    );
+  }
+
+  measureVisualSettings(
+    operation: string,
+    settings: GlobalLayoutSettings,
+  ): Promise<GlobalRendererMeasurement> {
+    const gapProbe = startRafGapProbe();
+    return this.measureNextRender(operation, () =>
+      this.updateSettings(settings),
+    ).then(
+      (measurement) => ({ ...measurement, highRafGapMs: gapProbe() }),
+      (error: unknown) => {
+        gapProbe();
+        throw error;
+      },
     );
   }
 
@@ -1629,6 +1753,49 @@ export class GlobalRendererSession {
     this.renderer.setCustomBBox(this.renderer.getBBox());
     this.positionFrameEstablished = true;
     this.renderer.refresh({ schedule: true });
+  }
+
+  /**
+   * Commits the exact final startup geometry as Sigma's normalization owner.
+   * Provisional seed/base frames may exist before this transaction, but the
+   * canvas is not revealed until the resulting render completes.
+   */
+  commitInitialPresentation(
+    positions: readonly GlobalLayoutPosition[],
+    fitAll: boolean,
+  ): Promise<void> {
+    const preservedViewport = fitAll
+      ? undefined
+      : captureRawViewportFrame(this.renderer);
+    return new Promise((resolve, reject) => {
+      const afterRender = (): void => {
+        this.renderer.off('afterRender', afterRender);
+        this.emitDensityQaDiagnostics();
+        resolve();
+      };
+      this.renderer.on('afterRender', afterRender);
+      try {
+        this.renderer.setCustomBBox(networkPositionExtent(positions));
+        this.positionFrameEstablished = true;
+        if (fitAll) {
+          this.cameraOwnership = 'auto';
+          this.positionCameraIntent.claimCamera();
+          this.semanticAnchorNodeKey = undefined;
+          this.renderer.getCamera().setState({
+            x: 0.5,
+            y: 0.5,
+            ratio: 1,
+            angle: 0,
+          });
+        } else if (preservedViewport !== undefined) {
+          restoreRawViewportFrame(this.renderer, preservedViewport);
+        }
+        this.renderer.refresh({ schedule: true });
+      } catch (error: unknown) {
+        this.renderer.off('afterRender', afterRender);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
   }
 
   private emitDensityQaDiagnostics(): void {
@@ -1896,8 +2063,7 @@ export class GlobalRendererSession {
     if (display === undefined) {
       throw new Error(`Cannot center missing Global node ${request.nodeId}.`);
     }
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     this.semanticAnchorNodeKey = request.nodeId;
     const started = performance.now();
     await this.renderer
@@ -1924,8 +2090,7 @@ export class GlobalRendererSession {
   }
 
   zoomBy(factor: number): void {
-    this.cameraOwnership = 'user';
-    this.positionCameraIntent.claimCamera();
+    this.claimUserCamera();
     const camera = this.renderer.getCamera();
     camera.animate(
       { ratio: Math.max(0.02, Math.min(6, camera.ratio * factor)) },
@@ -1942,7 +2107,7 @@ export class GlobalRendererSession {
       {
         x: 0.5,
         y: 0.5,
-        ratio: this.effectiveDensityRatio(),
+        ratio: 1,
         angle: 0,
       },
       { duration: preferredMotionDuration() },
@@ -2007,6 +2172,10 @@ export class GlobalRendererSession {
     }
     if (this.viewportObservationTimer !== undefined) {
       window.clearTimeout(this.viewportObservationTimer);
+    }
+    if (this.globalVisualRefreshFrame !== undefined) {
+      cancelAnimationFrame(this.globalVisualRefreshFrame);
+      this.globalVisualRefreshFrame = undefined;
     }
     this.renderer.kill();
   }

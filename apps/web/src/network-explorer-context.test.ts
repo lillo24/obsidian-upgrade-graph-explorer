@@ -226,6 +226,42 @@ describe('Network Explorer context contract', () => {
     }
   });
 
+  it('offers Move File only for canonical Files and explains unavailability', () => {
+    expect(
+      networkExplorerMenuActions(
+        nodeTarget(entity),
+        undefined,
+        new Set(),
+        new Set(),
+        { available: true },
+      ).map((action) => action.id),
+    ).toEqual(['focus', 'inspect', 'move-file', 'hide', 'size']);
+    expect(
+      networkExplorerMenuActions(
+        nodeTarget(entity),
+        undefined,
+        new Set(),
+        new Set(),
+        { available: false, reason: 'Waiting for Network layout…' },
+      ).find((action) => action.id === 'move-file'),
+    ).toEqual({
+      id: 'move-file',
+      label: 'Move File',
+      disabledReason: 'Waiting for Network layout…',
+    });
+    for (const kindLabel of ['Heading', 'Block', 'Diagnostic'] as const) {
+      expect(
+        networkExplorerMenuActions(
+          nodeTarget({ ...entity, kindLabel }),
+          undefined,
+          new Set(),
+          new Set(),
+          { available: true },
+        ).some((action) => action.id === 'move-file'),
+      ).toBe(false);
+    }
+  });
+
   it('keeps logical virtual targets and fails closed after row/projection removal', () => {
     const { folderRow, model, nodeRow } = fixture();
     const rows = [folderRow, nodeRow];
