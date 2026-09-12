@@ -47,6 +47,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@icarus-graph-explorer/argument-workspace':
+        specifier: workspace:*
+        version: link:../../packages/argument-workspace
       '@icarus-graph-explorer/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -159,6 +162,20 @@ importers:
         version: 24.13.3
 
   packages/ai-review: {}
+
+  packages/argument-workspace: {}
+
+  packages/argument-workspace-tauri:
+    dependencies:
+      '@icarus-graph-explorer/argument-workspace':
+        specifier: workspace:*
+        version: link:../argument-workspace
+      '@tauri-apps/api':
+        specifier: 2.11.1
+        version: 2.11.1
+      '@tauri-apps/plugin-fs':
+        specifier: 2.5.1
+        version: 2.5.1
 
   packages/core: {}
 

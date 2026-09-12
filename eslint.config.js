@@ -13,6 +13,7 @@ export default tseslint.config(
       '**/src-tauri/target/**',
       '.agents/**',
       '.codex/**',
+      '.private/**',
     ],
   },
   eslint.configs.recommended,
@@ -77,6 +78,74 @@ export default tseslint.config(
               ],
               message:
                 'Framework, renderer, platform, and source-specific imports are forbidden in core.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/argument-workspace/**/*.{ts,tsx}'],
+    ignores: [
+      'packages/argument-workspace/**/*.test.{ts,tsx}',
+      'packages/argument-workspace/**/test-fixture.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@icarus-graph-explorer/*',
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                '@xyflow/*',
+                '@tauri-apps/*',
+                '@react-sigma/*',
+                'sigma',
+                'sigma/*',
+                'graphology*',
+                'obsidian*',
+                '@obsidian/*',
+                'node:*',
+              ],
+              message:
+                'Argument Workspace core is source-neutral plain data; UI, graph, source, platform, agent, and filesystem dependencies belong outside.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/argument-workspace-tauri/**/*.{ts,tsx}'],
+    ignores: ['packages/argument-workspace-tauri/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@icarus-graph-explorer/*',
+                '!@icarus-graph-explorer/argument-workspace',
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                '@xyflow/*',
+                '@react-sigma/*',
+                'sigma*',
+                'graphology*',
+                'obsidian*',
+                '@obsidian/*',
+                'node:*',
+              ],
+              message:
+                'The Tauri Argument Library adapter may depend only on its source-neutral contract and Tauri platform APIs.',
             },
           ],
         },

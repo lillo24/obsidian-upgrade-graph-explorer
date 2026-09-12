@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@icarus-graph-explorer/argument-workspace": "workspace:*",
     "@icarus-graph-explorer/core": "workspace:*",
     "@icarus-graph-explorer/dagre-layout": "workspace:*",
     "@icarus-graph-explorer/diagnostics-obsidian": "workspace:*",
