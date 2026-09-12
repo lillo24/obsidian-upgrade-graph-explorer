@@ -466,6 +466,11 @@ transform, `0.02`–`6` camera bounds, and 120 ms semantic viewport observation
 remain unchanged. Wheel handling stays inside the imperative sessions and
 performs no React state, projection, Graphology, layout, or workspace work.
 
+Both sessions keep Sigma's currently eligible labels visible during camera
+movement. Panning therefore preserves the visible label set at a constant
+ratio, while zoom continues to change eligibility through the existing
+projected-size threshold, density, grid, and semantic-LOD rules.
+
 Sigma 3.0.3's default label and highlight drawing always extends to the right.
 Global replaces only that canvas drawing boundary: adaptive culling still
 chooses ordinary labels, while forced hover/selection labels can flip or clamp

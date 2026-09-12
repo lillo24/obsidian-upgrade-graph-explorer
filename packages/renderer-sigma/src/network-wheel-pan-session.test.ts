@@ -109,6 +109,24 @@ function pan(
   });
 }
 
+function zoom(renderer: SigmaTestRenderer, deltaY: number): void {
+  const wheel = renderer.captor.on.mock.calls.find(
+    ([event]) => event === 'wheel',
+  )?.[1] as ((coordinates: Record<string, unknown>) => void) | undefined;
+  expect(wheel).toBeDefined();
+  wheel?.({
+    x: 400,
+    y: 300,
+    original: {
+      ctrlKey: true,
+      deltaMode: 0,
+      deltaX: 0,
+      deltaY,
+    },
+    preventSigmaDefault: vi.fn(),
+  });
+}
+
 beforeEach(() => {
   SigmaTestRenderer.instances = [];
   vi.stubGlobal('window', {
@@ -124,6 +142,31 @@ afterEach(() => {
 });
 
 describe.each(['global', 'local'] as const)('%s two-finger pan', (kind) => {
+  it('keeps eligible labels visible while pan preserves zoom-based label settings', () => {
+    const { renderer, session } = mount(kind, 100, vi.fn());
+    const labelThreshold = renderer.settings.labelRenderedSizeThreshold;
+    expect(renderer.settings).toMatchObject({
+      hideLabelsOnMove: false,
+      labelDensity: kind === 'global' ? 0.08 : 0.12,
+      labelGridCellSize: kind === 'global' ? 120 : 100,
+    });
+    expect(typeof labelThreshold).toBe('number');
+    renderer.camera.setState({ ratio: 0.72 });
+
+    pan(renderer, { x: 3, y: 5, mode: 0 });
+
+    expect(renderer.camera.ratio).toBe(0.72);
+    expect(renderer.settings.labelRenderedSizeThreshold).toBe(labelThreshold);
+    expect(renderer.setSetting).not.toHaveBeenCalled();
+
+    zoom(renderer, 4);
+
+    expect(renderer.camera.ratio).not.toBe(0.72);
+    expect(renderer.settings.labelRenderedSizeThreshold).toBe(labelThreshold);
+    expect(renderer.setSetting).not.toHaveBeenCalled();
+    session.destroy();
+  });
+
   it.each([1, 10, 100, 1_000])(
     'moves by the same pixels at raw coordinate span %s',
     (span) => {

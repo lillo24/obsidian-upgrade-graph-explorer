@@ -406,7 +406,7 @@ export class GlobalRendererSession {
       doubleClickTimeout: NODE_DOUBLE_CLICK_TIMEOUT_MS,
       enableEdgeEvents: options.edgeEvents ?? false,
       hideEdgesOnMove: this.graph.size > 20_000,
-      hideLabelsOnMove: true,
+      hideLabelsOnMove: false,
       labelDensity: 0.08,
       labelGridCellSize: 120,
       labelRenderedSizeThreshold: this.settings.labelThreshold,
