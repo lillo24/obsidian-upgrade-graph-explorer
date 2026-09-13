@@ -182,6 +182,92 @@ version/request correlation, the receiving side validates order/completeness,
 and both sides yield between frames. No JSON serialization, parsed documents,
 engine object, full delta, source path, or identifier enters the result.
 
+### Current-main startup progress baseline
+
+Candidate A starts from `d8b86b81c2ef41864d19c9d30a6131ae92b9e1e4`
+and adds observation/presentation only. Initial vault opening publishes typed
+events immediately before source acquisition, W1 workspace preparation,
+identity persistence, candidate commit, and replacement recovery. Listeners are
+synchronous, non-awaited, and isolated from startup correctness; the display
+interval only requests a render and recomputes elapsed time from
+`performance.now()`.
+
+The existing startup transport remains unchanged: request chunks still default
+to 8, and the browser worker/client still yield with `setTimeout`. The older
+`e4926178ad292e775c5555b06fb672869aff3d94` experiment has merge base
+`440383234696db1fbc67507d048aff4a70842a60` and is 20 commits behind this
+baseline while carrying two unique commits, so it is not a valid current-main
+A/B comparison. PR #92 (`0279f48bf663b4acf5944aef625e7984aebd691a`)
+changed no W1 startup transport files. The user reported that PR #92's native
+executable opened the same real vault successfully while backgrounded; that is
+user-provided evidence, not Codex-executed native QA. Candidate A native
+foreground/background/minimized validation remains pending user evaluation.
+
+The 2026-09-13 Candidate A automated run preserved exact report/catalog
+equality. Medium (500 documents, 8,500 entities, 16,000 references) recorded
+730.044 ms worker compute, 1,599.385 ms round trip, and a 31.870 ms high gap,
+versus 840.466 ms direct. Large (2,000 documents, 42,000 entities, 80,000
+references) recorded 3,162.352 ms worker compute, 7,429.780 ms round trip, and a
+34.026 ms high gap, versus 5,447.305 ms direct. These single local runs are
+diagnostic evidence rather than portable thresholds.
+
+#### Vault progress PATCH2 render isolation
+
+The user reported that Candidate A (`95b6596a1fc62be21cd2e4392cf883a015ffc329`)
+stalled at “Reading vault files…” for the same real vault that the PR #92
+executable opened successfully, including while backgrounded. The visible stage
+proves the reported stall preceded W1 preparation/transport: it covered the
+parallel native source-discovery and workspace-identity promises. It does not by
+itself prove which promise stalled or that rendering caused the stall.
+
+The runtime comparison supports a narrow diagnosis. The only change from PR #92
+head `0279f48bf663b4acf5944aef625e7984aebd691a` to Candidate A baseline
+`d8b86b81c2ef41864d19c9d30a6131ae92b9e1e4` is
+`history-implementations/SAVED1B_implementation_status.md`; no startup runtime
+code changed. From that baseline to `95b6596`, the runtime delta consists of
+observer-only startup API instrumentation, React progress/elapsed rendering, and
+CSS for the notice. PATCH2 removes the once-per-second `App` clock as the leading
+hypothesis without claiming native causality before retest.
+
+Elapsed state now belongs to a memoized `WorkspaceNotice` child. Its interval
+samples `performance.now()` and rerenders only the elapsed text, so a delayed
+background tick recomputes absolute elapsed time. Initial timing begins after the
+folder picker resolves. Acquisition remains one concurrent `Promise.all`, with
+typed pending/complete status for source discovery and identity preparation;
+only source completion exposes aggregate file counts. Tests exercise both
+completion orders, App/GraphExplorer render counts, missed ticks, cancellation,
+failure, success, source switch, and unmount cleanup. User-native PATCH2 QA then
+showed identity preparation complete while source discovery remained pending.
+
+#### Vault discovery PATCH3 native-operation diagnostics
+
+The PATCH2 result proves the UI thread remained alive and awaited
+`discoverSelectedVault(...)`; it does not distinguish a hung plugin call from
+extremely slow serial traversal or runaway depth. PATCH3 preserves the serial
+discovery algorithm and instruments each awaited root inspection, directory
+read, path join, and Markdown read.
+
+Aggregate-only progress records directories read, entries examined,
+Markdown/non-Markdown files, bytes, current/maximum recursion depth, the current
+operation, and its workspace-relative target and monotonic start. A 3-second
+default threshold reveals a slow current operation. A configurable 60-second
+per-operation watchdog rejects the discovery attempt with
+operation/path/counter context; the underlying Tauri Promise may still complete,
+but cannot resume the rejected discovery or adopt a workspace.
+
+Detailed events enter a 100 ms coalescing external store subscribed to only by
+the notice timing child. Tests publish 2,000 events while asserting no additional
+`GraphExplorer` render, preserving PATCH2 isolation. Controlled promises cover
+all four operation boundaries and late completion, while healthy fake-bridge
+oracles confirm unchanged sources, sorting, excludes, strict UTF-8, and symlink
+skipping. The discovery and Tauri bridge sources are identical between working
+PR #92 head `0279f48bf663b4acf5944aef625e7984aebd691a` and PATCH3 parent
+`2bf373ffddbae44f69f3cf766d2fc8a228fa3e91`. The user then confirmed that the
+PATCH3 native candidate completed the previously stalled vault open. That result
+validates the candidate for the reported case, but does not establish that the
+diagnostic instrumentation caused the recovery or that the earlier stall was
+deterministic.
+
 ## KG12B2 W3 responsiveness evidence
 
 `pnpm benchmark:dagre-worker -- --profile small` and `--profile medium` derive

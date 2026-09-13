@@ -16,6 +16,7 @@ import {
 } from '@icarus-graph-explorer/diagnostics-obsidian';
 import type {
   TauriSourceProvider,
+  VaultDiscoveryProgressListener,
   VaultSelection,
   WorkspaceIdentitySession,
   WorkspaceIdentityRecovery,
@@ -52,7 +53,10 @@ import {
   type ResolutionFilter,
 } from './report-view';
 import sampleReportJson from './sample-report.json';
-import type { OpenedDesktopVault } from './desktop-vault';
+import type {
+  DesktopVaultOpenProgress,
+  OpenedDesktopVault,
+} from './desktop-vault';
 import type {
   DesktopLiveVaultController,
   DesktopLiveVaultPhase,
@@ -64,6 +68,14 @@ import {
   browserNetworkStartupTrace,
 } from './network-startup-trace';
 import { browserStorage, clearWorkspaceView } from './persistence/storage';
+import {
+  describeVaultOpenProgress,
+  guardVaultDiscoveryProgress,
+  guardVaultOpenProgress,
+  isCurrentVaultOpenRequest,
+  isLiveVaultProgressPhase,
+} from './vault-open-progress';
+import { createVaultDiscoveryProgressStore } from './vault-discovery-progress-store';
 
 const sampleValidation = validateObsidianDiagnosticReport(sampleReportJson);
 if (!sampleValidation.valid) {
@@ -150,7 +162,14 @@ export function App({
   );
   const lastPerformanceCorrelation = useRef<string | undefined>(undefined);
   const [livePhase, setLivePhase] = useState<DesktopLiveVaultPhase>();
+  const [vaultSelectionPending, setVaultSelectionPending] = useState(false);
   const [vaultOpening, setVaultOpening] = useState(false);
+  const [vaultOpenProgress, setVaultOpenProgress] =
+    useState<DesktopVaultOpenProgress>();
+  const [vaultOpeningStartedAt, setVaultOpeningStartedAt] = useState<number>();
+  const [vaultDiscoveryProgressStore] = useState(
+    createVaultDiscoveryProgressStore,
+  );
   const [diagnosticEvidenceOpen, setDiagnosticEvidenceOpen] = useState(false);
   const [workspaceArea, setWorkspaceArea] =
     useState<WorkspaceArea>('arguments');
@@ -230,14 +249,59 @@ export function App({
   useEffect(
     () => () => {
       sourceRequestGeneration.current += 1;
+      vaultDiscoveryProgressStore.dispose();
       liveUnsubscribeRef.current?.();
       const controller = liveControllerRef.current;
       liveControllerRef.current = undefined;
       if (controller !== undefined)
         void controller.stop().catch(() => undefined);
     },
-    [],
+    [vaultDiscoveryProgressStore],
   );
+
+  function clearVaultOpening(): void {
+    vaultDiscoveryProgressStore.clear();
+    setVaultSelectionPending(false);
+    setVaultOpening(false);
+    setVaultOpenProgress(undefined);
+    setVaultOpeningStartedAt(undefined);
+  }
+
+  function beginVaultOpening(): void {
+    vaultDiscoveryProgressStore.clear();
+    setVaultOpening(true);
+    setVaultOpenProgress(undefined);
+    setVaultOpeningStartedAt(performance.now());
+    setLoadError(undefined);
+  }
+
+  function progressListener(
+    requestGeneration: number,
+  ): (progress: DesktopVaultOpenProgress) => void {
+    return guardVaultOpenProgress(
+      requestGeneration,
+      () => sourceRequestGeneration.current,
+      (progress) => {
+        if (
+          progress.stage !== 'acquiring-source' ||
+          progress.acquisition.sourceDiscovery === 'complete'
+        ) {
+          vaultDiscoveryProgressStore.clear();
+        }
+        setVaultOpenProgress(progress);
+      },
+    );
+  }
+
+  function discoveryProgressListener(
+    requestGeneration: number,
+  ): VaultDiscoveryProgressListener {
+    return guardVaultDiscoveryProgress(
+      requestGeneration,
+      () => sourceRequestGeneration.current,
+      vaultDiscoveryProgressStore.publish,
+    );
+  }
 
   function stopActiveLiveController(): void {
     liveUnsubscribeRef.current?.();
@@ -409,14 +473,25 @@ export function App({
   }
 
   async function openVault(): Promise<void> {
-    if (desktopProvider === undefined || vaultOpening) return;
+    if (desktopProvider === undefined || vaultSelectionPending || vaultOpening)
+      return;
     const requestGeneration = sourceRequestGeneration.current + 1;
     sourceRequestGeneration.current = requestGeneration;
-    setVaultOpening(true);
+    setVaultSelectionPending(true);
+    setLoadError(undefined);
     let desktopVault: typeof import('./desktop-vault') | undefined;
     try {
       const selection = await desktopProvider.selectVaultDirectory();
+      if (
+        !isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      )
+        return;
       if (selection === undefined) return;
+      setVaultSelectionPending(false);
+      beginVaultOpening();
       const [desktopVaultModule, liveVaultModule] = await Promise.all([
         import('./desktop-vault'),
         import('./desktop-live-vault'),
@@ -425,14 +500,29 @@ export function App({
       const result = await liveVaultModule.openLiveDesktopVault(
         desktopProvider,
         selection,
+        {},
+        undefined,
+        progressListener(requestGeneration),
+        discoveryProgressListener(requestGeneration),
       );
-      if (sourceRequestGeneration.current !== requestGeneration) {
+      if (
+        !isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      ) {
         await result.controller?.stop();
         return;
       }
       activateDesktopVault(result.opened, result.controller);
     } catch (error: unknown) {
-      if (sourceRequestGeneration.current !== requestGeneration) return;
+      if (
+        !isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      )
+        return;
       const message = error instanceof Error ? error.message : String(error);
       setLoadError(
         `Could not open the selected vault: ${message} The current workspace remains loaded.`,
@@ -450,7 +540,14 @@ export function App({
         setIdentityRecovery(undefined);
       }
     } finally {
-      setVaultOpening(false);
+      if (
+        isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      ) {
+        clearVaultOpening();
+      }
     }
   }
 
@@ -458,12 +555,11 @@ export function App({
     if (
       desktopProvider === undefined ||
       identityRecovery === undefined ||
+      vaultSelectionPending ||
       vaultOpening
     ) {
       return;
     }
-    const requestGeneration = sourceRequestGeneration.current + 1;
-    sourceRequestGeneration.current = requestGeneration;
     const registryReset =
       identityRecovery.recovery === 'replace-corrupt-registry';
     const confirmed = window.confirm(
@@ -472,7 +568,9 @@ export function App({
         : 'Reset local identity for this vault? Stable IDs and current-view or Named Saved View continuity may change.',
     );
     if (!confirmed) return;
-    setVaultOpening(true);
+    const requestGeneration = sourceRequestGeneration.current + 1;
+    sourceRequestGeneration.current = requestGeneration;
+    beginVaultOpening();
     try {
       const { openLiveDesktopVault } = await import('./desktop-live-vault');
       const result = await openLiveDesktopVault(
@@ -482,20 +580,41 @@ export function App({
           reset: true,
           ...(registryReset ? { replaceCorruptRegistry: true } : {}),
         },
+        undefined,
+        progressListener(requestGeneration),
+        discoveryProgressListener(requestGeneration),
       );
-      if (sourceRequestGeneration.current !== requestGeneration) {
+      if (
+        !isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      ) {
         await result.controller?.stop();
         return;
       }
       activateDesktopVault(result.opened, result.controller);
     } catch (error: unknown) {
-      if (sourceRequestGeneration.current !== requestGeneration) return;
+      if (
+        !isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      )
+        return;
       const message = error instanceof Error ? error.message : String(error);
       setLoadError(
         `Could not reset local identity and open the vault: ${message} The current workspace remains loaded.`,
       );
     } finally {
-      setVaultOpening(false);
+      if (
+        isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      ) {
+        clearVaultOpening();
+      }
     }
   }
 
@@ -506,6 +625,7 @@ export function App({
     event.currentTarget.value = '';
     if (file === undefined) return;
     sourceRequestGeneration.current += 1;
+    clearVaultOpening();
     try {
       const parsed: unknown = JSON.parse(await file.text());
       const validation = validateObsidianDiagnosticReport(parsed);
@@ -540,6 +660,7 @@ export function App({
 
   function restoreSample(): void {
     sourceRequestGeneration.current += 1;
+    clearVaultOpening();
     stopActiveLiveController();
     performanceSession?.begin('I1-initial-view-preparation');
     setPerformanceUpdateKey(undefined);
@@ -589,7 +710,8 @@ export function App({
   );
   const closeWorkspace = useCallback(() => setWorkspaceOpen(false), []);
 
-  const currentSourceStatus = vaultOpening
+  const vaultBusy = vaultSelectionPending || vaultOpening;
+  const currentSourceStatus = vaultBusy
     ? 'Opening'
     : livePhase === undefined
       ? report.identity?.stability === 'transient'
@@ -607,14 +729,17 @@ export function App({
       ? { message: loadError, tone: 'error' as const }
       : vaultOpening
         ? {
-            message: 'Opening Vault… The current workspace remains active.',
+            message: describeVaultOpenProgress(vaultOpenProgress),
+            progressLabel: 'Opening vault',
+            startedAt: vaultOpeningStartedAt,
             tone: 'progress' as const,
           }
-        : livePhase === 'catching-up' || livePhase === 'resyncing'
+        : isLiveVaultProgressPhase(livePhase)
           ? {
               message:
                 sourceStatus ??
                 `${LIVE_PHASE_LABELS[livePhase]} the local vault.`,
+              progressLabel: `${LIVE_PHASE_LABELS[livePhase]} vault`,
               tone: 'progress' as const,
             }
           : livePhase === 'paused'
@@ -682,10 +807,10 @@ export function App({
                 onRescanVault={() => void rescanVault()}
                 onResetLocalIdentity={() => void resetLocalIdentity()}
                 onUseSample={restoreSample}
-                opening={vaultOpening}
+                opening={vaultBusy}
                 {...(recoveryLabel === undefined ? {} : { recoveryLabel })}
                 reportIsSample={reportName === 'Synthetic Sample'}
-                rescanDisabled={vaultOpening || livePhase === 'resyncing'}
+                rescanDisabled={vaultBusy || livePhase === 'resyncing'}
                 {...(sourceStatus === undefined
                   ? {}
                   : { sourceDetail: sourceStatus })}
@@ -700,7 +825,20 @@ export function App({
         />
         {sourceNotice === undefined ? null : (
           <div className="workspace-notice-stack">
-            <WorkspaceNotice tone={sourceNotice.tone}>
+            <WorkspaceNotice
+              tone={sourceNotice.tone}
+              {...(vaultOpening
+                ? { discoveryProgressStore: vaultDiscoveryProgressStore }
+                : {})}
+              {...('startedAt' in sourceNotice &&
+              sourceNotice.startedAt !== undefined
+                ? { startedAt: sourceNotice.startedAt }
+                : {})}
+              {...('progressLabel' in sourceNotice &&
+              sourceNotice.progressLabel !== undefined
+                ? { progressLabel: sourceNotice.progressLabel }
+                : {})}
+            >
               {sourceNotice.message}
             </WorkspaceNotice>
           </div>
