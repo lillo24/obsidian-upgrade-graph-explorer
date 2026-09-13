@@ -914,6 +914,26 @@ export class ReviewEngine {
     attempt: ReviewAttemptRecord,
     event: ProviderTerminalEvent,
   ): void {
+    if (event.adapterMetadata !== undefined) {
+      try {
+        assertSafeMetadata(
+          event.adapterMetadata,
+          'provider terminal adapter metadata',
+        );
+        attempt.adapterMetadata = {
+          ...(attempt.adapterMetadata ?? {}),
+          ...clonePlainData(event.adapterMetadata),
+        };
+      } catch (error) {
+        transition(attempt, 'failed');
+        attempt.endedAt = timestamp(this.#clock);
+        attempt.error = {
+          code: 'unsafe-adapter-metadata',
+          message: error instanceof Error ? error.message : String(error),
+        };
+        return;
+      }
+    }
     attempt.terminalStatus = event.status;
     if (event.usage) attempt.usage = clonePlainData(event.usage);
     if (attempt.state === 'cancel-requested' || runtime.run.cancellation) {

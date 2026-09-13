@@ -206,11 +206,11 @@ Current architecture has:
 
 - no backend requirement;
 - no account requirement;
-- no cloud upload;
+- no background cloud upload; AI Review uploads only explicitly selected frozen material after **Run**;
 - no telemetry pipeline;
 - no Markdown write path.
 
-The repository also contains a provider-neutral AI Review engine and a visible local review workspace. The screen captures authorized pinned Git evidence, previews the independent Negative and Positive prompts, saves model-optional preparations, imports validated runs, and renders integrated/original comparisons. Desktop history is private app-local data; browser history is explicitly session-only. A live model provider and real compiler binding are still deferred, so production never fabricates an assessment. See [`packages/ai-review`](packages/ai-review/README.md), the [`AI Review feature map`](apps/web/src/features/ai-review/README.md), and the [`AI Review / AI Compiler integration contract`](docs/AI_REVIEW_COMPILER_INTEGRATION.md).
+The repository also contains a provider-neutral AI Review engine and a visible local review workspace. The screen captures authorized pinned Git evidence, previews the independent Negative and Positive prompts, saves model-optional preparations, imports validated runs, and renders integrated/original comparisons. Desktop history is private app-local data; browser history is explicitly session-only. Desktop builds can run the fixed workflow through a native, credential-owning OpenAI Agents API adapter, while browser mode remains read/preparation-only. An application-owned Argument compiler adapter is available but optional, with placement off by default. See [`packages/ai-review`](packages/ai-review/README.md), the [`AI Review feature map`](apps/web/src/features/ai-review/README.md), the [`live OpenAI provider contract`](docs/REVIEW4_OPENAI_AGENTS_PROVIDER.md), and the [`AI Review / AI Compiler integration contract`](docs/AI_REVIEW_COMPILER_INTEGRATION.md).
 
 Workspace identity and saved graph state stay local to the application.
 

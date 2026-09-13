@@ -1,6 +1,7 @@
 use tauri::Manager;
 use tauri_plugin_fs::FsExt;
 
+mod openai_agents;
 mod review_source;
 
 fn allow_private_state_scope<R: tauri::Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
@@ -32,6 +33,7 @@ fn allow_private_state_scope<R: tauri::Runtime>(app: &tauri::App<R>) -> tauri::R
 pub fn run() {
     tauri::Builder::default()
         .manage(review_source::ReviewSourceState::default())
+        .manage(openai_agents::OpenAiAgentsState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
@@ -39,6 +41,10 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            openai_agents::openai_agents_availability,
+            openai_agents::start_openai_agent,
+            openai_agents::submit_openai_agent_tool_result,
+            openai_agents::cancel_openai_agent,
             review_source::open_review_source_session,
             review_source::prepare_review_source_history,
             review_source::list_review_source_files,

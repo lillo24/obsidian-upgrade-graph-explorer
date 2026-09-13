@@ -6,7 +6,7 @@ REVIEW1 for deterministic prompts/orchestration/results, and the independent
 review-history store for persistence. Its application adapter exposes the
 current confirmed Argument Library snapshot through REVIEW1's read-only
 compiler protocol. It does not own graph state, argument records, native paths,
-or a live model adapter.
+or provider transport.
 
 ```text
 controller.ts            Source lifecycle, setup, capture, prompt previews,
@@ -31,12 +31,16 @@ controller and valid capture alive. Changing source disposes the native session
 while saved entries retain their original opaque workspace identity and source.
 
 Prepared records are model-optional and export with the heading
-`PREPARED AI REVIEW — NOT AI CONCLUSIONS`. The production Run button remains
-disabled because no live model provider is connected. The default controller
-receives the application-owned compiler provider, while placement still
-defaults to none and a run cannot start without an Agent provider. Tests can
-inject source, history/run repositories, clock/IDs, agent provider, and compiler
-provider. No model provider, vault read, or rerun starts on mount/import.
+`PREPARED AI REVIEW — NOT AI CONCLUSIONS`. Desktop production uses the
+browser-safe `openai-agents-provider`; the Run button becomes available only
+after native readiness confirms `OPENAI_API_KEY`. Browser/report-only mode stays
+disabled without displaying or accepting a key. One explicit model applies to
+all stages and the nearby disclosure states exactly which captured material can
+be uploaded. The default controller also receives the application-owned
+Argument compiler provider, while compiler placement still defaults to none.
+Tests can inject source, history/run repositories, clock/IDs, agent provider,
+and compiler provider. No model call, vault read, or rerun starts on
+mount/import.
 
 Desktop history is private app-local data, separate from the vault, Arguments,
 and graph preferences. Browser history is visibly session-only. Records are

@@ -80,6 +80,9 @@ importers:
       '@icarus-graph-explorer/graph-query':
         specifier: workspace:*
         version: link:../../packages/graph-query
+      '@icarus-graph-explorer/openai-agents-provider':
+        specifier: workspace:*
+        version: link:../../packages/openai-agents-provider
       '@icarus-graph-explorer/performance':
         specifier: workspace:*
         version: link:../../packages/performance
@@ -292,6 +295,15 @@ importers:
       '@icarus-graph-explorer/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/openai-agents-provider:
+    dependencies:
+      '@icarus-graph-explorer/ai-review':
+        specifier: workspace:*
+        version: link:../ai-review
+      '@tauri-apps/api':
+        specifier: 2.11.1
+        version: 2.11.1
 
   packages/parser-markdown:
     dependencies:

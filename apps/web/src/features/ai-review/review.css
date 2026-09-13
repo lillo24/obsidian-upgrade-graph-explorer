@@ -425,6 +425,13 @@
   margin-top: 1rem;
 }
 
+.review-cloud-disclosure {
+  max-width: 52rem;
+  margin: 0.8rem 0 0;
+  color: #45616e;
+  font-size: 0.76rem;
+}
+
 .review-fieldset {
   display: grid;
   gap: 0.65rem;
@@ -766,6 +773,10 @@
   .review-advanced label,
   .review-context-search label,
   .review-empty {
+    color: #b9cbd3;
+  }
+
+  .review-cloud-disclosure {
     color: #b9cbd3;
   }
 }

@@ -344,6 +344,8 @@ export interface ProviderTerminalEvent extends ProviderEventBase {
   structured?: JsonValue;
   usage?: ProviderUsage;
   error?: string;
+  /** Safe identifiers learned after start, such as a remote session or turn ID. */
+  adapterMetadata?: Record<string, JsonValue>;
 }
 
 export type ProviderEvent =

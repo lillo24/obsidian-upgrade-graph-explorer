@@ -1,5 +1,16 @@
 # Architecture
 
+## REVIEW4 native OpenAI Agents boundary
+
+`packages/openai-agents-provider` adapts the provider-neutral REVIEW1 engine to
+a narrow Tauri invoke/channel contract. `apps/desktop/src-tauri/src/openai_agents.rs`
+alone owns `OPENAI_API_KEY`, the fixed OpenAI host and beta header, managed
+session HTTPS/SSE, exact function-call routing, cancellation, and bounded
+recovery. React owns the explicit shared model and upload disclosure but never
+receives a credential. Every REVIEW1 attempt receives a fresh managed session;
+the application remains the orchestrator. See
+[`REVIEW4_OPENAI_AGENTS_PROVIDER.md`](REVIEW4_OPENAI_AGENTS_PROVIDER.md).
+
 ## Status and purpose
 
 This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, and KG11 implements Tauri-selected, coalesced live vault acquisition with transactional KG10 application, full resync, and in-place view preservation. KG12 supplies the performance baseline and implements separate stateful W1 workspace and stateless W3 Dagre workers without changing KG11 transaction semantics or renderer-independent contracts. KG13A selected direct Sigma/Graphology for a complementary Global renderer. KG13B1 promotes it into the product as a lazy documents-first Global/Regional mode with off-main layout and soft folder geometry. KG13B2A adds bounded Local Free as an explicit third presentation with KG6 Focus/disclosure authority, deterministic immediate geometry, separate off-main layout, schema-v3 persistence/history, and Global transition anchoring. KG13B2B completes that Local presentation with a reusable React Flow/W3 schematic variant over the same bounded projection. PRE-KG14A4 assigns compact hierarchy cards to All and extended cards to Focus while preserving their separate Structure and Local Structured layout modes. KG14B2 adds a virtualized, accessible Network Explorer over the completed All or Focus Network projection; it is a DOM companion to the visual Sigma canvas, not a renderer replacement or a new topology authority.
@@ -816,7 +827,7 @@ Accuracy is more important than plausible guesses. The reference contract explic
 The initial product is local-first:
 
 - no required backend or account;
-- no cloud upload or remote processing of workspace content;
+- no background cloud upload or remote graph processing; AI Review is a separate explicit opt-in upload of selected frozen evidence;
 - no telemetry or analytics;
 - no source-file write-back;
 - application-owned caches and view state may be stored locally.
@@ -835,7 +846,7 @@ selection, coordinates, transition points, or Local/Global positions. Keys use e
 basenames, or paths. Storage denial/corruption is non-fatal and never becomes a
 success-shaped empty value.
 
-Remote capabilities, collaboration, or source editing would require an explicit later trust decision. Private workspace material must not enter repository fixtures or logs. Bugs discovered in the Icarus vault must be reduced to small synthetic examples before they are committed.
+Remote collaboration or source editing would require another explicit trust decision. REVIEW4's native OpenAI provider is the narrow exception for remote compute: only pressing **Run** sends selected frozen review evidence and prompts, plus requested compiler results when enabled. Private workspace material must not enter repository fixtures or logs. Bugs discovered in the Icarus vault must be reduced to small synthetic examples before they are committed.
 
 The KG5 browser File API reads one user-selected report in memory and performs
 no upload. KG11 desktop mode reads and watches one explicitly selected vault
