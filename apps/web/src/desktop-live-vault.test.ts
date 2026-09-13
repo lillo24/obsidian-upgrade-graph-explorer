@@ -219,6 +219,8 @@ describe('desktop live vault controller', () => {
 
     expect(progress.map(({ stage }) => stage)).toEqual([
       'acquiring-source',
+      'acquiring-source',
+      'acquiring-source',
       'building-workspace',
       'persisting-identity',
       'committing-workspace',

@@ -155,7 +155,9 @@ canonical truth, or own a platform storage implementation.
 - `WorkspaceNotice.tsx` presents transient source progress and actionable
   source failures above the canvas without consuming workspace layout. Its
   optional progress surface owns indeterminate ARIA semantics, hidden elapsed
-  ticks, and the reusable compact bar used by initial and live operations.
+  ticks, and the reusable compact bar used by initial and live operations. A
+  memoized elapsed child owns its monotonic interval so display ticks rerender
+  only that text node rather than `App` or `GraphExplorer`.
 - `EntitySearch.tsx` performs bounded deferred search over the full canonical
   inspection index, independently from visible graph filters.
   `entity-search-disclosure.ts` keeps its query and result disclosure separate:

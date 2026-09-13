@@ -44,11 +44,23 @@ export type DesktopVaultOpenStage =
   | 'committing-workspace'
   | 'recovering-workspace';
 
-export interface DesktopVaultOpenProgress {
-  readonly stage: DesktopVaultOpenStage;
+export interface DesktopVaultOpenAcquisitionProgress {
+  readonly sourceDiscovery: 'pending' | 'complete';
+  readonly identityPreparation: 'pending' | 'complete';
   readonly markdownFileCount?: number;
   readonly nonMarkdownPathCount?: number;
 }
+
+export type DesktopVaultOpenProgress =
+  | {
+      readonly stage: 'acquiring-source';
+      readonly acquisition: DesktopVaultOpenAcquisitionProgress;
+    }
+  | {
+      readonly stage: Exclude<DesktopVaultOpenStage, 'acquiring-source'>;
+      readonly markdownFileCount?: number;
+      readonly nonMarkdownPathCount?: number;
+    };
 
 export type DesktopVaultOpenProgressListener = (
   progress: DesktopVaultOpenProgress,
@@ -128,7 +140,7 @@ function publishProgress(
 }
 
 function inventoryProgress(
-  stage: DesktopVaultOpenStage,
+  stage: Exclude<DesktopVaultOpenStage, 'acquiring-source'>,
   inventory: VaultSourceInventory,
 ): DesktopVaultOpenProgress {
   return {
@@ -277,16 +289,45 @@ export async function openSelectedDesktopVault(
   services: DesktopVaultServices = DEFAULT_SERVICES,
   onProgress?: DesktopVaultOpenProgressListener,
 ): Promise<OpenedDesktopVault> {
-  publishProgress(onProgress, { stage: 'acquiring-source' });
+  let acquisitionActive = true;
+  let acquisition: DesktopVaultOpenAcquisitionProgress = {
+    sourceDiscovery: 'pending',
+    identityPreparation: 'pending',
+  };
+  const publishAcquisition = (): void => {
+    if (acquisitionActive) {
+      publishProgress(onProgress, { stage: 'acquiring-source', acquisition });
+    }
+  };
+  publishAcquisition();
   const acquisitionStart = services.now();
   let inventory: VaultSourceInventory;
   let identitySession: WorkspaceIdentitySession;
   try {
     [inventory, identitySession] = await Promise.all([
-      sourceProvider.discoverSelectedVault(selection),
-      sourceProvider.loadOrPrepareWorkspaceIdentity(selection, identityOptions),
+      sourceProvider.discoverSelectedVault(selection).then((discovered) => {
+        acquisition = {
+          ...acquisition,
+          sourceDiscovery: 'complete',
+          markdownFileCount: discovered.markdownDocuments.length,
+          nonMarkdownPathCount: discovered.nonMarkdownPaths.length,
+        };
+        publishAcquisition();
+        return discovered;
+      }),
+      sourceProvider
+        .loadOrPrepareWorkspaceIdentity(selection, identityOptions)
+        .then((preparedIdentity) => {
+          acquisition = {
+            ...acquisition,
+            identityPreparation: 'complete',
+          };
+          publishAcquisition();
+          return preparedIdentity;
+        }),
     ]);
   } catch (error: unknown) {
+    acquisitionActive = false;
     throw new DesktopVaultOpenError(
       error instanceof Error ? error.message : String(error),
       selection,
@@ -298,6 +339,7 @@ export async function openSelectedDesktopVault(
       },
     );
   }
+  acquisitionActive = false;
   let sourceAcquisitionMs = elapsed(acquisitionStart, services);
 
   let processor = services.createProcessor();

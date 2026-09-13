@@ -211,6 +211,34 @@ references) recorded 3,162.352 ms worker compute, 7,429.780 ms round trip, and a
 34.026 ms high gap, versus 5,447.305 ms direct. These single local runs are
 diagnostic evidence rather than portable thresholds.
 
+#### Vault progress PATCH2 render isolation
+
+The user reported that Candidate A (`95b6596a1fc62be21cd2e4392cf883a015ffc329`)
+stalled at “Reading vault files…” for the same real vault that the PR #92
+executable opened successfully, including while backgrounded. The visible stage
+proves the reported stall preceded W1 preparation/transport: it covered the
+parallel native source-discovery and workspace-identity promises. It does not by
+itself prove which promise stalled or that rendering caused the stall.
+
+The runtime comparison supports a narrow diagnosis. The only change from PR #92
+head `0279f48bf663b4acf5944aef625e7984aebd691a` to Candidate A baseline
+`d8b86b81c2ef41864d19c9d30a6131ae92b9e1e4` is
+`history-implementations/SAVED1B_implementation_status.md`; no startup runtime
+code changed. From that baseline to `95b6596`, the runtime delta consists of
+observer-only startup API instrumentation, React progress/elapsed rendering, and
+CSS for the notice. PATCH2 removes the once-per-second `App` clock as the leading
+hypothesis without claiming native causality before retest.
+
+Elapsed state now belongs to a memoized `WorkspaceNotice` child. Its interval
+samples `performance.now()` and rerenders only the elapsed text, so a delayed
+background tick recomputes absolute elapsed time. Initial timing begins after the
+folder picker resolves. Acquisition remains one concurrent `Promise.all`, with
+typed pending/complete status for source discovery and identity preparation;
+only source completion exposes aggregate file counts. Tests exercise both
+completion orders, App/GraphExplorer render counts, missed ticks, cancellation,
+failure, success, source switch, and unmount cleanup. Candidate PATCH2 native QA
+remains pending.
+
 ## KG12B2 W3 responsiveness evidence
 
 `pnpm benchmark:dagre-worker -- --profile small` and `--profile medium` derive

@@ -8,11 +8,12 @@ import {
   createStableIdentityCatalog,
   type StableIdentityCatalog,
 } from '@icarus-graph-explorer/stable-identity';
-import type {
-  TauriSourceProvider,
-  VaultSelection,
-  VaultWatchSubscription,
-  WorkspaceIdentitySession,
+import {
+  RecoverableWorkspaceIdentityError,
+  type TauriSourceProvider,
+  type VaultSelection,
+  type VaultWatchSubscription,
+  type WorkspaceIdentitySession,
 } from '@icarus-graph-explorer/source-provider-tauri';
 import {
   applyObsidianWorkspaceChanges,
@@ -25,6 +26,7 @@ import {
 } from '@icarus-graph-explorer/workspace-worker';
 
 import {
+  DesktopVaultOpenError,
   openSelectedDesktopVault,
   selectAndOpenDesktopVault,
   type DesktopVaultOpenProgress,
@@ -131,6 +133,25 @@ function measuredServices(
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, reject, resolve };
+}
+
+function identitySession(provider: FakeProvider): WorkspaceIdentitySession {
+  return {
+    selection: SELECTION,
+    workspaceId: provider.catalog.workspaceId,
+    catalog: provider.catalog,
+    association: 'existing',
+  };
+}
+
 describe('desktop vault worker orchestration', () => {
   it('leaves the application unchanged after directory-dialog cancellation', async () => {
     const provider = new FakeProvider();
@@ -193,12 +214,40 @@ describe('desktop vault worker orchestration', () => {
 
     expect(progress.map(({ stage }) => stage)).toEqual([
       'acquiring-source',
+      'acquiring-source',
+      'acquiring-source',
       'building-workspace',
       'persisting-identity',
       'committing-workspace',
     ]);
-    expect(progress[0]).toEqual({ stage: 'acquiring-source' });
-    expect(progress.slice(1)).toEqual(
+    expect(progress.slice(0, 3)).toEqual([
+      {
+        stage: 'acquiring-source',
+        acquisition: {
+          sourceDiscovery: 'pending',
+          identityPreparation: 'pending',
+        },
+      },
+      {
+        stage: 'acquiring-source',
+        acquisition: {
+          sourceDiscovery: 'complete',
+          identityPreparation: 'pending',
+          markdownFileCount: provider.inventory.markdownDocuments.length,
+          nonMarkdownPathCount: provider.inventory.nonMarkdownPaths.length,
+        },
+      },
+      {
+        stage: 'acquiring-source',
+        acquisition: {
+          sourceDiscovery: 'complete',
+          identityPreparation: 'complete',
+          markdownFileCount: provider.inventory.markdownDocuments.length,
+          nonMarkdownPathCount: provider.inventory.nonMarkdownPaths.length,
+        },
+      },
+    ]);
+    expect(progress.slice(3)).toEqual(
       Array.from({ length: 3 }, (_, index) => ({
         stage: [
           'building-workspace',
@@ -209,6 +258,105 @@ describe('desktop vault worker orchestration', () => {
         nonMarkdownPathCount: provider.inventory.nonMarkdownPaths.length,
       })),
     );
+    opened.runtime.processor.terminate();
+  });
+
+  it('keeps acquisition concurrent and reports source completion first with real counts', async () => {
+    const provider = new FakeProvider();
+    const source = deferred<typeof provider.inventory>();
+    const identity = deferred<WorkspaceIdentitySession>();
+    let sourceStarted = false;
+    let identityStarted = false;
+    provider.discoverSelectedVault = () => {
+      sourceStarted = true;
+      return source.promise;
+    };
+    provider.loadOrPrepareWorkspaceIdentity = () => {
+      identityStarted = true;
+      return identity.promise;
+    };
+    const measured = measuredServices();
+    const progress: DesktopVaultOpenProgress[] = [];
+
+    const opening = openSelectedDesktopVault(
+      provider,
+      SELECTION,
+      {},
+      measured.services,
+      (event) => progress.push(event),
+    );
+    expect(sourceStarted).toBe(true);
+    expect(identityStarted).toBe(true);
+
+    source.resolve(provider.inventory);
+    await Promise.resolve();
+    expect(progress.at(-1)).toEqual({
+      stage: 'acquiring-source',
+      acquisition: {
+        sourceDiscovery: 'complete',
+        identityPreparation: 'pending',
+        markdownFileCount: 2,
+        nonMarkdownPathCount: 1,
+      },
+    });
+
+    identity.resolve(identitySession(provider));
+    const opened = await opening;
+    expect(progress[3]).toMatchObject({
+      stage: 'building-workspace',
+      markdownFileCount: 2,
+      nonMarkdownPathCount: 1,
+    });
+    opened.runtime.processor.terminate();
+  });
+
+  it('reports identity completion first and waits for source before building', async () => {
+    const provider = new FakeProvider();
+    const source = deferred<typeof provider.inventory>();
+    const identity = deferred<WorkspaceIdentitySession>();
+    let sourceStarted = false;
+    let identityStarted = false;
+    provider.discoverSelectedVault = () => {
+      sourceStarted = true;
+      return source.promise;
+    };
+    provider.loadOrPrepareWorkspaceIdentity = () => {
+      identityStarted = true;
+      return identity.promise;
+    };
+    const measured = measuredServices();
+    const progress: DesktopVaultOpenProgress[] = [];
+
+    const opening = openSelectedDesktopVault(
+      provider,
+      SELECTION,
+      {},
+      measured.services,
+      (event) => progress.push(event),
+    );
+    expect(sourceStarted).toBe(true);
+    expect(identityStarted).toBe(true);
+
+    identity.resolve(identitySession(provider));
+    await Promise.resolve();
+    expect(progress.at(-1)).toEqual({
+      stage: 'acquiring-source',
+      acquisition: {
+        sourceDiscovery: 'pending',
+        identityPreparation: 'complete',
+      },
+    });
+    expect(progress.some(({ stage }) => stage === 'building-workspace')).toBe(
+      false,
+    );
+
+    source.resolve(provider.inventory);
+    const opened = await opening;
+    expect(progress[3]).toMatchObject({
+      stage: 'building-workspace',
+      markdownFileCount: 2,
+      nonMarkdownPathCount: 1,
+    });
     opened.runtime.processor.terminate();
   });
 
@@ -274,6 +422,8 @@ describe('desktop vault worker orchestration', () => {
     expect(firstTerminated).toBe(true);
     expect(progress.map(({ stage }) => stage)).toEqual([
       'acquiring-source',
+      'acquiring-source',
+      'acquiring-source',
       'building-workspace',
       'persisting-identity',
       'committing-workspace',
@@ -323,7 +473,7 @@ describe('desktop vault worker orchestration', () => {
     const baseline = await run(false);
     const observed = await run(true);
 
-    expect(observed.observerCalls).toBe(4);
+    expect(observed.observerCalls).toBe(6);
     expect(observed.evidence).toEqual(baseline.evidence);
   });
 
@@ -362,6 +512,34 @@ describe('desktop vault worker orchestration', () => {
     await expect(
       openSelectedDesktopVault(provider, SELECTION, {}, measured.services),
     ).rejects.toThrow('Cannot read vault directory Folder');
+    expect(provider.commits).toBe(0);
+    expect(measured.processors()).toBe(0);
+  });
+
+  it('preserves recoverable identity metadata when identity preparation fails', async () => {
+    const provider = new FakeProvider();
+    provider.loadOrPrepareWorkspaceIdentity = async () => {
+      throw new RecoverableWorkspaceIdentityError(
+        'workspace registry is corrupt',
+        'replace-corrupt-registry',
+      );
+    };
+    const measured = measuredServices();
+
+    try {
+      await openSelectedDesktopVault(
+        provider,
+        SELECTION,
+        {},
+        measured.services,
+      );
+      throw new Error('Expected identity preparation to fail.');
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(DesktopVaultOpenError);
+      expect((error as DesktopVaultOpenError).recovery).toBe(
+        'replace-corrupt-registry',
+      );
+    }
     expect(provider.commits).toBe(0);
     expect(measured.processors()).toBe(0);
   });

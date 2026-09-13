@@ -53,7 +53,7 @@ import {
 import { browserStorage, clearWorkspaceView } from './persistence/storage';
 import {
   describeVaultOpenProgress,
-  formatVaultOpenElapsed,
+  guardVaultOpenProgress,
   isCurrentVaultOpenRequest,
   isLiveVaultProgressPhase,
 } from './vault-open-progress';
@@ -114,11 +114,11 @@ export function App({
   const sourceRequestGeneration = useRef(0);
   const lastPerformanceCorrelation = useRef<string | undefined>(undefined);
   const [livePhase, setLivePhase] = useState<DesktopLiveVaultPhase>();
+  const [vaultSelectionPending, setVaultSelectionPending] = useState(false);
   const [vaultOpening, setVaultOpening] = useState(false);
   const [vaultOpenProgress, setVaultOpenProgress] =
     useState<DesktopVaultOpenProgress>();
   const [vaultOpeningStartedAt, setVaultOpeningStartedAt] = useState<number>();
-  const [vaultOpeningClock, setVaultOpeningClock] = useState<number>();
   const [diagnosticEvidenceOpen, setDiagnosticEvidenceOpen] = useState(false);
   const [argumentsOpen, setArgumentsOpen] = useState(false);
   const [argumentsRestoreFocus, setArgumentsRestoreFocus] =
@@ -173,44 +173,28 @@ export function App({
     [],
   );
 
-  useEffect(() => {
-    if (vaultOpeningStartedAt === undefined) return;
-    const interval = window.setInterval(
-      () => setVaultOpeningClock(performance.now()),
-      1_000,
-    );
-    return () => window.clearInterval(interval);
-  }, [vaultOpeningStartedAt]);
-
   function clearVaultOpening(): void {
+    setVaultSelectionPending(false);
     setVaultOpening(false);
     setVaultOpenProgress(undefined);
     setVaultOpeningStartedAt(undefined);
-    setVaultOpeningClock(undefined);
   }
 
   function beginVaultOpening(): void {
-    const startedAt = performance.now();
     setVaultOpening(true);
     setVaultOpenProgress(undefined);
-    setVaultOpeningStartedAt(startedAt);
-    setVaultOpeningClock(startedAt);
+    setVaultOpeningStartedAt(performance.now());
     setLoadError(undefined);
   }
 
   function progressListener(
     requestGeneration: number,
   ): (progress: DesktopVaultOpenProgress) => void {
-    return (progress) => {
-      if (
-        isCurrentVaultOpenRequest(
-          sourceRequestGeneration.current,
-          requestGeneration,
-        )
-      ) {
-        setVaultOpenProgress(progress);
-      }
-    };
+    return guardVaultOpenProgress(
+      requestGeneration,
+      () => sourceRequestGeneration.current,
+      setVaultOpenProgress,
+    );
   }
 
   function stopActiveLiveController(): void {
@@ -350,14 +334,25 @@ export function App({
   }
 
   async function openVault(): Promise<void> {
-    if (desktopProvider === undefined || vaultOpening) return;
+    if (desktopProvider === undefined || vaultSelectionPending || vaultOpening)
+      return;
     const requestGeneration = sourceRequestGeneration.current + 1;
     sourceRequestGeneration.current = requestGeneration;
-    beginVaultOpening();
+    setVaultSelectionPending(true);
+    setLoadError(undefined);
     let desktopVault: typeof import('./desktop-vault') | undefined;
     try {
       const selection = await desktopProvider.selectVaultDirectory();
+      if (
+        !isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      )
+        return;
       if (selection === undefined) return;
+      setVaultSelectionPending(false);
+      beginVaultOpening();
       const [desktopVaultModule, liveVaultModule] = await Promise.all([
         import('./desktop-vault'),
         import('./desktop-live-vault'),
@@ -420,12 +415,11 @@ export function App({
     if (
       desktopProvider === undefined ||
       identityRecovery === undefined ||
+      vaultSelectionPending ||
       vaultOpening
     ) {
       return;
     }
-    const requestGeneration = sourceRequestGeneration.current + 1;
-    sourceRequestGeneration.current = requestGeneration;
     const registryReset =
       identityRecovery.recovery === 'replace-corrupt-registry';
     const confirmed = window.confirm(
@@ -434,6 +428,8 @@ export function App({
         : 'Reset local identity for this vault? Stable IDs and current-view or Named Saved View continuity may change.',
     );
     if (!confirmed) return;
+    const requestGeneration = sourceRequestGeneration.current + 1;
+    sourceRequestGeneration.current = requestGeneration;
     beginVaultOpening();
     try {
       const { openLiveDesktopVault } = await import('./desktop-live-vault');
@@ -557,7 +553,8 @@ export function App({
   }, []);
   const closeArguments = useCallback(() => setArgumentsOpen(false), []);
 
-  const currentSourceStatus = vaultOpening
+  const vaultBusy = vaultSelectionPending || vaultOpening;
+  const currentSourceStatus = vaultBusy
     ? 'Opening'
     : livePhase === undefined
       ? report.identity?.stability === 'transient'
@@ -570,18 +567,14 @@ export function App({
       : identityRecovery === undefined
         ? undefined
         : 'Reset Local Identity for This Vault';
-  const vaultOpeningElapsed =
-    vaultOpeningStartedAt === undefined || vaultOpeningClock === undefined
-      ? undefined
-      : formatVaultOpenElapsed(vaultOpeningClock - vaultOpeningStartedAt);
   const sourceNotice =
     loadError !== undefined
       ? { message: loadError, tone: 'error' as const }
       : vaultOpening
         ? {
-            elapsed: vaultOpeningElapsed,
             message: describeVaultOpenProgress(vaultOpenProgress),
             progressLabel: 'Opening vault',
+            startedAt: vaultOpeningStartedAt,
             tone: 'progress' as const,
           }
         : isLiveVaultProgressPhase(livePhase)
@@ -656,10 +649,10 @@ export function App({
                 onRescanVault={() => void rescanVault()}
                 onResetLocalIdentity={() => void resetLocalIdentity()}
                 onUseSample={restoreSample}
-                opening={vaultOpening}
+                opening={vaultBusy}
                 {...(recoveryLabel === undefined ? {} : { recoveryLabel })}
                 reportIsSample={reportName === 'Synthetic Sample'}
-                rescanDisabled={vaultOpening || livePhase === 'resyncing'}
+                rescanDisabled={vaultBusy || livePhase === 'resyncing'}
                 {...(sourceStatus === undefined
                   ? {}
                   : { sourceDetail: sourceStatus })}
@@ -676,9 +669,9 @@ export function App({
           <div className="workspace-notice-stack">
             <WorkspaceNotice
               tone={sourceNotice.tone}
-              {...('elapsed' in sourceNotice &&
-              sourceNotice.elapsed !== undefined
-                ? { elapsed: sourceNotice.elapsed }
+              {...('startedAt' in sourceNotice &&
+              sourceNotice.startedAt !== undefined
+                ? { startedAt: sourceNotice.startedAt }
                 : {})}
               {...('progressLabel' in sourceNotice &&
               sourceNotice.progressLabel !== undefined
