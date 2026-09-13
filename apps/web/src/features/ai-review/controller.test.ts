@@ -244,7 +244,7 @@ function integrationResult(): IntegrationResultInput {
 }
 
 describe('AI Review application controller', () => {
-  it('loads native provider readiness while preserving an explicit default model', async () => {
+  it('loads live-provider readiness while preserving explicit default models', async () => {
     const controller = new AiReviewController({
       sourceProvider: sourceProvider().provider,
       historyStore: new MemoryReviewHistoryStore(),
@@ -252,29 +252,62 @@ describe('AI Review application controller', () => {
       agentProviderAvailability: async () => ({
         supported: true,
         ready: false,
-        provider: 'openai-agents',
-        message: 'Set OPENAI_API_KEY and restart.',
-        defaultModel: 'gpt-6-astra',
+        provider: 'openai',
+        message: 'Enter a session key.',
+        defaultModel: 'gpt-5.6-sol',
       }),
       defaultModels: {
-        analysis: { provider: 'openai-agents', model: 'gpt-6-astra' },
-        integrator: { provider: 'openai-agents', model: 'gpt-6-astra' },
-        postCheck: { provider: 'openai-agents', model: 'gpt-6-astra' },
+        analysis: { provider: 'openai', model: 'gpt-5.6-sol' },
+        integrator: { provider: 'openai', model: 'gpt-5.6-sol' },
+        postCheck: { provider: 'openai', model: 'gpt-5.6-sol' },
       },
     });
     expect(controller.snapshot().modelAvailable).toBe(false);
     await controller.open();
     expect(controller.snapshot()).toMatchObject({
       modelAvailable: false,
-      modelProvider: 'openai-agents',
-      modelMessage: 'Set OPENAI_API_KEY and restart.',
+      modelProvider: 'openai',
+      modelMessage: 'Enter a session key.',
       setup: {
         models: {
-          analysis: { provider: 'openai-agents', model: 'gpt-6-astra' },
-          integrator: { provider: 'openai-agents', model: 'gpt-6-astra' },
+          analysis: { provider: 'openai', model: 'gpt-5.6-sol' },
+          integrator: { provider: 'openai', model: 'gpt-5.6-sol' },
         },
       },
     });
+  });
+
+  it('rechecks credential readiness before start and creates no failed history without a key', async () => {
+    const agent = new ScriptedAgentProvider({});
+    const source = sourceProvider();
+    const history = new MemoryReviewHistoryStore();
+    const controller = new AiReviewController({
+      sourceProvider: source.provider,
+      historyStore: history,
+      agentProvider: agent,
+      agentProviderAvailability: async () => ({
+        supported: true,
+        ready: false,
+        provider: 'openai',
+        message:
+          'Enter an OpenAI API key for this app session to enable live review.',
+        defaultModel: 'gpt-5.6-sol',
+      }),
+      defaultModels: {
+        analysis: { provider: 'openai', model: 'analysis-model' },
+        integrator: { provider: 'openai', model: 'integrator-model' },
+        postCheck: { provider: 'openai', model: 'post-model' },
+      },
+    });
+    await controller.open();
+    await capture(controller);
+    await controller.startRun();
+
+    expect(agent.startedRequests).toHaveLength(0);
+    expect(controller.snapshot().run).toBeUndefined();
+    expect(controller.snapshot().activeRunId).toBeUndefined();
+    expect((await history.list()).summaries).toEqual([]);
+    expect(controller.snapshot().error).toContain('Enter an OpenAI API key');
   });
 
   it('reopens safely after a lifecycle cleanup replay', async () => {

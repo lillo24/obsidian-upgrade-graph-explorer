@@ -118,6 +118,9 @@ export interface AiReviewControllerDependencies {
   readonly runRepository?: ReviewRunRepository;
   readonly agentProvider?: AgentProvider;
   readonly agentProviderAvailability?: () => Promise<ReviewAgentProviderAvailability>;
+  readonly agentProviderAvailabilitySubscribe?: (
+    listener: () => void,
+  ) => () => void;
   readonly defaultModels?: ReviewModelConfiguration;
   readonly compilerProvider?: CompilerProvider;
   readonly clock?: ReviewClock;
@@ -175,6 +178,8 @@ export class AiReviewController {
   readonly #engine?: ReviewEngine;
   readonly #agentProviderAvailability:
     (() => Promise<ReviewAgentProviderAvailability>) | undefined;
+  readonly #agentProviderAvailabilitySubscribe:
+    ((listener: () => void) => () => void) | undefined;
   readonly #defaultModels: ReviewModelConfiguration | undefined;
   #sourceSession: ReviewSourceSession | undefined;
   #workspaceBinding: ReviewWorkspaceBinding | undefined;
@@ -183,6 +188,7 @@ export class AiReviewController {
   #captureAbort: AbortController | undefined;
   #disposed = false;
   #lifecycleGeneration = 0;
+  #agentProviderAvailabilityUnsubscribe: (() => void) | undefined;
   #state: ReviewWorkspaceSnapshot;
 
   public constructor(dependencies: AiReviewControllerDependencies) {
@@ -192,6 +198,8 @@ export class AiReviewController {
     this.#preparationId =
       dependencies.preparationId ?? (() => createReviewPreparationId());
     this.#agentProviderAvailability = dependencies.agentProviderAvailability;
+    this.#agentProviderAvailabilitySubscribe =
+      dependencies.agentProviderAvailabilitySubscribe;
     this.#defaultModels = dependencies.defaultModels;
     const injectedProvider =
       dependencies.agentProvider !== undefined &&
@@ -217,7 +225,7 @@ export class AiReviewController {
           ? 'Live analysis is not connected. Preparation and imported-result reading remain available.'
           : injectedProvider
             ? 'Injected live analysis provider is ready.'
-            : 'Checking the desktop OpenAI provider…',
+            : 'Checking the OpenAI provider…',
       compilerAvailable: dependencies.compilerProvider !== undefined,
       saveState: 'idle',
     };
@@ -309,12 +317,50 @@ export class AiReviewController {
           ? {}
           : { storageMessage: history.message }),
       });
+      this.#agentProviderAvailabilityUnsubscribe?.();
+      this.#agentProviderAvailabilityUnsubscribe =
+        this.#agentProviderAvailabilitySubscribe?.(() => {
+          void this.#refreshAgentProviderAvailability();
+        });
     } catch (error) {
       if (lifecycleGeneration !== this.#lifecycleGeneration) return;
       this.#set({
         phase: 'error',
         error: `Review history could not be opened: ${message(error)}`,
       });
+    }
+  }
+
+  async #refreshAgentProviderAvailability(): Promise<
+    ReviewAgentProviderAvailability | undefined
+  > {
+    if (this.#agentProviderAvailability === undefined) return undefined;
+    try {
+      const availability = await this.#agentProviderAvailability();
+      if (!this.#disposed) {
+        this.#set({
+          modelAvailable: availability.ready,
+          modelProvider: availability.provider || undefined,
+          modelMessage: availability.message,
+        });
+      }
+      return availability;
+    } catch (error) {
+      const availability = {
+        supported: false,
+        ready: false,
+        provider: '',
+        defaultModel: '',
+        message: `OpenAI provider initialization failed: ${message(error)}`,
+      } satisfies ReviewAgentProviderAvailability;
+      if (!this.#disposed) {
+        this.#set({
+          modelAvailable: false,
+          modelProvider: undefined,
+          modelMessage: availability.message,
+        });
+      }
+      return availability;
     }
   }
 
@@ -967,6 +1013,11 @@ export class AiReviewController {
   }
 
   public async startRun(): Promise<void> {
+    const currentAvailability = await this.#refreshAgentProviderAvailability();
+    if (currentAvailability?.ready === false) {
+      this.#set({ error: currentAvailability.message });
+      return;
+    }
     const source = this.#state.draftSource;
     const workspace = this.#state.draftWorkspace;
     const models = this.#state.setup.models;
@@ -981,9 +1032,7 @@ export class AiReviewController {
           model.trim() !== '' &&
           (this.#state.modelProvider === undefined ||
             provider === this.#state.modelProvider),
-      ) &&
-      (this.#state.modelProvider === undefined ||
-        new Set(configuredModels.map(({ model }) => model)).size === 1);
+      );
     if (
       this.#engine === undefined ||
       source === undefined ||
@@ -1002,7 +1051,7 @@ export class AiReviewController {
               : models === undefined
                 ? 'Configure injected provider model settings before running.'
                 : !modelConfigurationValid
-                  ? 'Use one non-empty model from the connected provider for every review stage.'
+                  ? 'Use a non-empty model from the connected provider for every review stage.'
                   : conflictingRun
                     ? 'Wait for the active review run to finish or cancel it before starting another.'
                     : 'Capture source material before running.',
@@ -1244,6 +1293,8 @@ export class AiReviewController {
     this.#lifecycleGeneration += 1;
     this.#sourceGeneration += 1;
     this.#captureAbort?.abort('Application disposed');
+    this.#agentProviderAvailabilityUnsubscribe?.();
+    this.#agentProviderAvailabilityUnsubscribe = undefined;
     const sourceSession = this.#sourceSession;
     this.#sourceSession = undefined;
     this.#listeners.clear();

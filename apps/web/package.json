@@ -20,7 +20,6 @@
     "@icarus-graph-explorer/focus-schematic": "workspace:*",
     "@icarus-graph-explorer/focus-schematic-layout": "workspace:*",
     "@icarus-graph-explorer/graph-query": "workspace:*",
-    "@icarus-graph-explorer/openai-agents-provider": "workspace:*",
     "@icarus-graph-explorer/performance": "workspace:*",
     "@icarus-graph-explorer/presentation-overrides": "workspace:*",
     "@icarus-graph-explorer/renderer-reactflow": "workspace:*",
@@ -35,13 +34,16 @@
     "@icarus-graph-explorer/visual-groups": "workspace:*",
     "@icarus-graph-explorer/workspace-worker": "workspace:*",
     "@icarus-graph-explorer/workspace-engine-obsidian": "workspace:*",
+    "@openai/agents": "0.18.0",
     "react": "19.2.8",
     "katex": "0.18.7",
+    "openai": "7.15.0",
     "react-dom": "19.2.8",
     "react-markdown": "10.1.0",
     "rehype-katex": "7.0.1",
     "remark-gfm": "4.0.1",
-    "remark-math": "6.0.0"
+    "remark-math": "6.0.0",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@icarus-graph-explorer/stable-identity": "workspace:*",

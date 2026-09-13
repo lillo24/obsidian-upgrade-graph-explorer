@@ -5,3 +5,6 @@ packages:
 
 allowBuilds:
   esbuild: true
+
+overrides:
+  zod: 4.4.3

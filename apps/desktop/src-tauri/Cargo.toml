@@ -14,12 +14,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "=2.6.3", features = [] }
 
 [dependencies]
-futures-util = "=0.3.34"
-reqwest = { version = "=0.12.23", default-features = false, features = ["json", "stream", "rustls-tls-native-roots"] }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
 tauri = { version = "=2.11.5", features = [] }
 tauri-plugin-dialog = "=2.7.2"
 tauri-plugin-fs = { version = "=2.5.1", features = ["watch"] }
-tokio = { version = "=1.53.1", features = ["macros", "rt", "sync", "time"] }
 uuid = { version = "=1.26.0", features = ["v4"] }

@@ -18,6 +18,7 @@ import type { ReviewHistorySummary } from '@icarus-graph-explorer/review-workspa
 import type { ReviewSourceFileDescriptor } from '@icarus-graph-explorer/review-source-tauri';
 
 import type { AiReviewController } from './controller';
+import type { OpenAiSessionCredentials } from './openai-session-credentials';
 import './review.css';
 
 const ReviewResults = lazy(() => import('./ReviewResults'));
@@ -86,10 +87,12 @@ function FileRow({
 
 function ModelsEditor({
   models,
+  openAi,
   provider,
   onChange,
 }: {
   readonly models: ReviewModelConfiguration | undefined;
+  readonly openAi: boolean;
   readonly provider: string;
   readonly onChange: (models: ReviewModelConfiguration | undefined) => void;
 }) {
@@ -111,28 +114,114 @@ function ModelsEditor({
   }
   return (
     <fieldset className="review-fieldset">
-      <legend>OpenAI model</legend>
+      <legend>{openAi ? 'OpenAI models' : 'Review models'}</legend>
       <p>
-        Provider: <code>{provider}</code>. The same explicit model is used for
-        Negative, Positive, Integrator, and an optional post-check.
+        Provider: <code>{provider}</code>. Model IDs are explicit and may be
+        configured independently for each review stage.
       </p>
-      <label>
-        Model
-        <input
-          autoComplete="off"
-          name="openai-review-model"
-          onChange={(event) => {
-            const model = event.currentTarget.value;
-            onChange({
-              analysis: { provider, model },
-              integrator: { provider, model },
-              postCheck: { provider, model },
-            });
-          }}
-          spellCheck={false}
-          value={models.analysis.model}
-        />
-      </label>
+      {(
+        [
+          ['analysis', 'Analysis model'],
+          ['integrator', 'Integrator model'],
+          ['postCheck', 'Post-check model'],
+        ] as const
+      ).map(([key, label]) => (
+        <label key={key}>
+          {label}
+          <input
+            autoComplete="off"
+            name={`${openAi ? 'openai' : 'review'}-${key}-model`}
+            onChange={(event) =>
+              onChange({
+                ...models,
+                [key]: { provider, model: event.currentTarget.value },
+              })
+            }
+            spellCheck={false}
+            value={models[key].model}
+          />
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+function OpenAiCredentialEditor({
+  credentials,
+}: {
+  readonly credentials: OpenAiSessionCredentials;
+}) {
+  const state = useSyncExternalStore(
+    credentials.subscribe,
+    credentials.snapshot,
+    credentials.snapshot,
+  );
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string>();
+
+  return (
+    <fieldset className="review-fieldset review-credential-fieldset">
+      <legend>OpenAI</legend>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          const input = inputRef.current;
+          if (input === null) return;
+          try {
+            credentials.set(input.value);
+            input.value = '';
+            setError(undefined);
+          } catch (submissionError) {
+            input.value = '';
+            setError(
+              submissionError instanceof Error
+                ? submissionError.message
+                : 'The OpenAI API key could not be loaded.',
+            );
+          }
+        }}
+      >
+        <label>
+          API key — session only
+          <input
+            autoComplete="off"
+            name="openai-session-api-key"
+            ref={inputRef}
+            spellCheck={false}
+            type="password"
+          />
+        </label>
+        <button type="submit">
+          {state.configured ? 'Replace' : 'Use key'}
+        </button>
+        {state.configured ? (
+          <button
+            onClick={() => {
+              credentials.clear();
+              if (inputRef.current !== null) inputRef.current.value = '';
+              setError(undefined);
+            }}
+            type="button"
+          >
+            Clear
+          </button>
+        ) : null}
+      </form>
+      <p role="status">
+        {state.configured
+          ? `API key loaded for this app session${state.activeExecutionCount === 0 ? '.' : ` · ${state.activeExecutionCount} active execution${state.activeExecutionCount === 1 ? '' : 's'}.`}`
+          : 'No API key is loaded.'}
+      </p>
+      {error === undefined ? null : (
+        <p className="review-error" role="alert">
+          {error}
+        </p>
+      )}
+      <p>
+        Stored in memory only. Reloading the app clears it. Because this version
+        calls OpenAI directly from the WebView, the key is present in client
+        memory while configured.
+      </p>
     </fieldset>
   );
 }
@@ -177,8 +266,12 @@ function TemplatesEditor({
 
 export const ReviewWorkspace = forwardRef<
   ReviewWorkspaceHandle,
-  { readonly active: boolean; readonly controller: AiReviewController }
->(function ReviewWorkspace({ active, controller }, ref) {
+  {
+    readonly active: boolean;
+    readonly controller: AiReviewController;
+    readonly openAiCredentials?: OpenAiSessionCredentials;
+  }
+>(function ReviewWorkspace({ active, controller, openAiCredentials }, ref) {
   const state = useSyncExternalStore(
     controller.subscribe,
     controller.snapshot,
@@ -276,9 +369,6 @@ export const ReviewWorkspace = forwardRef<
         model.trim() !== '' &&
         (state.modelProvider === undefined || provider === state.modelProvider),
     ) &&
-    (state.modelProvider === undefined ||
-      new Set(Object.values(state.setup.models).map(({ model }) => model))
-        .size === 1) &&
     capturedSource !== undefined &&
     state.draftWorkspace !== undefined &&
     !state.captureBusy &&
@@ -725,9 +815,13 @@ export const ReviewWorkspace = forwardRef<
                     ),
                   )}
                 </fieldset>
+                {openAiCredentials === undefined ? null : (
+                  <OpenAiCredentialEditor credentials={openAiCredentials} />
+                )}
                 {state.modelAvailable ? (
                   <ModelsEditor
                     models={state.setup.models}
+                    openAi={openAiCredentials !== undefined}
                     provider={state.modelProvider ?? 'injected-provider'}
                     onChange={(models) => controller.updateSetup({ models })}
                   />

@@ -18,6 +18,11 @@ ReviewWorkspace.tsx      Source picker, preparation/editor/history UI.
 ReviewResults.tsx        Lazily mounted individual/integrated/compare readers.
 MarkdownRenderer.tsx     Safe GFM + bounded KaTeX presentation boundary.
 markdown-security.ts     Shared inert/external URL policy for Markdown.
+openai-session-credentials.ts
+                         Non-serializable session-memory API key owner.
+openai-agents-provider.ts
+                         Direct Responses/HTTP Agents SDK adapter for one stage.
+openai-output-schemas.ts Strict Integrator and post-check transport schemas.
 platform-store.ts        Desktop app-local or explicit browser-session store.
 synthetic-qa-fixture.ts  Explicit development-only scripted result fixture.
 review.css               Responsive history, reading, and bounded overflow.
@@ -31,16 +36,21 @@ controller and valid capture alive. Changing source disposes the native session
 while saved entries retain their original opaque workspace identity and source.
 
 Prepared records are model-optional and export with the heading
-`PREPARED AI REVIEW — NOT AI CONCLUSIONS`. Desktop production uses the
-browser-safe `openai-agents-provider`; the Run button becomes available only
-after native readiness confirms `OPENAI_API_KEY`. Browser/report-only mode stays
-disabled without displaying or accepting a key. One explicit model applies to
-all stages and the nearby disclosure states exactly which captured material can
-be uploaded. The default controller also receives the application-owned
-Argument compiler provider, while compiler placement still defaults to none.
+`PREPARED AI REVIEW — NOT AI CONCLUSIONS`. The default app uses
+`@openai/agents` with one explicit browser client per stage and enables Run only
+while a session-memory key is configured. Analysis, Integrator, and post-check
+model IDs are independently editable, and the nearby disclosure states exactly
+which captured material can be uploaded. The default controller also receives
+the application-owned Argument compiler provider, while compiler placement
+still defaults to none.
 Tests can inject source, history/run repositories, clock/IDs, agent provider,
 and compiler provider. No model call, vault read, or rerun starts on
 mount/import.
+
+OpenAI uses the Responses API over HTTP. Browser use is explicitly enabled,
+SDK logging and tracing are disabled, and no SDK conversation/session state is
+shared. The key is not persisted but remains present in WebView memory while
+configured; this is the current local experimental credential mode.
 
 Desktop history is private app-local data, separate from the vault, Arguments,
 and graph preferences. Browser history is visibly session-only. Records are

@@ -441,6 +441,13 @@
   font-weight: 800;
 }
 
+.review-credential-fieldset form {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1fr) auto auto;
+  gap: 0.55rem;
+  align-items: end;
+}
+
 .review-check {
   display: flex;
   gap: 0.45rem;
@@ -696,6 +703,7 @@
 
   .review-form-grid,
   .review-model-row,
+  .review-credential-fieldset form,
   .review-context-search {
     grid-template-columns: 1fr;
   }

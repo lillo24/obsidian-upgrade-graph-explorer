@@ -12,6 +12,7 @@ import {
   type ReviewWorkspaceHandle,
 } from '../ai-review/ReviewWorkspace';
 import type { AiReviewController } from '../ai-review/controller';
+import type { OpenAiSessionCredentials } from '../ai-review/openai-session-credentials';
 import './workspace.css';
 
 export type WorkspaceArea = 'arguments' | 'review';
@@ -33,6 +34,7 @@ export function WorkspaceOverlay({
   controller,
   onAreaChange,
   onRequestClose,
+  openAiCredentials,
   open,
   restoreFocus,
 }: {
@@ -42,6 +44,7 @@ export function WorkspaceOverlay({
   readonly controller: AiReviewController;
   readonly onAreaChange: (area: WorkspaceArea) => void;
   readonly onRequestClose: () => void;
+  readonly openAiCredentials?: OpenAiSessionCredentials;
   readonly open: boolean;
   readonly restoreFocus?: HTMLElement;
 }) {
@@ -224,6 +227,7 @@ export function WorkspaceOverlay({
           <ReviewWorkspace
             active={open && area === 'review'}
             controller={controller}
+            {...(openAiCredentials === undefined ? {} : { openAiCredentials })}
             ref={reviewRef}
           />
         </div>
