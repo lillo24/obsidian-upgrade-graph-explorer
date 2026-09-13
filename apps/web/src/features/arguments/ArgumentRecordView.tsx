@@ -5,8 +5,8 @@ import {
   type ArgumentLibrary,
   type ArgumentRecordKind,
   type ArgumentTopic,
-  type TheorySourceReference,
 } from '@icarus-graph-explorer/argument-workspace';
+import type { ReactNode } from 'react';
 
 export interface ArgumentSelection {
   readonly kind: ArgumentRecordKind;
@@ -15,62 +15,6 @@ export interface ArgumentSelection {
 
 function MarkdownText({ children }: { readonly children: string }) {
   return <div className="arguments-markdown-text">{children}</div>;
-}
-
-function locator(reference: TheorySourceReference): string {
-  return (
-    reference.originalWikilink ??
-    `${reference.path}${
-      reference.heading === undefined ? '' : `#${reference.heading}`
-    }${reference.block === undefined ? '' : `^${reference.block}`}`
-  );
-}
-
-function SourceReferences({
-  references,
-  onCopy,
-}: {
-  readonly references: readonly TheorySourceReference[];
-  readonly onCopy: (value: string) => void;
-}) {
-  return (
-    <section className="arguments-reading-section">
-      <h3>Theory source locators</h3>
-      <p className="arguments-disclosure">
-        Recorded locators only — linked theory source text is unavailable and
-        has not been read or currently verified.
-      </p>
-      {references.length === 0 ? (
-        <p className="arguments-empty">No source references recorded.</p>
-      ) : (
-        <ul className="arguments-source-list">
-          {references.map((reference) => (
-            <li key={reference.id}>
-              <div>
-                <strong>{reference.label}</strong>{' '}
-                <span className="arguments-badge">{reference.role}</span>
-              </div>
-              <code>{locator(reference)}</code>
-              {reference.recordedVersion === undefined ? (
-                <small>No recorded version metadata.</small>
-              ) : (
-                <small>
-                  Recorded version:{' '}
-                  {reference.recordedVersion.sourceVersion ??
-                    'fingerprint only'}
-                  ; scope {reference.recordedVersion.fingerprintScope}. Not
-                  currently verified.
-                </small>
-              )}
-              <button onClick={() => onCopy(locator(reference))} type="button">
-                Copy locator
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
 }
 
 function Metadata({
@@ -210,13 +154,13 @@ export function ArgumentTopicView({
 export function ArgumentAxiomView({
   axiom,
   library,
-  onCopy,
   onNavigate,
+  sourceSection,
 }: {
   readonly axiom: ArgumentAxiom;
   readonly library: ArgumentLibrary;
-  readonly onCopy: (value: string) => void;
   readonly onNavigate: (selection: ArgumentSelection) => void;
+  readonly sourceSection: ReactNode;
 }) {
   const linked = library.counterArguments.filter(
     (counter) =>
@@ -256,7 +200,7 @@ export function ArgumentAxiomView({
           <MarkdownText>{axiom.supportingReasoning}</MarkdownText>
         </section>
       )}
-      <SourceReferences onCopy={onCopy} references={axiom.sourceReferences} />
+      {sourceSection}
       <section className="arguments-reading-section">
         <h3>Linked Counter-Arguments</h3>
         {linked.length === 0 ? (
@@ -295,15 +239,15 @@ function targetLabel(counter: ArgumentCounterArgument): string {
 export function ArgumentCounterArgumentView({
   counter,
   library,
-  onCopy,
   onNavigate,
   onReassess,
+  sourceSection,
 }: {
   readonly counter: ArgumentCounterArgument;
   readonly library: ArgumentLibrary;
-  readonly onCopy: (value: string) => void;
   readonly onNavigate: (selection: ArgumentSelection) => void;
   readonly onReassess: () => void;
+  readonly sourceSection: ReactNode;
 }) {
   const stale = responseStaleness(library, counter);
   return (
@@ -401,7 +345,7 @@ export function ArgumentCounterArgumentView({
           ) : null}
         </li>
       </ol>
-      <SourceReferences onCopy={onCopy} references={counter.sourceReferences} />
+      {sourceSection}
       <Metadata library={library} record={counter} />
     </article>
   );

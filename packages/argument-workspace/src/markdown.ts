@@ -30,12 +30,18 @@ function yamlString(value: string): string {
   return JSON.stringify(value);
 }
 
-function sourceLink(reference: TheorySourceReference): string {
+export function formatTheorySourceLocator(
+  reference: TheorySourceReference,
+): string {
   if (reference.originalWikilink !== undefined)
     return reference.originalWikilink;
+  const fragments = [
+    ...(reference.heading === undefined ? [] : [reference.heading]),
+    ...(reference.block === undefined ? [] : [`^${reference.block}`]),
+  ];
   const target = `${reference.path.replace(/\.md$/iu, '')}${
-    reference.heading === undefined ? '' : `#${reference.heading}`
-  }${reference.block === undefined ? '' : `^${reference.block}`}`;
+    fragments.length === 0 ? '' : `#${fragments.join('#')}`
+  }`;
   return `[[${target}|${reference.label}]]`;
 }
 
@@ -146,7 +152,7 @@ export function exportArgumentLibraryMarkdown(
           ? ['_None._']
           : axiom.sourceReferences.map(
               (reference) =>
-                `- ${sourceLink(reference)} — ${reference.role} (${reference.id})`,
+                `- ${formatTheorySourceLocator(reference)} — ${reference.role} (${reference.id})`,
             )),
       ].join('\n')}\n`,
     })),
@@ -224,7 +230,7 @@ export function exportArgumentLibraryMarkdown(
             ? ['_None._']
             : counter.sourceReferences.map(
                 (reference) =>
-                  `- ${sourceLink(reference)} — ${reference.role} (${reference.id})`,
+                  `- ${formatTheorySourceLocator(reference)} — ${reference.role} (${reference.id})`,
               )),
         ].join('\n')}\n`,
       };

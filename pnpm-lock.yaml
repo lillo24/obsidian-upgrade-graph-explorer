@@ -47,6 +47,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@icarus-graph-explorer/adapter-obsidian':
+        specifier: workspace:*
+        version: link:../../packages/adapter-obsidian
       '@icarus-graph-explorer/argument-workspace':
         specifier: workspace:*
         version: link:../../packages/argument-workspace
