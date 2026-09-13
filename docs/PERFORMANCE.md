@@ -262,7 +262,11 @@ all four operation boundaries and late completion, while healthy fake-bridge
 oracles confirm unchanged sources, sorting, excludes, strict UTF-8, and symlink
 skipping. The discovery and Tauri bridge sources are identical between working
 PR #92 head `0279f48bf663b4acf5944aef625e7984aebd691a` and PATCH3 parent
-`2bf373ffddbae44f69f3cf766d2fc8a228fa3e91`; native PATCH3 QA remains pending.
+`2bf373ffddbae44f69f3cf766d2fc8a228fa3e91`. The user then confirmed that the
+PATCH3 native candidate completed the previously stalled vault open. That result
+validates the candidate for the reported case, but does not establish that the
+diagnostic instrumentation caused the recovery or that the earlier stall was
+deterministic.
 
 ## KG12B2 W3 responsiveness evidence
 
