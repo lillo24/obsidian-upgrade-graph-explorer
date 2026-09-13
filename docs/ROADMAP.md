@@ -61,6 +61,7 @@ reorder KG14.
 | **SAVED1 — Saved Views**                            | Explicit named graph-context bookmarks with layout-appropriate presentation/spatial profiles.                                                                    | **Complete through SAVED1B.**                                                               |
 | **SAVED1A — Named semantic bookmarks**              | Workspace-scoped names over query, Scope/Layout, hierarchy detail, Focus, and semantic viewport bookmarks, with strict independent persistence.                  | **Complete — automated/browser evidence accepted for merge by explicit user instruction.**  |
 | **SAVED1B — Presentation/spatial profiles**         | Schema-v2 layout-appropriate Graph Preference profiles, All-Network spatial snapshots, derived quick switching, and rollback-protected Apply.                    | **Implemented — automated/browser/native merge gates tracked in the SAVED1B report.**       |
+| **SAVEDUX1 — Saved View load transition**           | Session-only visual acknowledgement after successful Apply and one exact startup match, with reduced-motion and latest-wins behavior.                            | **Implemented — automated/browser/native gates tracked in the SAVEDUX1 report.**            |
 
 ### ForceAtlas2 convergence track
 

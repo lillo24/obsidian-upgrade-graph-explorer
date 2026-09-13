@@ -229,6 +229,10 @@ import { NetworkEditingControls } from './NetworkEditingControls';
 import type { SavedGraphQueriesState } from './SavedGraphQueries';
 import type { SavedViewsState } from './SavedViews';
 import { SavedViewsPopover } from './SavedViewsPopover';
+import {
+  SavedViewTransitionOverlay,
+  type SavedViewVisualTransition,
+} from './SavedViewTransitionOverlay';
 import { StructureDepthControl } from './StructureDepthControl';
 import { VisualGroups } from './VisualGroups';
 import type { GlobalGraphViewProps } from './GlobalGraphView';
@@ -515,6 +519,27 @@ export function GraphExplorer({
       workspaceId,
     }),
   );
+  const [savedViewVisualTransition, setSavedViewVisualTransition] = useState<
+    SavedViewVisualTransition | undefined
+  >();
+  const savedViewTransitionGeneration = useRef(0);
+  const startupSavedViewTransitionChecked = useRef(false);
+  const showSavedViewTransition = useCallback(
+    (name: string, origin: SavedViewVisualTransition['origin']) => {
+      savedViewTransitionGeneration.current += 1;
+      setSavedViewVisualTransition({
+        name,
+        origin,
+        token: savedViewTransitionGeneration.current,
+      });
+    },
+    [],
+  );
+  const completeSavedViewTransition = useCallback((token: number) => {
+    setSavedViewVisualTransition((current) =>
+      current?.token === token ? undefined : current,
+    );
+  }, []);
   const [hydration] = useState(() =>
     hydrateGraphView({
       eligibility,
@@ -3061,6 +3086,7 @@ export function GraphExplorer({
                 } removed for this application only.`
           }${plan.adjustment === undefined ? '' : ` ${plan.adjustment}`}`,
         );
+        showSavedViewTransition(entry.name, 'apply');
         return undefined;
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
@@ -3083,6 +3109,7 @@ export function GraphExplorer({
       setGlobalSemanticViewportBookmark,
       setLocalSemanticViewportBookmark,
       setSemanticViewportBookmark,
+      showSavedViewTransition,
       temporaryFileMoveController,
       transitionNetworkEditing,
     ],
@@ -3129,6 +3156,13 @@ export function GraphExplorer({
     spatialOverrides.session.registry,
     viewportBookmark,
   ]);
+  useEffect(() => {
+    if (startupSavedViewTransitionChecked.current) return;
+    startupSavedViewTransitionChecked.current = true;
+    if (matchingNamedView !== undefined) {
+      showSavedViewTransition(matchingNamedView, 'startup-match');
+    }
+  }, [matchingNamedView, showSavedViewTransition]);
   const namedSavedViews = useMemo<SavedViewsState>(
     () => ({
       views: savedViewSession.registry.views,
@@ -5487,6 +5521,10 @@ export function GraphExplorer({
               visualVariant={hierarchyVisualVariantForScope(activeScope)}
             />
           )}
+          <SavedViewTransitionOverlay
+            onComplete={completeSavedViewTransition}
+            transition={savedViewVisualTransition}
+          />
           {networkLayoutActive &&
           networkExplorerModel !== undefined &&
           !networkExplorerVisible ? (

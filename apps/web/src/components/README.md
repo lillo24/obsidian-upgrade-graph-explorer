@@ -95,6 +95,10 @@ canonical truth, or own a platform storage implementation.
   stack. The selected label is derived from exact semantic/profile matching,
   never persisted identity. It also owns the viewport-bounded management portal,
   Escape/outside-pointer policy, initial input focus, and trigger focus return.
+- `SavedViewTransitionOverlay.tsx` owns the short, pointer-transparent visual
+  acknowledgement after a successful Named Saved View Apply or one exact
+  startup match. `GraphExplorer.tsx` owns the truthful trigger and latest-wins
+  token; the overlay owns only its static shard/text DOM and bounded timer.
 - `ExplorationControls.tsx` owns the accessible Scope and Layout button groups,
   focused-root text, and explained disabled Focus state. `../exploration-model.ts`
   owns the pure four-way mapping to existing internal modes plus the hierarchy
