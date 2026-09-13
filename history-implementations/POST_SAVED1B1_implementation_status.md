@@ -1,7 +1,7 @@
 # POST-SAVED1B1 implementation report
 
-Status: **implemented and locally/browser validated; native acceptance and
-merge remain gated.**
+Status: **implemented, locally/browser validated, and explicitly accepted for
+merge after native QA.**
 
 Implementation branch: `codex/post-saved1b-native-filter-fix`
 
@@ -9,9 +9,9 @@ Implementation branch: `codex/post-saved1b-native-filter-fix`
 is the isolated integration vehicle.
 
 The branch was created from the then-latest `origin/main` commit
-`c4d237c6abd72bfd37138cd297bea52ea1d7f76c` and was updated to the newer
-`dbc898e` main tip before opening the PR. The integration PR is intentionally
-kept in draft until the native checklist below is accepted.
+`c4d237c6abd72bfd37138cd297bea52ea1d7f76c` and was updated onto subsequent
+`main` revisions before integration. The integration PR was kept in draft until
+the native checklist below was accepted.
 
 ## Regression classification
 
@@ -193,9 +193,10 @@ Size: 13,188,096 bytes
 Built UTC: 2026-09-13T09:02:01.1132757Z
 ```
 
-Native computer control is disabled in this environment, so native pointer,
-keyboard, and WebView acceptance is not claimed. The draft PR must remain
-unmerged until the user reports this short checklist:
+Native computer control is disabled in this environment, so Codex did not
+directly observe native pointer, keyboard, or WebView behavior. The user
+reported "All Pass, merge" on 2026-09-13 after running this checklist, providing
+explicit native acceptance and merge authorization:
 
 1. Open the same vault.
 2. Filters -> Unresolved ON; the UI remains visible.
