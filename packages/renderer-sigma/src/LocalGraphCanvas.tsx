@@ -432,9 +432,11 @@ export function LocalGraphCanvas({
         ? { status: 'unavailable', reason: 'simulation-unavailable' }
         : !ready || layoutPending.current
           ? { status: 'unavailable', reason: 'simulation-not-running' }
-          : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
-            ? { status: 'unavailable', reason: 'graph-too-large' }
-            : { status: 'available' };
+          : physicsNodeCount === 0
+            ? { status: 'unavailable', reason: 'simulation-not-running' }
+            : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+              ? { status: 'unavailable', reason: 'graph-too-large' }
+              : { status: 'available' };
     callbacks.current.onTemporaryFileMoveCapabilityChange?.(capability);
   }, [layoutCommitKey, physicsNodeCount, physicsServiceFactory, ready]);
 
@@ -702,9 +704,11 @@ export function LocalGraphCanvas({
           reason:
             physicsService === undefined
               ? 'simulation-unavailable'
-              : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
-                ? 'graph-too-large'
-                : 'simulation-not-running',
+              : physicsNodeCount === 0
+                ? 'simulation-not-running'
+                : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+                  ? 'graph-too-large'
+                  : 'simulation-not-running',
         },
         sessionGeneration: physicsSessionGeneration.current,
         simulationGeneration: 'unavailable',

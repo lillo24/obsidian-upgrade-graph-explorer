@@ -1,4 +1,5 @@
 import {
+  forwardRef,
   useCallback,
   useDeferredValue,
   useEffect,
@@ -6,7 +7,10 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  useImperativeHandle,
   type ChangeEvent,
+  type ReactNode,
+  type RefObject,
   type SyntheticEvent,
 } from 'react';
 
@@ -543,17 +547,66 @@ function SearchPane({
   );
 }
 
-export function ArgumentsWorkspace({
-  open,
-  onRequestClose,
-  restoreFocus,
-  session,
-}: {
-  readonly open: boolean;
+export interface ArgumentsWorkspaceHandle {
+  handleEscape(): boolean;
+  requestExit(action: () => void, message?: string): void;
+  focusInitial(): void;
+}
+
+interface ArgumentsWorkspaceContentProps {
+  readonly active: boolean;
+  readonly embedded: boolean;
   readonly onRequestClose: () => void;
   readonly restoreFocus?: HTMLElement;
   readonly session: ArgumentWorkspaceSession;
+}
+
+function ArgumentsWorkspaceContainer({
+  active,
+  children,
+  dialogRef,
+  embedded,
+  onCancel,
+}: {
+  readonly active: boolean;
+  readonly children: ReactNode;
+  readonly dialogRef: RefObject<HTMLDialogElement | null>;
+  readonly embedded: boolean;
+  readonly onCancel: (event: SyntheticEvent<HTMLDialogElement>) => void;
 }) {
+  return embedded ? (
+    <section
+      aria-labelledby="arguments-workspace-title"
+      className="arguments-dialog arguments-dialog--embedded"
+      hidden={!active}
+    >
+      {children}
+    </section>
+  ) : (
+    <dialog
+      aria-labelledby="arguments-workspace-title"
+      className="arguments-dialog"
+      onCancel={onCancel}
+      ref={dialogRef}
+    >
+      {children}
+    </dialog>
+  );
+}
+
+const ArgumentsWorkspaceContent = forwardRef<
+  ArgumentsWorkspaceHandle,
+  ArgumentsWorkspaceContentProps
+>(function ArgumentsWorkspaceContent(
+  {
+    active: open,
+    embedded,
+    onRequestClose,
+    restoreFocus,
+    session,
+  }: ArgumentsWorkspaceContentProps,
+  ref,
+) {
   const state = useSyncExternalStore(
     session.subscribe,
     session.state,
@@ -601,31 +654,48 @@ export function ArgumentsWorkspace({
     requestTransition('Close Arguments with unsaved changes?', onRequestClose);
   }, [onRequestClose, requestTransition]);
 
-  useEffect(() => {
-    escapeAction.current = () => {
-      if (confirmation !== undefined) {
-        pendingTransition.current = undefined;
-        setConfirmation(undefined);
-        return;
-      }
-      if (contextExport !== undefined) {
-        setContextExport(undefined);
-        return;
-      }
-      if (markdownFiles !== undefined) {
-        setMarkdownFiles(undefined);
-        return;
-      }
-      if (importPreview !== undefined) {
-        setImportPreview(undefined);
-        return;
-      }
-      requestClose();
-    };
+  const handleEscape = useCallback((): boolean => {
+    if (confirmation !== undefined) {
+      pendingTransition.current = undefined;
+      setConfirmation(undefined);
+      return true;
+    }
+    if (contextExport !== undefined) {
+      setContextExport(undefined);
+      return true;
+    }
+    if (markdownFiles !== undefined) {
+      setMarkdownFiles(undefined);
+      return true;
+    }
+    if (importPreview !== undefined) {
+      setImportPreview(undefined);
+      return true;
+    }
+    requestClose();
+    return true;
   }, [confirmation, contextExport, importPreview, markdownFiles, requestClose]);
 
   useEffect(() => {
-    if (!open) return;
+    escapeAction.current = handleEscape;
+  }, [handleEscape]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      handleEscape,
+      requestExit(action, message = 'Leave Arguments with unsaved changes?') {
+        requestTransition(message, action);
+      },
+      focusInitial() {
+        (newTopicButtonRef.current ?? closeButtonRef.current)?.focus();
+      },
+    }),
+    [handleEscape, requestTransition],
+  );
+
+  useEffect(() => {
+    if (!open || embedded) return;
     const dialog = dialogRef.current;
     const closeButton = closeButtonRef.current;
     if (dialog === null || closeButton === null) return;
@@ -655,7 +725,7 @@ export function ArgumentsWorkspace({
       deactivate();
       if (dialog.open) dialog.close();
     };
-  }, [open, restoreFocus]);
+  }, [embedded, open, restoreFocus]);
 
   useEffect(() => {
     if (editor?.dirty !== true) return;
@@ -927,11 +997,11 @@ export function ArgumentsWorkspace({
       : undefined;
 
   return (
-    <dialog
-      aria-labelledby="arguments-workspace-title"
-      className="arguments-dialog"
+    <ArgumentsWorkspaceContainer
+      active={open}
+      dialogRef={dialogRef}
+      embedded={embedded}
       onCancel={cancelNative}
-      ref={dialogRef}
     >
       <div className="arguments-dialog__surface">
         <header className="arguments-dialog__header">
@@ -1527,9 +1597,42 @@ export function ArgumentsWorkspace({
           </section>
         )}
       </div>
-    </dialog>
+    </ArgumentsWorkspaceContainer>
+  );
+});
+
+export function ArgumentsWorkspace({
+  open,
+  onRequestClose,
+  restoreFocus,
+  session,
+}: {
+  readonly open: boolean;
+  readonly onRequestClose: () => void;
+  readonly restoreFocus?: HTMLElement;
+  readonly session: ArgumentWorkspaceSession;
+}) {
+  return (
+    <ArgumentsWorkspaceContent
+      active={open}
+      embedded={false}
+      onRequestClose={onRequestClose}
+      session={session}
+      {...(restoreFocus === undefined ? {} : { restoreFocus })}
+    />
   );
 }
+
+export const ArgumentsWorkspacePanel = forwardRef<
+  ArgumentsWorkspaceHandle,
+  {
+    readonly active: boolean;
+    readonly onRequestClose: () => void;
+    readonly session: ArgumentWorkspaceSession;
+  }
+>(function ArgumentsWorkspacePanel(props, ref) {
+  return <ArgumentsWorkspaceContent {...props} embedded ref={ref} />;
+});
 
 export function ArgumentWorkspaceOwner({
   open,

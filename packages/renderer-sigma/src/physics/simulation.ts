@@ -49,7 +49,7 @@ export function networkPhysicsNodeCountIsSupported(nodeCount: number): boolean {
       'Network physics node count must be a non-negative safe integer.',
     );
   }
-  return nodeCount <= NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT;
+  return nodeCount > 0 && nodeCount <= NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT;
 }
 
 /** Live Focus must settle in the displayed fixed frame as well as in shape. */

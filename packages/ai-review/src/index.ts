@@ -17,6 +17,7 @@ export {
 } from './engine';
 export { exportReviewRunJson, exportReviewRunMarkdown } from './export';
 export {
+  assertPlainData,
   assertSafeMetadata,
   clonePlainData,
   deepFreeze,
@@ -45,7 +46,9 @@ export {
 export {
   DEFAULT_COMPILER_POLICY,
   DEFAULT_REVIEW_LIMITS,
+  prepareReviewPromptPreview,
   prepareReviewInput,
+  validateReviewSource,
 } from './snapshot';
 export {
   DEFAULT_REVIEW_TEMPLATES,

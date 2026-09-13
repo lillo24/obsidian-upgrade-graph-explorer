@@ -714,6 +714,11 @@ export function GlobalGraphCanvas({
   const commitFinalGeometry = useCallback(
     (generation: object, positions: readonly GlobalLayoutPosition[]): void => {
       if (finalGeometryGenerationRef.current !== generation) return;
+      // An async source can mount the canvas with an empty projection before
+      // its first real graph arrives. Keep the initial presentation pending so
+      // that non-empty generation, rather than an unframeable placeholder,
+      // owns the first fit.
+      if (positions.length === 0) return;
       const pending = pendingInitialPresentation.current;
       if (pending === undefined) {
         setCommittedFinalGeometryGeneration((current) =>
@@ -953,9 +958,11 @@ export function GlobalGraphCanvas({
         ? { status: 'unavailable', reason: 'simulation-unavailable' }
         : !ready || layoutPendingState
           ? { status: 'unavailable', reason: 'simulation-not-running' }
-          : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
-            ? { status: 'unavailable', reason: 'graph-too-large' }
-            : { status: 'available' };
+          : physicsNodeCount === 0
+            ? { status: 'unavailable', reason: 'simulation-not-running' }
+            : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+              ? { status: 'unavailable', reason: 'graph-too-large' }
+              : { status: 'available' };
     if (startupTrace !== undefined) {
       sessionRef.current?.traceStartupEvent(
         'temporary-file-move-capability',
@@ -1701,6 +1708,7 @@ export function GlobalGraphCanvas({
   useEffect(() => {
     if (
       spatialRules !== undefined ||
+      input.nodes.length === 0 ||
       !ready ||
       layoutPending.current ||
       layoutPendingState
@@ -1785,6 +1793,7 @@ export function GlobalGraphCanvas({
   useEffect(() => {
     if (
       spatialRules === undefined ||
+      input.nodes.length === 0 ||
       !ready ||
       layoutPending.current ||
       layoutPendingState ||
@@ -1986,6 +1995,22 @@ export function GlobalGraphCanvas({
     if (!ready) return;
     const session = sessionRef.current;
     if (session === undefined) return;
+    if (input.nodes.length === 0) {
+      // Source loading can legitimately expose an empty generation. It has no
+      // layout or coordinate frame to adopt; the next non-empty input reruns
+      // this effect and remains responsible for initial presentation.
+      layoutPending.current = false;
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setLayoutPendingState(false);
+        setLayoutError(undefined);
+        setLayoutStatus(undefined);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
     let cancelled = false;
     const cancelledPreview = cancelArrangementPreview(
       'The layout changed; the unfinished folder movement was canceled.',
@@ -2136,9 +2161,11 @@ export function GlobalGraphCanvas({
           reason:
             physicsService === undefined
               ? 'simulation-unavailable'
-              : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
-                ? 'graph-too-large'
-                : 'simulation-not-running',
+              : physicsNodeCount === 0
+                ? 'simulation-not-running'
+                : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+                  ? 'graph-too-large'
+                  : 'simulation-not-running',
         },
         sessionGeneration: physicsSessionGeneration.current,
         simulationGeneration: 'unavailable',

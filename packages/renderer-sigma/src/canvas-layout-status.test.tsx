@@ -17,11 +17,18 @@ import type {
   LocalLayoutService,
 } from './types';
 
+const { globalApplySpatialPositions, globalCommitInitialPresentation } =
+  vi.hoisted(() => ({
+    globalApplySpatialPositions: vi.fn(async () => undefined),
+    globalCommitInitialPresentation: vi.fn(async () => undefined),
+  }));
+
 vi.mock('./session', () => ({
   GlobalRendererSession: class {
     ready = Promise.resolve();
     applyPositions = vi.fn(async () => undefined);
-    commitInitialPresentation = vi.fn(async () => undefined);
+    applySpatialPositions = globalApplySpatialPositions;
+    commitInitialPresentation = globalCommitInitialPresentation;
     createLayoutRequest = createGlobalLayoutRequest;
     destroy = vi.fn();
     setControlledSelection = vi.fn();
@@ -62,6 +69,7 @@ describe.each(['global', 'local'] as const)(
     let root: Root;
     beforeEach(() => {
       vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+      globalCommitInitialPresentation.mockClear();
       container = document.createElement('div');
       document.body.append(container);
       root = createRoot(container);
@@ -178,6 +186,9 @@ describe.each(['global', 'local'] as const)(
           container.querySelector(`.${mode}-graph-canvas__status`),
         ).toBeNull();
         expect(container.querySelector('[role="alert"]')).toBeNull();
+        if (mode === 'global') {
+          expect(globalCommitInitialPresentation).not.toHaveBeenCalled();
+        }
       },
     );
 
@@ -193,3 +204,44 @@ describe.each(['global', 'local'] as const)(
     });
   },
 );
+
+describe('empty Global layout generation', () => {
+  it('waits for a non-empty source without requesting or framing a layout', async () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    globalCommitInitialPresentation.mockClear();
+    globalApplySpatialPositions.mockClear();
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    const layout = vi.fn();
+    const onFailure = vi.fn();
+
+    await act(() =>
+      root.render(
+        <GlobalGraphCanvas
+          fitRequestKey={0}
+          layoutRequestKey={0}
+          layoutService={{ dispose: vi.fn(), layout }}
+          onFailure={onFailure}
+          onNodeActivate={vi.fn()}
+          onSelectionChange={vi.fn()}
+          onViewportObservation={vi.fn()}
+          projection={{ nodes: [], edges: [], issues: [] }}
+          selection={null}
+          settings={{ folderClustering: true, spacingPreset: 'normal' }}
+          spatialRules={[]}
+          trackpadZoomMode="pinch-zoom"
+        />,
+      ),
+    );
+
+    expect(layout).not.toHaveBeenCalled();
+    expect(globalApplySpatialPositions).not.toHaveBeenCalled();
+    expect(globalCommitInitialPresentation).not.toHaveBeenCalled();
+    expect(onFailure).not.toHaveBeenCalled();
+
+    await act(() => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  });
+});

@@ -71,6 +71,8 @@ function end(sequence = 2) {
 describe('ContinuousNetworkSimulation', () => {
   it('exposes the evidence-backed supported Move boundary', () => {
     expect(NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT).toBe(100);
+    expect(networkPhysicsNodeCountIsSupported(0)).toBe(false);
+    expect(networkPhysicsNodeCountIsSupported(1)).toBe(true);
     expect(networkPhysicsNodeCountIsSupported(100)).toBe(true);
     expect(networkPhysicsNodeCountIsSupported(101)).toBe(false);
     expect(() => networkPhysicsNodeCountIsSupported(-1)).toThrow(

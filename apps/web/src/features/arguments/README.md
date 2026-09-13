@@ -4,9 +4,9 @@ This folder owns the application-level Arguments workspace. It is independent
 of graph projection and rendering; the graph shell only hosts its launcher and
 requests open/close transitions.
 
-- `ArgumentsWorkspace.tsx` owns onboarding, modal UI, drafts, navigation,
-  search, import previews, and confirmed-snapshot exports. Its owner remains
-  mounted above report-keyed graph remounts.
+- `ArgumentsWorkspace.tsx` owns onboarding, drafts, navigation, search, import
+  previews, and confirmed-snapshot exports. It exposes a narrow leave guard to
+  the shared workspace modal while keeping a standalone wrapper for tests.
 - `ArgumentRecordView.tsx` presents Topic, Axiom, Counter-Argument, source
   locator, status, and metadata reading views without resolving sources.
 - `ArgumentRecordEditor.tsx` owns schema-shaped authoring controls, including
@@ -16,8 +16,8 @@ requests open/close transitions.
   and mutations, immutable reader replacement, and atomic multi-operation Save.
 - `platform-store.ts` selects the browser profile store or desktop app-local
   store once on first access. It never falls back across platforms.
-- `argument-overlay.ts` owns modal scroll lock, nested Escape order, focus
-  containment, and visible focus restoration.
+- `argument-overlay.ts` remains the focus/escape implementation used by the
+  shared workspace host and the standalone Arguments test wrapper.
 - `context-export.ts` formats complete core reader bundles; it does not recreate
   closure logic and always discloses that linked theory text was not read.
 - `markdown-directory-export.ts` preserves the core export's safe relative
