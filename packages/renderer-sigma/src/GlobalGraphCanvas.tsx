@@ -2151,6 +2151,9 @@ export function GlobalGraphCanvas({
     if (
       physicsService === undefined ||
       !ready ||
+      // The state mirror updates asynchronously; the ref closes the layout
+      // generation handoff before physics can compose adjacent node sets.
+      layoutPending.current ||
       layoutPendingState ||
       !networkPhysicsNodeCountIsSupported(physicsNodeCount)
     ) {

@@ -147,6 +147,28 @@ h2 {
   display: none;
 }
 
+.graph-search-controls {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(12rem, 18rem) minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: start;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid #e0e7ea;
+  background: #f9fbfc;
+}
+
+.graph-search-controls > .saved-view-switcher {
+  width: 100%;
+}
+
+.graph-search-controls > .entity-search {
+  min-width: 0;
+  padding: 0;
+  border-bottom: 0;
+  background: transparent;
+}
+
 .entity-search {
   display: grid;
   flex: 0 0 auto;
@@ -3942,6 +3964,12 @@ a:focus-visible {
   .saved-view-switcher select {
     width: auto;
     max-width: none;
+  }
+
+  .graph-search-controls {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: 0.4rem;
+    padding-inline: 0.55rem;
   }
 
   .graph-workspace--maximized .graph-floating-controls {

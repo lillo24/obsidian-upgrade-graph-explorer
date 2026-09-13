@@ -18,6 +18,11 @@ import {
   globalLayoutFingerprint,
 } from './layout';
 import { mapProjectionToGlobal } from './mapping';
+import type {
+  NetworkPhysicsServiceFactory,
+  NetworkPhysicsServiceFactoryOptions,
+  NetworkPhysicsSeed,
+} from './physics';
 import { GlobalRendererSession } from './session';
 import { SigmaTestRenderer } from './sigma-test-renderer';
 import {
@@ -55,6 +60,13 @@ beforeEach(() => {
   vi.stubGlobal('window', {
     setTimeout: vi.fn(() => 1),
     clearTimeout: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  });
+  vi.stubGlobal('document', {
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    visibilityState: 'visible',
   });
 });
 
@@ -64,6 +76,89 @@ afterEach(() => {
 });
 
 describe('production spatial rule adoption', () => {
+  it('does not initialize physics with adjacent coordinate generations during a topology change', async () => {
+    const fullProjection = globalTestProjection();
+    let projection = fullProjection;
+    const fullInput = mapProjectionToGlobal(fullProjection, settings);
+    const spatialRules: readonly FolderSpatialRule[] = [];
+    const cache = new GlobalLayoutCache();
+    cache.set(
+      globalLayoutFingerprint(createGlobalLayoutRequest(fullInput, settings)),
+      globalLayoutPositionsFromInput(fullInput),
+    );
+    const layout = vi.fn(() => new Promise<GlobalLayoutResult>(() => {}));
+    const layoutService = { layout, dispose: noop };
+    const initialize = vi.fn<(seed: NetworkPhysicsSeed) => void>();
+    let physicsOptions: NetworkPhysicsServiceFactoryOptions | undefined;
+    const physicsServiceFactory: NetworkPhysicsServiceFactory = (options) => {
+      physicsOptions = options;
+      return {
+        begin: noop,
+        update: noop,
+        end: noop,
+        initialize,
+        invalidate: noop,
+        dispose: noop,
+      };
+    };
+    const harness = new CanvasTestHarness(() =>
+      GlobalGraphCanvas({
+        projection,
+        settings,
+        spatialRules,
+        spatialSourceKey: 'filter-transition',
+        fitRequestKey: 0,
+        layoutCache: cache,
+        layoutRequestKey: 0,
+        layoutService,
+        physicsServiceFactory,
+        temporaryConstraintActive: true,
+        onFailure: vi.fn(),
+        onNodeActivate: noop,
+        onSelectionChange: noop,
+        onViewportObservation: noop,
+        selection: null,
+        trackpadZoomMode: 'pinch-zoom',
+      }),
+    );
+    await harness.flush();
+    expect(initialize).toHaveBeenCalled();
+
+    const visibleNodeIds = new Set(['entity:doc-a', 'entity:doc-b']);
+    const initializationCount = initialize.mock.calls.length;
+    const seed = initialize.mock.calls.at(-1)![0];
+    physicsOptions?.onRawFrame?.({
+      schemaVersion: 2,
+      kind: 'frame',
+      state: 'sleeping',
+      sessionGeneration: seed.sessionGeneration,
+      simulationGeneration: seed.simulationGeneration,
+      frameSequence: 1,
+      iterationsCompleted: 1,
+      interactionRevision: 0,
+      gestureId: 'filter-transition',
+      constraintNodeKey: 'entity:doc-a',
+      commandSequence: 0,
+      constraintSequence: null,
+      positions: seed.nodes.map(({ key, x, y }) => ({ key, x, y })),
+    });
+    projection = {
+      ...fullProjection,
+      nodes: fullProjection.nodes.filter((node) => visibleNodeIds.has(node.id)),
+      edges: fullProjection.edges.filter(
+        (edge) =>
+          visibleNodeIds.has(edge.sourceNodeId) &&
+          visibleNodeIds.has(edge.targetNodeId),
+      ),
+    };
+    harness.invalidate();
+
+    await expect(harness.flush()).resolves.toBeUndefined();
+    expect(layout).toHaveBeenCalledTimes(1);
+    expect(initialize).toHaveBeenCalledTimes(initializationCount);
+    harness.destroy();
+  });
+
   it.each(['place', 'pull'] as const)(
     'removes the only %s rule with one raw-frame position transaction',
     async (behavior) => {

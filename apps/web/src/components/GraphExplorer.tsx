@@ -185,7 +185,7 @@ import {
 import { deriveProjectionVisualGroupPresentationMap } from '../visual-groups/presentation';
 import {
   captureSavedView,
-  matchingSavedViewName,
+  matchingCurrentSavedViewName,
   planSavedViewApply,
   sameSavedViewSemanticSnapshot,
 } from '../saved-view';
@@ -3094,8 +3094,8 @@ export function GraphExplorer({
     if ((rendererMode === 'local') !== (activeViewState.focus !== undefined)) {
       return undefined;
     }
-    return matchingSavedViewName(
-      captureSavedView({
+    return matchingCurrentSavedViewName(
+      {
         name: 'Current View',
         workspace: projectionWorkspace,
         state: activeViewState,
@@ -3114,7 +3114,7 @@ export function GraphExplorer({
         },
         preferences,
         spatial: spatialOverrides.session.registry,
-      }),
+      },
       savedViewSession.registry.views,
     );
   }, [
@@ -4698,7 +4698,6 @@ export function GraphExplorer({
             onBack={goBack}
             onForward={goForward}
           />
-          <SavedViewsPopover {...namedSavedViews} />
           <button
             aria-controls="graph-tools-panel"
             aria-expanded={activeOverlay === 'tools'}
@@ -4783,12 +4782,15 @@ export function GraphExplorer({
           </button>
         </div>
         <div className="graph-tools-panel__body" data-graph-scroll-container>
-          <EntitySearch
-            key={transientResetKey}
-            onNavigate={navigateToEntity}
-            {...(performance === undefined ? {} : { performance })}
-            workspace={inspectionWorkspace}
-          />
+          <div className="graph-search-controls">
+            <SavedViewsPopover {...namedSavedViews} />
+            <EntitySearch
+              key={transientResetKey}
+              onNavigate={navigateToEntity}
+              {...(performance === undefined ? {} : { performance })}
+              workspace={inspectionWorkspace}
+            />
+          </div>
 
           <div className="graph-toolbar" aria-label="Graph view controls">
             {maximized ? null : (
@@ -4814,7 +4816,6 @@ export function GraphExplorer({
               onScopeChange={changeExplorationScope}
               scope={activeScope}
             />
-            {maximized ? null : <SavedViewsPopover {...namedSavedViews} />}
             {networkLayoutActive ? (
               <NetworkEditingControls
                 {...(activeScope !== 'all' ||
