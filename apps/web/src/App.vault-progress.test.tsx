@@ -18,6 +18,7 @@ import type {
   VaultSelection,
 } from '@icarus-graph-explorer/source-provider-tauri';
 import { validateObsidianDiagnosticReport } from '@icarus-graph-explorer/diagnostics-obsidian';
+import { createStableIdentityCatalog } from '@icarus-graph-explorer/stable-identity';
 
 const mocks = vi.hoisted(() => ({
   graphRenderCount: 0,
@@ -80,6 +81,9 @@ if (!sampleValidation.valid) throw new Error('Expected a valid sample report.');
 const SAMPLE_REPORT = sampleValidation.value;
 
 function openedVault(): OpenedDesktopVault {
+  const identityCatalog = createStableIdentityCatalog(
+    'progress-test-workspace',
+  );
   return {
     status: 'opened',
     displayName: 'vault',
@@ -100,7 +104,14 @@ function openedVault(): OpenedDesktopVault {
       referencesReused: 0,
       referencesNew: 0,
     },
-    runtime: {} as OpenedDesktopVault['runtime'],
+    runtime: {
+      identitySession: {
+        selection: SELECTION,
+        workspaceId: identityCatalog.workspaceId,
+        catalog: identityCatalog,
+        association: 'existing',
+      },
+    } as OpenedDesktopVault['runtime'],
   };
 }
 
