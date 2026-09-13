@@ -43,15 +43,15 @@ overrides, interaction preferences, and experiment gates remain separate.
 
 ## 2. Overall readiness
 
-| Area                                        | Readiness                                   | Evidence                                                                                                                                                                       |
-| ------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Canonical correctness and source neutrality | Ready                                       | Package contracts, schema-v3 tests, projection/inspection oracles, and source-neutral renderer boundaries.                                                                     |
-| All/Focus and Network/Hierarchy workflows   | Ready with polish work                      | Production-browser traversal of all four combinations, Hops/direction, depth 0–3, Custom disclosure, history, and reload.                                                      |
-| Live-vault safety                           | Ready                                       | Ordered prepare → persist → commit, latest-result rejection, paused recovery, last-valid-graph preservation, and Rescan tests.                                                 |
-| Browser runtime                             | Ready after KG14A fixes                     | Production build exercised without current warnings/errors; the Network refresh crash and missing Focus-root crash found by KG14A are fixed and regression-tested.             |
-| Accessibility                               | Network gate addressed; follow-up remains   | Both Sigma canvases stay visual-only, while KG14B2 supplies a synchronized virtualized DOM tree. QUERY1 announcement, contrast, scaling, and final manual feedback remain.     |
-| Desktop security/distribution               | Not release-ready                           | Narrow filesystem capabilities are good, but CSP is disabled, versions remain `0.0.0`, and bundling is inactive.                                                               |
-| Performance                                 | Ready for bounded use; feedback gap remains | Worker split and small profiles are healthy. A prior aggregate-only real-vault Rescan took about 9.7 seconds, while the UI exposes phase text rather than meaningful progress. |
+| Area                                        | Readiness                                      | Evidence                                                                                                                                                                                                                                        |
+| ------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Canonical correctness and source neutrality | Ready                                          | Package contracts, schema-v3 tests, projection/inspection oracles, and source-neutral renderer boundaries.                                                                                                                                      |
+| All/Focus and Network/Hierarchy workflows   | Ready with polish work                         | Production-browser traversal of all four combinations, Hops/direction, depth 0–3, Custom disclosure, history, and reload.                                                                                                                       |
+| Live-vault safety                           | Ready                                          | Ordered prepare → persist → commit, latest-result rejection, paused recovery, last-valid-graph preservation, and Rescan tests.                                                                                                                  |
+| Browser runtime                             | Ready after KG14A fixes                        | Production build exercised without current warnings/errors; the Network refresh crash and missing Focus-root crash found by KG14A are fixed and regression-tested.                                                                              |
+| Accessibility                               | Network gate addressed; follow-up remains      | Both Sigma canvases stay visual-only, while KG14B2 supplies a synchronized virtualized DOM tree. QUERY1 announcement, contrast, scaling, and final manual feedback remain.                                                                      |
+| Desktop security/distribution               | Not release-ready                              | Narrow filesystem capabilities are good, but CSP is disabled, versions remain `0.0.0`, and bundling is inactive.                                                                                                                                |
+| Performance                                 | Ready for bounded use; native baseline pending | Worker split and small profiles are healthy. Vault opening now exposes truthful typed phases, exact Markdown count once known, an indeterminate bar, and monotonic elapsed time; current-main foreground/background native QA is still pending. |
 
 No evidence supports replacing either renderer, changing the canonical model,
 or adding a general cache in KG14.
@@ -208,28 +208,32 @@ or adding a general cache in KG14.
   explicit distribution decision, not implicit scope.
 - **Decision required?:** Yes; see D-02.
 
-### KG14A-04 — long source transactions provide status but little progress
+### KG14A-04 — long source transactions provide meaningful progress
 
 - **Category:** Loading / perceived performance
-- **Severity / class:** P1 / Should
+- **Severity / class:** P1 / Should — progress UX implemented
 - **Confidence:** High
 - **Workflow:** Open a sizeable vault or perform a full Rescan
-- **Observed behavior:** The last valid graph remains visible and the UI reports
-  Opening/Catching up/Resyncing. It does not expose file counts, phase progress,
-  elapsed time, or an indeterminate-progress affordance beyond text.
+- **Observed behavior:** The last valid graph remains visible. Initial open now
+  reports acquisition, workspace build with the exact acquired Markdown count,
+  identity persistence, worker commit, and replacement recovery. Opening also
+  shows monotonic elapsed time and an accessible indeterminate bar; Catching up,
+  Updating, and Resyncing reuse that bar.
 - **Why it matters:** Aggregate-only real-vault evidence from KG12A recorded a
   roughly 9.7-second full Rescan, about 9.1 seconds of which was source
   reconciliation. At that duration users can reasonably interpret the app as
   stalled.
 - **Reproduction:** Open or Rescan a large local vault and observe the source
   notice while the W1 transaction runs.
-- **Evidence:** App source-notice strings, worker transaction boundary, and the
-  prior aggregate-only runtime sample. No private names, paths, content, or
-  topology are included here.
-- **Likely implementation area:** Source provider discovery/reconciliation
-  events, W1 request progress, `WorkspaceNotice`, and Source settings.
-- **Suggested direction:** Add coarse, serializable phase/count progress without
-  changing transactional adoption or exposing private paths.
+- **Evidence:** Typed `desktop-vault` stage tests, exact-inventory count and
+  observer-isolation oracles, App cancellation/failure tests, accessible notice
+  tests, and the prior aggregate-only runtime sample. No private names, paths,
+  content, or topology are included here.
+- **Implementation:** `desktop-vault`, `desktop-live-vault`, App generation
+  guards, `WorkspaceNotice`, and `vault-open-progress` presentation helpers.
+- **Native status:** The progress UX is implemented. Current-main native
+  foreground/background/minimized baseline QA remains pending user evaluation;
+  the loading surface alone does not resolve that separate startup question.
 - **Decision required?:** No.
 
 ### KG14A-05 — active source and live state are hidden behind Settings
@@ -699,14 +703,15 @@ local investigative run, not portable promises or CI thresholds.
 
 ## 17. Ranked implementation queue
 
-| Priority | Finding IDs                                      | Theme                               | User impact                                                                                             | Confidence  | Suggested implementation slice                          | Needs user decision? |
-| -------- | ------------------------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------- | -------------------- |
-| 1        | KG14A-07, contrast/manual scaling feedback       | Accessible feedback                 | Closes query announcement and remaining verified contrast/scaling gaps                                  | High        | KG14B follow-up — critical feedback and manual evidence | No                   |
-| 2        | KG14A-03                                         | Desktop hardening                   | Produces an identifiable, CSP-hardened, installable release artifact                                    | High        | KG14C — release configuration and packaged smoke        | Yes: D-02            |
-| 3        | KG14A-04, KG14A-05                               | Source confidence and progress      | Users know what is open/live and whether long work is progressing                                       | High        | KG14D — source onboarding/status/progress               | Yes: D-03 placement  |
-| 4        | KG14A-06, KG14A-09, KG14A-10, KG14A-08           | Workflow comprehension and recovery | Improves small Network readability, provenance scanning, depth mental model, and deletion safety        | Medium–High | KG14E — exploration polish                              | Yes only for D-04    |
-| Done     | KG14A-02                                         | Equivalent Network exploration      | Adds a virtualized DOM path for projected discovery, adjacency traversal, selection, and centering      | High        | KG14B2                                                  | No                   |
-| Done     | KG14A-01, KG14A-11, KG14A-12, KG14A-13, KG14A-14 | Audit-enabling fixes                | Prevents critical graph failures, restores query/empty-result feedback, and removes terminology leakage | High        | KG14A                                                   | No                   |
+| Priority | Finding IDs                                      | Theme                               | User impact                                                                                                                    | Confidence  | Suggested implementation slice                          | Needs user decision? |
+| -------- | ------------------------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------- | ------------------------------------------------------- | -------------------- |
+| 1        | KG14A-07, contrast/manual scaling feedback       | Accessible feedback                 | Closes query announcement and remaining verified contrast/scaling gaps                                                         | High        | KG14B follow-up — critical feedback and manual evidence | No                   |
+| 2        | KG14A-03                                         | Desktop hardening                   | Produces an identifiable, CSP-hardened, installable release artifact                                                           | High        | KG14C — release configuration and packaged smoke        | Yes: D-02            |
+| 3        | KG14A-05                                         | Source confidence                   | Users know what is open/live without first opening Settings                                                                    | High        | KG14D — source onboarding/status                        | Yes: D-03 placement  |
+| 4        | KG14A-06, KG14A-09, KG14A-10, KG14A-08           | Workflow comprehension and recovery | Improves small Network readability, provenance scanning, depth mental model, and deletion safety                               | Medium–High | KG14E — exploration polish                              | Yes only for D-04    |
+| Done     | KG14A-02                                         | Equivalent Network exploration      | Adds a virtualized DOM path for projected discovery, adjacency traversal, selection, and centering                             | High        | KG14B2                                                  | No                   |
+| Done     | KG14A-04                                         | Source progress                     | Adds truthful open phases/counts, accessible indeterminate progress, monotonic elapsed time, and live-operation progress reuse | High        | Current-main startup progress baseline                  | No                   |
+| Done     | KG14A-01, KG14A-11, KG14A-12, KG14A-13, KG14A-14 | Audit-enabling fixes                | Prevents critical graph failures, restores query/empty-result feedback, and removes terminology leakage                        | High        | KG14A                                                   | No                   |
 
 Future SAVED1B presentation/spatial profiles, manual positions, cluster dragging, multi-focus,
 analytics/community detection, semantic similarity, source editing, cloud sync,

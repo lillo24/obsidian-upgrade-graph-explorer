@@ -182,6 +182,35 @@ version/request correlation, the receiving side validates order/completeness,
 and both sides yield between frames. No JSON serialization, parsed documents,
 engine object, full delta, source path, or identifier enters the result.
 
+### Current-main startup progress baseline
+
+Candidate A starts from `d8b86b81c2ef41864d19c9d30a6131ae92b9e1e4`
+and adds observation/presentation only. Initial vault opening publishes typed
+events immediately before source acquisition, W1 workspace preparation,
+identity persistence, candidate commit, and replacement recovery. Listeners are
+synchronous, non-awaited, and isolated from startup correctness; the display
+interval only requests a render and recomputes elapsed time from
+`performance.now()`.
+
+The existing startup transport remains unchanged: request chunks still default
+to 8, and the browser worker/client still yield with `setTimeout`. The older
+`e4926178ad292e775c5555b06fb672869aff3d94` experiment has merge base
+`440383234696db1fbc67507d048aff4a70842a60` and is 20 commits behind this
+baseline while carrying two unique commits, so it is not a valid current-main
+A/B comparison. PR #92 (`0279f48bf663b4acf5944aef625e7984aebd691a`)
+changed no W1 startup transport files. The user reported that PR #92's native
+executable opened the same real vault successfully while backgrounded; that is
+user-provided evidence, not Codex-executed native QA. Candidate A native
+foreground/background/minimized validation remains pending user evaluation.
+
+The 2026-09-13 Candidate A automated run preserved exact report/catalog
+equality. Medium (500 documents, 8,500 entities, 16,000 references) recorded
+730.044 ms worker compute, 1,599.385 ms round trip, and a 31.870 ms high gap,
+versus 840.466 ms direct. Large (2,000 documents, 42,000 entities, 80,000
+references) recorded 3,162.352 ms worker compute, 7,429.780 ms round trip, and a
+34.026 ms high gap, versus 5,447.305 ms direct. These single local runs are
+diagnostic evidence rather than portable thresholds.
+
 ## KG12B2 W3 responsiveness evidence
 
 `pnpm benchmark:dagre-worker -- --profile small` and `--profile medium` derive

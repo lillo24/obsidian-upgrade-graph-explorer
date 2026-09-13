@@ -17,6 +17,7 @@ import {
 import {
   DesktopVaultOpenError,
   openSelectedDesktopVault,
+  type DesktopVaultOpenProgressListener,
   type DesktopVaultRuntime,
   type DesktopVaultServices,
   type OpenedDesktopVault,
@@ -596,6 +597,7 @@ export async function openLiveDesktopVault(
   selection: VaultSelection,
   identityOptions: PrepareWorkspaceIdentityOptions = {},
   services?: DesktopLiveVaultServices,
+  onProgress?: DesktopVaultOpenProgressListener,
 ): Promise<OpenLiveDesktopVaultResult> {
   const resolvedServices =
     services ??
@@ -632,6 +634,7 @@ export async function openLiveDesktopVault(
       selection,
       identityOptions,
       resolvedServices,
+      onProgress,
     );
   } catch (error: unknown) {
     await subscription.stop();

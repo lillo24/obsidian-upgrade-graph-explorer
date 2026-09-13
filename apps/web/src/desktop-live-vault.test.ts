@@ -29,6 +29,7 @@ import {
   openLiveDesktopVault,
   type DesktopLiveVaultServices,
 } from './desktop-live-vault';
+import type { DesktopVaultOpenProgress } from './desktop-vault';
 
 const SELECTION: VaultSelection = {
   rootPath: 'C:/private/vault',
@@ -204,6 +205,28 @@ async function openedController(
 }
 
 describe('desktop live vault controller', () => {
+  it('forwards initial-open progress without changing live startup', async () => {
+    const provider = new FakeLiveProvider();
+    const progress: DesktopVaultOpenProgress[] = [];
+
+    const result = await openLiveDesktopVault(
+      provider,
+      SELECTION,
+      {},
+      liveServices(),
+      (event) => progress.push(event),
+    );
+
+    expect(progress.map(({ stage }) => stage)).toEqual([
+      'acquiring-source',
+      'building-workspace',
+      'persisting-identity',
+      'committing-workspace',
+    ]);
+    expect(result.controller?.snapshot().phase).toBe('live');
+    await result.controller?.stop();
+  });
+
   it('starts watching before discovery and drains bootstrap changes in order', async () => {
     const provider = new FakeLiveProvider();
     const changed = inventory('# A\n\n## Added');
