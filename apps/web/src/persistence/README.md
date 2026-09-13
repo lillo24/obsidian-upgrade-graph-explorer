@@ -22,9 +22,10 @@ an explicit unreadable state. The UI limits explicitly selected JSON imports to
   records and returns explicit, non-fatal read/write/delete failures.
 - `session.ts` applies report identity eligibility and hydrates a reconciled KG6
   state before React autosave may run.
-- `saved-views.ts` owns the strict schema-v1 Named Saved Views registry and pure
-  add/update/rename/delete operations. Each entry combines one immutable KG9
-  semantic snapshot with a trimmed name and Network/Hierarchy choice.
+- `saved-views.ts` owns the strict schema-v2 Named Saved Views registry, strict
+  in-memory schema-v1 migration, and pure add/update/rename/delete operations.
+  Each new entry combines one immutable KG9 semantic snapshot with a trimmed
+  name, Network/Hierarchy choice, and a layout-appropriate discriminated profile.
 - `saved-views-session.ts` applies stable-workspace eligibility,
   write-before-adopt mutation policy, blocked-write behavior, and a narrow
   corrupt-registry reset that deletes only the Saved Views key.
@@ -73,12 +74,22 @@ current camera and never replay the source-load Fit.
 
 Named Saved Views use the separate key
 `icarus-graph-explorer:saved-views:<encodeURIComponent(workspaceId)>`. The
-schema-v1 registry contains its workspace ID plus at most 50 deterministically
+schema-v2 registry contains its workspace ID plus at most 50 deterministically
 sorted entries. Names are trimmed, at most 64 characters, and case-insensitively
 unique. Embedded view-state records use the existing strict schema-v3 validator,
-must belong to the same workspace, and are checked for Scope/Layout coherence.
-Raw renderer transforms, coordinates, selection, search, preferences, Visual
-Groups, per-File sizes, and folder spatial rules cannot cross this boundary.
+must belong to the same workspace, and are checked for Scope/Layout/profile
+coherence. Schema-v1 records migrate strictly in memory without a read-time
+write; the next explicit mutation serializes v2 and profile-less migrated entries
+retain semantic-only SAVED1A behavior.
+
+The v2 profile is discriminated by Scope × Layout. All Network owns the complete
+validated Global Layout Settings value and one validated snapshot of the
+workspace's committed folder spatial registry. Focus Network owns only Reference
+Pull, Base node size, Link thickness, and Label threshold. Focus Hierarchy owns
+only its appearance/implementation and modular presentation policies. All
+Hierarchy has an explicit empty profile. Trackpad Zoom, experiment gates, Saved
+Filters, Visual Groups, per-File sizes/movement, raw coordinates, selection,
+search, and shell state never enter the registry.
 
 Stable writable workspaces commit Named Saved Views before adopting them in
 memory. Transient, legacy, and storage-unavailable sessions expose the feature
@@ -86,7 +97,12 @@ as disabled with an explanation. Corrupt bytes are preserved and block writes;
 the product's confirmed registry recovery deletes only this key. Applying an
 entry does not rewrite the registry. Instead, the web orchestration reconciles
 its semantic snapshot against current canonical IDs and lets ordinary Current
-View autosave persist the applied result.
+View autosave persist the applied result. Profile application uses a wider
+write-before-adopt transaction: validate both owners, snapshot exact previous
+bytes, write changed spatial state before Graph Preferences, roll back successful
+writes if a later write fails, and only then adopt the combined profile and
+semantic state. Browser storage is not presented as database-atomic; rollback
+failure is surfaced explicitly.
 
 Saved Filters use the separate key
 `icarus-graph-explorer:saved-filters:<encodeURIComponent(workspaceId)>` and are

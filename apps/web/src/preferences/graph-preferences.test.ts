@@ -8,10 +8,14 @@ import {
 
 import type { StorageLike } from '../persistence/storage';
 import {
+  applyFocusHierarchySettings,
+  captureFocusHierarchySettings,
   DEFAULT_GRAPH_PREFERENCES,
   GRAPH_PREFERENCES_STORAGE_KEY,
   loadGraphPreferences,
   saveGraphPreferences,
+  serializeGraphPreferences,
+  validateFocusHierarchySettings,
 } from './graph-preferences';
 
 function memoryStorage(
@@ -539,5 +543,67 @@ describe('Experimental All Hierarchy preference compatibility', () => {
       showExperimentalAllHierarchy: true,
       trackpadZoomMode: 'pinch-zoom',
     });
+  });
+});
+
+describe('Focus Hierarchy Saved View profile boundary', () => {
+  it('captures and applies only the hierarchy-presentation subset', () => {
+    const savedPreferences = {
+      ...DEFAULT_GRAPH_PREFERENCES,
+      focusAppearance: 'minimal' as const,
+      focusHierarchyImplementation: 'modular-preview' as const,
+      modularFocusInternalLayout: 'vertical-spine' as const,
+      modularFocusHeadingOrder: 'document-order' as const,
+      modularFocusMacroLayout: 'soft-folder-clusters' as const,
+      modularFocusSoftFolderStrength: 81,
+      modularFolderStripsVisible: false,
+      modularConnectionStyle: 'electronic' as const,
+    };
+    const current = {
+      ...DEFAULT_GRAPH_PREFERENCES,
+      globalLayoutSettings: {
+        folderClustering: false,
+        spacingPreset: 'compact' as const,
+      },
+      localLayoutMode: 'free' as const,
+      showExperimentalAllHierarchy: true,
+      trackpadZoomMode: 'pinch-zoom' as const,
+    };
+
+    const profile = captureFocusHierarchySettings(savedPreferences);
+    const applied = applyFocusHierarchySettings(current, profile);
+
+    expect(captureFocusHierarchySettings(applied)).toEqual(profile);
+    expect(applied.globalLayoutSettings).toBe(current.globalLayoutSettings);
+    expect(applied.localLayoutMode).toBe('free');
+    expect(applied.showExperimentalAllHierarchy).toBe(true);
+    expect(applied.trackpadZoomMode).toBe('pinch-zoom');
+  });
+
+  it('rejects unknown and out-of-range profile fields', () => {
+    const profile = captureFocusHierarchySettings(DEFAULT_GRAPH_PREFERENCES);
+    expect(validateFocusHierarchySettings(profile)).toEqual(profile);
+    expect(() =>
+      validateFocusHierarchySettings({ ...profile, extra: true }),
+    ).toThrow('fields are incompatible');
+    expect(() =>
+      validateFocusHierarchySettings({
+        ...profile,
+        modularFocusSoftFolderStrength: 101,
+      }),
+    ).toThrow('0 to 100');
+  });
+
+  it('serializes a canonical complete record under the unchanged storage key', () => {
+    const storage = memoryStorage();
+    const preferences = {
+      ...DEFAULT_GRAPH_PREFERENCES,
+      trackpadZoomMode: 'pinch-zoom' as const,
+    };
+    expect(saveGraphPreferences(storage, preferences)).toEqual({ ok: true });
+    expect(storage.value).toBe(serializeGraphPreferences(preferences));
+    expect(GRAPH_PREFERENCES_STORAGE_KEY).toBe(
+      'icarus.graph-explorer.preferences.v1',
+    );
   });
 });

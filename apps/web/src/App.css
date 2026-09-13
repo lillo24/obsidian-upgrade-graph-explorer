@@ -445,6 +445,43 @@ h2 {
   opacity: 0.45;
 }
 
+.saved-view-switcher {
+  display: inline-flex;
+  max-width: min(18rem, 100%);
+  min-width: 0;
+  flex: 0 1 auto;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.saved-view-switcher select {
+  width: min(13rem, 100%);
+  max-width: 13rem;
+  min-width: 0;
+  min-height: 2.75rem;
+  flex: 1 1 auto;
+  padding: 0.45rem 0.6rem;
+  overflow: hidden;
+  border: 1px solid #879da8;
+  border-radius: 0.55rem;
+  color: #183d4d;
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 0.25rem 0.8rem rgb(24 47 61 / 10%);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+}
+
+.saved-view-switcher select:hover:not(:disabled),
+.saved-view-switcher select:focus-visible {
+  border-color: #1c5267;
+  background: #e9f3f5;
+}
+
+.saved-view-switcher select:disabled {
+  opacity: 0.65;
+}
+
 .saved-views-trigger {
   display: inline-grid;
   width: 2.75rem;
@@ -3893,6 +3930,22 @@ a:focus-visible {
 
   .graph-toolbar {
     align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .saved-view-switcher {
+    width: 100%;
+    max-width: 100%;
+    flex: 1 1 11rem;
+  }
+
+  .saved-view-switcher select {
+    width: auto;
+    max-width: none;
+  }
+
+  .graph-workspace--maximized .graph-floating-controls {
+    right: 1rem;
     flex-wrap: wrap;
   }
 

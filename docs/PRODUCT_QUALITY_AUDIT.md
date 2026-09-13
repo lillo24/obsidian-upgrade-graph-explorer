@@ -35,8 +35,11 @@ projection. Selecting a result reveals or centers it and establishes the file
 needed to enter Focus. Back/Forward traverses semantic graph navigation.
 Current View restores the last Scope, Layout, disclosure, filters, and semantic
 viewports for a stable workspace. SAVED1A adds explicit Named Saved Views over
-that same semantic graph contract. Graph Preferences, Saved Filters, Visual
-Groups, size overrides, and spatial rules remain separate persisted systems.
+that semantic graph contract. SAVED1B adds layout-appropriate embedded profiles:
+All Network owns Global Layout Settings and committed folder spatial rules,
+Focus Network owns only shared controls, Focus Hierarchy owns its presentation
+subset, and All Hierarchy is a no-op. Saved Filters, Visual Groups, per-File size
+overrides, interaction preferences, and experiment gates remain separate.
 
 ## 2. Overall readiness
 
@@ -526,15 +529,17 @@ surface differentiates or groups them.
   disclosure; no-op actions do not pollute history.
 - Stable-workspace Current View restores Scope, Layout, focus, filters,
   disclosure, and renderer-specific semantic viewport anchors under schema v3.
-- Named Saved Views retain explicit immutable snapshots in a separate schema-v1
-  workspace registry. Apply reconciles current canonical IDs, clears
-  Back/Forward and selection, synchronizes the query editor, and restores the
-  semantic viewport as one graph transaction.
+- Named Saved Views retain explicit immutable snapshots in a separate schema-v2
+  workspace registry. Strict schema-v1 migration is in memory and does not write
+  on read. Apply reconciles current canonical IDs and durably commits any owned
+  profile keys before clearing Back/Forward and selection, synchronizing the
+  query editor, and restoring the semantic viewport as one graph transaction.
 - Graph preferences persist focus appearance, Network layout/strength/spacing,
   trackpad mode, and preferred Focus layout independently from view history.
-- Saved Filters, Visual Groups, size overrides, and spatial rules remain
-  independent. Applying a Focus Saved View may update only the preferred Focus
-  layout because Graph Preferences own that live renderer choice.
+- Saved Filters, Visual Groups, and size overrides remain independent. Spatial
+  rules remain independently stored and are copied into a Saved View only for an
+  All Network profile; Apply uses rollback-protected write-before-adopt across
+  that key and Graph Preferences.
 - Live updates reconcile by stable identity; stale disclosure/viewports are
   dropped explicitly, and deletion of the focused root exits Focus rather than
   choosing a fuzzy replacement.
