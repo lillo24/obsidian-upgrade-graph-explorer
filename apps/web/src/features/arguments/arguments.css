@@ -18,6 +18,19 @@
   background: rgb(10 25 32 / 55%);
 }
 
+.arguments-dialog--embedded {
+  display: block;
+  width: auto;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  flex: 1 1 auto;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
 .arguments-dialog__surface {
   position: relative;
   display: flex;

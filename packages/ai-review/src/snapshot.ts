@@ -197,7 +197,9 @@ function validateGitCaptureManifest(
   }
 }
 
-function renderSharedMaterial(input: StartReviewInput): string {
+function renderSharedMaterial(
+  input: Pick<StartReviewInput, 'workspaceId' | 'source'>,
+): string {
   const source = input.source;
   const lines = [
     `Workspace identity: ${input.workspaceId}`,
@@ -242,7 +244,9 @@ function renderSharedMaterial(input: StartReviewInput): string {
   return lines.join('\n');
 }
 
-function validateSource(input: StartReviewInput): void {
+export function validateReviewSource(
+  input: Pick<StartReviewInput, 'workspaceId' | 'source'>,
+): void {
   assertNonEmpty(input.workspaceId, 'Workspace identity');
   if (
     input.workspaceId.startsWith('/') ||
@@ -360,13 +364,8 @@ export function prepareReviewInput(input: StartReviewInput): {
   compilerPolicy: CompilerPlacementPolicy;
   models: StartReviewInput['models'];
 } {
-  validateSource(input);
+  const preview = prepareReviewPromptPreview(input);
   const copied = clonePlainData(input);
-  const templates = resolveTemplates(copied.templates);
-  for (const [name, template] of Object.entries(templates)) {
-    assertNonEmpty(template.version, `${name} template version`);
-    assertNonEmpty(template.text, `${name} template text`);
-  }
   for (const [name, model] of Object.entries(copied.models)) {
     assertNonEmpty(model.provider, `${name} model provider`);
     assertNonEmpty(model.model, `${name} model name`);
@@ -391,6 +390,48 @@ export function prepareReviewInput(input: StartReviewInput): {
       assertSafeMetadata(model.metadata, `${name} model metadata`);
     }
   }
+  const fingerprintPayload = {
+    workspaceId: copied.workspaceId,
+    source: copied.source,
+    additionalRequest: copied.additionalRequest,
+    templates: preview.templates,
+    models: copied.models,
+    limits: preview.limits,
+    compilerPolicy: preview.compilerPolicy,
+  };
+  if (plainDataByteLength(fingerprintPayload) > preview.limits.maxInputBytes) {
+    throw new Error(
+      `Frozen review input exceeds maxInputBytes (${preview.limits.maxInputBytes}); no content was truncated.`,
+    );
+  }
+  return deepFreeze({
+    ...preview,
+    frozenInput: {
+      ...preview.frozenInput,
+      fingerprint: deterministicFingerprint(fingerprintPayload),
+    },
+    models: copied.models,
+  });
+}
+
+/** Builds exact analysis-prompt input without requiring invented model IDs. */
+export function prepareReviewPromptPreview(
+  input: Omit<StartReviewInput, 'models'> & {
+    readonly models?: StartReviewInput['models'];
+  },
+): {
+  frozenInput: FrozenReviewInput;
+  templates: ReviewTemplates;
+  limits: ReviewResourceLimits;
+  compilerPolicy: CompilerPlacementPolicy;
+} {
+  validateReviewSource(input);
+  const copied = clonePlainData(input);
+  const templates = resolveTemplates(copied.templates);
+  for (const [name, template] of Object.entries(templates)) {
+    assertNonEmpty(template.version, `${name} template version`);
+    assertNonEmpty(template.text, `${name} template text`);
+  }
   const limits = { ...DEFAULT_REVIEW_LIMITS, ...copied.limits };
   for (const [name, value] of Object.entries(limits)) {
     validatePositiveInteger(value, name);
@@ -405,7 +446,6 @@ export function prepareReviewInput(input: StartReviewInput): {
     source: copied.source,
     additionalRequest: copied.additionalRequest,
     templates,
-    models: copied.models,
     limits,
     compilerPolicy,
   };
@@ -431,6 +471,5 @@ export function prepareReviewInput(input: StartReviewInput): {
     templates,
     limits,
     compilerPolicy,
-    models: copied.models,
   });
 }

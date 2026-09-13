@@ -388,6 +388,7 @@ export function GraphExplorer({
   networkStartupCapabilityDelayMs = 0,
   onMaximizedChange,
   onOpenArguments,
+  onOpenReview,
   networkStartupTrace,
   performance,
   performanceUpdateKey,
@@ -404,6 +405,7 @@ export function GraphExplorer({
   readonly networkStartupCapabilityDelayMs?: number;
   readonly onMaximizedChange: (maximized: boolean) => void;
   readonly onOpenArguments?: (trigger: HTMLElement) => void;
+  readonly onOpenReview?: (trigger: HTMLElement) => void;
   /** Explicit QA trace; absent from ordinary production sessions. */
   readonly networkStartupTrace?: NetworkStartupTrace;
   /** Optional memory-only KG12 instrumentation, enabled by the app boundary. */
@@ -3733,6 +3735,34 @@ export function GraphExplorer({
       transitionNetworkEditing,
     ],
   );
+  const openReview = useCallback(
+    (event: ReactMouseEvent<HTMLButtonElement>) => {
+      if (retainDirtyFolderDraft()) return;
+      if (
+        temporaryFileMovePresentation !== 'idle' ||
+        keyboardFileMoveNodeId !== undefined
+      ) {
+        setNavigationAnnouncement(
+          'Finish or cancel the active File movement before opening AI Review.',
+        );
+        return;
+      }
+      if (networkEditingState.phase === 'editing') {
+        transitionNetworkEditing({ type: 'exit' });
+        dispatchFolderArrangementMode({ type: 'exit' });
+      }
+      dispatchWorkspaceOverlay({ type: 'close-all' });
+      onOpenReview?.(event.currentTarget);
+    },
+    [
+      keyboardFileMoveNodeId,
+      networkEditingState.phase,
+      onOpenReview,
+      retainDirtyFolderDraft,
+      temporaryFileMovePresentation,
+      transitionNetworkEditing,
+    ],
+  );
   const closeInspector = useCallback(() => {
     setInspectorOpen(false);
     queueMicrotask(() => {
@@ -4875,19 +4905,31 @@ export function GraphExplorer({
               savedFiltersWritable={savedFilterSession.writable}
               state={activeViewState}
             />
-            {onOpenArguments === undefined ? null : (
+            {onOpenArguments === undefined &&
+            onOpenReview === undefined ? null : (
               <div
-                aria-label="Argument workspace"
+                aria-label="Local workspaces"
                 className="control-group"
                 role="group"
               >
-                <button
-                  aria-haspopup="dialog"
-                  onClick={openArguments}
-                  type="button"
-                >
-                  Arguments
-                </button>
+                {onOpenArguments === undefined ? null : (
+                  <button
+                    aria-haspopup="dialog"
+                    onClick={openArguments}
+                    type="button"
+                  >
+                    Arguments
+                  </button>
+                )}
+                {onOpenReview === undefined ? null : (
+                  <button
+                    aria-haspopup="dialog"
+                    onClick={openReview}
+                    type="button"
+                  >
+                    AI Review
+                  </button>
+                )}
               </div>
             )}
             <VisualGroups

@@ -1184,6 +1184,61 @@ describe('snapshot, persistence, and exports', () => {
       '2030-01-01T00:00:00.000Z',
     );
     expect(roundTrip).toEqual(completedRun);
+
+    const forged = JSON.parse(exportReviewRunJson(completedRun)) as {
+      attempts: Array<{
+        stage: string;
+        output?: {
+          structured?: {
+            issues?: Array<{
+              negativeReferences?: Array<Record<string, unknown>>;
+            }>;
+            validationWarnings?: string[];
+          };
+        };
+      }>;
+    };
+    const forgedIntegration = forged.attempts.find(
+      ({ stage }) => stage === 'integrator',
+    )!;
+    const forgedReference =
+      forgedIntegration.output!.structured!.issues![0]!.negativeReferences![0]!;
+    forgedReference.quote = 'This quote was never in the Negative output.';
+    forgedReference.verification = 'verified';
+    forgedIntegration.output!.structured!.validationWarnings = [];
+    const revalidated = importReviewRunJson(
+      JSON.stringify(forged),
+      '2030-01-01T00:00:00.000Z',
+    );
+    const revalidatedIntegration = attempt(revalidated, 'integrator').output!
+      .structured as ReturnType<typeof integrationResult> & {
+      validationWarnings: string[];
+      issues: Array<{
+        negativeReferences: Array<{ verification: string }>;
+      }>;
+    };
+    expect(
+      revalidatedIntegration.issues[0]!.negativeReferences[0]!.verification,
+    ).toBe('invalid');
+    expect(revalidatedIntegration.validationWarnings).toContain(
+      'Quoted passage was not found in attempt export-attempt-1.',
+    );
+
+    const queuedWithoutAttempts = {
+      ...JSON.parse(exportReviewRunJson(completedRun)),
+      state: 'queued',
+      attempts: [],
+      currentAttemptIds: {},
+      automaticIntegrationPairs: [],
+      automaticPostCheckIntegrations: [],
+      artifacts: {},
+    };
+    expect(
+      importReviewRunJson(
+        JSON.stringify(queuedWithoutAttempts),
+        '2031-01-01T00:00:00.000Z',
+      ).state,
+    ).toBe('interrupted');
   });
 });
 

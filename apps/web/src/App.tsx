@@ -17,9 +17,12 @@ import {
 import type {
   TauriSourceProvider,
   VaultSelection,
+  WorkspaceIdentitySession,
   WorkspaceIdentityRecovery,
 } from '@icarus-graph-explorer/source-provider-tauri';
 import type { ArgumentLibraryStore } from '@icarus-graph-explorer/argument-workspace';
+import { createReviewSourceProvider } from '@icarus-graph-explorer/review-source-tauri';
+import type { ReviewHistoryStore } from '@icarus-graph-explorer/review-workspace';
 
 import './App.css';
 import { DeveloperSettingsSection } from './components/DeveloperSettingsSection';
@@ -28,7 +31,12 @@ import { DiagnosticEvidenceDialog } from './components/DiagnosticEvidenceDialog'
 import { GraphExplorer } from './components/GraphExplorer';
 import { SourceSettingsSection } from './components/SourceSettingsSection';
 import { WorkspaceNotice } from './components/WorkspaceNotice';
-import { ArgumentWorkspaceOwner } from './features/arguments/ArgumentsWorkspace';
+import { AiReviewController } from './features/ai-review/controller';
+import { createPlatformReviewHistoryStore } from './features/ai-review/platform-store';
+import {
+  WorkspaceOverlay,
+  type WorkspaceArea,
+} from './features/workspace/WorkspaceOverlay';
 import {
   ArgumentSourceAccessSession,
   type ArgumentSourceAccessHost,
@@ -83,6 +91,10 @@ export interface AppProps {
   readonly desktopSourceProvider?: TauriSourceProvider;
   /** Standalone/integration hosts may inject a disposable profile store. */
   readonly argumentLibraryStore?: ArgumentLibraryStore;
+  /** Integration hosts may inject a controller with deterministic providers. */
+  readonly reviewController?: AiReviewController;
+  /** Tests may inject an isolated history store for the default controller. */
+  readonly reviewHistoryStore?: ReviewHistoryStore;
   /** Tests may inject the narrow app-owned theory-source boundary. */
   readonly argumentSourceAccess?: ArgumentSourceAccessHost;
 }
@@ -91,6 +103,8 @@ export function App({
   argumentLibraryStore,
   argumentSourceAccess,
   desktopSourceProvider,
+  reviewController: injectedReviewController,
+  reviewHistoryStore,
 }: AppProps = {}) {
   const [report, setReport] = useState<ObsidianDiagnosticReport>(SAMPLE_REPORT);
   const [reportName, setReportName] = useState('Synthetic Sample');
@@ -119,9 +133,23 @@ export function App({
   const [livePhase, setLivePhase] = useState<DesktopLiveVaultPhase>();
   const [vaultOpening, setVaultOpening] = useState(false);
   const [diagnosticEvidenceOpen, setDiagnosticEvidenceOpen] = useState(false);
-  const [argumentsOpen, setArgumentsOpen] = useState(false);
-  const [argumentsRestoreFocus, setArgumentsRestoreFocus] =
+  const [workspaceArea, setWorkspaceArea] =
+    useState<WorkspaceArea>('arguments');
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [workspaceRestoreFocus, setWorkspaceRestoreFocus] =
     useState<HTMLElement>();
+  const [reviewWorkspace, setReviewWorkspace] = useState<{
+    readonly identitySession: WorkspaceIdentitySession;
+    readonly label: string;
+  }>();
+  const [reviewController] = useState(
+    () =>
+      injectedReviewController ??
+      new AiReviewController({
+        sourceProvider: createReviewSourceProvider(),
+        historyStore: reviewHistoryStore ?? createPlatformReviewHistoryStore(),
+      }),
+  );
   const [statusFilter, setStatusFilter] = useState<ResolutionFilter>('all');
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
@@ -144,6 +172,17 @@ export function App({
   );
 
   const desktopProvider = desktopSourceProvider ?? detectedDesktopProvider;
+
+  useEffect(() => {
+    void reviewController.open();
+    return () => {
+      void reviewController.dispose();
+    };
+  }, [reviewController]);
+
+  useEffect(() => {
+    reviewController.setWorkspace(reviewWorkspace);
+  }, [reviewController, reviewWorkspace]);
 
   useEffect(() => {
     if (desktopSourceProvider !== undefined) return;
@@ -241,6 +280,14 @@ export function App({
     setLoadError(undefined);
     setSourceWarning(opened.warning);
     setIdentityRecovery(undefined);
+    setReviewWorkspace(
+      opened.identityPersisted
+        ? {
+            identitySession: opened.runtime.identitySession,
+            label: opened.displayName,
+          }
+        : undefined,
+    );
     if (controller === undefined) {
       setReport(opened.report);
       setSourceStatus(status);
@@ -453,6 +500,7 @@ export function App({
       setSourceStatus(undefined);
       setSourceWarning(undefined);
       setIdentityRecovery(undefined);
+      setReviewWorkspace(undefined);
       argumentSources.reportOnly();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -477,6 +525,7 @@ export function App({
     setSourceStatus(undefined);
     setSourceWarning(undefined);
     setIdentityRecovery(undefined);
+    setReviewWorkspace(undefined);
     argumentSources.reportOnly();
   }
 
@@ -494,11 +543,23 @@ export function App({
     () => setDiagnosticEvidenceOpen(false),
     [],
   );
-  const openArguments = useCallback((trigger: HTMLElement) => {
-    setArgumentsRestoreFocus(trigger);
-    setArgumentsOpen(true);
-  }, []);
-  const closeArguments = useCallback(() => setArgumentsOpen(false), []);
+  const openWorkspace = useCallback(
+    (area: WorkspaceArea, trigger: HTMLElement) => {
+      setWorkspaceRestoreFocus(trigger);
+      setWorkspaceArea(area);
+      setWorkspaceOpen(true);
+    },
+    [],
+  );
+  const openArguments = useCallback(
+    (trigger: HTMLElement) => openWorkspace('arguments', trigger),
+    [openWorkspace],
+  );
+  const openReview = useCallback(
+    (trigger: HTMLElement) => openWorkspace('review', trigger),
+    [openWorkspace],
+  );
+  const closeWorkspace = useCallback(() => setWorkspaceOpen(false), []);
 
   const currentSourceStatus = vaultOpening
     ? 'Opening'
@@ -557,12 +618,13 @@ export function App({
           Icarus Graph Explorer
         </h1>
         <GraphExplorer
-          applicationOverlayOpen={diagnosticEvidenceOpen || argumentsOpen}
+          applicationOverlayOpen={diagnosticEvidenceOpen || workspaceOpen}
           initialViewport="fit"
           key={sourceSessionKey}
           maximized={graphMaximized}
           onMaximizedChange={setGraphMaximized}
           onOpenArguments={openArguments}
+          onOpenReview={openReview}
           {...(browserNetworkStartupTrace === undefined
             ? {}
             : { networkStartupTrace: browserNetworkStartupTrace.trace })}
@@ -634,16 +696,19 @@ export function App({
           />
         </DiagnosticEvidenceDialog>
       ) : null}
-      <ArgumentWorkspaceOwner
-        onRequestClose={closeArguments}
-        open={argumentsOpen}
-        sourceAccess={argumentSources}
+      <WorkspaceOverlay
+        area={workspaceArea}
+        controller={reviewController}
+        onAreaChange={setWorkspaceArea}
+        onRequestClose={closeWorkspace}
+        open={workspaceOpen}
+        argumentSourceAccess={argumentSources}
         {...(argumentLibraryStore === undefined
           ? {}
-          : { store: argumentLibraryStore })}
-        {...(argumentsRestoreFocus === undefined
+          : { argumentLibraryStore })}
+        {...(workspaceRestoreFocus === undefined
           ? {}
-          : { restoreFocus: argumentsRestoreFocus })}
+          : { restoreFocus: workspaceRestoreFocus })}
       />
     </div>
   );

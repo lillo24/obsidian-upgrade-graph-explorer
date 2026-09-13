@@ -1,0 +1,116 @@
+.workspace-dialog {
+  width: 94vw;
+  height: 93dvh;
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  overflow: hidden;
+  border: 2px solid #587786;
+  border-radius: 0.95rem;
+  color: #172631;
+  background: #eef3f5;
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 80%),
+    0 1.5rem 5rem rgb(10 25 32 / 38%);
+  overscroll-behavior: contain;
+}
+
+.workspace-dialog::backdrop {
+  background: rgb(10 25 32 / 55%);
+}
+
+.workspace-dialog__surface {
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.workspace-dialog__chrome {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid #b8c7ce;
+  background: #fff;
+}
+
+.workspace-dialog__tabs {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.workspace-dialog__tabs button,
+.workspace-dialog__close {
+  min-height: 2.25rem;
+  padding: 0.42rem 0.72rem;
+  border: 1px solid #91a6b0;
+  border-radius: 0.45rem;
+  color: #172631;
+  background: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.workspace-dialog__tabs button:hover,
+.workspace-dialog__close:hover {
+  border-color: #245d71;
+  background: #eaf3f6;
+}
+
+.workspace-dialog__tabs button[aria-selected='true'] {
+  border-color: #276b81;
+  color: #173f50;
+  background: #dceef3;
+}
+
+.workspace-dialog__tabs button:focus-visible,
+.workspace-dialog__close:focus-visible {
+  outline: 3px solid #dd8a2e;
+  outline-offset: 2px;
+}
+
+.workspace-dialog__area {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.workspace-dialog__area[hidden] {
+  display: none;
+}
+
+@media (max-width: 800px) {
+  .workspace-dialog {
+    width: calc(100vw - 1rem);
+    height: calc(100dvh - 1rem);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .workspace-dialog,
+  .workspace-dialog__chrome {
+    color: #e7eef1;
+    background: #1b2a32;
+    border-color: #7694a2;
+  }
+
+  .workspace-dialog__tabs button,
+  .workspace-dialog__close {
+    color: #edf4f6;
+    background: #16242b;
+    border-color: #67818d;
+  }
+
+  .workspace-dialog__tabs button:hover,
+  .workspace-dialog__close:hover {
+    background: #294653;
+  }
+}
