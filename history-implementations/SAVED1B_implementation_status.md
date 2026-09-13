@@ -1,13 +1,14 @@
 # SAVED1B implementation report
 
-Status: **implemented and validated locally and in a production browser; the
-draft PR is open and native acceptance is pending.**
+Status: **implemented, locally/browser validated, accepted by PR CI, and
+explicitly accepted for merge.**
 
 Implementation branch: `codex/saved1b-profiles-quick-switch`
 
-[Draft PR #92](https://github.com/lillo24/obsidian-upgrade-graph-explorer/pull/92)
-is the isolated integration vehicle and remains deliberately unmerged pending
-the native acceptance gate.
+[PR #92](https://github.com/lillo24/obsidian-upgrade-graph-explorer/pull/92) is
+the isolated integration vehicle. PR head `0279f48` passed the required
+`validate` and `desktop` jobs before this acceptance-only follow-up, which
+records the user's explicit merge instruction on 2026-09-13.
 
 ## Summary
 
@@ -115,6 +116,8 @@ No SAVEDUX1 animation or transition system was introduced.
   is `apps/desktop/src-tauri/target/release/icarus-graph-explorer-desktop.exe`.
 - `git diff --check`: passed before this report was added and is rerun during
   final inspection.
+- PR #92 CI at head `0279f48`: `validate` passed in 2m34s and `desktop` passed
+  in 6m34s.
 
 Production-browser QA used the minified build on a clean origin. It created a
 long-name Saved View, observed Current View after changing an owned setting,
@@ -126,7 +129,9 @@ browser console had no warnings or errors.
 Native desktop UI interaction could not be executed because native computer
 control is disabled in this environment. Desktop compile/package validation
 passed, but physical keyboard/pointer interaction and restart persistence remain
-the explicit user acceptance gate before merge.
+unrecorded. The user explicitly requested merge on 2026-09-13, accepting that
+residual risk after the optimized build, production-browser evidence, and PR CI
+passed.
 
 ## Dependencies
 
@@ -141,9 +146,6 @@ Its SHA-256 matches the source attachment:
 
 ## Remaining work
 
-- Open the isolated draft PR and let required CI complete.
-- Record user/native acceptance, then mark the PR ready and merge only after the
-  requested gate.
 - Run post-merge CI and remove the isolated worktree/branch when no follow-up QA
   needs it.
 - SAVEDUX1 transitions, PIN1 persistent File placement, and AUTO1 adaptive
