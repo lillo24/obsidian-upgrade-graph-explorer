@@ -153,7 +153,9 @@ canonical truth, or own a platform storage implementation.
   focus restoration. `DiagnosticEvidenceContent.tsx` composes the existing KG5
   filter, hierarchy, reference, summary, diagnostic, and probe panels inside it.
 - `WorkspaceNotice.tsx` presents transient source progress and actionable
-  source failures above the canvas without consuming workspace layout.
+  source failures above the canvas without consuming workspace layout. Its
+  optional progress surface owns indeterminate ARIA semantics, hidden elapsed
+  ticks, and the reusable compact bar used by initial and live operations.
 - `EntitySearch.tsx` performs bounded deferred search over the full canonical
   inspection index, independently from visible graph filters.
   `entity-search-disclosure.ts` keeps its query and result disclosure separate:

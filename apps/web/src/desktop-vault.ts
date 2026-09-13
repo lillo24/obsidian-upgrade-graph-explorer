@@ -37,6 +37,23 @@ export interface DesktopVaultIdentityCounts {
   readonly referencesNew: number;
 }
 
+export type DesktopVaultOpenStage =
+  | 'acquiring-source'
+  | 'building-workspace'
+  | 'persisting-identity'
+  | 'committing-workspace'
+  | 'recovering-workspace';
+
+export interface DesktopVaultOpenProgress {
+  readonly stage: DesktopVaultOpenStage;
+  readonly markdownFileCount?: number;
+  readonly nonMarkdownPathCount?: number;
+}
+
+export type DesktopVaultOpenProgressListener = (
+  progress: DesktopVaultOpenProgress,
+) => void;
+
 export interface DesktopVaultRuntime {
   readonly selection: VaultSelection;
   readonly inventory: VaultSourceInventory;
@@ -97,6 +114,28 @@ const DEFAULT_SERVICES: DesktopVaultServices = {
 
 function elapsed(start: number, services: DesktopVaultServices): number {
   return Number((services.now() - start).toFixed(3));
+}
+
+function publishProgress(
+  listener: DesktopVaultOpenProgressListener | undefined,
+  progress: DesktopVaultOpenProgress,
+): void {
+  try {
+    listener?.(progress);
+  } catch {
+    // Progress is an observer only; UI failures cannot control vault startup.
+  }
+}
+
+function inventoryProgress(
+  stage: DesktopVaultOpenStage,
+  inventory: VaultSourceInventory,
+): DesktopVaultOpenProgress {
+  return {
+    stage,
+    markdownFileCount: inventory.markdownDocuments.length,
+    nonMarkdownPathCount: inventory.nonMarkdownPaths.length,
+  };
 }
 
 function identityCounts(
@@ -174,6 +213,8 @@ async function recoverCommitFailure(input: {
   readonly identitySession: WorkspaceIdentitySession;
   readonly durableCatalog: StableIdentityCatalog;
   readonly services: DesktopVaultServices;
+  readonly inventory: VaultSourceInventory;
+  readonly onProgress?: DesktopVaultOpenProgressListener;
 }): Promise<{
   readonly processor: DesktopWorkspaceProcessor;
   readonly prepared: PreparedWorkspaceResult;
@@ -181,6 +222,10 @@ async function recoverCommitFailure(input: {
   readonly sourceAcquisitionMs: number;
   readonly persistenceMs: number;
 }> {
+  publishProgress(
+    input.onProgress,
+    inventoryProgress('recovering-workspace', input.inventory),
+  );
   input.failedProcessor.terminate();
   const replacement = input.services.createProcessor();
   const replacementSession: WorkspaceIdentitySession = {
@@ -230,7 +275,9 @@ export async function openSelectedDesktopVault(
   selection: VaultSelection,
   identityOptions: PrepareWorkspaceIdentityOptions = {},
   services: DesktopVaultServices = DEFAULT_SERVICES,
+  onProgress?: DesktopVaultOpenProgressListener,
 ): Promise<OpenedDesktopVault> {
+  publishProgress(onProgress, { stage: 'acquiring-source' });
   const acquisitionStart = services.now();
   let inventory: VaultSourceInventory;
   let identitySession: WorkspaceIdentitySession;
@@ -254,6 +301,10 @@ export async function openSelectedDesktopVault(
   let sourceAcquisitionMs = elapsed(acquisitionStart, services);
 
   let processor = services.createProcessor();
+  publishProgress(
+    onProgress,
+    inventoryProgress('building-workspace', inventory),
+  );
   const prepared = await prepareInitialization(
     processor,
     identitySession,
@@ -264,6 +315,10 @@ export async function openSelectedDesktopVault(
   let identityPersisted = true;
   let warning: string | undefined;
   let identityPersistenceMs: number;
+  publishProgress(
+    onProgress,
+    inventoryProgress('persisting-identity', inventory),
+  );
   const persistenceStart = services.now();
   try {
     await sourceProvider.commitWorkspaceIdentity(
@@ -289,6 +344,10 @@ export async function openSelectedDesktopVault(
   }
 
   if (identityPersisted) {
+    publishProgress(
+      onProgress,
+      inventoryProgress('committing-workspace', inventory),
+    );
     try {
       await processor.commitCandidate(prepared.candidateId);
     } catch {
@@ -299,6 +358,8 @@ export async function openSelectedDesktopVault(
         identitySession,
         durableCatalog: prepared.nextIdentityCatalog,
         services,
+        ...(onProgress === undefined ? {} : { onProgress }),
+        inventory,
       });
       processor = recovered.processor;
       activePrepared = recovered.prepared;
@@ -353,9 +414,16 @@ export async function openSelectedDesktopVault(
 export async function selectAndOpenDesktopVault(
   sourceProvider: TauriSourceProvider,
   services: DesktopVaultServices = DEFAULT_SERVICES,
+  onProgress?: DesktopVaultOpenProgressListener,
 ): Promise<SelectAndOpenDesktopVaultResult> {
   const selection = await sourceProvider.selectVaultDirectory();
   return selection === undefined
     ? { status: 'cancelled' }
-    : openSelectedDesktopVault(sourceProvider, selection, {}, services);
+    : openSelectedDesktopVault(
+        sourceProvider,
+        selection,
+        {},
+        services,
+        onProgress,
+      );
 }

@@ -3364,6 +3364,60 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.workspace-notice__title,
+.workspace-notice__message,
+.workspace-notice__elapsed,
+.workspace-notice__progress {
+  display: block;
+}
+
+.workspace-notice__title {
+  margin-bottom: 0.1rem;
+  font-size: 0.82rem;
+}
+
+.workspace-notice__progress {
+  position: relative;
+  height: 0.28rem;
+  margin-top: 0.55rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dce9ee;
+}
+
+.workspace-notice__progress-indicator {
+  position: absolute;
+  inset-block: 0;
+  width: 38%;
+  border-radius: inherit;
+  background: #1c6d85;
+  animation: workspace-notice-progress 1.5s ease-in-out infinite;
+}
+
+.workspace-notice__elapsed {
+  margin-top: 0.3rem;
+  color: #496671;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes workspace-notice-progress {
+  from {
+    transform: translateX(-105%);
+  }
+
+  to {
+    transform: translateX(270%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-notice__progress-indicator {
+    inset-inline: 31%;
+    animation: none;
+  }
+}
+
 .workspace-notice--progress {
   border-left-color: #1c6d85;
 }

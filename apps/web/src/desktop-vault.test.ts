@@ -27,6 +27,7 @@ import {
 import {
   openSelectedDesktopVault,
   selectAndOpenDesktopVault,
+  type DesktopVaultOpenProgress,
   type DesktopVaultServices,
 } from './desktop-vault';
 
@@ -135,11 +136,15 @@ describe('desktop vault worker orchestration', () => {
     const provider = new FakeProvider();
     provider.selection = undefined;
     const measured = measuredServices();
+    const progress: DesktopVaultOpenProgress[] = [];
     await expect(
-      selectAndOpenDesktopVault(provider, measured.services),
+      selectAndOpenDesktopVault(provider, measured.services, (event) =>
+        progress.push(event),
+      ),
     ).resolves.toEqual({ status: 'cancelled' });
     expect(provider.commits).toBe(0);
     expect(measured.processors()).toBe(0);
+    expect(progress).toEqual([]);
   });
 
   it('awaits worker preparation, persists, commits, and exposes no engine', async () => {
@@ -171,6 +176,40 @@ describe('desktop vault worker orchestration', () => {
       referencesReused: 0,
       referencesNew: 1,
     });
+  });
+
+  it('publishes ordered startup stages with exact acquired inventory counts', async () => {
+    const provider = new FakeProvider();
+    const measured = measuredServices();
+    const progress: DesktopVaultOpenProgress[] = [];
+
+    const opened = await openSelectedDesktopVault(
+      provider,
+      SELECTION,
+      {},
+      measured.services,
+      (event) => progress.push(event),
+    );
+
+    expect(progress.map(({ stage }) => stage)).toEqual([
+      'acquiring-source',
+      'building-workspace',
+      'persisting-identity',
+      'committing-workspace',
+    ]);
+    expect(progress[0]).toEqual({ stage: 'acquiring-source' });
+    expect(progress.slice(1)).toEqual(
+      Array.from({ length: 3 }, (_, index) => ({
+        stage: [
+          'building-workspace',
+          'persisting-identity',
+          'committing-workspace',
+        ][index],
+        markdownFileCount: provider.inventory.markdownDocuments.length,
+        nonMarkdownPathCount: provider.inventory.nonMarkdownPaths.length,
+      })),
+    );
+    opened.runtime.processor.terminate();
   });
 
   it('discards and terminates the candidate when identity persistence fails', async () => {
@@ -217,11 +256,13 @@ describe('desktop vault worker orchestration', () => {
         : processor,
     );
 
+    const progress: DesktopVaultOpenProgress[] = [];
     const opened = await openSelectedDesktopVault(
       provider,
       SELECTION,
       {},
       measured.services,
+      (event) => progress.push(event),
     );
 
     expect(opened.identityPersisted).toBe(true);
@@ -231,6 +272,59 @@ describe('desktop vault worker orchestration', () => {
     expect(provider.commits).toBe(2);
     expect(provider.discoverCalls).toBe(2);
     expect(firstTerminated).toBe(true);
+    expect(progress.map(({ stage }) => stage)).toEqual([
+      'acquiring-source',
+      'building-workspace',
+      'persisting-identity',
+      'committing-workspace',
+      'recovering-workspace',
+    ]);
+  });
+
+  it('isolates a throwing progress observer from startup results and commit order', async () => {
+    async function run(observe: boolean) {
+      const provider = new FakeProvider();
+      const operations: string[] = [];
+      const measured = measuredServices((processor) => ({
+        ...processor,
+        async prepareInitialize(input) {
+          operations.push('prepare');
+          return processor.prepareInitialize(input);
+        },
+        async commitCandidate(candidateId) {
+          operations.push('commit-candidate');
+          return processor.commitCandidate(candidateId);
+        },
+      }));
+      let observerCalls = 0;
+      const opened = await openSelectedDesktopVault(
+        provider,
+        SELECTION,
+        {},
+        measured.services,
+        observe
+          ? () => {
+              observerCalls += 1;
+              throw new Error('simulated presentation failure');
+            }
+          : undefined,
+      );
+      const evidence = {
+        report: opened.report,
+        catalog: opened.runtime.durableIdentityCatalog,
+        operations,
+        timings: opened.timings,
+        revision: opened.runtime.revision,
+      };
+      opened.runtime.processor.terminate();
+      return { evidence, observerCalls };
+    }
+
+    const baseline = await run(false);
+    const observed = await run(true);
+
+    expect(observed.observerCalls).toBe(4);
+    expect(observed.evidence).toEqual(baseline.evidence);
   });
 
   it('reuses every unchanged identity when the stable workspace opens again', async () => {

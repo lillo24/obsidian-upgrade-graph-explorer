@@ -36,7 +36,10 @@ import {
   type ResolutionFilter,
 } from './report-view';
 import sampleReportJson from './sample-report.json';
-import type { OpenedDesktopVault } from './desktop-vault';
+import type {
+  DesktopVaultOpenProgress,
+  OpenedDesktopVault,
+} from './desktop-vault';
 import type {
   DesktopLiveVaultController,
   DesktopLiveVaultPhase,
@@ -48,6 +51,12 @@ import {
   browserNetworkStartupTrace,
 } from './network-startup-trace';
 import { browserStorage, clearWorkspaceView } from './persistence/storage';
+import {
+  describeVaultOpenProgress,
+  formatVaultOpenElapsed,
+  isCurrentVaultOpenRequest,
+  isLiveVaultProgressPhase,
+} from './vault-open-progress';
 
 const sampleValidation = validateObsidianDiagnosticReport(sampleReportJson);
 if (!sampleValidation.valid) {
@@ -106,6 +115,10 @@ export function App({
   const lastPerformanceCorrelation = useRef<string | undefined>(undefined);
   const [livePhase, setLivePhase] = useState<DesktopLiveVaultPhase>();
   const [vaultOpening, setVaultOpening] = useState(false);
+  const [vaultOpenProgress, setVaultOpenProgress] =
+    useState<DesktopVaultOpenProgress>();
+  const [vaultOpeningStartedAt, setVaultOpeningStartedAt] = useState<number>();
+  const [vaultOpeningClock, setVaultOpeningClock] = useState<number>();
   const [diagnosticEvidenceOpen, setDiagnosticEvidenceOpen] = useState(false);
   const [argumentsOpen, setArgumentsOpen] = useState(false);
   const [argumentsRestoreFocus, setArgumentsRestoreFocus] =
@@ -159,6 +172,46 @@ export function App({
     },
     [],
   );
+
+  useEffect(() => {
+    if (vaultOpeningStartedAt === undefined) return;
+    const interval = window.setInterval(
+      () => setVaultOpeningClock(performance.now()),
+      1_000,
+    );
+    return () => window.clearInterval(interval);
+  }, [vaultOpeningStartedAt]);
+
+  function clearVaultOpening(): void {
+    setVaultOpening(false);
+    setVaultOpenProgress(undefined);
+    setVaultOpeningStartedAt(undefined);
+    setVaultOpeningClock(undefined);
+  }
+
+  function beginVaultOpening(): void {
+    const startedAt = performance.now();
+    setVaultOpening(true);
+    setVaultOpenProgress(undefined);
+    setVaultOpeningStartedAt(startedAt);
+    setVaultOpeningClock(startedAt);
+    setLoadError(undefined);
+  }
+
+  function progressListener(
+    requestGeneration: number,
+  ): (progress: DesktopVaultOpenProgress) => void {
+    return (progress) => {
+      if (
+        isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      ) {
+        setVaultOpenProgress(progress);
+      }
+    };
+  }
 
   function stopActiveLiveController(): void {
     liveUnsubscribeRef.current?.();
@@ -300,7 +353,7 @@ export function App({
     if (desktopProvider === undefined || vaultOpening) return;
     const requestGeneration = sourceRequestGeneration.current + 1;
     sourceRequestGeneration.current = requestGeneration;
-    setVaultOpening(true);
+    beginVaultOpening();
     let desktopVault: typeof import('./desktop-vault') | undefined;
     try {
       const selection = await desktopProvider.selectVaultDirectory();
@@ -313,14 +366,28 @@ export function App({
       const result = await liveVaultModule.openLiveDesktopVault(
         desktopProvider,
         selection,
+        {},
+        undefined,
+        progressListener(requestGeneration),
       );
-      if (sourceRequestGeneration.current !== requestGeneration) {
+      if (
+        !isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      ) {
         await result.controller?.stop();
         return;
       }
       activateDesktopVault(result.opened, result.controller);
     } catch (error: unknown) {
-      if (sourceRequestGeneration.current !== requestGeneration) return;
+      if (
+        !isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      )
+        return;
       const message = error instanceof Error ? error.message : String(error);
       setLoadError(
         `Could not open the selected vault: ${message} The current workspace remains loaded.`,
@@ -338,7 +405,14 @@ export function App({
         setIdentityRecovery(undefined);
       }
     } finally {
-      setVaultOpening(false);
+      if (
+        isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      ) {
+        clearVaultOpening();
+      }
     }
   }
 
@@ -360,7 +434,7 @@ export function App({
         : 'Reset local identity for this vault? Stable IDs and current-view or Named Saved View continuity may change.',
     );
     if (!confirmed) return;
-    setVaultOpening(true);
+    beginVaultOpening();
     try {
       const { openLiveDesktopVault } = await import('./desktop-live-vault');
       const result = await openLiveDesktopVault(
@@ -370,20 +444,40 @@ export function App({
           reset: true,
           ...(registryReset ? { replaceCorruptRegistry: true } : {}),
         },
+        undefined,
+        progressListener(requestGeneration),
       );
-      if (sourceRequestGeneration.current !== requestGeneration) {
+      if (
+        !isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      ) {
         await result.controller?.stop();
         return;
       }
       activateDesktopVault(result.opened, result.controller);
     } catch (error: unknown) {
-      if (sourceRequestGeneration.current !== requestGeneration) return;
+      if (
+        !isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      )
+        return;
       const message = error instanceof Error ? error.message : String(error);
       setLoadError(
         `Could not reset local identity and open the vault: ${message} The current workspace remains loaded.`,
       );
     } finally {
-      setVaultOpening(false);
+      if (
+        isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      ) {
+        clearVaultOpening();
+      }
     }
   }
 
@@ -394,6 +488,7 @@ export function App({
     event.currentTarget.value = '';
     if (file === undefined) return;
     sourceRequestGeneration.current += 1;
+    clearVaultOpening();
     try {
       const parsed: unknown = JSON.parse(await file.text());
       const validation = validateObsidianDiagnosticReport(parsed);
@@ -426,6 +521,7 @@ export function App({
 
   function restoreSample(): void {
     sourceRequestGeneration.current += 1;
+    clearVaultOpening();
     stopActiveLiveController();
     performanceSession?.begin('I1-initial-view-preparation');
     setPerformanceUpdateKey(undefined);
@@ -474,19 +570,26 @@ export function App({
       : identityRecovery === undefined
         ? undefined
         : 'Reset Local Identity for This Vault';
+  const vaultOpeningElapsed =
+    vaultOpeningStartedAt === undefined || vaultOpeningClock === undefined
+      ? undefined
+      : formatVaultOpenElapsed(vaultOpeningClock - vaultOpeningStartedAt);
   const sourceNotice =
     loadError !== undefined
       ? { message: loadError, tone: 'error' as const }
       : vaultOpening
         ? {
-            message: 'Opening Vault… The current workspace remains active.',
+            elapsed: vaultOpeningElapsed,
+            message: describeVaultOpenProgress(vaultOpenProgress),
+            progressLabel: 'Opening vault',
             tone: 'progress' as const,
           }
-        : livePhase === 'catching-up' || livePhase === 'resyncing'
+        : isLiveVaultProgressPhase(livePhase)
           ? {
               message:
                 sourceStatus ??
                 `${LIVE_PHASE_LABELS[livePhase]} the local vault.`,
+              progressLabel: `${LIVE_PHASE_LABELS[livePhase]} vault`,
               tone: 'progress' as const,
             }
           : livePhase === 'paused'
@@ -571,7 +674,17 @@ export function App({
         />
         {sourceNotice === undefined ? null : (
           <div className="workspace-notice-stack">
-            <WorkspaceNotice tone={sourceNotice.tone}>
+            <WorkspaceNotice
+              tone={sourceNotice.tone}
+              {...('elapsed' in sourceNotice &&
+              sourceNotice.elapsed !== undefined
+                ? { elapsed: sourceNotice.elapsed }
+                : {})}
+              {...('progressLabel' in sourceNotice &&
+              sourceNotice.progressLabel !== undefined
+                ? { progressLabel: sourceNotice.progressLabel }
+                : {})}
+            >
               {sourceNotice.message}
             </WorkspaceNotice>
           </div>
