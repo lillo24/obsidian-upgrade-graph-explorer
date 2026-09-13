@@ -23,6 +23,7 @@ import type {
 import type { ArgumentLibraryStore } from '@icarus-graph-explorer/argument-workspace';
 import { createReviewSourceProvider } from '@icarus-graph-explorer/review-source-tauri';
 import type { ReviewHistoryStore } from '@icarus-graph-explorer/review-workspace';
+import { createOpenAiAgentsProvider } from '@icarus-graph-explorer/openai-agents-provider';
 
 import './App.css';
 import { DeveloperSettingsSection } from './components/DeveloperSettingsSection';
@@ -160,6 +161,7 @@ export function App({
     readonly identitySession: WorkspaceIdentitySession;
     readonly label: string;
   }>();
+  const [openAiReview] = useState(() => createOpenAiAgentsProvider());
   const [reviewController] = useState(
     () =>
       injectedReviewController ??
@@ -167,6 +169,9 @@ export function App({
         sourceProvider: createReviewSourceProvider(),
         historyStore: reviewHistoryStore ?? createPlatformReviewHistoryStore(),
         compilerProvider: argumentCompilerProvider,
+        agentProvider: openAiReview.provider,
+        agentProviderAvailability: openAiReview.getAvailability,
+        defaultModels: openAiReview.defaultModels,
       }),
   );
   const [statusFilter, setStatusFilter] = useState<ResolutionFilter>('all');

@@ -11,6 +11,7 @@ import {
   type ArgumentLibraryStore,
 } from '@icarus-graph-explorer/argument-workspace';
 import { MemoryReviewHistoryStore } from '@icarus-graph-explorer/review-workspace';
+import { ScriptedAgentProvider } from '@icarus-graph-explorer/ai-review';
 import type { ReviewSourceProvider } from '@icarus-graph-explorer/review-source-tauri';
 
 import { AiReviewController } from '../ai-review/controller';
@@ -87,6 +88,45 @@ describe('shared local workspace overlay', () => {
     container.remove();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it('shows one explicit OpenAI model and cloud-upload disclosure', async () => {
+    const controller = new AiReviewController({
+      sourceProvider: unsupportedSource,
+      historyStore: new MemoryReviewHistoryStore(),
+      agentProvider: new ScriptedAgentProvider({}),
+      defaultModels: {
+        analysis: { provider: 'openai-agents', model: 'gpt-6-astra' },
+        integrator: { provider: 'openai-agents', model: 'gpt-6-astra' },
+        postCheck: { provider: 'openai-agents', model: 'gpt-6-astra' },
+      },
+    });
+    await controller.open();
+    const argumentSession = new ArgumentWorkspaceSession(new ArgumentStore());
+    await act(async () => {
+      root.render(
+        <WorkspaceOverlay
+          area="review"
+          argumentSession={argumentSession}
+          controller={controller}
+          onAreaChange={() => undefined}
+          onRequestClose={() => undefined}
+          open
+        />,
+      );
+    });
+    expect(
+      container.querySelectorAll('input[name="openai-review-model"]'),
+    ).toHaveLength(1);
+    expect(
+      container.querySelector<HTMLInputElement>(
+        'input[name="openai-review-model"]',
+      )?.value,
+    ).toBe('gpt-6-astra');
+    expect(container.textContent).toContain(
+      'does not upload the rest of your vault',
+    );
+    expect(container.textContent).not.toContain('API key');
   });
 
   it('keeps one modal, routes dirty Arguments transitions, and restores the launcher', async () => {

@@ -95,6 +95,8 @@ export interface ReviewWorkspaceSnapshot {
   readonly activeRunId?: string | undefined;
   readonly run?: ReviewRunRecord | undefined;
   readonly modelAvailable: boolean;
+  readonly modelProvider?: string | undefined;
+  readonly modelMessage: string;
   readonly compilerAvailable: boolean;
   readonly notice?: string | undefined;
   readonly error?: string | undefined;
@@ -102,11 +104,21 @@ export interface ReviewWorkspaceSnapshot {
   readonly importPreview?: ReviewImportPreview | undefined;
 }
 
+export interface ReviewAgentProviderAvailability {
+  readonly supported: boolean;
+  readonly ready: boolean;
+  readonly provider: string;
+  readonly message: string;
+  readonly defaultModel: string;
+}
+
 export interface AiReviewControllerDependencies {
   readonly sourceProvider: ReviewSourceProvider;
   readonly historyStore: ReviewHistoryStore;
   readonly runRepository?: ReviewRunRepository;
   readonly agentProvider?: AgentProvider;
+  readonly agentProviderAvailability?: () => Promise<ReviewAgentProviderAvailability>;
+  readonly defaultModels?: ReviewModelConfiguration;
   readonly compilerProvider?: CompilerProvider;
   readonly clock?: ReviewClock;
   readonly ids?: ReviewIdGenerator;
@@ -139,13 +151,14 @@ function cloneTemplates(): ReviewTemplates {
   return structuredClone(DEFAULT_REVIEW_TEMPLATES);
 }
 
-function defaultSetup(): ReviewSetupState {
+function defaultSetup(models?: ReviewModelConfiguration): ReviewSetupState {
   return {
     commitCount: 1,
     title: '',
     additionalRequest: '',
     templates: cloneTemplates(),
     compilerPolicy: { ...DEFAULT_COMPILER_POLICY },
+    ...(models === undefined ? {} : { models: structuredClone(models) }),
   };
 }
 
@@ -160,6 +173,9 @@ export class AiReviewController {
   readonly #clock: ReviewClock;
   readonly #preparationId: () => string;
   readonly #engine?: ReviewEngine;
+  readonly #agentProviderAvailability:
+    (() => Promise<ReviewAgentProviderAvailability>) | undefined;
+  readonly #defaultModels: ReviewModelConfiguration | undefined;
   #sourceSession: ReviewSourceSession | undefined;
   #workspaceBinding: ReviewWorkspaceBinding | undefined;
   #sourceGeneration = 0;
@@ -175,19 +191,33 @@ export class AiReviewController {
     this.#clock = dependencies.clock ?? systemClock();
     this.#preparationId =
       dependencies.preparationId ?? (() => createReviewPreparationId());
+    this.#agentProviderAvailability = dependencies.agentProviderAvailability;
+    this.#defaultModels = dependencies.defaultModels;
+    const injectedProvider =
+      dependencies.agentProvider !== undefined &&
+      dependencies.agentProviderAvailability === undefined;
     this.#state = {
       phase: 'opening',
       storageDurability: dependencies.historyStore.durability,
       sourceAvailable: false,
       sourceMessage:
         'Open a durably identified local vault to capture Git history.',
-      setup: defaultSetup(),
+      setup: defaultSetup(dependencies.defaultModels),
       contextFiles: [],
       contextQuery: '',
       selectedPaths: [],
       captureBusy: false,
       history: EMPTY_HISTORY,
-      modelAvailable: dependencies.agentProvider !== undefined,
+      modelAvailable: injectedProvider,
+      ...(injectedProvider && dependencies.defaultModels !== undefined
+        ? { modelProvider: dependencies.defaultModels.analysis.provider }
+        : {}),
+      modelMessage:
+        dependencies.agentProvider === undefined
+          ? 'Live analysis is not connected. Preparation and imported-result reading remain available.'
+          : injectedProvider
+            ? 'Injected live analysis provider is ready.'
+            : 'Checking the desktop OpenAI provider…',
       compilerAvailable: dependencies.compilerProvider !== undefined,
       saveState: 'idle',
     };
@@ -254,11 +284,27 @@ export class AiReviewController {
     this.#disposed = false;
     const lifecycleGeneration = ++this.#lifecycleGeneration;
     try {
-      const history = await this.#historyStore.list();
+      const [history, availability] = await Promise.all([
+        this.#historyStore.list(),
+        this.#agentProviderAvailability?.().catch((error: unknown) => ({
+          supported: false,
+          ready: false,
+          provider: '',
+          defaultModel: '',
+          message: `OpenAI provider initialization failed: ${message(error)}`,
+        })),
+      ]);
       if (lifecycleGeneration !== this.#lifecycleGeneration) return;
       this.#set({
         phase: history.status === 'loaded' ? 'ready' : 'error',
         history,
+        ...(availability === undefined
+          ? {}
+          : {
+              modelAvailable: availability.ready,
+              modelProvider: availability.provider || undefined,
+              modelMessage: availability.message,
+            }),
         ...(history.message === undefined
           ? {}
           : { storageMessage: history.message }),
@@ -924,19 +970,42 @@ export class AiReviewController {
     const source = this.#state.draftSource;
     const workspace = this.#state.draftWorkspace;
     const models = this.#state.setup.models;
+    const conflictingRun =
+      this.#state.run !== undefined && interruptedState(this.#state.run.state);
+    const configuredModels = models === undefined ? [] : Object.values(models);
+    const modelConfigurationValid =
+      configuredModels.length === 3 &&
+      configuredModels.every(
+        ({ provider, model }) =>
+          provider.trim() !== '' &&
+          model.trim() !== '' &&
+          (this.#state.modelProvider === undefined ||
+            provider === this.#state.modelProvider),
+      ) &&
+      (this.#state.modelProvider === undefined ||
+        new Set(configuredModels.map(({ model }) => model)).size === 1);
     if (
       this.#engine === undefined ||
       source === undefined ||
       workspace === undefined ||
-      models === undefined
+      models === undefined ||
+      !this.#state.modelAvailable ||
+      !modelConfigurationValid ||
+      conflictingRun
     ) {
       this.#set({
         error:
           this.#engine === undefined
-            ? 'Live analysis is not connected in this build. Preparation and imported-result reading remain available.'
-            : models === undefined
-              ? 'Configure injected provider model settings before running.'
-              : 'Capture source material before running.',
+            ? this.#state.modelMessage
+            : !this.#state.modelAvailable
+              ? this.#state.modelMessage
+              : models === undefined
+                ? 'Configure injected provider model settings before running.'
+                : !modelConfigurationValid
+                  ? 'Use one non-empty model from the connected provider for every review stage.'
+                  : conflictingRun
+                    ? 'Wait for the active review run to finish or cancel it before starting another.'
+                    : 'Capture source material before running.',
       });
       return;
     }
@@ -1108,7 +1177,7 @@ export class AiReviewController {
 
   public newReview(): void {
     this.#set({
-      setup: defaultSetup(),
+      setup: defaultSetup(this.#defaultModels),
       preparation: undefined,
       contextFiles: [],
       contextQuery: '',

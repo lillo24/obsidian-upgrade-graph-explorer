@@ -1264,6 +1264,45 @@ class ManualClock implements ReviewClock {
 }
 
 describe('provider terminal and limit semantics', () => {
+  it('merges safe identifiers discovered in a terminal event', async () => {
+    const provider = new ScriptedAgentProvider({
+      negative: [
+        [
+          {
+            type: 'terminal',
+            status: 'completed',
+            rawText: 'Synthetic negative',
+            adapterMetadata: {
+              remoteSessionId: 'session-negative',
+              remoteTurnId: 'turn-negative',
+            },
+          },
+        ],
+      ],
+      positive: [
+        [
+          {
+            type: 'terminal',
+            status: 'failed',
+            rawText: '',
+            adapterMetadata: { remoteSessionId: 'session-positive' },
+          },
+        ],
+      ],
+    });
+    const run = await (
+      await new ReviewEngine({ provider }).start(baseInput())
+    ).completion;
+    expect(attempt(run, 'negative').adapterMetadata).toMatchObject({
+      scripted: true,
+      remoteSessionId: 'session-negative',
+      remoteTurnId: 'turn-negative',
+    });
+    expect(attempt(run, 'positive').adapterMetadata).toMatchObject({
+      remoteSessionId: 'session-positive',
+    });
+  });
+
   it.each(['refused', 'truncated', 'failed'] as const)(
     'does not integrate a %s branch',
     async (status) => {

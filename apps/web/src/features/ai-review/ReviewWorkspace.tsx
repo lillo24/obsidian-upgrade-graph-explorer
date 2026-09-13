@@ -86,9 +86,11 @@ function FileRow({
 
 function ModelsEditor({
   models,
+  provider,
   onChange,
 }: {
   readonly models: ReviewModelConfiguration | undefined;
+  readonly provider: string;
   readonly onChange: (models: ReviewModelConfiguration | undefined) => void;
 }) {
   if (models === undefined) {
@@ -96,63 +98,41 @@ function ModelsEditor({
       <button
         onClick={() =>
           onChange({
-            analysis: { provider: '', model: '' },
-            integrator: { provider: '', model: '' },
-            postCheck: { provider: '', model: '' },
+            analysis: { provider, model: '' },
+            integrator: { provider, model: '' },
+            postCheck: { provider, model: '' },
           })
         }
         type="button"
       >
-        Configure Injected Provider Models
+        Configure model
       </button>
     );
   }
   return (
     <fieldset className="review-fieldset">
-      <legend>Injected provider model settings</legend>
-      {(['analysis', 'integrator', 'postCheck'] as const).map((stage) => (
-        <div className="review-model-row" key={stage}>
-          <label>
-            {stage} provider
-            <input
-              autoComplete="off"
-              name={`${stage}-provider`}
-              onChange={(event) =>
-                onChange({
-                  ...models,
-                  [stage]: {
-                    ...models[stage],
-                    provider: event.currentTarget.value,
-                  },
-                })
-              }
-              spellCheck={false}
-              value={models[stage].provider}
-            />
-          </label>
-          <label>
-            {stage} model
-            <input
-              autoComplete="off"
-              name={`${stage}-model`}
-              onChange={(event) =>
-                onChange({
-                  ...models,
-                  [stage]: {
-                    ...models[stage],
-                    model: event.currentTarget.value,
-                  },
-                })
-              }
-              spellCheck={false}
-              value={models[stage].model}
-            />
-          </label>
-        </div>
-      ))}
-      <button onClick={() => onChange(undefined)} type="button">
-        Clear Model Settings
-      </button>
+      <legend>OpenAI model</legend>
+      <p>
+        Provider: <code>{provider}</code>. The same explicit model is used for
+        Negative, Positive, Integrator, and an optional post-check.
+      </p>
+      <label>
+        Model
+        <input
+          autoComplete="off"
+          name="openai-review-model"
+          onChange={(event) => {
+            const model = event.currentTarget.value;
+            onChange({
+              analysis: { provider, model },
+              integrator: { provider, model },
+              postCheck: { provider, model },
+            });
+          }}
+          spellCheck={false}
+          value={models.analysis.model}
+        />
+      </label>
     </fieldset>
   );
 }
@@ -284,13 +264,26 @@ export const ReviewWorkspace = forwardRef<
       ? capturedSource.captureManifest
       : undefined;
   const selectedRun = state.run;
+  const runActive =
+    selectedRun !== undefined &&
+    ['queued', 'running', 'cancel-requested'].includes(selectedRun.state);
   const canRun =
     state.modelAvailable &&
     state.setup.models !== undefined &&
     Object.values(state.setup.models).every(
-      ({ provider, model }) => provider.trim() !== '' && model.trim() !== '',
+      ({ provider, model }) =>
+        provider.trim() !== '' &&
+        model.trim() !== '' &&
+        (state.modelProvider === undefined || provider === state.modelProvider),
     ) &&
-    capturedSource !== undefined;
+    (state.modelProvider === undefined ||
+      new Set(Object.values(state.setup.models).map(({ model }) => model))
+        .size === 1) &&
+    capturedSource !== undefined &&
+    state.draftWorkspace !== undefined &&
+    !state.captureBusy &&
+    state.saveState !== 'saving' &&
+    !runActive;
 
   return (
     <section
@@ -735,15 +728,22 @@ export const ReviewWorkspace = forwardRef<
                 {state.modelAvailable ? (
                   <ModelsEditor
                     models={state.setup.models}
+                    provider={state.modelProvider ?? 'injected-provider'}
                     onChange={(models) => controller.updateSetup({ models })}
                   />
                 ) : (
                   <p className="review-provider-unavailable">
-                    Live analysis is not connected. You can capture, inspect,
-                    save, export, and read imported results without a model
-                    call.
+                    {state.modelMessage} You can still capture, inspect, save,
+                    export, and read imported results without a model call.
                   </p>
                 )}
+                <p className="review-cloud-disclosure">
+                  Running uploads the selected captured material and rendered
+                  prompts to OpenAI. It does not upload the rest of your vault.
+                  Compiler records are sent only when compiler access is enabled
+                  and the agent requests one of the declared read-only
+                  functions.
+                </p>
                 <div className="review-primary-actions">
                   <button
                     disabled={state.draftSource === undefined}

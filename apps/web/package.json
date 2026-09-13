@@ -20,6 +20,7 @@
     "@icarus-graph-explorer/focus-schematic": "workspace:*",
     "@icarus-graph-explorer/focus-schematic-layout": "workspace:*",
     "@icarus-graph-explorer/graph-query": "workspace:*",
+    "@icarus-graph-explorer/openai-agents-provider": "workspace:*",
     "@icarus-graph-explorer/performance": "workspace:*",
     "@icarus-graph-explorer/presentation-overrides": "workspace:*",
     "@icarus-graph-explorer/renderer-reactflow": "workspace:*",

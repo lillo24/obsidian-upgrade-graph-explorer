@@ -24,7 +24,7 @@ examples/
   scripted-review.test.ts  Runnable, visibly synthetic end-to-end example.
 ```
 
-The application supplies source capture, a live provider adapter, durable storage, and any UI. The compiler supplies its knowledge model/store through the small snapshot session contract; Review stores only what a stage requested and received.
+The application supplies source capture, a live provider adapter, durable storage, and any UI. The desktop OpenAI adapter lives in [`../openai-agents-provider`](../openai-agents-provider/README.md); this engine remains provider-neutral. The compiler supplies its knowledge model/store through the small snapshot session contract; Review stores only what a stage requested and received.
 
 ## Public flow
 
@@ -100,7 +100,7 @@ pnpm check
 
 ## Deliberate limitations
 
-- No live Agents API/SDK adapter or credentials.
+- No provider SDK, HTTP transport, or credentials inside this package; the desktop-only outer adapter is separate.
 - No Git/filesystem capture inside this package; the desktop-only outer adapter lives in [`../review-source-tauri`](../review-source-tauri/README.md).
 - In-memory storage only; JSON import cannot reconnect an unfinished remote session and marks it interrupted.
 - No compiler implementation, writes, embeddings, MCP server, or knowledge-library prepopulation.

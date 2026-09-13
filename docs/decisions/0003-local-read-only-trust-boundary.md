@@ -2,6 +2,11 @@
 
 **Status:** Accepted
 
+REVIEW4 narrows the original no-cloud rule: graph exploration remains local,
+while AI Review is an explicit **Run** action that uploads only selected frozen
+review evidence and prompts through a credential-owning native provider. The
+vault remains read-only and there is still no background sync or telemetry.
+
 ## Context
 
 Markdown workspaces may contain private material. The initial explorer does not require collaboration, accounts, remote compute, or editing source files.

@@ -73,6 +73,7 @@ export type ScriptedStep =
           ) => JsonValue | IntegrationResultInput | PostCheckResultInput);
       usage?: ProviderUsage;
       error?: string;
+      adapterMetadata?: Record<string, JsonValue>;
       eventId?: string;
       identity?: ScriptIdentityOverride;
     }
@@ -188,6 +189,9 @@ export class ScriptedAgentProvider implements AgentProvider {
                   }),
               ...(step.usage === undefined ? {} : { usage: step.usage }),
               ...(step.error === undefined ? {} : { error: step.error }),
+              ...(step.adapterMetadata === undefined
+                ? {}
+                : { adapterMetadata: step.adapterMetadata }),
             };
             return;
         }

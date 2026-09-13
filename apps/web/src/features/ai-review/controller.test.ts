@@ -244,6 +244,39 @@ function integrationResult(): IntegrationResultInput {
 }
 
 describe('AI Review application controller', () => {
+  it('loads native provider readiness while preserving an explicit default model', async () => {
+    const controller = new AiReviewController({
+      sourceProvider: sourceProvider().provider,
+      historyStore: new MemoryReviewHistoryStore(),
+      agentProvider: new ScriptedAgentProvider({}),
+      agentProviderAvailability: async () => ({
+        supported: true,
+        ready: false,
+        provider: 'openai-agents',
+        message: 'Set OPENAI_API_KEY and restart.',
+        defaultModel: 'gpt-6-astra',
+      }),
+      defaultModels: {
+        analysis: { provider: 'openai-agents', model: 'gpt-6-astra' },
+        integrator: { provider: 'openai-agents', model: 'gpt-6-astra' },
+        postCheck: { provider: 'openai-agents', model: 'gpt-6-astra' },
+      },
+    });
+    expect(controller.snapshot().modelAvailable).toBe(false);
+    await controller.open();
+    expect(controller.snapshot()).toMatchObject({
+      modelAvailable: false,
+      modelProvider: 'openai-agents',
+      modelMessage: 'Set OPENAI_API_KEY and restart.',
+      setup: {
+        models: {
+          analysis: { provider: 'openai-agents', model: 'gpt-6-astra' },
+          integrator: { provider: 'openai-agents', model: 'gpt-6-astra' },
+        },
+      },
+    });
+  });
+
   it('reopens safely after a lifecycle cleanup replay', async () => {
     const controller = new AiReviewController({
       sourceProvider: sourceProvider().provider,

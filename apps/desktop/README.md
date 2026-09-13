@@ -18,6 +18,7 @@ src-tauri/
   tauri.global-renderer-spike.conf.json KG13A-only release harness override.
   capabilities/main.json     Dialog, selected-root read/watch, and app-data scope.
   src/lib.rs                 Tauri/plugin initialization.
+  src/openai_agents.rs       Credential-owning fixed-host Agents HTTPS/SSE transport and tests.
   src/review_source.rs       Authorized, pinned, bounded read-only Git capture and disposable-repository tests.
   src/main.rs                Desktop executable entry point.
   icons/                     Tauri-generated desktop icon formats.
@@ -45,6 +46,9 @@ npm/crates registries:
 | `serde`                     | 1.0.229 | MIT OR Apache-2.0 |
 | `serde_json`                | 1.0.151 | MIT OR Apache-2.0 |
 | `uuid`                      |  1.26.0 | MIT OR Apache-2.0 |
+| `reqwest`                   | 0.12.23 | MIT OR Apache-2.0 |
+| `futures-util`              |  0.3.34 | MIT OR Apache-2.0 |
+| `tokio`                     |  1.53.1 | MIT               |
 
 ```bash
 pnpm desktop:check
@@ -90,6 +94,12 @@ Windows app container virtualizes application-local files; both scopes remain
 restricted to private application state, and command permissions remain
 capability-gated. Keep these scopes aligned with `appLocalDataDir()` if the
 storage root changes.
+
+Live AI Review uses another narrow native boundary. Only Rust reads
+`OPENAI_API_KEY`; the webview cannot provide credentials, URLs, headers, hosted
+tools, or environments. The module calls the fixed OpenAI Agents API host,
+streams bounded events, and exposes only safe provider events and identifiers.
+See [`../../docs/REVIEW4_OPENAI_AGENTS_PROVIDER.md`](../../docs/REVIEW4_OPENAI_AGENTS_PROVIDER.md).
 
 Dialog-added scope is not durable. Restarting requires the user to select the
 vault again; an exact normalized private registry match then recovers its stable
