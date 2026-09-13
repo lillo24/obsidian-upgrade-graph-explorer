@@ -5,6 +5,9 @@ merge remain gated.**
 
 Implementation branch: `codex/post-saved1b-native-filter-fix`
 
+[Draft PR #96](https://github.com/lillo24/obsidian-upgrade-graph-explorer/pull/96)
+is the isolated integration vehicle.
+
 The branch was created from the then-latest `origin/main` commit
 `c4d237c6abd72bfd37138cd297bea52ea1d7f76c` and was updated to the newer
 `dbc898e` main tip before opening the PR. The integration PR is intentionally
