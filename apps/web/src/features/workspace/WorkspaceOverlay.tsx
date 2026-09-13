@@ -9,6 +9,7 @@ import {
 import { activateArgumentWorkspaceOverlay } from '../arguments/argument-overlay';
 import { createPlatformArgumentLibraryStore } from '../arguments/platform-store';
 import { ArgumentWorkspaceSession } from '../arguments/session';
+import type { ArgumentSourceAccess } from '../arguments/source-capture';
 import {
   ReviewWorkspace,
   type ReviewWorkspaceHandle,
@@ -31,6 +32,7 @@ const FOCUSABLE_SELECTOR = [
 export function WorkspaceOverlay({
   area,
   argumentLibraryStore,
+  argumentSourceAccess,
   controller,
   onAreaChange,
   onRequestClose,
@@ -39,6 +41,7 @@ export function WorkspaceOverlay({
 }: {
   readonly area: WorkspaceArea;
   readonly argumentLibraryStore?: ArgumentLibraryStore;
+  readonly argumentSourceAccess?: ArgumentSourceAccess;
   readonly controller: AiReviewController;
   readonly onAreaChange: (area: WorkspaceArea) => void;
   readonly onRequestClose: () => void;
@@ -214,6 +217,9 @@ export function WorkspaceOverlay({
             onRequestClose={onRequestClose}
             ref={argumentsRef}
             session={argumentSession}
+            {...(argumentSourceAccess === undefined
+              ? {}
+              : { sourceAccess: argumentSourceAccess })}
           />
         </div>
         <div

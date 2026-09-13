@@ -38,6 +38,10 @@ import {
   type WorkspaceArea,
 } from './features/workspace/WorkspaceOverlay';
 import {
+  ArgumentSourceAccessSession,
+  type ArgumentSourceAccessHost,
+} from './features/arguments/source-capture';
+import {
   buildReferenceViews,
   filterReferenceViews,
   matchingHierarchyDocumentIds,
@@ -91,10 +95,13 @@ export interface AppProps {
   readonly reviewController?: AiReviewController;
   /** Tests may inject an isolated history store for the default controller. */
   readonly reviewHistoryStore?: ReviewHistoryStore;
+  /** Tests may inject the narrow app-owned theory-source boundary. */
+  readonly argumentSourceAccess?: ArgumentSourceAccessHost;
 }
 
 export function App({
   argumentLibraryStore,
+  argumentSourceAccess,
   desktopSourceProvider,
   reviewController: injectedReviewController,
   reviewHistoryStore,
@@ -117,6 +124,11 @@ export function App({
   );
   const liveUnsubscribeRef = useRef<(() => void) | undefined>(undefined);
   const sourceRequestGeneration = useRef(0);
+  const argumentSourceSessionSequence = useRef(0);
+  const [defaultArgumentSourceAccess] = useState(
+    () => new ArgumentSourceAccessSession(),
+  );
+  const argumentSources = argumentSourceAccess ?? defaultArgumentSourceAccess;
   const lastPerformanceCorrelation = useRef<string | undefined>(undefined);
   const [livePhase, setLivePhase] = useState<DesktopLiveVaultPhase>();
   const [vaultOpening, setVaultOpening] = useState(false);
@@ -220,6 +232,7 @@ export function App({
     opened: OpenedDesktopVault,
     controller?: DesktopLiveVaultController,
   ): void {
+    const argumentSourceSessionId = `${opened.runtime.workspaceId}:session-${++argumentSourceSessionSequence.current}`;
     performanceSession?.begin('I1-initial-view-preparation');
     if (performanceSession !== undefined) {
       const instrumentation = performanceSession.instrumentation;
@@ -278,6 +291,16 @@ export function App({
     if (controller === undefined) {
       setReport(opened.report);
       setSourceStatus(status);
+      argumentSources.publishCommittedSource({
+        sourceSessionId: argumentSourceSessionId,
+        sourceSpaceId: opened.runtime.workspaceId,
+        displayName: opened.displayName,
+        acquisition: 'captured',
+        acquisitionState: 'ready',
+        runtimeRevision: opened.runtime.revision,
+        inventory: opened.runtime.inventory,
+        observedAt: new Date().toISOString(),
+      });
       return;
     }
 
@@ -338,6 +361,20 @@ export function App({
       );
       setLivePhase(snapshot.phase);
       setSourceStatus(liveSourceStatus(snapshot));
+      argumentSources.publishCommittedSource({
+        sourceSessionId: argumentSourceSessionId,
+        sourceSpaceId: snapshot.runtime.workspaceId,
+        displayName: opened.displayName,
+        acquisition: 'live',
+        acquisitionState: snapshot.dirty
+          ? 'dirty'
+          : snapshot.phase === 'live'
+            ? 'ready'
+            : snapshot.phase,
+        runtimeRevision: snapshot.runtime.revision,
+        inventory: snapshot.runtime.inventory,
+        observedAt: new Date().toISOString(),
+      });
     };
     liveUnsubscribeRef.current = controller.subscribe(applySnapshot);
     applySnapshot(controller.snapshot());
@@ -464,6 +501,7 @@ export function App({
       setSourceWarning(undefined);
       setIdentityRecovery(undefined);
       setReviewWorkspace(undefined);
+      argumentSources.reportOnly();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       setLoadError(
@@ -488,6 +526,7 @@ export function App({
     setSourceWarning(undefined);
     setIdentityRecovery(undefined);
     setReviewWorkspace(undefined);
+    argumentSources.reportOnly();
   }
 
   async function rescanVault(): Promise<void> {
@@ -663,6 +702,7 @@ export function App({
         onAreaChange={setWorkspaceArea}
         onRequestClose={closeWorkspace}
         open={workspaceOpen}
+        argumentSourceAccess={argumentSources}
         {...(argumentLibraryStore === undefined
           ? {}
           : { argumentLibraryStore })}

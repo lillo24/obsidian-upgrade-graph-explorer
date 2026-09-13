@@ -58,9 +58,9 @@ reorder KG14.
 | **MOVE1A — Constraint/gesture foundation**          | Display-to-dynamic coordinate inverse, serializable consumer port, pure gesture/coalescing, session seams, and lifecycle/arbitration tests.                      | **Complete.**                                                                               |
 | **MOVE1B — Production direct movement**             | Direct Network File dragging and real PHYSICS1 integration with bounded transport, guarded cooling, and an explicit supported-size limit.                        | **Implemented in draft — mandatory optimized Windows pointer/touchpad acceptance pending.** |
 | **PIN1 — Persistent individual placement**          | Explicit durable single-File placement semantics, storage, reconciliation, and authoring controls.                                                               | **Later; no schema is defined.**                                                            |
-| **SAVED1 — Saved Views**                            | Explicit named graph-context bookmarks now; optional presentation/spatial profile composition later.                                                             | **Split into SAVED1A and SAVED1B.**                                                         |
+| **SAVED1 — Saved Views**                            | Explicit named graph-context bookmarks with layout-appropriate presentation/spatial profiles.                                                                    | **Complete through SAVED1B.**                                                               |
 | **SAVED1A — Named semantic bookmarks**              | Workspace-scoped names over query, Scope/Layout, hierarchy detail, Focus, and semantic viewport bookmarks, with strict independent persistence.                  | **Complete — automated/browser evidence accepted for merge by explicit user instruction.**  |
-| **SAVED1B — Presentation/spatial profiles**         | Optional composition with independently owned Graph Preferences, Visual Groups, size overrides, and spatial profiles.                                            | **Later; no schema is defined.**                                                            |
+| **SAVED1B — Presentation/spatial profiles**         | Schema-v2 layout-appropriate Graph Preference profiles, All-Network spatial snapshots, derived quick switching, and rollback-protected Apply.                    | **Implemented — automated/browser/native merge gates tracked in the SAVED1B report.**       |
 
 ### ForceAtlas2 convergence track
 
@@ -177,8 +177,11 @@ All/Focus Network interaction and accessible Network Explorer controller, with
 Arrange Folders remaining an explicit All-only owner. That implementation
 remains a draft until the mandatory optimized Windows pointer/touchpad acceptance
 passes. PIN1 remains a separate later persistence feature rather than a side
-effect of Move. SAVED1A Named Saved Views are implemented as semantic bookmarks;
-the wider presentation/spatial composition question remains SAVED1B.
+effect of Move. SAVED1A Named Saved Views are semantic bookmarks; SAVED1B adds
+their schema-v2 layout-appropriate graph profiles and derived quick switch while
+keeping Visual Groups, Saved Filters, per-File sizes, PIN1, and interaction
+preferences independent. SAVEDUX1 transition animation and AUTO1 adaptive layout
+selection remain future work.
 
 Post-MVP analytics—typed conceptual relations, pathfinding variants,
 centrality, betweenness, communities, connected components, co-citation,

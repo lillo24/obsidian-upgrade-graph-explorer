@@ -50,6 +50,18 @@ export interface GraphPreferences {
   readonly trackpadZoomMode: TrackpadZoomMode;
 }
 
+/** Serializable presentation subset owned by a Focus Hierarchy Saved View. */
+export interface SavedFocusHierarchySettings {
+  readonly focusAppearance: FocusAppearance;
+  readonly focusHierarchyImplementation: FocusHierarchyImplementation;
+  readonly modularFocusInternalLayout: FocusSchematicProductInternalLayoutVariant;
+  readonly modularFocusHeadingOrder: FocusSchematicEndpointOrderPolicy;
+  readonly modularFocusMacroLayout: FocusSchematicProductMacroLayout;
+  readonly modularFocusSoftFolderStrength: number;
+  readonly modularFolderStripsVisible: boolean;
+  readonly modularConnectionStyle: GraphEdgePathStyle;
+}
+
 export const DEFAULT_GRAPH_PREFERENCES: GraphPreferences = {
   focusAppearance: 'inverted',
   focusHierarchyImplementation: 'classic',
@@ -100,6 +112,106 @@ function isLocalLayoutMode(value: unknown): value is LocalLayoutMode {
 
 function isGraphEdgePathStyle(value: unknown): value is GraphEdgePathStyle {
   return value === 'direct' || value === 'electronic';
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function exactFields(
+  value: Record<string, unknown>,
+  expected: readonly string[],
+): boolean {
+  return Object.keys(value).sort().join(',') === [...expected].sort().join(',');
+}
+
+export function captureFocusHierarchySettings(
+  preferences: GraphPreferences,
+): SavedFocusHierarchySettings {
+  return {
+    focusAppearance: preferences.focusAppearance,
+    focusHierarchyImplementation: preferences.focusHierarchyImplementation,
+    modularFocusInternalLayout: preferences.modularFocusInternalLayout,
+    modularFocusHeadingOrder: preferences.modularFocusHeadingOrder,
+    modularFocusMacroLayout: preferences.modularFocusMacroLayout,
+    modularFocusSoftFolderStrength: preferences.modularFocusSoftFolderStrength,
+    modularFolderStripsVisible: preferences.modularFolderStripsVisible,
+    modularConnectionStyle: preferences.modularConnectionStyle,
+  };
+}
+
+export function validateFocusHierarchySettings(
+  value: unknown,
+): SavedFocusHierarchySettings {
+  const keys = [
+    'focusAppearance',
+    'focusHierarchyImplementation',
+    'modularFocusInternalLayout',
+    'modularFocusHeadingOrder',
+    'modularFocusMacroLayout',
+    'modularFocusSoftFolderStrength',
+    'modularFolderStripsVisible',
+    'modularConnectionStyle',
+  ] as const satisfies readonly (keyof SavedFocusHierarchySettings)[];
+  if (!isPlainRecord(value) || !exactFields(value, keys)) {
+    throw new Error('Focus Hierarchy profile fields are incompatible.');
+  }
+  if (!isFocusAppearance(value.focusAppearance)) {
+    throw new Error('Focus Hierarchy profile has an invalid appearance.');
+  }
+  if (!isFocusHierarchyImplementation(value.focusHierarchyImplementation)) {
+    throw new Error('Focus Hierarchy profile has an invalid implementation.');
+  }
+  if (
+    !isFocusSchematicProductInternalLayoutVariant(
+      value.modularFocusInternalLayout,
+    )
+  ) {
+    throw new Error('Focus Hierarchy profile has an invalid internal layout.');
+  }
+  if (!isFocusSchematicEndpointOrderPolicy(value.modularFocusHeadingOrder)) {
+    throw new Error('Focus Hierarchy profile has an invalid heading order.');
+  }
+  if (!isFocusSchematicProductMacroLayout(value.modularFocusMacroLayout)) {
+    throw new Error('Focus Hierarchy profile has an invalid macro layout.');
+  }
+  const strength = normalizeFocusSchematicSoftFolderStrength(
+    value.modularFocusSoftFolderStrength,
+  );
+  if (
+    typeof value.modularFocusSoftFolderStrength !== 'number' ||
+    !Number.isFinite(value.modularFocusSoftFolderStrength) ||
+    strength !== value.modularFocusSoftFolderStrength
+  ) {
+    throw new Error(
+      'Focus Hierarchy profile soft-folder strength must be from 0 to 100.',
+    );
+  }
+  if (typeof value.modularFolderStripsVisible !== 'boolean') {
+    throw new Error(
+      'Focus Hierarchy profile folder-strip visibility must be boolean.',
+    );
+  }
+  if (!isGraphEdgePathStyle(value.modularConnectionStyle)) {
+    throw new Error('Focus Hierarchy profile has an invalid connection style.');
+  }
+  return {
+    focusAppearance: value.focusAppearance,
+    focusHierarchyImplementation: value.focusHierarchyImplementation,
+    modularFocusInternalLayout: value.modularFocusInternalLayout,
+    modularFocusHeadingOrder: value.modularFocusHeadingOrder,
+    modularFocusMacroLayout: value.modularFocusMacroLayout,
+    modularFocusSoftFolderStrength: strength,
+    modularFolderStripsVisible: value.modularFolderStripsVisible,
+    modularConnectionStyle: value.modularConnectionStyle,
+  };
+}
+
+export function applyFocusHierarchySettings(
+  current: GraphPreferences,
+  saved: SavedFocusHierarchySettings,
+): GraphPreferences {
+  return { ...current, ...validateFocusHierarchySettings(saved) };
 }
 
 function defaultLoadResult(
@@ -214,6 +326,42 @@ export function loadGraphPreferences(
   return defaultLoadResult();
 }
 
+/** Canonical write form used by ordinary controls and Saved View transactions. */
+export function serializeGraphPreferences(
+  preferences: GraphPreferences,
+): string {
+  const hierarchy = validateFocusHierarchySettings(
+    captureFocusHierarchySettings(preferences),
+  );
+  if (!isLocalLayoutMode(preferences.localLayoutMode)) {
+    throw new Error('Graph preference localLayoutMode is invalid.');
+  }
+  if (typeof preferences.showExperimentalAllHierarchy !== 'boolean') {
+    throw new Error(
+      'Graph preference showExperimentalAllHierarchy must be boolean.',
+    );
+  }
+  if (!isTrackpadZoomMode(preferences.trackpadZoomMode)) {
+    throw new Error('Graph preference trackpadZoomMode is invalid.');
+  }
+  return JSON.stringify({
+    focusAppearance: hierarchy.focusAppearance,
+    focusHierarchyImplementation: hierarchy.focusHierarchyImplementation,
+    globalLayoutSettings: validateGlobalLayoutSettings(
+      preferences.globalLayoutSettings,
+    ),
+    localLayoutMode: preferences.localLayoutMode,
+    modularFocusInternalLayout: hierarchy.modularFocusInternalLayout,
+    modularFocusHeadingOrder: hierarchy.modularFocusHeadingOrder,
+    modularFocusMacroLayout: hierarchy.modularFocusMacroLayout,
+    modularFocusSoftFolderStrength: hierarchy.modularFocusSoftFolderStrength,
+    modularFolderStripsVisible: hierarchy.modularFolderStripsVisible,
+    modularConnectionStyle: hierarchy.modularConnectionStyle,
+    showExperimentalAllHierarchy: preferences.showExperimentalAllHierarchy,
+    trackpadZoomMode: preferences.trackpadZoomMode,
+  } satisfies GraphPreferences);
+}
+
 export function saveGraphPreferences(
   storage: StorageLike | undefined,
   preferences: GraphPreferences,
@@ -222,7 +370,10 @@ export function saveGraphPreferences(
     return { ok: false, message: SESSION_ONLY_WARNING };
   }
   try {
-    storage.setItem(GRAPH_PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
+    storage.setItem(
+      GRAPH_PREFERENCES_STORAGE_KEY,
+      serializeGraphPreferences(preferences),
+    );
     return { ok: true };
   } catch {
     return { ok: false, message: SESSION_ONLY_WARNING };

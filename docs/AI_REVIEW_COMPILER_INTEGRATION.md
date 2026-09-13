@@ -12,11 +12,13 @@ receives tools. Tool arguments cannot select another workspace, snapshot,
 revision, root, or path.
 
 ```text
-application source capture ── exact text/diffs ──► AI Review run
-                                                    │
-AI Compiler store ── retained snapshot session ─────┤
-                                                    ▼
-                          Negative ║ Positive → Integrator → optional post-check
+application source capture ──► Arguments previews / source-aware packets
+             │
+             └── future strict retained-source adapter ──► AI Review run
+                                                            │
+AI Compiler store ── retained snapshot session ─────────────┤
+                                                            ▼
+                                  Negative ║ Positive → Integrator → optional post-check
 ```
 
 Review access is configurable at three fixed placements: both analysis branches, Integrator, and separate post-check. The default is none. When analysis access is on, both branches get the same bound snapshot/capabilities/budgets but separate execution contexts and tool histories. One branch's discoveries are never inserted into the other branch.
@@ -49,6 +51,27 @@ Repository/source/model/tool content remains untrusted evidence. It cannot enabl
 The two packages deliberately do not import each other. Their current public
 contracts require a small application-owned translation:
 
+- `apps/web/src/App.tsx` now publishes only matching committed desktop
+  inventories to `ArgumentSourceAccessSession`. A new vault/report source
+  session invalidates the Arguments binding; live `catching-up`, `updating`,
+  `resyncing`, `paused`, or dirty acquisition states cannot claim a fresh disk
+  read. A one-shot open is labeled captured rather than continuously live.
+- `apps/web/src/features/arguments/source-capture.ts` is the current host
+  authorization/capture entry point. After explicit “Use selected vault for
+  theory sources” confirmation it copies only selected registered Markdown
+  files into a bounded immutable `ArgumentSourceCapture`, whose provider
+  implements the core `LinkedTheorySourceProvider`. Absolute roots, the
+  desktop runtime, arbitrary paths, URLs, attachments, embeds, and unsupported
+  block bodies do not cross this boundary.
+- `source-packet.ts` is the current source-aware export entry point. It retains
+  the original core `ArgumentBundle` and receipt unchanged, pins one source
+  capture, includes successful exact payloads and source consultation receipts,
+  records explicit failures/gaps, deduplicates equal
+  source-space/location/version/extent/text payloads while preserving origins,
+  and adds a version-1 outer fingerprint over every envelope field except the
+  fingerprint field itself. The structured export contains the actual argument
+  and source payloads.
+
 - `CompilerProvider.openSnapshot` captures the application's current confirmed
   `ArgumentLibrarySnapshot` and constructs one `KnowledgeReader`; it must not
   initialize, seed, repair, or expose `ArgumentLibraryRepository` or
@@ -71,6 +94,24 @@ contracts require a small application-owned translation:
   become unavailable/stale; newly fetched changed text must not be presented as
   retained historical content. A non-Review overlay may instead show current
   text with the core reader's explicit freshness result.
+- Captured document versions are
+  `icarus-full-document-sha256-canonical-json-v1:<digest>`, computed from the
+  exact complete source string with the core canonical fingerprint algorithm.
+  They are full-file identities, not Git commits; an unrelated edit in the same
+  file therefore reports changed. The core continues to fingerprint the exact
+  returned text separately with `fingerprintScope: "returned-excerpt"`.
+- The current web limits are 24 selected references, 16 captured Markdown
+  files, 1,000,000 UTF-16 characters per file, 4,000,000 captured characters,
+  and four concurrent reads. Source-aware packets request at most 64,000
+  characters per passage and 256,000 source characters in total. Incomplete
+  reads and unavailable/ambiguous/denied/version failures remain explicit and
+  never erase the complete argumentative exchange.
+- `recordTheorySourceVersion` plus
+  `ArgumentWorkspaceSession.recordSourceVersion` is a separate, confirmed
+  expected-snapshot authoring transaction. It stores portable source-space and
+  full-file version metadata only. Ordinary reads/refreshes/exports are
+  read-only; no source body, verdict, review state, reassessment, or theory file
+  is changed.
 - Abort/cancellation, per-call byte limits, placement, model-visible shaping,
   and saving Review artifacts remain Review/adapter responsibilities. Live
   source acquisition remains the host's authorized source-provider
@@ -92,6 +133,14 @@ Workspace to erase it.
 
 The Soundness and Objectivity case remains compiler-owned. Review contains no special mathematical blacklist, truth rule, or private theory passage for that case.
 
-## Future UI contract (not implemented)
+## Future Review UI contract (not implemented)
 
 Graph Explorer will own the overlay and source selection: 1–10 commits/files, prompt previews, Integrated/Negative/Positive/Compare tabs, full-width vertical comparison by default, optional horizontal comparison, distinct post-check output, retrieval evidence, and Markdown export. That work must not make review orchestration responsible for graph layout, camera, filters, selection, canvas lifecycle, or shared rendering styles.
+
+The Arguments overlay's local read-only source previews and source-aware packets
+are implemented independently of that future Review UI. There is still no
+`CompilerProvider` adapter, stage choice, model/tool transport, Review run,
+source-history archive, or theory write-back. A later Review adapter may reuse
+the immutable capture/provider and packet evidence shapes, but it must add
+strict retained-version/session mapping and its own cancellation and
+model-visible limits without importing Argument Workspace authoring.

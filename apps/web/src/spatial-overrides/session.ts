@@ -150,6 +150,31 @@ export function commitSpatialOverrideSessionMutation(
   };
 }
 
+/**
+ * Adopts a registry already written by a wider product transaction. This seam
+ * deliberately performs no storage mutation of its own.
+ */
+export function adoptPersistedSpatialOverrideRegistry(
+  session: SpatialOverrideSession,
+  candidate: SpatialOverrideRegistry,
+): SpatialOverrideSession {
+  if (session.persistenceMode !== 'durable') {
+    throw new Error(
+      'Saved View spatial profiles require writable durable folder positions.',
+    );
+  }
+  const validation = validateSpatialOverrideRegistry(
+    candidate,
+    session.registry.workspaceId,
+  );
+  if (!validation.ok) throw new Error(validation.message);
+  return {
+    registry: validation.value,
+    persistenceMode: 'durable',
+    status: SPATIAL_OVERRIDE_DURABLE_STATUS,
+  };
+}
+
 export function resetCorruptSpatialOverrideSession(
   session: SpatialOverrideSession,
   storage: StorageLike | undefined,

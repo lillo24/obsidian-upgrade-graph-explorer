@@ -14,8 +14,10 @@ import {
   sameGlobalVisualSettings,
   validateGlobalPhysicsSettings,
   validateGlobalLayoutSettings,
+  validateNetworkSettings,
   withFolderClusteringStrength,
   withGlobalSpacingPreset,
+  withNetworkSettings,
 } from './settings';
 
 describe('Global folder clustering strength', () => {
@@ -121,6 +123,52 @@ describe('Global folder clustering strength', () => {
     expect(resolveNetworkSettings(changedAllOnly)).toEqual(
       resolveNetworkSettings(baseline),
     );
+  });
+
+  it('applies exactly the four shared Network settings', () => {
+    const current = {
+      folderClustering: false,
+      spacingPreset: 'spacious' as const,
+      custom: {
+        ...customGlobalLayoutSettings('spacious'),
+        folderCohesion: 0.14,
+        withinFolderSpacing: 2.6,
+        betweenFolderSpacing: 7.2,
+        referenceDegreeSizeInfluence: 88,
+      },
+    };
+    const shared = {
+      referencePull: 1.7,
+      nodeSize: 8,
+      linkThickness: 2.1,
+      labelThreshold: 13,
+    };
+
+    const applied = withNetworkSettings(current, shared);
+
+    expect(resolveNetworkSettings(applied)).toEqual(shared);
+    expect(resolveGlobalLayoutSettings(applied)).toMatchObject({
+      folderClustering: false,
+      spacingPreset: 'spacious',
+      folderCohesion: 0.14,
+      withinFolderSpacing: 2.6,
+      betweenFolderSpacing: 7.2,
+      referenceDegreeSizeInfluence: 88,
+    });
+  });
+
+  it('strictly validates the shared Network profile boundary', () => {
+    const shared = resolveNetworkSettings(DEFAULT_GLOBAL_LAYOUT_SETTINGS);
+    expect(validateNetworkSettings(shared)).toEqual(shared);
+    expect(() =>
+      validateNetworkSettings({ ...shared, folderClustering: true }),
+    ).toThrow('unexpected field folderClustering');
+    expect(() =>
+      validateNetworkSettings({ ...shared, referencePull: 4 }),
+    ).toThrow('referencePull');
+    expect(() =>
+      validateNetworkSettings({ ...shared, labelThreshold: undefined }),
+    ).toThrow('labelThreshold');
   });
 
   it('normalizes legacy custom settings to the old degree-size behavior', () => {

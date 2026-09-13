@@ -8,6 +8,7 @@ import {
   editCounterArgument,
   editTopic,
   reassessCounterArgumentResponse,
+  recordTheorySourceVersion,
   setRecordArchived,
   setRecordReviewState,
   setTopicMembership,
@@ -30,6 +31,7 @@ import type {
   EditCounterArgumentInput,
   EditTopicInput,
   HumanReviewState,
+  RecordTheorySourceVersionInput,
   SnapshotDescriptor,
   TopicMembershipKind,
   UpdateCounterArgumentResponseInput,
@@ -166,6 +168,15 @@ export class ArgumentLibraryAuthoringService {
   ): Promise<ArgumentLibraryCommitResult> {
     return this.commit(expected, (library) =>
       reassessCounterArgumentResponse(library, counterArgumentId, this.runtime),
+    );
+  }
+
+  recordSourceVersion(
+    expected: SnapshotDescriptor,
+    input: RecordTheorySourceVersionInput,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      recordTheorySourceVersion(library, input, this.runtime),
     );
   }
 

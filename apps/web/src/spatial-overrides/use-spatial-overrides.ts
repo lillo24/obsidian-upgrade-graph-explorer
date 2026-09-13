@@ -16,6 +16,7 @@ import { useCallback, useMemo, useState } from 'react';
 import type { ViewPersistenceEligibility } from '../persistence/session';
 import type { StorageLike } from '../persistence/storage';
 import {
+  adoptPersistedSpatialOverrideRegistry,
   commitSpatialOverrideSessionMutation,
   createSpatialOverrideSession,
   resetCorruptSpatialOverrideSession,
@@ -87,6 +88,13 @@ export function useSpatialOverrides({
     setSessions((current) => new Map(current).set(key, recovered.value));
     return recovered.ok ? undefined : recovered.message;
   }, [key, session, storage]);
+  const adoptPersistedRegistry = useCallback(
+    (candidate: SpatialOverrideRegistry) => {
+      const adopted = adoptPersistedSpatialOverrideRegistry(session, candidate);
+      setSessions((current) => new Map(current).set(key, adopted));
+    },
+    [key, session],
+  );
   return {
     session,
     anchors,
@@ -98,5 +106,6 @@ export function useSpatialOverrides({
     resetFolderAnchor,
     resetAllFolderAnchors,
     recoverCorruptRegistry,
+    adoptPersistedRegistry,
   };
 }

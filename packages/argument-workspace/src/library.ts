@@ -14,6 +14,7 @@ import {
   type EditCounterArgumentInput,
   type EditTopicInput,
   type HumanReviewState,
+  type RecordTheorySourceVersionInput,
   type RetrievalMetadata,
   type TopicMembershipKind,
   type UpdateCounterArgumentResponseInput,
@@ -414,6 +415,62 @@ export function editCounterArgument(
       record.id === counterArgumentId ? next : record,
     ),
   });
+}
+
+/**
+ * Records a confirmed full-document source baseline on one existing locator.
+ * This is an ordinary record mutation: it never reads or writes source text.
+ */
+export function recordTheorySourceVersion(
+  library: ArgumentLibrary,
+  input: RecordTheorySourceVersionInput,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  requiredText(input.sourceSpaceId, 'Source-space ID');
+  requiredText(input.sourceVersion, 'Source version');
+  const record =
+    input.recordKind === 'axiom'
+      ? library.axioms.find(({ id }) => id === input.recordId)
+      : library.counterArguments.find(({ id }) => id === input.recordId);
+  if (record === undefined) {
+    throw new Error(`${input.recordKind} "${input.recordId}" does not exist.`);
+  }
+  const reference = record.sourceReferences.find(
+    ({ id }) => id === input.sourceReferenceId,
+  );
+  if (reference === undefined) {
+    throw new Error(
+      `Source reference "${input.sourceReferenceId}" is not registered on ${input.recordKind} "${input.recordId}".`,
+    );
+  }
+  if (
+    reference.sourceSpaceHint !== undefined &&
+    reference.sourceSpaceHint !== input.sourceSpaceId
+  ) {
+    throw new Error(
+      `Source reference "${reference.id}" is bound to a different source space.`,
+    );
+  }
+  const sourceReferences = record.sourceReferences.map((candidate) =>
+    candidate.id === reference.id
+      ? {
+          ...candidate,
+          sourceSpaceHint: candidate.sourceSpaceHint ?? input.sourceSpaceId,
+          recordedVersion: {
+            sourceVersion: input.sourceVersion,
+            fingerprintScope: 'file' as const,
+          },
+        }
+      : candidate,
+  );
+  return input.recordKind === 'axiom'
+    ? editAxiom(library, input.recordId, { sourceReferences }, runtime)
+    : editCounterArgument(
+        library,
+        input.recordId,
+        { sourceReferences },
+        runtime,
+      );
 }
 
 function updateCounterArgument(

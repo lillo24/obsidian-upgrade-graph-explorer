@@ -34,7 +34,7 @@ function BookmarkIcon() {
 export const SavedViewsPopover = memo(function SavedViewsPopover(
   props: SavedViewsState,
 ) {
-  const { onApply } = props;
+  const { activeName, onApply, views } = props;
   const reactId = useId().replaceAll(':', '');
   const panelId = `${reactId}-saved-views-panel`;
   const [open, setOpen] = useState(false);
@@ -120,16 +120,39 @@ export const SavedViewsPopover = memo(function SavedViewsPopover(
   }, [close, open]);
 
   return (
-    <>
+    <div aria-label="Saved Views" className="saved-view-switcher" role="group">
+      <label className="visually-hidden" htmlFor={`${panelId}-quick-switch`}>
+        Saved View
+      </label>
+      <select
+        aria-label="Quick switch Saved View"
+        disabled={views.length === 0}
+        id={`${panelId}-quick-switch`}
+        onChange={(event) => {
+          const selected = event.currentTarget.value;
+          if (selected.length > 0) onApply(selected);
+        }}
+        title={activeName ?? 'Current View'}
+        value={activeName ?? ''}
+      >
+        <option disabled={activeName !== undefined} value="">
+          Current View
+        </option>
+        {views.map((entry) => (
+          <option key={entry.name} value={entry.name}>
+            {entry.name}
+          </option>
+        ))}
+      </select>
       <button
         aria-controls={panelId}
         aria-expanded={open}
         aria-haspopup="dialog"
-        aria-label="Saved Views"
+        aria-label="Manage Saved Views"
         className="saved-views-trigger"
         onClick={() => setOpen((current) => !current)}
         ref={triggerRef}
-        title="Saved Views"
+        title="Manage Saved Views"
         type="button"
       >
         <BookmarkIcon />
@@ -160,6 +183,6 @@ export const SavedViewsPopover = memo(function SavedViewsPopover(
             </section>,
             document.body,
           )}
-    </>
+    </div>
   );
 });

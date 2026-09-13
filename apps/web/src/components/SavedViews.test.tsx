@@ -5,12 +5,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { validateObsidianDiagnosticReport } from '@icarus-graph-explorer/diagnostics-obsidian';
+import { createEmptySpatialOverrideRegistry } from '@icarus-graph-explorer/spatial-overrides';
 import {
   createProjectionWorkspace,
   documentOnlyProjectionState,
 } from '@icarus-graph-explorer/view-projection';
 
 import { captureSavedView } from '../saved-view';
+import { DEFAULT_GRAPH_PREFERENCES } from '../preferences/graph-preferences';
 import sampleReport from '../sample-report.json';
 import { SavedViews, type SavedViewsState } from './SavedViews';
 import { SavedViewsPopover } from './SavedViewsPopover';
@@ -18,6 +20,12 @@ import { SavedViewsPopover } from './SavedViewsPopover';
 const validation = validateObsidianDiagnosticReport(sampleReport);
 if (!validation.valid) throw new Error('Invalid Synthetic Sample.');
 const workspace = createProjectionWorkspace(validation.value.snapshot);
+const profileInputs = {
+  preferences: DEFAULT_GRAPH_PREFERENCES,
+  spatial: createEmptySpatialOverrideRegistry(
+    validation.value.snapshot.workspace.id,
+  ),
+};
 const saved = captureSavedView({
   name: 'Language Overview',
   workspace,
@@ -25,6 +33,7 @@ const saved = captureSavedView({
   presentationMode: 'global',
   layout: 'network',
   viewports: {},
+  ...profileInputs,
 });
 const savedWithQuery = captureSavedView({
   name: 'Query view',
@@ -36,6 +45,18 @@ const savedWithQuery = captureSavedView({
   presentationMode: 'global',
   layout: 'network',
   viewports: {},
+  ...profileInputs,
+});
+const longName =
+  'A deliberately long Saved View name for narrow width checks 1234';
+const longSaved = captureSavedView({
+  name: longName,
+  workspace,
+  state: documentOnlyProjectionState(),
+  presentationMode: 'global',
+  layout: 'network',
+  viewports: {},
+  ...profileInputs,
 });
 
 describe('Saved Views product UI', () => {
@@ -74,8 +95,8 @@ describe('Saved Views product UI', () => {
     expect(markup).toContain('for="saved-views-test-name"');
     expect(markup).toContain('>Save current view</button>');
     expect(markup).toContain('<strong>Language Overview</strong>');
-    expect(markup).toContain('All · Network');
-    expect(markup).toContain('All · Network · kind:document');
+    expect(markup).toContain('All · Network · Profile');
+    expect(markup).toContain('All · Network · Profile · kind:document');
     for (const action of ['Apply', 'Update', 'Rename', 'Delete']) {
       expect(markup).toContain(`>${action}</button>`);
     }
@@ -123,7 +144,7 @@ describe('Saved Views product UI', () => {
 
     async function open() {
       const trigger = container.querySelector<HTMLButtonElement>(
-        '[aria-label="Saved Views"]',
+        '[aria-label="Manage Saved Views"]',
       )!;
       await act(() => trigger.click());
       return trigger;
@@ -146,6 +167,39 @@ describe('Saved Views product UI', () => {
       );
       expect(document.body.querySelector('.saved-views-popover')).toBeNull();
       expect(document.activeElement).toBe(trigger);
+    });
+
+    it('quick-switches from a derived label without opening the manager', async () => {
+      await mount({
+        activeName: 'Language Overview',
+        views: [saved, savedWithQuery],
+      });
+      const select = container.querySelector<HTMLSelectElement>(
+        '[aria-label="Quick switch Saved View"]',
+      )!;
+      expect(select.value).toBe('Language Overview');
+      expect(select.title).toBe('Language Overview');
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLSelectElement.prototype,
+        'value',
+      )?.set;
+      await act(() => {
+        setter?.call(select, 'Query view');
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      expect(onApply).toHaveBeenCalledWith('Query view');
+      expect(document.body.querySelector('.saved-views-popover')).toBeNull();
+    });
+
+    it('keeps a long quick-switch name fully accessible to native controls', async () => {
+      await mount({ activeName: longName, views: [longSaved] });
+      const select = container.querySelector<HTMLSelectElement>(
+        '[aria-label="Quick switch Saved View"]',
+      )!;
+      expect(select.value).toBe(longName);
+      expect(select.title).toBe(longName);
+      expect(select.options[1]?.textContent).toBe(longName);
+      expect(select.closest('.saved-view-switcher')).not.toBeNull();
     });
 
     it('dismisses on outside pointer without moving focus', async () => {

@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { validateObsidianDiagnosticReport } from '@icarus-graph-explorer/diagnostics-obsidian';
+import { createEmptySpatialOverrideRegistry } from '@icarus-graph-explorer/spatial-overrides';
 import {
   createProjectionWorkspace,
   documentOnlyProjectionState,
 } from '@icarus-graph-explorer/view-projection';
 
 import { captureSavedView } from '../saved-view';
+import { DEFAULT_GRAPH_PREFERENCES } from '../preferences/graph-preferences';
 import sampleReport from '../sample-report.json';
 import {
   addSavedView,
@@ -60,6 +62,8 @@ function entry(
           }
         : documentOnlyProjectionState(),
     viewports: {},
+    preferences: DEFAULT_GRAPH_PREFERENCES,
+    spatial: createEmptySpatialOverrideRegistry(workspaceId),
   });
 }
 
@@ -76,12 +80,12 @@ function memoryStorage(): StorageLike & {
 }
 
 describe('Named Saved Views registry', () => {
-  it('uses an encoded workspace-scoped key and creates an empty schema-v1 registry', () => {
+  it('uses an encoded workspace-scoped key and creates an empty schema-v2 registry', () => {
     expect(savedViewStorageKey('stable/workspace name')).toBe(
       'icarus-graph-explorer:saved-views:stable%2Fworkspace%20name',
     );
     expect(createEmptySavedViewRegistry(workspaceId)).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       workspaceId,
       views: [],
     });
@@ -110,6 +114,99 @@ describe('Named Saved Views registry', () => {
     expect(serializeSavedViewRegistry(alpha.value)).toBe(
       storage.values.get(savedViewStorageKey(workspaceId)),
     );
+    expect(
+      alpha.value.views.every(({ profile }) => profile !== undefined),
+    ).toBe(true);
+  });
+
+  it('strictly loads schema v1 in memory without rewriting and writes v2 on the next mutation', () => {
+    const storage = memoryStorage();
+    const current = entry('Legacy');
+    const legacy = {
+      name: current.name,
+      layout: current.layout,
+      view: current.view,
+    };
+    const key = savedViewStorageKey(workspaceId);
+    const raw = JSON.stringify({
+      schemaVersion: 1,
+      workspaceId,
+      views: [legacy],
+    });
+    storage.values.set(key, raw);
+
+    const loaded = loadSavedViews(storage, workspaceId);
+
+    expect(loaded).toEqual({
+      status: 'loaded',
+      value: {
+        schemaVersion: 2,
+        workspaceId,
+        views: [legacy],
+      },
+    });
+    expect(storage.values.get(key)).toBe(raw);
+    if (loaded.status !== 'loaded') return;
+    const renamed = renameSavedView(loaded.value, 'Legacy', 'Migrated');
+    expect(renamed.ok).toBe(true);
+    if (!renamed.ok) return;
+    expect(saveSavedViewRegistry(storage, renamed.value)).toEqual({ ok: true });
+    expect(JSON.parse(storage.values.get(key)!)).toMatchObject({
+      schemaVersion: 2,
+      views: [{ name: 'Migrated' }],
+    });
+    expect(JSON.parse(storage.values.get(key)!).views[0]).not.toHaveProperty(
+      'profile',
+    );
+  });
+
+  it('adds a current profile when Update replaces a migrated profile-less entry', () => {
+    const captured = entry('Legacy');
+    const legacy: SavedViewEntry = {
+      name: captured.name,
+      layout: captured.layout,
+      view: captured.view,
+    };
+    const replacement = entry('ignored', 'local', 'hierarchy');
+    const updated = updateSavedView(
+      {
+        schemaVersion: 2,
+        workspaceId,
+        views: [legacy],
+      },
+      'Legacy',
+      replacement,
+    );
+
+    expect(updated).toMatchObject({
+      ok: true,
+      value: {
+        views: [{ name: 'Legacy', profile: { kind: 'focus-hierarchy' } }],
+      },
+    });
+  });
+
+  it('rejects malformed legacy fields rather than weakening the v1 contract', () => {
+    const storage = memoryStorage();
+    const current = entry('Legacy');
+    storage.values.set(
+      savedViewStorageKey(workspaceId),
+      JSON.stringify({
+        schemaVersion: 1,
+        workspaceId,
+        views: [
+          {
+            name: current.name,
+            layout: current.layout,
+            view: current.view,
+            profile: current.profile,
+          },
+        ],
+      }),
+    );
+    expect(loadSavedViews(storage, workspaceId)).toMatchObject({
+      status: 'error',
+    });
   });
 
   it('rejects duplicate names case-insensitively and enforces name/count bounds', () => {
@@ -154,8 +251,9 @@ describe('Named Saved Views registry', () => {
       name: 'Language',
       layout: 'hierarchy',
       view: { presentationMode: 'local' },
+      profile: { kind: 'focus-hierarchy' },
     });
-    const snapshot = updated.value.views[0]!.view;
+    const updatedEntry = updated.value.views[0]!;
     const renamed = renameSavedView(
       updated.value,
       'Language',
@@ -163,10 +261,12 @@ describe('Named Saved Views registry', () => {
     );
     expect(renamed.ok).toBe(true);
     if (!renamed.ok) return;
+    expect(JSON.stringify(renamed.value.views[0]!.profile)).toBe(
+      JSON.stringify(updatedEntry.profile),
+    );
     expect(renamed.value.views[0]).toEqual({
+      ...updatedEntry,
       name: 'Deep Language',
-      layout: 'hierarchy',
-      view: snapshot,
     });
     expect(
       renameSavedView(renamed.value, 'Deep Language', 'deep language'),
@@ -177,12 +277,34 @@ describe('Named Saved Views registry', () => {
     });
   });
 
+  it('deletes only the requested entry', () => {
+    const first = entry('Alpha');
+    const second = entry('Beta', 'local', 'network');
+    expect(
+      deleteSavedView(
+        {
+          schemaVersion: 2,
+          workspaceId,
+          views: [first, second],
+        },
+        'Alpha',
+      ),
+    ).toEqual({
+      ok: true,
+      value: {
+        schemaVersion: 2,
+        workspaceId,
+        views: [second],
+      },
+    });
+  });
+
   it('strictly rejects malformed fields, wrong workspaces, layouts, and presentations', () => {
     const valid = entry('Valid');
     expect(
       validateSavedViewRegistry(
         {
-          schemaVersion: 1,
+          schemaVersion: 2,
           workspaceId: 'other',
           views: [valid],
         },
@@ -191,28 +313,28 @@ describe('Named Saved Views registry', () => {
     ).toBe(false);
     expect(
       validateSavedViewRegistry({
-        schemaVersion: 1,
+        schemaVersion: 2,
         workspaceId,
         views: [{ ...valid, layout: 'radial' }],
       }).valid,
     ).toBe(false);
     expect(
       validateSavedViewRegistry({
-        schemaVersion: 1,
+        schemaVersion: 2,
         workspaceId,
         views: [{ ...valid, extra: true }],
       }).valid,
     ).toBe(false);
     expect(
       validateSavedViewRegistry({
-        schemaVersion: 1,
+        schemaVersion: 2,
         workspaceId,
         views: [{ ...valid, layout: 'hierarchy' }],
       }).valid,
     ).toBe(false);
     expect(
       validateSavedViewRegistry({
-        schemaVersion: 1,
+        schemaVersion: 2,
         workspaceId,
         views: [
           {
@@ -224,11 +346,62 @@ describe('Named Saved Views registry', () => {
     ).toBe(false);
   });
 
+  it('rejects malformed, incoherent, and cross-workspace profiles', () => {
+    const valid = entry('Valid');
+    expect(
+      validateSavedViewRegistry({
+        schemaVersion: 2,
+        workspaceId,
+        views: [
+          {
+            ...valid,
+            profile: {
+              kind: 'focus-network',
+              network: {
+                referencePull: 1,
+                nodeSize: 4,
+                linkThickness: 1,
+                labelThreshold: 7,
+              },
+            },
+          },
+        ],
+      }).valid,
+    ).toBe(false);
+    expect(
+      validateSavedViewRegistry({
+        schemaVersion: 2,
+        workspaceId,
+        views: [
+          {
+            ...valid,
+            profile: { ...valid.profile, unexpected: true },
+          },
+        ],
+      }).valid,
+    ).toBe(false);
+    expect(
+      validateSavedViewRegistry({
+        schemaVersion: 2,
+        workspaceId,
+        views: [
+          {
+            ...valid,
+            profile: {
+              ...valid.profile,
+              spatial: createEmptySpatialOverrideRegistry('other-workspace'),
+            },
+          },
+        ],
+      }).valid,
+    ).toBe(false);
+  });
+
   it('reuses strict embedded view-state validation and requires deterministic data', () => {
     const valid = entry('Valid');
     expect(
       validateSavedViewRegistry({
-        schemaVersion: 1,
+        schemaVersion: 2,
         workspaceId,
         views: [
           {
@@ -249,7 +422,7 @@ describe('Named Saved Views registry', () => {
     ).toBe(false);
     expect(
       validateSavedViewRegistry({
-        schemaVersion: 1,
+        schemaVersion: 2,
         workspaceId,
         views: [
           {

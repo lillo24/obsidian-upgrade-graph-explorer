@@ -44,6 +44,8 @@ apps/web/
     graph-state.ts    Pure disclosure/focus/filter interaction reducer.
     network-editing.ts Pure transient one-tool-at-a-time editing-mode contract.
     exploration-model.ts Pure Scope/Layout mapping onto schema-v3 internal modes.
+    saved-view.ts      Canonical profile capture, reconciliation planning, and exact-match derivation.
+    saved-view-profile-transaction.ts Cross-key profile persistence and rollback before UI adoption.
     navigation.ts     Shared reveal/filter-widening/navigation planner.
     local-view.ts     Local entry/reroot/minimum-reveal planner over KG6 state.
     visual-groups/    Visible-entity GROUP1A presentation-map derivation; no projection calls.
@@ -327,23 +329,44 @@ graph. It never resets the KG9A catalog or Named Saved Views.
 
 **Saved Views** is a separate explicit registry under
 `icarus-graph-explorer:saved-views:<encodeURIComponent(workspaceId)>`. Each
-schema-v1 entry adds a unique trimmed name and Network/Hierarchy choice to an
-immutable snapshot of the same persisted semantic view contract. Up to 50
+schema-v2 entry adds a unique trimmed name, Network/Hierarchy choice, and a
+layout-appropriate graph profile to an immutable snapshot of the same persisted
+semantic view contract. Up to 50
 entries are sorted deterministically. Names are at most 64 characters and are
-unique case-insensitively. Save, Update, Rename, Delete, and Apply write only
-this registry; Save does not trigger projection, layout, or viewport work.
+unique case-insensitively. Save, Update, Rename, and Delete write only this
+registry; Save does not trigger projection, layout, or viewport work.
+
+Schema-v1 SAVED1A registries load through a strict in-memory migration and are
+not rewritten on read. Their profile-less entries keep semantic-only behavior;
+the next explicit registry mutation writes schema v2, and Update captures the
+current profile. All Network profiles contain full Global Layout Settings plus
+committed folder Pull/Place rules. Focus Network contains only the four shared
+Network controls. Focus Hierarchy contains only hierarchy presentation choices.
+All Hierarchy is an explicit profile no-op. Trackpad mode, experiment exposure,
+Saved Filters, Visual Groups, per-File sizes/movement, selection, and shell state
+remain independent.
 
 Apply performs one reconciled graph-state transaction against the current
 workspace. It switches Scope/Layout, disclosure, Focus, filters/query, and
 semantic viewport; cancels temporary movement; exits Arrange Folders; clears
 selection; adopts the applied query into its editor; and deliberately starts a
 new Back/Forward baseline. Current availability may safely adjust an unavailable
-presentation and announces that adjustment. The only preference it may change
-is the preferred Focus layout when a Focus entry selects Network versus
-Hierarchy; Graph Preferences, Visual Groups, File size overrides, and folder
-spatial rules otherwise remain independent. Ordinary Current View autosave then
-records the reconciled result. Exact reapplication skips projection/layout and
-viewport work while retaining the explicit history/selection reset semantics.
+presentation and announces that adjustment. Before semantic adoption, Apply
+validates and writes every changed owned profile key, spatial first and Graph
+Preferences second, with best-effort rollback to the exact prior bytes. Failure
+retains the prior semantic, presentation, history, selection, preference, and
+in-memory spatial state. Ordinary Current View autosave then records only a
+successful reconciled result. Exact reapplication skips writes,
+projection/layout, and viewport work while retaining the explicit
+history/selection reset semantics. Visual-only Network profile differences use
+the existing presentation refresh path; physics and spatial differences keep the
+existing latest-generation geometry and final semantic-viewport gating.
+
+The toolbar's native Saved View switcher displays the deterministic first exact
+semantic/profile match, or **Current View** after any meaningful edit. It does
+not persist an active Saved View identity and never reapplies a named view at
+startup. The adjacent management button retains Save, Update, Rename, Delete,
+and recovery in normal and maximized graph modes.
 
 The registry follows write-before-adopt behavior. Invalid bytes stay untouched
 and block mutations until the two-step **Reset Saved Views registry** action

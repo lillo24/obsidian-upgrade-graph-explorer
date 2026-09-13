@@ -30,7 +30,18 @@ describe('argument-library context formatting', () => {
       {
         id: 'AX-NEUTRAL',
         title: 'Neutral Axiom',
-        statement: 'Neutral premise.',
+        statement: 'Neutral premise.\n\n```text\nkept fence\n```',
+        supportingReasoning: 'First line.\nSecond line.',
+        sourceReferences: [
+          {
+            id: 'SRC-CONTEXT',
+            path: 'Theory/Neutral.md',
+            heading: 'Structured heading',
+            label: 'Readable source',
+            originalWikilink: '[[Neutral#Authored heading|Source alias]]',
+            role: 'support',
+          },
+        ],
       },
       runtime,
     );
@@ -41,6 +52,7 @@ describe('argument-library context formatting', () => {
         title: 'Neutral objection',
         observation: 'Neutral observation.',
         challengedClaim: 'Neutral challenged claim.',
+        target: { kind: 'axiom', axiomId: 'AX-NEUTRAL' },
         response: {
           explanation: 'Neutral response.',
           outcome: 'refuted',
@@ -68,6 +80,17 @@ describe('argument-library context formatting', () => {
     expect(formatted.text).toContain('Observation / example / argument:');
     expect(formatted.text).toContain('Recorded response — why it applies:');
     expect(formatted.text).toContain('Answered using: AX-NEUTRAL@');
+    expect(formatted.text).toContain(
+      '### Supporting reasoning\n\nFirst line.\nSecond line.',
+    );
+    expect(formatted.text).toContain('Structured target: Axiom: AX-NEUTRAL');
+    expect(formatted.text).toContain(
+      '[[Neutral#Authored heading|Source alias]] [support; SRC-CONTEXT]',
+    );
+    expect(formatted.text).not.toContain(
+      '[[Neutral#Authored heading|Source alias]]#Structured heading',
+    );
+    expect(formatted.text).toContain('```text\nkept fence\n```');
     expect(JSON.parse(formatted.structured)).toMatchObject({
       completeness: { status: 'complete', theorySources: 'not-read' },
       receipt: { completeness: 'complete' },

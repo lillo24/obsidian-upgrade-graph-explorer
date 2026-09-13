@@ -1,22 +1,57 @@
 import { parseGraphQuery } from '@icarus-graph-explorer/graph-query';
 import {
+  validateGlobalLayoutSettings,
+  validateNetworkSettings,
+  type GlobalLayoutSettings,
+  type ResolvedNetworkSettings,
+} from '@icarus-graph-explorer/renderer-sigma/settings';
+import {
+  validateSpatialOverrideRegistry,
+  type SpatialOverrideRegistry,
+} from '@icarus-graph-explorer/spatial-overrides';
+import {
   PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION,
   validatePersistedWorkspaceView,
   type PersistedWorkspaceView,
 } from '@icarus-graph-explorer/view-state';
 
+import {
+  validateFocusHierarchySettings,
+  type SavedFocusHierarchySettings,
+} from '../preferences/graph-preferences';
 import type { StorageLike, StorageMutationResult } from './storage';
 
-export const SAVED_VIEW_REGISTRY_SCHEMA_VERSION = 1 as const;
+export const SAVED_VIEW_REGISTRY_SCHEMA_VERSION = 2 as const;
+const LEGACY_SAVED_VIEW_REGISTRY_SCHEMA_VERSION = 1 as const;
 export const MAX_SAVED_VIEWS = 50;
 export const MAX_SAVED_VIEW_NAME_LENGTH = 64;
 
 export type SavedViewLayout = 'network' | 'hierarchy';
 
+export type SavedFocusNetworkSettings = ResolvedNetworkSettings;
+
+export type SavedViewProfile =
+  | {
+      readonly kind: 'all-network';
+      readonly network: GlobalLayoutSettings;
+      readonly spatial: SpatialOverrideRegistry;
+    }
+  | {
+      readonly kind: 'focus-network';
+      readonly network: SavedFocusNetworkSettings;
+    }
+  | {
+      readonly kind: 'focus-hierarchy';
+      readonly hierarchy: SavedFocusHierarchySettings;
+    }
+  | { readonly kind: 'all-hierarchy' };
+
 export interface SavedViewEntry {
   readonly name: string;
   readonly layout: SavedViewLayout;
   readonly view: PersistedWorkspaceView;
+  /** Absent only for an in-memory migration from the SAVED1A schema. */
+  readonly profile?: SavedViewProfile;
 }
 
 export interface SavedViewRegistry {
@@ -46,6 +81,13 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   }
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
+}
+
+function hasExactFields(
+  value: Record<string, unknown>,
+  expected: readonly string[],
+): boolean {
+  return Object.keys(value).sort().join(',') === [...expected].sort().join(',');
 }
 
 function isJsonSafePlainValue(
@@ -150,6 +192,128 @@ function validatePresentation(
   return undefined;
 }
 
+function expectedProfileKind(
+  view: PersistedWorkspaceView,
+  layout: SavedViewLayout,
+): SavedViewProfile['kind'] {
+  if (view.presentationMode === 'global') return 'all-network';
+  if (view.presentationMode === 'structure') return 'all-hierarchy';
+  return layout === 'network' ? 'focus-network' : 'focus-hierarchy';
+}
+
+function validateSavedViewProfile(
+  value: unknown,
+  expectedKind: SavedViewProfile['kind'],
+  workspaceId: string,
+):
+  | { readonly valid: true; readonly value: SavedViewProfile }
+  | { readonly valid: false; readonly message: string } {
+  if (!isPlainRecord(value) || typeof value.kind !== 'string') {
+    return {
+      valid: false,
+      message: 'Saved View profile must be a discriminated plain object.',
+    };
+  }
+  if (value.kind !== expectedKind) {
+    return {
+      valid: false,
+      message: `Saved View profile kind must be ${expectedKind}.`,
+    };
+  }
+  try {
+    switch (expectedKind) {
+      case 'all-network': {
+        if (!hasExactFields(value, ['kind', 'network', 'spatial'])) {
+          throw new Error('All Network profile fields are incompatible.');
+        }
+        const spatial = validateSpatialOverrideRegistry(
+          value.spatial,
+          workspaceId,
+        );
+        if (!spatial.ok) throw new Error(spatial.message);
+        return {
+          valid: true,
+          value: {
+            kind: 'all-network',
+            network: validateGlobalLayoutSettings(value.network),
+            spatial: spatial.value,
+          },
+        };
+      }
+      case 'focus-network':
+        if (!hasExactFields(value, ['kind', 'network'])) {
+          throw new Error('Focus Network profile fields are incompatible.');
+        }
+        return {
+          valid: true,
+          value: {
+            kind: 'focus-network',
+            network: validateNetworkSettings(value.network),
+          },
+        };
+      case 'focus-hierarchy':
+        if (!hasExactFields(value, ['hierarchy', 'kind'])) {
+          throw new Error('Focus Hierarchy profile fields are incompatible.');
+        }
+        return {
+          valid: true,
+          value: {
+            kind: 'focus-hierarchy',
+            hierarchy: validateFocusHierarchySettings(value.hierarchy),
+          },
+        };
+      case 'all-hierarchy':
+        if (!hasExactFields(value, ['kind'])) {
+          throw new Error('All Hierarchy profile fields are incompatible.');
+        }
+        return { valid: true, value: { kind: 'all-hierarchy' } };
+    }
+  } catch (error: unknown) {
+    return { valid: false, message: errorMessage(error) };
+  }
+}
+
+function migrateLegacySavedViewRegistry(
+  value: unknown,
+  expectedWorkspaceId: string,
+):
+  | { readonly valid: true; readonly value: SavedViewRegistry }
+  | { readonly valid: false; readonly message: string } {
+  if (
+    !isJsonSafePlainValue(value) ||
+    !isPlainRecord(value) ||
+    !hasExactFields(value, ['schemaVersion', 'views', 'workspaceId']) ||
+    value.schemaVersion !== LEGACY_SAVED_VIEW_REGISTRY_SCHEMA_VERSION ||
+    !Array.isArray(value.views)
+  ) {
+    return {
+      valid: false,
+      message: 'Legacy Saved Views registry fields are incompatible.',
+    };
+  }
+  const legacyViews: SavedViewEntry[] = [];
+  for (const [index, entry] of value.views.entries()) {
+    if (
+      !isPlainRecord(entry) ||
+      !hasExactFields(entry, ['layout', 'name', 'view'])
+    ) {
+      return {
+        valid: false,
+        message: `Legacy Saved View ${index + 1} has incompatible fields.`,
+      };
+    }
+    legacyViews.push(entry as unknown as SavedViewEntry);
+  }
+  return validateSavedViewRegistry(
+    {
+      schemaVersion: SAVED_VIEW_REGISTRY_SCHEMA_VERSION,
+      workspaceId: value.workspaceId,
+      views: legacyViews,
+    },
+    expectedWorkspaceId,
+  );
+}
+
 export function createEmptySavedViewRegistry(
   workspaceId: string,
 ): SavedViewRegistry {
@@ -221,7 +385,11 @@ export function validateSavedViewRegistry(
         message: `Saved View ${index + 1} is not a plain object.`,
       };
     }
-    if (Object.keys(candidate).sort().join(',') !== 'layout,name,view') {
+    const candidateFields = Object.keys(candidate).sort().join(',');
+    if (
+      candidateFields !== 'layout,name,view' &&
+      candidateFields !== 'layout,name,profile,view'
+    ) {
       return {
         valid: false,
         message: `Saved View ${index + 1} has incompatible fields.`,
@@ -299,10 +467,24 @@ export function validateSavedViewRegistry(
         message: `${candidate.name}: ${presentationIssue}`,
       };
     }
+    const profile = Object.hasOwn(candidate, 'profile')
+      ? validateSavedViewProfile(
+          candidate.profile,
+          expectedProfileKind(validation.value, candidate.layout),
+          value.workspaceId,
+        )
+      : undefined;
+    if (profile !== undefined && !profile.valid) {
+      return {
+        valid: false,
+        message: `Saved View "${candidate.name}" has an invalid profile: ${profile.message}`,
+      };
+    }
     views.push({
       name: candidate.name,
       layout: candidate.layout,
       view: validation.value,
+      ...(profile === undefined ? {} : { profile: profile.value }),
     });
   }
   const normalized = sortedSavedViews(views);
@@ -350,7 +532,11 @@ export function loadSavedViews(
       message: `Saved Views for workspace "${workspaceId}" are not valid JSON: ${errorMessage(error)}`,
     };
   }
-  const validation = validateSavedViewRegistry(parsed, workspaceId);
+  const validation =
+    isPlainRecord(parsed) &&
+    parsed.schemaVersion === LEGACY_SAVED_VIEW_REGISTRY_SCHEMA_VERSION
+      ? migrateLegacySavedViewRegistry(parsed, workspaceId)
+      : validateSavedViewRegistry(parsed, workspaceId);
   return validation.valid
     ? { status: 'loaded', value: validation.value }
     : {

@@ -40,6 +40,15 @@ export interface RecordedSourceVersion {
   readonly span?: SourceSpan;
 }
 
+export interface RecordTheorySourceVersionInput {
+  readonly recordKind: 'axiom' | 'counter-argument';
+  readonly recordId: string;
+  readonly sourceReferenceId: string;
+  readonly sourceSpaceId: string;
+  /** Namespaced content identity for the complete captured source document. */
+  readonly sourceVersion: string;
+}
+
 export interface TheorySourceReference {
   readonly id: string;
   readonly sourceSpaceHint?: string;

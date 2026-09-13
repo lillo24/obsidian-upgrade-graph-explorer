@@ -79,7 +79,10 @@ import type {
 } from '@icarus-graph-explorer/renderer-sigma';
 import { NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT } from '@icarus-graph-explorer/renderer-sigma/physics';
 import type { NetworkPhysicsPresentationState } from '@icarus-graph-explorer/renderer-sigma/physics';
-import { resolveNetworkSettings } from '@icarus-graph-explorer/renderer-sigma/settings';
+import {
+  resolveNetworkSettings,
+  sameGlobalPhysicsSettings,
+} from '@icarus-graph-explorer/renderer-sigma/settings';
 import {
   compileVisualGroups,
   matchingVisualGroupsForEntity,
@@ -182,9 +185,11 @@ import {
 import { deriveProjectionVisualGroupPresentationMap } from '../visual-groups/presentation';
 import {
   captureSavedView,
+  matchingSavedViewName,
   planSavedViewApply,
-  sameSavedViewSnapshot,
+  sameSavedViewSemanticSnapshot,
 } from '../saved-view';
+import { commitSavedViewProfileTransaction } from '../saved-view-profile-transaction';
 import { usePresentationOverrides } from '../presentation-overrides/use-presentation-overrides';
 import { useSpatialOverrides } from '../spatial-overrides/use-spatial-overrides';
 import { useSoftFolderDisplay } from '../soft-folder-display/use-soft-folder-display';
@@ -562,14 +567,18 @@ export function GraphExplorer({
     () => resolveNetworkSettings(globalLayoutSettings),
     [globalLayoutSettings],
   );
+  const adoptGraphPreferences = useCallback((next: GraphPreferences) => {
+    preferencesRef.current = next;
+    setPreferences(next);
+    setPreferenceWarning(undefined);
+  }, []);
   const commitGraphPreferences = useCallback(
     (next: GraphPreferences) => {
-      preferencesRef.current = next;
-      setPreferences(next);
+      adoptGraphPreferences(next);
       const saved = saveGraphPreferences(persistenceStorage, next);
       setPreferenceWarning(saved.ok ? undefined : saved.message);
     },
-    [persistenceStorage],
+    [adoptGraphPreferences, persistenceStorage],
   );
   // Every control patches the same complete record, including updates batched
   // before React renders. Storage failure does not roll back session behavior.
@@ -2830,8 +2839,10 @@ export function GraphExplorer({
             ? {}
             : { local: localViewportBookmarkRef.current }),
         },
+        preferences: preferencesRef.current,
+        spatial: spatialOverrides.session.registry,
       }),
-    [projectionWorkspace],
+    [projectionWorkspace, spatialOverrides.session.registry],
   );
   const commitNamedViewRegistry = useCallback(
     (
@@ -2929,6 +2940,8 @@ export function GraphExplorer({
     );
     return undefined;
   }, [persistenceStorage, savedViewSession]);
+  const adoptSavedViewSpatialRegistry = spatialOverrides.adoptPersistedRegistry;
+  const savedViewSpatialSession = spatialOverrides.session;
   const applyNamedView = useCallback(
     (name: string): string | undefined => {
       const entry = savedViewSession.registry.views.find(
@@ -2943,25 +2956,67 @@ export function GraphExplorer({
           entry,
           workspace: projectionWorkspace,
           availability: availabilityRef.current,
+          preferences: preferencesRef.current,
         });
         const current = captureCurrentNamedView(entry.name);
-        const equivalent = sameSavedViewSnapshot(current, entry);
+        const semanticEquivalent = sameSavedViewSemanticSnapshot(
+          current,
+          entry,
+        );
 
         temporaryFileMoveController?.cancel('scope-changed');
+        const profileTransaction = commitSavedViewProfileTransaction({
+          storage: persistenceStorage,
+          plan: {
+            currentPreferences: preferencesRef.current,
+            preferences: plan.preferences,
+            spatialSession: savedViewSpatialSession,
+            ...(plan.spatial === undefined ? {} : { spatial: plan.spatial }),
+          },
+        });
+        if (!profileTransaction.ok) {
+          setNavigationError(
+            `Could not apply Saved View "${name}": ${profileTransaction.message}`,
+          );
+          return profileTransaction.message;
+        }
+        const globalPhysicsChange =
+          plan.presentationMode === 'global' &&
+          !sameGlobalPhysicsSettings(
+            preferencesRef.current.globalLayoutSettings,
+            plan.preferences.globalLayoutSettings,
+          );
+        const profileChangesGeometry =
+          profileTransaction.spatialWrite ||
+          globalPhysicsChange ||
+          (plan.presentationMode === 'local' &&
+            plan.localLayoutMode === 'free' &&
+            resolveNetworkSettings(preferencesRef.current.globalLayoutSettings)
+              .referencePull !==
+              resolveNetworkSettings(plan.preferences.globalLayoutSettings)
+                .referencePull) ||
+          (plan.presentationMode === 'local' &&
+            plan.localLayoutMode === 'structured' &&
+            profileTransaction.preferenceWrite);
+
         setKeyboardFileMoveNodeId(undefined);
         transitionNetworkEditing({ type: 'exit' }, 'scope-changed');
         dispatchFolderArrangementMode({ type: 'exit' });
+        if (globalPhysicsChange) {
+          setGlobalLayoutRequestKey((current) => current + 1);
+        }
         // Applying a named graph context establishes a new navigation baseline.
         clearNavigationHistory();
-        if (
-          plan.presentationMode === 'local' &&
-          localLayoutModeRef.current !== plan.localLayoutMode
-        ) {
-          // Focus layout is owned by Graph Preferences, so this is the only
-          // preference field a Saved View may update during application.
-          localLayoutModeRef.current = plan.localLayoutMode;
-          updateGraphPreferences({ localLayoutMode: plan.localLayoutMode });
+        if (profileTransaction.preferenceWrite) {
+          adoptGraphPreferences(profileTransaction.preferences);
         }
+        if (profileTransaction.spatialWrite) {
+          adoptSavedViewSpatialRegistry(
+            profileTransaction.spatialSession.registry,
+          );
+        }
+        if (plan.presentationMode === 'local')
+          localLayoutModeRef.current = plan.localLayoutMode;
         if (!sameGraphViewState(activeViewStateRef.current, plan.state)) {
           activeViewStateRef.current = plan.state;
           dispatch({ type: 'replace-state', state: plan.state });
@@ -2979,7 +3034,7 @@ export function GraphExplorer({
         setLocalTransitionAnchor(undefined);
         setAutomaticLocalFitRequestKey(undefined);
         setLocalFitRequestKey(undefined);
-        if (!equivalent) {
+        if (!semanticEquivalent || profileChangesGeometry) {
           requestHistoryViewportRestore(plan.presentationMode, plan.viewports);
         }
         setSelection(null);
@@ -3015,23 +3070,71 @@ export function GraphExplorer({
     },
     [
       adoptQuery,
+      adoptGraphPreferences,
+      adoptSavedViewSpatialRegistry,
       captureCurrentNamedView,
       clearNavigationHistory,
       projectionWorkspace,
+      persistenceStorage,
       requestHistoryViewportRestore,
       retainDirtyFolderDraft,
       savedViewSession.registry.views,
+      savedViewSpatialSession,
       setGlobalSemanticViewportBookmark,
       setLocalSemanticViewportBookmark,
       setSemanticViewportBookmark,
       temporaryFileMoveController,
       transitionNetworkEditing,
-      updateGraphPreferences,
     ],
   );
+  const matchingNamedView = useMemo(() => {
+    // Live source reconciliation can briefly render the old presentation
+    // beside a newly focus-less projection state. That transient is not a
+    // valid Saved View candidate and must never be labeled as one.
+    if ((rendererMode === 'local') !== (activeViewState.focus !== undefined)) {
+      return undefined;
+    }
+    return matchingSavedViewName(
+      captureSavedView({
+        name: 'Current View',
+        workspace: projectionWorkspace,
+        state: activeViewState,
+        presentationMode: rendererMode,
+        layout: explorationLayout(rendererMode, localLayoutMode),
+        viewports: {
+          ...(viewportBookmark === undefined
+            ? {}
+            : { structure: viewportBookmark }),
+          ...(globalViewportBookmark === undefined
+            ? {}
+            : { global: globalViewportBookmark }),
+          ...(localViewportBookmark === undefined
+            ? {}
+            : { local: localViewportBookmark }),
+        },
+        preferences,
+        spatial: spatialOverrides.session.registry,
+      }),
+      savedViewSession.registry.views,
+    );
+  }, [
+    activeViewState,
+    globalViewportBookmark,
+    localLayoutMode,
+    localViewportBookmark,
+    preferences,
+    projectionWorkspace,
+    rendererMode,
+    savedViewSession.registry.views,
+    spatialOverrides.session.registry,
+    viewportBookmark,
+  ]);
   const namedSavedViews = useMemo<SavedViewsState>(
     () => ({
       views: savedViewSession.registry.views,
+      ...(matchingNamedView === undefined
+        ? {}
+        : { activeName: matchingNamedView }),
       status: savedViewSession.status,
       writable: savedViewSession.writable,
       recoveryAvailable: savedViewSession.recoveryAvailable,
@@ -3049,6 +3152,7 @@ export function GraphExplorer({
       resetNamedViews,
       saveCurrentNamedView,
       savedViewSession,
+      matchingNamedView,
       updateNamedView,
     ],
   );
