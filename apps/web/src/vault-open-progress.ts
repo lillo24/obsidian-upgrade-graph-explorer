@@ -1,11 +1,12 @@
 import type {
   DesktopVaultOpenProgress,
+  DesktopVaultOpenProgressListener,
   DesktopVaultOpenStage,
 } from './desktop-vault';
 import type { DesktopLiveVaultPhase } from './desktop-live-vault';
 
 const STAGE_MESSAGES: Record<DesktopVaultOpenStage, string> = {
-  'acquiring-source': 'Reading vault files…',
+  'acquiring-source': 'Preparing vault source…',
   'building-workspace': 'Building workspace…',
   'persisting-identity': 'Saving workspace identity…',
   'committing-workspace': 'Finalizing workspace…',
@@ -26,6 +27,18 @@ export function isCurrentVaultOpenRequest(
   return currentGeneration === requestGeneration;
 }
 
+export function guardVaultOpenProgress(
+  requestGeneration: number,
+  currentGeneration: () => number,
+  publish: DesktopVaultOpenProgressListener,
+): DesktopVaultOpenProgressListener {
+  return (progress) => {
+    if (isCurrentVaultOpenRequest(currentGeneration(), requestGeneration)) {
+      publish(progress);
+    }
+  };
+}
+
 export function isLiveVaultProgressPhase(
   phase: DesktopLiveVaultPhase | undefined,
 ): phase is 'catching-up' | 'updating' | 'resyncing' {
@@ -39,6 +52,31 @@ export function describeVaultOpenProgress(
 ): string {
   const stage = progress?.stage ?? 'acquiring-source';
   const message = STAGE_MESSAGES[stage];
+  if (progress?.stage === 'acquiring-source') {
+    if (
+      progress.acquisition.sourceDiscovery === 'complete' &&
+      progress.acquisition.identityPreparation === 'pending'
+    ) {
+      return 'Loading workspace identity…';
+    }
+    if (
+      progress.acquisition.sourceDiscovery === 'pending' &&
+      progress.acquisition.identityPreparation === 'complete'
+    ) {
+      return 'Reading vault files…';
+    }
+    if (
+      progress.acquisition.sourceDiscovery === 'complete' &&
+      progress.acquisition.identityPreparation === 'complete'
+    ) {
+      return progress.acquisition.markdownFileCount === undefined
+        ? STAGE_MESSAGES['building-workspace']
+        : `${STAGE_MESSAGES['building-workspace']} ${progress.acquisition.markdownFileCount.toLocaleString()} Markdown ${
+            progress.acquisition.markdownFileCount === 1 ? 'file' : 'files'
+          }`;
+    }
+    return message;
+  }
   if (
     stage !== 'building-workspace' ||
     progress?.markdownFileCount === undefined

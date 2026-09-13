@@ -5,6 +5,7 @@ import { WorkspaceNotice } from './components/WorkspaceNotice';
 import {
   describeVaultOpenProgress,
   formatVaultOpenElapsed,
+  guardVaultOpenProgress,
   isCurrentVaultOpenRequest,
   isLiveVaultProgressPhase,
 } from './vault-open-progress';
@@ -22,7 +23,29 @@ describe('vault open progress presentation', () => {
   );
 
   it('describes typed stages and uses only the real building-stage count', () => {
-    expect(describeVaultOpenProgress(undefined)).toBe('Reading vault files…');
+    expect(describeVaultOpenProgress(undefined)).toBe(
+      'Preparing vault source…',
+    );
+    expect(
+      describeVaultOpenProgress({
+        stage: 'acquiring-source',
+        acquisition: {
+          sourceDiscovery: 'complete',
+          identityPreparation: 'pending',
+          markdownFileCount: 1_203,
+          nonMarkdownPathCount: 19,
+        },
+      }),
+    ).toBe('Loading workspace identity…');
+    expect(
+      describeVaultOpenProgress({
+        stage: 'acquiring-source',
+        acquisition: {
+          sourceDiscovery: 'pending',
+          identityPreparation: 'complete',
+        },
+      }),
+    ).toBe('Reading vault files…');
     expect(
       describeVaultOpenProgress({
         stage: 'building-workspace',
@@ -43,6 +66,36 @@ describe('vault open progress presentation', () => {
     expect(isCurrentVaultOpenRequest(9, 8)).toBe(false);
   });
 
+  it('rejects late source and identity completions from an old request', () => {
+    let currentGeneration = 8;
+    const accepted: string[] = [];
+    const listener = guardVaultOpenProgress(
+      8,
+      () => currentGeneration,
+      (progress) => accepted.push(describeVaultOpenProgress(progress)),
+    );
+    currentGeneration = 9;
+
+    listener({
+      stage: 'acquiring-source',
+      acquisition: {
+        sourceDiscovery: 'complete',
+        identityPreparation: 'pending',
+        markdownFileCount: 2,
+        nonMarkdownPathCount: 1,
+      },
+    });
+    listener({
+      stage: 'acquiring-source',
+      acquisition: {
+        sourceDiscovery: 'pending',
+        identityPreparation: 'complete',
+      },
+    });
+
+    expect(accepted).toEqual([]);
+  });
+
   it.each([
     ['catching-up', true],
     ['updating', true],
@@ -59,8 +112,8 @@ describe('vault open progress presentation', () => {
   it('renders an accessible indeterminate bar without announcing elapsed ticks', () => {
     const markup = renderToStaticMarkup(
       <WorkspaceNotice
-        elapsed="01:07"
         progressLabel="Opening vault"
+        startedAt={0}
         tone="progress"
       >
         Building workspace… 1,203 Markdown files
@@ -73,7 +126,7 @@ describe('vault open progress presentation', () => {
     );
     expect(markup).not.toContain('aria-valuenow');
     expect(markup).toContain(
-      'aria-hidden="true" class="workspace-notice__elapsed">Elapsed 01:07',
+      'aria-hidden="true" class="workspace-notice__elapsed">Elapsed 00:00',
     );
   });
 });

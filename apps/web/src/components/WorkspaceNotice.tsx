@@ -1,14 +1,38 @@
-import { memo, type ReactNode } from 'react';
+import { memo, useEffect, useState, type ReactNode } from 'react';
+
+import { formatVaultOpenElapsed } from '../vault-open-progress';
+
+const WorkspaceNoticeElapsed = memo(function WorkspaceNoticeElapsed({
+  startedAt,
+}: {
+  readonly startedAt: number;
+}) {
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+  useEffect(() => {
+    const updateElapsed = () =>
+      setElapsedMs(Math.max(0, performance.now() - startedAt));
+    updateElapsed();
+    const interval = window.setInterval(updateElapsed, 1_000);
+    return () => window.clearInterval(interval);
+  }, [startedAt]);
+
+  return (
+    <span aria-hidden="true" className="workspace-notice__elapsed">
+      Elapsed {formatVaultOpenElapsed(elapsedMs)}
+    </span>
+  );
+});
 
 export const WorkspaceNotice = memo(function WorkspaceNotice({
   children,
-  elapsed,
   progressLabel,
+  startedAt,
   tone,
 }: {
   readonly children: ReactNode;
-  readonly elapsed?: string;
   readonly progressLabel?: string;
+  readonly startedAt?: number;
   readonly tone: 'error' | 'progress' | 'warning';
 }) {
   return (
@@ -30,10 +54,8 @@ export const WorkspaceNotice = memo(function WorkspaceNotice({
           >
             <span className="workspace-notice__progress-indicator" />
           </span>
-          {elapsed === undefined ? null : (
-            <span aria-hidden="true" className="workspace-notice__elapsed">
-              Elapsed {elapsed}
-            </span>
+          {startedAt === undefined ? null : (
+            <WorkspaceNoticeElapsed startedAt={startedAt} />
           )}
         </>
       )}
