@@ -1,3 +1,5 @@
+import type { VaultDiscoveryProgressListener } from '@icarus-graph-explorer/source-provider-tauri';
+
 import type {
   DesktopVaultOpenProgress,
   DesktopVaultOpenProgressListener,
@@ -32,6 +34,18 @@ export function guardVaultOpenProgress(
   currentGeneration: () => number,
   publish: DesktopVaultOpenProgressListener,
 ): DesktopVaultOpenProgressListener {
+  return (progress) => {
+    if (isCurrentVaultOpenRequest(currentGeneration(), requestGeneration)) {
+      publish(progress);
+    }
+  };
+}
+
+export function guardVaultDiscoveryProgress(
+  requestGeneration: number,
+  currentGeneration: () => number,
+  publish: VaultDiscoveryProgressListener,
+): VaultDiscoveryProgressListener {
   return (progress) => {
     if (isCurrentVaultOpenRequest(currentGeneration(), requestGeneration)) {
       publish(progress);

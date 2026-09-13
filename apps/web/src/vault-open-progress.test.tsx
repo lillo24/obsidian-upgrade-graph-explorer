@@ -5,6 +5,7 @@ import { WorkspaceNotice } from './components/WorkspaceNotice';
 import {
   describeVaultOpenProgress,
   formatVaultOpenElapsed,
+  guardVaultDiscoveryProgress,
   guardVaultOpenProgress,
   isCurrentVaultOpenRequest,
   isLiveVaultProgressPhase,
@@ -96,6 +97,33 @@ describe('vault open progress presentation', () => {
     expect(accepted).toEqual([]);
   });
 
+  it('rejects detailed discovery events from an old request', () => {
+    let currentGeneration = 8;
+    const accepted: number[] = [];
+    const listener = guardVaultDiscoveryProgress(
+      8,
+      () => currentGeneration,
+      (progress) => accepted.push(progress.entriesExamined),
+    );
+    currentGeneration = 9;
+
+    listener({
+      directoriesRead: 1,
+      entriesExamined: 2,
+      markdownFilesRead: 0,
+      nonMarkdownFilesSeen: 0,
+      bytesRead: 0,
+      currentRecursionDepth: 0,
+      maximumRecursionDepth: 0,
+      slowOperationWarningMs: 3_000,
+      currentOperation: 'read-directory',
+      currentWorkspacePath: '.',
+      currentOperationStartedAt: 0,
+    });
+
+    expect(accepted).toEqual([]);
+  });
+
   it.each([
     ['catching-up', true],
     ['updating', true],
@@ -126,7 +154,8 @@ describe('vault open progress presentation', () => {
     );
     expect(markup).not.toContain('aria-valuenow');
     expect(markup).toContain(
-      'aria-hidden="true" class="workspace-notice__elapsed">Elapsed 00:00',
+      'aria-hidden="true" class="workspace-notice__timing"',
     );
+    expect(markup).toContain('class="workspace-notice__elapsed">Elapsed 00:00');
   });
 });

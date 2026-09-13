@@ -15,6 +15,41 @@ export interface VaultSourceInventory {
   readonly nonMarkdownPaths: readonly WorkspacePath[];
 }
 
+export type VaultDiscoveryNativeOperation =
+  | 'inspect-root'
+  | 'inspect-path'
+  | 'read-directory'
+  | 'join-path'
+  | 'read-markdown';
+
+/** A workspace-relative target, with `.` reserved for the selected root. */
+export type VaultDiscoveryWorkspacePath = WorkspacePath | '.';
+
+export interface VaultDiscoveryCompletedOperation {
+  readonly operation: VaultDiscoveryNativeOperation;
+  readonly workspacePath: VaultDiscoveryWorkspacePath;
+  readonly durationMs: number;
+}
+
+export interface VaultDiscoveryProgress {
+  readonly directoriesRead: number;
+  readonly entriesExamined: number;
+  readonly markdownFilesRead: number;
+  readonly nonMarkdownFilesSeen: number;
+  readonly bytesRead: number;
+  readonly currentRecursionDepth: number;
+  readonly maximumRecursionDepth: number;
+  readonly slowOperationWarningMs: number;
+  readonly currentOperation?: VaultDiscoveryNativeOperation;
+  readonly currentWorkspacePath?: VaultDiscoveryWorkspacePath;
+  readonly currentOperationStartedAt?: number;
+  readonly lastCompletedOperation?: VaultDiscoveryCompletedOperation;
+}
+
+export type VaultDiscoveryProgressListener = (
+  progress: VaultDiscoveryProgress,
+) => void;
+
 export interface TauriWorkspaceRegistryEntry {
   readonly rootPath: string;
   readonly workspaceId: WorkspaceId;
@@ -41,6 +76,39 @@ export interface PrepareWorkspaceIdentityOptions {
 
 export interface DiscoverSelectedVaultOptions {
   readonly excludes?: readonly string[];
+  /** Observer-only aggregate progress; listener failures never control discovery. */
+  readonly onProgress?: VaultDiscoveryProgressListener;
+  /** Slow-operation UI threshold. Defaults to 3,000 ms. */
+  readonly slowOperationWarningMs?: number;
+  /** Per-native-operation watchdog. Defaults to 60,000 ms. */
+  readonly operationTimeoutMs?: number;
+}
+
+export class VaultDiscoveryTimeoutError extends Error {
+  readonly operation: VaultDiscoveryNativeOperation;
+  readonly workspacePath: VaultDiscoveryWorkspacePath;
+  readonly timeoutMs: number;
+  readonly progress: VaultDiscoveryProgress;
+
+  constructor(
+    operation: VaultDiscoveryNativeOperation,
+    workspacePath: VaultDiscoveryWorkspacePath,
+    timeoutMs: number,
+    progress: VaultDiscoveryProgress,
+  ) {
+    const seconds = Number((timeoutMs / 1_000).toFixed(3));
+    super(
+      `Vault discovery stalled for ${seconds} s during ${operation} at ${workspacePath}. ` +
+        `Directories ${progress.directoriesRead} · Entries ${progress.entriesExamined} · ` +
+        `Markdown ${progress.markdownFilesRead} · Non-Markdown ${progress.nonMarkdownFilesSeen}. ` +
+        'The native operation may still complete, but this discovery attempt was abandoned.',
+    );
+    this.name = 'VaultDiscoveryTimeoutError';
+    this.operation = operation;
+    this.workspacePath = workspacePath;
+    this.timeoutMs = timeoutMs;
+    this.progress = progress;
+  }
 }
 
 export type VaultWatchCategory =
@@ -54,7 +122,8 @@ export interface VaultWatchBatch {
   readonly reasons: readonly string[];
 }
 
-export interface WatchSelectedVaultOptions extends DiscoverSelectedVaultOptions {
+export interface WatchSelectedVaultOptions {
+  readonly excludes?: readonly string[];
   /** Burst quiet period. Defaults to 250 ms. */
   readonly quietWindowMs?: number;
   /** Hard cap from the first pending signal. Defaults to 1,000 ms. */

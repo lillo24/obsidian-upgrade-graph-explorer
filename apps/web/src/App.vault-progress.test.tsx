@@ -14,6 +14,7 @@ import {
 
 import type {
   TauriSourceProvider,
+  VaultDiscoveryProgressListener,
   VaultSelection,
 } from '@icarus-graph-explorer/source-provider-tauri';
 import { validateObsidianDiagnosticReport } from '@icarus-graph-explorer/diagnostics-obsidian';
@@ -200,15 +201,17 @@ describe('App vault progress lifecycle', () => {
     expect(vi.getTimerCount()).toBe(1);
   });
 
-  it('isolates elapsed ticks from GraphExplorer and clears progress after failure', async () => {
+  it('isolates elapsed and discovery updates from GraphExplorer and clears progress after failure', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     let monotonicNow = 0;
     vi.spyOn(performance, 'now').mockImplementation(() => monotonicNow);
     let progressListener: DesktopVaultOpenProgressListener | undefined;
+    let discoveryProgressListener: VaultDiscoveryProgressListener | undefined;
     let rejectOpen!: (error: Error) => void;
     mocks.openLiveDesktopVault.mockImplementation(
       (...args: readonly unknown[]) => {
         progressListener = args[4] as DesktopVaultOpenProgressListener;
+        discoveryProgressListener = args[5] as VaultDiscoveryProgressListener;
         return new Promise((_resolve, reject) => {
           rejectOpen = reject;
         });
@@ -227,6 +230,40 @@ describe('App vault progress lifecycle', () => {
         { timeout: 5_000 },
       );
     });
+    const rendersBeforeDiscoveryProgress = mocks.graphRenderCount;
+    await act(() => {
+      for (let index = 1; index <= 2_000; index += 1) {
+        discoveryProgressListener?.({
+          directoriesRead: 83,
+          entriesExamined: index,
+          markdownFilesRead: Math.floor(index / 2),
+          nonMarkdownFilesSeen: Math.floor(index / 3),
+          bytesRead: index * 10,
+          currentRecursionDepth: 2,
+          maximumRecursionDepth: 4,
+          slowOperationWarningMs: 3_000,
+          currentOperation: 'read-markdown',
+          currentWorkspacePath: `Folder/Note-${index}.md`,
+          currentOperationStartedAt: 0,
+        });
+      }
+    });
+    expect(mocks.graphRenderCount).toBe(rendersBeforeDiscoveryProgress);
+    await act(() => vi.advanceTimersByTimeAsync(100));
+    expect(container.textContent).toContain(
+      'Directories 83 · Entries 2,000 · Markdown 1,000 · Non-Markdown 666 · Depth 2 (max 4)',
+    );
+    expect(mocks.graphRenderCount).toBe(rendersBeforeDiscoveryProgress);
+    monotonicNow = 3_200;
+    await act(() => vi.advanceTimersByTimeAsync(1_000));
+    expect(container.textContent).toContain(
+      'Still waiting for a Markdown file read…',
+    );
+    expect(container.textContent).toContain(
+      'Current item: Folder/Note-2000.md · Waiting on current operation: 3 s',
+    );
+    expect(mocks.graphRenderCount).toBe(rendersBeforeDiscoveryProgress);
+
     await act(() =>
       progressListener?.({
         stage: 'building-workspace',

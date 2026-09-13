@@ -9,11 +9,16 @@ import {
 } from '@icarus-graph-explorer/vault-discovery-policy';
 
 import type { NativeFileInfo, TauriNativeBridge } from './bridge';
+import {
+  createVaultDiscoveryTracker,
+  type VaultDiscoveryTracker,
+} from './discovery-progress';
 import type {
   DiscoverSelectedVaultOptions,
   VaultSelection,
   VaultSourceInventory,
 } from './types';
+import { VaultDiscoveryTimeoutError } from './types';
 
 const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true });
 
@@ -40,13 +45,18 @@ async function readMarkdown(
   bridge: TauriNativeBridge,
   absolutePath: string,
   path: WorkspacePath,
+  tracker: VaultDiscoveryTracker,
 ): Promise<string> {
   let bytes: Uint8Array;
   try {
-    bytes = await bridge.readFileBytes(absolutePath);
+    bytes = await tracker.operation('read-markdown', path, () =>
+      bridge.readFileBytes(absolutePath),
+    );
   } catch (error: unknown) {
+    if (error instanceof VaultDiscoveryTimeoutError) throw error;
     throw new Error(`Cannot read Markdown source ${path}.`, { cause: error });
   }
+  tracker.recordMarkdownRead(bytes.byteLength);
   try {
     return UTF8_DECODER.decode(bytes);
   } catch (error: unknown) {
@@ -61,14 +71,16 @@ async function collectFile(
   absolutePath: string,
   path: WorkspacePath,
   collector: InventoryCollector,
+  tracker: VaultDiscoveryTracker,
 ): Promise<void> {
   if (!isMarkdownWorkspacePath(path)) {
     collector.nonMarkdownPaths.push(path);
+    tracker.recordNonMarkdownFile();
     return;
   }
   collector.markdownDocuments.push({
     path,
-    source: await readMarkdown(bridge, absolutePath, path),
+    source: await readMarkdown(bridge, absolutePath, path, tracker),
   });
 }
 
@@ -79,28 +91,36 @@ async function collectDirectory(
   segments: readonly string[],
   excludes: readonly WorkspacePath[],
   collector: InventoryCollector,
+  tracker: VaultDiscoveryTracker,
 ): Promise<void> {
+  tracker.setRecursionDepth(segments.length);
   let entries;
   try {
-    entries = await bridge.readDirectory(absoluteDirectory);
+    const workspacePath =
+      segments.length === 0 ? '.' : workspacePathFromSegments(segments);
+    entries = await tracker.operation('read-directory', workspacePath, () =>
+      bridge.readDirectory(absoluteDirectory),
+    );
   } catch (error: unknown) {
+    if (error instanceof VaultDiscoveryTimeoutError) throw error;
     const relative =
       segments.length === 0 ? 'the selected root' : segments.join('/');
     throw new Error(`Cannot read vault directory ${relative}.`, {
       cause: error,
     });
   }
+  tracker.recordDirectoryRead();
   const sorted = [...entries].sort((left, right) =>
     compareWorkspaceText(left.name, right.name),
   );
   for (const entry of sorted) {
+    tracker.examineEntry();
     if (shouldSkipVaultEntry(entry.name, entry.isDirectory)) continue;
     const nextSegments = [...segments, entry.name];
     const path = workspacePathFromSegments(nextSegments);
     if (isDiscoveryPathExcluded(path, excludes) || entry.isSymlink) continue;
-    const absolutePath = await bridge.joinPath(
-      selection.rootPath,
-      ...nextSegments,
+    const absolutePath = await tracker.operation('join-path', path, () =>
+      bridge.joinPath(selection.rootPath, ...nextSegments),
     );
     if (entry.isDirectory) {
       await collectDirectory(
@@ -110,9 +130,11 @@ async function collectDirectory(
         nextSegments,
         excludes,
         collector,
+        tracker,
       );
+      tracker.setRecursionDepth(segments.length);
     } else if (entry.isFile) {
-      await collectFile(bridge, absolutePath, path, collector);
+      await collectFile(bridge, absolutePath, path, collector, tracker);
     }
   }
 }
@@ -121,10 +143,16 @@ async function inspect(
   bridge: TauriNativeBridge,
   absolutePath: string,
   description: string,
+  operation: 'inspect-root' | 'inspect-path',
+  workspacePath: WorkspacePath | '.',
+  tracker: VaultDiscoveryTracker,
 ): Promise<NativeFileInfo> {
   try {
-    return await bridge.inspectPath(absolutePath);
+    return await tracker.operation(operation, workspacePath, () =>
+      bridge.inspectPath(absolutePath),
+    );
   } catch (error: unknown) {
+    if (error instanceof VaultDiscoveryTimeoutError) throw error;
     throw new Error(`${description} cannot be inspected.`, { cause: error });
   }
 }
@@ -134,10 +162,14 @@ export async function discoverSelectedVault(
   selection: VaultSelection,
   options: DiscoverSelectedVaultOptions = {},
 ): Promise<VaultSourceInventory> {
+  const tracker = createVaultDiscoveryTracker(options);
   const rootInfo = await inspect(
     bridge,
     selection.rootPath,
     'The selected vault root',
+    'inspect-root',
+    '.',
+    tracker,
   );
   if (rootInfo.isSymlink) {
     throw new Error('The selected vault root must not be a symbolic link.');
@@ -156,6 +188,7 @@ export async function discoverSelectedVault(
     [],
     (options.excludes ?? []).map(normalizeDiscoveryExclude),
     collector,
+    tracker,
   );
   return completedInventory(collector);
 }
@@ -173,8 +206,18 @@ export async function discoverSelectedVaultSubtree(
   if (isDiscoveryPathExcluded(path, excludes)) {
     return { markdownDocuments: [], nonMarkdownPaths: [] };
   }
-  const absolutePath = await bridge.joinPath(selection.rootPath, ...segments);
-  const info = await inspect(bridge, absolutePath, `Vault path ${path}`);
+  const tracker = createVaultDiscoveryTracker(options);
+  const absolutePath = await tracker.operation('join-path', path, () =>
+    bridge.joinPath(selection.rootPath, ...segments),
+  );
+  const info = await inspect(
+    bridge,
+    absolutePath,
+    `Vault path ${path}`,
+    'inspect-path',
+    path,
+    tracker,
+  );
   if (info.isSymlink) {
     return { markdownDocuments: [], nonMarkdownPaths: [] };
   }
@@ -190,9 +233,10 @@ export async function discoverSelectedVaultSubtree(
       segments,
       excludes,
       collector,
+      tracker,
     );
   } else if (info.isFile) {
-    await collectFile(bridge, absolutePath, path, collector);
+    await collectFile(bridge, absolutePath, path, collector, tracker);
   } else {
     throw new Error(`Vault path ${path} is not a regular file or directory.`);
   }

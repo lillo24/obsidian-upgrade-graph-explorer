@@ -10,7 +10,10 @@ import {
 } from '@icarus-graph-explorer/stable-identity';
 import {
   RecoverableWorkspaceIdentityError,
+  VaultDiscoveryTimeoutError,
+  type DiscoverSelectedVaultOptions,
   type TauriSourceProvider,
+  type VaultDiscoveryProgress,
   type VaultSelection,
   type VaultWatchSubscription,
   type WorkspaceIdentitySession,
@@ -57,7 +60,12 @@ class FakeProvider implements TauriSourceProvider {
     return this.selection;
   }
 
-  async discoverSelectedVault() {
+  async discoverSelectedVault(
+    selection: VaultSelection,
+    options?: DiscoverSelectedVaultOptions,
+  ) {
+    void selection;
+    void options;
     this.discoverCalls += 1;
     return this.inventory;
   }
@@ -310,6 +318,44 @@ describe('desktop vault worker orchestration', () => {
     opened.runtime.processor.terminate();
   });
 
+  it('threads detailed discovery progress separately from App-wide stage progress', async () => {
+    const provider = new FakeProvider();
+    const measured = measuredServices();
+    const discoveryProgress: VaultDiscoveryProgress[] = [];
+    const expected: VaultDiscoveryProgress = {
+      directoriesRead: 3,
+      entriesExamined: 8,
+      markdownFilesRead: 4,
+      nonMarkdownFilesSeen: 2,
+      bytesRead: 120,
+      currentRecursionDepth: 1,
+      maximumRecursionDepth: 2,
+      slowOperationWarningMs: 3_000,
+      currentOperation: 'read-markdown',
+      currentWorkspacePath: 'Folder/A.md',
+      currentOperationStartedAt: 10,
+    };
+    provider.discoverSelectedVault = async (
+      _selection: VaultSelection,
+      options?: DiscoverSelectedVaultOptions,
+    ) => {
+      options?.onProgress?.(expected);
+      return provider.inventory;
+    };
+
+    const opened = await openSelectedDesktopVault(
+      provider,
+      SELECTION,
+      {},
+      measured.services,
+      undefined,
+      (progress) => discoveryProgress.push(progress),
+    );
+
+    expect(discoveryProgress).toEqual([expected]);
+    opened.runtime.processor.terminate();
+  });
+
   it('reports identity completion first and waits for source before building', async () => {
     const provider = new FakeProvider();
     const source = deferred<typeof provider.inventory>();
@@ -512,6 +558,39 @@ describe('desktop vault worker orchestration', () => {
     await expect(
       openSelectedDesktopVault(provider, SELECTION, {}, measured.services),
     ).rejects.toThrow('Cannot read vault directory Folder');
+    expect(provider.commits).toBe(0);
+    expect(measured.processors()).toBe(0);
+  });
+
+  it('preserves relative watchdog diagnostics without creating a worker', async () => {
+    const provider = new FakeProvider();
+    provider.discoverSelectedVault = async () => {
+      throw new VaultDiscoveryTimeoutError(
+        'read-markdown',
+        'Notes/A.md',
+        60_000,
+        {
+          directoriesRead: 83,
+          entriesExamined: 1_426,
+          markdownFilesRead: 612,
+          nonMarkdownFilesSeen: 4,
+          bytesRead: 123_456,
+          currentRecursionDepth: 2,
+          maximumRecursionDepth: 4,
+          slowOperationWarningMs: 3_000,
+          currentOperation: 'read-markdown',
+          currentWorkspacePath: 'Notes/A.md',
+          currentOperationStartedAt: 0,
+        },
+      );
+    };
+    const measured = measuredServices();
+
+    await expect(
+      openSelectedDesktopVault(provider, SELECTION, {}, measured.services),
+    ).rejects.toThrow(
+      'Vault discovery stalled for 60 s during read-markdown at Notes/A.md. Directories 83 · Entries 1426 · Markdown 612',
+    );
     expect(provider.commits).toBe(0);
     expect(measured.processors()).toBe(0);
   });

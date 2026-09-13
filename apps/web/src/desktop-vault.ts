@@ -6,6 +6,7 @@ import {
   RecoverableWorkspaceIdentityError,
   type PrepareWorkspaceIdentityOptions,
   type TauriSourceProvider,
+  type VaultDiscoveryProgressListener,
   type VaultSelection,
   type VaultSourceInventory,
   type WorkspaceIdentityRecovery,
@@ -227,6 +228,7 @@ async function recoverCommitFailure(input: {
   readonly services: DesktopVaultServices;
   readonly inventory: VaultSourceInventory;
   readonly onProgress?: DesktopVaultOpenProgressListener;
+  readonly onDiscoveryProgress?: VaultDiscoveryProgressListener;
 }): Promise<{
   readonly processor: DesktopWorkspaceProcessor;
   readonly prepared: PreparedWorkspaceResult;
@@ -246,9 +248,11 @@ async function recoverCommitFailure(input: {
   };
   try {
     const acquisitionStart = input.services.now();
-    const inventory = await input.sourceProvider.discoverSelectedVault(
-      input.selection,
-    );
+    const inventory = await (input.onDiscoveryProgress === undefined
+      ? input.sourceProvider.discoverSelectedVault(input.selection)
+      : input.sourceProvider.discoverSelectedVault(input.selection, {
+          onProgress: input.onDiscoveryProgress,
+        }));
     const sourceAcquisitionMs = elapsed(acquisitionStart, input.services);
     const prepared = await replacement.prepareInitialize({
       workspaceId: replacementSession.workspaceId,
@@ -288,6 +292,7 @@ export async function openSelectedDesktopVault(
   identityOptions: PrepareWorkspaceIdentityOptions = {},
   services: DesktopVaultServices = DEFAULT_SERVICES,
   onProgress?: DesktopVaultOpenProgressListener,
+  onDiscoveryProgress?: VaultDiscoveryProgressListener,
 ): Promise<OpenedDesktopVault> {
   let acquisitionActive = true;
   let acquisition: DesktopVaultOpenAcquisitionProgress = {
@@ -305,7 +310,12 @@ export async function openSelectedDesktopVault(
   let identitySession: WorkspaceIdentitySession;
   try {
     [inventory, identitySession] = await Promise.all([
-      sourceProvider.discoverSelectedVault(selection).then((discovered) => {
+      (onDiscoveryProgress === undefined
+        ? sourceProvider.discoverSelectedVault(selection)
+        : sourceProvider.discoverSelectedVault(selection, {
+            onProgress: onDiscoveryProgress,
+          })
+      ).then((discovered) => {
         acquisition = {
           ...acquisition,
           sourceDiscovery: 'complete',
@@ -401,6 +411,7 @@ export async function openSelectedDesktopVault(
         durableCatalog: prepared.nextIdentityCatalog,
         services,
         ...(onProgress === undefined ? {} : { onProgress }),
+        ...(onDiscoveryProgress === undefined ? {} : { onDiscoveryProgress }),
         inventory,
       });
       processor = recovered.processor;
@@ -457,6 +468,7 @@ export async function selectAndOpenDesktopVault(
   sourceProvider: TauriSourceProvider,
   services: DesktopVaultServices = DEFAULT_SERVICES,
   onProgress?: DesktopVaultOpenProgressListener,
+  onDiscoveryProgress?: VaultDiscoveryProgressListener,
 ): Promise<SelectAndOpenDesktopVaultResult> {
   const selection = await sourceProvider.selectVaultDirectory();
   return selection === undefined
@@ -467,5 +479,6 @@ export async function selectAndOpenDesktopVault(
         {},
         services,
         onProgress,
+        onDiscoveryProgress,
       );
 }

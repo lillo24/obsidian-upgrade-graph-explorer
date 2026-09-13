@@ -3388,6 +3388,10 @@ h2 {
 
 .workspace-notice__title,
 .workspace-notice__message,
+.workspace-notice__timing,
+.workspace-notice__discovery,
+.workspace-notice__slow-operation,
+.workspace-notice__slow-operation span,
 .workspace-notice__elapsed,
 .workspace-notice__progress {
   display: block;
@@ -3416,11 +3420,24 @@ h2 {
   animation: workspace-notice-progress 1.5s ease-in-out infinite;
 }
 
-.workspace-notice__elapsed {
+.workspace-notice__timing {
   margin-top: 0.3rem;
   color: #496671;
   font-size: 0.7rem;
   font-variant-numeric: tabular-nums;
+}
+
+.workspace-notice__discovery {
+  font-weight: 600;
+}
+
+.workspace-notice__slow-operation {
+  margin-top: 0.3rem;
+  color: #7b5700;
+}
+
+.workspace-notice__elapsed {
+  margin-top: 0.3rem;
 }
 
 @keyframes workspace-notice-progress {

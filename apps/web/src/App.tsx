@@ -16,6 +16,7 @@ import {
 } from '@icarus-graph-explorer/diagnostics-obsidian';
 import type {
   TauriSourceProvider,
+  VaultDiscoveryProgressListener,
   VaultSelection,
   WorkspaceIdentitySession,
   WorkspaceIdentityRecovery,
@@ -69,10 +70,12 @@ import {
 import { browserStorage, clearWorkspaceView } from './persistence/storage';
 import {
   describeVaultOpenProgress,
+  guardVaultDiscoveryProgress,
   guardVaultOpenProgress,
   isCurrentVaultOpenRequest,
   isLiveVaultProgressPhase,
 } from './vault-open-progress';
+import { createVaultDiscoveryProgressStore } from './vault-discovery-progress-store';
 
 const sampleValidation = validateObsidianDiagnosticReport(sampleReportJson);
 if (!sampleValidation.valid) {
@@ -164,6 +167,9 @@ export function App({
   const [vaultOpenProgress, setVaultOpenProgress] =
     useState<DesktopVaultOpenProgress>();
   const [vaultOpeningStartedAt, setVaultOpeningStartedAt] = useState<number>();
+  const [vaultDiscoveryProgressStore] = useState(
+    createVaultDiscoveryProgressStore,
+  );
   const [diagnosticEvidenceOpen, setDiagnosticEvidenceOpen] = useState(false);
   const [workspaceArea, setWorkspaceArea] =
     useState<WorkspaceArea>('arguments');
@@ -243,16 +249,18 @@ export function App({
   useEffect(
     () => () => {
       sourceRequestGeneration.current += 1;
+      vaultDiscoveryProgressStore.dispose();
       liveUnsubscribeRef.current?.();
       const controller = liveControllerRef.current;
       liveControllerRef.current = undefined;
       if (controller !== undefined)
         void controller.stop().catch(() => undefined);
     },
-    [],
+    [vaultDiscoveryProgressStore],
   );
 
   function clearVaultOpening(): void {
+    vaultDiscoveryProgressStore.clear();
     setVaultSelectionPending(false);
     setVaultOpening(false);
     setVaultOpenProgress(undefined);
@@ -260,6 +268,7 @@ export function App({
   }
 
   function beginVaultOpening(): void {
+    vaultDiscoveryProgressStore.clear();
     setVaultOpening(true);
     setVaultOpenProgress(undefined);
     setVaultOpeningStartedAt(performance.now());
@@ -272,7 +281,25 @@ export function App({
     return guardVaultOpenProgress(
       requestGeneration,
       () => sourceRequestGeneration.current,
-      setVaultOpenProgress,
+      (progress) => {
+        if (
+          progress.stage !== 'acquiring-source' ||
+          progress.acquisition.sourceDiscovery === 'complete'
+        ) {
+          vaultDiscoveryProgressStore.clear();
+        }
+        setVaultOpenProgress(progress);
+      },
+    );
+  }
+
+  function discoveryProgressListener(
+    requestGeneration: number,
+  ): VaultDiscoveryProgressListener {
+    return guardVaultDiscoveryProgress(
+      requestGeneration,
+      () => sourceRequestGeneration.current,
+      vaultDiscoveryProgressStore.publish,
     );
   }
 
@@ -476,6 +503,7 @@ export function App({
         {},
         undefined,
         progressListener(requestGeneration),
+        discoveryProgressListener(requestGeneration),
       );
       if (
         !isCurrentVaultOpenRequest(
@@ -554,6 +582,7 @@ export function App({
         },
         undefined,
         progressListener(requestGeneration),
+        discoveryProgressListener(requestGeneration),
       );
       if (
         !isCurrentVaultOpenRequest(
@@ -798,6 +827,9 @@ export function App({
           <div className="workspace-notice-stack">
             <WorkspaceNotice
               tone={sourceNotice.tone}
+              {...(vaultOpening
+                ? { discoveryProgressStore: vaultDiscoveryProgressStore }
+                : {})}
               {...('startedAt' in sourceNotice &&
               sourceNotice.startedAt !== undefined
                 ? { startedAt: sourceNotice.startedAt }

@@ -43,15 +43,15 @@ overrides, interaction preferences, and experiment gates remain separate.
 
 ## 2. Overall readiness
 
-| Area                                        | Readiness                                    | Evidence                                                                                                                                                                                                                                         |
-| ------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Canonical correctness and source neutrality | Ready                                        | Package contracts, schema-v3 tests, projection/inspection oracles, and source-neutral renderer boundaries.                                                                                                                                       |
-| All/Focus and Network/Hierarchy workflows   | Ready with polish work                       | Production-browser traversal of all four combinations, Hops/direction, depth 0–3, Custom disclosure, history, and reload.                                                                                                                        |
-| Live-vault safety                           | Ready                                        | Ordered prepare → persist → commit, latest-result rejection, paused recovery, last-valid-graph preservation, and Rescan tests.                                                                                                                   |
-| Browser runtime                             | Ready after KG14A fixes                      | Production build exercised without current warnings/errors; the Network refresh crash and missing Focus-root crash found by KG14A are fixed and regression-tested.                                                                               |
-| Accessibility                               | Network gate addressed; follow-up remains    | Both Sigma canvases stay visual-only, while KG14B2 supplies a synchronized virtualized DOM tree. QUERY1 announcement, contrast, scaling, and final manual feedback remain.                                                                       |
-| Desktop security/distribution               | Not release-ready                            | Narrow filesystem capabilities are good, but CSP is disabled, versions remain `0.0.0`, and bundling is inactive.                                                                                                                                 |
-| Performance                                 | Ready for bounded use; native retest pending | Worker split and small profiles are healthy. Vault opening exposes truthful typed phases, exact Markdown count once known, an indeterminate bar, and locally isolated monotonic elapsed time; PATCH2 foreground/background native QA is pending. |
+| Area                                        | Readiness                                       | Evidence                                                                                                                                                                                                                                          |
+| ------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Canonical correctness and source neutrality | Ready                                           | Package contracts, schema-v3 tests, projection/inspection oracles, and source-neutral renderer boundaries.                                                                                                                                        |
+| All/Focus and Network/Hierarchy workflows   | Ready with polish work                          | Production-browser traversal of all four combinations, Hops/direction, depth 0–3, Custom disclosure, history, and reload.                                                                                                                         |
+| Live-vault safety                           | Ready                                           | Ordered prepare → persist → commit, latest-result rejection, paused recovery, last-valid-graph preservation, and Rescan tests.                                                                                                                    |
+| Browser runtime                             | Ready after KG14A fixes                         | Production build exercised without current warnings/errors; the Network refresh crash and missing Focus-root crash found by KG14A are fixed and regression-tested.                                                                                |
+| Accessibility                               | Network gate addressed; follow-up remains       | Both Sigma canvases stay visual-only, while KG14B2 supplies a synchronized virtualized DOM tree. QUERY1 announcement, contrast, scaling, and final manual feedback remain.                                                                        |
+| Desktop security/distribution               | Not release-ready                               | Narrow filesystem capabilities are good, but CSP is disabled, versions remain `0.0.0`, and bundling is inactive.                                                                                                                                  |
+| Performance                                 | Ready for bounded use; native diagnosis pending | Worker split and small profiles are healthy. Vault opening exposes typed phases, isolated elapsed time, coalesced native-discovery counters, slow-operation detail, and a bounded per-operation watchdog; PATCH3 real-vault diagnosis is pending. |
 
 No evidence supports replacing either renderer, changing the canonical model,
 or adding a general cache in KG14.
@@ -221,6 +221,8 @@ or adding a general cache in KG14.
   monotonic elapsed time and an accessible indeterminate bar; Catching up,
   Updating, and Resyncing reuse that bar. The elapsed interval is isolated to a
   memoized notice child rather than rerendering the graph-owning App each second.
+  PATCH3 adds coalesced source-discovery counters and workspace-relative slow-call
+  detail without routing per-entry updates through App.
 - **Why it matters:** Aggregate-only real-vault evidence from KG12A recorded a
   roughly 9.7-second full Rescan, about 9.1 seconds of which was source
   reconciliation. At that duration users can reasonably interpret the app as
@@ -233,11 +235,11 @@ or adding a general cache in KG14.
   content, or topology are included here.
 - **Implementation:** `desktop-vault`, `desktop-live-vault`, App generation
   guards, `WorkspaceNotice`, and `vault-open-progress` presentation helpers.
-- **Native status:** The progress UX is implemented. Current-main native
-  Candidate A was user-reported stalled at its ambiguous pre-worker acquisition
-  stage. PATCH2 splits that diagnostic and removes the top-level elapsed rerender;
-  foreground/background/minimized retesting remains pending. Rendering is the
-  leading hypothesis, not a confirmed native root cause.
+- **Native status:** Candidate A stalled at its ambiguous pre-worker acquisition
+  stage in user-native testing. PATCH2 proved identity preparation completed while native source
+  discovery remained pending, despite removal of the top-level elapsed rerender.
+  PATCH3 bounds each native discovery operation at 60 seconds and reports its
+  relative target and aggregate counters; real-vault diagnosis remains pending.
 - **Decision required?:** No.
 
 ### KG14A-05 — active source and live state are hidden behind Settings

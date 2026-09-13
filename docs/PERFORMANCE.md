@@ -236,8 +236,33 @@ folder picker resolves. Acquisition remains one concurrent `Promise.all`, with
 typed pending/complete status for source discovery and identity preparation;
 only source completion exposes aggregate file counts. Tests exercise both
 completion orders, App/GraphExplorer render counts, missed ticks, cancellation,
-failure, success, source switch, and unmount cleanup. Candidate PATCH2 native QA
-remains pending.
+failure, success, source switch, and unmount cleanup. User-native PATCH2 QA then
+showed identity preparation complete while source discovery remained pending.
+
+#### Vault discovery PATCH3 native-operation diagnostics
+
+The PATCH2 result proves the UI thread remained alive and awaited
+`discoverSelectedVault(...)`; it does not distinguish a hung plugin call from
+extremely slow serial traversal or runaway depth. PATCH3 preserves the serial
+discovery algorithm and instruments each awaited root inspection, directory
+read, path join, and Markdown read.
+
+Aggregate-only progress records directories read, entries examined,
+Markdown/non-Markdown files, bytes, current/maximum recursion depth, the current
+operation, and its workspace-relative target and monotonic start. A 3-second
+default threshold reveals a slow current operation. A configurable 60-second
+per-operation watchdog rejects the discovery attempt with
+operation/path/counter context; the underlying Tauri Promise may still complete,
+but cannot resume the rejected discovery or adopt a workspace.
+
+Detailed events enter a 100 ms coalescing external store subscribed to only by
+the notice timing child. Tests publish 2,000 events while asserting no additional
+`GraphExplorer` render, preserving PATCH2 isolation. Controlled promises cover
+all four operation boundaries and late completion, while healthy fake-bridge
+oracles confirm unchanged sources, sorting, excludes, strict UTF-8, and symlink
+skipping. The discovery and Tauri bridge sources are identical between working
+PR #92 head `0279f48bf663b4acf5944aef625e7984aebd691a` and PATCH3 parent
+`2bf373ffddbae44f69f3cf766d2fc8a228fa3e91`; native PATCH3 QA remains pending.
 
 ## KG12B2 W3 responsiveness evidence
 

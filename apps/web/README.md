@@ -85,6 +85,11 @@ completion separately; exact Markdown/non-Markdown counts appear only after
 discovery. The UI uses an indeterminate accessible bar and monotonic elapsed
 time while the last committed graph remains visible. The elapsed interval lives
 inside the small notice child, so its ticks do not rerender `App` or the graph.
+Native discovery details flow through a 100 ms trailing-coalesced external
+store read only by that notice child. Directory, entry, Markdown, non-Markdown,
+and recursion-depth updates therefore remain visible without turning thousands
+of filesystem events into `App` or `GraphExplorer` renders. A workspace-relative
+target appears only after the configured current operation becomes slow.
 These observations are synchronous and non-awaited; presentation failure or a
 throttled display timer cannot schedule or block W1 startup.
 The graph workspace owns one lazily started W3 layout service for the mounted
