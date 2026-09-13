@@ -1,13 +1,10 @@
-import { useEffect, useRef, useState, type SyntheticEvent } from 'react';
-
-import type { ArgumentLibraryStore } from '@icarus-graph-explorer/argument-workspace';
+import { useEffect, useRef, type SyntheticEvent } from 'react';
 
 import {
   ArgumentsWorkspacePanel,
   type ArgumentsWorkspaceHandle,
 } from '../arguments/ArgumentsWorkspace';
 import { activateArgumentWorkspaceOverlay } from '../arguments/argument-overlay';
-import { createPlatformArgumentLibraryStore } from '../arguments/platform-store';
 import { ArgumentWorkspaceSession } from '../arguments/session';
 import type { ArgumentSourceAccess } from '../arguments/source-capture';
 import {
@@ -31,7 +28,7 @@ const FOCUSABLE_SELECTOR = [
 
 export function WorkspaceOverlay({
   area,
-  argumentLibraryStore,
+  argumentSession,
   argumentSourceAccess,
   controller,
   onAreaChange,
@@ -40,7 +37,7 @@ export function WorkspaceOverlay({
   restoreFocus,
 }: {
   readonly area: WorkspaceArea;
-  readonly argumentLibraryStore?: ArgumentLibraryStore;
+  readonly argumentSession: ArgumentWorkspaceSession;
   readonly argumentSourceAccess?: ArgumentSourceAccess;
   readonly controller: AiReviewController;
   readonly onAreaChange: (area: WorkspaceArea) => void;
@@ -48,12 +45,6 @@ export function WorkspaceOverlay({
   readonly open: boolean;
   readonly restoreFocus?: HTMLElement;
 }) {
-  const [argumentSession] = useState(
-    () =>
-      new ArgumentWorkspaceSession(
-        argumentLibraryStore ?? createPlatformArgumentLibraryStore(),
-      ),
-  );
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const argumentsRef = useRef<ArgumentsWorkspaceHandle>(null);

@@ -290,6 +290,9 @@ function sameLocator(
 /** Immutable, bounded source capture. It retains no absolute vault root. */
 export class ArgumentSourceCapture {
   readonly provenance: ArgumentSourceIdentity;
+  /** Whether capture limits retained every otherwise selectable reference. */
+  readonly selectionLimitStatus: 'complete' | 'limit-exceeded';
+  readonly limitOmissions: readonly string[];
   readonly provider: LinkedTheorySourceProvider;
 
   constructor(
@@ -297,8 +300,12 @@ export class ArgumentSourceCapture {
     documents: ReadonlyMap<string, CapturedDocument>,
     references: ReadonlyMap<string, TheorySourceReference>,
     unavailable: ReadonlyMap<string, LinkedTheorySourceProviderResult>,
+    limitOmissions: readonly string[],
   ) {
     this.provenance = Object.freeze({ ...provenance });
+    this.limitOmissions = Object.freeze([...limitOmissions]);
+    this.selectionLimitStatus =
+      this.limitOmissions.length === 0 ? 'complete' : 'limit-exceeded';
     this.provider = {
       sourceSpaceId: provenance.sourceSpaceId,
       read: async (request) => {
@@ -574,6 +581,7 @@ export class ArgumentSourceAccessSession implements ArgumentSourceAccessHost {
     );
     const documents = new Map<string, CapturedDocument>();
     const unavailable = new Map<string, LinkedTheorySourceProviderResult>();
+    const limitOmissions = new Set<string>();
     let capturedCharacters = 0;
     for (const reference of uniqueReferences) {
       if (!isNormalizedWorkspacePath(reference.path)) {
@@ -608,6 +616,9 @@ export class ArgumentSourceAccessSession implements ArgumentSourceAccessHost {
         continue;
       }
       if (source.length > ARGUMENT_SOURCE_CAPTURE_LIMITS.perFileCharacters) {
+        limitOmissions.add(
+          `A registered file exceeds the ${ARGUMENT_SOURCE_CAPTURE_LIMITS.perFileCharacters}-character capture limit.`,
+        );
         unavailable.set(
           reference.id,
           failure(
@@ -623,6 +634,9 @@ export class ArgumentSourceAccessSession implements ArgumentSourceAccessHost {
           capturedCharacters + source.length >
             ARGUMENT_SOURCE_CAPTURE_LIMITS.totalCapturedCharacters
         ) {
+          limitOmissions.add(
+            'The bounded source capture reached its file or total-character limit.',
+          );
           unavailable.set(
             reference.id,
             failure(
@@ -657,6 +671,7 @@ export class ArgumentSourceAccessSession implements ArgumentSourceAccessHost {
         documents,
         selected,
         unavailable,
+        [...limitOmissions],
       ),
     };
   }

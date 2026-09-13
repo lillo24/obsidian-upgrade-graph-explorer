@@ -3,12 +3,17 @@
 This folder owns the visible local AI Review workflow and its single
 application-level controller. It uses REVIEW2 for authorized Git capture,
 REVIEW1 for deterministic prompts/orchestration/results, and the independent
-review-history store for persistence. It does not own graph state, argument
-records, native paths, a live model adapter, or a compiler implementation.
+review-history store for persistence. Its application adapter exposes the
+current confirmed Argument Library snapshot through REVIEW1's read-only
+compiler protocol. It does not own graph state, argument records, native paths,
+or a live model adapter.
 
 ```text
 controller.ts            Source lifecycle, setup, capture, prompt previews,
                          history/imports, and optional injected engine runs.
+argument-compiler-adapter.ts
+                         Retained Argument snapshot/source translation into
+                         REVIEW1 CompilerProvider sessions.
 ReviewWorkspace.tsx      Source picker, preparation/editor/history UI.
 ReviewResults.tsx        Lazily mounted individual/integrated/compare readers.
 MarkdownRenderer.tsx     Safe GFM + bounded KaTeX presentation boundary.
@@ -27,9 +32,11 @@ while saved entries retain their original opaque workspace identity and source.
 
 Prepared records are model-optional and export with the heading
 `PREPARED AI REVIEW — NOT AI CONCLUSIONS`. The production Run button remains
-disabled because no live model provider or real compiler binding is connected.
-Tests can inject source, history/run repositories, clock/IDs, agent provider,
-and compiler provider. No provider, vault read, or rerun starts on mount/import.
+disabled because no live model provider is connected. The default controller
+receives the application-owned compiler provider, while placement still
+defaults to none and a run cannot start without an Agent provider. Tests can
+inject source, history/run repositories, clock/IDs, agent provider, and compiler
+provider. No model provider, vault read, or rerun starts on mount/import.
 
 Desktop history is private app-local data, separate from the vault, Arguments,
 and graph preferences. Browser history is visibly session-only. Records are

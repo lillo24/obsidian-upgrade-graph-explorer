@@ -14,6 +14,7 @@ import { MemoryReviewHistoryStore } from '@icarus-graph-explorer/review-workspac
 import type { ReviewSourceProvider } from '@icarus-graph-explorer/review-source-tauri';
 
 import { AiReviewController } from '../ai-review/controller';
+import { ArgumentWorkspaceSession } from '../arguments/session';
 import { WorkspaceOverlay, type WorkspaceArea } from './WorkspaceOverlay';
 
 class ArgumentStore implements ArgumentLibraryStore {
@@ -95,6 +96,7 @@ describe('shared local workspace overlay', () => {
     });
     await controller.open();
     const argumentStore = new ArgumentStore();
+    const argumentSession = new ArgumentWorkspaceSession(argumentStore);
 
     function Harness() {
       const [area, setArea] = useState<WorkspaceArea>('arguments');
@@ -114,7 +116,7 @@ describe('shared local workspace overlay', () => {
           </button>
           <WorkspaceOverlay
             area={area}
-            argumentLibraryStore={argumentStore}
+            argumentSession={argumentSession}
             controller={controller}
             onAreaChange={setArea}
             onRequestClose={() => setOpen(false)}
