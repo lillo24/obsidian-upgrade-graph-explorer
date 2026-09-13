@@ -6,6 +6,9 @@ remain gated.**
 
 Implementation branch: `codex/savedux1-saved-view-transition`
 
+[Draft PR #100](https://github.com/lillo24/obsidian-upgrade-graph-explorer/pull/100)
+is the isolated integration vehicle.
+
 The branch was created from `main` commit
 `eb7d8006e4881a32d06547a4752109cff058e838` in a dedicated worktree. The
 integration PR remains draft until the native checklist below is accepted.
