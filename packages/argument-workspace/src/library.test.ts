@@ -9,6 +9,7 @@ import {
   editCounterArgument,
   editTopic,
   reassessCounterArgumentResponse,
+  recordTheorySourceVersion,
   responseStaleness,
   setRecordArchived,
   setRecordReviewState,
@@ -22,6 +23,56 @@ import {
 import { validateArgumentLibrary } from './validation';
 
 describe('Argument Library domain operations', () => {
+  it('records only a confirmed full-file source baseline and leaves verdicts untouched', () => {
+    const runtime = deterministicRuntime('source-baseline');
+    const before = createNeutralArgumentLibrary();
+    const outcome = before.counterArguments[0]!.response.outcome;
+    const reviewState = before.axioms[0]!.reviewState;
+    const next = recordTheorySourceVersion(
+      before,
+      {
+        recordKind: 'axiom',
+        recordId: 'AX-NEUTRAL',
+        sourceReferenceId: 'SRC-NEUTRAL',
+        sourceSpaceId: 'authorized-space',
+        sourceVersion: 'full-file:v2',
+      },
+      runtime,
+    );
+
+    expect(next.axioms[0]!.sourceReferences[0]).toMatchObject({
+      id: 'SRC-NEUTRAL',
+      sourceSpaceHint: 'authorized-space',
+      recordedVersion: {
+        sourceVersion: 'full-file:v2',
+        fingerprintScope: 'file',
+      },
+    });
+    expect(next.axioms[0]!.reviewState).toBe(reviewState);
+    expect(next.counterArguments[0]!.response.outcome).toBe(outcome);
+    expect(responseStaleness(next, next.counterArguments[0]!)).toMatchObject({
+      stale: true,
+      axiomIds: ['AX-NEUTRAL'],
+    });
+    expect(JSON.stringify(next)).not.toContain('source body');
+  });
+
+  it('rejects recording a baseline under an incompatible source-space hint', () => {
+    expect(() =>
+      recordTheorySourceVersion(
+        createNeutralArgumentLibrary(),
+        {
+          recordKind: 'axiom',
+          recordId: 'AX-NEUTRAL',
+          sourceReferenceId: 'SRC-NEUTRAL',
+          sourceSpaceId: 'different-space',
+          sourceVersion: 'full-file:v2',
+        },
+        deterministicRuntime('wrong-source'),
+      ),
+    ).toThrow('different source space');
+  });
+
   it('creates and edits all record kinds without changing stable IDs', () => {
     const runtime = deterministicRuntime('edit');
     let library = createNeutralArgumentLibrary();

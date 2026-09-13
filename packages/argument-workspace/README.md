@@ -15,8 +15,9 @@ has no UI, renderer, vault, platform, agent, or model dependency.
 - `canonical.ts` owns canonical JSON, browser/worker/Node-neutral SHA-256,
   content descriptors, cloning, and immutable snapshot capture.
 - `library.ts` owns pure record creation/editing, membership, response,
-  archive/review mutations, revision increments, stale-response detection, and
-  explicit reassessment against current answering-Axiom revisions.
+  archive/review mutations, revision increments, stale-response detection,
+  explicit reassessment against current answering-Axiom revisions, and
+  confirmed full-file source-baseline recording.
 - `storage.ts` serializes expected-snapshot commits and adopts data only after a
   store confirms persistence.
 - `authoring.ts` exposes the mutation-only service over that repository.
@@ -28,8 +29,8 @@ has no UI, renderer, vault, platform, agent, or model dependency.
   Counter-Argument reads.
 - `reader.ts` exposes the read-only facade, validates callable inputs, dispatches
   registered source reads, and creates consultation receipts.
-- `markdown.ts` purely exports compact Obsidian-oriented Markdown files; it never
-  writes a vault.
+- `markdown.ts` owns the canonical readable source-locator formatter and purely
+  exports compact Obsidian-oriented Markdown files; it never writes a vault.
 - `test-fixture.ts` is a neutral public structural fixture. Private theory data
   is deliberately absent from the package and tests.
 
@@ -53,7 +54,10 @@ recorded explanation and outcome. Reading, ordinary response edits, reopening,
 and attachment of an already-attached Axiom do not imply reassessment.
 
 Every semantic mutation advances the owning record and library revisions.
-Reads and source observations do not. A descriptor is
+Reads and source observations do not. Explicit `recordTheorySourceVersion`
+authoring stores only a compatible source-space hint and namespaced full-file
+version metadata; it follows normal record revisions and never changes theory
+text, human review, or a recorded outcome. A descriptor is
 `libraryId + schemaVersion + libraryRevision + contentFingerprint`. The
 fingerprint is lowercase SHA-256 over `canonical-json-v1`: object keys sort
 lexically, arrays retain their authored/semantic order, strings are unchanged,
@@ -86,9 +90,10 @@ vault, graph view state, or workspace identity catalog.
 
 `ArgumentLibraryAuthoringService` supports Topic/Axiom/Counter-Argument
 create/edit, Topic membership, answering-Axiom attach/detach, response updates,
-explicit response reassessment, archive/restore, human review/reopen, and
-validated merge imports. All calls take an expected snapshot descriptor and
-return an explicit commit/conflict/failure.
+explicit response reassessment, explicit source-version baseline recording,
+archive/restore, human review/reopen, and validated merge imports. All calls
+take an expected snapshot descriptor and return an explicit
+commit/conflict/failure.
 
 JSON is the authoritative lossless interchange. Exact export/import reproduces
 the descriptor. Historical JSON may be validated and opened in an isolated
@@ -155,9 +160,11 @@ version, excerpt completeness, observation time, content fingerprint, and
 freshness against recorded metadata. Source changes never update library
 records or outcomes.
 
-The web application hosts the local Arguments overlay as an outer consumer; the
-core remains UI-free. Live vault binding, source previews/watchers, AI Review
-orchestration, model consent/tool registration, durable review runs, and
-Markdown write-back remain outer/later responsibilities. Any AI Review stage or
-standalone verifier may wrap the same plain callable facade; this package has no
-role or stage concept.
+The web application hosts the local Arguments overlay, explicit live-vault
+binding, immutable bounded source capture, plain-text previews, and
+source-aware packets as outer consumers. It reuses the application's existing
+vault acquisition/live controller; the core remains UI- and watcher-free. AI
+Review orchestration, model consent/tool registration, durable review runs,
+source history, and Markdown write-back remain outer/later responsibilities.
+Any AI Review stage or standalone verifier may wrap the same plain callable
+facade; this package has no role or stage concept.

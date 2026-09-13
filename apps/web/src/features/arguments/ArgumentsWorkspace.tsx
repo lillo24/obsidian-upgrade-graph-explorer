@@ -11,8 +11,12 @@ import {
 } from 'react';
 
 import {
+  canonicalJson,
+  createKnowledgeReader,
   exportArgumentLibraryMarkdown,
   parseArgumentLibraryJson,
+  safeMarkdownFileName,
+  sameSnapshot,
   serializeArgumentLibrary,
   type ArgumentLibrary,
   type ArgumentLibraryStore,
@@ -37,7 +41,27 @@ import {
   formatArgumentBundle,
   type ArgumentContextExport,
 } from './context-export';
+import {
+  buildArgumentSourcePacket,
+  formatArgumentSourcePacket,
+  sourceOrigins,
+  type ArgumentSourcePacketExport,
+} from './source-packet';
 import { createPlatformArgumentLibraryStore } from './platform-store';
+import {
+  normalizeRetrievalEditorText,
+  retrievalEditorText,
+  type RetrievalEditorText,
+} from './retrieval-editor';
+import {
+  ArgumentSourceAccessSession,
+  type ArgumentSourceAccess,
+} from './source-capture';
+import {
+  argumentSourcePreviewKey,
+  type ArgumentSourcePreview,
+} from './source-preview';
+import { TheorySourceReferences } from './TheorySourceReferences';
 import {
   saveMarkdownDirectory,
   type DirectoryPicker,
@@ -54,6 +78,7 @@ import './arguments.css';
 
 interface EditorState {
   readonly record: ArgumentRecordDraft;
+  readonly retrievalText: RetrievalEditorText;
   readonly source: string;
   readonly dirty: boolean;
   readonly errors: readonly string[];
@@ -65,6 +90,13 @@ interface ImportPreviewState {
   readonly merge?: ArgumentImportPlan;
   readonly replace?: ArgumentImportPlan;
   readonly error?: string;
+}
+
+interface ContextPreviewState {
+  readonly libraryOnly: ArgumentContextExport;
+  readonly sourcePacket?: ArgumentSourcePacketExport | undefined;
+  readonly preparing: boolean;
+  readonly error?: string | undefined;
 }
 
 const EMPTY_RETRIEVAL = { aliases: [], keywords: [], phrases: [] } as const;
@@ -122,6 +154,7 @@ function editDraft(
     return {
       dirty: false,
       errors: [],
+      retrievalText: retrievalEditorText(topic.retrieval),
       source: '[]',
       record: {
         kind: 'topic',
@@ -143,6 +176,7 @@ function editDraft(
     return {
       dirty: false,
       errors: [],
+      retrievalText: retrievalEditorText(axiom.retrieval),
       source: sourceJson(axiom.sourceReferences),
       record: {
         kind: 'axiom',
@@ -165,6 +199,7 @@ function editDraft(
   return {
     dirty: false,
     errors: [],
+    retrievalText: retrievalEditorText(counter.retrieval),
     source: sourceJson(counter.sourceReferences),
     record: {
       kind: 'counter-argument',
@@ -206,10 +241,12 @@ function newDraft(
     reviewState: 'draft' as const,
     topicIds: topicId === undefined ? [] : [topicId],
   };
+  const emptyRetrievalText = retrievalEditorText(EMPTY_RETRIEVAL);
   if (kind === 'topic') {
     return {
       dirty: true,
       errors: [],
+      retrievalText: emptyRetrievalText,
       source: '[]',
       record: {
         ...base,
@@ -224,6 +261,7 @@ function newDraft(
     return {
       dirty: true,
       errors: [],
+      retrievalText: emptyRetrievalText,
       source: '[]',
       record: { ...base, kind, statement: '', sourceReferences: [] },
     };
@@ -231,6 +269,7 @@ function newDraft(
   return {
     dirty: true,
     errors: [],
+    retrievalText: emptyRetrievalText,
     source: '[]',
     record: {
       ...base,
@@ -264,9 +303,13 @@ function parseSources(
     if (editor.record.challengedClaim.trim() === '')
       errors.push('Challenged claim is required.');
   }
-  if (editor.record.kind === 'topic') {
+  const record = {
+    ...editor.record,
+    retrieval: normalizeRetrievalEditorText(editor.retrievalText),
+  } as ArgumentRecordDraft;
+  if (record.kind === 'topic') {
     return errors.length === 0
-      ? { valid: true, record: editor.record }
+      ? { valid: true, record }
       : { valid: false, errors };
   }
   let parsed: unknown;
@@ -284,7 +327,7 @@ function parseSources(
   return {
     valid: true,
     record: {
-      ...editor.record,
+      ...record,
       sourceReferences: parsed as readonly TheorySourceReference[],
     },
   };
@@ -548,16 +591,27 @@ export function ArgumentsWorkspace({
   onRequestClose,
   restoreFocus,
   session,
+  sourceAccess,
 }: {
   readonly open: boolean;
   readonly onRequestClose: () => void;
   readonly restoreFocus?: HTMLElement;
   readonly session: ArgumentWorkspaceSession;
+  readonly sourceAccess?: ArgumentSourceAccess;
 }) {
+  const [fallbackSourceAccess] = useState(
+    () => new ArgumentSourceAccessSession(),
+  );
+  const argumentSources = sourceAccess ?? fallbackSourceAccess;
   const state = useSyncExternalStore(
     session.subscribe,
     session.state,
     session.state,
+  );
+  const sourceState = useSyncExternalStore(
+    argumentSources.subscribe,
+    argumentSources.state,
+    argumentSources.state,
   );
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -571,7 +625,12 @@ export function ArgumentsWorkspace({
   const [importPreview, setImportPreview] = useState<ImportPreviewState>();
   const [markdownFiles, setMarkdownFiles] =
     useState<ReturnType<typeof exportArgumentLibraryMarkdown>>();
-  const [contextExport, setContextExport] = useState<ArgumentContextExport>();
+  const [contextExport, setContextExport] = useState<ContextPreviewState>();
+  const [sourcePreviews, setSourcePreviews] = useState<
+    ReadonlyMap<string, ArgumentSourcePreview>
+  >(() => new Map());
+  const sourceReadTokens = useRef(new Map<string, symbol>());
+  const contextSourceToken = useRef<symbol | undefined>(undefined);
   const escapeAction = useRef<() => void>(() => undefined);
 
   useEffect(() => {
@@ -682,6 +741,7 @@ export function ArgumentsWorkspace({
 
   function navigate(next: ArgumentSelection) {
     requestTransition('Switch records with unsaved changes?', () => {
+      sourceReadTokens.current.clear();
       setHistory((current) =>
         currentSelection === undefined || sameSelection(currentSelection, next)
           ? current
@@ -696,6 +756,7 @@ export function ArgumentsWorkspace({
     const target = history.at(-1);
     if (target === undefined) return;
     requestTransition('Return with unsaved changes?', () => {
+      sourceReadTokens.current.clear();
       setHistory((current) => current.slice(0, -1));
       setSelection(target);
       setEditor(undefined);
@@ -748,6 +809,7 @@ export function ArgumentsWorkspace({
   function beginCreate(kind: ArgumentRecordKind) {
     if (state.phase !== 'ready') return;
     requestTransition('Start a new record with unsaved changes?', () => {
+      sourceReadTokens.current.clear();
       setEditor(
         newDraft(
           kind,
@@ -810,8 +872,250 @@ export function ArgumentsWorkspace({
       expectedSnapshot: state.snapshot.descriptor,
     });
     if (result.status === 'ok')
-      setContextExport(formatArgumentBundle(result.value));
+      setContextExport({
+        libraryOnly: formatArgumentBundle(result.value),
+        preparing: false,
+      });
     else setNotice(argumentBundleFailure(result));
+  }
+
+  async function includeTheorySources() {
+    if (state.phase !== 'ready' || contextExport === undefined) return;
+    if (
+      !sameSnapshot(
+        state.snapshot.descriptor,
+        contextExport.libraryOnly.bundle.snapshot,
+      )
+    ) {
+      setContextExport((current) =>
+        current === undefined
+          ? current
+          : {
+              ...current,
+              preparing: false,
+              error:
+                'The library changed after this preview. Close and preview context again.',
+            },
+      );
+      return;
+    }
+    const origins = sourceOrigins(contextExport.libraryOnly.bundle);
+    const captured = argumentSources.capture(
+      origins.map(({ locator }) => locator),
+    );
+    if (captured.status !== 'ok') {
+      setContextExport((current) =>
+        current === undefined
+          ? current
+          : { ...current, preparing: false, error: captured.message },
+      );
+      return;
+    }
+    const token = Symbol('source-packet');
+    contextSourceToken.current = token;
+    const retainedLibrary = state.snapshot;
+    setContextExport((current) =>
+      current === undefined
+        ? current
+        : { ...current, preparing: true, error: undefined },
+    );
+    const packet = await buildArgumentSourcePacket(
+      contextExport.libraryOnly.bundle,
+      captured.capture,
+      retainedLibrary,
+    );
+    const activeSource = argumentSources.state();
+    const activeSession = session.state();
+    if (
+      contextSourceToken.current !== token ||
+      activeSource.status === 'unavailable' ||
+      activeSource.generation !==
+        captured.capture.provenance.sourceGeneration ||
+      activeSession.phase !== 'ready' ||
+      !sameSnapshot(
+        activeSession.snapshot.descriptor,
+        retainedLibrary.descriptor,
+      )
+    ) {
+      setContextExport((current) =>
+        current === undefined
+          ? current
+          : {
+              ...current,
+              preparing: false,
+              error:
+                'Source or library changed while preparing the packet. Regenerate from the current capture.',
+            },
+      );
+      return;
+    }
+    setContextExport((current) =>
+      current === undefined
+        ? current
+        : {
+            ...current,
+            preparing: false,
+            error: undefined,
+            sourcePacket: formatArgumentSourcePacket(packet),
+          },
+    );
+  }
+
+  function bindTheorySources() {
+    if (sourceState.status === 'unavailable') {
+      setNotice(sourceState.message);
+      return;
+    }
+    if (
+      !window.confirm(
+        `Use ${sourceState.source.displayName} for registered theory-source reads in this Arguments session? This grants no write access.`,
+      )
+    ) {
+      return;
+    }
+    const result = argumentSources.bindCurrent(sourceState.generation);
+    setNotice(
+      result.status === 'bound'
+        ? `Bound ${result.source.displayName} for registered theory-source reads.`
+        : result.message,
+    );
+  }
+
+  async function readTheorySource(
+    recordKind: ArgumentSourcePreview['recordKind'],
+    recordId: string,
+    reference: TheorySourceReference,
+  ) {
+    if (state.phase !== 'ready') return;
+    const captured = argumentSources.capture([reference]);
+    if (captured.status !== 'ok') {
+      setNotice(captured.message);
+      return;
+    }
+    const key = argumentSourcePreviewKey({
+      recordKind,
+      recordId,
+      reference,
+    });
+    const token = Symbol(key);
+    sourceReadTokens.current.set(key, token);
+    const retainedLibrary = state.snapshot;
+    const source = captured.capture.provenance;
+    const reader = createKnowledgeReader(retainedLibrary, {
+      sourceProvider: captured.capture.provider,
+    });
+    const result = await reader.readLinkedTheorySource({
+      sourceReferenceId: reference.id,
+      maxCharacters: 64_000,
+      expectedSnapshot: retainedLibrary.descriptor,
+    });
+    const activeSource = argumentSources.state();
+    const activeSession = session.state();
+    if (
+      sourceReadTokens.current.get(key) !== token ||
+      activeSource.status === 'unavailable' ||
+      activeSource.generation !== source.sourceGeneration ||
+      activeSession.phase !== 'ready' ||
+      !sameSnapshot(
+        activeSession.snapshot.descriptor,
+        retainedLibrary.descriptor,
+      )
+    ) {
+      return;
+    }
+    const preview: ArgumentSourcePreview = {
+      recordKind,
+      recordId,
+      reference,
+      source,
+      library: retainedLibrary.descriptor,
+      result,
+    };
+    setSourcePreviews((current) => {
+      const next = new Map(current);
+      next.set(key, preview);
+      return next;
+    });
+    setNotice(
+      result.status === 'ok'
+        ? result.value.complete
+          ? 'Source captured'
+          : 'Source captured with an explicit size omission'
+        : `Source read failed: ${result.status}`,
+    );
+  }
+
+  function exportTheorySource(preview: ArgumentSourcePreview) {
+    if (preview.result.status !== 'ok') return;
+    downloadText(
+      safeMarkdownFileName('source-passage', preview.reference.id),
+      preview.result.value.text,
+      'text/markdown',
+    );
+  }
+
+  async function recordTheorySourceBaseline(preview: ArgumentSourcePreview) {
+    if (state.phase !== 'ready' || preview.result.status !== 'ok') return;
+    const source = preview.result.value;
+    const activeSource = argumentSources.state();
+    if (
+      editor?.dirty === true ||
+      !source.complete ||
+      source.sourceVersion === undefined ||
+      activeSource.status !== 'bound' ||
+      activeSource.generation !== preview.source.sourceGeneration ||
+      !sameSnapshot(state.snapshot.descriptor, preview.library)
+    ) {
+      setNotice(
+        'Refresh the source against the current confirmed library before recording its baseline.',
+      );
+      return;
+    }
+    const record =
+      preview.recordKind === 'axiom'
+        ? findRecord(state.snapshot.library, 'axiom', preview.recordId)
+        : findRecord(
+            state.snapshot.library,
+            'counter-argument',
+            preview.recordId,
+          );
+    const currentReference = record.sourceReferences.find(
+      ({ id }) => id === preview.reference.id,
+    );
+    if (
+      currentReference === undefined ||
+      canonicalJson(currentReference) !== canonicalJson(preview.reference)
+    ) {
+      setNotice('The registered locator changed. Refresh before recording.');
+      return;
+    }
+    const addsBinding = currentReference.sourceSpaceHint === undefined;
+    if (
+      !window.confirm(
+        `Record the observed full-file source version on ${preview.reference.label}?${
+          addsBinding
+            ? ` This also records the portable source-space binding ${preview.source.sourceSpaceId}.`
+            : ''
+        } This does not verify the argument or write to the theory file.`,
+      )
+    ) {
+      return;
+    }
+    const result = await session.recordSourceVersion(
+      state.snapshot.descriptor,
+      {
+        recordKind: preview.recordKind,
+        recordId: preview.recordId,
+        sourceReferenceId: preview.reference.id,
+        sourceSpaceId: preview.source.sourceSpaceId,
+        sourceVersion: source.sourceVersion,
+      },
+    );
+    setNotice(
+      result.status === 'ok'
+        ? 'Source baseline saved; the source file and recorded argument outcome were not changed.'
+        : result.message,
+    );
   }
 
   async function copy(value: string, success = 'Copied') {
@@ -925,6 +1229,22 @@ export function ArgumentsWorkspace({
           currentSelection.id,
         )
       : undefined;
+  const displayedContext =
+    contextExport?.sourcePacket ?? contextExport?.libraryOnly;
+  const contextOrigins =
+    contextExport === undefined
+      ? []
+      : sourceOrigins(contextExport.libraryOnly.bundle);
+  const sourcePacketCurrent =
+    contextExport?.sourcePacket !== undefined &&
+    state.phase === 'ready' &&
+    sourceState.status !== 'unavailable' &&
+    contextExport.sourcePacket.packet.sourceCapture.sourceGeneration ===
+      sourceState.source.sourceGeneration &&
+    sameSnapshot(
+      contextExport.sourcePacket.packet.library,
+      state.snapshot.descriptor,
+    );
 
   return (
     <dialog
@@ -1101,6 +1421,28 @@ export function ArgumentsWorkspace({
               />
             </aside>
             <main className="arguments-main" data-graph-scroll-container>
+              <section className="arguments-source-binding">
+                <div>
+                  <strong>Theory source access</strong>
+                  <small>{sourceState.message}</small>
+                </div>
+                {sourceState.status ===
+                'unavailable' ? null : sourceState.status === 'bound' ? (
+                  <button
+                    onClick={() => {
+                      argumentSources.disconnect();
+                      setNotice('Theory source access disconnected.');
+                    }}
+                    type="button"
+                  >
+                    Disconnect source access
+                  </button>
+                ) : (
+                  <button onClick={bindTheorySources} type="button">
+                    Use selected vault for theory sources
+                  </button>
+                )}
+              </section>
               <div className="arguments-main__toolbar">
                 <button
                   disabled={history.length === 0}
@@ -1182,7 +1524,7 @@ export function ArgumentsWorkspace({
                       onClick={() =>
                         downloadText(
                           `argument-draft-${editor.record.id}.json`,
-                          `${JSON.stringify({ ...editor.record, sourceReferencesJson: editor.source }, null, 2)}\n`,
+                          `${JSON.stringify({ ...editor.record, retrievalEditorText: editor.retrievalText, sourceReferencesJson: editor.source }, null, 2)}\n`,
                           'application/json',
                         )
                       }
@@ -1217,8 +1559,39 @@ export function ArgumentsWorkspace({
                       currentSelection.id,
                     )}
                     library={state.snapshot.library}
-                    onCopy={(value) => void copy(value, 'Locator copied')}
                     onNavigate={navigate}
+                    sourceSection={
+                      <TheorySourceReferences
+                        currentLibrary={state.snapshot.descriptor}
+                        currentSourceGeneration={
+                          sourceState.status === 'unavailable'
+                            ? undefined
+                            : sourceState.source.sourceGeneration
+                        }
+                        onCopy={(value, message) => void copy(value, message)}
+                        onExport={exportTheorySource}
+                        onRead={(kind, id, reference) =>
+                          void readTheorySource(kind, id, reference)
+                        }
+                        onRecord={(preview) =>
+                          void recordTheorySourceBaseline(preview)
+                        }
+                        previews={sourcePreviews}
+                        readAvailable={
+                          sourceState.status === 'bound' &&
+                          sourceState.freshReadAvailable
+                        }
+                        recordId={currentSelection.id}
+                        recordKind="axiom"
+                        references={
+                          findRecord(
+                            state.snapshot.library,
+                            'axiom',
+                            currentSelection.id,
+                          ).sourceReferences
+                        }
+                      />
+                    }
                   />
                 ) : (
                   <ArgumentCounterArgumentView
@@ -1228,9 +1601,40 @@ export function ArgumentsWorkspace({
                       currentSelection!.id,
                     )}
                     library={state.snapshot.library}
-                    onCopy={(value) => void copy(value, 'Locator copied')}
                     onNavigate={navigate}
                     onReassess={() => void reassess()}
+                    sourceSection={
+                      <TheorySourceReferences
+                        currentLibrary={state.snapshot.descriptor}
+                        currentSourceGeneration={
+                          sourceState.status === 'unavailable'
+                            ? undefined
+                            : sourceState.source.sourceGeneration
+                        }
+                        onCopy={(value, message) => void copy(value, message)}
+                        onExport={exportTheorySource}
+                        onRead={(kind, id, reference) =>
+                          void readTheorySource(kind, id, reference)
+                        }
+                        onRecord={(preview) =>
+                          void recordTheorySourceBaseline(preview)
+                        }
+                        previews={sourcePreviews}
+                        readAvailable={
+                          sourceState.status === 'bound' &&
+                          sourceState.freshReadAvailable
+                        }
+                        recordId={currentSelection!.id}
+                        recordKind="counter-argument"
+                        references={
+                          findRecord(
+                            state.snapshot.library,
+                            'counter-argument',
+                            currentSelection!.id,
+                          ).sourceReferences
+                        }
+                      />
+                    }
                   />
                 )
               ) : (
@@ -1245,6 +1649,18 @@ export function ArgumentsWorkspace({
                         : { ...current, dirty: true, errors: [], record },
                     )
                   }
+                  onRetrievalTextChange={(retrievalText) =>
+                    setEditor((current) =>
+                      current === undefined
+                        ? current
+                        : {
+                            ...current,
+                            dirty: true,
+                            errors: [],
+                            retrievalText,
+                          },
+                    )
+                  }
                   onSourceChange={(source) =>
                     setEditor((current) =>
                       current === undefined
@@ -1252,6 +1668,7 @@ export function ArgumentsWorkspace({
                         : { ...current, dirty: true, errors: [], source },
                     )
                   }
+                  retrievalText={editor.retrievalText}
                   source={editor.source}
                 />
               )}
@@ -1439,16 +1856,77 @@ export function ArgumentsWorkspace({
           >
             <div>
               <h2 id="arguments-context-title">Context preview</h2>
-              <p>{contextExport.label}.</p>
+              <p>{displayedContext!.label}.</p>
+              {contextExport.sourcePacket === undefined ? null : (
+                <p className="arguments-disclosure">
+                  {sourcePacketCurrent
+                    ? 'This packet matches the current library and captured source.'
+                    : 'This is a retained older packet. Its exports remain reproducible; regenerate for current content.'}
+                </p>
+              )}
+              <details className="arguments-context-sources">
+                <summary>
+                  Registered theory sources ({contextOrigins.length})
+                </summary>
+                {contextOrigins.length === 0 ? (
+                  <p className="arguments-empty">No linked sources selected.</p>
+                ) : (
+                  <ul>
+                    {contextOrigins.map((origin) => (
+                      <li
+                        key={`${origin.recordKind}:${origin.recordId}:${origin.sourceReferenceId}`}
+                      >
+                        <code>{origin.sourceReferenceId}</code> —{' '}
+                        {origin.locator.label} [{origin.role}]
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </details>
+              {contextExport.error === undefined ? null : (
+                <p className="arguments-error" role="alert">
+                  {contextExport.error}
+                </p>
+              )}
               <textarea
                 aria-label="Argument context preview"
                 readOnly
-                value={contextExport.text}
+                value={displayedContext!.text}
               />
               <div className="arguments-actions">
                 <button
+                  disabled={
+                    contextExport.preparing ||
+                    contextOrigins.length === 0 ||
+                    sourceState.status !== 'bound' ||
+                    !sourceState.freshReadAvailable
+                  }
+                  onClick={() => void includeTheorySources()}
+                  type="button"
+                >
+                  {contextExport.preparing
+                    ? 'Preparing source packet…'
+                    : contextExport.sourcePacket === undefined
+                      ? 'Include linked theory sources'
+                      : 'Regenerate source packet'}
+                </button>
+                {contextExport.sourcePacket === undefined ? null : (
+                  <button
+                    onClick={() =>
+                      setContextExport((current) =>
+                        current === undefined
+                          ? current
+                          : { ...current, sourcePacket: undefined },
+                      )
+                    }
+                    type="button"
+                  >
+                    Show library-only context
+                  </button>
+                )}
+                <button
                   onClick={() =>
-                    void copy(contextExport.text, 'Context copied')
+                    void copy(displayedContext!.text, 'Context copied')
                   }
                   type="button"
                 >
@@ -1458,7 +1936,7 @@ export function ArgumentsWorkspace({
                   onClick={() =>
                     downloadText(
                       'argument-context.md',
-                      contextExport.text,
+                      displayedContext!.text,
                       'text/markdown',
                     )
                   }
@@ -1470,7 +1948,7 @@ export function ArgumentsWorkspace({
                   onClick={() =>
                     downloadText(
                       'argument-context.json',
-                      contextExport.structured,
+                      displayedContext!.structured,
                       'application/json',
                     )
                   }
@@ -1535,11 +2013,13 @@ export function ArgumentWorkspaceOwner({
   open,
   onRequestClose,
   restoreFocus,
+  sourceAccess,
   store,
 }: {
   readonly open: boolean;
   readonly onRequestClose: () => void;
   readonly restoreFocus?: HTMLElement;
+  readonly sourceAccess?: ArgumentSourceAccess;
   readonly store?: ArgumentLibraryStore;
 }) {
   const [session] = useState(
@@ -1553,6 +2033,7 @@ export function ArgumentWorkspaceOwner({
       onRequestClose={onRequestClose}
       open={open}
       session={session}
+      {...(sourceAccess === undefined ? {} : { sourceAccess })}
       {...(restoreFocus === undefined ? {} : { restoreFocus })}
     />
   );

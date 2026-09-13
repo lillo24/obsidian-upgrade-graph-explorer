@@ -34,6 +34,7 @@ import {
   type HumanReviewState,
   type KnowledgeReader,
   type RetrievalMetadata,
+  type RecordTheorySourceVersionInput,
   type SnapshotDescriptor,
   type TheorySourceReference,
 } from '@icarus-graph-explorer/argument-workspace';
@@ -629,6 +630,13 @@ export class ArgumentWorkspaceSession {
     return this.#commit(expected, (library) =>
       reassessCounterArgumentResponse(library, id, this.runtime),
     );
+  }
+
+  recordSourceVersion(
+    expected: SnapshotDescriptor,
+    input: RecordTheorySourceVersionInput,
+  ): Promise<ArgumentWorkspaceActionResult> {
+    return this.#adopt(this.#authoring.recordSourceVersion(expected, input));
   }
 
   previewImport(

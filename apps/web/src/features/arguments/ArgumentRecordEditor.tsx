@@ -1,9 +1,9 @@
 import type {
   ArgumentLibrary,
   HumanReviewState,
-  RetrievalMetadata,
 } from '@icarus-graph-explorer/argument-workspace';
 
+import type { RetrievalEditorText } from './retrieval-editor';
 import type { ArgumentRecordDraft } from './session';
 
 const REVIEW_STATES: readonly HumanReviewState[] = [
@@ -14,23 +14,12 @@ const REVIEW_STATES: readonly HumanReviewState[] = [
   'rejected',
 ];
 
-function values(source: string): readonly string[] {
-  return [
-    ...new Set(
-      source
-        .split(/[\n,]/u)
-        .map((value) => value.trim())
-        .filter(Boolean),
-    ),
-  ].sort();
-}
-
 function MetadataEditor({
-  retrieval,
+  text,
   onChange,
 }: {
-  readonly retrieval: RetrievalMetadata;
-  readonly onChange: (value: RetrievalMetadata) => void;
+  readonly text: RetrievalEditorText;
+  readonly onChange: (value: RetrievalEditorText) => void;
 }) {
   return (
     <fieldset className="arguments-editor__fieldset">
@@ -39,39 +28,30 @@ function MetadataEditor({
         Aliases
         <textarea
           onChange={(event) =>
-            onChange({
-              ...retrieval,
-              aliases: values(event.currentTarget.value),
-            })
+            onChange({ ...text, aliases: event.currentTarget.value })
           }
           rows={2}
-          value={retrieval.aliases.join('\n')}
+          value={text.aliases}
         />
       </label>
       <label>
         Keywords
         <textarea
           onChange={(event) =>
-            onChange({
-              ...retrieval,
-              keywords: values(event.currentTarget.value),
-            })
+            onChange({ ...text, keywords: event.currentTarget.value })
           }
           rows={2}
-          value={retrieval.keywords.join('\n')}
+          value={text.keywords}
         />
       </label>
       <label>
         Exact retrieval phrases
         <textarea
           onChange={(event) =>
-            onChange({
-              ...retrieval,
-              phrases: values(event.currentTarget.value),
-            })
+            onChange({ ...text, phrases: event.currentTarget.value })
           }
           rows={2}
-          value={retrieval.phrases.join('\n')}
+          value={text.phrases}
         />
       </label>
     </fieldset>
@@ -128,10 +108,14 @@ function CheckboxList({
 
 function CommonFields({
   draft,
+  retrievalText,
   onChange,
+  onRetrievalTextChange,
 }: {
   readonly draft: ArgumentRecordDraft;
+  readonly retrievalText: RetrievalEditorText;
   readonly onChange: (draft: ArgumentRecordDraft) => void;
+  readonly onRetrievalTextChange: (value: RetrievalEditorText) => void;
 }) {
   return (
     <>
@@ -163,10 +147,7 @@ function CommonFields({
           ))}
         </select>
       </label>
-      <MetadataEditor
-        retrieval={draft.retrieval}
-        onChange={(retrieval) => onChange({ ...draft, retrieval })}
-      />
+      <MetadataEditor onChange={onRetrievalTextChange} text={retrievalText} />
     </>
   );
 }
@@ -204,14 +185,18 @@ export function ArgumentRecordEditor({
   errors,
   library,
   onChange,
+  onRetrievalTextChange,
   onSourceChange,
+  retrievalText,
   source,
 }: {
   readonly draft: ArgumentRecordDraft;
   readonly errors: readonly string[];
   readonly library: ArgumentLibrary;
   readonly onChange: (draft: ArgumentRecordDraft) => void;
+  readonly onRetrievalTextChange: (value: RetrievalEditorText) => void;
   readonly onSourceChange: (source: string) => void;
+  readonly retrievalText: RetrievalEditorText;
   readonly source: string;
 }) {
   const topics = library.topics.map((record) => ({
@@ -255,7 +240,12 @@ export function ArgumentRecordEditor({
         </div>
       )}
 
-      <CommonFields draft={draft} onChange={onChange} />
+      <CommonFields
+        draft={draft}
+        onChange={onChange}
+        onRetrievalTextChange={onRetrievalTextChange}
+        retrievalText={retrievalText}
+      />
 
       {draft.kind === 'topic' ? (
         <>
