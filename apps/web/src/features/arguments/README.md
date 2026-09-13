@@ -31,7 +31,9 @@ requests open/close transitions.
 - `source-capture.ts` is the narrow app-owned authorization boundary over a
   committed desktop inventory. It exposes safe source metadata, explicit
   binding, and immutable captures for selected registered Markdown locators;
-  it never exposes the absolute vault root or desktop runtime.
+  it never exposes the absolute vault root or desktop runtime. Each capture
+  also reports whether capture limits retained the entire selected set, so a
+  strict Review session can disable source reads instead of exposing a subset.
 - `source-preview.ts` owns retained source-preview identity and keys.
 - `source-packet.ts` wraps an unmodified core bundle/receipt with source-capture
   provenance, deduplicated exact passages, per-reference receipts, failures,

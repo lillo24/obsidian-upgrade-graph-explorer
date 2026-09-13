@@ -32,6 +32,7 @@ import { GraphExplorer } from './components/GraphExplorer';
 import { SourceSettingsSection } from './components/SourceSettingsSection';
 import { WorkspaceNotice } from './components/WorkspaceNotice';
 import { AiReviewController } from './features/ai-review/controller';
+import { createArgumentCompilerProvider } from './features/ai-review/argument-compiler-adapter';
 import { createPlatformReviewHistoryStore } from './features/ai-review/platform-store';
 import {
   WorkspaceOverlay,
@@ -41,6 +42,8 @@ import {
   ArgumentSourceAccessSession,
   type ArgumentSourceAccessHost,
 } from './features/arguments/source-capture';
+import { createPlatformArgumentLibraryStore } from './features/arguments/platform-store';
+import { ArgumentWorkspaceSession } from './features/arguments/session';
 import {
   buildReferenceViews,
   filterReferenceViews,
@@ -129,6 +132,21 @@ export function App({
     () => new ArgumentSourceAccessSession(),
   );
   const argumentSources = argumentSourceAccess ?? defaultArgumentSourceAccess;
+  const [argumentSession] = useState(
+    () =>
+      new ArgumentWorkspaceSession(
+        argumentLibraryStore ?? createPlatformArgumentLibraryStore(),
+      ),
+  );
+  const [argumentCompilerProvider] = useState(() =>
+    createArgumentCompilerProvider({
+      currentSnapshot: () => {
+        const state = argumentSession.state();
+        return state.phase === 'ready' ? state.snapshot : undefined;
+      },
+      sourceAccess: argumentSources,
+    }),
+  );
   const lastPerformanceCorrelation = useRef<string | undefined>(undefined);
   const [livePhase, setLivePhase] = useState<DesktopLiveVaultPhase>();
   const [vaultOpening, setVaultOpening] = useState(false);
@@ -148,6 +166,7 @@ export function App({
       new AiReviewController({
         sourceProvider: createReviewSourceProvider(),
         historyStore: reviewHistoryStore ?? createPlatformReviewHistoryStore(),
+        compilerProvider: argumentCompilerProvider,
       }),
   );
   const [statusFilter, setStatusFilter] = useState<ResolutionFilter>('all');
@@ -179,6 +198,10 @@ export function App({
       void reviewController.dispose();
     };
   }, [reviewController]);
+
+  useEffect(() => {
+    void argumentSession.open();
+  }, [argumentSession]);
 
   useEffect(() => {
     reviewController.setWorkspace(reviewWorkspace);
@@ -698,14 +721,12 @@ export function App({
       ) : null}
       <WorkspaceOverlay
         area={workspaceArea}
+        argumentSession={argumentSession}
         controller={reviewController}
         onAreaChange={setWorkspaceArea}
         onRequestClose={closeWorkspace}
         open={workspaceOpen}
         argumentSourceAccess={argumentSources}
-        {...(argumentLibraryStore === undefined
-          ? {}
-          : { argumentLibraryStore })}
         {...(workspaceRestoreFocus === undefined
           ? {}
           : { restoreFocus: workspaceRestoreFocus })}

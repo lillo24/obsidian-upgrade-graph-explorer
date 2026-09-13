@@ -156,6 +156,8 @@ describe('argument source capture', () => {
     oversized.bindCurrent(oversized.state().generation);
     const result = oversized.capture([reference()]);
     if (result.status !== 'ok') throw new Error(result.message);
+    expect(result.capture.selectionLimitStatus).toBe('limit-exceeded');
+    expect(result.capture.limitOmissions).toHaveLength(1);
     expect(
       await result.capture.provider.read(request(reference())),
     ).toMatchObject({ status: 'denied' });
@@ -185,6 +187,7 @@ describe('argument source capture', () => {
     fileLimited.bindCurrent(fileLimited.state().generation);
     const fileCapture = fileLimited.capture(fileReferences);
     if (fileCapture.status !== 'ok') throw new Error(fileCapture.message);
+    expect(fileCapture.capture.selectionLimitStatus).toBe('limit-exceeded');
     const lastFile = fileReferences.at(-1)!;
     expect(
       await fileCapture.capture.provider.read(request(lastFile)),
@@ -212,6 +215,7 @@ describe('argument source capture', () => {
     totalLimited.bindCurrent(totalLimited.state().generation);
     const totalCapture = totalLimited.capture(totalReferences);
     if (totalCapture.status !== 'ok') throw new Error(totalCapture.message);
+    expect(totalCapture.capture.selectionLimitStatus).toBe('limit-exceeded');
     expect(
       await totalCapture.capture.provider.read(request(totalReferences[4]!)),
     ).toMatchObject({ status: 'denied' });
@@ -222,6 +226,7 @@ describe('argument source capture', () => {
       originalWikilink: '[[Conflicting#Display only]]',
     });
     const { capture } = boundCapture(candidate(), [locator]);
+    expect(capture.selectionLimitStatus).toBe('complete');
     const result = await capture.provider.read(request(locator));
     expect(result.status).toBe('ok');
     if (result.status !== 'ok') return;
