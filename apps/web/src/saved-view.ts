@@ -260,3 +260,19 @@ export function matchingSavedViewName(
         : left.toLowerCase().localeCompare(right.toLowerCase()),
     )[0];
 }
+
+/**
+ * Best-effort render-time decoration. Saving and updating continue to use the
+ * strict capture boundary above; an uncapturable transient state is no match.
+ */
+export function matchingCurrentSavedViewName(
+  input: Parameters<typeof captureSavedView>[0],
+  views: readonly SavedViewEntry[],
+): string | undefined {
+  if (views.length === 0) return undefined;
+  try {
+    return matchingSavedViewName(captureSavedView(input), views);
+  } catch {
+    return undefined;
+  }
+}

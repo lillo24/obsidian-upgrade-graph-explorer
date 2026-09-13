@@ -22,6 +22,7 @@ import {
 } from './preferences/graph-preferences';
 import {
   captureSavedView,
+  matchingCurrentSavedViewName,
   matchingSavedViewName,
   planSavedViewApply,
   sameSavedViewSnapshot,
@@ -663,5 +664,34 @@ describe('Named Saved View semantic composition', () => {
       view: changedProfile.view,
     };
     expect(sameSavedViewSnapshot(current, legacy)).toBe(true);
+  });
+
+  it('keeps render-time matching nonfatal without weakening strict capture', () => {
+    const invalid = {
+      name: 'Current View',
+      workspace,
+      state: {
+        ...documentOnlyProjectionState(),
+        filters: { query: 'kind:' },
+      },
+      presentationMode: 'global' as const,
+      layout: 'network' as const,
+      viewports: {},
+      preferences: DEFAULT_GRAPH_PREFERENCES,
+      spatial,
+    };
+    const existing = capture({
+      name: 'Existing',
+      workspace,
+      state: documentOnlyProjectionState(),
+      presentationMode: 'global',
+      layout: 'network',
+      viewports: {},
+    });
+
+    expect(() => captureSavedView(invalid)).toThrow(
+      'Cannot persist invalid graph query',
+    );
+    expect(matchingCurrentSavedViewName(invalid, [existing])).toBeUndefined();
   });
 });

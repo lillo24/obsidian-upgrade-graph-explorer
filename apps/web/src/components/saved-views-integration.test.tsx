@@ -129,6 +129,18 @@ const namedTarget = captureSavedView({
   preferences: DEFAULT_GRAPH_PREFERENCES,
   spatial: emptySpatial,
 });
+const matchingCurrentTarget = captureSavedView({
+  name: 'Current network',
+  workspace,
+  state: currentState,
+  presentationMode: 'global',
+  layout: 'network',
+  viewports: {
+    global: { anchorEntityId: source.id, ratio: 0.35 },
+  },
+  preferences: DEFAULT_GRAPH_PREFERENCES,
+  spatial: emptySpatial,
+});
 
 describe('GraphExplorer Named Saved Views integration', () => {
   let container: HTMLDivElement;
@@ -150,6 +162,10 @@ describe('GraphExplorer Named Saved Views integration', () => {
 
   beforeEach(() => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 1024,
+    });
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -265,6 +281,31 @@ describe('GraphExplorer Named Saved Views integration', () => {
       await Promise.resolve();
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
+  }
+
+  function statusCheckbox(status: string) {
+    const result = document.body.querySelector<HTMLInputElement>(
+      `[name="graph-status-${status}"]`,
+    );
+    if (result === null) throw new Error(`Missing ${status} status control.`);
+    return result;
+  }
+
+  async function setReferenceStatus(status: string, enabled: boolean) {
+    const control = statusCheckbox(status);
+    if (control.checked === enabled) return;
+    await act(async () => {
+      control.click();
+      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(statusCheckbox(status).checked).toBe(enabled);
+  }
+
+  function persistedReferenceStatuses() {
+    return JSON.parse(
+      values.get(workspaceViewStorageKey(snapshot.workspace.id))!,
+    ).projection.filters.referenceStatuses as readonly string[];
   }
 
   function setControlValue(
@@ -405,6 +446,200 @@ describe('GraphExplorer Named Saved Views integration', () => {
     ).toBe('kind:block');
   });
 
+  it('keeps All Network mounted through every explicit reference-status transition and recovery', async () => {
+    await mount();
+    await click('Filters');
+    const initialFitRequestKey = captured.global!.fitRequestKey;
+
+    for (const status of ['unresolved', 'ambiguous', 'invalid'] as const) {
+      const before =
+        performance.snapshot().operations['global-projections'] ?? 0;
+      await setReferenceStatus(status, true);
+      expect(performance.snapshot().operations['global-projections']).toBe(
+        before + 1,
+      );
+      expect(persistedReferenceStatuses()).toEqual(['resolved', status].sort());
+      expect(container.querySelector('.graph-workspace')).not.toBeNull();
+      expect(captured.global?.projection.nodes).toBeInstanceOf(Array);
+      expect(quickSwitch().disabled).toBe(false);
+
+      await setReferenceStatus('resolved', false);
+      expect(persistedReferenceStatuses()).toEqual([status]);
+      expect(mode()).toBe('global');
+      await setReferenceStatus('resolved', true);
+      await setReferenceStatus(status, false);
+      expect(persistedReferenceStatuses()).toEqual(['resolved']);
+    }
+
+    const selectedId = captured.global!.projection.nodes[0]!.id;
+    await act(() =>
+      captured.global!.onSelectionChange({ kind: 'node', id: selectedId }),
+    );
+    await setReferenceStatus('resolved', false);
+    expect(persistedReferenceStatuses()).toEqual([]);
+    expect(mode()).toBe('global');
+    expect(captured.global?.projection.nodes).toBeInstanceOf(Array);
+    if (
+      captured.global?.projection.nodes.every(({ id }) => id !== selectedId)
+    ) {
+      expect(captured.global.selection).toBeNull();
+    }
+    await setReferenceStatus('resolved', true);
+
+    await setReferenceStatus('unresolved', true);
+    await setReferenceStatus('ambiguous', true);
+    await setReferenceStatus('invalid', true);
+    await setReferenceStatus('resolved', false);
+    expect(persistedReferenceStatuses()).toEqual([
+      'ambiguous',
+      'invalid',
+      'unresolved',
+    ]);
+    expect(container.querySelector('.graph-workspace')).not.toBeNull();
+    expect(mode()).toBe('global');
+    expect(captured.global?.fitRequestKey).toBe(initialFitRequestKey);
+    expect(
+      container.querySelector<HTMLButtonElement>(
+        '[aria-label="Back in graph history"]',
+      )?.disabled,
+    ).toBe(false);
+  });
+
+  it.each([
+    {
+      label: 'no Named Saved Views',
+      registry: serializeSavedViewRegistry({
+        schemaVersion: 2,
+        workspaceId: snapshot.workspace.id,
+        views: [],
+      }),
+      expectedInitialName: '',
+    },
+    {
+      label: 'a matching v2 Saved View',
+      registry: serializeSavedViewRegistry({
+        schemaVersion: 2,
+        workspaceId: snapshot.workspace.id,
+        views: [matchingCurrentTarget],
+      }),
+      expectedInitialName: 'Current network',
+    },
+    {
+      label: 'a nonmatching v2 Saved View',
+      registry: serializeSavedViewRegistry({
+        schemaVersion: 2,
+        workspaceId: snapshot.workspace.id,
+        views: [namedTarget],
+      }),
+      expectedInitialName: '',
+    },
+    {
+      label: 'a migrated profile-less v1 Saved View',
+      registry: JSON.stringify({
+        schemaVersion: 1,
+        workspaceId: snapshot.workspace.id,
+        views: [
+          {
+            name: matchingCurrentTarget.name,
+            layout: matchingCurrentTarget.layout,
+            view: matchingCurrentTarget.view,
+          },
+        ],
+      }),
+      expectedInitialName: 'Current network',
+    },
+  ])(
+    'keeps an Unresolved live transition safe with $label',
+    async ({ registry, expectedInitialName }) => {
+      values.set(savedViewStorageKey(snapshot.workspace.id), registry);
+      await mount();
+      expect(quickSwitch().value).toBe(expectedInitialName);
+      await click('Filters');
+
+      await setReferenceStatus('unresolved', true);
+
+      expect(mode()).toBe('global');
+      expect(container.querySelector('.graph-workspace')).not.toBeNull();
+      expect(statusCheckbox('unresolved').checked).toBe(true);
+      expect(quickSwitch().value).toBe('');
+
+      await setReferenceStatus('unresolved', false);
+      expect(mode()).toBe('global');
+      // The live round trip preserves the explicit Global resolved-only
+      // filter, so it correctly remains distinct from an implicit-default
+      // saved snapshot while the renderer and matcher stay usable.
+      expect(quickSwitch().value).toBe('');
+    },
+  );
+
+  it('converges live and cold Unresolved hydration to the same valid graph', async () => {
+    await mount();
+    await click('Filters');
+    await setReferenceStatus('unresolved', true);
+    const liveNodes = captured.global!.projection.nodes.map(({ id }) => id);
+    const liveEdges = captured.global!.projection.edges.map(({ id }) => id);
+
+    await act(() => root.unmount());
+    root = createRoot(container);
+    captured.global = undefined;
+    await mount();
+
+    expect(mode()).toBe('global');
+    expect(captured.global!.projection.nodes.map(({ id }) => id)).toEqual(
+      liveNodes,
+    );
+    expect(captured.global!.projection.edges.map(({ id }) => id)).toEqual(
+      liveEdges,
+    );
+    await click('Filters');
+    expect(statusCheckbox('unresolved').checked).toBe(true);
+  });
+
+  it('keeps a cold zero-node All Network projection inside the usable app shell', async () => {
+    values.set(
+      workspaceViewStorageKey(snapshot.workspace.id),
+      serializePersistedWorkspaceView(
+        createPersistedWorkspaceView({
+          workspace,
+          state: {
+            ...currentState,
+            filters: {
+              query: 'documents AND path:"__no_matching_path__"',
+              referenceStatuses: ['unresolved'],
+            },
+          },
+          presentationMode: 'global',
+          viewports: {},
+        }),
+      ),
+    );
+
+    await mount();
+
+    expect(mode()).toBe('global');
+    expect(captured.global?.projection.nodes).toEqual([]);
+    expect(captured.global?.projection.edges).toEqual([]);
+    expect(container.querySelector('.graph-workspace')).not.toBeNull();
+    expect(quickSwitch()).toBeInstanceOf(HTMLSelectElement);
+  });
+
+  it('keeps status changes safe in Focus Network and Focus Hierarchy', async () => {
+    await mount();
+    await quickApply('Focus hierarchy');
+    expect(mode()).toBe('local-structured');
+    await click('Filters');
+    await setReferenceStatus('unresolved', false);
+    await setReferenceStatus('unresolved', true);
+    expect(mode()).toBe('local-structured');
+
+    await click('Network');
+    expect(mode()).toBe('local-free');
+    await setReferenceStatus('ambiguous', false);
+    await setReferenceStatus('ambiguous', true);
+    expect(mode()).toBe('local-free');
+    expect(container.querySelector('.graph-workspace')).not.toBeNull();
+  });
+
   it('does not adopt semantic, presentation, selection, history, or preferences when profile persistence fails', async () => {
     const failedSpatial = setFolderSpatialRule(emptySpatial, {
       folderKey: 'Architecture',
@@ -500,19 +735,51 @@ describe('GraphExplorer Named Saved Views integration', () => {
   });
 
   it.each([false, true])(
-    'exposes one accessible trigger with unique controls in %s maximized mode',
+    'places one keyboard-accessible switcher immediately before Search in %s maximized mode',
     async (maximized) => {
       await mount(maximized);
+      const searchRegion = container.querySelector('.graph-search-controls');
+      const switchers = document.body.querySelectorAll(
+        '[aria-label="Quick switch Saved View"]',
+      );
       const triggers = document.body.querySelectorAll(
         'button[aria-label="Manage Saved Views"]',
       );
+      const search = container.querySelector('.entity-search');
+      expect(searchRegion).not.toBeNull();
+      expect(searchRegion?.children).toHaveLength(2);
+      expect(searchRegion?.firstElementChild).toContain(switchers[0]);
+      expect(searchRegion?.lastElementChild).toBe(search);
+      expect(switchers).toHaveLength(1);
       expect(triggers).toHaveLength(1);
+      (switchers[0] as HTMLSelectElement).focus();
+      expect(document.activeElement).toBe(switchers[0]);
+      (triggers[0] as HTMLButtonElement).focus();
+      expect(document.activeElement).toBe(triggers[0]);
       const controls = triggers[0]!.getAttribute('aria-controls');
       expect(controls).toBeTruthy();
       await act(() => (triggers[0] as HTMLButtonElement).click());
       expect(document.getElementById(controls!)).not.toBeNull();
     },
   );
+
+  it('keeps the single switcher structurally beside Search at 320px', async () => {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 320,
+    });
+    await mount();
+
+    const region = container.querySelector('.graph-search-controls');
+    const switcher = quickSwitch().closest('.saved-view-switcher');
+    expect(region?.firstElementChild).toBe(switcher);
+    expect(region?.lastElementChild).toBe(
+      container.querySelector('.entity-search'),
+    );
+    expect(
+      document.body.querySelectorAll('[aria-label="Manage Saved Views"]'),
+    ).toHaveLength(1);
+  });
 
   it('saves without projection or layout work and writes only the Named Saved Views registry', async () => {
     await mount();
