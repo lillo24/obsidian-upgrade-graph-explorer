@@ -1,8 +1,8 @@
 # SAVEDUX1 implementation report
 
-Status: **implemented, locally and production-browser validated, and built as
-an optimized Windows executable; native visual/interaction acceptance and PR CI
-remain gated.**
+Status: **implemented, locally and production-browser validated, built as an
+optimized Windows executable, and accepted by PR CI; native visual/interaction
+acceptance remains gated.**
 
 Implementation branch: `codex/savedux1-saved-view-transition`
 
@@ -120,6 +120,9 @@ QA used the minified Vite production build with the real graph renderers.
 - `pnpm benchmark:local-renderer -- --profile small`: passed.
 - `git diff --check`: passed before this report and is rerun during final
   inspection.
+- PR #100 CI at head `7f50332`: `validate` passed in 2m42s and `desktop` passed
+  in 6m30s. This CI-evidence-only documentation follow-up is validated on its
+  own resulting head before handoff.
 
 Fresh optimized executable:
 
@@ -178,7 +181,6 @@ The supplied prompt is archived byte-for-byte with SHA-256
 
 ## Remaining separate work
 
-- Native acceptance, PR CI, merge, post-merge CI, and task worktree/branch
-  cleanup.
+- Native acceptance, merge, post-merge CI, and task worktree/branch cleanup.
 - Automatic last-vault reopen, PIN1, and AUTO1 remain separate and were not
   started.
