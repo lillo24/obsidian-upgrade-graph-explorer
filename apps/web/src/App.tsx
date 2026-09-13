@@ -24,7 +24,6 @@ import type {
 import type { ArgumentLibraryStore } from '@icarus-graph-explorer/argument-workspace';
 import { createReviewSourceProvider } from '@icarus-graph-explorer/review-source-tauri';
 import type { ReviewHistoryStore } from '@icarus-graph-explorer/review-workspace';
-import { createOpenAiAgentsProvider } from '@icarus-graph-explorer/openai-agents-provider';
 
 import './App.css';
 import { DeveloperSettingsSection } from './components/DeveloperSettingsSection';
@@ -35,6 +34,8 @@ import { SourceSettingsSection } from './components/SourceSettingsSection';
 import { WorkspaceNotice } from './components/WorkspaceNotice';
 import { AiReviewController } from './features/ai-review/controller';
 import { createArgumentCompilerProvider } from './features/ai-review/argument-compiler-adapter';
+import { createOpenAiAgentsProvider } from './features/ai-review/openai-agents-provider';
+import { OpenAiSessionCredentials } from './features/ai-review/openai-session-credentials';
 import { createPlatformReviewHistoryStore } from './features/ai-review/platform-store';
 import {
   WorkspaceOverlay,
@@ -180,7 +181,10 @@ export function App({
     readonly identitySession: WorkspaceIdentitySession;
     readonly label: string;
   }>();
-  const [openAiReview] = useState(() => createOpenAiAgentsProvider());
+  const [openAiCredentials] = useState(() => new OpenAiSessionCredentials());
+  const [openAiReview] = useState(() =>
+    createOpenAiAgentsProvider({ credentials: openAiCredentials }),
+  );
   const [reviewController] = useState(
     () =>
       injectedReviewController ??
@@ -190,6 +194,7 @@ export function App({
         compilerProvider: argumentCompilerProvider,
         agentProvider: openAiReview.provider,
         agentProviderAvailability: openAiReview.getAvailability,
+        agentProviderAvailabilitySubscribe: openAiReview.subscribeAvailability,
         defaultModels: openAiReview.defaultModels,
       }),
   );
@@ -866,6 +871,9 @@ export function App({
         area={workspaceArea}
         argumentSession={argumentSession}
         controller={reviewController}
+        {...(injectedReviewController === undefined
+          ? { openAiCredentials }
+          : {})}
         onAreaChange={setWorkspaceArea}
         onRequestClose={closeWorkspace}
         open={workspaceOpen}

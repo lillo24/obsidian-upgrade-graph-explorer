@@ -24,7 +24,7 @@ examples/
   scripted-review.test.ts  Runnable, visibly synthetic end-to-end example.
 ```
 
-The application supplies source capture, a live provider adapter, durable storage, and any UI. The desktop OpenAI adapter lives in [`../openai-agents-provider`](../openai-agents-provider/README.md); this engine remains provider-neutral. The compiler supplies its knowledge model/store through the small snapshot session contract; Review stores only what a stage requested and received.
+The application supplies source capture, a live provider adapter, durable storage, and any UI. The OpenAI adapter lives in the web application's AI Review feature; this engine remains provider-neutral. The compiler supplies its knowledge model/store through the small snapshot session contract; Review stores only what a stage requested and received.
 
 ## Public flow
 

@@ -1,14 +1,13 @@
 # Architecture
 
-## REVIEW4 native OpenAI Agents boundary
+## OpenAI Agents application boundary
 
-`packages/openai-agents-provider` adapts the provider-neutral REVIEW1 engine to
-a narrow Tauri invoke/channel contract. `apps/desktop/src-tauri/src/openai_agents.rs`
-alone owns `OPENAI_API_KEY`, the fixed OpenAI host and beta header, managed
-session HTTPS/SSE, exact function-call routing, cancellation, and bounded
-recovery. React owns the explicit shared model and upload disclosure but never
-receives a credential. Every REVIEW1 attempt receives a fresh managed session;
-the application remains the orchestrator. See
+`apps/web/src/features/ai-review/openai-agents-provider.ts` adapts the
+provider-neutral REVIEW1 engine to `@openai/agents`. Each stage gets a fresh
+browser OpenAI client and an independent Responses API HTTP run; the React app
+owns a session-memory credential and REVIEW1 remains the only orchestrator.
+The adapter explicitly disables tracing, logging, WebSocket transport, SDK
+sessions, and implicit client retries. See
 [`REVIEW4_OPENAI_AGENTS_PROVIDER.md`](REVIEW4_OPENAI_AGENTS_PROVIDER.md).
 
 ## Status and purpose
@@ -846,7 +845,7 @@ selection, coordinates, transition points, or Local/Global positions. Keys use e
 basenames, or paths. Storage denial/corruption is non-fatal and never becomes a
 success-shaped empty value.
 
-Remote collaboration or source editing would require another explicit trust decision. REVIEW4's native OpenAI provider is the narrow exception for remote compute: only pressing **Run** sends selected frozen review evidence and prompts, plus requested compiler results when enabled. Private workspace material must not enter repository fixtures or logs. Bugs discovered in the Icarus vault must be reduced to small synthetic examples before they are committed.
+Remote collaboration or source editing would require another explicit trust decision. The direct OpenAI provider is the narrow exception for remote compute: only pressing **Run** sends selected frozen review evidence and prompts, plus requested compiler results when enabled. Its key remains in WebView memory for the configured app session and is never persisted. Private workspace material must not enter repository fixtures or logs. Bugs discovered in the Icarus vault must be reduced to small synthetic examples before they are committed.
 
 The KG5 browser File API reads one user-selected report in memory and performs
 no upload. KG11 desktop mode reads and watches one explicitly selected vault

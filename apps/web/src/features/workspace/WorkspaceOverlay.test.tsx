@@ -15,6 +15,11 @@ import { ScriptedAgentProvider } from '@icarus-graph-explorer/ai-review';
 import type { ReviewSourceProvider } from '@icarus-graph-explorer/review-source-tauri';
 
 import { AiReviewController } from '../ai-review/controller';
+import {
+  OPENAI_DEFAULT_MODEL,
+  createOpenAiAgentsProvider,
+} from '../ai-review/openai-agents-provider';
+import { OpenAiSessionCredentials } from '../ai-review/openai-session-credentials';
 import { ArgumentWorkspaceSession } from '../arguments/session';
 import { WorkspaceOverlay, type WorkspaceArea } from './WorkspaceOverlay';
 
@@ -51,6 +56,8 @@ const unsupportedSource: ReviewSourceProvider = {
     throw new Error('unsupported');
   },
 };
+
+const SENTINEL_KEY = 'sk-test-DO-NOT-PERSIST-123';
 
 function setValue(control: HTMLInputElement, value: string): void {
   const setter = Object.getOwnPropertyDescriptor(
@@ -90,15 +97,15 @@ describe('shared local workspace overlay', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows one explicit OpenAI model and cloud-upload disclosure', async () => {
+  it('keeps injected controllers generic and supports independent stage models', async () => {
     const controller = new AiReviewController({
       sourceProvider: unsupportedSource,
       historyStore: new MemoryReviewHistoryStore(),
       agentProvider: new ScriptedAgentProvider({}),
       defaultModels: {
-        analysis: { provider: 'openai-agents', model: 'gpt-6-astra' },
-        integrator: { provider: 'openai-agents', model: 'gpt-6-astra' },
-        postCheck: { provider: 'openai-agents', model: 'gpt-6-astra' },
+        analysis: { provider: 'custom-provider', model: 'analysis-model' },
+        integrator: { provider: 'custom-provider', model: 'integrator-model' },
+        postCheck: { provider: 'custom-provider', model: 'post-model' },
       },
     });
     await controller.open();
@@ -115,18 +122,92 @@ describe('shared local workspace overlay', () => {
         />,
       );
     });
+    expect(container.querySelectorAll('input[name$="-model"]')).toHaveLength(3);
     expect(
-      container.querySelectorAll('input[name="openai-review-model"]'),
-    ).toHaveLength(1);
-    expect(
-      container.querySelector<HTMLInputElement>(
-        'input[name="openai-review-model"]',
-      )?.value,
-    ).toBe('gpt-6-astra');
+      [
+        ...container.querySelectorAll<HTMLInputElement>(
+          'input[name$="-model"]',
+        ),
+      ].map(({ value }) => value),
+    ).toEqual(['analysis-model', 'integrator-model', 'post-model']);
     expect(container.textContent).toContain(
       'does not upload the rest of your vault',
     );
     expect(container.textContent).not.toContain('API key');
+  });
+
+  it('adopts and clears a session-only OpenAI key without leaving it in DOM or storage', async () => {
+    const credentials = new OpenAiSessionCredentials();
+    const openAi = createOpenAiAgentsProvider({ credentials });
+    const storageWrite = vi.spyOn(Storage.prototype, 'setItem');
+    const consoleCalls = vi
+      .spyOn(console, 'log')
+      .mockImplementation(() => undefined);
+    const controller = new AiReviewController({
+      sourceProvider: unsupportedSource,
+      historyStore: new MemoryReviewHistoryStore(),
+      agentProvider: new ScriptedAgentProvider({}),
+      agentProviderAvailability: openAi.getAvailability,
+      agentProviderAvailabilitySubscribe: openAi.subscribeAvailability,
+      defaultModels: openAi.defaultModels,
+    });
+    await controller.open();
+    const argumentSession = new ArgumentWorkspaceSession(new ArgumentStore());
+    await act(async () => {
+      root.render(
+        <WorkspaceOverlay
+          area="review"
+          argumentSession={argumentSession}
+          controller={controller}
+          onAreaChange={() => undefined}
+          onRequestClose={() => undefined}
+          open
+          openAiCredentials={credentials}
+        />,
+      );
+    });
+    const keyInput = container.querySelector<HTMLInputElement>(
+      'input[name="openai-session-api-key"]',
+    )!;
+    expect(keyInput.type).toBe('password');
+    expect(controller.snapshot().modelAvailable).toBe(false);
+    setValue(keyInput, SENTINEL_KEY);
+    await act(async () => {
+      keyInput.form!.dispatchEvent(
+        new SubmitEvent('submit', { bubbles: true, cancelable: true }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(keyInput.value).toBe('');
+    expect(container.innerHTML).not.toContain(SENTINEL_KEY);
+    expect(container.textContent).toContain(
+      'API key loaded for this app session',
+    );
+    expect(controller.snapshot().modelAvailable).toBe(true);
+    expect(
+      [
+        ...container.querySelectorAll<HTMLInputElement>(
+          'input[name^="openai-"][name$="-model"]',
+        ),
+      ].map(({ value }) => value),
+    ).toEqual([
+      OPENAI_DEFAULT_MODEL,
+      OPENAI_DEFAULT_MODEL,
+      OPENAI_DEFAULT_MODEL,
+    ]);
+    expect(storageWrite).not.toHaveBeenCalled();
+    expect(consoleCalls).not.toHaveBeenCalled();
+
+    await act(async () => {
+      const clear = [...container.querySelectorAll('button')].find(
+        ({ textContent }) => textContent === 'Clear',
+      );
+      clear!.click();
+      await Promise.resolve();
+    });
+    expect(credentials.snapshot().configured).toBe(false);
+    expect(controller.snapshot().modelAvailable).toBe(false);
   });
 
   it('keeps one modal, routes dirty Arguments transitions, and restores the launcher', async () => {
