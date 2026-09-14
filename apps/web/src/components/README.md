@@ -387,8 +387,8 @@ handles still come from final endpoint geometry; Heading and Block attachment
 semantics remain exact.
 
 HIER4A-PATCH2 gives `ModularStructuredGraphView.tsx` a session-only
-Flat/Nested (1 level) Directional comparison control. Nested is the experiment
-default while the accepted production settings remain Flat. The selected value
+Flat/Nested (1 level) Directional comparison control. Nested is the reviewed
+session default while the accepted production settings remain Flat. The selected value
 enters the exact worker input and cache identity. It never persists, never
 affects Classic or Soft requests, and Folder Guides still controls rendering
 visibility only.

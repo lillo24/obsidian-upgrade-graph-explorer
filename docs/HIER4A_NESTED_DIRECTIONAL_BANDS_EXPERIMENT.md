@@ -2,9 +2,10 @@
 
 ## Status
 
-Implemented on `codex/hier4a-patch2-nested-directional` and ready for user
-graphical review. This note records experimental evidence; it does not amend the
-accepted HIER4A ADR or select Nested as product behavior.
+Approved for merge on September 14, 2026. One-level Nested is the reviewed
+default in the session-only Directional comparison; Flat remains available as
+development evidence. This refinement does not amend the accepted Adaptive
+Compass decision or change the Classic product default.
 
 ## One-level hierarchy
 
@@ -105,7 +106,9 @@ It exposes ND1, ND3, ND4, ND6, ND7, ND8, ND9, and ND12 with Flat/Nested,
 Folder Guides, and precise-link controls. Browser smoke verification confirmed
 that scenarios populate, the comparison selector changes geometry, singleton
 simplification is reported, and guide visibility changes presentation only.
-User review of the lab and optimized application remains the acceptance gate.
+User graphical review approved the one-level containment, root treatment,
+singleton simplification, sibling preservation, labels, and Flat comparison on
+September 14, 2026.
 The optimized Windows executable is produced at
 `apps/desktop/src-tauri/target/release/icarus-graph-explorer-desktop.exe`; it
 passed a hidden launch smoke check after the final build.

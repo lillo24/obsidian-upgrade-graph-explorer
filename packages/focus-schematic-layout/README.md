@@ -68,7 +68,7 @@ counts. Folder Bands Off ignores the review variant and remains the byte-exact
 A1 oracle. No internal-layout choice enters product settings or the worker
 selection until graphical approval.
 
-HIER4A-PATCH2 adds an experimental, one-level hierarchy mode for Directional
+HIER4A-PATCH2 adds the approved one-level hierarchy mode for Directional
 Folder Bands. It derives the deepest meaningful parent containers from exact
 canonical folder ancestry after final module dimensions are known. The focused
 root folder remains an independent full-path band. A materialized parent is an
