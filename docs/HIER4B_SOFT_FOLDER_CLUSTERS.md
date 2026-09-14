@@ -1,6 +1,6 @@
 # HIER4B Soft Folder Clusters
 
-Status: **UNDER EVALUATION — HIER4B-FIX4 implemented; optimized graphical QA pending.**
+Status: **IMPLEMENTED — graphical cleanup approved; Soft macro-layout adoption remains undecided.**
 
 HIER4B evaluates a second macro-layout family for Modular Focus Hierarchy.
 Directional Folder Bands remains the Modular Preview default, and Classic Focus
@@ -42,7 +42,8 @@ stable seeding, hierarchical folder attraction, and deterministic
 variable-rectangle collision packing. Secondary connections remain at zero
 geometry influence.
 
-Each File participates in its visible displayed ancestor scopes. FIX2 compared:
+Each visible File retains truthful membership in its displayed ancestor scopes.
+For attraction, each non-root File participates in those scopes. FIX2 compared:
 
 - H0: nearest displayed folder only;
 - H1: normalized decaying ancestor weights;
@@ -53,6 +54,15 @@ share while all shares for one File sum to at most one, so depth cannot amplify
 the global Folder strength. At strength 0 the solver builds no folder-force
 groups. Manually promoted Files leave their former child scope; flattened and
 automatically compressed layers receive no separate force.
+
+In Focus Soft Folder Clusters, the Focus/root File remains a topology anchor
+and visible folder member but is excluded from folder-attraction centroids and
+force membership before the two-member active-group threshold. Root Headings
+and Blocks remain internal module geometry and never become folder-force
+members. Display evidence (`displayedFolderCount`, `maximumDisplayedDepth`, and
+`maximumPerFileFolderWeight`) continues to use the root-inclusive memberships.
+Repeated-folder counts, radii, coherence, and runtime group counts describe the
+root-excluded force-active groups.
 
 The deterministic schedule remains Adaptive Compass, 36 relaxation/collision
 iterations, Adaptive Compass, then 18 iterations. The Focus File is translated
