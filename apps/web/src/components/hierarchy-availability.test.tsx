@@ -465,12 +465,12 @@ describe('GraphExplorer experimental availability integration', () => {
     expect(button('Hierarchy, experimental in All scope')).toBeDefined();
     await act(() =>
       container
-        .querySelector<HTMLInputElement>('input[value="minimal"]')!
+        .querySelector<HTMLInputElement>('input[value="pinch-zoom"]')!
         .click(),
     );
     expect(preference()).toMatchObject({
       showExperimentalAllHierarchy: true,
-      focusAppearance: 'minimal',
+      trackpadZoomMode: 'pinch-zoom',
     });
     await experimental(false);
     expect(mode()).toBe('global');
