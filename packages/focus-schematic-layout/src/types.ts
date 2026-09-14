@@ -103,7 +103,92 @@ export interface FocusSchematicPrototypeSettings {
   readonly macroRankSeparation: number;
   /** Categorical HIER4A development/production geometry switch. */
   readonly directionalFolderBandsEnabled: boolean;
+  /** Temporary HIER4A-PATCH2 comparison; production adoption is not decided. */
+  readonly directionalFolderHierarchy: FocusSchematicDirectionalFolderHierarchyMode;
   readonly ranker: 'network-simplex' | 'tight-tree' | 'longest-path';
+}
+
+export type FocusSchematicDirectionalFolderHierarchyMode =
+  'flat' | 'nested-one-level';
+
+export type FocusSchematicDirectionalFolderDisplayProvenance =
+  'exact-directional-folder' | 'automatic-directional-singleton-simplification';
+
+export interface FocusSchematicDirectionalTopLevelFolderUnit {
+  readonly id: string;
+  readonly kind: 'root-band' | 'standalone-band' | 'parent-container';
+  readonly folderKey: WorkspaceFolderKey;
+  readonly order: number;
+  readonly topY: number;
+  readonly bottomY: number;
+  readonly centerY: number;
+  readonly height: number;
+  readonly moduleIds: readonly EntityId[];
+}
+
+export interface FocusSchematicDirectionalParentContainer {
+  readonly id: string;
+  readonly folderKey: WorkspaceFolderKey;
+  readonly label: string;
+  readonly fullLabel: WorkspaceFolderKey;
+  readonly topY: number;
+  readonly bottomY: number;
+  readonly centerY: number;
+  readonly height: number;
+  readonly x: number;
+  readonly width: number;
+  readonly initialInternalUnitIds: readonly string[];
+  readonly internalUnitIds: readonly string[];
+  readonly moduleIds: readonly EntityId[];
+}
+
+export interface FocusSchematicDirectionalInternalUnit {
+  readonly id: string;
+  readonly kind: 'direct-parent' | 'child-band';
+  readonly folderKey: WorkspaceFolderKey;
+  readonly parentContainerId: string;
+  readonly label: string | null;
+  readonly fullLabel: WorkspaceFolderKey;
+  readonly order: number;
+  readonly topY: number;
+  readonly bottomY: number;
+  readonly centerY: number;
+  readonly height: number;
+  readonly x: number;
+  readonly width: number;
+  readonly moduleIds: readonly EntityId[];
+}
+
+export interface FocusSchematicDirectionalNestedModulePlacement {
+  readonly moduleId: EntityId;
+  readonly exactFolderKey: WorkspaceFolderKey;
+  readonly displayedFolderKey: WorkspaceFolderKey;
+  readonly displayUnitId: string;
+  readonly parentContainerId: string | null;
+  readonly provenance: FocusSchematicDirectionalFolderDisplayProvenance;
+}
+
+export interface FocusSchematicDirectionalFolderHierarchySummary {
+  readonly visibleExactFolderCount: number;
+  readonly parentContainerCount: number;
+  readonly childBandCount: number;
+  readonly standaloneBandCount: number;
+  readonly simplifiedSingletonChildCount: number;
+  readonly topLevelOrderingCandidateCount: number;
+  readonly parentLocalOrderingSweepCount: number;
+  readonly parentLocalOrderingChangeCount: number;
+  readonly maximumNestedDepth: 1;
+}
+
+export interface FocusSchematicDirectionalFolderHierarchyPlan {
+  readonly schemaVersion: 1;
+  readonly maximumNestedDepth: 1;
+  readonly rootBandFolderKey: WorkspaceFolderKey;
+  readonly topLevelUnits: readonly FocusSchematicDirectionalTopLevelFolderUnit[];
+  readonly parentContainers: readonly FocusSchematicDirectionalParentContainer[];
+  readonly internalUnits: readonly FocusSchematicDirectionalInternalUnit[];
+  readonly modulePlacements: readonly FocusSchematicDirectionalNestedModulePlacement[];
+  readonly summary: FocusSchematicDirectionalFolderHierarchySummary;
 }
 
 export interface FocusSchematicFolderBand {
@@ -227,6 +312,8 @@ export interface FocusSchematicFolderBandPlan {
   readonly exceptions: readonly FocusSchematicFolderBandException[];
   readonly rootBalance: FocusSchematicFolderBandRootBalance | null;
   readonly optimization: FocusSchematicFolderBandOptimizationEvidence | null;
+  /** Present only for the PATCH2 experiment; omission preserves the flat oracle. */
+  readonly hierarchy?: FocusSchematicDirectionalFolderHierarchyPlan;
   readonly summary: FocusSchematicFolderBandSummary;
 }
 

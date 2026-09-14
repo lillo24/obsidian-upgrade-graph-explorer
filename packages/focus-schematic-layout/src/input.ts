@@ -129,6 +129,7 @@ export function validateFocusSchematicLayoutInput(
     'diagnosticReserveHeight',
     'filteredModulePolicy',
     'directionalFolderBandsEnabled',
+    'directionalFolderHierarchy',
     'internalNodeSeparation',
     'internalRankSeparation',
     'macroNodeSeparation',
@@ -157,6 +158,14 @@ export function validateFocusSchematicLayoutInput(
     issues.push({
       path: '$.settings.directionalFolderBandsEnabled',
       message: 'Directional Folder Bands must be enabled or disabled.',
+    });
+  if (
+    input.settings.directionalFolderHierarchy !== 'flat' &&
+    input.settings.directionalFolderHierarchy !== 'nested-one-level'
+  )
+    issues.push({
+      path: '$.settings.directionalFolderHierarchy',
+      message: 'Directional folder hierarchy must be flat or one-level nested.',
     });
   if (
     !['compact-bridge', 'context-card'].includes(

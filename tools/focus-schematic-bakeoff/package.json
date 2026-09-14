@@ -13,6 +13,7 @@
     "benchmark:soft-clusters": "tsx src/soft-cluster-benchmark.ts",
     "generate:endpoint-lab": "tsx src/endpoint-lab.ts",
     "generate:folder-lab": "tsx src/folder-lab.ts",
+    "generate:nested-directional-folder-lab": "tsx src/nested-directional-folder-lab.ts",
     "generate:soft-cluster-lab": "tsx src/soft-cluster-lab.ts",
     "generate:lab": "tsx src/lab.ts",
     "typecheck": "tsc --noEmit"

@@ -15,6 +15,11 @@ import {
   type FocusSchematicInternalLayoutRunStats,
 } from './internal-layout-variants';
 import {
+  applyFocusSchematicNestedDirectionalFolderBands,
+  validateFocusSchematicNestedDirectionalFolderPlan,
+  validateFocusSchematicNestedDirectionalGeometry,
+} from './directional-folder-hierarchy';
+import {
   FOCUS_SCHEMATIC_DIRECTIONAL_FOLDER_BAND_PADDING_Y,
   FOCUS_SCHEMATIC_LAYOUT_CLEARANCE,
 } from './settings';
@@ -1634,6 +1639,32 @@ export function applyFocusSchematicFolderBands(
       },
     };
   }
+  if (input.settings.directionalFolderHierarchy === 'nested-one-level') {
+    const application = applyFocusSchematicNestedDirectionalFolderBands(
+      input,
+      modulePlan,
+      endpointPlan,
+      lanePlan,
+      baseline,
+      endpointOrderPolicy,
+      internalLayoutVariant,
+    );
+    const validation = validateFocusSchematicFolderBandLayout(
+      input,
+      modulePlan,
+      endpointPlan,
+      baseline,
+      application.plan,
+      application.candidate,
+    );
+    if (!validation.valid)
+      throw new Error(
+        `Nested Directional Folder Band validation failed: ${validation.issues
+          .map(({ path, message }) => `${path}: ${message}`)
+          .join('; ')}`,
+      );
+    return application;
+  }
   const initialOrderStarted = Date.now();
   const order = initialFolderOrder(inventory);
   const folderInitialOrderMs = Date.now() - initialOrderStarted;
@@ -1765,14 +1796,34 @@ export function validateSerializedFocusSchematicFolderBandPlan(
       plan.modulePlacements.length !== 0 ||
       plan.exceptions.length !== 0 ||
       plan.rootBalance !== null ||
-      plan.optimization !== null
+      plan.optimization !== null ||
+      plan.hierarchy !== undefined
     )
       issues.push({
         path: '$.folderBandPlan',
         message:
           'Disabled Directional Folder Bands must carry no band geometry.',
       });
+  } else if (
+    input.settings.directionalFolderHierarchy === 'nested-one-level' &&
+    plan.hierarchy !== undefined
+  ) {
+    const nested = validateFocusSchematicNestedDirectionalFolderPlan(
+      input,
+      modulePlan,
+      candidate,
+      plan,
+    );
+    if (!nested.valid) issues.push(...nested.issues);
   } else {
+    if (
+      input.settings.directionalFolderHierarchy !== 'flat' ||
+      plan.hierarchy !== undefined
+    )
+      issues.push({
+        path: '$.folderBandPlan.hierarchy',
+        message: 'Directional folder hierarchy mode does not match the plan.',
+      });
     const optimization = plan.optimization;
     if (
       optimization === null ||
@@ -2102,6 +2153,12 @@ export function validateFocusSchematicFolderBandLayout(
     plan,
   );
   if (!planValidation.valid) return planValidation;
+  if (plan.hierarchy !== undefined)
+    return validateFocusSchematicNestedDirectionalGeometry(
+      input,
+      baseline,
+      candidate,
+    );
   const beforeModules = new Map(
     baseline.modules.map((module) => [module.moduleId, module]),
   );

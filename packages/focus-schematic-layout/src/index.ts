@@ -78,6 +78,12 @@ export {
   type FocusSchematicFolderBandTimings,
 } from './folder-bands';
 export {
+  applyFocusSchematicNestedDirectionalFolderBands,
+  FOCUS_SCHEMATIC_DIRECTIONAL_NESTED_ORDERING_SWEEP_COUNT,
+  validateFocusSchematicNestedDirectionalFolderPlan,
+  validateFocusSchematicNestedDirectionalGeometry,
+} from './directional-folder-hierarchy';
+export {
   compareFocusSchematicSoftInternalVariants,
   computeFocusSchematicSoftClusterLayout,
   computeFocusSchematicSoftClusterLayoutAttempt,
@@ -108,6 +114,7 @@ export {
   INTERNAL_LAYOUT_FIXTURES,
   type FolderStabilityPair,
 } from './folder-fixtures';
+export { NESTED_DIRECTIONAL_FOLDER_FIXTURES } from './directional-folder-hierarchy-fixtures';
 export {
   computeFocusSchematicLayout,
   computeFocusSchematicLayoutAttempt,

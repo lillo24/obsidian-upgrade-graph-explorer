@@ -11,8 +11,11 @@ renderer-neutral result to validated React Flow data.
   identity, filtered anonymity, diagnostic clearance, module-aware aggregate
   hover, direct-ring predicates, visible-structure boundary presentation,
   provenance continuity, and secondary zero-geometry influence.
-- `folder-band-strips.tsx` renders the Directional macro's exact horizontal
-  world-space guides.
+- `folder-band-strips.tsx` renders the Directional macro's exact world-space
+  guides. Flat plans retain full-width strips. Experimental one-level nested
+  plans consume worker-owned parent and child rectangles, use short visible
+  labels with full-path title metadata, and leave direct-parent File units
+  unlabeled.
 - `folder-cluster-guides.tsx` builds child regions before parent regions from the
   nested displayed tree and final module rectangles. It preserves disconnected
   islands, fixed padding, containment, pointer-inert hulls, short accessible
@@ -27,6 +30,8 @@ currently rendered reference edges. Classic mapping never receives these
 fields.
 
 Both guide shapes are pointer-inert viewport overlays behind edges and nodes.
+Nested Directional parent and child containment comes from the validated worker
+plan; the renderer does not infer or repair it.
 The Soft guide's small HTML label uses passive text presentation while retaining
 keyboard focus, a focus-visible outline, and pointer/keyboard context-menu
 entry. Empty-area context targeting is handled separately by world-space

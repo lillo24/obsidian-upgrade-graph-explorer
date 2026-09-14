@@ -1344,7 +1344,7 @@ remain unchanged by hover.
 
 HIER4A supersedes the original center-spine production geometry for Modular
 Preview. Its Directional Folder Bands geometry remains the default. The strict
-protocol-v7 worker now receives persisted macro-layout, normalized Soft
+protocol-v8 worker now receives persisted macro-layout, normalized Soft
 strength, sparse workspace Soft display intent, internal-layout, and Heading-order policies. Adaptive Compass plus
 Crossing optimized remain the defaults; Vertical Spine and Document order
 remain Sandbox alternatives. Current/Mosaic remains development-only.
@@ -1357,6 +1357,18 @@ root balance. Every visible exact folder retains a band, singleton folders stay
 visible, and filtered bridges remain excluded. Ordinary Compass search evaluates
 at most 64 restricted assignments per module; large modules use deterministic
 bounded relocation and no global Cartesian product.
+
+HIER4A-PATCH2 is a pending graphical experiment layered only onto the
+Directional macro. The worker may derive one visible parent layer from
+canonical immediate folder ancestry after final module sizes exist. The focused
+root exact folder stays independent. Materialized parent containers are atomic
+in global ordering, contain an unlabeled direct-File unit plus preserved child
+bands, and use actual packed heights in root balancing. Bounded local ordering
+may retain an unavoidable exact crossing, because nested parent/child
+containment is a harder constraint in this mode. Short nested labels retain
+normalized full-path metadata. A session-only Flat/Nested selector isolates
+cache entries for review; Flat serialization, Soft semantics, Classic, routing,
+and persisted settings remain unchanged until the user decides the experiment.
 
 PRE-HIER4B adds no layout semantics. The Modular renderer consumes the already
 validated `folderBandPlan.bands` records to draw pointer-inert, world-coordinate

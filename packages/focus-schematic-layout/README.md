@@ -68,6 +68,17 @@ counts. Folder Bands Off ignores the review variant and remains the byte-exact
 A1 oracle. No internal-layout choice enters product settings or the worker
 selection until graphical approval.
 
+HIER4A-PATCH2 adds an experimental, one-level hierarchy mode for Directional
+Folder Bands. It derives the deepest meaningful parent containers from exact
+canonical folder ancestry after final module dimensions are known. The focused
+root folder remains an independent full-path band. A materialized parent is an
+atomic top-level ordering unit; its direct Files form an unlabeled internal
+unit, and preserved immediate child folders form structurally contained bands.
+The bounded parent-local and top-level sweeps may reorder those units for exact
+primary topology, but they cannot trade away parent or child containment.
+Flat omits the hierarchy plan and preserves the accepted serialized oracle.
+Soft Folder Clusters does not call this pass.
+
 The root folder owns the central band. Every folder candidate receives its own
 provisional module placement, legal whole-branch sibling reorder, safe rank
 order, and repack for exactly two alternating rounds before crossings and
@@ -130,6 +141,11 @@ the bakeoff evidence if changed.
   order, bounded joint candidate refinement, small-set side assignment, exact
   primary span scoring, exact band assignment, explicit topology exceptions,
   quality metrics, and strict geometry validation.
+- `src/directional-folder-hierarchy.ts` derives the experimental one-level
+  parent/direct/child plan, applies deterministic local and atomic top-level
+  ordering, packs actual-height rectangles, and validates hard containment.
+- `src/directional-folder-hierarchy-fixtures.ts` owns ND1–ND15 hierarchy,
+  simplification, ordering, root, disclosure, reroot, and invariance evidence.
 - `src/endpoint-facing.ts` composes center TB, left RL, and right LR Dagre
   regions, runs the macro and endpoint-order stages, derives exact attachments,
   and evaluates endpoint-side quality.
@@ -155,7 +171,7 @@ the bakeoff evidence if changed.
   placeholder policy.
 - `src/selected.ts` maps the accepted A1 computed result to the compatible
   selected candidate/attempt API.
-- `src/worker-protocol.ts` owns the version-6 exact-shape production messages,
+- `src/worker-protocol.ts` owns the version-8 exact-shape production messages,
   macro/strength/display-intent policy normalization, cardinal attachment evidence,
   and originating-input result validation.
 - `src/worker-runtime.ts` validates requests, computes A1, records phase

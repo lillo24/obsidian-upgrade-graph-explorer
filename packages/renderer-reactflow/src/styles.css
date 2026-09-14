@@ -85,6 +85,25 @@
   stroke: rgb(36 94 116 / 58%);
 }
 
+.focus-schematic-folder-parent-strip {
+  fill: rgb(73 126 149 / 3%);
+  stroke: rgb(55 109 132 / 30%);
+  stroke-width: 1.25;
+  stroke-dasharray: 3 8;
+}
+
+.focus-schematic-folder-parent-strip__label {
+  fill: rgb(33 79 97 / 72%);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.focus-schematic-folder-strip--nested {
+  fill: rgb(73 126 149 / 6%);
+  stroke: rgb(55 109 132 / 45%);
+}
+
 .focus-schematic-folder-strip__guide {
   stroke: rgb(55 109 132 / 18%);
   stroke-width: 1;

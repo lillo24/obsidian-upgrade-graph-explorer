@@ -16,7 +16,7 @@ import type {
   FocusSchematicSoftClusterEvidence,
 } from './types';
 
-export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 7 as const;
+export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 8 as const;
 
 export interface FocusSchematicLayoutWorkerRequest {
   readonly protocolVersion: typeof FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION;

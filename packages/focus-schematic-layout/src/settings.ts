@@ -12,6 +12,8 @@ export const FOCUS_SCHEMATIC_LAYOUT_SETTINGS = {
   macroRankSeparation: 80,
   // Development labs retain pure A1 as the Folder Bands Off oracle.
   directionalFolderBandsEnabled: false,
+  // Flat remains the frozen HIER4A oracle used by non-production fixtures.
+  directionalFolderHierarchy: 'flat',
   ranker: 'network-simplex',
 } as const satisfies FocusSchematicPrototypeSettings;
 
