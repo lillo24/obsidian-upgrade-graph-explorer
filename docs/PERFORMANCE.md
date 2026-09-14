@@ -1418,3 +1418,17 @@ separate operation counters distinguish raw schedules, actual worker requests,
 superseded desired/pending inputs, and preview adoptions. Timing remains local
 evidence rather than a CI gate; production browser and optimized-desktop QA are
 reported separately.
+
+MOVE300B adds `pnpm analyze:network-physics-drift`. Its pre-settled 300-node
+fixture contains an 80-node connected core, 190 isolates, and ten disconnected
+three-node components. Over a 1,024-iteration stationary hold, the unbounded
+production analogue increased unclustered isolate p90 radius from `299.427173`
+to `334.121439` monotonically and moved disconnected-component centroids p90
+`42.252904`. Component-bounded production kept unrelated isolate displacement
+at exactly zero with or without the output-only M2 handoff and Pull. The
+unclustered A1 hot-turn p50/p95 sample was `1.29885/2.027125 ms` versus
+`1.1764/1.909675 ms` for the raw baseline; timings are local evidence, not CI
+limits. Connected-core mean response remained `11.791331` versus `11.762995`,
+the target error stayed zero, and all production scenarios reached sleeping
+with zero post-sleep work. Native interaction and rendering remain the release
+gate.

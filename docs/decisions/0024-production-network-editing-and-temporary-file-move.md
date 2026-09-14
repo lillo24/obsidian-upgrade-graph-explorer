@@ -51,6 +51,13 @@ source Markdown, history, view state, layout caches, spatial rules, or persisten
 coordinates. Pull and Place keep their established meanings. A service failure
 ends the gesture, retains the last valid graph, and offers an explicit retry.
 
+In All, “automatic physical behavior” is bounded to the constrained File's
+undirected reference component plus components coupled by effective resolved
+Pull groups. Unrelated nodes retain their current transient coordinates while
+remaining in the graph as repulsive context. This prevents long direct drags
+from expanding disconnected isolate/component rings without turning Move into
+persistence or reapplying the output-only M2 folder field.
+
 The accessible Network Explorer action is available only for canonical File
 nodes. Its relocated controller uses viewport-relative 8-pixel arrow nudges,
 32 pixels with Shift, Enter/Space to release, and Escape to cancel, without

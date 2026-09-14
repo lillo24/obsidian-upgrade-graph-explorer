@@ -29,6 +29,13 @@ coordinate-identical, but the automatic folder field is intentionally allowed
 to relax during live physics and is restored by the next normal finite layout.
 Reapplying shaped output into the working graph remains forbidden.
 
+For All, the dynamic region is the constrained File's undirected reference
+component plus the transitive closure of components joined by positive-strength
+resolved Pull memberships. Other nodes remain physically present for repulsion
+but are reasserted at their gesture-start transient coordinates during hot work
+and through cooling. M2 folder membership does not create coupling. A later
+gesture recomputes the closure from the existing seed edges.
+
 ## Rejected alternatives
 
 - The package's public worker supervisor lacks supported stepping, frame, and
@@ -44,8 +51,9 @@ Reapplying shaped output into the working graph remains forbidden.
 
 - Normal browsing remains on the finite Focus/All layout workers and creates no
   continuous worker until a real constraint begins.
-- Whole-graph reaction is preserved, including large graphs; reduced-scope
-  simulation is not introduced silently.
+- Full-node frames and full-graph repulsion are preserved, while unrelated
+  reference components no longer accumulate independent motion during one
+  gesture. Connected and Pull-coupled regions remain reactive.
 - Public calls rebuild ForceAtlas2's adaptive private matrix per call. This is
   accepted and measured rather than hidden behind a private API.
 - Live Pull strength uses a deliberate four-iteration reference, independent of
@@ -54,6 +62,9 @@ Reapplying shaped output into the working graph remains forbidden.
 - Interactive All has a separate 8,192 / 1,024 / 256 cooling cap because its
   arbitrary post-drag states and active Pull require more tail work than finite
   seeded base layouts. The five-second failure boundary remains authoritative.
+- A released degree-zero All singleton without effective Pull sleeps at its
+  exact release coordinate because it has no active automatic relationship to
+  cool. Pull-bound singletons and multi-node closures retain bounded cooling.
 - Production activation originally used one 100-visible-node boundary.
   MOVE300A retains 100 for Focus and raises All to the conservative 300-node QA
   boundary; views above the active limit surface `graph-too-large` before Worker

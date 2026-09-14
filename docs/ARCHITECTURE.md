@@ -1628,3 +1628,12 @@ The 300-node All boundary is a conservative real-vault QA boundary backed by
 targeted retained-simulation All and All-with-Pull probes, not a claim of a
 physical solver cliff. Focus remains at 100 because the existing larger Focus
 release probes reached explicit caps.
+
+MOVE300B bounds All's live dynamic region by undirected reference components.
+The constrained File's component is active, and positive-strength resolved Pull
+memberships transitively activate every represented component; M2 folder
+membership does not. Other nodes stay in the retained graph for repulsion but
+are held at gesture-start transient coordinates through hot work and cooling.
+Convergence evaluates the active closure, and a degree-zero singleton without
+effective Pull sleeps directly on release. No new worker schema or lifecycle
+state is introduced.
