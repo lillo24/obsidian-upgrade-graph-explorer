@@ -1,4 +1,4 @@
-import { memo, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import type {
   FocusAppearance,
@@ -23,6 +23,7 @@ import type {
   FocusHierarchyImplementation,
   GraphPreferences,
 } from '../preferences/graph-preferences';
+import type { ExplorationLayout, ExplorationScope } from '../exploration-model';
 
 import {
   graphSettingsTabForKey,
@@ -30,6 +31,8 @@ import {
 } from './graph-settings-tabs';
 
 interface GraphSettingsProps {
+  readonly activeLayout: ExplorationLayout;
+  readonly activeScope: ExplorationScope;
   readonly allNetworkDensityQaDiagnostics?: GlobalDensityQaDiagnostics;
   readonly allNetworkDensityFramingStrength: number;
   readonly focusNetworkDensityQaDiagnostics?: LocalDensityQaDiagnostics;
@@ -154,6 +157,8 @@ function DensityQaDiagnostics({
 }
 
 export const GraphSettings = memo(function GraphSettings({
+  activeLayout,
+  activeScope,
   allNetworkDensityQaDiagnostics,
   allNetworkDensityFramingStrength,
   focusNetworkDensityQaDiagnostics,
@@ -191,6 +196,12 @@ export const GraphSettings = memo(function GraphSettings({
   const [activeTab, setActiveTab] = useState<GraphSettingsTab>('preferences');
   const [advancedLayoutOpen, setAdvancedLayoutOpen] = useState(false);
   const [experimentalOpen, setExperimentalOpen] = useState(false);
+  const focusActive = activeScope === 'focus';
+  const networkActive = activeLayout === 'network';
+  const allNetworkActive = activeScope === 'all' && networkActive;
+  const focusHierarchyActive = focusActive && activeLayout === 'hierarchy';
+  const modularFocusHierarchyActive =
+    focusHierarchyActive && focusHierarchyImplementation === 'modular-preview';
   const folderStrength = folderClusteringStrength(globalLayoutSettings);
   const customSettings =
     globalLayoutSettings.custom ??
@@ -198,6 +209,26 @@ export const GraphSettings = memo(function GraphSettings({
   const preferencesTabRef = useRef<HTMLButtonElement>(null);
   const sandboxTabRef = useRef<HTMLButtonElement>(null);
   const sourceTabRef = useRef<HTMLButtonElement>(null);
+  const lastSandboxFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const previousFocus = lastSandboxFocusRef.current;
+    if (
+      !open ||
+      activeTab !== 'sandbox' ||
+      previousFocus === null ||
+      previousFocus.isConnected ||
+      document.activeElement !== document.body
+    ) {
+      return;
+    }
+    sandboxTabRef.current?.focus();
+  }, [
+    activeLayout,
+    activeScope,
+    activeTab,
+    focusHierarchyImplementation,
+    open,
+  ]);
   const changePreset = (spacingPreset: GlobalSpacingPreset) => {
     onGlobalLayoutSettingsChange(
       withGlobalSpacingPreset(globalLayoutSettings, spacingPreset),
@@ -357,265 +388,272 @@ export const GraphSettings = memo(function GraphSettings({
               aria-labelledby="graph-settings-sandbox-tab"
               hidden={activeTab !== 'sandbox'}
               id="graph-settings-sandbox-panel"
+              onFocusCapture={(event) => {
+                lastSandboxFocusRef.current = event.target as HTMLElement;
+              }}
               role="tabpanel"
             >
               <p className="graph-settings__sandbox-note">
                 Controls for experimenting with graph presentation and choosing
                 useful defaults.
               </p>
-              <section
-                aria-labelledby="graph-appearance-settings-heading"
-                className="graph-settings__section"
-              >
-                <h3 id="graph-appearance-settings-heading">
-                  Focus Root appearance
-                </h3>
-                <fieldset>
-                  <legend>Focus Root</legend>
-                  <label>
-                    <input
-                      checked={focusAppearance === 'outline'}
-                      name="focus-appearance"
-                      onChange={() => onFocusAppearanceChange('outline')}
-                      type="radio"
-                      value="outline"
-                    />
-                    <span>
-                      <strong>Outline</strong>
-                      <small>
-                        A strong geometric boundary around the root.
-                      </small>
-                    </span>
-                  </label>
-                  <label>
-                    <input
-                      checked={focusAppearance === 'inverted'}
-                      name="focus-appearance"
-                      onChange={() => onFocusAppearanceChange('inverted')}
-                      type="radio"
-                      value="inverted"
-                    />
-                    <span>
-                      <strong>Inverted</strong>
-                      <small>
-                        A dark root card with high-contrast content.
-                      </small>
-                    </span>
-                  </label>
-                  <label>
-                    <input
-                      checked={focusAppearance === 'minimal'}
-                      name="focus-appearance"
-                      onChange={() => onFocusAppearanceChange('minimal')}
-                      type="radio"
-                      value="minimal"
-                    />
-                    <span>
-                      <strong>Minimal</strong>
-                      <small>A quiet corner marker and title accent.</small>
-                    </span>
-                  </label>
-                </fieldset>
-              </section>
-              <section
-                aria-labelledby="network-settings-heading"
-                className="graph-settings__section"
-              >
-                <h3 id="network-settings-heading">Network</h3>
-                <p className="global-layout-scope-note">
-                  Shared by Scope = All and Scope = Focus when Layout = Network.
-                  Hierarchy layouts are unchanged.
-                </p>
-                <NetworkSharedControls
-                  onChange={changeCustom}
-                  settings={customSettings}
-                />
-              </section>
-              <section
-                aria-labelledby="global-layout-settings-heading"
-                className="graph-settings__section"
-              >
-                <h3 id="global-layout-settings-heading">All Network</h3>
-                <p className="global-layout-scope-note">
-                  Folder physics apply only to Scope = All, Layout = Network.
-                </p>
-                <label className="graph-settings__check">
-                  <input
-                    checked={globalLayoutSettings.folderClustering}
-                    name="global-folder-clustering"
-                    onChange={(event) =>
-                      onGlobalLayoutSettingsChange({
-                        ...globalLayoutSettings,
-                        folderClustering: event.currentTarget.checked,
-                      })
-                    }
-                    type="checkbox"
-                  />
-                  <span>
-                    <strong>Folder clustering</strong>
-                    <small>
-                      Adds a soft spatial preference without creating graph
-                      links.
-                    </small>
-                  </span>
-                </label>
-                <label
-                  className="global-layout-strength"
-                  htmlFor="global-folder-clustering-strength"
+              {focusHierarchyActive ? (
+                <section
+                  aria-labelledby="graph-appearance-settings-heading"
+                  className="graph-settings__section"
                 >
-                  <span>
-                    <strong>Folder clustering strength</strong>
-                    <output>{folderStrength}%</output>
-                  </span>
-                  <input
-                    aria-valuetext={`${folderStrength} percent`}
-                    disabled={!globalLayoutSettings.folderClustering}
-                    id="global-folder-clustering-strength"
-                    max="100"
-                    min="0"
-                    onChange={(event) =>
-                      onGlobalLayoutSettingsChange(
-                        withFolderClusteringStrength(
-                          globalLayoutSettings,
-                          Number(event.currentTarget.value),
-                        ),
-                      )
-                    }
-                    step="1"
-                    type="range"
-                    value={folderStrength}
-                  />
-                  <small>
-                    <span>Weak</span>
-                    <span>Strong</span>
-                  </small>
-                </label>
-                <fieldset>
-                  <legend>Spacing</legend>
-                  {(['compact', 'normal', 'spacious'] as const).map(
-                    (preset) => (
-                      <label key={preset}>
-                        <input
-                          checked={
-                            globalLayoutSettings.spacingPreset === preset
-                          }
-                          name="global-spacing-preset"
-                          onChange={() => changePreset(preset)}
-                          type="radio"
-                          value={preset}
-                        />
-                        <span>
-                          {preset.slice(0, 1).toUpperCase() + preset.slice(1)}
-                        </span>
-                      </label>
-                    ),
-                  )}
-                </fieldset>
-                <button
-                  aria-controls="global-layout-advanced-controls"
-                  aria-expanded={advancedLayoutOpen}
-                  className="graph-settings__disclosure"
-                  onClick={() => setAdvancedLayoutOpen((current) => !current)}
-                  type="button"
+                  <h3 id="graph-appearance-settings-heading">
+                    Focus Root appearance
+                  </h3>
+                  <fieldset>
+                    <legend>Focus Root</legend>
+                    <label>
+                      <input
+                        checked={focusAppearance === 'outline'}
+                        name="focus-appearance"
+                        onChange={() => onFocusAppearanceChange('outline')}
+                        type="radio"
+                        value="outline"
+                      />
+                      <span>
+                        <strong>Outline</strong>
+                        <small>
+                          A strong geometric boundary around the root.
+                        </small>
+                      </span>
+                    </label>
+                    <label>
+                      <input
+                        checked={focusAppearance === 'inverted'}
+                        name="focus-appearance"
+                        onChange={() => onFocusAppearanceChange('inverted')}
+                        type="radio"
+                        value="inverted"
+                      />
+                      <span>
+                        <strong>Inverted</strong>
+                        <small>
+                          A dark root card with high-contrast content.
+                        </small>
+                      </span>
+                    </label>
+                    <label>
+                      <input
+                        checked={focusAppearance === 'minimal'}
+                        name="focus-appearance"
+                        onChange={() => onFocusAppearanceChange('minimal')}
+                        type="radio"
+                        value="minimal"
+                      />
+                      <span>
+                        <strong>Minimal</strong>
+                        <small>A quiet corner marker and title accent.</small>
+                      </span>
+                    </label>
+                  </fieldset>
+                </section>
+              ) : null}
+              {networkActive ? (
+                <section
+                  aria-labelledby="network-settings-heading"
+                  className="graph-settings__section"
                 >
-                  <span aria-hidden="true">
-                    {advancedLayoutOpen ? '▾' : '▸'}
-                  </span>{' '}
-                  Advanced All Network controls
-                </button>
-                {advancedLayoutOpen ? (
-                  <GlobalCustomLayoutControls
+                  <h3 id="network-settings-heading">Network</h3>
+                  <NetworkSharedControls
                     onChange={changeCustom}
                     settings={customSettings}
                   />
-                ) : null}
-              </section>
-              <section
-                aria-labelledby="network-density-settings-heading"
-                className="graph-settings__section"
-              >
-                <h3 id="network-density-settings-heading">Network Density</h3>
-                <div className="graph-settings__scope-group">
-                  <h4>All Network Density</h4>
+                </section>
+              ) : null}
+              {allNetworkActive ? (
+                <section
+                  aria-labelledby="global-layout-settings-heading"
+                  className="graph-settings__section"
+                >
+                  <h3 id="global-layout-settings-heading">All Network</h3>
+                  <label className="graph-settings__check">
+                    <input
+                      checked={globalLayoutSettings.folderClustering}
+                      name="global-folder-clustering"
+                      onChange={(event) =>
+                        onGlobalLayoutSettingsChange({
+                          ...globalLayoutSettings,
+                          folderClustering: event.currentTarget.checked,
+                        })
+                      }
+                      type="checkbox"
+                    />
+                    <span>
+                      <strong>Folder clustering</strong>
+                      <small>
+                        Adds a soft spatial preference without creating graph
+                        links.
+                      </small>
+                    </span>
+                  </label>
                   <label
                     className="global-layout-strength"
-                    htmlFor="all-density-framing-strength"
+                    htmlFor="global-folder-clustering-strength"
                   >
                     <span>
-                      <strong>Strength</strong>
-                      <output htmlFor="all-density-framing-strength">
-                        {allNetworkDensityFramingStrength}%
-                      </output>
+                      <strong>Folder clustering strength</strong>
+                      <output>{folderStrength}%</output>
                     </span>
                     <input
-                      aria-valuetext={`${allNetworkDensityFramingStrength} percent`}
-                      id="all-density-framing-strength"
-                      max="150"
+                      aria-valuetext={`${folderStrength} percent`}
+                      disabled={!globalLayoutSettings.folderClustering}
+                      id="global-folder-clustering-strength"
+                      max="100"
                       min="0"
                       onChange={(event) =>
-                        onAllNetworkDensityFramingStrengthChange(
-                          Number(event.currentTarget.value),
+                        onGlobalLayoutSettingsChange(
+                          withFolderClusteringStrength(
+                            globalLayoutSettings,
+                            Number(event.currentTarget.value),
+                          ),
                         )
                       }
                       step="1"
                       type="range"
-                      value={allNetworkDensityFramingStrength}
+                      value={folderStrength}
                     />
                     <small>
-                      <span>Legacy</span>
-                      <span>Auto</span>
-                      <span>Stronger</span>
+                      <span>Weak</span>
+                      <span>Strong</span>
                     </small>
                   </label>
-                  <p className="global-layout-scope-note">
-                    Camera-only framing for Scope = All, Layout = Network.
-                  </p>
-                  <DensityQaDiagnostics
-                    diagnostics={allNetworkDensityQaDiagnostics}
-                    unavailableMessage="Open All Network to read its live density camera."
-                  />
-                </div>
-                <div className="graph-settings__scope-group">
-                  <h4>Focus Network Density</h4>
-                  <label
-                    className="global-layout-strength"
-                    htmlFor="focus-density-framing-strength"
+                  <fieldset>
+                    <legend>Spacing</legend>
+                    {(['compact', 'normal', 'spacious'] as const).map(
+                      (preset) => (
+                        <label key={preset}>
+                          <input
+                            checked={
+                              globalLayoutSettings.spacingPreset === preset
+                            }
+                            name="global-spacing-preset"
+                            onChange={() => changePreset(preset)}
+                            type="radio"
+                            value={preset}
+                          />
+                          <span>
+                            {preset.slice(0, 1).toUpperCase() + preset.slice(1)}
+                          </span>
+                        </label>
+                      ),
+                    )}
+                  </fieldset>
+                  <button
+                    aria-controls="global-layout-advanced-controls"
+                    aria-expanded={advancedLayoutOpen}
+                    className="graph-settings__disclosure"
+                    onClick={() => setAdvancedLayoutOpen((current) => !current)}
+                    type="button"
                   >
-                    <span>
-                      <strong>Strength</strong>
-                      <output htmlFor="focus-density-framing-strength">
-                        {focusNetworkDensityFramingStrength}%
-                      </output>
-                    </span>
-                    <input
-                      aria-valuetext={`${focusNetworkDensityFramingStrength} percent`}
-                      id="focus-density-framing-strength"
-                      max="150"
-                      min="0"
-                      onChange={(event) =>
-                        onFocusNetworkDensityFramingStrengthChange(
-                          Number(event.currentTarget.value),
-                        )
-                      }
-                      step="1"
-                      type="range"
-                      value={focusNetworkDensityFramingStrength}
+                    <span aria-hidden="true">
+                      {advancedLayoutOpen ? '▾' : '▸'}
+                    </span>{' '}
+                    Advanced All Network controls
+                  </button>
+                  {advancedLayoutOpen ? (
+                    <GlobalCustomLayoutControls
+                      onChange={changeCustom}
+                      settings={customSettings}
                     />
-                    <small>
-                      <span>Legacy</span>
-                      <span>Auto</span>
-                      <span>Stronger</span>
-                    </small>
-                  </label>
-                  <p className="global-layout-scope-note">
-                    Camera-only framing for Scope = Focus, Layout = Network.
-                  </p>
-                  <DensityQaDiagnostics
-                    diagnostics={focusNetworkDensityQaDiagnostics}
-                    unavailableMessage="Open Focus Network to read its live density camera."
-                  />
-                </div>
-              </section>
+                  ) : null}
+                </section>
+              ) : null}
+              {networkActive ? (
+                <section
+                  aria-labelledby="network-density-settings-heading"
+                  className="graph-settings__section"
+                >
+                  <h3 id="network-density-settings-heading">Network Density</h3>
+                  {allNetworkActive ? (
+                    <div className="graph-settings__scope-group">
+                      <h4>All Network Density</h4>
+                      <label
+                        className="global-layout-strength"
+                        htmlFor="all-density-framing-strength"
+                      >
+                        <span>
+                          <strong>Strength</strong>
+                          <output htmlFor="all-density-framing-strength">
+                            {allNetworkDensityFramingStrength}%
+                          </output>
+                        </span>
+                        <input
+                          aria-valuetext={`${allNetworkDensityFramingStrength} percent`}
+                          id="all-density-framing-strength"
+                          max="150"
+                          min="0"
+                          onChange={(event) =>
+                            onAllNetworkDensityFramingStrengthChange(
+                              Number(event.currentTarget.value),
+                            )
+                          }
+                          step="1"
+                          type="range"
+                          value={allNetworkDensityFramingStrength}
+                        />
+                        <small>
+                          <span>Legacy</span>
+                          <span>Auto</span>
+                          <span>Stronger</span>
+                        </small>
+                      </label>
+                      <p className="global-layout-scope-note">
+                        Camera-only framing for Scope = All, Layout = Network.
+                      </p>
+                      <DensityQaDiagnostics
+                        diagnostics={allNetworkDensityQaDiagnostics}
+                        unavailableMessage="Open All Network to read its live density camera."
+                      />
+                    </div>
+                  ) : (
+                    <div className="graph-settings__scope-group">
+                      <h4>Focus Network Density</h4>
+                      <label
+                        className="global-layout-strength"
+                        htmlFor="focus-density-framing-strength"
+                      >
+                        <span>
+                          <strong>Strength</strong>
+                          <output htmlFor="focus-density-framing-strength">
+                            {focusNetworkDensityFramingStrength}%
+                          </output>
+                        </span>
+                        <input
+                          aria-valuetext={`${focusNetworkDensityFramingStrength} percent`}
+                          id="focus-density-framing-strength"
+                          max="150"
+                          min="0"
+                          onChange={(event) =>
+                            onFocusNetworkDensityFramingStrengthChange(
+                              Number(event.currentTarget.value),
+                            )
+                          }
+                          step="1"
+                          type="range"
+                          value={focusNetworkDensityFramingStrength}
+                        />
+                        <small>
+                          <span>Legacy</span>
+                          <span>Auto</span>
+                          <span>Stronger</span>
+                        </small>
+                      </label>
+                      <p className="global-layout-scope-note">
+                        Camera-only framing for Scope = Focus, Layout = Network.
+                      </p>
+                      <DensityQaDiagnostics
+                        diagnostics={focusNetworkDensityQaDiagnostics}
+                        unavailableMessage="Open Focus Network to read its live density camera."
+                      />
+                    </div>
+                  )}
+                </section>
+              ) : null}
               <section className="graph-settings__section">
                 <button
                   aria-controls="graph-experimental-controls"
@@ -629,233 +667,230 @@ export const GraphSettings = memo(function GraphSettings({
                 </button>
                 {experimentalOpen ? (
                   <div id="graph-experimental-controls">
-                    <fieldset className="graph-settings__choice-group">
-                      <legend>Focus Hierarchy implementation</legend>
-                      <label>
-                        <input
-                          checked={focusHierarchyImplementation === 'classic'}
-                          name="focus-hierarchy-implementation"
-                          onChange={() =>
-                            onFocusHierarchyImplementationChange?.('classic')
-                          }
-                          type="radio"
-                          value="classic"
-                        />
-                        <span>
-                          <strong>Classic</strong>
-                          <small>Current Focus Hierarchy renderer.</small>
-                        </span>
-                      </label>
-                      <label>
-                        <input
-                          checked={
-                            focusHierarchyImplementation === 'modular-preview'
-                          }
-                          name="focus-hierarchy-implementation"
-                          onChange={() =>
-                            onFocusHierarchyImplementationChange?.(
-                              'modular-preview',
-                            )
-                          }
-                          type="radio"
-                          value="modular-preview"
-                        />
-                        <span>
-                          <strong>Modular preview</strong>
-                          <small>
-                            New File-module layout with exact File/Heading/Block
-                            endpoints. Experimental until HIER3C.
-                          </small>
-                        </span>
-                      </label>
-                    </fieldset>
-                    <fieldset
-                      className="graph-settings__choice-group"
-                      disabled={
-                        focusHierarchyImplementation !== 'modular-preview'
-                      }
-                    >
-                      <legend>Macro layout</legend>
-                      <label>
-                        <input
-                          checked={
-                            modularFocusMacroLayout === 'directional-bands'
-                          }
-                          name="modular-focus-macro-layout"
-                          onChange={() =>
-                            onModularFocusMacroLayoutChange?.(
-                              'directional-bands',
-                            )
-                          }
-                          type="radio"
-                          value="directional-bands"
-                        />
-                        <span>
-                          <strong>Directional Bands</strong>
-                          <small>
-                            Keeps incoming, root, and outgoing folder ranks.
-                          </small>
-                        </span>
-                      </label>
-                      <label>
-                        <input
-                          checked={
-                            modularFocusMacroLayout === 'soft-folder-clusters'
-                          }
-                          name="modular-focus-macro-layout"
-                          onChange={() =>
-                            onModularFocusMacroLayoutChange?.(
-                              'soft-folder-clusters',
-                            )
-                          }
-                          type="radio"
-                          value="soft-folder-clusters"
-                        />
-                        <span>
-                          <strong>Soft Folder Clusters</strong>
-                          <small>
-                            Gently groups repeated folders around the Focus
-                            topology.
-                          </small>
-                        </span>
-                      </label>
-                      {modularFocusMacroLayout === 'soft-folder-clusters' ? (
-                        <label className="global-layout-strength">
-                          <span>
-                            Folder strength{' '}
-                            <output>{modularFocusSoftFolderStrength}</output>
-                          </span>
+                    {focusHierarchyActive ? (
+                      <fieldset className="graph-settings__choice-group">
+                        <legend>Focus Hierarchy implementation</legend>
+                        <label>
                           <input
-                            aria-label="Folder strength"
-                            list="modular-focus-folder-strength-marks"
-                            max={100}
-                            min={0}
-                            onChange={(event) =>
-                              onModularFocusSoftFolderStrengthChange?.(
-                                event.currentTarget.valueAsNumber,
+                            checked={focusHierarchyImplementation === 'classic'}
+                            name="focus-hierarchy-implementation"
+                            onChange={() =>
+                              onFocusHierarchyImplementationChange?.('classic')
+                            }
+                            type="radio"
+                            value="classic"
+                          />
+                          <span>
+                            <strong>Classic</strong>
+                            <small>Current Focus Hierarchy renderer.</small>
+                          </span>
+                        </label>
+                        <label>
+                          <input
+                            checked={
+                              focusHierarchyImplementation === 'modular-preview'
+                            }
+                            name="focus-hierarchy-implementation"
+                            onChange={() =>
+                              onFocusHierarchyImplementationChange?.(
+                                'modular-preview',
                               )
                             }
-                            step={1}
-                            type="range"
-                            value={modularFocusSoftFolderStrength}
+                            type="radio"
+                            value="modular-preview"
                           />
-                          <datalist id="modular-focus-folder-strength-marks">
-                            <option value="0" />
-                            <option value="25" />
-                            <option value="50" />
-                            <option value="75" />
-                            <option value="100" />
-                          </datalist>
-                          <small>
-                            <span>0</span>
-                            <span>25</span>
-                            <span>50</span>
-                            <span>75</span>
-                            <span>100</span>
-                          </small>
+                          <span>
+                            <strong>Modular preview</strong>
+                            <small>
+                              New File-module layout with exact
+                              File/Heading/Block endpoints. Experimental until
+                              HIER3C.
+                            </small>
+                          </span>
                         </label>
-                      ) : null}
-                    </fieldset>
-                    <fieldset
-                      className="graph-settings__choice-group"
-                      disabled={
-                        focusHierarchyImplementation !== 'modular-preview'
-                      }
-                    >
-                      <legend>Internal layout</legend>
-                      <label>
-                        <input
-                          checked={
-                            modularFocusInternalLayout === 'adaptive-compass'
-                          }
-                          name="modular-focus-internal-layout"
-                          onChange={() =>
-                            onModularFocusInternalLayoutChange?.(
-                              'adaptive-compass',
-                            )
-                          }
-                          type="radio"
-                          value="adaptive-compass"
-                        />
-                        <span>
-                          <strong>Adaptive Compass</strong>
-                          <small>
-                            Places structural branches around each File using
-                            exact endpoint demand.
-                          </small>
-                        </span>
-                      </label>
-                      <label>
-                        <input
-                          checked={
-                            modularFocusInternalLayout === 'vertical-spine'
-                          }
-                          name="modular-focus-internal-layout"
-                          onChange={() =>
-                            onModularFocusInternalLayoutChange?.(
-                              'vertical-spine',
-                            )
-                          }
-                          type="radio"
-                          value="vertical-spine"
-                        />
-                        <span>
-                          <strong>Vertical Spine</strong>
-                          <small>
-                            Keeps structural branches above and below each File.
-                          </small>
-                        </span>
-                      </label>
-                    </fieldset>
-                    <fieldset
-                      className="graph-settings__choice-group"
-                      disabled={
-                        focusHierarchyImplementation !== 'modular-preview'
-                      }
-                    >
-                      <legend>Heading order</legend>
-                      <label>
-                        <input
-                          checked={
-                            modularFocusHeadingOrder === 'crossing-optimized'
-                          }
-                          name="modular-focus-heading-order"
-                          onChange={() =>
-                            onModularFocusHeadingOrderChange?.(
-                              'crossing-optimized',
-                            )
-                          }
-                          type="radio"
-                          value="crossing-optimized"
-                        />
-                        <span>
-                          <strong>Crossing optimized</strong>
-                          <small>
-                            Reorders visual branches when that reduces exact
-                            endpoint crossings.
-                          </small>
-                        </span>
-                      </label>
-                      <label>
-                        <input
-                          checked={
-                            modularFocusHeadingOrder === 'document-order'
-                          }
-                          name="modular-focus-heading-order"
-                          onChange={() =>
-                            onModularFocusHeadingOrderChange?.('document-order')
-                          }
-                          type="radio"
-                          value="document-order"
-                        />
-                        <span>
-                          <strong>Document order</strong>
-                          <small>
-                            Uses Markdown source order for visual branches.
-                          </small>
-                        </span>
-                      </label>
-                    </fieldset>
+                      </fieldset>
+                    ) : null}
+                    {modularFocusHierarchyActive ? (
+                      <fieldset className="graph-settings__choice-group">
+                        <legend>Macro layout</legend>
+                        <label>
+                          <input
+                            checked={
+                              modularFocusMacroLayout === 'directional-bands'
+                            }
+                            name="modular-focus-macro-layout"
+                            onChange={() =>
+                              onModularFocusMacroLayoutChange?.(
+                                'directional-bands',
+                              )
+                            }
+                            type="radio"
+                            value="directional-bands"
+                          />
+                          <span>
+                            <strong>Directional Bands</strong>
+                            <small>
+                              Keeps incoming, root, and outgoing folder ranks.
+                            </small>
+                          </span>
+                        </label>
+                        <label>
+                          <input
+                            checked={
+                              modularFocusMacroLayout === 'soft-folder-clusters'
+                            }
+                            name="modular-focus-macro-layout"
+                            onChange={() =>
+                              onModularFocusMacroLayoutChange?.(
+                                'soft-folder-clusters',
+                              )
+                            }
+                            type="radio"
+                            value="soft-folder-clusters"
+                          />
+                          <span>
+                            <strong>Soft Folder Clusters</strong>
+                            <small>
+                              Gently groups repeated folders around the Focus
+                              topology.
+                            </small>
+                          </span>
+                        </label>
+                        {modularFocusMacroLayout === 'soft-folder-clusters' ? (
+                          <label className="global-layout-strength">
+                            <span>
+                              Folder strength{' '}
+                              <output>{modularFocusSoftFolderStrength}</output>
+                            </span>
+                            <input
+                              aria-label="Folder strength"
+                              list="modular-focus-folder-strength-marks"
+                              max={100}
+                              min={0}
+                              onChange={(event) =>
+                                onModularFocusSoftFolderStrengthChange?.(
+                                  event.currentTarget.valueAsNumber,
+                                )
+                              }
+                              step={1}
+                              type="range"
+                              value={modularFocusSoftFolderStrength}
+                            />
+                            <datalist id="modular-focus-folder-strength-marks">
+                              <option value="0" />
+                              <option value="25" />
+                              <option value="50" />
+                              <option value="75" />
+                              <option value="100" />
+                            </datalist>
+                            <small>
+                              <span>0</span>
+                              <span>25</span>
+                              <span>50</span>
+                              <span>75</span>
+                              <span>100</span>
+                            </small>
+                          </label>
+                        ) : null}
+                      </fieldset>
+                    ) : null}
+                    {modularFocusHierarchyActive ? (
+                      <fieldset className="graph-settings__choice-group">
+                        <legend>Internal layout</legend>
+                        <label>
+                          <input
+                            checked={
+                              modularFocusInternalLayout === 'adaptive-compass'
+                            }
+                            name="modular-focus-internal-layout"
+                            onChange={() =>
+                              onModularFocusInternalLayoutChange?.(
+                                'adaptive-compass',
+                              )
+                            }
+                            type="radio"
+                            value="adaptive-compass"
+                          />
+                          <span>
+                            <strong>Adaptive Compass</strong>
+                            <small>
+                              Places structural branches around each File using
+                              exact endpoint demand.
+                            </small>
+                          </span>
+                        </label>
+                        <label>
+                          <input
+                            checked={
+                              modularFocusInternalLayout === 'vertical-spine'
+                            }
+                            name="modular-focus-internal-layout"
+                            onChange={() =>
+                              onModularFocusInternalLayoutChange?.(
+                                'vertical-spine',
+                              )
+                            }
+                            type="radio"
+                            value="vertical-spine"
+                          />
+                          <span>
+                            <strong>Vertical Spine</strong>
+                            <small>
+                              Keeps structural branches above and below each
+                              File.
+                            </small>
+                          </span>
+                        </label>
+                      </fieldset>
+                    ) : null}
+                    {modularFocusHierarchyActive ? (
+                      <fieldset className="graph-settings__choice-group">
+                        <legend>Heading order</legend>
+                        <label>
+                          <input
+                            checked={
+                              modularFocusHeadingOrder === 'crossing-optimized'
+                            }
+                            name="modular-focus-heading-order"
+                            onChange={() =>
+                              onModularFocusHeadingOrderChange?.(
+                                'crossing-optimized',
+                              )
+                            }
+                            type="radio"
+                            value="crossing-optimized"
+                          />
+                          <span>
+                            <strong>Crossing optimized</strong>
+                            <small>
+                              Reorders visual branches when that reduces exact
+                              endpoint crossings.
+                            </small>
+                          </span>
+                        </label>
+                        <label>
+                          <input
+                            checked={
+                              modularFocusHeadingOrder === 'document-order'
+                            }
+                            name="modular-focus-heading-order"
+                            onChange={() =>
+                              onModularFocusHeadingOrderChange?.(
+                                'document-order',
+                              )
+                            }
+                            type="radio"
+                            value="document-order"
+                          />
+                          <span>
+                            <strong>Document order</strong>
+                            <small>
+                              Uses Markdown source order for visual branches.
+                            </small>
+                          </span>
+                        </label>
+                      </fieldset>
+                    ) : null}
                     <label className="graph-settings__check">
                       <input
                         checked={showExperimentalAllHierarchy}
@@ -874,75 +909,70 @@ export const GraphSettings = memo(function GraphSettings({
                         </small>
                       </span>
                     </label>
-                    <fieldset
-                      className="graph-settings__choice-group"
-                      disabled={
-                        focusHierarchyImplementation !== 'modular-preview'
-                      }
-                    >
-                      <legend>Folder guides</legend>
-                      <label>
-                        <input
-                          checked={modularFolderStripsVisible}
-                          name="modular-folder-guides"
-                          onChange={(event) =>
-                            onModularFolderStripsVisibleChange?.(
-                              event.currentTarget.checked,
-                            )
-                          }
-                          type="checkbox"
-                        />
-                        <span>
-                          <strong>Show folder guides</strong>
-                          <small>
-                            Shows exact-folder strips or cluster regions for the
-                            selected macro layout without changing geometry.
-                          </small>
-                        </span>
-                      </label>
-                    </fieldset>
-                    <fieldset
-                      className="graph-settings__choice-group"
-                      disabled={
-                        focusHierarchyImplementation !== 'modular-preview'
-                      }
-                    >
-                      <legend>Connection style</legend>
-                      <label>
-                        <input
-                          checked={modularConnectionStyle === 'direct'}
-                          name="modular-connection-style"
-                          onChange={() =>
-                            onModularConnectionStyleChange?.('direct')
-                          }
-                          type="radio"
-                          value="direct"
-                        />
-                        <span>
-                          <strong>Direct</strong>
-                          <small>
-                            Draws one straight path between exact endpoints.
-                          </small>
-                        </span>
-                      </label>
-                      <label>
-                        <input
-                          checked={modularConnectionStyle === 'electronic'}
-                          name="modular-connection-style"
-                          onChange={() =>
-                            onModularConnectionStyleChange?.('electronic')
-                          }
-                          type="radio"
-                          value="electronic"
-                        />
-                        <span>
-                          <strong>Electronic</strong>
-                          <small>
-                            Uses the existing stepped connector appearance.
-                          </small>
-                        </span>
-                      </label>
-                    </fieldset>
+                    {modularFocusHierarchyActive ? (
+                      <fieldset className="graph-settings__choice-group">
+                        <legend>Folder guides</legend>
+                        <label>
+                          <input
+                            checked={modularFolderStripsVisible}
+                            name="modular-folder-guides"
+                            onChange={(event) =>
+                              onModularFolderStripsVisibleChange?.(
+                                event.currentTarget.checked,
+                              )
+                            }
+                            type="checkbox"
+                          />
+                          <span>
+                            <strong>Show folder guides</strong>
+                            <small>
+                              Shows exact-folder strips or cluster regions for
+                              the selected macro layout without changing
+                              geometry.
+                            </small>
+                          </span>
+                        </label>
+                      </fieldset>
+                    ) : null}
+                    {modularFocusHierarchyActive ? (
+                      <fieldset className="graph-settings__choice-group">
+                        <legend>Connection style</legend>
+                        <label>
+                          <input
+                            checked={modularConnectionStyle === 'direct'}
+                            name="modular-connection-style"
+                            onChange={() =>
+                              onModularConnectionStyleChange?.('direct')
+                            }
+                            type="radio"
+                            value="direct"
+                          />
+                          <span>
+                            <strong>Direct</strong>
+                            <small>
+                              Draws one straight path between exact endpoints.
+                            </small>
+                          </span>
+                        </label>
+                        <label>
+                          <input
+                            checked={modularConnectionStyle === 'electronic'}
+                            name="modular-connection-style"
+                            onChange={() =>
+                              onModularConnectionStyleChange?.('electronic')
+                            }
+                            type="radio"
+                            value="electronic"
+                          />
+                          <span>
+                            <strong>Electronic</strong>
+                            <small>
+                              Uses the existing stepped connector appearance.
+                            </small>
+                          </span>
+                        </label>
+                      </fieldset>
+                    ) : null}
                   </div>
                 ) : null}
               </section>

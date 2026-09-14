@@ -4710,6 +4710,8 @@ export function GraphExplorer({
             <span>Tools</span>
           </button>
           <GraphSettings
+            activeLayout={activeLayout}
+            activeScope={activeScope}
             {...(allNetworkDensityQaDiagnostics === undefined
               ? {}
               : { allNetworkDensityQaDiagnostics })}
@@ -5004,6 +5006,8 @@ export function GraphExplorer({
               ) : null}
               {maximized ? null : (
                 <GraphSettings
+                  activeLayout={activeLayout}
+                  activeScope={activeScope}
                   {...(allNetworkDensityQaDiagnostics === undefined
                     ? {}
                     : { allNetworkDensityQaDiagnostics })}

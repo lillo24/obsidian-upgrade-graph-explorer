@@ -125,21 +125,25 @@ canonical truth, or own a platform storage implementation.
   Settings popover. Its transient keyboard-accessible tabs separate ordinary
   Preferences, the graph-presentation Sandbox, and App-owned Source & Diagnostics
   controls while keeping all panels mounted. `graph-settings-tabs.ts` owns the
-  wrapping three-tab keyboard transition. One visible Network section owns the
-  shared Reference Pull, Base node size, Link thickness, and Label threshold for
-  All + Network and Focus + Network. The All Network section retains Folder
-  clustering, normalized Strength, Spacing, Folder separation, and the persisted
-  0–100 link-influence setting. Its Advanced disclosure is transient. All four
-  controls still edit one validated serializable preference rather than adding
-  component-local or per-renderer state; global focus-root and gesture preference
-  storage remains in `../preferences/`.
+  wrapping three-tab keyboard transition. `GraphExplorer` supplies the canonical
+  semantic Scope/Layout, and Sandbox removes controls that cannot affect that
+  active view: Focus Root appears only in Focus + Hierarchy because Focus Network
+  has no appearance adapter; shared Network controls only in Network; All Network
+  controls only in All + Network; and Network Density mounts only the active
+  scope's slider and live QA diagnostics. The Experimental All Hierarchy feature
+  gate remains reachable in every view, while the Focus Hierarchy implementation
+  selector appears only in Focus + Hierarchy and its Modular controls mount only
+  for Modular preview. If a live mode change removes the focused control, focus
+  returns to the Sandbox tab. Hidden values remain owned by the existing
+  preference/session state and are never reset on unmount.
+  The shared Network controls still edit one validated serializable preference;
+  global focus-root and gesture preference storage remains in `../preferences/`.
   Separate All and Focus density sliders are page-lifetime live A/B camera
   controls: changing either preserves that renderer's semantic screen anchor
   and previews the new ratio without Fit, layout, or Pull work, even from a
   user-owned viewport. Their 0–150% labels distinguish Legacy (0), Auto (100),
   and Sandbox-only Stronger amplification (101–150); both still default to 100.
-  All-only physics/visual controls remain grouped and
-  explicitly scoped. Reset Sandbox deliberately excludes Trackpad Zoom, source
+  Reset Sandbox deliberately excludes Trackpad Zoom, source
   settings, spatial folder intent, Current View, and Named Saved Views. Temporary SPACING1B QA
   readouts mirror the mounted renderer sessions' ratios and fallback evidence;
   they are not product state and clear when their Network renderer unmounts.
