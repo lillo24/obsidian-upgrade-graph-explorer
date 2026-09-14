@@ -459,6 +459,7 @@ describe('HIER4A categorical Directional Folder Bands', () => {
     const policies = {
       macroLayout: 'directional-bands',
       softFolderStrength: 50,
+      softSpacing: 50,
       softFolderDisplayIntent: {
         fileParentOverrides: [],
         flattenedFolderKeys: [],

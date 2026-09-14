@@ -55,6 +55,8 @@ interface GraphSettingsProps {
   ) => void;
   readonly modularFocusSoftFolderStrength?: number;
   readonly onModularFocusSoftFolderStrengthChange?: (strength: number) => void;
+  readonly modularFocusSoftSpacing?: number;
+  readonly onModularFocusSoftSpacingChange?: (spacing: number) => void;
   readonly modularFolderStripsVisible?: GraphPreferences['modularFolderStripsVisible'];
   readonly onModularFolderStripsVisibleChange?: (visible: boolean) => void;
   readonly modularConnectionStyle?: GraphPreferences['modularConnectionStyle'];
@@ -173,6 +175,8 @@ export const GraphSettings = memo(function GraphSettings({
   onModularFocusMacroLayoutChange,
   modularFocusSoftFolderStrength = 50,
   onModularFocusSoftFolderStrengthChange,
+  modularFocusSoftSpacing = 50,
+  onModularFocusSoftSpacingChange,
   modularFolderStripsVisible = true,
   onModularFolderStripsVisibleChange,
   modularConnectionStyle = 'direct',
@@ -757,40 +761,86 @@ export const GraphSettings = memo(function GraphSettings({
                           </span>
                         </label>
                         {modularFocusMacroLayout === 'soft-folder-clusters' ? (
-                          <label className="global-layout-strength">
-                            <span>
-                              Folder strength{' '}
-                              <output>{modularFocusSoftFolderStrength}</output>
-                            </span>
-                            <input
-                              aria-label="Folder strength"
-                              list="modular-focus-folder-strength-marks"
-                              max={100}
-                              min={0}
-                              onChange={(event) =>
-                                onModularFocusSoftFolderStrengthChange?.(
-                                  event.currentTarget.valueAsNumber,
-                                )
-                              }
-                              step={1}
-                              type="range"
-                              value={modularFocusSoftFolderStrength}
-                            />
-                            <datalist id="modular-focus-folder-strength-marks">
-                              <option value="0" />
-                              <option value="25" />
-                              <option value="50" />
-                              <option value="75" />
-                              <option value="100" />
-                            </datalist>
-                            <small>
-                              <span>0</span>
-                              <span>25</span>
-                              <span>50</span>
-                              <span>75</span>
-                              <span>100</span>
-                            </small>
-                          </label>
+                          <>
+                            <label className="global-layout-strength">
+                              <span>
+                                Folder strength{' '}
+                                <output>
+                                  {modularFocusSoftFolderStrength}
+                                </output>
+                              </span>
+                              <input
+                                aria-label="Folder strength"
+                                list="modular-focus-folder-strength-marks"
+                                max={100}
+                                min={0}
+                                onChange={(event) =>
+                                  onModularFocusSoftFolderStrengthChange?.(
+                                    event.currentTarget.valueAsNumber,
+                                  )
+                                }
+                                step={1}
+                                type="range"
+                                value={modularFocusSoftFolderStrength}
+                              />
+                              <datalist id="modular-focus-folder-strength-marks">
+                                <option value="0" />
+                                <option value="25" />
+                                <option value="50" />
+                                <option value="75" />
+                                <option value="100" />
+                              </datalist>
+                              <small>
+                                <span>0</span>
+                                <span>25</span>
+                                <span>50</span>
+                                <span>75</span>
+                                <span>100</span>
+                              </small>
+                            </label>
+                            <label className="global-layout-strength">
+                              <span>
+                                Soft spacing{' '}
+                                <output htmlFor="modular-focus-soft-spacing">
+                                  {modularFocusSoftSpacing}
+                                </output>
+                              </span>
+                              <input
+                                aria-label="Soft spacing"
+                                aria-valuetext={
+                                  modularFocusSoftSpacing === 0
+                                    ? 'compact spacing'
+                                    : modularFocusSoftSpacing === 50
+                                      ? 'selected spacing'
+                                      : modularFocusSoftSpacing === 100
+                                        ? 'spacious spacing'
+                                        : `${modularFocusSoftSpacing} percent between Compact and Spacious`
+                                }
+                                id="modular-focus-soft-spacing"
+                                list="modular-focus-soft-spacing-marks"
+                                max={100}
+                                min={0}
+                                onChange={(event) =>
+                                  onModularFocusSoftSpacingChange?.(
+                                    event.currentTarget.valueAsNumber,
+                                  )
+                                }
+                                step={1}
+                                type="range"
+                                value={modularFocusSoftSpacing}
+                              />
+                              <datalist id="modular-focus-soft-spacing-marks">
+                                <option value="0" />
+                                <option value="50" />
+                                <option value="100" />
+                              </datalist>
+                              <small>
+                                <span>Compact</span>
+                                <span>Selected</span>
+                                <span>Spacious</span>
+                              </small>
+                            </label>
+                          </>
                         ) : null}
                       </fieldset>
                     ) : null}

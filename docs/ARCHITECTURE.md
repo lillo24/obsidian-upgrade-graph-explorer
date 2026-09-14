@@ -1445,9 +1445,10 @@ records per-module cardinal counts, demand matches and hard-guard overrides,
 pass-to-pass region and bounds changes, and pass-two crossing/span deltas. A
 separate perturbation diagnostic compares Adaptive and Vertical internal
 rectangles with final File-center displacement; identical internal geometry must
-produce identical downstream Soft geometry. Soft algorithm version 5 covers the
-combined spatial-Compass and root-neutral force geometry; worker protocol 7
-isolates the evidence change while the Directional algorithm version remains 3.
+produce identical downstream Soft geometry. Soft algorithm version 6 covers the
+combined spatial-Compass, root-neutral force, and spacing geometry; worker
+protocol 9 isolates the combined policy and evidence changes while the
+Directional algorithm version remains 4.
 
 The renderer derives a typed visible-structure marker for each unfiltered module
 after layout. Modules with only a currently visible File paint a transparent

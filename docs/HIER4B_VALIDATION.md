@@ -45,8 +45,8 @@ non-root Files only, and the root module is labeled `DISPLAY MEMBER ·
 FORCE-NEUTRAL`. SC26 shows that a root plus one peer cannot create an attraction
 group; SC27 shows two peers attracting around their own centroid; SC28 covers
 normalized-decay ancestor scopes. These scenarios display strengths 0, 25, 50,
-75, and 100 side by side. Soft cache algorithm version 5 separates the combined
-root-neutral and spatial-Compass geometry from both earlier version-4 branches.
+75, and 100 side by side. Soft cache algorithm version 6 separates the combined
+root-neutral, spatial-Compass, and spacing geometry from the earlier branches.
 
 ## Display-tree cases
 
@@ -175,6 +175,32 @@ merged `bfc4b1c` baseline. All six SHA-256 values remain byte-identical. The
 shared Compass engine still owns both policies; no algorithm copy or dependency
 was added.
 
+## HIER4B-SPACING candidate
+
+The spacing run first captured the version-5 baseline, then compared baseline,
+moderate, and wide macro policies independently against baseline, moderate, and
+wide internal policies on seven representative fixtures. The selected
+moderate/moderate default raises minimum module clearance from 72 to 88. On the
+representative matrix, mean bounds area rises about 16.8%, connected-pair P95
+about 10%, and exact endpoint-span P95 about 10.2% from the old baseline. The
+wide/wide upper anchor raises clearance to 104 without overlap, containment,
+root-centering, determinism, secondary-influence, schedule, or packing failure.
+
+The benchmark additionally runs all SC1–SC24 fixtures at spacing
+0/25/50/75/100, the 3×3 Folder strength × Soft spacing matrix, and
+development-only Adaptive region-use observations at the three anchors. Every
+sample uses the fixed `[36, 18]` schedule. Hop-radius error is measured against
+the currently resolved hop spacing. Root-neutral force regressions run at
+spacing 0, 50, and 100. Directional byte hashes and algorithm version remain
+unchanged. Native graphical QA is still required before merge.
+
+Adaptive Compass remains diagnostic for this task. The dedicated AC-S1–AC-S8
+rows preserve the merged Compass oracle at spacing 0 and separately record
+branch-region use and exact crossings at spacing 50 and 100. AC-S6 has zero
+crossings at 0 and one at both wider anchors, so native review must assess that
+visible interaction; HIER4B-SPACING does not change Compass assignment or
+scoring to conceal it.
+
 ## Commands
 
 ```text
@@ -219,3 +245,8 @@ The exact PATCH1 prompt is archived at
 `history-implementations/HIER4B_PATCH1_soft_adaptive_compass_consistency_codex_prompt.md`.
 Its SHA-256 is
 `9C43FC2C51C0F71D9F3E862BB7EF5377868D17202B319010BC3D8E5D684A8458`.
+
+The exact HIER4B-SPACING prompt is archived at
+`history-implementations/HIER4B_SPACING_soft_cluster_bakeoff_sandbox_slider_codex_prompt.md`.
+Its SHA-256 is
+`23845CB4420871AB06AEA263627C79636391EDF7D2EC2410387B2AC86146934C`.

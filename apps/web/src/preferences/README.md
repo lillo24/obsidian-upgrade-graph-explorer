@@ -62,6 +62,16 @@ horizontal strips and Soft Folder Clusters renders spatial regions. The value is
 consumed only after renderer adoption and never enters the model, worker, or
 cache key.
 
+HIER4B-SPACING adds `modularFocusSoftSpacing` to the same v1 preference record.
+It is normalized to 0–100 and defaults to 50; malformed values use 50 and
+finite out-of-range values clamp. Reset Sandbox restores 50. The value is sent
+to the layout worker and cache only for Soft Folder Clusters. Directional Bands
+retains the preference for a later return to Soft but erases its geometry and
+cache influence. This experimental control is intentionally absent from the
+exact `SavedFocusHierarchySettings` profile contract: capture omits it and
+applying an existing profile preserves the current Sandbox spacing value, so no
+Saved View schema migration is introduced.
+
 SPACING1B-QA keeps separate All Network and Focus Network density-framing
 strengths outside this durable record. Both start at 100% on every application
 launch and exist only to compare legacy ratio 1 with each production density

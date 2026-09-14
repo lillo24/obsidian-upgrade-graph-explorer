@@ -37,8 +37,8 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     const key = exactFocusSchematicLayoutCacheKey(input);
     expect(key).toContain('modular-focus-hierarchy');
     expect(key).toContain('"algorithmVersion":4');
-    expect(key).toContain('"protocolVersion":8');
-    expect(key.replace('"protocolVersion":8', '"protocolVersion":7')).not.toBe(
+    expect(key).toContain('"protocolVersion":9');
+    expect(key.replace('"protocolVersion":9', '"protocolVersion":8')).not.toBe(
       key,
     );
     expect(exactFocusSchematicLayoutCacheKey(input, 1)).not.toBe(key);
@@ -184,7 +184,7 @@ describe('page-lifetime Focus Schematic layout cache', () => {
       }) as const;
     expect(
       exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)),
-    ).toContain('"algorithmVersion":5');
+    ).toContain('"algorithmVersion":6');
     expect(
       exactFocusSchematicLayoutCacheKey(
         directionalInput,
@@ -218,6 +218,63 @@ describe('page-lifetime Focus Schematic layout cache', () => {
         DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
       ),
     ).not.toBe(exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)));
+  });
+
+  it('keys Soft spacing independently while Directional ignores the retained value', () => {
+    const directionalInput = fixtureInput(4);
+    const softInput = {
+      ...directionalInput,
+      settings: {
+        ...directionalInput.settings,
+        directionalFolderBandsEnabled: false,
+      },
+    };
+    const policiesAt = (
+      softSpacing: number,
+      macroLayout:
+        'soft-folder-clusters' | 'directional-bands' = 'soft-folder-clusters',
+    ) => ({
+      ...DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+      macroLayout,
+      softSpacing,
+    });
+    expect(
+      exactFocusSchematicLayoutCacheKey(
+        directionalInput,
+        policiesAt(25, 'directional-bands'),
+      ),
+    ).toBe(
+      exactFocusSchematicLayoutCacheKey(
+        directionalInput,
+        policiesAt(75, 'directional-bands'),
+      ),
+    );
+    expect(
+      exactFocusSchematicLayoutCacheKey(softInput, policiesAt(25)),
+    ).not.toBe(exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)));
+    expect(
+      exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)),
+    ).not.toBe(exactFocusSchematicLayoutCacheKey(softInput, policiesAt(75)));
+
+    const at25 = computeFocusSchematicSoftClusterLayoutAttempt(softInput, {
+      spacing: 25,
+    });
+    const at75 = computeFocusSchematicSoftClusterLayoutAttempt(softInput, {
+      spacing: 75,
+    });
+    if (at25.status !== 'success' || at75.status !== 'success')
+      throw new Error('Expected Soft spacing cache fixtures to compute.');
+    const cache = new FocusSchematicLayoutCache();
+    cache.set(softInput, policiesAt(25), at25.result);
+    cache.set(softInput, policiesAt(75), at75.result);
+    expect(cache.get(softInput, policiesAt(25))).toMatchObject({
+      status: 'hit',
+      value: at25.result,
+    });
+    expect(cache.get(softInput, policiesAt(75))).toMatchObject({
+      status: 'hit',
+      value: at75.result,
+    });
   });
 
   it('keys canonical manual display intent only in Soft mode', () => {

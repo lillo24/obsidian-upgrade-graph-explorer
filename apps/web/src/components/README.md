@@ -377,6 +377,15 @@ geometry-relevant values. Disclosure, reroot, filtering, exact hover, Secondary
 presentation, and camera behavior continue through the existing projection and
 React Flow seams.
 
+HIER4B-SPACING places one additional `Soft spacing` range beside Folder
+strength only while Focus + Hierarchy + Modular Preview + Soft Folder Clusters
+is active. `GraphExplorer.tsx` persists and normalizes the 0–100 value, Reset
+Sandbox restores 50, and `ModularStructuredGraphView.tsx` includes it in the
+typed Soft policy and exact cache key. Directional mode resolves the retained
+value to the inert default. Rapid input continues through the existing
+latest-result-wins worker lifecycle, so superseded values cannot replace the
+newest layout and no serial queue or release-only update path is added.
+
 HIER4B-FIX2 keeps exact folders as source truth while `GraphExplorer.tsx`
 derives stable File identity/folder pairs from the canonical snapshot and owns
 the workspace-keyed sparse display-intent session. `ModularStructuredGraphView.tsx`

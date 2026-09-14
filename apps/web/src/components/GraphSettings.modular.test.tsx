@@ -46,6 +46,8 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
     onSoftFolderStrengthChange = vi.fn(),
     onFolderStripsChange = vi.fn(),
     onConnectionStyleChange = vi.fn(),
+    softSpacing = 50,
+    onSoftSpacingChange = vi.fn(),
   ) {
     act(() => {
       root.render(
@@ -61,6 +63,7 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
           modularFocusInternalLayout={internalLayout}
           modularFocusMacroLayout={macroLayout}
           modularFocusSoftFolderStrength={softFolderStrength}
+          modularFocusSoftSpacing={softSpacing}
           modularFolderStripsVisible={folderStrips}
           modularConnectionStyle={connectionStyle}
           onAllNetworkDensityFramingStrengthChange={() => undefined}
@@ -72,6 +75,7 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
           onModularFocusInternalLayoutChange={onInternalLayoutChange}
           onModularFocusMacroLayoutChange={onMacroLayoutChange}
           onModularFocusSoftFolderStrengthChange={onSoftFolderStrengthChange}
+          onModularFocusSoftSpacingChange={onSoftSpacingChange}
           onModularFolderStripsVisibleChange={onFolderStripsChange}
           onModularConnectionStyleChange={onConnectionStyleChange}
           onOpenChange={() => undefined}
@@ -95,6 +99,7 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
       onInternalLayoutChange,
       onMacroLayoutChange,
       onSoftFolderStrengthChange,
+      onSoftSpacingChange,
       onFolderStripsChange,
       onConnectionStyleChange,
     };
@@ -131,6 +136,7 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
           modularFocusInternalLayout="adaptive-compass"
           modularFocusMacroLayout="directional-bands"
           modularFocusSoftFolderStrength={50}
+          modularFocusSoftSpacing={50}
           modularFolderStripsVisible
           modularConnectionStyle="direct"
           onAllNetworkDensityFramingStrengthChange={
@@ -146,6 +152,7 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
           onModularFocusInternalLayoutChange={() => undefined}
           onModularFocusMacroLayoutChange={() => undefined}
           onModularFocusSoftFolderStrengthChange={() => undefined}
+          onModularFocusSoftSpacingChange={() => undefined}
           onModularFolderStripsVisibleChange={() => undefined}
           onModularConnectionStyleChange={() => undefined}
           onOpenChange={() => undefined}
@@ -355,6 +362,9 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
     expect(
       container.querySelector('input[aria-label="Folder strength"]'),
     ).toBeNull();
+    expect(
+      container.querySelector('input[aria-label="Soft spacing"]'),
+    ).toBeNull();
     const modularControls = Array.from(
       container.querySelectorAll<HTMLInputElement>('input[name^="modular-"]'),
     );
@@ -366,6 +376,7 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
     const onHeadingOrderChange = vi.fn();
     const onMacroLayoutChange = vi.fn();
     const onSoftFolderStrengthChange = vi.fn();
+    const onSoftSpacingChange = vi.fn();
     const onFolderStripsChange = vi.fn();
     const onConnectionStyleChange = vi.fn();
     renderSettings(
@@ -382,6 +393,8 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
       onSoftFolderStrengthChange,
       onFolderStripsChange,
       onConnectionStyleChange,
+      63,
+      onSoftSpacingChange,
     );
 
     const byValue = (value: string) =>
@@ -416,11 +429,34 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
       slider.dispatchEvent(new Event('input', { bubbles: true }));
       slider.dispatchEvent(new Event('change', { bubbles: true }));
     });
+    const spacingSlider = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Soft spacing"]',
+    )!;
+    expect(spacingSlider.value).toBe('63');
+    expect(spacingSlider.getAttribute('aria-valuetext')).toContain(
+      '63 percent',
+    );
+    act(() => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      )!.set!.call(spacingSlider, '75');
+      spacingSlider.dispatchEvent(new Event('input', { bubbles: true }));
+      spacingSlider.dispatchEvent(new Event('change', { bubbles: true }));
+    });
     expect(onInternalLayoutChange).toHaveBeenCalledWith('adaptive-compass');
     expect(onHeadingOrderChange).toHaveBeenCalledWith('crossing-optimized');
     expect(onMacroLayoutChange).toHaveBeenCalledWith('directional-bands');
     expect(onSoftFolderStrengthChange).toHaveBeenCalledWith(75);
+    expect(onSoftSpacingChange).toHaveBeenCalledWith(75);
     expect(onConnectionStyleChange).toHaveBeenCalledWith('direct');
     expect(onFolderStripsChange).toHaveBeenCalledWith(true);
+  });
+
+  it('shows Soft spacing only for active Modular Soft Folder Clusters', () => {
+    renderSettings('modular-preview', 'adaptive-compass', 'crossing-optimized');
+    expect(
+      container.querySelector('input[aria-label="Soft spacing"]'),
+    ).toBeNull();
   });
 });

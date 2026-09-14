@@ -17,6 +17,10 @@ import {
   createSoftClusterMultiplicityFixture,
   FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
   SOFT_ADAPTIVE_COMPASS_FIXTURES,
+  FOCUS_SCHEMATIC_SOFT_CLUSTER_BASELINE_SPACING,
+  FOCUS_SCHEMATIC_SOFT_SPACING_COMPACT,
+  FOCUS_SCHEMATIC_SOFT_SPACING_SELECTED,
+  FOCUS_SCHEMATIC_SOFT_SPACING_SPACIOUS,
   SOFT_CLUSTER_FIXTURES,
   SOFT_CLUSTER_STABILITY_PAIRS,
   type EndpointFixtureSpec,
@@ -25,6 +29,7 @@ import {
   type FocusSchematicSoftHierarchyForcePolicy,
   type FocusSchematicSoftClusterStrength,
   type FocusSchematicSoftClusterOptions,
+  type FocusSchematicSoftClusterSpacingPolicy,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 
 import { createLayoutInput } from './dimensions';
@@ -80,6 +85,8 @@ function soft(
     fixtureId: spec.id,
     fixtureLabel: spec.label,
     strength,
+    softSpacing: first.evidence.softSpacing,
+    resolvedSpacing: first.evidence.resolvedSpacing,
     deterministic:
       JSON.stringify(first.result.candidate) ===
       JSON.stringify(second.result.candidate),
@@ -112,6 +119,47 @@ function soft(
         ).length,
       ]),
     ),
+    adaptiveRegionUse: (() => {
+      const modules = first.result.internalLayoutEvidence.moduleMetrics.filter(
+        ({ topLevelBranchCount }) => topLevelBranchCount > 0,
+      );
+      const regionCounts = modules.map(
+        (module) =>
+          [
+            module.branchesLeftOfFile,
+            module.branchesRightOfFile,
+            module.branchesAboveFile,
+            module.branchesBelowFile,
+          ].filter((count) => count > 0).length,
+      );
+      return {
+        modulesByRegionCount: Object.fromEntries(
+          [1, 2, 3, 4].map((count) => [
+            count,
+            regionCounts.filter((value) => value === count).length,
+          ]),
+        ),
+        branches: {
+          left: modules.reduce(
+            (sum, module) => sum + module.branchesLeftOfFile,
+            0,
+          ),
+          right: modules.reduce(
+            (sum, module) => sum + module.branchesRightOfFile,
+            0,
+          ),
+          top: modules.reduce(
+            (sum, module) => sum + module.branchesAboveFile,
+            0,
+          ),
+          bottom: modules.reduce(
+            (sum, module) => sum + module.branchesBelowFile,
+            0,
+          ),
+        },
+        branchRegionChurn: first.evidence.runtime.compassBranchRegionChurn,
+      };
+    })(),
   };
 }
 
@@ -678,6 +726,248 @@ function stabilityRows() {
   );
 }
 
+const emptyDisplayIntent: FocusSchematicSoftFolderDisplayIntent = {
+  fileParentOverrides: [],
+  flattenedFolderKeys: [],
+};
+
+const macroSpacingCandidates = {
+  baseline: {
+    hopSpacing: 520,
+    moduleGap: 72,
+    topologyExtraDistance: 155,
+    packingStep: 64,
+    radialJitter: 90,
+  },
+  moderate: {
+    hopSpacing: 600,
+    moduleGap: 88,
+    topologyExtraDistance: 180,
+    packingStep: 72,
+    radialJitter: 104,
+  },
+  wide: {
+    hopSpacing: 680,
+    moduleGap: 104,
+    topologyExtraDistance: 210,
+    packingStep: 84,
+    radialJitter: 120,
+  },
+} as const;
+
+const internalSpacingCandidates = {
+  baseline: {
+    internalNodeSeparation: 24,
+    internalRankSeparation: 48,
+    modulePaddingX: 28,
+    modulePaddingY: 24,
+  },
+  moderate: {
+    internalNodeSeparation: 30,
+    internalRankSeparation: 60,
+    modulePaddingX: 34,
+    modulePaddingY: 30,
+  },
+  wide: {
+    internalNodeSeparation: 36,
+    internalRankSeparation: 72,
+    modulePaddingX: 42,
+    modulePaddingY: 36,
+  },
+} as const;
+
+function candidateSpacing(
+  macro: keyof typeof macroSpacingCandidates,
+  internal: keyof typeof internalSpacingCandidates,
+): FocusSchematicSoftClusterSpacingPolicy {
+  return {
+    ...macroSpacingCandidates[macro],
+    ...internalSpacingCandidates[internal],
+  };
+}
+
+const representativeSpacingFixtures = [
+  'SC1',
+  'SC2',
+  'SC7',
+  'SC8',
+  'SC11',
+  'SC14',
+  'SC16',
+].map((id) => SOFT_CLUSTER_FIXTURES.find((spec) => spec.id === id)!);
+
+const spacingCandidateRows = Object.keys(macroSpacingCandidates).flatMap(
+  (macro) =>
+    Object.keys(internalSpacingCandidates).flatMap((internal) =>
+      representativeSpacingFixtures.map((spec) => ({
+        macro,
+        internal,
+        ...soft(spec, 50, emptyDisplayIntent, 'normalized-decay', {
+          spacing: 50,
+          spacingPolicy: candidateSpacing(
+            macro as keyof typeof macroSpacingCandidates,
+            internal as keyof typeof internalSpacingCandidates,
+          ),
+        }),
+      })),
+    ),
+);
+
+type SoftRow = ReturnType<typeof soft>;
+
+function numbers(
+  rows: readonly SoftRow[],
+  read: (row: SoftRow) => number | null,
+): number[] {
+  return rows.flatMap((row) => {
+    const value = read(row);
+    return value === null ? [] : [value];
+  });
+}
+
+function average(values: readonly number[]): number | null {
+  return values.length === 0
+    ? null
+    : values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function summarizeSpacingRows(rows: readonly SoftRow[]) {
+  const metric = (
+    read: (row: SoftRow) => number | null,
+    worst: 'maximum' | 'minimum' = 'maximum',
+  ) => {
+    const values = numbers(rows, read);
+    return {
+      mean: average(values),
+      worst:
+        values.length === 0
+          ? null
+          : worst === 'maximum'
+            ? Math.max(...values)
+            : Math.min(...values),
+    };
+  };
+  return {
+    rowCount: rows.length,
+    hardGatesPass: rows.every(
+      ({ deterministic, rootFileCentered, hardGates }) =>
+        deterministic &&
+        rootFileCentered &&
+        hardGates.overlapFree &&
+        hardGates.nodeContainment &&
+        hardGates.secondaryGeometryInfluence === 0 &&
+        hardGates.boundedSchedule,
+    ),
+    minimumModuleGap: metric((row) => row.metrics.minimumModuleGap, 'minimum'),
+    boundsWidth: metric((row) => row.metrics.boundsWidth),
+    boundsHeight: metric((row) => row.metrics.boundsHeight),
+    boundsArea: metric((row) => row.metrics.boundsArea),
+    connectedPairDistanceMean: metric(
+      (row) => row.metrics.connectedPairDistanceMean,
+    ),
+    connectedPairDistanceP95: metric(
+      (row) => row.metrics.connectedPairDistanceP95,
+    ),
+    exactPrimaryEndpointSpanMean: metric(
+      (row) => row.metrics.exactPrimaryEndpointSpanMean,
+    ),
+    exactPrimaryEndpointSpanP95: metric(
+      (row) => row.metrics.exactPrimaryEndpointSpanP95,
+    ),
+    exactEndpointCrossingCount: metric(
+      (row) => row.metrics.exactEndpointCrossingCount,
+    ),
+    hopMeanAbsoluteRadiusError: metric(
+      (row) => row.metrics.hopMeanAbsoluteRadiusError,
+    ),
+    repeatedFolderRmsRadiusMean: metric(
+      (row) => row.metrics.repeatedFolderRmsRadiusMean,
+    ),
+    repeatedFolderRmsRadiusMedian: metric(
+      (row) => row.metrics.repeatedFolderRmsRadiusMedian,
+    ),
+    repeatedFolderRmsRadiusP95: metric(
+      (row) => row.metrics.repeatedFolderRmsRadiusP95,
+    ),
+    childFolderCoherenceMean: metric(
+      (row) => row.metrics.childFolderCoherenceMean,
+    ),
+    parentFolderCoherenceMean: metric(
+      (row) => row.metrics.parentFolderCoherenceMean,
+    ),
+    collisionCheckCount: metric((row) => row.runtime.collisionCheckCount),
+    collisionCorrectionCount: metric(
+      (row) => row.runtime.collisionCorrectionCount,
+    ),
+    layoutMs: metric((row) => row.runtime.layoutMs),
+  };
+}
+
+const spacingCandidateSummaries = Object.keys(macroSpacingCandidates).flatMap(
+  (macro) =>
+    Object.keys(internalSpacingCandidates).map((internal) => ({
+      macro,
+      internal,
+      policy: candidateSpacing(
+        macro as keyof typeof macroSpacingCandidates,
+        internal as keyof typeof internalSpacingCandidates,
+      ),
+      summary: summarizeSpacingRows(
+        spacingCandidateRows.filter(
+          (row) => row.macro === macro && row.internal === internal,
+        ),
+      ),
+    })),
+);
+
+const spacingSamples = [0, 25, 50, 75, 100] as const;
+const spacingRows = spacingSamples.flatMap((spacing) =>
+  SOFT_CLUSTER_FIXTURES.map((spec) => ({
+    spacing,
+    ...soft(spec, 50, emptyDisplayIntent, 'normalized-decay', { spacing }),
+  })),
+);
+const adaptiveSpacingRows = [0, 50, 100].flatMap((spacing) =>
+  SOFT_ADAPTIVE_COMPASS_FIXTURES.map((spec) => ({
+    spacing,
+    ...soft(spec, 50, emptyDisplayIntent, 'normalized-decay', { spacing }),
+  })),
+);
+const spacingAnchorSummaries = spacingSamples.map((spacing) => ({
+  spacing,
+  policy:
+    spacing === 0
+      ? FOCUS_SCHEMATIC_SOFT_SPACING_COMPACT
+      : spacing === 50
+        ? FOCUS_SCHEMATIC_SOFT_SPACING_SELECTED
+        : spacing === 100
+          ? FOCUS_SCHEMATIC_SOFT_SPACING_SPACIOUS
+          : spacingRows.find((row) => row.spacing === spacing)!.resolvedSpacing,
+  summary: summarizeSpacingRows(
+    spacingRows.filter((row) => row.spacing === spacing),
+  ),
+  adaptiveObservation: adaptiveSpacingRows
+    .filter((row) => row.spacing === spacing)
+    .map(({ fixtureId, metrics, adaptiveRegionUse }) => ({
+      fixtureId,
+      exactEndpointCrossingCount: metrics.exactEndpointCrossingCount,
+      ...adaptiveRegionUse,
+    })),
+}));
+
+const strengthSpacingRows = [0, 50, 100].flatMap((strength) =>
+  [0, 50, 100].map((spacing) => ({
+    spacing,
+    ...soft(
+      SOFT_CLUSTER_FIXTURES.find(({ id }) => id === 'SC16')!,
+      strength,
+      emptyDisplayIntent,
+      'normalized-decay',
+      { spacing },
+    ),
+  })),
+);
+
 const fixtureRows = SOFT_CLUSTER_FIXTURES.flatMap((spec) =>
   strengths.map((strength) => soft(spec, strength)),
 );
@@ -686,12 +976,14 @@ const compassDemandBakeoffRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.flatMap(
     {
       strategy: 'D0-directional-horizontal',
       ...soft(spec, 50, undefined, undefined, {
+        spacing: 0,
         compassDemandPolicy: 'directional-horizontal',
       }),
     },
     {
       strategy: 'S1-dominant-cardinal',
       ...soft(spec, 50, undefined, undefined, {
+        spacing: 0,
         compassDemandPolicy: 'spatial-cardinal',
         spatialDemandSummary: 'dominant-cardinal',
       }),
@@ -699,6 +991,7 @@ const compassDemandBakeoffRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.flatMap(
     {
       strategy: 'S2-aggregate-vector',
       ...soft(spec, 50, undefined, undefined, {
+        spacing: 0,
         compassDemandPolicy: 'spatial-cardinal',
         spatialDemandSummary: 'aggregate-vector',
       }),
@@ -706,17 +999,22 @@ const compassDemandBakeoffRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.flatMap(
     {
       strategy: 'V-vertical-control',
       ...soft(spec, 50, undefined, undefined, {
+        spacing: 0,
         internalLayoutVariant: 'vertical-spine',
       }),
     },
   ],
 );
 const compassStrengthRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.flatMap((spec) =>
-  strengths.map((strength) => soft(spec, strength)),
+  strengths.map((strength) =>
+    soft(spec, strength, undefined, undefined, { spacing: 0 }),
+  ),
 );
 const macroPerturbationRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.map((spec) => ({
   fixtureId: spec.id,
-  ...compareFocusSchematicSoftInternalVariants(inputFor(spec, false)),
+  ...compareFocusSchematicSoftInternalVariants(inputFor(spec, false), {
+    spacing: 0,
+  }),
 }));
 const stressRows = [20, 50, 100].flatMap((count) =>
   strengths.map((strength) => ({
@@ -766,17 +1064,21 @@ const hardGatesPass =
   zeroFolderMutation.byteIdentical;
 const completeHardGatesPass =
   hardGatesPass &&
+  spacingCandidateSummaries.every(({ summary }) => summary.hardGatesPass) &&
+  spacingAnchorSummaries.every(({ summary }) => summary.hardGatesPass) &&
+  summarizeSpacingRows(strengthSpacingRows).hardGatesPass &&
   secondaryInvariant.byteIdentical &&
   permutationInvariant.byteIdentical;
 
 const report = {
-  schemaVersion: 1,
-  title: 'HIER4B Soft Folder Clusters bakeoff',
+  schemaVersion: 2,
+  title: 'HIER4B-SPACING Soft Folder Clusters bakeoff',
   status: 'UNDER_EVALUATION',
-  productionLayoutChanged: false,
+  productionLayoutChanged: true,
   defaultLabConfiguration: {
     macroLayout: 'soft-folder-clusters',
     strength: 50,
+    spacing: 50,
     internalLayout: 'adaptive-compass',
     headingOrder: 'crossing-optimized',
   },
@@ -785,6 +1087,23 @@ const report = {
     : 'SOFT_CLUSTERS_REQUIRE_REDESIGN',
   strengths,
   fixedIterationSchedule: [36, 18],
+  oldBaselineSpacing: FOCUS_SCHEMATIC_SOFT_CLUSTER_BASELINE_SPACING,
+  spacingCandidateMatrix: {
+    representativeFixtureIds: representativeSpacingFixtures.map(({ id }) => id),
+    macroCandidates: macroSpacingCandidates,
+    internalCandidates: internalSpacingCandidates,
+    selected: { macro: 'moderate', internal: 'moderate' },
+    summaries: spacingCandidateSummaries,
+  },
+  spacingAnchors: {
+    compact: FOCUS_SCHEMATIC_SOFT_SPACING_COMPACT,
+    selected: FOCUS_SCHEMATIC_SOFT_SPACING_SELECTED,
+    spacious: FOCUS_SCHEMATIC_SOFT_SPACING_SPACIOUS,
+  },
+  spacingRows,
+  adaptiveSpacingRows,
+  spacingAnchorSummaries,
+  strengthSpacingRows,
   hardGatesPass: completeHardGatesPass,
   strengthZeroFolderMutation: zeroFolderMutation,
   secondaryMutation: secondaryInvariant,

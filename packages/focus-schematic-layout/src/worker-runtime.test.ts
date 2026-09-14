@@ -161,6 +161,7 @@ describe('Focus Schematic layout worker protocol', () => {
           const selectedPolicies = {
             macroLayout,
             softFolderStrength: 50,
+            softSpacing: 50,
             softFolderDisplayIntent: {
               fileParentOverrides: [],
               flattenedFolderKeys: [],

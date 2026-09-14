@@ -99,10 +99,42 @@ pass-one/pass-two region and bounds churn, and before/after pass-two crossings
 and span. The macro perturbation diagnostic distinguishes visible region,
 internal rectangle, and module-bound changes from a true geometric no-op. When
 Adaptive and Vertical input rectangles are identical, the downstream Soft
-candidate is byte-identical. Soft cache algorithm version 5 covers the combined
-spatial-Compass and root-neutral force geometry, while worker protocol version 7
-isolates the changed evidence shape without invalidating the Directional
+candidate is byte-identical. Soft cache algorithm version 6 covers the combined spatial-Compass, root-neutral
+force, and spacing geometry, while worker protocol version 9 isolates the
+combined evidence and policy shape without invalidating the Directional
 algorithm version.
+
+## Soft spacing
+
+HIER4B-SPACING adds a separate Sandbox `Soft spacing` value from 0 to 100.
+It controls geometric breathing room; `Folder strength` continues to control
+only repeated-folder attraction. The default value is 50. Values use piecewise
+integer interpolation through three benchmarked policies:
+
+| Property                  | 0 Compact | 50 Selected | 100 Spacious |
+| ------------------------- | --------: | ----------: | -----------: |
+| Hop spacing               |       520 |         600 |          680 |
+| Module gap                |        72 |          88 |          104 |
+| Topology extra distance   |       155 |         180 |          210 |
+| Packing step              |        64 |          72 |           84 |
+| Radial jitter range       |        90 |         104 |          120 |
+| Internal node separation  |        24 |          30 |           36 |
+| Internal rank separation  |        48 |          60 |           72 |
+| Horizontal module padding |        28 |          34 |           42 |
+| Vertical module padding   |        24 |          30 |           36 |
+
+The 0 anchor preserves the pre-spacing Soft geometry. The selected 50 anchor
+raises the hard module clearance from 72 to 88 while keeping bounds, endpoint
+span, hop error, cohesion, collision work, and runtime within the validated
+bakeoff range. The 100 anchor provides a bounded exploratory upper limit.
+All values keep the fixed `[36, 18]` schedule and root-neutral force behavior.
+
+The internal values are applied through a derived Soft-only input and never
+change the shared HIER settings. Soft cache identity includes the normalized
+spacing value. Directional requests replace it with the default and exclude it
+from cache identity, so a retained hidden value has no Directional geometry or
+worker influence. Adaptive Compass assignment, search, scoring, and tie-breaks
+are unchanged; region-use observations belong only to the development evidence.
 
 ## Nested Folder guides
 
@@ -225,9 +257,10 @@ graphical question.
 
 ## Later work
 
-`HIER4B-SPACING` will evaluate wider use of the available canvas and less
-cramped module interiors after folder semantics are frozen.
-`HIER4B-UNIFIED-REGIONS` will separately compare the current split-when-needed
-policy with a policy that prioritizes spatially unified displayed folders.
-`MODULAR-CONTEXT1` will add Network-style Focus, Inspect, Hide File, and Hide
-Folder actions to the same composed menu model. None belongs to PATCH1.
+`HIER4B-SPACING` now has an implemented candidate and Sandbox tuning control;
+native graphical approval is pending. `HIER4B-UNIFIED-REGIONS` will separately
+compare the current split-when-needed policy with a policy that prioritizes
+spatially unified displayed folders. `MODULAR-CONTEXT1` will add Network-style
+Focus, Inspect, Hide File, and Hide Folder actions to the same composed menu
+model. Adaptive Compass compatibility remains a separate graphical review
+question.

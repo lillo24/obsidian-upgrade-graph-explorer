@@ -18,6 +18,12 @@ import {
 import { evaluateFocusSchematicFolderBandQuality } from './folder-bands';
 import { normalizeFocusSchematicSoftFolderStrength } from './policies';
 import {
+  normalizeFocusSchematicSoftSpacing,
+  resolveFocusSchematicSoftClusterSpacing,
+  validateFocusSchematicSoftClusterSpacingPolicy,
+  type FocusSchematicSoftClusterSpacingPolicy,
+} from './soft-cluster-spacing';
+import {
   buildFocusSchematicSoftFolderDisplayTree,
   canonicalFocusSchematicSoftFolderDisplayIntent,
   EMPTY_FOCUS_SCHEMATIC_SOFT_FOLDER_DISPLAY_INTENT,
@@ -42,11 +48,9 @@ import type {
 export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE = [
   36, 18,
 ] as const;
-export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 5 as const;
+export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 6 as const;
 
 const STRATEGY_ID = 'HIER4B-soft-folder-clusters' as const;
-const HOP_SPACING = 520;
-const MODULE_GAP = 72;
 const EPSILON = 1e-6;
 
 interface Position {
@@ -269,6 +273,7 @@ function initialPositions(
   input: FocusSchematicLayoutInput,
   candidate: FocusSchematicLayoutCandidate,
   hops: ReadonlyMap<string, number>,
+  spacing: FocusSchematicSoftClusterSpacingPolicy,
 ): Map<string, Position> {
   return new Map(
     [...candidate.modules]
@@ -282,8 +287,12 @@ function initialPositions(
         const hop =
           hops.get(module.moduleId) ?? Math.max(1, semantic.focusDistance);
         const angle = hashUnit(`module:${module.moduleId}`) * Math.PI * 2;
-        const radialJitter = (hashUnit(`radius:${module.moduleId}`) - 0.5) * 90;
-        const radius = Math.max(HOP_SPACING, hop * HOP_SPACING + radialJitter);
+        const radialJitter =
+          (hashUnit(`radius:${module.moduleId}`) - 0.5) * spacing.radialJitter;
+        const radius = Math.max(
+          spacing.hopSpacing,
+          hop * spacing.hopSpacing + radialJitter,
+        );
         return [
           module.moduleId,
           { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius },
@@ -341,6 +350,7 @@ function collisionPass(
   positions: Map<string, Position>,
   rootId: string,
   stats: RelaxationStats,
+  spacing: FocusSchematicSoftClusterSpacingPolicy,
 ) {
   for (let leftIndex = 0; leftIndex < modules.length; leftIndex += 1) {
     const left = modules[leftIndex]!;
@@ -354,9 +364,13 @@ function collisionPass(
       const a = positions.get(left.moduleId)!;
       const b = positions.get(right.moduleId)!;
       const overlapX =
-        (left.width + right.width) / 2 + MODULE_GAP - Math.abs(b.x - a.x);
+        (left.width + right.width) / 2 +
+        spacing.moduleGap -
+        Math.abs(b.x - a.x);
       const overlapY =
-        (left.height + right.height) / 2 + MODULE_GAP - Math.abs(b.y - a.y);
+        (left.height + right.height) / 2 +
+        spacing.moduleGap -
+        Math.abs(b.y - a.y);
       if (overlapX <= 0 || overlapY <= 0) continue;
       stats.collisionCorrectionCount += 1;
       const axis = overlapX < overlapY ? 'x' : 'y';
@@ -389,6 +403,7 @@ function packWithoutOverlaps(
   positions: Map<string, Position>,
   rootId: string,
   stats: RelaxationStats,
+  spacing: FocusSchematicSoftClusterSpacingPolicy,
 ) {
   const ordered = [...modules].sort((left, right) => {
     if (left.moduleId === rootId) return -1;
@@ -410,7 +425,7 @@ function packWithoutOverlaps(
       const sampleCount = ring === 0 ? 1 : 32;
       for (let sample = 0; sample < sampleCount; sample += 1) {
         const angle = phase + (sample / sampleCount) * Math.PI * 2;
-        const radius = ring * 64;
+        const radius = ring * spacing.packingStep;
         const point = {
           x: target.x + Math.cos(angle) * radius,
           y: target.y + Math.sin(angle) * radius,
@@ -420,9 +435,9 @@ function packWithoutOverlaps(
             stats.collisionCheckCount += 1;
             return (
               Math.abs(point.x - otherPoint.x) <
-                (module.width + other.width) / 2 + MODULE_GAP &&
+                (module.width + other.width) / 2 + spacing.moduleGap &&
               Math.abs(point.y - otherPoint.y) <
-                (module.height + other.height) / 2 + MODULE_GAP
+                (module.height + other.height) / 2 + spacing.moduleGap
             );
           },
         );
@@ -454,6 +469,7 @@ function relax(
   hierarchyForcePolicy: FocusSchematicSoftHierarchyForcePolicy,
   iterations: number,
   stats: RelaxationStats,
+  spacing: FocusSchematicSoftClusterSpacingPolicy,
 ) {
   const positions = new Map(starting);
   const seed = new Map(starting);
@@ -490,7 +506,7 @@ function relax(
         Math.hypot(
           (aSize.width + bSize.width) / 2,
           (aSize.height + bSize.height) / 2,
-        ) + 155;
+        ) + spacing.topologyExtraDistance;
       const force = Math.max(
         -55,
         Math.min(55, (distance - desired) * 0.055 * pair.weight),
@@ -533,7 +549,7 @@ function relax(
       const point = positions.get(module.moduleId)!;
       const change = changes.get(module.moduleId)!;
       const hop = hops.get(module.moduleId) ?? 1;
-      const targetRadius = Math.max(1, hop) * HOP_SPACING;
+      const targetRadius = Math.max(1, hop) * spacing.hopSpacing;
       const radius = Math.max(EPSILON, Math.hypot(point.x, point.y));
       const radial = (targetRadius - radius) * 0.032;
       change.x += (point.x / radius) * radial;
@@ -550,13 +566,19 @@ function relax(
         y: point.y + change.y * scale,
       });
     }
-    collisionPass(modules, positions, input.model.rootModuleId, stats);
+    collisionPass(modules, positions, input.model.rootModuleId, stats, spacing);
   }
   // A short fixed pairwise tail preserves local structure, then a bounded
   // deterministic spiral pack guarantees valid variable-rectangle geometry.
   for (let pass = 0; pass < 24; pass += 1)
-    collisionPass(modules, positions, input.model.rootModuleId, stats);
-  packWithoutOverlaps(modules, positions, input.model.rootModuleId, stats);
+    collisionPass(modules, positions, input.model.rootModuleId, stats, spacing);
+  packWithoutOverlaps(
+    modules,
+    positions,
+    input.model.rootModuleId,
+    stats,
+    spacing,
+  );
   return positions;
 }
 
@@ -711,6 +733,7 @@ function metrics(
   hops: ReadonlyMap<string, number>,
   tree: FocusSchematicSoftFolderDisplayTree,
   hierarchyForcePolicy: FocusSchematicSoftHierarchyForcePolicy,
+  spacing: FocusSchematicSoftClusterSpacingPolicy,
 ): FocusSchematicSoftClusterMetrics {
   const positions = new Map(
     candidate.modules.map((module) => [module.moduleId, center(module)]),
@@ -774,7 +797,7 @@ function metrics(
     const radius = Math.hypot(point.x, point.y);
     hopValues.push(hop);
     radiusValues.push(radius);
-    hopErrors.push(Math.abs(radius - hop * HOP_SPACING));
+    hopErrors.push(Math.abs(radius - hop * spacing.hopSpacing));
   }
   const modules = [...candidate.modules];
   const left = Math.min(...modules.map((module) => module.x));
@@ -841,6 +864,11 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
   options: FocusSchematicSoftClusterOptions = {},
 ): FocusSchematicSoftClusterLayoutAttempt {
   const strength = normalizeFocusSchematicSoftFolderStrength(options.strength);
+  const softSpacing = normalizeFocusSchematicSoftSpacing(options.spacing);
+  const spacing =
+    options.spacingPolicy === undefined
+      ? resolveFocusSchematicSoftClusterSpacing(softSpacing)
+      : validateFocusSchematicSoftClusterSpacingPolicy(options.spacingPolicy);
   const internalLayoutVariant =
     options.internalLayoutVariant ?? 'adaptive-compass';
   const compassDemandPolicy: FocusSchematicCompassDemandPolicy =
@@ -859,13 +887,28 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
   )
     .toString(16)
     .padStart(8, '0');
-  const configId = `HIER4Bv${FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION}-soft-clusters-s${strength}-${internalLayoutVariant}-${endpointOrderPolicy}-${hierarchyForcePolicy}-${compassDemandPolicy}-${spatialDemandSummary}-intent-${displayIntent.fileParentOverrides.length}-${displayIntent.flattenedFolderKeys.length}-${intentFingerprint}`;
+  const spacingFingerprint = Math.floor(
+    hashUnit(JSON.stringify(spacing)) * 0x1_0000_0000,
+  )
+    .toString(16)
+    .padStart(8, '0');
+  const configId = `HIER4Bv${FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION}-soft-clusters-s${strength}-spacing-${softSpacing}-${spacingFingerprint}-${internalLayoutVariant}-${endpointOrderPolicy}-${hierarchyForcePolicy}-${compassDemandPolicy}-${spatialDemandSummary}-intent-${displayIntent.fileParentOverrides.length}-${displayIntent.flattenedFolderKeys.length}-${intentFingerprint}`;
   const started = performance.now();
   try {
     const baseAttempt = computeFocusSchematicRevision2LayoutAttempt(input);
     if (baseAttempt.status !== 'success') throw new Error(baseAttempt.reason);
     const softStarted = performance.now();
     const base = baseAttempt.result;
+    const softInput: FocusSchematicLayoutInput = {
+      ...input,
+      settings: {
+        ...input.settings,
+        internalNodeSeparation: spacing.internalNodeSeparation,
+        internalRankSeparation: spacing.internalRankSeparation,
+        modulePaddingX: spacing.modulePaddingX,
+        modulePaddingY: spacing.modulePaddingY,
+      },
+    };
     const tree = displayTree(input, displayIntent);
     const memberships = focusSchematicSoftFolderScopeMemberships(
       tree,
@@ -887,10 +930,10 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       collisionCheckCount: 0,
       collisionCorrectionCount: 0,
     };
-    let positions = initialPositions(input, base.candidate, hops);
+    let positions = initialPositions(input, base.candidate, hops, spacing);
     let candidate = placeAtCenters(base.candidate, positions);
     candidate = applyFocusSchematicInternalLayoutVariant(
-      input,
+      softInput,
       base.modulePlan,
       base.endpointPlan,
       candidate,
@@ -917,11 +960,12 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       hierarchyForcePolicy,
       FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE[0],
       relaxation,
+      spacing,
     );
     candidate = placeAtCenters(candidate, positions);
     const secondPassDemandCandidate = candidate;
     candidate = applyFocusSchematicInternalLayoutVariant(
-      input,
+      softInput,
       base.modulePlan,
       base.endpointPlan,
       candidate,
@@ -948,6 +992,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       hierarchyForcePolicy,
       FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE[1],
       relaxation,
+      spacing,
     );
     candidate = anchorRootFile(input, placeAtCenters(candidate, positions));
     const attachments = createFocusSchematicEndpointAttachments(
@@ -980,7 +1025,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       quality,
     );
     const internalLayoutEvidence = createFocusSchematicInternalLayoutEvidence(
-      input,
+      softInput,
       base.endpointPlan,
       candidate,
       base.candidate,
@@ -1028,10 +1073,12 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       0,
     );
     const evidence: FocusSchematicSoftClusterEvidence = {
-      schemaVersion: 3,
+      schemaVersion: 4,
       developmentOnly: true,
       layoutFamily: 'soft-folder-clusters',
       strength,
+      softSpacing,
+      resolvedSpacing: spacing,
       endpointOrderPolicy,
       fileParentOverrideCount: tree.reconciledIntent.fileParentOverrides.length,
       flattenedFolderCount: tree.reconciledIntent.flattenedFolderKeys.length,
@@ -1118,6 +1165,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
         hops,
         tree,
         hierarchyForcePolicy,
+        spacing,
       ),
       runtime: {
         moduleCount: candidate.modules.length,
@@ -1141,9 +1189,11 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       internalLayoutEvidence: {
         ...internalLayoutEvidence,
         softClusterPolicyEvidence: {
-          schemaVersion: 3,
+          schemaVersion: 4,
           layoutFamily: 'soft-folder-clusters',
           strength,
+          softSpacing,
+          resolvedSpacing: spacing,
           endpointOrderPolicy,
           displayIntent,
           hierarchyForcePolicy,
@@ -1191,15 +1241,30 @@ export function compareFocusSchematicSoftInternalVariants(
     .map(({ moduleId }) => moduleId)
     .sort(compareText);
   const hops = hopDistances(input.model.rootModuleId, moduleIds, pairs);
+  const softSpacing = normalizeFocusSchematicSoftSpacing(options.spacing);
+  const spacing =
+    options.spacingPolicy === undefined
+      ? resolveFocusSchematicSoftClusterSpacing(softSpacing)
+      : validateFocusSchematicSoftClusterSpacingPolicy(options.spacingPolicy);
+  const softInput: FocusSchematicLayoutInput = {
+    ...input,
+    settings: {
+      ...input.settings,
+      internalNodeSeparation: spacing.internalNodeSeparation,
+      internalRankSeparation: spacing.internalRankSeparation,
+      modulePaddingX: spacing.modulePaddingX,
+      modulePaddingY: spacing.modulePaddingY,
+    },
+  };
   const common = placeAtCenters(
     base.candidate,
-    initialPositions(input, base.candidate, hops),
+    initialPositions(softInput, base.candidate, hops, spacing),
   );
   const demandPolicy = options.compassDemandPolicy ?? 'spatial-cardinal';
   const spatialDemandSummary =
     options.spatialDemandSummary ?? 'dominant-cardinal';
   const adaptiveInitial = applyFocusSchematicInternalLayoutVariant(
-    input,
+    softInput,
     base.modulePlan,
     base.endpointPlan,
     common,
@@ -1211,7 +1276,7 @@ export function compareFocusSchematicSoftInternalVariants(
     spatialDemandSummary,
   );
   const verticalInitial = applyFocusSchematicInternalLayoutVariant(
-    input,
+    softInput,
     base.modulePlan,
     base.endpointPlan,
     common,

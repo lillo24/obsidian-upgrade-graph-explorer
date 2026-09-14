@@ -153,7 +153,7 @@ describe('Focus Schematic worker client', () => {
     expect(workers[3]!.terminated).toBe(false);
   });
 
-  it('adopts only the latest result across rapid strength and macro switches', async () => {
+  it('adopts only the latest result across rapid strength, spacing, and macro switches', async () => {
     const { service, workers } = harness();
     const softInput: FocusSchematicLayoutInput = {
       ...input,
@@ -162,11 +162,12 @@ describe('Focus Schematic worker client', () => {
         directionalFolderBandsEnabled: false,
       },
     };
-    const softPolicy = (softFolderStrength: number) =>
+    const softPolicy = (softFolderStrength: number, softSpacing = 50) =>
       ({
         ...DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
         macroLayout: 'soft-folder-clusters',
         softFolderStrength,
+        softSpacing,
       }) as const;
     const strengthRequests = [0, 25, 50, 75, 100].map((strength) =>
       service.layoutLatest(softInput, softPolicy(strength)),
@@ -181,6 +182,21 @@ describe('Focus Schematic worker client', () => {
     expect(await strengthRequests[4]).toMatchObject({
       status: 'success',
       metrics: { softClusterEvidence: { strength: 100 } },
+    });
+
+    const spacingRequests = [0, 25, 50, 75, 100].map((spacing) =>
+      service.layoutLatest(softInput, softPolicy(50, spacing)),
+    );
+    expect(await Promise.all(spacingRequests.slice(0, 4))).toEqual([
+      { status: 'superseded' },
+      { status: 'superseded' },
+      { status: 'superseded' },
+      { status: 'superseded' },
+    ]);
+    workers.at(-1)!.succeed();
+    expect(await spacingRequests[4]).toMatchObject({
+      status: 'success',
+      metrics: { softClusterEvidence: { softSpacing: 100 } },
     });
 
     const macroRequests = [

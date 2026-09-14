@@ -14,6 +14,7 @@ import {
   DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
   buildFocusSchematicSoftFolderDisplayTree,
   normalizeFocusSchematicSoftFolderStrength,
+  normalizeFocusSchematicSoftSpacing,
   type FocusSchematicComputedLayout,
   type FocusSchematicDirectionalFolderHierarchyMode,
   type FocusSchematicEndpointLayoutPhaseTimings,
@@ -79,6 +80,7 @@ export interface ModularStructuredGraphViewProps {
   readonly internalLayoutVariant: FocusSchematicProductInternalLayoutVariant;
   readonly macroLayout: FocusSchematicProductMacroLayout;
   readonly softFolderStrength: number;
+  readonly softSpacing: number;
   readonly softFolderDisplayIntent: FocusSchematicProductLayoutPolicies['softFolderDisplayIntent'];
   readonly softFolderDisplayPersistenceStatus: string;
   readonly softFolderDisplayPersistenceError: string | undefined;
@@ -298,6 +300,7 @@ export default function ModularStructuredGraphView(
     projectionWorkspace,
     rootEntityId,
     softFolderStrength,
+    softSpacing,
     softFolderDisplayIntent,
     softFolderDisplayPersistenceStatus,
     softFolderDisplayPersistenceError,
@@ -340,10 +343,15 @@ export default function ModularStructuredGraphView(
     macroLayout === 'soft-folder-clusters'
       ? normalizeFocusSchematicSoftFolderStrength(softFolderStrength)
       : DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softFolderStrength;
+  const effectiveSoftSpacing =
+    macroLayout === 'soft-folder-clusters'
+      ? normalizeFocusSchematicSoftSpacing(softSpacing)
+      : DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softSpacing;
   const layoutPolicies = useMemo<FocusSchematicProductLayoutPolicies>(
     () => ({
       macroLayout,
       softFolderStrength: effectiveSoftFolderStrength,
+      softSpacing: effectiveSoftSpacing,
       softFolderDisplayIntent:
         macroLayout === 'soft-folder-clusters'
           ? softFolderDisplayIntent
@@ -353,6 +361,7 @@ export default function ModularStructuredGraphView(
     }),
     [
       effectiveSoftFolderStrength,
+      effectiveSoftSpacing,
       endpointOrderPolicy,
       internalLayoutVariant,
       macroLayout,

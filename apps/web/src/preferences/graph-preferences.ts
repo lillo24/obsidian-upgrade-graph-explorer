@@ -15,6 +15,7 @@ import {
   isFocusSchematicProductMacroLayout,
   isFocusSchematicProductInternalLayoutVariant,
   normalizeFocusSchematicSoftFolderStrength,
+  normalizeFocusSchematicSoftSpacing,
   type FocusSchematicEndpointOrderPolicy,
   type FocusSchematicProductMacroLayout,
   type FocusSchematicProductInternalLayoutVariant,
@@ -41,6 +42,8 @@ export interface GraphPreferences {
   readonly modularFocusMacroLayout: FocusSchematicProductMacroLayout;
   /** Experimental Soft Folder Clusters strength, normalized to [0, 100]. */
   readonly modularFocusSoftFolderStrength: number;
+  /** Sandbox-only Soft geometry spacing, normalized to [0, 100]. */
+  readonly modularFocusSoftSpacing: number;
   /** Historical storage key for both macro-specific Folder guide overlays. */
   readonly modularFolderStripsVisible: boolean;
   /** Modular Preview edge drawing only; omitted from the Classic renderer. */
@@ -75,6 +78,8 @@ export const DEFAULT_GRAPH_PREFERENCES: GraphPreferences = {
     DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.macroLayout,
   modularFocusSoftFolderStrength:
     DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softFolderStrength,
+  modularFocusSoftSpacing:
+    DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softSpacing,
   modularFolderStripsVisible: true,
   modularConnectionStyle: 'direct',
   showExperimentalAllHierarchy: false,
@@ -226,6 +231,10 @@ export function normalizeModularFocusSoftFolderStrength(
   return normalizeFocusSchematicSoftFolderStrength(value);
 }
 
+export function normalizeModularFocusSoftSpacing(value: unknown): number {
+  return normalizeFocusSchematicSoftSpacing(value);
+}
+
 export function loadGraphPreferences(
   storage: StorageLike | undefined,
 ): GraphPreferencesLoadResult {
@@ -253,6 +262,7 @@ export function loadGraphPreferences(
         readonly modularFocusHeadingOrder?: unknown;
         readonly modularFocusMacroLayout?: unknown;
         readonly modularFocusSoftFolderStrength?: unknown;
+        readonly modularFocusSoftSpacing?: unknown;
         readonly modularFolderStripsVisible?: unknown;
         readonly modularConnectionStyle?: unknown;
         readonly showExperimentalAllHierarchy?: unknown;
@@ -304,6 +314,9 @@ export function loadGraphPreferences(
             normalizeModularFocusSoftFolderStrength(
               stored.modularFocusSoftFolderStrength,
             ),
+          modularFocusSoftSpacing: normalizeModularFocusSoftSpacing(
+            stored.modularFocusSoftSpacing,
+          ),
           modularFolderStripsVisible:
             typeof stored.modularFolderStripsVisible === 'boolean'
               ? stored.modularFolderStripsVisible
@@ -355,6 +368,9 @@ export function serializeGraphPreferences(
     modularFocusHeadingOrder: hierarchy.modularFocusHeadingOrder,
     modularFocusMacroLayout: hierarchy.modularFocusMacroLayout,
     modularFocusSoftFolderStrength: hierarchy.modularFocusSoftFolderStrength,
+    modularFocusSoftSpacing: normalizeModularFocusSoftSpacing(
+      preferences.modularFocusSoftSpacing,
+    ),
     modularFolderStripsVisible: hierarchy.modularFolderStripsVisible,
     modularConnectionStyle: hierarchy.modularConnectionStyle,
     showExperimentalAllHierarchy: preferences.showExperimentalAllHierarchy,

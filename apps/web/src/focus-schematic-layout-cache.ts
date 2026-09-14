@@ -6,6 +6,7 @@ import {
   focusSchematicLayoutMatchesProductPolicies,
   normalizeFocusSchematicSoftFolderDisplayIntent,
   normalizeFocusSchematicSoftFolderStrength,
+  normalizeFocusSchematicSoftSpacing,
   validateFocusSchematicComputedLayout,
   type FocusSchematicComputedLayout,
   type FocusSchematicLayoutInput,
@@ -56,6 +57,10 @@ export function exactFocusSchematicLayoutCacheKey(
           ? normalizeFocusSchematicSoftFolderStrength(
               policies.softFolderStrength,
             )
+          : null,
+      softSpacing:
+        policies.macroLayout === 'soft-folder-clusters'
+          ? normalizeFocusSchematicSoftSpacing(policies.softSpacing)
           : null,
       softFolderDisplayIntent:
         policies.macroLayout === 'soft-folder-clusters'
