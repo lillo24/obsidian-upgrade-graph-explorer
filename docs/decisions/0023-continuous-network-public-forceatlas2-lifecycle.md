@@ -54,9 +54,10 @@ Reapplying shaped output into the working graph remains forbidden.
 - Interactive All has a separate 8,192 / 1,024 / 256 cooling cap because its
   arbitrary post-drag states and active Pull require more tail work than finite
   seeded base layouts. The five-second failure boundary remains authoritative.
-- Production activation is limited to 100 visible nodes. Direct 500/1,000/5,000
-  release probes remain diagnostic; larger product views surface
-  `graph-too-large` before Worker construction.
+- Production activation originally used one 100-visible-node boundary.
+  MOVE300A retains 100 for Focus and raises All to the conservative 300-node QA
+  boundary; views above the active limit surface `graph-too-large` before Worker
+  construction. Direct 500/1,000/5,000 release probes remain diagnostic.
 - MOVE1A remains the source of truth for gesture threshold, coalescing,
   generation/sequence commands, arbitration, and displayed-to-dynamic inversion.
 - MOVE1B may activate the dormant capability but must not reinterpret these

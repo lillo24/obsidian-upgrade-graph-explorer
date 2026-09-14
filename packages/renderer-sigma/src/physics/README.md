@@ -31,7 +31,9 @@ snapshot. That automatic field may relax during transient Move; it is never
 reapplied into the solver, so the normal finite-layout field remains free of
 feedback accumulation.
 
-Production canvases expose this lifecycle only for one to 100 visible nodes.
-An empty startup projection cannot initialize the worker, while larger views
-report `graph-too-large` before constructing it; analyzer fixtures remain free
-to probe the explicit failure boundaries at larger sizes.
+Production canvases expose this lifecycle for one to 100 visible simulation
+nodes in Focus and one to 300 in All. An empty startup projection cannot
+initialize the worker, while views above the active mode's limit report
+`graph-too-large` before constructing it. The All 300-node value is a release/QA
+boundary rather than a solver cliff; analyzer fixtures remain free to probe the
+explicit failure boundaries at larger sizes.

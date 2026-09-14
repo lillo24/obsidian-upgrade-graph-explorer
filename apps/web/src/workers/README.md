@@ -105,6 +105,7 @@ authority and bridges other nodes for at most 80 ms; reduced-motion adopts the
 raw result directly. Exact raw coordinates remain distinct for future seeds
 and never enter layout or spatial caches through the presentation path.
 
-Production canvases gate worker initialization at the shared 100-visible-node
-support limit. Larger views surface `graph-too-large` instead of starting work
-known to exceed Focus caps or All-with-Pull wall limits in the release probes.
+Production canvases gate worker initialization at mode-specific limits: 100
+visible simulation nodes for Focus and 300 for All. Views above the active limit
+surface `graph-too-large` instead of starting work. The 300-node All value is a
+conservative release/QA boundary, not a universal solver guarantee.

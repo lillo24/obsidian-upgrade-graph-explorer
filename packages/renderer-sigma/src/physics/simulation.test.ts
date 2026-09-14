@@ -6,10 +6,12 @@ import {
 } from './protocol';
 import {
   ContinuousNetworkSimulation,
-  NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT,
+  NETWORK_PHYSICS_ALL_SUPPORTED_NODE_LIMIT,
+  NETWORK_PHYSICS_FOCUS_SUPPORTED_NODE_LIMIT,
   networkPhysicsCoolingMaxIterations,
   networkPhysicsFocusBatchIsStable,
   networkPhysicsNodeCountIsSupported,
+  networkPhysicsSupportedNodeLimit,
   nextNetworkPhysicsStableBatchCount,
 } from './simulation';
 
@@ -69,13 +71,39 @@ function end(sequence = 2) {
 }
 
 describe('ContinuousNetworkSimulation', () => {
-  it('exposes the evidence-backed supported Move boundary', () => {
-    expect(NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT).toBe(100);
-    expect(networkPhysicsNodeCountIsSupported(0)).toBe(false);
-    expect(networkPhysicsNodeCountIsSupported(1)).toBe(true);
-    expect(networkPhysicsNodeCountIsSupported(100)).toBe(true);
-    expect(networkPhysicsNodeCountIsSupported(101)).toBe(false);
-    expect(() => networkPhysicsNodeCountIsSupported(-1)).toThrow(
+  it('exposes the mode-specific supported Move boundaries', () => {
+    expect(NETWORK_PHYSICS_FOCUS_SUPPORTED_NODE_LIMIT).toBe(100);
+    expect(NETWORK_PHYSICS_ALL_SUPPORTED_NODE_LIMIT).toBe(300);
+    expect(networkPhysicsSupportedNodeLimit('focus')).toBe(100);
+    expect(networkPhysicsSupportedNodeLimit('all')).toBe(300);
+    expect(() =>
+      networkPhysicsSupportedNodeLimit('invalid' as 'focus'),
+    ).toThrow('must be Focus or All');
+  });
+
+  it.each([
+    ['all', 0, false],
+    ['all', 1, true],
+    ['all', 100, true],
+    ['all', 101, true],
+    ['all', 299, true],
+    ['all', 300, true],
+    ['all', 301, false],
+    ['focus', 0, false],
+    ['focus', 1, true],
+    ['focus', 99, true],
+    ['focus', 100, true],
+    ['focus', 101, false],
+    ['focus', 300, false],
+  ] as const)('supports %s node count %i: %s', (mode, nodeCount, supported) => {
+    expect(networkPhysicsNodeCountIsSupported(mode, nodeCount)).toBe(supported);
+  });
+
+  it('rejects invalid support-policy node counts', () => {
+    expect(() => networkPhysicsNodeCountIsSupported('all', -1)).toThrow(
+      'non-negative safe integer',
+    );
+    expect(() => networkPhysicsNodeCountIsSupported('focus', 1.5)).toThrow(
       'non-negative safe integer',
     );
   });

@@ -44,6 +44,7 @@ src/
   network-spacing-analysis.ts SPACING1B-GLOBAL final-geometry matrix, scale oracle, and density benchmark.
   file-move-benchmark.ts MOVE1A inverse/index/coalescing aggregate microbenchmark.
   spatial-pull-preview-benchmark.ts SPATIAL2C finite Pull-preview iteration quality/latency bakeoff.
+  physics1-candidate-analysis.ts PHYSICS1 public-call evidence plus fail-loud 300-node All Move probes.
   convergence-fixtures.ts Synthetic Local and Global topology families for CONVERGENCE1A.
   convergence-metrics.ts Production-backed Local metrics plus Global diagnostic movement/quality.
   convergence-candidates.ts Public-batch runners and bounded stopping-policy evaluation.
@@ -150,6 +151,7 @@ pnpm analyze:focus-spacing
 pnpm analyze:network-spacing
 pnpm benchmark:file-move
 pnpm benchmark:spatial-pull-preview
+pnpm analyze:physics1
 pnpm analyze:forceatlas2-convergence
 ```
 

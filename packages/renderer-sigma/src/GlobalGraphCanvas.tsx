@@ -969,7 +969,7 @@ export function GlobalGraphCanvas({
           ? { status: 'unavailable', reason: 'simulation-not-running' }
           : physicsNodeCount === 0
             ? { status: 'unavailable', reason: 'simulation-not-running' }
-            : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+            : !networkPhysicsNodeCountIsSupported('all', physicsNodeCount)
               ? { status: 'unavailable', reason: 'graph-too-large' }
               : { status: 'available' };
     if (startupTrace !== undefined) {
@@ -2337,7 +2337,7 @@ export function GlobalGraphCanvas({
       // generation handoff before physics can compose adjacent node sets.
       layoutPending.current ||
       layoutPendingState ||
-      !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+      !networkPhysicsNodeCountIsSupported('all', physicsNodeCount)
     ) {
       session.setTemporaryFileMoveContext({
         active: true,
@@ -2348,7 +2348,7 @@ export function GlobalGraphCanvas({
               ? 'simulation-unavailable'
               : physicsNodeCount === 0
                 ? 'simulation-not-running'
-                : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+                : !networkPhysicsNodeCountIsSupported('all', physicsNodeCount)
                   ? 'graph-too-large'
                   : 'simulation-not-running',
         },

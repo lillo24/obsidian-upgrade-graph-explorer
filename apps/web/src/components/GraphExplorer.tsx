@@ -77,8 +77,11 @@ import type {
   TemporaryNodeConstraintCapability,
   TemporaryNodeConstraintEndReason,
 } from '@icarus-graph-explorer/renderer-sigma';
-import { NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT } from '@icarus-graph-explorer/renderer-sigma/physics';
-import type { NetworkPhysicsPresentationState } from '@icarus-graph-explorer/renderer-sigma/physics';
+import {
+  networkPhysicsSupportedNodeLimit,
+  type NetworkPhysicsMode,
+  type NetworkPhysicsPresentationState,
+} from '@icarus-graph-explorer/renderer-sigma/physics';
 import {
   resolveNetworkSettings,
   sameGlobalPhysicsSettings,
@@ -281,6 +284,11 @@ const GLOBAL_NAVIGATION_RATIO = 0.32;
 const LOCAL_NAVIGATION_RATIO = 0.48;
 const LOCAL_STRUCTURED_NAVIGATION_ZOOM = 0.92;
 const NARROW_GRAPH_WORKSPACE_MEDIA_QUERY = '(max-width: 900px)';
+
+function temporaryFileMoveSizeLimitMessage(mode: NetworkPhysicsMode): string {
+  const scopeLabel = mode === 'all' ? 'All' : 'Focus';
+  return `File movement supports up to ${networkPhysicsSupportedNodeLimit(mode)} visible nodes in ${scopeLabel} Network in this release.`;
+}
 
 const GRAPH_HISTORY_SHORTCUT_EXCLUSION_SELECTOR =
   'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [data-graph-history-shortcuts="off"]';
@@ -1670,7 +1678,7 @@ export function GraphExplorer({
                     'simulation-not-running'
                       ? 'Waiting for Network layout…'
                       : temporaryFileMoveCapability.reason === 'graph-too-large'
-                        ? `File movement supports up to ${NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT} visible nodes in this release.`
+                        ? temporaryFileMoveSizeLimitMessage(activeScope)
                         : 'File movement is unavailable in this Network view.',
                 }),
       onCancel: cancelKeyboardFileMove,
@@ -1681,6 +1689,7 @@ export function GraphExplorer({
     }),
     [
       cancelKeyboardFileMove,
+      activeScope,
       folderArrangementDraftDirty,
       handleUnavailableKeyboardFileMoveTarget,
       keyboardFileMoveNodeId,
@@ -4569,7 +4578,7 @@ export function GraphExplorer({
         ? temporaryFileMoveCapability.reason === 'simulation-not-running'
           ? 'Waiting for Network layout…'
           : temporaryFileMoveCapability.reason === 'graph-too-large'
-            ? `File movement supports up to ${NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT} visible nodes in this release.`
+            ? temporaryFileMoveSizeLimitMessage(activeScope)
             : 'File movement is unavailable in this Network view.'
         : temporaryFileMoveLifecycle === 'cooling' ||
             temporaryFileMovePresentation === 'settling'

@@ -1300,8 +1300,10 @@ Pull reached `max-wall-time`; and 1,000-node Focus plus 1,000/5,000-node All
 reached explicit cap or wall failures. Repeated no-Pull 500-node All runs
 straddled the five-second wall boundary, so that size is not a reliable
 cross-mode product guarantee. These probes still omit browser Worker and Sigma
-costs. They select a conservative 100-visible-node product limit rather than a
-hidden neighborhood-only simulation or success-shaped failure.
+costs. They originally selected a shared 100-visible-node product limit rather
+than a hidden neighborhood-only simulation or success-shaped failure;
+MOVE300A's targeted 300-node evidence supports only the separate All QA
+boundary described below.
 
 ## MOVE1B production interaction boundary
 
@@ -1322,10 +1324,12 @@ stops scheduling when caught up. The Network Explorer keyboard controller uses
 the same coordinator and service, so it does not introduce a second simulation
 or a row-local controller.
 
-Direct File movement is available only at 100 or fewer visible simulation nodes
-in this release. Larger views expose `graph-too-large`, never create the
-continuous Worker, and show the limit near the Network controls. This is a release
-boundary, not a claim that every topology under the boundary must converge.
+Direct File movement is available at up to 100 visible simulation nodes in
+Focus and up to 300 in All in this release. Views above the active mode's limit
+expose `graph-too-large`, never create the continuous Worker, and show the
+mode-specific limit near the Network controls. The All 300-node value is a
+conservative real-vault QA boundary, not a universal performance limit or a
+claim that every topology under the boundary must converge.
 Unexpected cap/wall/runtime failures remain explicit and retryable. Production
 browser evidence and a fresh optimized Windows build are required for the
 MOVE1B draft; native pointer/touchpad acceptance remains a separate mandatory
@@ -1384,10 +1388,13 @@ final presentation callback arrived at 200.2 ms. Fifteen raw cooling frames were
 reduced to 11 visible presentations. These pixel observations describe the fixed
 fixture and camera, not a universal per-frame motion threshold.
 
-The analyzer separately kept the supported 100-node Focus, All, and All-with-
-Pull releases successful: 832 iterations/47.435 ms, 2,304/127.458 ms, and
-4,832/418.608 ms respectively on this run. Production browser interaction used
-the bundled small fixture; browser-level 100-node All/Focus evidence remains a
+The analyzer separately keeps the 100-node Focus release case and adds targeted
+300-node All and All-with-Pull begin/update/end probes. Each 300-node probe must
+keep the constrained File exact, move a neighbor, return only valid current-
+generation finite frames, and sleep after release; a failure aborts the
+analysis instead of weakening the solver contracts. Its local timings have no
+CI threshold. Production browser interaction still uses the bundled small
+fixture, so real-vault All behavior at the 300-node release boundary remains a
 native acceptance item rather than being inferred from the analyzer or the
 100-node Global renderer benchmark.
 

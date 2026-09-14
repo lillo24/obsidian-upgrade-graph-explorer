@@ -1621,8 +1621,10 @@ frame gains cache, camera, history, spatial, source, or persistence ownership.
 An All seed begins from the current output-only M2 snapshot without reapplying
 the field, so activation is jump-free and feedback cannot accumulate. Automatic
 folder shaping may temporarily relax during Move and returns with the normal
-finite layout after invalidation/remount. Production canvases expose Move only
-at 100 or fewer visible nodes; larger graphs return `graph-too-large` before
-Worker construction. This boundary follows direct release probes where
-500-node Focus/All-with-Pull and the 1,000/5,000-node cases reached explicit
-caps or wall limits.
+finite layout after invalidation/remount. Production canvases expose Move for
+one to 100 visible simulation nodes in Focus and one to 300 in All; views above
+the active mode's boundary return `graph-too-large` before Worker construction.
+The 300-node All boundary is a conservative real-vault QA boundary backed by
+targeted retained-simulation All and All-with-Pull probes, not a claim of a
+physical solver cliff. Focus remains at 100 because the existing larger Focus
+release probes reached explicit caps.

@@ -195,10 +195,12 @@ gesture, leaves the last valid graph visible, and exposes an explicit retry that
 reinitializes the retained service. Exit and invalidation do not restore, freeze,
 or persist coordinates.
 
-Production Move is enabled only when the current simulation has at most 100
-visible nodes. Larger views report `graph-too-large`, construct no continuous
-Worker, and show the supported limit. The development lab and analyzer can
-still exercise larger retained simulations as explicit evidence.
+Production Move is enabled when the current simulation has at most 100 visible
+nodes in Focus or at most 300 in All. Views above the active mode's limit report
+`graph-too-large`, construct no continuous Worker, and show the mode-specific
+supported limit. The All 300-node boundary is a conservative real-vault QA
+boundary rather than a solver cliff. The development lab and analyzer can still
+exercise larger retained simulations as explicit evidence.
 
 The MOVE1B native-QA correction reproduced release independently of UI state.
 `handle(end)` was coordinate-identical to the last hot worker state on every
@@ -240,8 +242,9 @@ frame-rate evidence.
 The direct release probe slept for 100-node Focus, All, and All-with-Pull. Its
 500-node Focus and All-with-Pull cases failed at the iteration/wall guard, as did
 the 1,000-node Focus and 1,000/5,000-node All cases. Repeated 500-node All
-without Pull runs straddled the five-second wall boundary. This evidence selects
-the conservative 100-node product boundary.
+without Pull runs straddled the five-second wall boundary. MOVE300A therefore
+keeps Focus at 100 while adding fail-loud 300-node All and All-with-Pull
+begin/update/end probes for a conservative All-only QA boundary.
 No larger graph silently switches to neighborhood-only physics. End-to-end
 command latency, neighbor-frame age, dropped frames, structured cloning,
 validation/adoption, Sigma rendering, and release-to-sleep p50/p95 at supported

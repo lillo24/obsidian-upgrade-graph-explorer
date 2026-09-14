@@ -31,6 +31,7 @@ import {
   type NetworkPhysicsFailureResponse,
   type NetworkPhysicsFrameResponse,
   type NetworkPhysicsLifecycleState,
+  type NetworkPhysicsMode,
   type NetworkPhysicsPosition,
   type NetworkPhysicsSeed,
 } from './protocol';
@@ -41,15 +42,27 @@ type PhysicsGraph = MultiDirectedGraph<
 >;
 
 const HOT_ITERATIONS_PER_TURN = 4;
-export const NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT = 100 as const;
+export const NETWORK_PHYSICS_FOCUS_SUPPORTED_NODE_LIMIT = 100 as const;
+export const NETWORK_PHYSICS_ALL_SUPPORTED_NODE_LIMIT = 300 as const;
 
-export function networkPhysicsNodeCountIsSupported(nodeCount: number): boolean {
+export function networkPhysicsSupportedNodeLimit(
+  mode: NetworkPhysicsMode,
+): number {
+  if (mode === 'focus') return NETWORK_PHYSICS_FOCUS_SUPPORTED_NODE_LIMIT;
+  if (mode === 'all') return NETWORK_PHYSICS_ALL_SUPPORTED_NODE_LIMIT;
+  throw new Error('Network physics mode must be Focus or All.');
+}
+
+export function networkPhysicsNodeCountIsSupported(
+  mode: NetworkPhysicsMode,
+  nodeCount: number,
+): boolean {
   if (!Number.isSafeInteger(nodeCount) || nodeCount < 0) {
     throw new Error(
       'Network physics node count must be a non-negative safe integer.',
     );
   }
-  return nodeCount > 0 && nodeCount <= NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT;
+  return nodeCount > 0 && nodeCount <= networkPhysicsSupportedNodeLimit(mode);
 }
 
 /** Live Focus must settle in the displayed fixed frame as well as in shape. */
