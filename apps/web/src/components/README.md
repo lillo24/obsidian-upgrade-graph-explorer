@@ -386,6 +386,13 @@ intent and retain their exact cache identity. Soft File and module-anchor
 handles still come from final endpoint geometry; Heading and Block attachment
 semantics remain exact.
 
+HIER4A-PATCH2 gives `ModularStructuredGraphView.tsx` a session-only
+Flat/Nested (1 level) Directional comparison control. Nested is the reviewed
+session default while the accepted production settings remain Flat. The selected value
+enters the exact worker input and cache identity. It never persists, never
+affects Classic or Soft requests, and Folder Guides still controls rendering
+visibility only.
+
 The persisted Folder guides toggle is resolved after a current worker result is
 adopted. Directional mode supplies the existing band strips; Soft mode supplies
 renderer-only nested cluster regions from final module rectangles and visible

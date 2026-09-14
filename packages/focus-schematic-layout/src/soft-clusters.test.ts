@@ -4,12 +4,17 @@ import { describe, expect, it } from 'vitest';
 
 import { buildEndpointFixture } from './endpoint-fixtures';
 import { computeFocusSchematicComputedLayoutAttempt } from './endpoint-facing';
-import { DIRECTIONAL_FOLDER_BAND_FIXTURES } from './folder-fixtures';
 import {
+  DIRECTIONAL_FOLDER_BAND_FIXTURES,
+  FOLDER_FIXTURES,
+} from './folder-fixtures';
+import {
+  compareFocusSchematicSoftInternalVariants,
   computeFocusSchematicSoftClusterLayoutAttempt,
   FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE,
 } from './soft-clusters';
 import {
+  SOFT_ADAPTIVE_COMPASS_FIXTURES,
   SOFT_CLUSTER_FIXTURES,
   createSoftClusterMultiplicityFixture,
 } from './soft-cluster-fixtures';
@@ -20,7 +25,10 @@ import {
 import { FOCUS_SCHEMATIC_LAYOUT_SETTINGS } from './settings';
 import { layoutInput } from './test-helpers';
 import type { EndpointFixtureSpec } from './endpoint-fixtures';
-import type { FocusSchematicSoftFolderDisplayIntent } from './types';
+import type {
+  FocusSchematicSoftClusterOptions,
+  FocusSchematicSoftFolderDisplayIntent,
+} from './types';
 
 function run(
   spec: EndpointFixtureSpec,
@@ -29,12 +37,17 @@ function run(
     fileParentOverrides: [],
     flattenedFolderKeys: [],
   },
+  options: Omit<
+    FocusSchematicSoftClusterOptions,
+    'strength' | 'displayIntent'
+  > = {},
 ) {
   const input = layoutInput(buildEndpointFixture(spec), {
     ...FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
     directionalFolderBandsEnabled: false,
   });
   const attempt = computeFocusSchematicSoftClusterLayoutAttempt(input, {
+    ...options,
     strength,
     displayIntent,
   });
@@ -72,86 +85,6 @@ const mixedScopeFixture: EndpointFixtureSpec = {
   hops: 2,
 };
 
-const rootAndOneSameFolderFixture: EndpointFixtureSpec = {
-  id: 'SC26',
-  label: 'root plus one same-folder File',
-  authored: 'Synthetic PATCH2 root-folder force exclusion case.',
-  expectation: 'The root and one peer do not form an attraction group.',
-  inspect: 'Strength zero and one hundred must produce identical geometry.',
-  rootDocumentId: 'Focus',
-  documents: [
-    { id: 'Focus', path: 'shared/Focus.md' },
-    { id: 'Peer', path: 'shared/Peer.md' },
-  ],
-  references: [{ sourceEntityId: 'Focus', targetEntityId: 'Peer' }],
-  hops: 1,
-};
-
-const rootAndTwoSameFolderFixture: EndpointFixtureSpec = {
-  id: 'SC27',
-  label: 'root plus two same-folder Files',
-  authored: 'Synthetic PATCH2 root-centroid and descendant exclusion case.',
-  expectation: 'Only the two non-root Files attract toward their centroid.',
-  inspect:
-    'Root display membership remains while force membership excludes it.',
-  rootDocumentId: 'Focus',
-  documents: [
-    { id: 'Focus', path: 'shared/Focus.md' },
-    { id: 'B', path: 'shared/B.md' },
-    { id: 'C', path: 'shared/C.md' },
-  ],
-  entities: [
-    {
-      id: 'Focus-Heading',
-      kind: 'section',
-      documentId: 'Focus',
-      parentId: 'Focus',
-      line: 2,
-    },
-    {
-      id: 'Focus-Block',
-      kind: 'block',
-      documentId: 'Focus',
-      parentId: 'Focus-Heading',
-      line: 3,
-    },
-  ],
-  references: [
-    { sourceEntityId: 'Focus-Block', targetEntityId: 'B' },
-    { sourceEntityId: 'Focus-Heading', targetEntityId: 'C' },
-  ],
-  hops: 1,
-};
-
-const rootAncestorScopeFixture: EndpointFixtureSpec = {
-  id: 'SC28',
-  label: 'root-neutral ancestor scopes',
-  authored: 'Synthetic PATCH2 normalized-decay ancestor exclusion case.',
-  expectation:
-    'Moving only the root between stable sibling folders cannot alter Soft geometry.',
-  inspect:
-    'Exact sibling groups and their shared ancestor contain only non-root force members.',
-  rootDocumentId: 'Focus',
-  documents: [
-    { id: 'Focus', path: 'ancestor/root-a/Focus.md' },
-    { id: 'A1', path: 'ancestor/root-a/A1.md' },
-    { id: 'A2', path: 'ancestor/root-a/A2.md' },
-    { id: 'B', path: 'ancestor/shared/B.md' },
-    { id: 'C', path: 'ancestor/shared/C.md' },
-    { id: 'D1', path: 'ancestor/root-b/D1.md' },
-    { id: 'D2', path: 'ancestor/root-b/D2.md' },
-  ],
-  references: [
-    { sourceEntityId: 'Focus', targetEntityId: 'A1' },
-    { sourceEntityId: 'Focus', targetEntityId: 'A2' },
-    { sourceEntityId: 'Focus', targetEntityId: 'B' },
-    { sourceEntityId: 'Focus', targetEntityId: 'C' },
-    { sourceEntityId: 'Focus', targetEntityId: 'D1' },
-    { sourceEntityId: 'Focus', targetEntityId: 'D2' },
-  ],
-  hops: 1,
-};
-
 function moduleDistance(
   attempt: ReturnType<typeof run>['attempt'],
   firstId: string,
@@ -175,11 +108,24 @@ function fixture(id: `SC${number}`) {
   return value;
 }
 
+const rootAndOneSameFolderFixture = fixture('SC26');
+const rootAndTwoSameFolderFixture = fixture('SC27');
+const rootAncestorScopeFixture = fixture('SC28');
+
+function adaptiveFixture(id: `AC-S${number}`) {
+  const value = SOFT_ADAPTIVE_COMPASS_FIXTURES.find((item) => item.id === id);
+  if (value === undefined) throw new Error(`Missing fixture ${id}.`);
+  return value;
+}
+
 describe('HIER4B Soft Folder Clusters', () => {
-  it('owns the complete SC1-SC24 fixture inventory', () => {
-    expect(SOFT_CLUSTER_FIXTURES.map(({ id }) => id)).toEqual(
-      Array.from({ length: 24 }, (_, index) => `SC${index + 1}`),
-    );
+  it('owns the complete base and root-neutral Soft fixture inventory', () => {
+    expect(SOFT_CLUSTER_FIXTURES.map(({ id }) => id)).toEqual([
+      ...Array.from({ length: 24 }, (_, index) => `SC${index + 1}`),
+      'SC26',
+      'SC27',
+      'SC28',
+    ]);
   });
 
   it('uses a fixed two-round schedule, anchors the root File, and clears overlaps', () => {
@@ -505,5 +451,249 @@ describe('HIER4B Soft Folder Clusters', () => {
     expect(JSON.stringify(baseline.result.candidate)).toBe(
       JSON.stringify(changed.result.candidate),
     );
+  });
+
+  it('owns AC-S1 through AC-S8 and uses all four regions only when demanded', () => {
+    expect(SOFT_ADAPTIVE_COMPASS_FIXTURES.map(({ id }) => id)).toEqual(
+      Array.from({ length: 8 }, (_, index) => `AC-S${index + 1}`),
+    );
+    const adaptive = run(adaptiveFixture('AC-S1')).attempt;
+    expect(adaptive.evidence.compass).toMatchObject({
+      demandPolicy: 'spatial-cardinal',
+      spatialDemandSummary: 'dominant-cardinal',
+      topBranchCount: 1,
+      bottomBranchCount: 1,
+      leftBranchCount: 1,
+      rightBranchCount: 1,
+      demandedBranchCount: 4,
+      demandMatchedBranchCount: 4,
+    });
+    const vertical = run(adaptiveFixture('AC-S1'), 50, undefined, {
+      internalLayoutVariant: 'vertical-spine',
+    }).attempt;
+    expect(vertical.evidence.compass.leftBranchCount).toBe(0);
+    expect(vertical.evidence.compass.rightBranchCount).toBe(0);
+    expect(vertical.evidence.compass.topBranchCount).toBe(2);
+    expect(vertical.evidence.compass.bottomBranchCount).toBe(2);
+  });
+
+  it('uses spatial demand for vertical, horizontal, mixed, and neutral cases', () => {
+    const vertical = run(adaptiveFixture('AC-S2')).attempt.evidence.compass;
+    expect(vertical.topBranchCount).toBe(1);
+    expect(vertical.bottomBranchCount).toBe(1);
+    expect(vertical.leftBranchCount + vertical.rightBranchCount).toBe(0);
+
+    const horizontal = run(adaptiveFixture('AC-S3')).attempt.evidence.compass;
+    expect(horizontal.leftBranchCount).toBe(1);
+    expect(horizontal.rightBranchCount).toBe(1);
+
+    const mixed = run(adaptiveFixture('AC-S4')).attempt;
+    const vector = run(adaptiveFixture('AC-S4'), 50, undefined, {
+      spatialDemandSummary: 'aggregate-vector',
+    }).attempt;
+    expect(mixed.evidence.compass.topBranchCount).toBe(1);
+    expect(vector.evidence.compass.rightBranchCount).toBe(1);
+    expect(mixed.result.quality.exactEndpointCrossingCount).toBe(0);
+    expect(vector.result.quality.exactEndpointCrossingCount).toBe(0);
+    expect(
+      mixed.result.internalLayoutEvidence.metrics
+        .totalPrimaryReferenceManhattanSpan,
+    ).toBeLessThan(
+      vector.result.internalLayoutEvidence.metrics
+        .totalPrimaryReferenceManhattanSpan,
+    );
+    expect(mixed.evidence.metrics.boundsArea).toBeLessThan(
+      vector.evidence.metrics.boundsArea,
+    );
+
+    const perturbedInput = {
+      ...run(adaptiveFixture('AC-S4')).input,
+      nodeDimensions: run(adaptiveFixture('AC-S4')).input.nodeDimensions.map(
+        (dimension, index) =>
+          index === 0
+            ? { ...dimension, width: dimension.width + 0.0001 }
+            : dimension,
+      ),
+    };
+    const perturbed =
+      computeFocusSchematicSoftClusterLayoutAttempt(perturbedInput);
+    expect(perturbed.status).toBe('success');
+    if (perturbed.status === 'success')
+      expect(perturbed.evidence.compass.topBranchCount).toBe(1);
+
+    const neutral = run(adaptiveFixture('AC-S5')).attempt.evidence.compass;
+    expect(neutral.demandedBranchCount).toBe(0);
+    expect(neutral.leftBranchCount + neutral.rightBranchCount).toBe(0);
+  });
+
+  it('lets crossing quality override lateral demand and retains useful pass 2 adaptation', () => {
+    const guarded = run(adaptiveFixture('AC-S6')).attempt;
+    expect(guarded.result.quality.exactEndpointCrossingCount).toBe(0);
+    expect(guarded.evidence.compass).toMatchObject({
+      demandOverriddenByCrossingCount: 1,
+      pass2ExactEndpointCrossingBeforeCount: 1,
+      pass2ExactEndpointCrossingAfterCount: 0,
+    });
+    expect(
+      guarded.evidence.compass.topBranchCount +
+        guarded.evidence.compass.bottomBranchCount,
+    ).toBeGreaterThan(0);
+
+    const adaptive = run(adaptiveFixture('AC-S8')).attempt.evidence.compass;
+    expect(adaptive.pass1ToPass2BranchRegionChangeCount).toBe(3);
+    expect(adaptive.pass2DemandMatchedAfterCount).toBeGreaterThan(
+      adaptive.pass2DemandMatchedBeforeCount,
+    );
+    expect(adaptive.pass2ExactEndpointCrossingAfterCount).toBeLessThan(
+      adaptive.pass2ExactEndpointCrossingBeforeCount,
+    );
+    expect(adaptive.pass2PrimaryManhattanSpanAfter).toBeLessThan(
+      adaptive.pass2PrimaryManhattanSpanBefore,
+    );
+  });
+
+  it('distinguishes legitimate macro movement from a semantic internal no-op', () => {
+    const noOp = run(adaptiveFixture('AC-S7'));
+    const noOpDiagnostic = compareFocusSchematicSoftInternalVariants(
+      noOp.input,
+    );
+    expect(noOpDiagnostic).toMatchObject({
+      internalRegionAssignmentDifferenceCount: 0,
+      internalNodeGeometryDifferenceCount: 0,
+      moduleBoundsDifferenceCount: 0,
+      macroFileCenterTotalDisplacement: 0,
+      macroFileCenterMaximumDisplacement: 0,
+      initialInternalGeometryIdentical: true,
+      finalGeometryIdentical: true,
+      semanticNoOpSatisfied: true,
+    });
+
+    const changed = run(adaptiveFixture('AC-S1'));
+    const changedDiagnostic = compareFocusSchematicSoftInternalVariants(
+      changed.input,
+    );
+    expect(changedDiagnostic.internalRegionAssignmentDifferenceCount).toBe(2);
+    expect(
+      changedDiagnostic.internalNodeGeometryDifferenceCount,
+    ).toBeGreaterThan(0);
+    expect(changedDiagnostic.moduleBoundsDifferenceCount).toBeGreaterThan(0);
+    expect(changedDiagnostic.macroFileCenterTotalDisplacement).toBeGreaterThan(
+      0,
+    );
+    expect(changedDiagnostic.semanticNoOpSatisfied).toBe(true);
+  });
+
+  it('keeps four-side File attachments correct after spatial Heading placement', () => {
+    const result = run(adaptiveFixture('AC-S1')).attempt.result;
+    expect(
+      new Set(
+        result.attachments
+          .filter(({ endpoint }) => endpoint === 'target')
+          .map(({ side }) => side),
+      ),
+    ).toEqual(new Set(['top', 'bottom', 'left', 'right']));
+    expect(
+      result.attachments.every(({ kind }) => kind === 'visible-node'),
+    ).toBe(true);
+  });
+
+  it('recomputes disclosure, reroot, and every Soft strength deterministically', () => {
+    const expandedSpec = adaptiveFixture('AC-S1');
+    const collapsedSpec: EndpointFixtureSpec = {
+      ...expandedSpec,
+      id: 'AC-S11',
+      collapsedEntityIds: ['Focus'],
+      expandedEntityIds: [],
+    };
+    const expanded = run(expandedSpec).attempt;
+    const collapsed = run(collapsedSpec).attempt;
+    const restored = run(expandedSpec).attempt;
+    expect(restored.result.candidate).toEqual(expanded.result.candidate);
+    expect(collapsed.evidence.compass.demandedBranchCount).toBe(0);
+
+    const rerootedSpec: EndpointFixtureSpec = {
+      ...expandedSpec,
+      id: 'AC-S12',
+      rootDocumentId: 'LeftTarget262',
+    };
+    const rerooted = run(rerootedSpec).attempt;
+    expect(run(rerootedSpec).attempt.result.candidate).toEqual(
+      rerooted.result.candidate,
+    );
+    expect(rerooted.result.candidate.rootModuleId).toBe('LeftTarget262');
+    expect(rerooted.result.quality.moduleOverlapPairs).toEqual([]);
+
+    for (const strength of [0, 25, 50, 75, 100] as const) {
+      const first = run(expandedSpec, strength).attempt;
+      const second = run(expandedSpec, strength).attempt;
+      expect(second.result.candidate, String(strength)).toEqual(
+        first.result.candidate,
+      );
+      expect(first.evidence.compass.demandPolicy).toBe('spatial-cardinal');
+      expect(first.result.quality.moduleOverlapPairs).toEqual([]);
+    }
+  }, 30_000);
+
+  it('separates Soft algorithm and variant cache identities', () => {
+    const adaptive = run(adaptiveFixture('AC-S1')).attempt;
+    const repeated = run(adaptiveFixture('AC-S1')).attempt;
+    const vertical = run(adaptiveFixture('AC-S1'), 50, undefined, {
+      internalLayoutVariant: 'vertical-spine',
+    }).attempt;
+    expect(adaptive.configId).toContain('HIER4Bv5');
+    expect(repeated.configId).toBe(adaptive.configId);
+    expect(repeated.result.candidate).toEqual(adaptive.result.candidate);
+    expect(vertical.configId).not.toBe(adaptive.configId);
+    expect(vertical.result.candidate).not.toEqual(adaptive.result.candidate);
+  });
+
+  it('keeps the merged Directional Adaptive oracle byte-identical', () => {
+    const expected = new Map([
+      [
+        'DB5',
+        'd1a29e0f58549855c30f77e0453f163aac1ced1cccc00e203905a2db1df7768c',
+      ],
+      [
+        'DB11',
+        'fda189a732b2e00746699e2635e10ab58e2fc73a8a1c46d183abfd400a2106d5',
+      ],
+      [
+        'DB12',
+        '71a889c446f481ce6c373ddd0ceca16d87aedd108981a6574abb4572ddd4c946',
+      ],
+      [
+        'FB4',
+        '3dae4397884d3046e6ecc68f80944b69708dc0c91acb390e2d088347c6a11415',
+      ],
+      [
+        'DB14',
+        'b1d2beb1cd353fca6c0f35fa700489a9de208bcf6cb6d013830a41dd0a0b1f1b',
+      ],
+      [
+        'DB19',
+        'a8d2a3165d57039888d3f72b7dc814341ada73240ec30339a036b658118ba0f8',
+      ],
+    ]);
+    const fixtures = [...FOLDER_FIXTURES, ...DIRECTIONAL_FOLDER_BAND_FIXTURES];
+    for (const [id, hash] of expected) {
+      const spec = fixtures.find((item) => item.id === id)!;
+      const input = layoutInput(buildEndpointFixture(spec), {
+        ...FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+        directionalFolderBandsEnabled: true,
+      });
+      const attempt = computeFocusSchematicComputedLayoutAttempt(input, {
+        endpointOrderPolicy: 'crossing-optimized',
+        internalLayoutVariant: 'adaptive-compass',
+      });
+      expect(attempt.status, id).toBe('success');
+      if (attempt.status !== 'success') continue;
+      const payload = JSON.stringify({
+        candidate: attempt.result.candidate,
+        attachments: attempt.result.attachments,
+        folderBandPlan: attempt.result.folderBandPlan,
+        quality: attempt.result.quality,
+      });
+      expect(createHash('sha256').update(payload).digest('hex'), id).toBe(hash);
+    }
   });
 });

@@ -9,6 +9,7 @@ coverage/
 /output/hier3a-endpoint-lab/
 /output/hier4-folder-lab/
 /output/hier4a-directional-folder-lab/
+/output/hier4a-patch2-nested-directional-lab/
 /output/hier4-folder-benchmark*.json
 /output/hier4a-directional-folder-bands-benchmark.json
 /output/hier4a-root-balance-*.json

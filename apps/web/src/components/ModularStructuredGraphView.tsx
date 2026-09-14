@@ -15,6 +15,7 @@ import {
   buildFocusSchematicSoftFolderDisplayTree,
   normalizeFocusSchematicSoftFolderStrength,
   type FocusSchematicComputedLayout,
+  type FocusSchematicDirectionalFolderHierarchyMode,
   type FocusSchematicEndpointLayoutPhaseTimings,
   type FocusSchematicLayoutInput,
   type FocusSchematicProductInternalLayoutVariant,
@@ -311,6 +312,8 @@ export default function ModularStructuredGraphView(
   useWorkerServiceDisposal(workerService);
   const [secondaryRelationshipsVisible, setSecondaryRelationshipsVisible] =
     useState(false);
+  const [directionalFolderHierarchy, setDirectionalFolderHierarchy] =
+    useState<FocusSchematicDirectionalFolderHierarchyMode>('nested-one-level');
   const [retryKey, setRetryKey] = useState(0);
   const [softFolderDisplayMutationError, setSoftFolderDisplayMutationError] =
     useState<string | undefined>();
@@ -399,6 +402,10 @@ export default function ModularStructuredGraphView(
       settings: {
         ...FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
         directionalFolderBandsEnabled: macroLayout === 'directional-bands',
+        directionalFolderHierarchy:
+          macroLayout === 'directional-bands'
+            ? directionalFolderHierarchy
+            : 'flat',
       },
     });
 
@@ -409,7 +416,14 @@ export default function ModularStructuredGraphView(
           undefined,
           prepare,
         );
-  }, [instrumentation, macroLayout, model, nodeDimensions, projection]);
+  }, [
+    directionalFolderHierarchy,
+    instrumentation,
+    macroLayout,
+    model,
+    nodeDimensions,
+    projection,
+  ]);
   const layoutKey = useMemo(() => {
     const serialize = () =>
       exactFocusSchematicLayoutCacheKey(layoutInput, layoutPolicies);
@@ -748,7 +762,7 @@ export default function ModularStructuredGraphView(
       return undefined;
     return macroLayout === 'directional-bands' ? (
       <FocusSchematicFolderBandStrips
-        bands={lifecycle.adopted.computed.folderBandPlan.bands}
+        plan={lifecycle.adopted.computed.folderBandPlan}
         nodes={displayedGraph.nodes}
       />
     ) : (
@@ -850,6 +864,24 @@ export default function ModularStructuredGraphView(
             />
             Secondary links
           </label>
+          {macroLayout !== 'directional-bands' ? null : (
+            <label>
+              Directional folder hierarchy
+              <select
+                aria-label="Directional folder hierarchy"
+                onChange={(event) =>
+                  setDirectionalFolderHierarchy(
+                    event.currentTarget
+                      .value as FocusSchematicDirectionalFolderHierarchyMode,
+                  )
+                }
+                value={directionalFolderHierarchy}
+              >
+                <option value="flat">Flat</option>
+                <option value="nested-one-level">Nested (1 level)</option>
+              </select>
+            </label>
+          )}
           {lifecycle.message === undefined ? null : (
             <span role="alert">{lifecycle.message}</span>
           )}

@@ -78,6 +78,8 @@ function inputFor(
   return createLayoutInput(fixture, {
     ...FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
     directionalFolderBandsEnabled: macroLayout === 'directional-bands',
+    directionalFolderHierarchy:
+      macroLayout === 'directional-bands' ? 'nested-one-level' : 'flat',
   });
 }
 

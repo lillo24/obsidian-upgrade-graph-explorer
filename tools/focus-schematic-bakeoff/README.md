@@ -23,6 +23,12 @@ bounded candidate counts, and runtime. DB12 is neutral internal-layout pressure;
 DB19 is the replacement true-blocked oracle after V1/C1 optimization. Metrics
 remain evidence only until the user explicitly selects one grammar.
 
+HIER4A-PATCH2 adds a self-contained Flat/Nested Directional review lab for the
+ND1, ND3, ND4, ND6, ND7, ND8, ND9, and ND12 visual cases. Its hierarchy, guide,
+and precise-link selectors operate on renderer-neutral output from the same
+layout package used by the worker. Parent/child rectangles are structural plan
+geometry rather than renderer-created hulls.
+
 HIER4B adds a separate Soft Folder Clusters benchmark and graphical lab. It
 compares the unchanged Directional Bands production reference with the
 development-only 2D solver at strengths 0/25/50/75/100. HIER4B-FIX2 adds
@@ -64,6 +70,7 @@ pnpm benchmark:focus-schematic-production-worker -- --profile medium --macro sof
 pnpm benchmark:focus-schematic-directional-folder-bands -- --profile all --out output/hier4a-directional-folder-bands-benchmark.json
 pnpm benchmark:focus-schematic-internal-layout -- --out output/hier4a-fix2-internal-layout-benchmark.json
 pnpm generate:focus-schematic-folder-lab -- --out output/hier4a-fix2-internal-layout-lab
+pnpm generate:focus-schematic-nested-directional-folder-lab
 
 pnpm benchmark:focus-schematic-soft-clusters
 pnpm generate:focus-schematic-soft-cluster-lab -- --out output/hier4b-soft-clusters-lab
@@ -122,6 +129,8 @@ adjacent keyboard-accessible list. Generated output is gitignored.
 - `src/internal-layout-benchmark.ts` reports the M0/V1/C1 trade-off table,
   bounded search counts, determinism, hard gates, DB12 reinterpretation, DB19
   proof, CP4 width pressure, and the fair CP5 Compass improvement case.
+- `src/nested-directional-folder-lab.ts` generates the offline HIER4A-PATCH2
+  Flat/Nested review surface for the required one-level visual cases.
 - `src/soft-cluster-benchmark.ts` measures SC1–SC24 across all strengths,
   Directional Bands references, stability pairs, multiplicity saturation,
   20/50/100-module hubs, five manual display-intent profiles, HFA1–HFA7 across

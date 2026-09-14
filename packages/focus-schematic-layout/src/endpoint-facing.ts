@@ -66,7 +66,7 @@ export { createFocusSchematicEndpointAttachments } from './attachments';
 
 const STRATEGY_ID = 'A1-endpoint-facing-split-lanes' as const;
 /** Cache/evidence revision for the selected A1 implementation. */
-export const FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION = 3 as const;
+export const FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION = 4 as const;
 const now = () => Date.now();
 const compareText = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
@@ -978,7 +978,7 @@ function validSoftClusterPolicyEvidence(
     evidence.displayIntent,
   );
   return (
-    evidence.schemaVersion === 2 &&
+    evidence.schemaVersion === 3 &&
     evidence.layoutFamily === 'soft-folder-clusters' &&
     Number.isFinite(evidence.strength) &&
     evidence.strength >= 0 &&
@@ -991,7 +991,11 @@ function validSoftClusterPolicyEvidence(
     (evidence.hierarchyForcePolicy === 'nearest-only' ||
       evidence.hierarchyForcePolicy === 'normalized-decay' ||
       evidence.hierarchyForcePolicy === 'normalized-equal') &&
-    evidence.fileAttachmentPolicy === 'spatial-cardinal'
+    evidence.fileAttachmentPolicy === 'spatial-cardinal' &&
+    (evidence.compassDemandPolicy === 'directional-horizontal' ||
+      evidence.compassDemandPolicy === 'spatial-cardinal') &&
+    (evidence.spatialDemandSummary === 'dominant-cardinal' ||
+      evidence.spatialDemandSummary === 'aggregate-vector')
   );
 }
 
@@ -1233,7 +1237,7 @@ export function computeFocusSchematicComputedLayoutAttempt(
     : 'current';
   const internalVariantConfig =
     internalLayoutVariant === 'current' ? '' : `-il${internalLayoutVariant}`;
-  const configId = `A1v${FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION}-${value.settings.ranker}-i${value.settings.internalNodeSeparation}-${value.settings.internalRankSeparation}-m${value.settings.macroNodeSeparation}-${value.settings.macroRankSeparation}-db${value.settings.directionalFolderBandsEnabled ? 'on' : 'off'}-ho${endpointOrderPolicy}${internalVariantConfig}`;
+  const configId = `A1v${FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION}-${value.settings.ranker}-i${value.settings.internalNodeSeparation}-${value.settings.internalRankSeparation}-m${value.settings.macroNodeSeparation}-${value.settings.macroRankSeparation}-db${value.settings.directionalFolderBandsEnabled ? 'on' : 'off'}-dh${value.settings.directionalFolderHierarchy}-ho${endpointOrderPolicy}${internalVariantConfig}`;
   try {
     const inputStarted = now();
     assertFocusSchematicLayoutInput(value);

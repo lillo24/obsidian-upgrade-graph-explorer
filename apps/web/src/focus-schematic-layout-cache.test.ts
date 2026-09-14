@@ -36,9 +36,9 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     const input = fixtureInput();
     const key = exactFocusSchematicLayoutCacheKey(input);
     expect(key).toContain('modular-focus-hierarchy');
-    expect(key).toContain('"algorithmVersion":3');
-    expect(key).toContain('"protocolVersion":6');
-    expect(key.replace('"protocolVersion":6', '"protocolVersion":5')).not.toBe(
+    expect(key).toContain('"algorithmVersion":4');
+    expect(key).toContain('"protocolVersion":8');
+    expect(key.replace('"protocolVersion":8', '"protocolVersion":7')).not.toBe(
       key,
     );
     expect(exactFocusSchematicLayoutCacheKey(input, 1)).not.toBe(key);
@@ -61,6 +61,15 @@ describe('page-lifetime Focus Schematic layout cache', () => {
       exactFocusSchematicLayoutCacheKey({
         ...input,
         settings: { ...input.settings, directionalFolderBandsEnabled: false },
+      }),
+    ).not.toBe(key);
+    expect(
+      exactFocusSchematicLayoutCacheKey({
+        ...input,
+        settings: {
+          ...input.settings,
+          directionalFolderHierarchy: 'nested-one-level',
+        },
       }),
     ).not.toBe(key);
   });
@@ -175,13 +184,13 @@ describe('page-lifetime Focus Schematic layout cache', () => {
       }) as const;
     expect(
       exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)),
-    ).toContain('"algorithmVersion":4');
+    ).toContain('"algorithmVersion":5');
     expect(
       exactFocusSchematicLayoutCacheKey(
         directionalInput,
         DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
       ),
-    ).toContain('"algorithmVersion":3');
+    ).toContain('"algorithmVersion":4');
     const at25 = computeFocusSchematicSoftClusterLayoutAttempt(softInput, {
       strength: 25,
     });

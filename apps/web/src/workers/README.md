@@ -74,17 +74,20 @@ is created only after Local Free is mounted; Structure startup and ordinary
 Global use do not load it.
 
 The Focus Schematic worker is a fifth independent protocol and loads only after
-Focus + Hierarchy + Modular Preview mounts. Its version-5 request carries the
+Focus + Hierarchy + Modular Preview mounts. Its version-8 request carries the
 plain HIER1 model, Local projection, exact renderer dimensions, and frozen A1
 settings plus macro layout, normalized Soft strength, canonical sparse Soft
-scope, internal layout, and Heading-order policies. It dispatches unchanged Directional Bands or the
+scope, internal layout, Heading-order, and experimental Directional hierarchy
+policies. It dispatches unchanged Directional Bands or the
 experimental Soft Folder Clusters solver. Both sides validate exact message
 shape, cardinal File attachment policy, and Soft runtime evidence; success is revalidated
 against the originating input. A new request terminates obsolete compute,
 generation/request guards reject stale messages, and unmount or presentation
 change disposes the worker. Startup, clone, transport, runtime, malformed, and
 computed-result failures remain explicit so the component can retain its last
-valid graph or request session-only Classic fallback.
+valid graph or request session-only Classic fallback. Flat and one-level nested
+Directional requests have separate exact cache/configuration identities; Soft
+requests normalize the hierarchy policy back to Flat semantics.
 
 The continuous Network physics worker is dormant scaffolding for PHYSICS1. An
 `initialize` call stores clone-safe Focus or All seed data in the client but

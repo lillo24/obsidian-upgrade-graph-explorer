@@ -12,12 +12,14 @@ import {
 import type {
   FocusSchematicEndpointOrderPolicy,
   FocusSchematicEndpointPlan,
+  FocusSchematicCompassDemandPolicy,
   FocusSchematicInternalLayoutEvidence,
   FocusSchematicInternalLayoutModuleMetrics,
   FocusSchematicInternalLayoutQualityMetrics,
   FocusSchematicInternalLayoutVariant,
   FocusSchematicLayoutInput,
   FocusSchematicLayoutPlan,
+  FocusSchematicSpatialDemandSummary,
 } from './types';
 
 export const FOCUS_SCHEMATIC_VERTICAL_SPINE_PLACEMENT_CANDIDATE_CAP = 64;
@@ -36,6 +38,23 @@ const centerY = (rectangle: FocusSchematicRectangle): number =>
 type CandidateNode = FocusSchematicLayoutCandidate['nodes'][number];
 type CandidateModule = FocusSchematicLayoutCandidate['modules'][number];
 type CompassRegion = 'top' | 'bottom' | 'left' | 'right';
+
+interface BranchDemand {
+  readonly preferredY: number;
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+  readonly bottom: number;
+  readonly preferredCardinal: CompassRegion | null;
+  readonly fallbackCardinal: CompassRegion;
+}
+
+const CARDINAL_REGIONS: readonly CompassRegion[] = [
+  'top',
+  'bottom',
+  'left',
+  'right',
+];
 
 interface BranchGeometry {
   readonly rootId: ProjectionNodeId;
@@ -63,6 +82,9 @@ export interface FocusSchematicInternalLayoutRunStats {
   placementCandidatesEvaluated: number;
   localRelocationSweeps: number;
   largeModuleFallbackCount: number;
+  spatialDemandCrossingOverrideCount: number;
+  spatialDemandInversionOverrideCount: number;
+  spatialDemandHierarchyOverrideCount: number;
   readonly optimizedModuleIds: Set<string>;
 }
 
@@ -73,6 +95,9 @@ export function createFocusSchematicInternalLayoutRunStats(): FocusSchematicInte
     placementCandidatesEvaluated: 0,
     localRelocationSweeps: 0,
     largeModuleFallbackCount: 0,
+    spatialDemandCrossingOverrideCount: 0,
+    spatialDemandInversionOverrideCount: 0,
+    spatialDemandHierarchyOverrideCount: 0,
     optimizedModuleIds: new Set(),
   };
 }
@@ -448,16 +473,12 @@ function placeRegions(
   );
 }
 
-function branchDemand(
+function directionalBranchDemand(
   endpointPlan: FocusSchematicEndpointPlan,
   candidate: FocusSchematicLayoutCandidate,
   structure: ModuleStructure,
   branch: BranchGeometry,
-): {
-  readonly preferredY: number;
-  readonly left: number;
-  readonly right: number;
-} {
+): BranchDemand {
   const nodeIds = new Set(branch.nodeIds);
   const moduleById = new Map(
     candidate.modules.map((module) => [module.moduleId, module]),
@@ -493,7 +514,126 @@ function branchDemand(
         : counterpartYs[Math.floor((counterpartYs.length - 1) / 2)]!,
     left,
     right,
+    top: 0,
+    bottom: 0,
+    preferredCardinal:
+      left > 0 && right === 0
+        ? 'left'
+        : right > 0 && left === 0
+          ? 'right'
+          : null,
+    fallbackCardinal: branch.sourceIndex % 2 === 0 ? 'top' : 'bottom',
   };
+}
+
+function cardinalRegion(dx: number, dy: number): CompassRegion | null {
+  if (Math.abs(dx) <= EPSILON && Math.abs(dy) <= EPSILON) return null;
+  if (Math.abs(dx) >= Math.abs(dy)) return dx < 0 ? 'left' : 'right';
+  return dy < 0 ? 'top' : 'bottom';
+}
+
+function spatialBranchDemand(
+  endpointPlan: FocusSchematicEndpointPlan,
+  candidate: FocusSchematicLayoutCandidate,
+  structure: ModuleStructure,
+  branch: BranchGeometry,
+  summary: FocusSchematicSpatialDemandSummary,
+): BranchDemand {
+  const nodeIds = new Set(branch.nodeIds);
+  const file = {
+    x: centerX(structure.document),
+    y: centerY(structure.document),
+  };
+  const counterpartYs: number[] = [];
+  const counts: Record<CompassRegion, number> = {
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  };
+  let aggregateX = 0;
+  let aggregateY = 0;
+  for (const connection of endpointPlan.connections) {
+    if (connection.role === 'secondary') continue;
+    const sourceIn =
+      connection.source.kind === 'visible-entity' &&
+      nodeIds.has(connection.source.projectionNodeId);
+    const targetIn =
+      connection.target.kind === 'visible-entity' &&
+      nodeIds.has(connection.target.projectionNodeId);
+    if (sourceIn === targetIn) continue;
+    const counterpart = sourceIn ? connection.target : connection.source;
+    if (counterpart.moduleId === structure.module.moduleId) continue;
+    const rectangle = rectangleForEndpoint(candidate, counterpart);
+    if (rectangle === undefined) continue;
+    const point = { x: centerX(rectangle), y: centerY(rectangle) };
+    const dx = point.x - file.x;
+    const dy = point.y - file.y;
+    const distance = Math.hypot(dx, dy);
+    const region = cardinalRegion(dx, dy);
+    if (region === null || distance <= EPSILON) continue;
+    const authoredReferenceCount = Math.max(1, connection.referenceIds.length);
+    for (let index = 0; index < authoredReferenceCount; index += 1)
+      counterpartYs.push(point.y);
+    counts[region] += authoredReferenceCount;
+    // Unit vectors keep one distant module from outweighing several authored
+    // references while preserving their aggregate spatial direction.
+    aggregateX += (dx / distance) * authoredReferenceCount;
+    aggregateY += (dy / distance) * authoredReferenceCount;
+  }
+  counterpartYs.sort((first, second) => first - second);
+  const ranked = [...CARDINAL_REGIONS].sort(
+    (left, right) =>
+      counts[right] - counts[left] ||
+      CARDINAL_REGIONS.indexOf(left) - CARDINAL_REGIONS.indexOf(right),
+  );
+  const aggregateRegion = cardinalRegion(aggregateX, aggregateY);
+  const preferredCardinal =
+    counterpartYs.length === 0
+      ? null
+      : summary === 'aggregate-vector' && aggregateRegion !== null
+        ? aggregateRegion
+        : ranked[0]!;
+  const secondDemanded = ranked.find(
+    (region) => region !== preferredCardinal && counts[region] > 0,
+  );
+  const fallbackCardinal =
+    secondDemanded ??
+    (preferredCardinal === 'top'
+      ? 'bottom'
+      : preferredCardinal === 'bottom'
+        ? 'top'
+        : branch.sourceIndex % 2 === 0
+          ? 'top'
+          : 'bottom');
+  return {
+    preferredY:
+      counterpartYs.length === 0
+        ? centerY(branch.root)
+        : counterpartYs[Math.floor((counterpartYs.length - 1) / 2)]!,
+    ...counts,
+    preferredCardinal,
+    fallbackCardinal,
+  };
+}
+
+function branchDemand(
+  endpointPlan: FocusSchematicEndpointPlan,
+  candidate: FocusSchematicLayoutCandidate,
+  structure: ModuleStructure,
+  branch: BranchGeometry,
+  demandPolicy: FocusSchematicCompassDemandPolicy = 'directional-horizontal',
+  spatialDemandSummary: FocusSchematicSpatialDemandSummary = 'dominant-cardinal',
+): BranchDemand {
+  return demandPolicy === 'spatial-cardinal'
+    ? spatialBranchDemand(
+        endpointPlan,
+        candidate,
+        structure,
+        branch,
+        spatialDemandSummary,
+      )
+    : directionalBranchDemand(endpointPlan, candidate, structure, branch);
 }
 
 function classifyRegion(
@@ -505,6 +645,73 @@ function classifyRegion(
     return 'right';
   if (branch.bottom <= structure.document.y + EPSILON) return 'top';
   return 'bottom';
+}
+
+function moduleDemandAlignment(
+  endpointPlan: FocusSchematicEndpointPlan,
+  demandCandidate: FocusSchematicLayoutCandidate,
+  layoutCandidate: FocusSchematicLayoutCandidate,
+  input: FocusSchematicLayoutInput,
+  moduleId: string,
+  demandPolicy: FocusSchematicCompassDemandPolicy,
+  spatialDemandSummary: FocusSchematicSpatialDemandSummary,
+) {
+  const demandStructure = moduleStructure(input, demandCandidate, moduleId);
+  const layoutStructure = moduleStructure(input, layoutCandidate, moduleId);
+  if (demandStructure === null || layoutStructure === null)
+    return { demanded: 0, matched: 0 };
+  const finalRegionByRootId = new Map(
+    layoutStructure.branches.map((branch) => [
+      branch.rootId,
+      classifyRegion(layoutStructure, branch),
+    ]),
+  );
+  let demanded = 0;
+  let matched = 0;
+  for (const branch of demandStructure.branches) {
+    const demand = branchDemand(
+      endpointPlan,
+      demandCandidate,
+      demandStructure,
+      branch,
+      demandPolicy,
+      spatialDemandSummary,
+    );
+    if (demand.preferredCardinal === null) continue;
+    demanded += 1;
+    if (finalRegionByRootId.get(branch.rootId) === demand.preferredCardinal)
+      matched += 1;
+  }
+  return { demanded, matched };
+}
+
+export function measureFocusSchematicCompassDemandAlignment(
+  input: FocusSchematicLayoutInput,
+  endpointPlan: FocusSchematicEndpointPlan,
+  demandCandidate: FocusSchematicLayoutCandidate,
+  layoutCandidate: FocusSchematicLayoutCandidate,
+  demandPolicy: FocusSchematicCompassDemandPolicy,
+  spatialDemandSummary: FocusSchematicSpatialDemandSummary,
+) {
+  return layoutCandidate.modules.reduce(
+    (total, module) => {
+      const value = moduleDemandAlignment(
+        endpointPlan,
+        demandCandidate,
+        layoutCandidate,
+        input,
+        module.moduleId,
+        demandPolicy,
+        spatialDemandSummary,
+      );
+      return {
+        demandedBranchCount: total.demandedBranchCount + value.demanded,
+        demandMatchedBranchCount:
+          total.demandMatchedBranchCount + value.matched,
+      };
+    },
+    { demandedBranchCount: 0, demandMatchedBranchCount: 0 },
+  );
 }
 
 function moduleMetrics(
@@ -644,6 +851,8 @@ function scoreCandidate(
   variant: FocusSchematicInternalLayoutVariant,
   stableKey: string,
   attachmentPolicy: FocusSchematicEndpointAttachmentPolicy,
+  demandPolicy: FocusSchematicCompassDemandPolicy = 'directional-horizontal',
+  spatialDemandSummary: FocusSchematicSpatialDemandSummary = 'dominant-cardinal',
 ): readonly (number | string)[] {
   const order = measureFocusSchematicEndpointOrder(
     modulePlan,
@@ -671,10 +880,26 @@ function scoreCandidate(
       (module?.branchesBelowFile ?? 0) === 0)
       ? 1
       : 0;
+  const demandMismatch =
+    demandPolicy === 'spatial-cardinal'
+      ? (() => {
+          const alignment = moduleDemandAlignment(
+            endpointPlan,
+            baseline,
+            candidate,
+            input,
+            moduleId,
+            demandPolicy,
+            spatialDemandSummary,
+          );
+          return alignment.demanded - alignment.matched;
+        })()
+      : 0;
   return [
     exactEndpointCrossingCount,
     order.adjacentRankOrderInversionCount,
     quality.internalHierarchyCrossingCount,
+    demandMismatch,
     oneSided,
     variant === 'vertical-spine' || !hasLateralBranches
       ? (module?.packedExtentImbalance ?? 0)
@@ -710,11 +935,20 @@ function regionOrders(
   structure: ModuleStructure,
   regionByRootId: ReadonlyMap<ProjectionNodeId, CompassRegion>,
   policy: FocusSchematicEndpointOrderPolicy,
+  demandPolicy: FocusSchematicCompassDemandPolicy = 'directional-horizontal',
+  spatialDemandSummary: FocusSchematicSpatialDemandSummary = 'dominant-cardinal',
 ): ReadonlyMap<CompassRegion, readonly ProjectionNodeId[]> {
   const demand = new Map(
     structure.branches.map((branch) => [
       branch.rootId,
-      branchDemand(endpointPlan, candidate, structure, branch),
+      branchDemand(
+        endpointPlan,
+        candidate,
+        structure,
+        branch,
+        demandPolicy,
+        spatialDemandSummary,
+      ),
     ]),
   );
   return new Map(
@@ -865,9 +1099,22 @@ function compassAssignments(
   candidate: FocusSchematicLayoutCandidate,
   structure: ModuleStructure,
   stats: FocusSchematicInternalLayoutRunStats,
+  demandPolicy: FocusSchematicCompassDemandPolicy,
+  spatialDemandSummary: FocusSchematicSpatialDemandSummary,
 ): readonly ReadonlyMap<ProjectionNodeId, CompassRegion>[] {
   const choices = structure.branches.map((branch) => {
-    const demand = branchDemand(endpointPlan, candidate, structure, branch);
+    const demand = branchDemand(
+      endpointPlan,
+      candidate,
+      structure,
+      branch,
+      demandPolicy,
+      spatialDemandSummary,
+    );
+    if (demandPolicy === 'spatial-cardinal')
+      return demand.preferredCardinal === null
+        ? (['top', 'bottom'] as const)
+        : ([demand.preferredCardinal, demand.fallbackCardinal] as const);
     if (demand.left > 0 && demand.right === 0)
       return ['left', branch.sourceIndex % 2 === 0 ? 'top' : 'bottom'] as const;
     if (demand.right > 0 && demand.left === 0)
@@ -943,12 +1190,16 @@ function adaptiveCompassModule(
   policy: FocusSchematicEndpointOrderPolicy,
   stats: FocusSchematicInternalLayoutRunStats,
   attachmentPolicy: FocusSchematicEndpointAttachmentPolicy,
+  demandPolicy: FocusSchematicCompassDemandPolicy,
+  spatialDemandSummary: FocusSchematicSpatialDemandSummary,
 ): FocusSchematicLayoutCandidate {
   const candidates = compassAssignments(
     endpointPlan,
     initial,
     structure,
     stats,
+    demandPolicy,
+    spatialDemandSummary,
   ).flatMap((regionByRootId, assignmentIndex) => {
     const policies: FocusSchematicEndpointOrderPolicy[] =
       policy === 'crossing-optimized'
@@ -961,6 +1212,8 @@ function adaptiveCompassModule(
         structure,
         regionByRootId,
         orderingPolicy,
+        demandPolicy,
+        spatialDemandSummary,
       );
       stats.placementCandidatesEvaluated += 1;
       return {
@@ -978,7 +1231,9 @@ function adaptiveCompassModule(
       };
     });
   });
-  return selectBest(candidates, ({ candidate, key }) =>
+  if (demandPolicy === 'spatial-cardinal')
+    candidates.push({ candidate: initial, key: '' });
+  const score = ({ candidate, key }: (typeof candidates)[number]) =>
     scoreCandidate(
       input,
       modulePlan,
@@ -989,8 +1244,32 @@ function adaptiveCompassModule(
       'adaptive-compass',
       key,
       attachmentPolicy,
-    ),
-  ).candidate;
+      demandPolicy,
+      spatialDemandSummary,
+    );
+  const selected = selectBest(candidates, score);
+  if (demandPolicy === 'spatial-cardinal') {
+    const selectedScore = score(selected);
+    const leastMismatch = Math.min(
+      ...candidates.map((item) => score(item)[3] as number),
+    );
+    if ((selectedScore[3] as number) > leastMismatch) {
+      const aligned = selectBest(
+        candidates.filter(
+          (item) => (score(item)[3] as number) === leastMismatch,
+        ),
+        score,
+      );
+      const alignedScore = score(aligned);
+      if ((selectedScore[0] as number) < (alignedScore[0] as number))
+        stats.spatialDemandCrossingOverrideCount += 1;
+      else if ((selectedScore[1] as number) < (alignedScore[1] as number))
+        stats.spatialDemandInversionOverrideCount += 1;
+      else if ((selectedScore[2] as number) < (alignedScore[2] as number))
+        stats.spatialDemandHierarchyOverrideCount += 1;
+    }
+  }
+  return selected.candidate;
 }
 
 export function applyFocusSchematicInternalLayoutVariant(
@@ -1002,6 +1281,8 @@ export function applyFocusSchematicInternalLayoutVariant(
   policy: FocusSchematicEndpointOrderPolicy,
   stats: FocusSchematicInternalLayoutRunStats,
   attachmentPolicy: FocusSchematicEndpointAttachmentPolicy = 'directional',
+  compassDemandPolicy: FocusSchematicCompassDemandPolicy = 'directional-horizontal',
+  spatialDemandSummary: FocusSchematicSpatialDemandSummary = 'dominant-cardinal',
 ): FocusSchematicLayoutCandidate {
   if (variant === 'current') return initial;
   let candidate = initial;
@@ -1032,6 +1313,8 @@ export function applyFocusSchematicInternalLayoutVariant(
             policy,
             stats,
             attachmentPolicy,
+            compassDemandPolicy,
+            spatialDemandSummary,
           );
   }
   return candidate;
