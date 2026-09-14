@@ -175,7 +175,13 @@ describe('page-lifetime Focus Schematic layout cache', () => {
       }) as const;
     expect(
       exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)),
-    ).toContain('"algorithmVersion":4');
+    ).toContain('"algorithmVersion":5');
+    expect(
+      exactFocusSchematicLayoutCacheKey(
+        directionalInput,
+        DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+      ),
+    ).toContain('"algorithmVersion":3');
     const at25 = computeFocusSchematicSoftClusterLayoutAttempt(softInput, {
       strength: 25,
     });

@@ -33,21 +33,25 @@ mode.
 Search spans canonical entities even when a result is outside the current
 projection. Selecting a result reveals or centers it and establishes the file
 needed to enter Focus. Back/Forward traverses semantic graph navigation.
-Saved view state restores Scope, Layout, disclosure, filters, and semantic
-viewports for a stable workspace. Graph preferences, Saved Filters, and Visual
-Groups are separate persisted systems.
+Current View restores the last Scope, Layout, disclosure, filters, and semantic
+viewports for a stable workspace. SAVED1A adds explicit Named Saved Views over
+that semantic graph contract. SAVED1B adds layout-appropriate embedded profiles:
+All Network owns Global Layout Settings and committed folder spatial rules,
+Focus Network owns only shared controls, Focus Hierarchy owns its presentation
+subset, and All Hierarchy is a no-op. Saved Filters, Visual Groups, per-File size
+overrides, interaction preferences, and experiment gates remain separate.
 
 ## 2. Overall readiness
 
-| Area                                        | Readiness                                   | Evidence                                                                                                                                                                       |
-| ------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Canonical correctness and source neutrality | Ready                                       | Package contracts, schema-v3 tests, projection/inspection oracles, and source-neutral renderer boundaries.                                                                     |
-| All/Focus and Network/Hierarchy workflows   | Ready with polish work                      | Production-browser traversal of all four combinations, Hops/direction, depth 0–3, Custom disclosure, history, and reload.                                                      |
-| Live-vault safety                           | Ready                                       | Ordered prepare → persist → commit, latest-result rejection, paused recovery, last-valid-graph preservation, and Rescan tests.                                                 |
-| Browser runtime                             | Ready after KG14A fixes                     | Production build exercised without current warnings/errors; the Network refresh crash and missing Focus-root crash found by KG14A are fixed and regression-tested.             |
-| Accessibility                               | Network gate addressed; follow-up remains   | Both Sigma canvases stay visual-only, while KG14B2 supplies a synchronized virtualized DOM tree. QUERY1 announcement, contrast, scaling, and final manual feedback remain.     |
-| Desktop security/distribution               | Not release-ready                           | Narrow filesystem capabilities are good, but CSP is disabled, versions remain `0.0.0`, and bundling is inactive.                                                               |
-| Performance                                 | Ready for bounded use; feedback gap remains | Worker split and small profiles are healthy. A prior aggregate-only real-vault Rescan took about 9.7 seconds, while the UI exposes phase text rather than meaningful progress. |
+| Area                                        | Readiness                                      | Evidence                                                                                                                                                                                                                                                                                |
+| ------------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Canonical correctness and source neutrality | Ready                                          | Package contracts, schema-v3 tests, projection/inspection oracles, and source-neutral renderer boundaries.                                                                                                                                                                              |
+| All/Focus and Network/Hierarchy workflows   | Ready with polish work                         | Production-browser traversal of all four combinations, Hops/direction, depth 0–3, Custom disclosure, history, and reload.                                                                                                                                                               |
+| Live-vault safety                           | Ready                                          | Ordered prepare → persist → commit, latest-result rejection, paused recovery, last-valid-graph preservation, and Rescan tests.                                                                                                                                                          |
+| Browser runtime                             | Ready after KG14A fixes                        | Production build exercised without current warnings/errors; the Network refresh crash and missing Focus-root crash found by KG14A are fixed and regression-tested.                                                                                                                      |
+| Accessibility                               | Network gate addressed; follow-up remains      | Both Sigma canvases stay visual-only, while KG14B2 supplies a synchronized virtualized DOM tree. QUERY1 announcement, contrast, scaling, and final manual feedback remain.                                                                                                              |
+| Desktop security/distribution               | Not release-ready                              | Narrow filesystem capabilities are good, but CSP is disabled, versions remain `0.0.0`, and bundling is inactive.                                                                                                                                                                        |
+| Performance                                 | Ready for bounded use; repeatability follow-up | Worker split and small profiles are healthy. Vault opening exposes typed phases, isolated elapsed time, coalesced native-discovery counters, slow-operation detail, and a bounded per-operation watchdog; the PATCH3 candidate completed the previously stalled user-native vault open. |
 
 No evidence supports replacing either renderer, changing the canonical model,
 or adding a general cache in KG14.
@@ -204,28 +208,42 @@ or adding a general cache in KG14.
   explicit distribution decision, not implicit scope.
 - **Decision required?:** Yes; see D-02.
 
-### KG14A-04 — long source transactions provide status but little progress
+### KG14A-04 — long source transactions provide meaningful progress
 
 - **Category:** Loading / perceived performance
-- **Severity / class:** P1 / Should
+- **Severity / class:** P1 / Should — progress UX implemented
 - **Confidence:** High
 - **Workflow:** Open a sizeable vault or perform a full Rescan
-- **Observed behavior:** The last valid graph remains visible and the UI reports
-  Opening/Catching up/Resyncing. It does not expose file counts, phase progress,
-  elapsed time, or an indeterminate-progress affordance beyond text.
+- **Observed behavior:** The last valid graph remains visible. Initial open now
+  distinguishes parallel source discovery from workspace-identity preparation,
+  then reports workspace build with the exact acquired Markdown count, identity
+  persistence, worker commit, and replacement recovery. Opening also shows
+  monotonic elapsed time and an accessible indeterminate bar; Catching up,
+  Updating, and Resyncing reuse that bar. The elapsed interval is isolated to a
+  memoized notice child rather than rerendering the graph-owning App each second.
+  PATCH3 adds coalesced source-discovery counters and workspace-relative slow-call
+  detail without routing per-entry updates through App.
 - **Why it matters:** Aggregate-only real-vault evidence from KG12A recorded a
   roughly 9.7-second full Rescan, about 9.1 seconds of which was source
   reconciliation. At that duration users can reasonably interpret the app as
   stalled.
 - **Reproduction:** Open or Rescan a large local vault and observe the source
   notice while the W1 transaction runs.
-- **Evidence:** App source-notice strings, worker transaction boundary, and the
-  prior aggregate-only runtime sample. No private names, paths, content, or
-  topology are included here.
-- **Likely implementation area:** Source provider discovery/reconciliation
-  events, W1 request progress, `WorkspaceNotice`, and Source settings.
-- **Suggested direction:** Add coarse, serializable phase/count progress without
-  changing transactional adoption or exposing private paths.
+- **Evidence:** Typed `desktop-vault` stage tests, exact-inventory count and
+  observer-isolation oracles, App cancellation/failure tests, accessible notice
+  tests, and the prior aggregate-only runtime sample. No private names, paths,
+  content, or topology are included here.
+- **Implementation:** `desktop-vault`, `desktop-live-vault`, App generation
+  guards, `WorkspaceNotice`, and `vault-open-progress` presentation helpers.
+- **Native status:** Candidate A stalled at its ambiguous pre-worker acquisition
+  stage in user-native testing. PATCH2 proved identity preparation completed
+  while native source discovery remained pending, despite removal of the
+  top-level elapsed rerender.
+  PATCH3 bounds each native discovery operation at 60 seconds and reports its
+  relative target and aggregate counters. The user confirmed that the PATCH3
+  native candidate completed the same previously stalled vault open. This
+  validates that run without attributing the recovery to instrumentation or
+  establishing repeatability.
 - **Decision required?:** No.
 
 ### KG14A-05 — active source and live state are hidden behind Settings
@@ -403,27 +421,28 @@ and continued assistive-technology feedback remain appropriate in KG14B.
 “Inspected” below means deterministic code/test evidence rather than a browser
 fault injected into a production session.
 
-| Failure/state                          | Last valid graph                | Explicit failure                      | Recovery / stale-result policy                               | Evidence                                   |
-| -------------------------------------- | ------------------------------- | ------------------------------------- | ------------------------------------------------------------ | ------------------------------------------ |
-| Corrupt/unsupported report             | Yes                             | Validation path + actionable location | Current source preserved                                     | App report tests and report validator      |
-| Corrupt saved view                     | Default in memory               | Visible alert                         | Stored bytes untouched; explicit Reset saved view            | persistence storage/session tests          |
-| Corrupt graph preferences              | Usable defaults                 | Visible warning                       | Session continues; write failures do not masquerade as saved | graph-preferences tests                    |
-| Corrupt Saved Filters                  | Graph unaffected                | Visible blocked state                 | Stored bytes untouched; repair outside app                   | saved-filter persistence tests             |
-| Corrupt Visual Groups                  | Graph unchanged                 | Visible blocked state                 | Explicit two-step reset clears only group key                | Visual Group session/component tests       |
-| Storage read/write/remove failure      | Yes                             | Alert/warning                         | Memory stays usable; failed candidate not adopted            | App, storage, preferences, group tests     |
-| WebGL/Sigma mount failure              | Projection companion remains    | Named renderer failure                | Network Explorer remains usable; Hierarchy fallback remains  | Sigma lifecycle, model, and App tests      |
-| All Network layout-worker failure      | Seed/current graph remains      | Renderer status                       | Explicit Re-layout can retry; latest request owns adoption   | Global worker/client tests                 |
-| Focus Network layout-worker failure    | Deterministic seed remains      | Renderer failure/status               | Structured/All Hierarchy fallback; stale result rejected     | Local worker/client/session tests          |
-| W3 Hierarchy failure                   | Deterministic grid/seed remains | Layout warning                        | No synchronous Dagre fallback; newest valid result only      | React Flow layout and W3 client tests      |
-| W1 workspace failure                   | Yes                             | Paused/source error                   | Failed candidate discarded; replacement on Rescan            | workspace worker/live-vault tests          |
-| Watch resync-required                  | Yes                             | Resyncing status                      | Queued events retained around full replacement               | watch-burst/live-vault tests               |
-| Catalog persistence failure            | Yes                             | Live updates paused                   | Prepare discarded before adoption; manual recovery           | live-vault transaction tests               |
-| Focused root deleted                   | Yes                             | Focus exits/selection clears          | No fuzzy reassignment                                        | view-state and live reconciliation tests   |
-| Permission/read/watch failure          | Current source preserved        | Selected-vault context                | Reselect/Rescan; no empty success report                     | source-provider and App tests              |
-| Vault moved/reselected                 | Current source until success    | Open failure is explicit              | Exact root selection creates/reuses scoped identity          | source-provider tests; manual gate pending |
-| Source switch while work pending       | New session isolated            | No stale paint adopted                | Correlation/session keys reject old work                     | performance and App session tests          |
-| Renderer disposal while worker pending | Yes/next renderer seed          | Request settles/rejects               | Worker termination and stale message rejection               | Global/Local/W3 worker tests               |
-| Network topology + style overlap       | Yes after fix                   | Regression would fail test            | Style refresh waits for indexed topology                     | KG14A regression test                      |
+| Failure/state                          | Last valid graph                 | Explicit failure                      | Recovery / stale-result policy                               | Evidence                                   |
+| -------------------------------------- | -------------------------------- | ------------------------------------- | ------------------------------------------------------------ | ------------------------------------------ |
+| Corrupt/unsupported report             | Yes                              | Validation path + actionable location | Current source preserved                                     | App report tests and report validator      |
+| Corrupt Current View                   | Default in memory                | Visible alert                         | Stored bytes untouched; explicit Reset current view          | persistence storage/session tests          |
+| Corrupt Named Saved Views              | Graph and Current View unchanged | Visible blocked state                 | Two-step reset clears only the Named Saved Views key         | Saved Views session/component tests        |
+| Corrupt graph preferences              | Usable defaults                  | Visible warning                       | Session continues; write failures do not masquerade as saved | graph-preferences tests                    |
+| Corrupt Saved Filters                  | Graph unaffected                 | Visible blocked state                 | Stored bytes untouched; repair outside app                   | saved-filter persistence tests             |
+| Corrupt Visual Groups                  | Graph unchanged                  | Visible blocked state                 | Explicit two-step reset clears only group key                | Visual Group session/component tests       |
+| Storage read/write/remove failure      | Yes                              | Alert/warning                         | Memory stays usable; failed candidate not adopted            | App, storage, preferences, group tests     |
+| WebGL/Sigma mount failure              | Projection companion remains     | Named renderer failure                | Network Explorer remains usable; Hierarchy fallback remains  | Sigma lifecycle, model, and App tests      |
+| All Network layout-worker failure      | Seed/current graph remains       | Renderer status                       | Explicit Re-layout can retry; latest request owns adoption   | Global worker/client tests                 |
+| Focus Network layout-worker failure    | Deterministic seed remains       | Renderer failure/status               | Structured/All Hierarchy fallback; stale result rejected     | Local worker/client/session tests          |
+| W3 Hierarchy failure                   | Deterministic grid/seed remains  | Layout warning                        | No synchronous Dagre fallback; newest valid result only      | React Flow layout and W3 client tests      |
+| W1 workspace failure                   | Yes                              | Paused/source error                   | Failed candidate discarded; replacement on Rescan            | workspace worker/live-vault tests          |
+| Watch resync-required                  | Yes                              | Resyncing status                      | Queued events retained around full replacement               | watch-burst/live-vault tests               |
+| Catalog persistence failure            | Yes                              | Live updates paused                   | Prepare discarded before adoption; manual recovery           | live-vault transaction tests               |
+| Focused root deleted                   | Yes                              | Focus exits/selection clears          | No fuzzy reassignment                                        | view-state and live reconciliation tests   |
+| Permission/read/watch failure          | Current source preserved         | Selected-vault context                | Reselect/Rescan; no empty success report                     | source-provider and App tests              |
+| Vault moved/reselected                 | Current source until success     | Open failure is explicit              | Exact root selection creates/reuses scoped identity          | source-provider tests; manual gate pending |
+| Source switch while work pending       | New session isolated             | No stale paint adopted                | Correlation/session keys reject old work                     | performance and App session tests          |
+| Renderer disposal while worker pending | Yes/next renderer seed           | Request settles/rejects               | Worker termination and stale message rejection               | Global/Local/W3 worker tests               |
+| Network topology + style overlap       | Yes after fix                    | Regression would fail test            | Style refresh waits for indexed topology                     | KG14A regression test                      |
 
 The matrix supports a strong reliability assessment: failures are normally
 failure-shaped, the last committed graph stays visible, and recovery is
@@ -443,8 +462,8 @@ communicated, not silent data corruption.
 - The steady active source and live state are visible only after opening
   Settings (KG14A-05). The first-run graph does not explain that its realistic
   unresolved/ambiguous/invalid nodes are sample diagnostics.
-- Identity recovery correctly warns that it changes continuity and does not
-  reset the saved graph view. This is accurate but also exposes the need for a
+- Identity recovery correctly warns that it changes stable-ID continuity and
+  does not reset Current View or Named Saved Views. This is accurate but also exposes the need for a
   short explanation of the product's separate persistence layers.
 
 ## 7. Scope × Layout consistency
@@ -522,20 +541,29 @@ surface differentiates or groups them.
 
 - Back/Forward records semantic graph actions, including depth and manual
   disclosure; no-op actions do not pollute history.
-- Stable-workspace saved view restores Scope, Layout, focus, filters,
+- Stable-workspace Current View restores Scope, Layout, focus, filters,
   disclosure, and renderer-specific semantic viewport anchors under schema v3.
+- Named Saved Views retain explicit immutable snapshots in a separate schema-v2
+  workspace registry. Strict schema-v1 migration is in memory and does not write
+  on read. Apply reconciles current canonical IDs and durably commits any owned
+  profile keys before clearing Back/Forward and selection, synchronizing the
+  query editor, and restoring the semantic viewport as one graph transaction.
 - Graph preferences persist focus appearance, Network layout/strength/spacing,
   trackpad mode, and preferred Focus layout independently from view history.
-- Saved Filters and Visual Groups are separate named workspace registries.
+- Saved Filters, Visual Groups, and size overrides remain independent. Spatial
+  rules remain independently stored and are copied into a Saved View only for an
+  All Network profile; Apply uses rollback-protected write-before-adopt across
+  that key and Graph Preferences.
 - Live updates reconcile by stable identity; stale disclosure/viewports are
   dropped explicitly, and deletion of the focused root exits Focus rather than
   choosing a fuzzy replacement.
-- Reset saved view deletes only the view-state key. Identity recovery, Saved
-  Filters, Visual Groups, and preferences remain separate.
+- Reset current view deletes only the view-state key. Reset Saved Views registry
+  deletes only the named registry key. Identity recovery and every other
+  persistence layer remain separate.
 
 This implementation is robust but requires product explanation. The current UI
-names each system accurately at its point of use; it does not provide one place
-that explains what Back, reload, Reset saved view, and recovery each affect.
+names each system accurately at its point of use; its documentation now
+distinguishes Back, reload, Reset current view, and Saved Views recovery.
 
 ## 12. Settings
 
@@ -685,16 +713,17 @@ local investigative run, not portable promises or CI thresholds.
 
 ## 17. Ranked implementation queue
 
-| Priority | Finding IDs                                      | Theme                               | User impact                                                                                             | Confidence  | Suggested implementation slice                          | Needs user decision? |
-| -------- | ------------------------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------- | -------------------- |
-| 1        | KG14A-07, contrast/manual scaling feedback       | Accessible feedback                 | Closes query announcement and remaining verified contrast/scaling gaps                                  | High        | KG14B follow-up — critical feedback and manual evidence | No                   |
-| 2        | KG14A-03                                         | Desktop hardening                   | Produces an identifiable, CSP-hardened, installable release artifact                                    | High        | KG14C — release configuration and packaged smoke        | Yes: D-02            |
-| 3        | KG14A-04, KG14A-05                               | Source confidence and progress      | Users know what is open/live and whether long work is progressing                                       | High        | KG14D — source onboarding/status/progress               | Yes: D-03 placement  |
-| 4        | KG14A-06, KG14A-09, KG14A-10, KG14A-08           | Workflow comprehension and recovery | Improves small Network readability, provenance scanning, depth mental model, and deletion safety        | Medium–High | KG14E — exploration polish                              | Yes only for D-04    |
-| Done     | KG14A-02                                         | Equivalent Network exploration      | Adds a virtualized DOM path for projected discovery, adjacency traversal, selection, and centering      | High        | KG14B2                                                  | No                   |
-| Done     | KG14A-01, KG14A-11, KG14A-12, KG14A-13, KG14A-14 | Audit-enabling fixes                | Prevents critical graph failures, restores query/empty-result feedback, and removes terminology leakage | High        | KG14A                                                   | No                   |
+| Priority | Finding IDs                                      | Theme                               | User impact                                                                                                                    | Confidence  | Suggested implementation slice                          | Needs user decision? |
+| -------- | ------------------------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------- | ------------------------------------------------------- | -------------------- |
+| 1        | KG14A-07, contrast/manual scaling feedback       | Accessible feedback                 | Closes query announcement and remaining verified contrast/scaling gaps                                                         | High        | KG14B follow-up — critical feedback and manual evidence | No                   |
+| 2        | KG14A-03                                         | Desktop hardening                   | Produces an identifiable, CSP-hardened, installable release artifact                                                           | High        | KG14C — release configuration and packaged smoke        | Yes: D-02            |
+| 3        | KG14A-05                                         | Source confidence                   | Users know what is open/live without first opening Settings                                                                    | High        | KG14D — source onboarding/status                        | Yes: D-03 placement  |
+| 4        | KG14A-06, KG14A-09, KG14A-10, KG14A-08           | Workflow comprehension and recovery | Improves small Network readability, provenance scanning, depth mental model, and deletion safety                               | Medium–High | KG14E — exploration polish                              | Yes only for D-04    |
+| Done     | KG14A-02                                         | Equivalent Network exploration      | Adds a virtualized DOM path for projected discovery, adjacency traversal, selection, and centering                             | High        | KG14B2                                                  | No                   |
+| Done     | KG14A-04                                         | Source progress                     | Adds truthful open phases/counts, accessible indeterminate progress, monotonic elapsed time, and live-operation progress reuse | High        | Current-main startup progress baseline                  | No                   |
+| Done     | KG14A-01, KG14A-11, KG14A-12, KG14A-13, KG14A-14 | Audit-enabling fixes                | Prevents critical graph failures, restores query/empty-result feedback, and removes terminology leakage                        | High        | KG14A                                                   | No                   |
 
-Future Saved Views, manual positions, cluster dragging, multi-focus,
+Future SAVED1B presentation/spatial profiles, manual positions, cluster dragging, multi-focus,
 analytics/community detection, semantic similarity, source editing, cloud sync,
 and a new renderer are deliberately absent from this issue queue.
 

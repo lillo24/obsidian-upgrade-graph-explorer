@@ -1,5 +1,15 @@
 # Architecture
 
+## OpenAI Agents application boundary
+
+`apps/web/src/features/ai-review/openai-agents-provider.ts` adapts the
+provider-neutral REVIEW1 engine to `@openai/agents`. Each stage gets a fresh
+browser OpenAI client and an independent Responses API HTTP run; the React app
+owns a session-memory credential and REVIEW1 remains the only orchestrator.
+The adapter explicitly disables tracing, logging, WebSocket transport, SDK
+sessions, and implicit client retries. See
+[`REVIEW4_OPENAI_AGENTS_PROVIDER.md`](REVIEW4_OPENAI_AGENTS_PROVIDER.md).
+
 ## Status and purpose
 
 This document is the engineering source of truth for the Markdown Structure Graph Explorer. KG0 established the React/Vite shell and workspace packages, KG1 implemented canonical snapshot schema version 1, KG2 implements generic CommonMark document/section structure parsing, KG3 implements the tested Obsidian frontmatter/link/block syntax adapter, KG4 resolves complete parsed workspaces into validated canonical snapshots, KG5 implements a development-only scanner and validated diagnostic report, KG6 implements renderer-independent view projection, KG7 implements the first structural renderer, KG8 implements source-neutral inspection/search plus provenance-first navigation, KG9 implements app-owned stable canonical identity plus local renderer-independent view restoration, KG10 implements file-granular parsed-document caching plus exact stable snapshot deltas, and KG11 implements Tauri-selected, coalesced live vault acquisition with transactional KG10 application, full resync, and in-place view preservation. KG12 supplies the performance baseline and implements separate stateful W1 workspace and stateless W3 Dagre workers without changing KG11 transaction semantics or renderer-independent contracts. KG13A selected direct Sigma/Graphology for a complementary Global renderer. KG13B1 promotes it into the product as a lazy documents-first Global/Regional mode with off-main layout and soft folder geometry. KG13B2A adds bounded Local Free as an explicit third presentation with KG6 Focus/disclosure authority, deterministic immediate geometry, separate off-main layout, schema-v3 persistence/history, and Global transition anchoring. KG13B2B completes that Local presentation with a reusable React Flow/W3 schematic variant over the same bounded projection. PRE-KG14A4 assigns compact hierarchy cards to All and extended cards to Focus while preserving their separate Structure and Local Structured layout modes. KG14B2 adds a virtualized, accessible Network Explorer over the completed All or Focus Network projection; it is a DOM companion to the visual Sigma canvas, not a renderer replacement or a new topology authority.
@@ -123,6 +133,28 @@ Worker builds, the web build boundary explicitly resolves the Markdown
 named-reference decoder's worker-safe entry and rejects emitted worker chunks
 that construct DOM values.
 
+`packages/ai-review` is a separate provider-neutral, headless orchestration
+boundary. It freezes explicitly supplied review material and configuration,
+starts isolated Negative and Positive executions concurrently, validates their
+terminal results before a constrained Integrator, and optionally runs a
+read-only compiler-aware post-check. It owns immutable run evidence, lifecycle,
+result validation, and exports—not Git/filesystem capture, React/graph UI,
+provider SDK transport, durable storage, or the compiler's knowledge model.
+Compiler access is an injected retained-snapshot session with four bounded read
+operations; placement and authorization stay application-owned. See
+[`AI_REVIEW_COMPILER_INTEGRATION.md`](AI_REVIEW_COMPILER_INTEGRATION.md).
+
+`packages/review-source-tauri` is the REVIEW2 outer adapter between an
+already-authorized KG11 vault session and `packages/ai-review`. Its TypeScript
+surface owns opaque session/preparation/request lifecycles, native-envelope
+validation, cancellation, and mapping into `GitHistoryReviewSource`. The Rust
+module in `apps/desktop/src-tauri` alone resolves and invokes Git. It captures
+strict-UTF-8 Markdown blobs and per-first-parent-commit patches from pinned
+objects, never from working-tree content, and retains a versioned provenance
+manifest. Absolute roots are accepted only at native session opening and are
+not placed in review data. This adapter has no graph, React, provider SDK,
+compiler-store, general process, or repository-write responsibility.
+
 `packages/dagre-layout` owns the versioned plain-data W3 protocol, strict
 input/output validation, and the only synchronous Dagre compute/configuration
 implementation. It is stateless and knows nothing about React, React Flow,
@@ -147,6 +179,39 @@ deliberately does not own KG10 application, diagnostics, React, projection,
 rendering, live subscriptions, or full resync orchestration. An injectable
 narrow bridge and scheduler keep all provider tests independent of a native
 runtime.
+
+`packages/argument-workspace` is an independent source-neutral domain and
+application boundary for one local Argument Library. Its schema-v1
+Topic/Axiom/Counter-Argument data is not added to the canonical Markdown graph.
+The package owns strict validation, stable record/library revisions, portable
+source locators, stale-response detection, deterministic descriptive indexing,
+JSON/Markdown interchange, serialized expected-snapshot authoring commits, and
+immutable snapshot-bound read/bundle/source-dispatch contracts. Authoring and
+consumer facades are separate. The consumer has no store access, agent role,
+review stage, graph/view state, or model dependency.
+
+`apps/web/src/persistence/argument-library.ts` adapts that store contract to one
+profile-level localStorage key. `packages/argument-workspace-tauri` adapts it to
+dedicated private app-local JSON using validated temporary-sibling replacement.
+Neither adapter uses the graph view registry, selected-vault Markdown, or
+workspace identity catalog. Live theory-source acquisition remains a later host
+adapter behind the Argument Workspace's narrow registered-reference reader; it
+must reuse authorized source infrastructure rather than introduce another vault
+scanner.
+
+`apps/web/src/features/arguments` is the outer application UI for that domain.
+`App.tsx` owns exactly one profile-level repository/session above the
+report-keyed `GraphExplorer`, so source switches and graph remounts do not reset
+the library or protected drafts. The feature composes pure core operations into
+one serialized commit per Save, replaces its UI reader only after persistence
+confirms the exact new snapshot, and keeps search/import/export/context state
+outside canonical data. Its platform store is chosen once: browser localStorage
+or the dedicated Tauri app-local adapter, with no cross-platform fallback.
+`GraphExplorer` owns only the normal/maximized Arguments launcher and graph-tool
+arbitration; opening the native modal never enters projection, layout, camera,
+selection, filter, history, or canvas identity. Source locators remain recorded,
+copyable, explicitly unverified data because no live provider is installed by
+this feature.
 
 `apps/web/src/desktop-live-vault.ts` is the non-React application orchestration
 boundary between that provider and the W1 processor. It owns one live runtime, watcher
@@ -385,7 +450,8 @@ KG9B adds one interaction-end semantic viewport observation. The renderer uses
 the current React Flow transform and actual container dimensions to find the
 nearest visible entity node, then reports only its canonical entity ID plus
 zoom. Diagnostic nodes never become bookmarks. Raw x/y, renderer node IDs,
-Dagre coordinates, and per-frame movement never cross into saved view state.
+Dagre coordinates, and per-frame movement never cross into Current View or
+Named Saved View state.
 Restoration reuses the KG8 center request after layout; missing or filtered
 anchors use normal fit without widening the restored view.
 
@@ -689,14 +755,30 @@ and explicit resolution results. Later source-backed fields may be added only
 for concrete requirements. KG6 renderer-independent projection state now covers
 structural disclosure, block inclusion, focus root/hops/direction/context, and
 path/projected-text/entity-kind/resolution filters. KG9 persists the user-facing
-subset: disclosure, block inclusion, focus, path/entity/status filters, and a
-semantic canonical-entity-plus-zoom viewport bookmark. The internal projected
-text filter is deliberately excluded because the current UI does not expose it.
-Selection, hover, search, inspector pagination, renderer graph data, raw
-viewport transforms, manual positions/pins, named saved views, timestamps, and
-renderer preferences are not persisted. A UI action such as hiding or focusing
-an entity never mutates source truth. Early releases remain read-only with
-respect to Markdown.
+subset as one automatic Current View per workspace: disclosure, block inclusion,
+focus, path/entity/status filters, presentation mode, and semantic
+canonical-entity-plus-zoom viewport bookmarks. The internal projected text
+filter is deliberately excluded because the current UI does not expose it.
+SAVED1A stores immutable copies of that same source-neutral subset in a separate
+Named Saved Views registry, adding a trimmed name and explicit user-facing
+Network/Hierarchy layout. SAVED1B advances that registry to schema v2 with a
+strict discriminated profile: All Network owns complete Global Layout Settings
+plus committed normalized folder spatial rules; Focus Network owns only its four
+shared Network controls; Focus Hierarchy owns only its presentation policies;
+All Hierarchy is an explicit no-op. Schema-v1 data migrates in memory without a
+read-time write and remains semantic-only until explicit Update.
+
+Applying an entry reconciles it against the current report, commits changed
+profile owners through a cross-key write-before-adopt transaction with exact-byte
+rollback, establishes a fresh Back/Forward baseline, clears selection, adopts its
+query into the editor, and lets ordinary KG9 autosave record the reconciled result
+as the new Current View. Trackpad and exposure preferences, selection, hover,
+search, inspector pagination, renderer graph data, raw viewport transforms,
+individual File movement/positions, timestamps, Visual Groups, Saved Filters,
+and size overrides are not captured. Exact current matching is derived from
+canonical semantic/profile snapshots; no active Saved View identity is stored or
+replayed at startup. A UI action such as hiding or focusing an entity never
+mutates source truth. Early releases remain read-only with respect to Markdown.
 
 KG5 search, resolution filters, disclosure state, and pagination are transient
 diagnostic UI state. They are not KG6 projection contracts or KG9 persisted view
@@ -711,10 +793,18 @@ provenance. The browser synchronously loads, validates, and reconciles the
 workspace-keyed record before autosave is enabled. Stale disclosure IDs, focus
 roots, path scopes, and viewport anchors are removed with visible non-fatal
 status; collapsed disclosure wins conflicts. Corrupt or unsupported records are
-not overwritten or deleted. Reset removes only that workspace view, restores
+not overwritten or deleted. Reset current view removes only that workspace view, restores
 documents-only defaults, clears transient selection/search, and fits the graph;
 it never resets the KG9A identity catalog. A selected report file itself must
 still be re-selected after browser reload because file handles are out of scope.
+
+SAVED1B uses
+`icarus-graph-explorer:saved-views:<encodeURIComponent(workspaceId)>` for its
+strictly validated schema-v2 registry. It is eligible only for the same stable,
+writable-storage workspaces as Current View persistence. Writes happen before
+the in-memory registry is adopted; corruption blocks mutations and leaves stored
+bytes intact until a separate two-step registry reset deletes only this key.
+Reset current view and Reset Saved Views registry are deliberately independent.
 
 Renderers receive `ViewProjection` plain data formed from canonical source truth
 plus renderer-independent state. Structural disclosure happens before each
@@ -736,7 +826,7 @@ Accuracy is more important than plausible guesses. The reference contract explic
 The initial product is local-first:
 
 - no required backend or account;
-- no cloud upload or remote processing of workspace content;
+- no background cloud upload or remote graph processing; AI Review is a separate explicit opt-in upload of selected frozen evidence;
 - no telemetry or analytics;
 - no source-file write-back;
 - application-owned caches and view state may be stored locally.
@@ -746,8 +836,8 @@ Markdown body text they may contain paths, headings, fingerprints, and raw
 targets, so they must stay in ignored/app-local storage outside the selected
 vault and must not be logged or included in browser reports.
 
-KG9B/KG13 browser saved views are also private local application data, but
-their scope is intentionally small: stable workspace/entity IDs,
+KG9B/KG13 Current Views and SAVED1A Named Saved Views are also private local
+application data, but their scope is intentionally small: stable workspace/entity IDs,
 disclosure/focus, workspace-relative path filters, enum filters, presentation
 mode, and semantic Structure/Global/Local zoom or ratio. They contain no report,
 catalog, source body, absolute path, renderer layout, raw transform, search,
@@ -755,7 +845,7 @@ selection, coordinates, transition points, or Local/Global positions. Keys use e
 basenames, or paths. Storage denial/corruption is non-fatal and never becomes a
 success-shaped empty value.
 
-Remote capabilities, collaboration, or source editing would require an explicit later trust decision. Private workspace material must not enter repository fixtures or logs. Bugs discovered in the Icarus vault must be reduced to small synthetic examples before they are committed.
+Remote collaboration or source editing would require another explicit trust decision. The direct OpenAI provider is the narrow exception for remote compute: only pressing **Run** sends selected frozen review evidence and prompts, plus requested compiler results when enabled. Its key remains in WebView memory for the configured app session and is never persisted. Private workspace material must not enter repository fixtures or logs. Bugs discovered in the Icarus vault must be reduced to small synthetic examples before they are committed.
 
 The KG5 browser File API reads one user-selected report in memory and performs
 no upload. KG11 desktop mode reads and watches one explicitly selected vault
@@ -920,11 +1010,11 @@ moves only the marker and commits one full rule before the existing SPATIAL2A
 settlement path adopts authoritative geometry. Place retains the transient rigid
 preview over effective members and relevant edges, or restores confirmed state
 on cancel/failure. This is folder-rule authoring, not MOVE1A individual-File
-movement or the final PHYSICS1 reaction lifecycle. A
-later Saved View may
-reference, copy, or selectively override an independently serializable spatial
-profile alongside query, scope, layout, hierarchy detail, settings, and
-viewport; no Saved View schema is introduced here.
+movement or the final PHYSICS1 reaction lifecycle. SAVED1A Named Saved Views
+deliberately do not reference, copy, or override this independently serializable
+spatial profile. A later SAVED1B design may compose spatial or presentation
+profiles with a named semantic bookmark, but no such composition schema is
+introduced here.
 
 Every schema-v2 rule mutation is a spatial coordinate transaction, including
 the transition from one rule to an empty registry. `GlobalGraphCanvas` carries
@@ -1342,8 +1432,9 @@ records per-module cardinal counts, demand matches and hard-guard overrides,
 pass-to-pass region and bounds changes, and pass-two crossing/span deltas. A
 separate perturbation diagnostic compares Adaptive and Vertical internal
 rectangles with final File-center displacement; identical internal geometry must
-produce identical downstream Soft geometry. Soft algorithm version 4 and worker
-protocol 7 isolate the change while the Directional algorithm version remains 3.
+produce identical downstream Soft geometry. Soft algorithm version 5 covers the
+combined spatial-Compass and root-neutral force geometry; worker protocol 7
+isolates the evidence change while the Directional algorithm version remains 3.
 
 The renderer derives a typed visible-structure marker for each unfiltered module
 after layout. Modules with only a currently visible File paint a transparent

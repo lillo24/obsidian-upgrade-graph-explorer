@@ -32,8 +32,21 @@ Automated tests verify:
 - Secondary connections retain zero geometry influence;
 - Soft File/module anchors retain final-geometry left/right/top/bottom ports;
 - Direct and Electronic consume identical selected handles;
-- the root File stays centered and all final variable module rectangles remain
-  non-overlapping.
+- the root File stays centered, remains visible in folder membership, is
+  excluded from every folder-attraction force group, and all final variable
+  module rectangles remain non-overlapping.
+
+## Root-neutral Compass Lab update
+
+The PATCH1 lab now runs against the merged root-neutral Soft solver and includes
+SC26–SC28 from the shared fixture catalog. Folder hulls retain the root's
+truthful visible exact-folder membership. Attraction centroids use eligible
+non-root Files only, and the root module is labeled `DISPLAY MEMBER ·
+FORCE-NEUTRAL`. SC26 shows that a root plus one peer cannot create an attraction
+group; SC27 shows two peers attracting around their own centroid; SC28 covers
+normalized-decay ancestor scopes. These scenarios display strengths 0, 25, 50,
+75, and 100 side by side. Soft cache algorithm version 5 separates the combined
+root-neutral and spatial-Compass geometry from both earlier version-4 branches.
 
 ## Display-tree cases
 

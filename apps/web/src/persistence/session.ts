@@ -39,8 +39,8 @@ export function persistenceEligibility(
 
 function restoredStatus(issues: readonly ViewRestoreIssue[]): string {
   return issues.length === 0
-    ? 'Restored saved graph view.'
-    : `Restored saved graph view with ${issues.length} stale item${issues.length === 1 ? '' : 's'} removed.`;
+    ? 'Restored current graph view.'
+    : `Restored current graph view with ${issues.length} stale item${issues.length === 1 ? '' : 's'} removed.`;
 }
 
 export function hydrateGraphView({
@@ -95,7 +95,7 @@ export function hydrateGraphView({
       viewports: {},
       issues: [],
       writable: false,
-      status: `${loaded.message} The stored value was left unchanged; use Reset saved view to remove it.`,
+      status: `${loaded.message} The stored value was left unchanged; use Reset current view to remove it.`,
     };
   }
   try {
@@ -119,7 +119,7 @@ export function hydrateGraphView({
       viewports: {},
       issues: [],
       writable: false,
-      status: `${message} The stored value was left unchanged; use Reset saved view to remove it.`,
+      status: `${message} The stored value was left unchanged; use Reset current view to remove it.`,
     };
   }
 }

@@ -1,12 +1,34 @@
-# Browser View Persistence
+# Browser Graph Persistence
 
-This folder owns the current browser adapter for KG9B's source-neutral saved
-view contract.
+This folder owns browser adapters for the automatic KG9B Current View and the
+independent workspace registries that compose the graph product.
+
+It also contains `argument-library.ts`, the independent profile-level browser
+adapter for `@icarus-graph-explorer/argument-workspace`. That adapter uses one
+`icarus-graph-explorer:argument-library:v1` key rather than a workspace-scoped
+graph key, validates before adoption, preserves corrupt/future values, performs
+expected-snapshot checks, and surfaces implementation-dependent browser quota
+failures. It stores prose-sized Argument Library JSON only; source bodies and
+live source observations are not added to it.
+
+`../features/arguments/platform-store.ts` chooses this adapter in a browser and
+dynamically chooses `@icarus-graph-explorer/argument-workspace-tauri` only when
+the Tauri runtime marker is present. That decision is cached on first access and
+never falls back from failed desktop I/O to localStorage. Missing storage remains
+an explicit unreadable state. The UI limits explicitly selected JSON imports to
+5 MiB before parsing; that practical interaction limit does not alter schema v1.
 
 - `storage.ts` maps encoded stable workspace IDs to small `localStorage`
   records and returns explicit, non-fatal read/write/delete failures.
 - `session.ts` applies report identity eligibility and hydrates a reconciled KG6
   state before React autosave may run.
+- `saved-views.ts` owns the strict schema-v2 Named Saved Views registry, strict
+  in-memory schema-v1 migration, and pure add/update/rename/delete operations.
+  Each new entry combines one immutable KG9 semantic snapshot with a trimmed
+  name, Network/Hierarchy choice, and a layout-appropriate discriminated profile.
+- `saved-views-session.ts` applies stable-workspace eligibility,
+  write-before-adopt mutation policy, blocked-write behavior, and a narrow
+  corrupt-registry reset that deletes only the Saved Views key.
 - `saved-filters.ts` owns the separate schema-v1 `{name, query}` registry for a
   stable workspace, including strict validation, deterministic ordering, a
   50-filter limit, and explicit read/write failures.
@@ -34,7 +56,7 @@ legacy reports never read or write cross-session state. The stored record
 contains no report body, source body, identity catalog, absolute path, renderer
 layout, raw viewport transform, search, or selection.
 
-The current key is
+The Current View key is
 `icarus-graph-explorer:view-state:<encodeURIComponent(workspaceId)>`; the value,
 not the key, carries schema version 1 so future readers can discover older
 records. Browser storage access is synchronous during report-scoped hydration,
@@ -50,12 +72,44 @@ mounting alone does not rewrite storage. Subsequent within-session history and
 mode restoration use that fitted semantic viewport. Live revisions preserve the
 current camera and never replay the source-load Fit.
 
+Named Saved Views use the separate key
+`icarus-graph-explorer:saved-views:<encodeURIComponent(workspaceId)>`. The
+schema-v2 registry contains its workspace ID plus at most 50 deterministically
+sorted entries. Names are trimmed, at most 64 characters, and case-insensitively
+unique. Embedded view-state records use the existing strict schema-v3 validator,
+must belong to the same workspace, and are checked for Scope/Layout/profile
+coherence. Schema-v1 records migrate strictly in memory without a read-time
+write; the next explicit mutation serializes v2 and profile-less migrated entries
+retain semantic-only SAVED1A behavior.
+
+The v2 profile is discriminated by Scope × Layout. All Network owns the complete
+validated Global Layout Settings value and one validated snapshot of the
+workspace's committed folder spatial registry. Focus Network owns only Reference
+Pull, Base node size, Link thickness, and Label threshold. Focus Hierarchy owns
+only its appearance/implementation and modular presentation policies. All
+Hierarchy has an explicit empty profile. Trackpad Zoom, experiment gates, Saved
+Filters, Visual Groups, per-File sizes/movement, raw coordinates, selection,
+search, and shell state never enter the registry.
+
+Stable writable workspaces commit Named Saved Views before adopting them in
+memory. Transient, legacy, and storage-unavailable sessions expose the feature
+as disabled with an explanation. Corrupt bytes are preserved and block writes;
+the product's confirmed registry recovery deletes only this key. Applying an
+entry does not rewrite the registry. Instead, the web orchestration reconciles
+its semantic snapshot against current canonical IDs and lets ordinary Current
+View autosave persist the applied result. Profile application uses a wider
+write-before-adopt transaction: validate both owners, snapshot exact previous
+bytes, write changed spatial state before Graph Preferences, roll back successful
+writes if a later write fails, and only then adopt the combined profile and
+semantic state. Browser storage is not presented as database-atomic; rollback
+failure is surfaced explicitly.
+
 Saved Filters use the separate key
 `icarus-graph-explorer:saved-filters:<encodeURIComponent(workspaceId)>` and are
 available cross-session only for stable identities with writable browser
 storage. They contain only trimmed names and canonical QUERY1 strings—never
 simple filters, disclosure, Focus, viewport, selection, source paths, or raw
-ASTs. A corrupt registry is left unchanged, and Reset saved view does not
+ASTs. A corrupt registry is left unchanged, and Reset current view does not
 delete it.
 
 Visual Groups use
@@ -77,7 +131,7 @@ query, position, or hidden flag. Reset size removes an entry. Stable workspaces 
 before adoption; transient and legacy reports keep memory-only sessions. This
 uses declared identity provenance, not whether a report is a sample or a vault.
 Corrupt data is left untouched and editing blocked with a visible recovery
-message; failed writes retain the last confirmed sizes. Reset saved view does
+message; failed writes retain the last confirmed sizes. Reset current view does
 not affect this registry. Missing canonical IDs remain inactive without fuzzy
 remapping, and a query-hidden File keeps its entry for when it becomes visible.
 
@@ -91,7 +145,7 @@ and legacy reports remain editable only for the current session. Missing or
 unreadable storage falls back to a visible session-only state. A corrupt record
 remains untouched and blocks edits until the explicit spatial reset deletes
 only this key. Durable mutations write before adoption, and a failed write
-retains the last confirmed registry. Reset saved view, Graph Preferences,
+retains the last confirmed registry. Reset current view, Graph Preferences,
 Visual Groups, Saved Filters, and per-File presentation overrides do not clear
 or merge with this registry.
 

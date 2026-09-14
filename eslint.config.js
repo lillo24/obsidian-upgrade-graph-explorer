@@ -13,6 +13,7 @@ export default tseslint.config(
       '**/src-tauri/target/**',
       '.agents/**',
       '.codex/**',
+      '.private/**',
     ],
   },
   eslint.configs.recommended,
@@ -77,6 +78,74 @@ export default tseslint.config(
               ],
               message:
                 'Framework, renderer, platform, and source-specific imports are forbidden in core.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/argument-workspace/**/*.{ts,tsx}'],
+    ignores: [
+      'packages/argument-workspace/**/*.test.{ts,tsx}',
+      'packages/argument-workspace/**/test-fixture.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@icarus-graph-explorer/*',
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                '@xyflow/*',
+                '@tauri-apps/*',
+                '@react-sigma/*',
+                'sigma',
+                'sigma/*',
+                'graphology*',
+                'obsidian*',
+                '@obsidian/*',
+                'node:*',
+              ],
+              message:
+                'Argument Workspace core is source-neutral plain data; UI, graph, source, platform, agent, and filesystem dependencies belong outside.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/argument-workspace-tauri/**/*.{ts,tsx}'],
+    ignores: ['packages/argument-workspace-tauri/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@icarus-graph-explorer/*',
+                '!@icarus-graph-explorer/argument-workspace',
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                '@xyflow/*',
+                '@react-sigma/*',
+                'sigma*',
+                'graphology*',
+                'obsidian*',
+                '@obsidian/*',
+                'node:*',
+              ],
+              message:
+                'The Tauri Argument Library adapter may depend only on its source-neutral contract and Tauri platform APIs.',
             },
           ],
         },
@@ -924,6 +993,67 @@ export default tseslint.config(
               ],
               message:
                 'The workspace-worker package is a platform-independent protocol/state machine; browser Worker, Tauri, UI, and filesystem concerns belong outside it.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/ai-review/**/*.{ts,tsx}'],
+    ignores: ['packages/ai-review/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                '@xyflow/*',
+                '@dagrejs/*',
+                '@tauri-apps/*',
+                '@icarus-graph-explorer/*',
+                'node:*',
+              ],
+              message:
+                'AI Review is a provider-neutral plain-data orchestration boundary; UI, graph, platform, filesystem, provider SDK, and compiler-store concerns belong outside it.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/review-source-tauri/**/*.{ts,tsx}'],
+    ignores: ['packages/review-source-tauri/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@icarus-graph-explorer/*',
+                '!@icarus-graph-explorer/ai-review',
+                '!@icarus-graph-explorer/source-provider-tauri',
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                '@xyflow/*',
+                '@react-sigma/*',
+                'sigma*',
+                'graphology*',
+                'obsidian*',
+                '@obsidian/*',
+                'node:*',
+              ],
+              message:
+                'The Git review-source adapter may depend only on REVIEW1, the selected-vault contract, and Tauri invoke APIs.',
             },
           ],
         },

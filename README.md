@@ -27,7 +27,7 @@ Focus
 incoming / outgoing / both
 ```
 
-The important part is that Focus is not a separate disposable view. The same focused neighborhood can then be shown as a network or as a structured hierarchy, while navigation, inspection, and saved view state continue to refer to the same underlying entities.
+The important part is that Focus is not a separate disposable view. The same focused neighborhood can then be shown as a network or as a structured hierarchy, while navigation, inspection, Current View, and Named Saved Views continue to refer to the same underlying entities.
 
 This makes the graph useful for questions like:
 
@@ -206,9 +206,11 @@ Current architecture has:
 
 - no backend requirement;
 - no account requirement;
-- no cloud upload;
+- no background cloud upload; AI Review uploads only explicitly selected frozen material after **Run**;
 - no telemetry pipeline;
 - no Markdown write path.
+
+The repository also contains a provider-neutral AI Review engine and a visible local review workspace. The screen captures authorized pinned Git evidence, previews the independent Negative and Positive prompts, saves model-optional preparations, imports validated runs, and renders integrated/original comparisons. Desktop history is private app-local data; browser history is explicitly session-only. Browser and desktop-WebView builds can run the fixed workflow through a direct OpenAI Agents SDK adapter after the user loads a session-memory key. An application-owned Argument compiler adapter is available but optional, with placement off by default. See [`packages/ai-review`](packages/ai-review/README.md), the [`AI Review feature map`](apps/web/src/features/ai-review/README.md), the [`live OpenAI provider contract`](docs/REVIEW4_OPENAI_AGENTS_PROVIDER.md), and the [`AI Review / AI Compiler integration contract`](docs/AI_REVIEW_COMPILER_INTEGRATION.md).
 
 Workspace identity and saved graph state stay local to the application.
 
@@ -226,7 +228,7 @@ The project already has working foundations for:
 - canonical search and navigation;
 - backlinks and provenance inspection;
 - live filesystem updates;
-- local saved view state;
+- automatic local Current View plus explicit Named Saved Views;
 - worker-backed expensive layout / workspace processing;
 - QUERY1 filtering and Visual Groups;
 - folder-aware Network placement;

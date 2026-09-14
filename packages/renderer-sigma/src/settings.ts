@@ -278,6 +278,79 @@ export function resolveNetworkSettings(
   };
 }
 
+/** Strict serializable boundary for the four controls shared by both Network scopes. */
+export function validateNetworkSettings(
+  value: unknown,
+): ResolvedNetworkSettings {
+  if (!isPlainRecord(value)) {
+    throw new Error('Shared Network settings must be a plain object.');
+  }
+  const keys = [
+    'referencePull',
+    'nodeSize',
+    'linkThickness',
+    'labelThreshold',
+  ] as const satisfies readonly (keyof ResolvedNetworkSettings)[];
+  const allowed = new Set<string>(keys);
+  const unexpected = Object.keys(value).find((key) => !allowed.has(key));
+  if (unexpected !== undefined) {
+    throw new Error(
+      `Shared Network settings contain unexpected field ${unexpected}.`,
+    );
+  }
+  const missing = keys.find((key) => !Object.hasOwn(value, key));
+  if (missing !== undefined) {
+    throw new Error(`Shared Network setting ${missing} is required.`);
+  }
+  const sharedNumber = (
+    key: keyof ResolvedNetworkSettings,
+    rangeKey: keyof GlobalLayoutCustomSettings,
+  ) => {
+    const range = GLOBAL_LAYOUT_CUSTOM_RANGES[rangeKey];
+    const candidate = value[key];
+    if (
+      typeof candidate !== 'number' ||
+      !Number.isFinite(candidate) ||
+      candidate < range.min ||
+      candidate > range.max
+    ) {
+      throw new Error(
+        `Shared Network setting ${key} must be a finite number from ${range.min} to ${range.max}.`,
+      );
+    }
+    return candidate;
+  };
+  return {
+    referencePull: sharedNumber('referencePull', 'linkForce'),
+    nodeSize: sharedNumber('nodeSize', 'nodeSize'),
+    linkThickness: sharedNumber('linkThickness', 'linkThickness'),
+    labelThreshold: sharedNumber('labelThreshold', 'labelThreshold'),
+  };
+}
+
+/**
+ * Applies Focus Network's shared controls without changing any All-only
+ * clustering, spacing, or degree-size semantics.
+ */
+export function withNetworkSettings(
+  current: GlobalLayoutSettings,
+  shared: ResolvedNetworkSettings,
+): GlobalLayoutSettings {
+  const resolved = resolveGlobalLayoutSettings(current);
+  const validated = validateNetworkSettings(shared);
+  return {
+    folderClustering: resolved.folderClustering,
+    spacingPreset: resolved.spacingPreset,
+    custom: {
+      ...customFromResolved(resolved),
+      linkForce: validated.referencePull,
+      nodeSize: validated.nodeSize,
+      linkThickness: validated.linkThickness,
+      labelThreshold: validated.labelThreshold,
+    },
+  };
+}
+
 export function sameGlobalPhysicsSettings(
   left: GlobalLayoutSettings,
   right: GlobalLayoutSettings,

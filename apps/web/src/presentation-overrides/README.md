@@ -7,7 +7,7 @@
   A read failure is explicitly
   session-only. Corrupt data is left untouched and editing blocked; a failed
   write keeps the last confirmed sizes active and blocks further writes until
-  reopening. Reset saved view never clears these entries.
+  reopening. Reset current view never clears these entries.
 - The source-neutral registry/validation/reconciliation is in
   `packages/presentation-overrides`; `../persistence/presentation-overrides.ts`
   is the local-storage adapter, without graph or UI logic.

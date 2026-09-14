@@ -230,4 +230,49 @@ describe('authoritative initial Network presentation', () => {
     expect(renderer.camera.angle).toBeCloseTo(0.2, 8);
     session.destroy();
   });
+
+  it('traces the one authoritative startup frame and no hidden second Fit', async () => {
+    const startupTrace = vi.fn();
+    const session = new GlobalRendererSession(
+      {
+        closest: vi.fn(() => undefined),
+        getBoundingClientRect: vi.fn(() => ({
+          x: 0,
+          y: 0,
+          width: 800,
+          height: 600,
+        })),
+        setAttribute: vi.fn(),
+      } as unknown as HTMLElement,
+      globalInput(),
+      {
+        settings: { folderClustering: true, spacingPreset: 'normal' },
+        startupTrace,
+        trackpadZoomMode: 'pinch-zoom',
+      },
+    );
+
+    await session.commitInitialPresentation(basePositions, true);
+
+    expect(startupTrace.mock.calls.map(([entry]) => entry.reason)).toEqual([
+      'session-created',
+      'initial-presentation-begin',
+      'custom-bbox-write',
+      'camera-write:initial-fit',
+      'sigma-before-render',
+      'sigma-after-render',
+    ]);
+    expect(startupTrace.mock.calls.at(-1)?.[0]).toMatchObject({
+      camera: { x: 0.5, y: 0.5, ratio: 1, angle: 0 },
+      customBBox: networkPositionExtent(basePositions),
+      rendererDimensions: { width: 800, height: 600 },
+      nodes: expect.arrayContaining([
+        expect.objectContaining({
+          key: 'left',
+          raw: { x: -10, y: 0 },
+        }),
+      ]),
+    });
+    session.destroy();
+  });
 });

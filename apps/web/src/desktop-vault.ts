@@ -6,6 +6,7 @@ import {
   RecoverableWorkspaceIdentityError,
   type PrepareWorkspaceIdentityOptions,
   type TauriSourceProvider,
+  type VaultDiscoveryProgressListener,
   type VaultSelection,
   type VaultSourceInventory,
   type WorkspaceIdentityRecovery,
@@ -36,6 +37,35 @@ export interface DesktopVaultIdentityCounts {
   readonly referencesReused: number;
   readonly referencesNew: number;
 }
+
+export type DesktopVaultOpenStage =
+  | 'acquiring-source'
+  | 'building-workspace'
+  | 'persisting-identity'
+  | 'committing-workspace'
+  | 'recovering-workspace';
+
+export interface DesktopVaultOpenAcquisitionProgress {
+  readonly sourceDiscovery: 'pending' | 'complete';
+  readonly identityPreparation: 'pending' | 'complete';
+  readonly markdownFileCount?: number;
+  readonly nonMarkdownPathCount?: number;
+}
+
+export type DesktopVaultOpenProgress =
+  | {
+      readonly stage: 'acquiring-source';
+      readonly acquisition: DesktopVaultOpenAcquisitionProgress;
+    }
+  | {
+      readonly stage: Exclude<DesktopVaultOpenStage, 'acquiring-source'>;
+      readonly markdownFileCount?: number;
+      readonly nonMarkdownPathCount?: number;
+    };
+
+export type DesktopVaultOpenProgressListener = (
+  progress: DesktopVaultOpenProgress,
+) => void;
 
 export interface DesktopVaultRuntime {
   readonly selection: VaultSelection;
@@ -97,6 +127,28 @@ const DEFAULT_SERVICES: DesktopVaultServices = {
 
 function elapsed(start: number, services: DesktopVaultServices): number {
   return Number((services.now() - start).toFixed(3));
+}
+
+function publishProgress(
+  listener: DesktopVaultOpenProgressListener | undefined,
+  progress: DesktopVaultOpenProgress,
+): void {
+  try {
+    listener?.(progress);
+  } catch {
+    // Progress is an observer only; UI failures cannot control vault startup.
+  }
+}
+
+function inventoryProgress(
+  stage: Exclude<DesktopVaultOpenStage, 'acquiring-source'>,
+  inventory: VaultSourceInventory,
+): DesktopVaultOpenProgress {
+  return {
+    stage,
+    markdownFileCount: inventory.markdownDocuments.length,
+    nonMarkdownPathCount: inventory.nonMarkdownPaths.length,
+  };
 }
 
 function identityCounts(
@@ -174,6 +226,9 @@ async function recoverCommitFailure(input: {
   readonly identitySession: WorkspaceIdentitySession;
   readonly durableCatalog: StableIdentityCatalog;
   readonly services: DesktopVaultServices;
+  readonly inventory: VaultSourceInventory;
+  readonly onProgress?: DesktopVaultOpenProgressListener;
+  readonly onDiscoveryProgress?: VaultDiscoveryProgressListener;
 }): Promise<{
   readonly processor: DesktopWorkspaceProcessor;
   readonly prepared: PreparedWorkspaceResult;
@@ -181,6 +236,10 @@ async function recoverCommitFailure(input: {
   readonly sourceAcquisitionMs: number;
   readonly persistenceMs: number;
 }> {
+  publishProgress(
+    input.onProgress,
+    inventoryProgress('recovering-workspace', input.inventory),
+  );
   input.failedProcessor.terminate();
   const replacement = input.services.createProcessor();
   const replacementSession: WorkspaceIdentitySession = {
@@ -189,9 +248,11 @@ async function recoverCommitFailure(input: {
   };
   try {
     const acquisitionStart = input.services.now();
-    const inventory = await input.sourceProvider.discoverSelectedVault(
-      input.selection,
-    );
+    const inventory = await (input.onDiscoveryProgress === undefined
+      ? input.sourceProvider.discoverSelectedVault(input.selection)
+      : input.sourceProvider.discoverSelectedVault(input.selection, {
+          onProgress: input.onDiscoveryProgress,
+        }));
     const sourceAcquisitionMs = elapsed(acquisitionStart, input.services);
     const prepared = await replacement.prepareInitialize({
       workspaceId: replacementSession.workspaceId,
@@ -230,16 +291,53 @@ export async function openSelectedDesktopVault(
   selection: VaultSelection,
   identityOptions: PrepareWorkspaceIdentityOptions = {},
   services: DesktopVaultServices = DEFAULT_SERVICES,
+  onProgress?: DesktopVaultOpenProgressListener,
+  onDiscoveryProgress?: VaultDiscoveryProgressListener,
 ): Promise<OpenedDesktopVault> {
+  let acquisitionActive = true;
+  let acquisition: DesktopVaultOpenAcquisitionProgress = {
+    sourceDiscovery: 'pending',
+    identityPreparation: 'pending',
+  };
+  const publishAcquisition = (): void => {
+    if (acquisitionActive) {
+      publishProgress(onProgress, { stage: 'acquiring-source', acquisition });
+    }
+  };
+  publishAcquisition();
   const acquisitionStart = services.now();
   let inventory: VaultSourceInventory;
   let identitySession: WorkspaceIdentitySession;
   try {
     [inventory, identitySession] = await Promise.all([
-      sourceProvider.discoverSelectedVault(selection),
-      sourceProvider.loadOrPrepareWorkspaceIdentity(selection, identityOptions),
+      (onDiscoveryProgress === undefined
+        ? sourceProvider.discoverSelectedVault(selection)
+        : sourceProvider.discoverSelectedVault(selection, {
+            onProgress: onDiscoveryProgress,
+          })
+      ).then((discovered) => {
+        acquisition = {
+          ...acquisition,
+          sourceDiscovery: 'complete',
+          markdownFileCount: discovered.markdownDocuments.length,
+          nonMarkdownPathCount: discovered.nonMarkdownPaths.length,
+        };
+        publishAcquisition();
+        return discovered;
+      }),
+      sourceProvider
+        .loadOrPrepareWorkspaceIdentity(selection, identityOptions)
+        .then((preparedIdentity) => {
+          acquisition = {
+            ...acquisition,
+            identityPreparation: 'complete',
+          };
+          publishAcquisition();
+          return preparedIdentity;
+        }),
     ]);
   } catch (error: unknown) {
+    acquisitionActive = false;
     throw new DesktopVaultOpenError(
       error instanceof Error ? error.message : String(error),
       selection,
@@ -251,9 +349,14 @@ export async function openSelectedDesktopVault(
       },
     );
   }
+  acquisitionActive = false;
   let sourceAcquisitionMs = elapsed(acquisitionStart, services);
 
   let processor = services.createProcessor();
+  publishProgress(
+    onProgress,
+    inventoryProgress('building-workspace', inventory),
+  );
   const prepared = await prepareInitialization(
     processor,
     identitySession,
@@ -264,6 +367,10 @@ export async function openSelectedDesktopVault(
   let identityPersisted = true;
   let warning: string | undefined;
   let identityPersistenceMs: number;
+  publishProgress(
+    onProgress,
+    inventoryProgress('persisting-identity', inventory),
+  );
   const persistenceStart = services.now();
   try {
     await sourceProvider.commitWorkspaceIdentity(
@@ -289,6 +396,10 @@ export async function openSelectedDesktopVault(
   }
 
   if (identityPersisted) {
+    publishProgress(
+      onProgress,
+      inventoryProgress('committing-workspace', inventory),
+    );
     try {
       await processor.commitCandidate(prepared.candidateId);
     } catch {
@@ -299,6 +410,9 @@ export async function openSelectedDesktopVault(
         identitySession,
         durableCatalog: prepared.nextIdentityCatalog,
         services,
+        ...(onProgress === undefined ? {} : { onProgress }),
+        ...(onDiscoveryProgress === undefined ? {} : { onDiscoveryProgress }),
+        inventory,
       });
       processor = recovered.processor;
       activePrepared = recovered.prepared;
@@ -353,9 +467,18 @@ export async function openSelectedDesktopVault(
 export async function selectAndOpenDesktopVault(
   sourceProvider: TauriSourceProvider,
   services: DesktopVaultServices = DEFAULT_SERVICES,
+  onProgress?: DesktopVaultOpenProgressListener,
+  onDiscoveryProgress?: VaultDiscoveryProgressListener,
 ): Promise<SelectAndOpenDesktopVaultResult> {
   const selection = await sourceProvider.selectVaultDirectory();
   return selection === undefined
     ? { status: 'cancelled' }
-    : openSelectedDesktopVault(sourceProvider, selection, {}, services);
+    : openSelectedDesktopVault(
+        sourceProvider,
+        selection,
+        {},
+        services,
+        onProgress,
+        onDiscoveryProgress,
+      );
 }

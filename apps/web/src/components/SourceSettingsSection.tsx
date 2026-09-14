@@ -124,7 +124,7 @@ export const SourceSettingsSection = memo(function SourceSettingsSection({
           <h4 id="source-recovery-heading">Recovery</h4>
           <p>
             Local identity recovery changes graph continuity. It does not reset
-            the saved graph view by itself.
+            the current graph view or Named Saved Views by itself.
           </p>
           <button
             disabled={opening}

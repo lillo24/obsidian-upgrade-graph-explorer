@@ -16,9 +16,14 @@ import {
 } from '@icarus-graph-explorer/diagnostics-obsidian';
 import type {
   TauriSourceProvider,
+  VaultDiscoveryProgressListener,
   VaultSelection,
+  WorkspaceIdentitySession,
   WorkspaceIdentityRecovery,
 } from '@icarus-graph-explorer/source-provider-tauri';
+import type { ArgumentLibraryStore } from '@icarus-graph-explorer/argument-workspace';
+import { createReviewSourceProvider } from '@icarus-graph-explorer/review-source-tauri';
+import type { ReviewHistoryStore } from '@icarus-graph-explorer/review-workspace';
 
 import './App.css';
 import { DeveloperSettingsSection } from './components/DeveloperSettingsSection';
@@ -27,6 +32,21 @@ import { DiagnosticEvidenceDialog } from './components/DiagnosticEvidenceDialog'
 import { GraphExplorer } from './components/GraphExplorer';
 import { SourceSettingsSection } from './components/SourceSettingsSection';
 import { WorkspaceNotice } from './components/WorkspaceNotice';
+import { AiReviewController } from './features/ai-review/controller';
+import { createArgumentCompilerProvider } from './features/ai-review/argument-compiler-adapter';
+import { createOpenAiAgentsProvider } from './features/ai-review/openai-agents-provider';
+import { OpenAiSessionCredentials } from './features/ai-review/openai-session-credentials';
+import { createPlatformReviewHistoryStore } from './features/ai-review/platform-store';
+import {
+  WorkspaceOverlay,
+  type WorkspaceArea,
+} from './features/workspace/WorkspaceOverlay';
+import {
+  ArgumentSourceAccessSession,
+  type ArgumentSourceAccessHost,
+} from './features/arguments/source-capture';
+import { createPlatformArgumentLibraryStore } from './features/arguments/platform-store';
+import { ArgumentWorkspaceSession } from './features/arguments/session';
 import {
   buildReferenceViews,
   filterReferenceViews,
@@ -34,14 +54,29 @@ import {
   type ResolutionFilter,
 } from './report-view';
 import sampleReportJson from './sample-report.json';
-import type { OpenedDesktopVault } from './desktop-vault';
+import type {
+  DesktopVaultOpenProgress,
+  OpenedDesktopVault,
+} from './desktop-vault';
 import type {
   DesktopLiveVaultController,
   DesktopLiveVaultPhase,
   DesktopLiveVaultSnapshot,
 } from './desktop-live-vault';
 import { browserPerformanceSession } from './performance';
+import {
+  browserNetworkStartupCapabilityDelayMs,
+  browserNetworkStartupTrace,
+} from './network-startup-trace';
 import { browserStorage, clearWorkspaceView } from './persistence/storage';
+import {
+  describeVaultOpenProgress,
+  guardVaultDiscoveryProgress,
+  guardVaultOpenProgress,
+  isCurrentVaultOpenRequest,
+  isLiveVaultProgressPhase,
+} from './vault-open-progress';
+import { createVaultDiscoveryProgressStore } from './vault-discovery-progress-store';
 
 const sampleValidation = validateObsidianDiagnosticReport(sampleReportJson);
 if (!sampleValidation.valid) {
@@ -71,9 +106,23 @@ function liveSourceStatus(snapshot: DesktopLiveVaultSnapshot): string {
 export interface AppProps {
   /** Tests may inject the native provider; ordinary browser mode detects lazily. */
   readonly desktopSourceProvider?: TauriSourceProvider;
+  /** Standalone/integration hosts may inject a disposable profile store. */
+  readonly argumentLibraryStore?: ArgumentLibraryStore;
+  /** Integration hosts may inject a controller with deterministic providers. */
+  readonly reviewController?: AiReviewController;
+  /** Tests may inject an isolated history store for the default controller. */
+  readonly reviewHistoryStore?: ReviewHistoryStore;
+  /** Tests may inject the narrow app-owned theory-source boundary. */
+  readonly argumentSourceAccess?: ArgumentSourceAccessHost;
 }
 
-export function App({ desktopSourceProvider }: AppProps = {}) {
+export function App({
+  argumentLibraryStore,
+  argumentSourceAccess,
+  desktopSourceProvider,
+  reviewController: injectedReviewController,
+  reviewHistoryStore,
+}: AppProps = {}) {
   const [report, setReport] = useState<ObsidianDiagnosticReport>(SAMPLE_REPORT);
   const [reportName, setReportName] = useState('Synthetic Sample');
   const [sourceSessionKey, setSourceSessionKey] = useState(0);
@@ -92,10 +141,63 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
   );
   const liveUnsubscribeRef = useRef<(() => void) | undefined>(undefined);
   const sourceRequestGeneration = useRef(0);
+  const argumentSourceSessionSequence = useRef(0);
+  const [defaultArgumentSourceAccess] = useState(
+    () => new ArgumentSourceAccessSession(),
+  );
+  const argumentSources = argumentSourceAccess ?? defaultArgumentSourceAccess;
+  const [argumentSession] = useState(
+    () =>
+      new ArgumentWorkspaceSession(
+        argumentLibraryStore ?? createPlatformArgumentLibraryStore(),
+      ),
+  );
+  const [argumentCompilerProvider] = useState(() =>
+    createArgumentCompilerProvider({
+      currentSnapshot: () => {
+        const state = argumentSession.state();
+        return state.phase === 'ready' ? state.snapshot : undefined;
+      },
+      sourceAccess: argumentSources,
+    }),
+  );
   const lastPerformanceCorrelation = useRef<string | undefined>(undefined);
   const [livePhase, setLivePhase] = useState<DesktopLiveVaultPhase>();
+  const [vaultSelectionPending, setVaultSelectionPending] = useState(false);
   const [vaultOpening, setVaultOpening] = useState(false);
+  const [vaultOpenProgress, setVaultOpenProgress] =
+    useState<DesktopVaultOpenProgress>();
+  const [vaultOpeningStartedAt, setVaultOpeningStartedAt] = useState<number>();
+  const [vaultDiscoveryProgressStore] = useState(
+    createVaultDiscoveryProgressStore,
+  );
   const [diagnosticEvidenceOpen, setDiagnosticEvidenceOpen] = useState(false);
+  const [workspaceArea, setWorkspaceArea] =
+    useState<WorkspaceArea>('arguments');
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [workspaceRestoreFocus, setWorkspaceRestoreFocus] =
+    useState<HTMLElement>();
+  const [reviewWorkspace, setReviewWorkspace] = useState<{
+    readonly identitySession: WorkspaceIdentitySession;
+    readonly label: string;
+  }>();
+  const [openAiCredentials] = useState(() => new OpenAiSessionCredentials());
+  const [openAiReview] = useState(() =>
+    createOpenAiAgentsProvider({ credentials: openAiCredentials }),
+  );
+  const [reviewController] = useState(
+    () =>
+      injectedReviewController ??
+      new AiReviewController({
+        sourceProvider: createReviewSourceProvider(),
+        historyStore: reviewHistoryStore ?? createPlatformReviewHistoryStore(),
+        compilerProvider: argumentCompilerProvider,
+        agentProvider: openAiReview.provider,
+        agentProviderAvailability: openAiReview.getAvailability,
+        agentProviderAvailabilitySubscribe: openAiReview.subscribeAvailability,
+        defaultModels: openAiReview.defaultModels,
+      }),
+  );
   const [statusFilter, setStatusFilter] = useState<ResolutionFilter>('all');
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
@@ -120,6 +222,21 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
   const desktopProvider = desktopSourceProvider ?? detectedDesktopProvider;
 
   useEffect(() => {
+    void reviewController.open();
+    return () => {
+      void reviewController.dispose();
+    };
+  }, [reviewController]);
+
+  useEffect(() => {
+    void argumentSession.open();
+  }, [argumentSession]);
+
+  useEffect(() => {
+    reviewController.setWorkspace(reviewWorkspace);
+  }, [reviewController, reviewWorkspace]);
+
+  useEffect(() => {
     if (desktopSourceProvider !== undefined) return;
     let active = true;
     void import('./desktop-runtime')
@@ -137,14 +254,59 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
   useEffect(
     () => () => {
       sourceRequestGeneration.current += 1;
+      vaultDiscoveryProgressStore.dispose();
       liveUnsubscribeRef.current?.();
       const controller = liveControllerRef.current;
       liveControllerRef.current = undefined;
       if (controller !== undefined)
         void controller.stop().catch(() => undefined);
     },
-    [],
+    [vaultDiscoveryProgressStore],
   );
+
+  function clearVaultOpening(): void {
+    vaultDiscoveryProgressStore.clear();
+    setVaultSelectionPending(false);
+    setVaultOpening(false);
+    setVaultOpenProgress(undefined);
+    setVaultOpeningStartedAt(undefined);
+  }
+
+  function beginVaultOpening(): void {
+    vaultDiscoveryProgressStore.clear();
+    setVaultOpening(true);
+    setVaultOpenProgress(undefined);
+    setVaultOpeningStartedAt(performance.now());
+    setLoadError(undefined);
+  }
+
+  function progressListener(
+    requestGeneration: number,
+  ): (progress: DesktopVaultOpenProgress) => void {
+    return guardVaultOpenProgress(
+      requestGeneration,
+      () => sourceRequestGeneration.current,
+      (progress) => {
+        if (
+          progress.stage !== 'acquiring-source' ||
+          progress.acquisition.sourceDiscovery === 'complete'
+        ) {
+          vaultDiscoveryProgressStore.clear();
+        }
+        setVaultOpenProgress(progress);
+      },
+    );
+  }
+
+  function discoveryProgressListener(
+    requestGeneration: number,
+  ): VaultDiscoveryProgressListener {
+    return guardVaultDiscoveryProgress(
+      requestGeneration,
+      () => sourceRequestGeneration.current,
+      vaultDiscoveryProgressStore.publish,
+    );
+  }
 
   function stopActiveLiveController(): void {
     liveUnsubscribeRef.current?.();
@@ -167,6 +329,7 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     opened: OpenedDesktopVault,
     controller?: DesktopLiveVaultController,
   ): void {
+    const argumentSourceSessionId = `${opened.runtime.workspaceId}:session-${++argumentSourceSessionSequence.current}`;
     performanceSession?.begin('I1-initial-view-preparation');
     if (performanceSession !== undefined) {
       const instrumentation = performanceSession.instrumentation;
@@ -214,9 +377,27 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     setLoadError(undefined);
     setSourceWarning(opened.warning);
     setIdentityRecovery(undefined);
+    setReviewWorkspace(
+      opened.identityPersisted
+        ? {
+            identitySession: opened.runtime.identitySession,
+            label: opened.displayName,
+          }
+        : undefined,
+    );
     if (controller === undefined) {
       setReport(opened.report);
       setSourceStatus(status);
+      argumentSources.publishCommittedSource({
+        sourceSessionId: argumentSourceSessionId,
+        sourceSpaceId: opened.runtime.workspaceId,
+        displayName: opened.displayName,
+        acquisition: 'captured',
+        acquisitionState: 'ready',
+        runtimeRevision: opened.runtime.revision,
+        inventory: opened.runtime.inventory,
+        observedAt: new Date().toISOString(),
+      });
       return;
     }
 
@@ -277,20 +458,45 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
       );
       setLivePhase(snapshot.phase);
       setSourceStatus(liveSourceStatus(snapshot));
+      argumentSources.publishCommittedSource({
+        sourceSessionId: argumentSourceSessionId,
+        sourceSpaceId: snapshot.runtime.workspaceId,
+        displayName: opened.displayName,
+        acquisition: 'live',
+        acquisitionState: snapshot.dirty
+          ? 'dirty'
+          : snapshot.phase === 'live'
+            ? 'ready'
+            : snapshot.phase,
+        runtimeRevision: snapshot.runtime.revision,
+        inventory: snapshot.runtime.inventory,
+        observedAt: new Date().toISOString(),
+      });
     };
     liveUnsubscribeRef.current = controller.subscribe(applySnapshot);
     applySnapshot(controller.snapshot());
   }
 
   async function openVault(): Promise<void> {
-    if (desktopProvider === undefined || vaultOpening) return;
+    if (desktopProvider === undefined || vaultSelectionPending || vaultOpening)
+      return;
     const requestGeneration = sourceRequestGeneration.current + 1;
     sourceRequestGeneration.current = requestGeneration;
-    setVaultOpening(true);
+    setVaultSelectionPending(true);
+    setLoadError(undefined);
     let desktopVault: typeof import('./desktop-vault') | undefined;
     try {
       const selection = await desktopProvider.selectVaultDirectory();
+      if (
+        !isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      )
+        return;
       if (selection === undefined) return;
+      setVaultSelectionPending(false);
+      beginVaultOpening();
       const [desktopVaultModule, liveVaultModule] = await Promise.all([
         import('./desktop-vault'),
         import('./desktop-live-vault'),
@@ -299,14 +505,29 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
       const result = await liveVaultModule.openLiveDesktopVault(
         desktopProvider,
         selection,
+        {},
+        undefined,
+        progressListener(requestGeneration),
+        discoveryProgressListener(requestGeneration),
       );
-      if (sourceRequestGeneration.current !== requestGeneration) {
+      if (
+        !isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      ) {
         await result.controller?.stop();
         return;
       }
       activateDesktopVault(result.opened, result.controller);
     } catch (error: unknown) {
-      if (sourceRequestGeneration.current !== requestGeneration) return;
+      if (
+        !isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      )
+        return;
       const message = error instanceof Error ? error.message : String(error);
       setLoadError(
         `Could not open the selected vault: ${message} The current workspace remains loaded.`,
@@ -324,7 +545,14 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
         setIdentityRecovery(undefined);
       }
     } finally {
-      setVaultOpening(false);
+      if (
+        isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      ) {
+        clearVaultOpening();
+      }
     }
   }
 
@@ -332,21 +560,22 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     if (
       desktopProvider === undefined ||
       identityRecovery === undefined ||
+      vaultSelectionPending ||
       vaultOpening
     ) {
       return;
     }
-    const requestGeneration = sourceRequestGeneration.current + 1;
-    sourceRequestGeneration.current = requestGeneration;
     const registryReset =
       identityRecovery.recovery === 'replace-corrupt-registry';
     const confirmed = window.confirm(
       registryReset
         ? 'Replace the corrupt local workspace registry? Existing catalog files will remain private but their associations may need to be recreated.'
-        : 'Reset local identity for this vault? Stable IDs and its saved graph view continuity will change.',
+        : 'Reset local identity for this vault? Stable IDs and current-view or Named Saved View continuity may change.',
     );
     if (!confirmed) return;
-    setVaultOpening(true);
+    const requestGeneration = sourceRequestGeneration.current + 1;
+    sourceRequestGeneration.current = requestGeneration;
+    beginVaultOpening();
     try {
       const { openLiveDesktopVault } = await import('./desktop-live-vault');
       const result = await openLiveDesktopVault(
@@ -356,20 +585,41 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
           reset: true,
           ...(registryReset ? { replaceCorruptRegistry: true } : {}),
         },
+        undefined,
+        progressListener(requestGeneration),
+        discoveryProgressListener(requestGeneration),
       );
-      if (sourceRequestGeneration.current !== requestGeneration) {
+      if (
+        !isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      ) {
         await result.controller?.stop();
         return;
       }
       activateDesktopVault(result.opened, result.controller);
     } catch (error: unknown) {
-      if (sourceRequestGeneration.current !== requestGeneration) return;
+      if (
+        !isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      )
+        return;
       const message = error instanceof Error ? error.message : String(error);
       setLoadError(
         `Could not reset local identity and open the vault: ${message} The current workspace remains loaded.`,
       );
     } finally {
-      setVaultOpening(false);
+      if (
+        isCurrentVaultOpenRequest(
+          sourceRequestGeneration.current,
+          requestGeneration,
+        )
+      ) {
+        clearVaultOpening();
+      }
     }
   }
 
@@ -380,6 +630,7 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     event.currentTarget.value = '';
     if (file === undefined) return;
     sourceRequestGeneration.current += 1;
+    clearVaultOpening();
     try {
       const parsed: unknown = JSON.parse(await file.text());
       const validation = validateObsidianDiagnosticReport(parsed);
@@ -402,6 +653,8 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
       setSourceStatus(undefined);
       setSourceWarning(undefined);
       setIdentityRecovery(undefined);
+      setReviewWorkspace(undefined);
+      argumentSources.reportOnly();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       setLoadError(
@@ -412,6 +665,7 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
 
   function restoreSample(): void {
     sourceRequestGeneration.current += 1;
+    clearVaultOpening();
     stopActiveLiveController();
     performanceSession?.begin('I1-initial-view-preparation');
     setPerformanceUpdateKey(undefined);
@@ -425,6 +679,8 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     setSourceStatus(undefined);
     setSourceWarning(undefined);
     setIdentityRecovery(undefined);
+    setReviewWorkspace(undefined);
+    argumentSources.reportOnly();
   }
 
   async function rescanVault(): Promise<void> {
@@ -441,8 +697,26 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
     () => setDiagnosticEvidenceOpen(false),
     [],
   );
+  const openWorkspace = useCallback(
+    (area: WorkspaceArea, trigger: HTMLElement) => {
+      setWorkspaceRestoreFocus(trigger);
+      setWorkspaceArea(area);
+      setWorkspaceOpen(true);
+    },
+    [],
+  );
+  const openArguments = useCallback(
+    (trigger: HTMLElement) => openWorkspace('arguments', trigger),
+    [openWorkspace],
+  );
+  const openReview = useCallback(
+    (trigger: HTMLElement) => openWorkspace('review', trigger),
+    [openWorkspace],
+  );
+  const closeWorkspace = useCallback(() => setWorkspaceOpen(false), []);
 
-  const currentSourceStatus = vaultOpening
+  const vaultBusy = vaultSelectionPending || vaultOpening;
+  const currentSourceStatus = vaultBusy
     ? 'Opening'
     : livePhase === undefined
       ? report.identity?.stability === 'transient'
@@ -460,14 +734,17 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
       ? { message: loadError, tone: 'error' as const }
       : vaultOpening
         ? {
-            message: 'Opening Vault… The current workspace remains active.',
+            message: describeVaultOpenProgress(vaultOpenProgress),
+            progressLabel: 'Opening vault',
+            startedAt: vaultOpeningStartedAt,
             tone: 'progress' as const,
           }
-        : livePhase === 'catching-up' || livePhase === 'resyncing'
+        : isLiveVaultProgressPhase(livePhase)
           ? {
               message:
                 sourceStatus ??
                 `${LIVE_PHASE_LABELS[livePhase]} the local vault.`,
+              progressLabel: `${LIVE_PHASE_LABELS[livePhase]} vault`,
               tone: 'progress' as const,
             }
           : livePhase === 'paused'
@@ -499,11 +776,19 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
           Icarus Graph Explorer
         </h1>
         <GraphExplorer
-          applicationOverlayOpen={diagnosticEvidenceOpen}
+          applicationOverlayOpen={diagnosticEvidenceOpen || workspaceOpen}
           initialViewport="fit"
           key={sourceSessionKey}
           maximized={graphMaximized}
           onMaximizedChange={setGraphMaximized}
+          onOpenArguments={openArguments}
+          onOpenReview={openReview}
+          {...(browserNetworkStartupTrace === undefined
+            ? {}
+            : { networkStartupTrace: browserNetworkStartupTrace.trace })}
+          networkStartupCapabilityDelayMs={
+            browserNetworkStartupCapabilityDelayMs
+          }
           {...(performanceSession === undefined
             ? {}
             : { performance: performanceSession.instrumentation })}
@@ -527,10 +812,10 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
                 onRescanVault={() => void rescanVault()}
                 onResetLocalIdentity={() => void resetLocalIdentity()}
                 onUseSample={restoreSample}
-                opening={vaultOpening}
+                opening={vaultBusy}
                 {...(recoveryLabel === undefined ? {} : { recoveryLabel })}
                 reportIsSample={reportName === 'Synthetic Sample'}
-                rescanDisabled={vaultOpening || livePhase === 'resyncing'}
+                rescanDisabled={vaultBusy || livePhase === 'resyncing'}
                 {...(sourceStatus === undefined
                   ? {}
                   : { sourceDetail: sourceStatus })}
@@ -545,7 +830,20 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
         />
         {sourceNotice === undefined ? null : (
           <div className="workspace-notice-stack">
-            <WorkspaceNotice tone={sourceNotice.tone}>
+            <WorkspaceNotice
+              tone={sourceNotice.tone}
+              {...(vaultOpening
+                ? { discoveryProgressStore: vaultDiscoveryProgressStore }
+                : {})}
+              {...('startedAt' in sourceNotice &&
+              sourceNotice.startedAt !== undefined
+                ? { startedAt: sourceNotice.startedAt }
+                : {})}
+              {...('progressLabel' in sourceNotice &&
+              sourceNotice.progressLabel !== undefined
+                ? { progressLabel: sourceNotice.progressLabel }
+                : {})}
+            >
               {sourceNotice.message}
             </WorkspaceNotice>
           </div>
@@ -569,6 +867,21 @@ export function App({ desktopSourceProvider }: AppProps = {}) {
           />
         </DiagnosticEvidenceDialog>
       ) : null}
+      <WorkspaceOverlay
+        area={workspaceArea}
+        argumentSession={argumentSession}
+        controller={reviewController}
+        {...(injectedReviewController === undefined
+          ? { openAiCredentials }
+          : {})}
+        onAreaChange={setWorkspaceArea}
+        onRequestClose={closeWorkspace}
+        open={workspaceOpen}
+        argumentSourceAccess={argumentSources}
+        {...(workspaceRestoreFocus === undefined
+          ? {}
+          : { restoreFocus: workspaceRestoreFocus })}
+      />
     </div>
   );
 }

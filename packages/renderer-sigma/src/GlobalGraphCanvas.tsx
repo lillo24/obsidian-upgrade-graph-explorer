@@ -83,7 +83,10 @@ import {
   createGlobalSpatialInfluenceRequest,
   globalSpatialInfluenceFingerprint,
 } from './spatial-influence';
-import { shouldApplyGlobalViewportRequest } from './viewport-request';
+import {
+  initialViewportSatisfiesGlobalCenterRequest,
+  shouldApplyGlobalViewportRequest,
+} from './viewport-request';
 import type {
   GlobalCenterRequest,
   GlobalDensityQaDiagnostics,
@@ -98,6 +101,7 @@ import type {
   GlobalSpatialInfluenceService,
   SemanticGlobalViewport,
 } from './types';
+import type { NetworkStartupNetworkState } from './startup-trace';
 
 const EMPTY_FOLDER_ANCHOR_MAP: FolderClusterAnchorMap = new Map();
 const SCOPE_TREE_PAGE_SIZE = 200;
@@ -166,6 +170,8 @@ export interface GlobalGraphCanvasProps {
   /** Transient Sandbox policy; excluded from layout input and fingerprinting. */
   readonly densityFramingStrength?: number;
   readonly instrumentation?: GlobalRendererInstrumentation;
+  /** Opt-in, bounded startup diagnostics; ordinary production omits it. */
+  readonly startupTrace?: import('./startup-trace').NetworkStartupTrace;
   readonly layoutRequestKey: number;
   /** Optional session cache owner; the lazy web module keeps this across mode switches. */
   readonly layoutCache?: GlobalLayoutCache;
@@ -471,6 +477,7 @@ export function GlobalGraphCanvas({
   settings,
   spatialOverrides,
   spatialRules,
+  startupTrace,
   temporaryConstraintActive = false,
   temporaryConstraintRetryKey = 0,
   trackpadZoomMode,
@@ -495,6 +502,7 @@ export function GlobalGraphCanvas({
   );
   const presentationCameraIntentGeneration = useRef(0);
   const presentationCommitGeneration = useRef<object | undefined>(undefined);
+  const startupObservationStarted = useRef(false);
   const [initialPresentationReady, setInitialPresentationReady] =
     useState(false);
   const handledLayoutRequest = useRef(layoutRequestKey);
@@ -547,6 +555,34 @@ export function GlobalGraphCanvas({
     onNodeSingleClick,
     onSelectionChange,
     onViewportObservation,
+  ]);
+  useEffect(() => {
+    if (
+      centerRequest === undefined ||
+      centerRequest.key <= handledCenterRequest.current
+    ) {
+      return;
+    }
+    const requestNode = projection.nodes.find(
+      ({ id }) => id === centerRequest.nodeId,
+    );
+    if (
+      !initialViewportSatisfiesGlobalCenterRequest({
+        initialViewport,
+        request: centerRequest,
+        requestEntityId:
+          requestNode?.kind === 'entity' ? requestNode.entityId : undefined,
+      })
+    ) {
+      return;
+    }
+    handledCenterRequest.current = centerRequest.key;
+    onCenterRequestConsumed?.(centerRequest.key);
+  }, [
+    centerRequest,
+    initialViewport,
+    onCenterRequestConsumed,
+    projection.nodes,
   ]);
   useLayoutEffect(() => {
     automaticFitRequestKeyRef.current = automaticFitRequestKey;
@@ -667,6 +703,7 @@ export function GlobalGraphCanvas({
     ],
   );
   const finalGeometryGenerationRef = useRef(finalGeometryGeneration);
+  const finalGeometryTraceKey = `${fingerprint}:${layoutRequestKey}:${spatialSourceKey ?? 'no-spatial-source'}`;
   const [
     committedFinalGeometryGeneration,
     setCommittedFinalGeometryGeneration,
@@ -677,6 +714,11 @@ export function GlobalGraphCanvas({
   const commitFinalGeometry = useCallback(
     (generation: object, positions: readonly GlobalLayoutPosition[]): void => {
       if (finalGeometryGenerationRef.current !== generation) return;
+      // An async source can mount the canvas with an empty projection before
+      // its first real graph arrives. Keep the initial presentation pending so
+      // that non-empty generation, rather than an unframeable placeholder,
+      // owns the first fit.
+      if (positions.length === 0) return;
       const pending = pendingInitialPresentation.current;
       if (pending === undefined) {
         setCommittedFinalGeometryGeneration((current) =>
@@ -702,6 +744,13 @@ export function GlobalGraphCanvas({
           }
           if (finalGeometryGenerationRef.current !== generation) return;
           pendingInitialPresentation.current = undefined;
+          if (startupTrace !== undefined) {
+            session.traceStartupEvent('initial-presentation-ready', {
+              initialPresentationReady: true,
+              layoutPending: false,
+              finalGeometryGeneration: finalGeometryTraceKey,
+            });
+          }
           setInitialPresentationReady(true);
           setCommittedFinalGeometryGeneration(generation);
           if (
@@ -725,7 +774,7 @@ export function GlobalGraphCanvas({
           );
         });
     },
-    [],
+    [finalGeometryTraceKey, startupTrace],
   );
   const appliedVisualGroupStyles = useRef(initial.visualGroupStyles);
   const appliedPresentationOverrides = useRef(initial.presentationOverrides);
@@ -868,17 +917,84 @@ export function GlobalGraphCanvas({
   const [layoutPendingState, setLayoutPendingState] = useState(!initial.cached);
   const [spatialCommitKey, setSpatialCommitKey] = useState(0);
   const spatialGeneration = useRef(0);
+  const startupNetworkStateRef = useRef<NetworkStartupNetworkState>({
+    initialPresentationReady,
+    layoutPending: layoutPendingState,
+    finalGeometryGeneration: finalGeometryTraceKey,
+    ...(layoutStatus === undefined ? {} : { layoutStatus }),
+  });
+  useLayoutEffect(() => {
+    startupNetworkStateRef.current = {
+      initialPresentationReady,
+      layoutPending: layoutPendingState,
+      finalGeometryGeneration: finalGeometryTraceKey,
+      ...(layoutStatus === undefined ? {} : { layoutStatus }),
+    };
+  }, [
+    finalGeometryTraceKey,
+    initialPresentationReady,
+    layoutPendingState,
+    layoutStatus,
+  ]);
+  const startupNetworkState = useCallback(
+    (
+      capability?: TemporaryNodeConstraintCapability,
+    ): NetworkStartupNetworkState => ({
+      ...startupNetworkStateRef.current,
+      ...(capability === undefined
+        ? {}
+        : {
+            temporaryFileMoveCapability:
+              capability.status === 'available'
+                ? 'available'
+                : `unavailable:${capability.reason}`,
+          }),
+    }),
+    [],
+  );
   useEffect(() => {
     const capability: TemporaryNodeConstraintCapability =
       physicsServiceFactory === undefined
         ? { status: 'unavailable', reason: 'simulation-unavailable' }
         : !ready || layoutPendingState
           ? { status: 'unavailable', reason: 'simulation-not-running' }
-          : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
-            ? { status: 'unavailable', reason: 'graph-too-large' }
-            : { status: 'available' };
+          : physicsNodeCount === 0
+            ? { status: 'unavailable', reason: 'simulation-not-running' }
+            : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+              ? { status: 'unavailable', reason: 'graph-too-large' }
+              : { status: 'available' };
+    if (startupTrace !== undefined) {
+      sessionRef.current?.traceStartupEvent(
+        'temporary-file-move-capability',
+        startupNetworkState(capability),
+      );
+    }
     callbacks.current.onTemporaryFileMoveCapabilityChange?.(capability);
-  }, [layoutPendingState, physicsNodeCount, physicsServiceFactory, ready]);
+  }, [
+    layoutPendingState,
+    physicsNodeCount,
+    physicsServiceFactory,
+    ready,
+    startupNetworkState,
+    startupTrace,
+  ]);
+  useEffect(() => {
+    if (startupTrace === undefined) return;
+    sessionRef.current?.traceStartupEvent(
+      'layout-status-transition',
+      startupNetworkState(),
+    );
+  }, [layoutStatus, startupNetworkState, startupTrace]);
+  useLayoutEffect(() => {
+    if (startupTrace === undefined) return;
+    if (!initialPresentationReady) {
+      startupObservationStarted.current = false;
+      return;
+    }
+    if (startupObservationStarted.current) return;
+    startupObservationStarted.current = true;
+    sessionRef.current?.markInitialPresentationRevealed(startupNetworkState());
+  }, [initialPresentationReady, startupNetworkState, startupTrace]);
   const [arrangementGesturePhase, setArrangementGesturePhase] = useState<
     'idle' | 'primed' | 'dragging' | 'committing'
   >('idle');
@@ -1164,6 +1280,7 @@ export function GlobalGraphCanvas({
             ? {}
             : { initialViewport: initial.initialViewport }),
           ...(instrumentation === undefined ? {} : { instrumentation }),
+          ...(startupTrace === undefined ? {} : { startupTrace }),
           onNodeSelected: (key) =>
             callbacks.current.onSelectionChange(
               key === undefined ? null : { kind: 'node', id: key },
@@ -1295,6 +1412,7 @@ export function GlobalGraphCanvas({
     instrumentation,
     onTransitionAnchorApiChange,
     pulseScope,
+    startupTrace,
   ]);
 
   const arrangeableFolderKeys = useMemo(
@@ -1590,6 +1708,7 @@ export function GlobalGraphCanvas({
   useEffect(() => {
     if (
       spatialRules !== undefined ||
+      input.nodes.length === 0 ||
       !ready ||
       layoutPending.current ||
       layoutPendingState
@@ -1674,6 +1793,7 @@ export function GlobalGraphCanvas({
   useEffect(() => {
     if (
       spatialRules === undefined ||
+      input.nodes.length === 0 ||
       !ready ||
       layoutPending.current ||
       layoutPendingState ||
@@ -1726,6 +1846,12 @@ export function GlobalGraphCanvas({
       await session.applySpatialPositions(positions);
       if (cancelled || generation !== spatialGeneration.current) return;
       latestDisplayedPositions.current = positions;
+      if (startupTrace !== undefined) {
+        session.traceStartupEvent(
+          'spatial-generation-accepted',
+          startupNetworkState(),
+        );
+      }
       appliedSpatialOverrides.current = spatialOverrides;
       setSpatialError(undefined);
       setSpatialCommitKey((current) => current + 1);
@@ -1855,6 +1981,8 @@ export function GlobalGraphCanvas({
     spatialOverrides,
     spatialRules,
     spatialSourceKey,
+    startupNetworkState,
+    startupTrace,
   ]);
 
   useEffect(() => {
@@ -1867,6 +1995,22 @@ export function GlobalGraphCanvas({
     if (!ready) return;
     const session = sessionRef.current;
     if (session === undefined) return;
+    if (input.nodes.length === 0) {
+      // Source loading can legitimately expose an empty generation. It has no
+      // layout or coordinate frame to adopt; the next non-empty input reruns
+      // this effect and remains responsible for initial presentation.
+      layoutPending.current = false;
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setLayoutPendingState(false);
+        setLayoutError(undefined);
+        setLayoutStatus(undefined);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
     let cancelled = false;
     const cancelledPreview = cancelArrangementPreview(
       'The layout changed; the unfinished folder movement was canceled.',
@@ -1895,6 +2039,9 @@ export function GlobalGraphCanvas({
         .then((positions) => {
           if (cancelled) return;
           latestDisplayedPositions.current = positions;
+          if (startupTrace !== undefined) {
+            session.traceStartupEvent('layout-accepted', startupNetworkState());
+          }
           layoutPending.current = false;
           setLayoutPendingState(false);
           setLayoutError(undefined);
@@ -1948,6 +2095,9 @@ export function GlobalGraphCanvas({
         const positions = await rendered;
         if (cancelled) return;
         latestDisplayedPositions.current = positions;
+        if (startupTrace !== undefined) {
+          session.traceStartupEvent('layout-accepted', startupNetworkState());
+        }
         instrumentation?.record('global-layout-worker', result.computeMs);
         instrumentation?.record('folder-prior', result.folderPriorMs);
         cache.set(fingerprint, result.positions);
@@ -1988,6 +2138,8 @@ export function GlobalGraphCanvas({
     layoutService,
     ready,
     layoutSettings,
+    startupNetworkState,
+    startupTrace,
   ]);
 
   useEffect(() => {
@@ -1999,6 +2151,9 @@ export function GlobalGraphCanvas({
     if (
       physicsService === undefined ||
       !ready ||
+      // The state mirror updates asynchronously; the ref closes the layout
+      // generation handoff before physics can compose adjacent node sets.
+      layoutPending.current ||
       layoutPendingState ||
       !networkPhysicsNodeCountIsSupported(physicsNodeCount)
     ) {
@@ -2009,9 +2164,11 @@ export function GlobalGraphCanvas({
           reason:
             physicsService === undefined
               ? 'simulation-unavailable'
-              : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
-                ? 'graph-too-large'
-                : 'simulation-not-running',
+              : physicsNodeCount === 0
+                ? 'simulation-not-running'
+                : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+                  ? 'graph-too-large'
+                  : 'simulation-not-running',
         },
         sessionGeneration: physicsSessionGeneration.current,
         simulationGeneration: 'unavailable',

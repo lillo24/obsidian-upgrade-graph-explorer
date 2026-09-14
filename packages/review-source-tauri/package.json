@@ -1,0 +1,23 @@
+{
+  "name": "@icarus-graph-explorer/review-source-tauri",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "example": "cargo test --manifest-path ../../apps/desktop/src-tauri/Cargo.toml source_capture_smoke -- --nocapture",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@icarus-graph-explorer/ai-review": "workspace:*",
+    "@icarus-graph-explorer/source-provider-tauri": "workspace:*",
+    "@tauri-apps/api": "2.11.1"
+  }
+}

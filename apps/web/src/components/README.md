@@ -8,8 +8,13 @@ canonical truth, or own a platform storage implementation.
   compact structural/focus/workspace controls, controlled Filters and Settings
   overlays, shared canonical navigation, graph selection, the transient unified
   Inspector drawer, and the transient Network Explorer drawer,
-  saved-view hydration/alert/reset orchestration, transient graph Back/Forward
-  checkpoints, and semantic renderer viewport requests. Across live snapshots it
+  Current View hydration/alert/reset orchestration, Named Saved Views session
+  mutations and cross-key profile application, transient graph Back/Forward
+  checkpoints, and semantic renderer viewport requests. Applying a named view
+  cancels movement/Arrange state, validates and durably commits any owned Graph
+  Preferences/All-Network spatial profile before in-memory adoption, establishes
+  a fresh history baseline, clears selection, reconciles the snapshot, adopts
+  its query draft, and restores its semantic viewport. Across live snapshots it
   reconciles current KG6 state before
   projection, rebuilds inspection/search indexes, preserves surviving selection
   and semantic viewport context, and safely clears missing selections. It keeps
@@ -60,6 +65,11 @@ canonical truth, or own a platform storage implementation.
   screens both side drawers may coexist; at the existing 900 px breakpoint the
   most recently opened drawer owns the overlay and the other closes without
   stealing focus.
+  The **Arguments** launcher is the sole integration with the application-level
+  Argument Workspace. It appears beside Filters/Groups in the normal toolbar
+  and inside maximized Tools, blocks opening while a movement or unsaved folder
+  arrangement is active, and otherwise closes transient toolbar chrome before
+  invoking the App-owned modal. It does not pass graph state into the library.
   In All Network it exposes `Arrange folder` for canonical folders including
   container-only folders, a root-folder fallback, and exact-root badges that
   summarize Pull/Place, scope, and strength. Exact-root rules can be edited or
@@ -77,6 +87,14 @@ canonical truth, or own a platform storage implementation.
   group shared by the normal toolbar and maximized floating controls. It receives
   only availability and callbacks; graph state, semantic viewport, keyboard
   policy, and storage remain outside the component.
+- `SavedViews.tsx` owns the product content for creating, applying, updating,
+  renaming, deleting, and recovering Named Saved Views. It owns only local form
+  and confirmation drafts; registry validation and persistence remain outside.
+- `SavedViewsPopover.tsx` owns the compact native quick switch plus adjacent
+  management trigger rendered in either the normal toolbar or maximized control
+  stack. The selected label is derived from exact semantic/profile matching,
+  never persisted identity. It also owns the viewport-bounded management portal,
+  Escape/outside-pointer policy, initial input focus, and trigger focus return.
 - `ExplorationControls.tsx` owns the accessible Scope and Layout button groups,
   focused-root text, and explained disabled Focus state. `../exploration-model.ts`
   owns the pure four-way mapping to existing internal modes plus the hierarchy
@@ -84,7 +102,11 @@ canonical truth, or own a platform storage implementation.
 - `NetworkEditingControls.tsx` exposes Arrange Folders directly in All Network
   and its Done/saved-rule meaning only while active. Focus renders this surface
   only for actionable movement status or recovery. File dragging has no toolbar
-  mode; GraphExplorer owns Arrange arbitration and cancellation order.
+  mode; GraphExplorer owns Arrange arbitration and cancellation order. Transient
+  readiness/settling text remains an accessible `aria-live` status, but is a
+  bounded overlay below the stable toolbar shell rather than toolbar-flow content,
+  so capability adoption cannot resize the graph stage after its startup Fit or
+  cover wrapped controls.
 - `StructureDepthControl.tsx` owns the labeled Hierarchy depth select and
   compact Custom override indicator, and
   `structure-depth-selection.ts` maps its four options onto the existing
@@ -118,7 +140,7 @@ canonical truth, or own a platform storage implementation.
   and Sandbox-only Stronger amplification (101–150); both still default to 100.
   All-only physics/visual controls remain grouped and
   explicitly scoped. Reset Sandbox deliberately excludes Trackpad Zoom, source
-  settings, spatial folder intent, and saved view state. Temporary SPACING1B QA
+  settings, spatial folder intent, Current View, and Named Saved Views. Temporary SPACING1B QA
   readouts mirror the mounted renderer sessions' ratios and fallback evidence;
   they are not product state and clear when their Network renderer unmounts.
 - `SourceSettingsSection.tsx` presents safe current-source metadata, browser
@@ -131,7 +153,14 @@ canonical truth, or own a platform storage implementation.
   focus restoration. `DiagnosticEvidenceContent.tsx` composes the existing KG5
   filter, hierarchy, reference, summary, diagnostic, and probe panels inside it.
 - `WorkspaceNotice.tsx` presents transient source progress and actionable
-  source failures above the canvas without consuming workspace layout.
+  source failures above the canvas without consuming workspace layout. Its
+  optional progress surface owns indeterminate ARIA semantics, hidden elapsed
+  ticks, and the reusable compact bar used by initial and live operations. A
+  memoized elapsed child owns its monotonic interval so display ticks rerender
+  only the notice timing subtree rather than `App` or `GraphExplorer`. That
+  subtree also subscribes directly to the coalesced native-discovery progress
+  store, shows aggregate counters, and discloses a workspace-relative target
+  only when one native operation crosses its slow threshold.
 - `EntitySearch.tsx` performs bounded deferred search over the full canonical
   inspection index, independently from visible graph filters.
   `entity-search-disclosure.ts` keeps its query and result disclosure separate:
@@ -179,7 +208,8 @@ canonical truth, or own a platform storage implementation.
   Fresh-source seeds remain internal until the current layout and spatial
   generation commits its final normalization frame and Fit All render. The view
   receives the app shell's existing maximize/restore owner; it does not keep a
-  second maximize state.
+  second maximize state. The optional NETWORKVIEW1B callback is forwarded only
+  for explicit QA traces; ordinary sessions allocate no trace collector.
 - `LocalGraphView.tsx` owns the separate Local Free worker client and bounded
   page-lifetime layout cache. An exact hit warms the first canvas draw; otherwise
   it mounts deterministic seed geometry internally, then reveals only after the
@@ -288,9 +318,13 @@ canonical truth, or own a platform storage implementation.
 - `EvidencePanel.tsx` keeps diagnostics and non-canonical probes visibly separate.
 
 `App.tsx` owns source/live status, source-session switching, report identity
-provenance, maximized shell state, diagnostic-dialog state, and transient
-secondary diagnostic filters. Presentation-only Settings sections receive this
-state through a narrow composition seam. `desktop-live-vault.ts` owns non-React
+provenance, maximized shell state, diagnostic-dialog state, transient secondary
+diagnostic filters, and the single profile-level Arguments session/modal owner.
+The Arguments owner is outside the keyed `GraphExplorer`, preserving its draft
+and confirmed library across report/vault switches while the graph receives only
+open-state arbitration and a launcher callback. Presentation-only Settings
+sections receive app state through a narrow composition seam.
+`desktop-live-vault.ts` owns non-React
 serialized live transactions, pause/recovery, and watcher lifecycle.
 `graph-state.ts` owns pure KG6 interaction transitions and web-boundary
 normalization that keeps legacy entity-kind filters internally eligible for

@@ -83,12 +83,16 @@ describe('graph-first explorer shell', () => {
     expect(markup).not.toContain('Open Vault');
     expect(markup).toContain('Search');
     expect(markup).toContain('>Filters<');
+    expect(markup).toContain('>Arguments<');
     expect(markup).toContain('aria-label="Graph navigation history"');
     expect(markup).toContain('aria-label="Back in graph history" disabled=""');
     expect(markup).toContain(
       'aria-label="Forward in graph history" disabled=""',
     );
     expect(markup).toContain('aria-label="Scope"');
+    expect(markup).toContain('aria-label="Saved Views"');
+    expect(markup).toContain('>Reset current view</button>');
+    expect(markup).not.toContain('Reset saved view');
     expect(markup).toContain(
       '<button aria-pressed="true" type="button">All</button>',
     );

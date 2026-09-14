@@ -11,7 +11,11 @@ import type {
   TauriNativeBridge,
 } from './bridge';
 import { createTauriSourceProvider } from './provider';
-import type { VaultSelection } from './types';
+import {
+  VaultDiscoveryTimeoutError,
+  type VaultDiscoveryProgress,
+  type VaultSelection,
+} from './types';
 
 const ENCODER = new TextEncoder();
 const APP_DATA = '/private-app-data';
@@ -226,6 +230,26 @@ function persistedRegistry(
   bridge.addFile(catalogPath(workspaceId), `${JSON.stringify(catalog)}\n`);
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+  return { promise, resolve };
+}
+
+async function discoveryTimeout(
+  opening: Promise<unknown>,
+): Promise<VaultDiscoveryTimeoutError> {
+  try {
+    await opening;
+    throw new Error('Expected vault discovery to time out.');
+  } catch (error: unknown) {
+    expect(error).toBeInstanceOf(VaultDiscoveryTimeoutError);
+    return error as VaultDiscoveryTimeoutError;
+  }
+}
+
 describe('Tauri source provider', () => {
   it('treats dialog cancellation as an unchanged outcome', async () => {
     const bridge = new FakeBridge();
@@ -251,18 +275,195 @@ describe('Tauri source provider', () => {
     bridge.addFile('/vault/node_modules/ignored.md', '# ignored');
     bridge.addFile('/vault/Excluded/ignored.md', '# ignored');
     bridge.symlinks.add('/vault/linked.md');
+    bridge.addFile('/vault/linked-folder/nested.md', '# linked');
+    bridge.symlinks.add('/vault/linked-folder');
 
+    const baseline = await provider(bridge).discoverSelectedVault(selection(), {
+      excludes: ['Excluded'],
+    });
+    const progress: VaultDiscoveryProgress[] = [];
     const inventory = await provider(bridge).discoverSelectedVault(
       selection(),
-      { excludes: ['Excluded'] },
+      {
+        excludes: ['Excluded'],
+        onProgress: (event) => progress.push(event),
+      },
     );
 
+    expect(inventory).toEqual(baseline);
     expect(inventory.markdownDocuments).toEqual([
       { path: 'Folder/A.md', source: '# A' },
       { path: 'Z.MD', source: '# Z' },
     ]);
     expect(inventory.nonMarkdownPaths).toEqual(['Folder/image.png']);
     expect(bridge.unreadableFiles.size).toBe(0);
+    const finalProgress = progress.at(-1);
+    expect(finalProgress).toMatchObject({
+      directoriesRead: 2,
+      markdownFilesRead: 2,
+      nonMarkdownFilesSeen: 1,
+      currentRecursionDepth: 0,
+      maximumRecursionDepth: 1,
+    });
+  });
+
+  it('reports deterministic aggregate counters for a healthy synthetic tree', async () => {
+    const bridge = new FakeBridge();
+    bridge.addFile('/vault/A/one.md', '# one');
+    bridge.addFile('/vault/A/two.png', new Uint8Array([1, 2]));
+    bridge.addFile('/vault/three.md', '# three');
+    const progress: VaultDiscoveryProgress[] = [];
+
+    await provider(bridge).discoverSelectedVault(selection(), {
+      onProgress: (event) => progress.push(event),
+      slowOperationWarningMs: 25,
+    });
+
+    const finalProgress = progress.at(-1);
+    expect(finalProgress).toMatchObject({
+      directoriesRead: 2,
+      entriesExamined: 4,
+      markdownFilesRead: 2,
+      nonMarkdownFilesSeen: 1,
+      bytesRead:
+        ENCODER.encode('# one').byteLength +
+        ENCODER.encode('# three').byteLength,
+      currentRecursionDepth: 0,
+      maximumRecursionDepth: 1,
+      slowOperationWarningMs: 25,
+      lastCompletedOperation: {
+        operation: 'read-markdown',
+        workspacePath: 'three.md',
+      },
+    });
+    expect(
+      finalProgress?.lastCompletedOperation?.durationMs,
+    ).toBeGreaterThanOrEqual(0);
+  });
+
+  it('keeps healthy output unchanged when the progress observer throws', async () => {
+    const bridge = new FakeBridge();
+    bridge.addFile('/vault/A.md', '# A');
+    bridge.addFile('/vault/image.png', new Uint8Array([1]));
+    const expected = await provider(bridge).discoverSelectedVault(selection());
+
+    await expect(
+      provider(bridge).discoverSelectedVault(selection(), {
+        onProgress: () => {
+          throw new Error('presentation failed');
+        },
+      }),
+    ).resolves.toEqual(expected);
+  });
+
+  it('times out a hung root inspection with only the root marker', async () => {
+    const bridge = new FakeBridge();
+    bridge.inspectPath = () => new Promise(() => undefined);
+
+    const error = await discoveryTimeout(
+      provider(bridge).discoverSelectedVault(selection(), {
+        operationTimeoutMs: 5,
+      }),
+    );
+
+    expect(error).toMatchObject({
+      operation: 'inspect-root',
+      workspacePath: '.',
+      timeoutMs: 5,
+    });
+    expect(error.message).not.toContain('/vault');
+  });
+
+  it('times out a hung directory read with a workspace-relative directory', async () => {
+    const bridge = new FakeBridge();
+    bridge.addDirectory('/vault/Folder');
+    const readDirectory = bridge.readDirectory.bind(bridge);
+    bridge.readDirectory = (path) =>
+      normalized(path) === '/vault/Folder'
+        ? new Promise(() => undefined)
+        : readDirectory(path);
+
+    const error = await discoveryTimeout(
+      provider(bridge).discoverSelectedVault(selection(), {
+        operationTimeoutMs: 5,
+      }),
+    );
+
+    expect(error).toMatchObject({
+      operation: 'read-directory',
+      workspacePath: 'Folder',
+    });
+    expect(error.progress).toMatchObject({
+      directoriesRead: 1,
+      entriesExamined: 1,
+      maximumRecursionDepth: 1,
+    });
+  });
+
+  it('times out a hung path join with a workspace-relative entry', async () => {
+    const bridge = new FakeBridge();
+    bridge.addFile('/vault/A.md', '# A');
+    bridge.joinPath = () => new Promise(() => undefined);
+
+    const error = await discoveryTimeout(
+      provider(bridge).discoverSelectedVault(selection(), {
+        operationTimeoutMs: 5,
+      }),
+    );
+
+    expect(error).toMatchObject({
+      operation: 'join-path',
+      workspacePath: 'A.md',
+    });
+  });
+
+  it('times out a hung Markdown read with a workspace-relative file', async () => {
+    const bridge = new FakeBridge();
+    bridge.addFile('/vault/Notes/A.md', '# A');
+    bridge.readFileBytes = () => new Promise(() => undefined);
+
+    const error = await discoveryTimeout(
+      provider(bridge).discoverSelectedVault(selection(), {
+        operationTimeoutMs: 5,
+      }),
+    );
+
+    expect(error).toMatchObject({
+      operation: 'read-markdown',
+      workspacePath: 'Notes/A.md',
+    });
+    expect(error.message).not.toContain('/vault');
+  });
+
+  it('ignores late native resolution after a watchdog abandons discovery', async () => {
+    const bridge = new FakeBridge();
+    bridge.addFile('/vault/A.md', '# A');
+    const fileRead = deferred<Uint8Array>();
+    bridge.readFileBytes = () => fileRead.promise;
+    const progress: VaultDiscoveryProgress[] = [];
+    let adopted = false;
+    const opening = provider(bridge)
+      .discoverSelectedVault(selection(), {
+        onProgress: (event) => progress.push(event),
+        operationTimeoutMs: 5,
+      })
+      .then(() => {
+        adopted = true;
+      });
+
+    await discoveryTimeout(opening);
+    const eventCountAfterTimeout = progress.length;
+    fileRead.resolve(ENCODER.encode('# late'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(adopted).toBe(false);
+    expect(progress).toHaveLength(eventCountAfterTimeout);
+    expect(progress.at(-1)).toMatchObject({
+      currentOperation: 'read-markdown',
+      currentWorkspacePath: 'A.md',
+      markdownFilesRead: 0,
+    });
   });
 
   it('rejects invalid UTF-8 and unreadable Markdown with relative context', async () => {

@@ -2,6 +2,7 @@ import type { ObsidianDiagnosticReport } from '@icarus-graph-explorer/diagnostic
 import type {
   PrepareWorkspaceIdentityOptions,
   TauriSourceProvider,
+  VaultDiscoveryProgressListener,
   VaultSelection,
   VaultSourceChange,
   VaultSourceInventory,
@@ -17,6 +18,7 @@ import {
 import {
   DesktopVaultOpenError,
   openSelectedDesktopVault,
+  type DesktopVaultOpenProgressListener,
   type DesktopVaultRuntime,
   type DesktopVaultServices,
   type OpenedDesktopVault,
@@ -596,6 +598,8 @@ export async function openLiveDesktopVault(
   selection: VaultSelection,
   identityOptions: PrepareWorkspaceIdentityOptions = {},
   services?: DesktopLiveVaultServices,
+  onProgress?: DesktopVaultOpenProgressListener,
+  onDiscoveryProgress?: VaultDiscoveryProgressListener,
 ): Promise<OpenLiveDesktopVaultResult> {
   const resolvedServices =
     services ??
@@ -632,6 +636,8 @@ export async function openLiveDesktopVault(
       selection,
       identityOptions,
       resolvedServices,
+      onProgress,
+      onDiscoveryProgress,
     );
   } catch (error: unknown) {
     await subscription.stop();

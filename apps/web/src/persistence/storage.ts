@@ -48,7 +48,7 @@ export function loadWorkspaceView(
   } catch (error: unknown) {
     return {
       status: 'error',
-      message: `Could not read the saved view for workspace "${workspaceId}": ${errorMessage(error)}`,
+      message: `Could not read the current view for workspace "${workspaceId}": ${errorMessage(error)}`,
     };
   }
   if (serialized === null) return { status: 'empty' };
@@ -59,7 +59,7 @@ export function loadWorkspaceView(
   } catch (error: unknown) {
     return {
       status: 'error',
-      message: `The saved view for workspace "${workspaceId}" is not valid JSON: ${errorMessage(error)}`,
+      message: `The current view for workspace "${workspaceId}" is not valid JSON: ${errorMessage(error)}`,
     };
   }
   const validation = validatePersistedWorkspaceView(parsed);
@@ -67,7 +67,7 @@ export function loadWorkspaceView(
     const first = validation.issues[0];
     return {
       status: 'error',
-      message: `The saved view for workspace "${workspaceId}" is incompatible${first === undefined ? '.' : ` at ${first.path}: ${first.message}`}`,
+      message: `The current view for workspace "${workspaceId}" is incompatible${first === undefined ? '.' : ` at ${first.path}: ${first.message}`}`,
     };
   }
   return { status: 'loaded', value: validation.value };
@@ -101,7 +101,7 @@ export function clearWorkspaceView(
   } catch (error: unknown) {
     return {
       ok: false,
-      message: `Could not reset the saved view for workspace "${workspaceId}": ${errorMessage(error)}`,
+      message: `Could not reset the current view for workspace "${workspaceId}": ${errorMessage(error)}`,
     };
   }
 }

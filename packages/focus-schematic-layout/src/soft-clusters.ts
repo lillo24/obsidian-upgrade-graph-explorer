@@ -42,7 +42,7 @@ import type {
 export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE = [
   36, 18,
 ] as const;
-export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 4 as const;
+export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 5 as const;
 
 const STRATEGY_ID = 'HIER4B-soft-folder-clusters' as const;
 const HOP_SPACING = 520;
@@ -308,6 +308,7 @@ function hierarchyFolderGroups(
   tree: FocusSchematicSoftFolderDisplayTree,
   strength: FocusSchematicSoftClusterStrength,
   policy: FocusSchematicSoftHierarchyForcePolicy,
+  rootModuleId: string,
 ) {
   if (strength === 0)
     return new Map<
@@ -318,12 +319,16 @@ function hierarchyFolderGroups(
   for (const [id, memberships] of focusSchematicSoftFolderScopeMemberships(
     tree,
     policy,
-  ))
+  )) {
+    // The Focus File remains a displayed folder member, but it is the neutral
+    // topology anchor and must not bias Soft folder-attraction centroids.
+    if (id === rootModuleId) continue;
     for (const { folderKey, weight } of memberships) {
       const members = groups.get(folderKey) ?? [];
       members.push({ id, weight });
       groups.set(folderKey, members);
     }
+  }
   return new Map(
     [...groups.entries()]
       .filter(([, members]) => members.length > 1)
@@ -460,6 +465,7 @@ function relax(
     tree,
     strength,
     hierarchyForcePolicy,
+    input.model.rootModuleId,
   );
   const folderFactor = strength / 100;
   for (let iteration = 0; iteration < iterations; iteration += 1) {
@@ -709,7 +715,12 @@ function metrics(
   const positions = new Map(
     candidate.modules.map((module) => [module.moduleId, center(module)]),
   );
-  const repeated = hierarchyFolderGroups(tree, 100, hierarchyForcePolicy);
+  const repeated = hierarchyFolderGroups(
+    tree,
+    100,
+    hierarchyForcePolicy,
+    input.model.rootModuleId,
+  );
   const folderRadiiByKey = [...repeated].map(([folderKey, members]) => {
     const centroid = members.reduce(
       (sum, { id }) => {
@@ -859,6 +870,12 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
     const memberships = focusSchematicSoftFolderScopeMemberships(
       tree,
       hierarchyForcePolicy,
+    );
+    const forceGroups = hierarchyFolderGroups(
+      tree,
+      100,
+      hierarchyForcePolicy,
+      input.model.rootModuleId,
     );
     const pairs = primaryPairs(base.endpointPlan);
     const moduleIds = base.candidate.modules
@@ -1105,11 +1122,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       runtime: {
         moduleCount: candidate.modules.length,
         primaryPairCount: pairs.length,
-        repeatedFolderCount: hierarchyFolderGroups(
-          tree,
-          100,
-          hierarchyForcePolicy,
-        ).size,
+        repeatedFolderCount: forceGroups.size,
         iterationCount: 54,
         jointRoundCount: 2,
         compassAssignmentCount: stats.completeCompassAssignmentsEvaluated,

@@ -9,6 +9,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@icarus-graph-explorer/adapter-obsidian": "workspace:*",
+    "@icarus-graph-explorer/argument-workspace": "workspace:*",
+    "@icarus-graph-explorer/argument-workspace-tauri": "workspace:*",
+    "@icarus-graph-explorer/ai-review": "workspace:*",
     "@icarus-graph-explorer/core": "workspace:*",
     "@icarus-graph-explorer/dagre-layout": "workspace:*",
     "@icarus-graph-explorer/diagnostics-obsidian": "workspace:*",
@@ -20,6 +24,9 @@
     "@icarus-graph-explorer/presentation-overrides": "workspace:*",
     "@icarus-graph-explorer/renderer-reactflow": "workspace:*",
     "@icarus-graph-explorer/renderer-sigma": "workspace:*",
+    "@icarus-graph-explorer/review-source-tauri": "workspace:*",
+    "@icarus-graph-explorer/review-workspace": "workspace:*",
+    "@icarus-graph-explorer/review-workspace-tauri": "workspace:*",
     "@icarus-graph-explorer/spatial-overrides": "workspace:*",
     "@icarus-graph-explorer/source-provider-tauri": "workspace:*",
     "@icarus-graph-explorer/view-state": "workspace:*",
@@ -27,8 +34,16 @@
     "@icarus-graph-explorer/visual-groups": "workspace:*",
     "@icarus-graph-explorer/workspace-worker": "workspace:*",
     "@icarus-graph-explorer/workspace-engine-obsidian": "workspace:*",
+    "@openai/agents": "0.18.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "katex": "0.18.7",
+    "openai": "7.15.0",
+    "react-dom": "19.2.8",
+    "react-markdown": "10.1.0",
+    "rehype-katex": "7.0.1",
+    "remark-gfm": "4.0.1",
+    "remark-math": "6.0.0",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@icarus-graph-explorer/stable-identity": "workspace:*",

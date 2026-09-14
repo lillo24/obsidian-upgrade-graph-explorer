@@ -39,11 +39,14 @@ apps/web/
     desktop-runtime.ts Lazy official Tauri detection and provider creation.
     desktop-vault.ts Lazy worker initialization and truthful identity/worker commit orchestration.
     desktop-live-vault.ts Serialized watch, worker candidate, pause, replacement, and resync lifecycle.
+    vault-open-progress.ts Typed startup-stage presentation, elapsed formatting, and generation/live-phase guards.
     workers/          Separate Vite W1, W3, Global, and Local entries/clients.
     performance.ts    Query-gated browser recorder and local inspection API.
     graph-state.ts    Pure disclosure/focus/filter interaction reducer.
     network-editing.ts Pure transient one-tool-at-a-time editing-mode contract.
     exploration-model.ts Pure Scope/Layout mapping onto schema-v3 internal modes.
+    saved-view.ts      Canonical profile capture, reconciliation planning, and exact-match derivation.
+    saved-view-profile-transaction.ts Cross-key profile persistence and rollback before UI adoption.
     navigation.ts     Shared reveal/filter-widening/navigation planner.
     local-view.ts     Local entry/reroot/minimum-reveal planner over KG6 state.
     visual-groups/    Visible-entity GROUP1A presentation-map derivation; no projection calls.
@@ -75,6 +78,20 @@ on a prior Global visit to establish its canvas height or controls. A real
 source-session switch keys a complete transient selection/search reset and
 workspace-specific hydration;
 live revisions reconcile current state and update the mounted explorer in place.
+Initial desktop opens publish observer-only acquisition, workspace-build,
+identity-persistence, worker-commit, and replacement-recovery stages. Acquisition
+retains parallel source discovery and identity preparation while reporting each
+completion separately; exact Markdown/non-Markdown counts appear only after
+discovery. The UI uses an indeterminate accessible bar and monotonic elapsed
+time while the last committed graph remains visible. The elapsed interval lives
+inside the small notice child, so its ticks do not rerender `App` or the graph.
+Native discovery details flow through a 100 ms trailing-coalesced external
+store read only by that notice child. Directory, entry, Markdown, non-Markdown,
+and recursion-depth updates therefore remain visible without turning thousands
+of filesystem events into `App` or `GraphExplorer` renders. A workspace-relative
+target appears only after the configured current operation becomes slow.
+These observations are synchronous and non-awaited; presentation failure or a
+throttled display timer cannot schedule or block W1 startup.
 The graph workspace owns one lazily started W3 layout service for the mounted
 explorer. New projections supersede active layout jobs by replacing that
 worker; an idle worker is reused. A later layout keeps the last committed graph
@@ -295,14 +312,15 @@ The secondary KG5 evidence explorer is launched from **Settings → Developer**
 and uses a modal, internally scrolling surface. Opening or closing it does not
 resize or remount the graph workspace.
 
-## Saved graph view
+## Current View and Named Saved Views
 
 Cross-session persistence activates only when a report explicitly declares
 `identity.stability: "stable"`. Transient and legacy schema-v1 reports remain
-usable in memory and never read or write saved state. The schema-v3 saved record
-is keyed by encoded stable workspace ID and contains only structural disclosure,
-the optional literal heading ceiling, focus, user-facing path/entity/status
-filters, explicit presentation mode, and canonical renderer viewport bookmarks.
+usable in memory and never read or write persistent graph state. The automatic
+**Current View** is the one schema-v3 resume record keyed by encoded stable
+workspace ID. It contains only structural disclosure, the optional literal
+heading ceiling, focus, user-facing path/entity/status filters, explicit
+presentation mode, and canonical renderer viewport bookmarks.
 Internally those bookmarks remain named Structure/Global/Local for schema-v3
 compatibility. Schema v1 migrates to Structure; schema v2 preserves its explicit
 Structure/Global mode and does not infer Local from an active focus. The Local
@@ -319,10 +337,56 @@ eligibility cannot contradict the single visible **Blocks** choice; the saved
 schema version does not change. `disclosure.includeBlocks` remains the user
 intent that decides whether blocks may be projected.
 Corrupt, inaccessible, or unsupported stored values are not overwritten or
-silently deleted. Writes stop after one failure. **Reset saved view** deletes
-only that workspace's view, restores **Files only**, clears transient
-search/selection and both navigation-history stacks, and fits the graph. It
-never resets the KG9A catalog.
+silently deleted. Writes stop after one failure. **Reset current view** deletes
+only that workspace's automatic resume record, restores **Files only**, clears
+transient search/selection and both navigation-history stacks, and fits the
+graph. It never resets the KG9A catalog or Named Saved Views.
+
+**Saved Views** is a separate explicit registry under
+`icarus-graph-explorer:saved-views:<encodeURIComponent(workspaceId)>`. Each
+schema-v2 entry adds a unique trimmed name, Network/Hierarchy choice, and a
+layout-appropriate graph profile to an immutable snapshot of the same persisted
+semantic view contract. Up to 50
+entries are sorted deterministically. Names are at most 64 characters and are
+unique case-insensitively. Save, Update, Rename, and Delete write only this
+registry; Save does not trigger projection, layout, or viewport work.
+
+Schema-v1 SAVED1A registries load through a strict in-memory migration and are
+not rewritten on read. Their profile-less entries keep semantic-only behavior;
+the next explicit registry mutation writes schema v2, and Update captures the
+current profile. All Network profiles contain full Global Layout Settings plus
+committed folder Pull/Place rules. Focus Network contains only the four shared
+Network controls. Focus Hierarchy contains only hierarchy presentation choices.
+All Hierarchy is an explicit profile no-op. Trackpad mode, experiment exposure,
+Saved Filters, Visual Groups, per-File sizes/movement, selection, and shell state
+remain independent.
+
+Apply performs one reconciled graph-state transaction against the current
+workspace. It switches Scope/Layout, disclosure, Focus, filters/query, and
+semantic viewport; cancels temporary movement; exits Arrange Folders; clears
+selection; adopts the applied query into its editor; and deliberately starts a
+new Back/Forward baseline. Current availability may safely adjust an unavailable
+presentation and announces that adjustment. Before semantic adoption, Apply
+validates and writes every changed owned profile key, spatial first and Graph
+Preferences second, with best-effort rollback to the exact prior bytes. Failure
+retains the prior semantic, presentation, history, selection, preference, and
+in-memory spatial state. Ordinary Current View autosave then records only a
+successful reconciled result. Exact reapplication skips writes,
+projection/layout, and viewport work while retaining the explicit
+history/selection reset semantics. Visual-only Network profile differences use
+the existing presentation refresh path; physics and spatial differences keep the
+existing latest-generation geometry and final semantic-viewport gating.
+
+The toolbar's native Saved View switcher displays the deterministic first exact
+semantic/profile match, or **Current View** after any meaningful edit. It does
+not persist an active Saved View identity and never reapplies a named view at
+startup. The adjacent management button retains Save, Update, Rename, Delete,
+and recovery in normal and maximized graph modes.
+
+The registry follows write-before-adopt behavior. Invalid bytes stay untouched
+and block mutations until the two-step **Reset Saved Views registry** action
+deletes only that key. This recovery never deletes Current View, Saved Filters,
+Visual Groups, preferences, size overrides, or spatial rules.
 
 Back/Forward history is never persisted. Meaningful presentation, disclosure,
 Focus, filter, and Search/Inspector navigation actions record the current
@@ -348,7 +412,7 @@ QUERY1 adds one optional canonical advanced-query string to that saved
 active view. Draft text never projects, enters history, or persists. Saved
 Filters are a separate stable-workspace registry containing only `{name,
 query}` definitions; applying one changes only the active query, deleting one
-does not change graph history, and Reset saved view leaves definitions intact.
+does not change graph history, and Reset current view leaves definitions intact.
 All Network applies that same canonical query to its files-only topology, so
 document-compatible clauses filter files while Section-only clauses correctly
 produce no matches instead of promoting parent files.
@@ -372,6 +436,18 @@ only instrumentation availability and must be set before `desktop:dev` or
 controller correlation tokens are monotonic within one controller, survive
 only long enough to join I16/I17/I18 processing to the matching paint, and
 never enter reports or persistence.
+
+NETWORKVIEW1B startup diagnostics are a separate bounded QA path. Add
+`?network-startup-trace=1` to an optimized browser/native URL to expose the
+memory-only `window.icarusNetworkStartupTrace` API and a non-rendering
+`#network-startup-trace` JSON script. The trace records shell and Sigma physical
+dimensions, camera/customBBox/live extent, five representative raw and viewport
+node positions, LOD, and startup state until 500 ms after All Network reveal;
+its `summary.pass` is the no-input stability oracle. The collector and DOM sink
+do not exist without the flag. To reproduce the former fast race without a
+production sleep, QA may also add `&network-startup-capability-delay-ms=150`
+(bounded to 0–2000 ms); this delays only app adoption of the renderer's
+`available` capability. It is ignored unless tracing is enabled.
 
 ## Graph interaction boundary
 

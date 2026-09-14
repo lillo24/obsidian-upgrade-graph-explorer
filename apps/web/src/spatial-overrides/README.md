@@ -20,7 +20,7 @@ the source-neutral spatial registry.
 V1 registries migrate in memory on read; reads never rewrite storage, while the
 next confirmed mutation writes v2 through the existing transaction. No function
 here dispatches projection, reconciles topology, requests layout, or reads source
-content. Reset saved view, Graph Preferences, Visual Groups, Saved Filters, and
+content. Reset current view, Graph Preferences, Visual Groups, Saved Filters, and
 presentation-size overrides use different storage keys.
 
 The editor draft is transient React state and never enters browser persistence

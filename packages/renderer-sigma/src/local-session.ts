@@ -298,7 +298,7 @@ export class LocalRendererSession {
       doubleClickTimeout: NODE_DOUBLE_CLICK_TIMEOUT_MS,
       enableEdgeEvents: false,
       hideEdgesOnMove: this.graph.size > 4_000,
-      hideLabelsOnMove: true,
+      hideLabelsOnMove: false,
       labelDensity: 0.12,
       labelGridCellSize: 100,
       labelRenderedSizeThreshold:

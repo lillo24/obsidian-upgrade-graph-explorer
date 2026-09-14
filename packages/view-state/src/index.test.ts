@@ -428,7 +428,7 @@ describe('persisted workspace view', () => {
     const other = createProjectionWorkspace(snapshot(ENTITIES, 'other'));
 
     expect(() => restorePersistedWorkspaceView(other, persisted())).toThrow(
-      'Cannot restore saved view for workspace "stable-workspace" into "other".',
+      'Cannot restore persisted workspace view for workspace "stable-workspace" into "other".',
     );
   });
 

@@ -53,4 +53,20 @@ describe('Network editing controls', () => {
     expect(markup).toContain('Retry Move');
     expect(markup).toContain('role="alert"');
   });
+
+  it('keeps transient readiness text in its accessible non-layout status surface', () => {
+    const markup = renderToStaticMarkup(
+      <NetworkEditingControls
+        {...callbacks}
+        scope="all"
+        state={{ phase: 'off' }}
+        status="Waiting for Network layout…"
+      />,
+    );
+
+    expect(markup).toContain('aria-live="polite"');
+    expect(markup).toContain('aria-atomic="true"');
+    expect(markup).toContain('network-editing-controls__status');
+    expect(markup).toContain('Waiting for Network layout…');
+  });
 });

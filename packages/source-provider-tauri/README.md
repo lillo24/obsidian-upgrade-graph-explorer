@@ -1,6 +1,6 @@
 # Tauri Source Provider
 
-Status: **STABLE — KG11 acquisition, watch planning, repeated identity commits, and fake-bridge tests pass.**
+Status: **STABLE — KG11 acquisition, bounded native-operation diagnostics, watch planning, repeated identity commits, and fake-bridge tests pass.**
 
 This outer platform package owns native folder selection, read-only vault
 discovery, recursive watch acquisition, deterministic source-change planning,
@@ -12,6 +12,7 @@ src/
   bridge.ts       Narrow injectable dialog/fs/watch/path/app-data bridge and Tauri implementation.
   selection.ts    Absolute selected-root normalization and safe display basename.
   discovery.ts    Full or bounded-subtree strict-UTF-8 acquisition using shared KG5 policy.
+  discovery-progress.ts  Aggregate counters, operation timing, and the per-call native watchdog.
   reconciliation.ts  Observed inventory diff and conservative source-change planning.
   registry.ts     Versioned registry/catalog validation and temporary-sibling writes.
   provider.ts     Public discovery/watch/reconciliation/identity orchestration.
@@ -45,8 +46,21 @@ watchSelectedVault(selection, listener)
 Discovery skips hidden entries and `node_modules`, honors normalized optional
 excludes, never follows symlinks, decodes Markdown bytes with fatal UTF-8,
 sorts workspace-relative paths deterministically, and inventories only paths
-for non-Markdown files. The pure lexical rules are shared with the Node KG5
-scanner through `vault-discovery-policy`; Node and Tauri I/O remain separate.
+for non-Markdown files. Traversal remains serial. Observer-only discovery
+progress reports directory/entry/file/byte/depth counters plus the current
+native operation and workspace-relative target; observer failures cannot alter
+discovery. Every root inspection, directory read, path join, and Markdown read
+has a configurable 60-second default watchdog. A timeout abandons the discovery
+attempt with a relative-path diagnostic but cannot cancel the already-issued
+Tauri Promise. The slow-operation presentation threshold defaults to 3 seconds.
+The pure lexical rules are shared with the Node KG5 scanner through
+`vault-discovery-policy`; Node and Tauri I/O remain separate.
+
+Tauri plugin-fs 2.5.1 derives `isSymlink` from Rust
+`DirEntry::file_type().is_symlink()`. Discovery preserves that skip and tests a
+recursive symlink entry. The plugin does not expose raw Windows reparse
+attributes, so junction classification remains a native risk; discovery does
+not add an `lstat` call for every directory without evidence that it is needed.
 
 ## Watch and planning policy
 

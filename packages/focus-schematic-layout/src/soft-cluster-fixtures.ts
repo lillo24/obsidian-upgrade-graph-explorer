@@ -348,7 +348,7 @@ export const SOFT_CLUSTER_FIXTURES: readonly EndpointFixtureSpec[] = [
     {
       hops: 2,
       expectation:
-        'Root-folder peers attract softly while the root File remains centered.',
+        'Root-folder peers attract each other while the visible root File remains a neutral centered anchor.',
     },
   ),
   fixture(
@@ -588,6 +588,73 @@ export const SOFT_CLUSTER_FIXTURES: readonly EndpointFixtureSpec[] = [
       hops: 2,
       expectation:
         'The result uses the full plane and does not recreate directional rank bands.',
+    },
+  ),
+  fixture(
+    'SC26',
+    'root plus one same-folder File',
+    [doc('Focus', 'shared'), doc('Peer', 'shared')],
+    [ref('Focus', 'Peer')],
+    {
+      hops: 1,
+      authored: 'Synthetic PATCH2 root-folder force exclusion case.',
+      expectation:
+        'The root stays a displayed folder member, but the lone peer cannot form an attraction group by itself.',
+      inspect:
+        'Compare strengths 0 and 100: geometry stays identical and no attraction centroid appears.',
+    },
+  ),
+  fixture(
+    'SC27',
+    'root plus two same-folder Files',
+    [doc('Focus', 'shared'), doc('B', 'shared'), doc('C', 'shared')],
+    [ref('Focus-Block', 'B'), ref('Focus-Heading', 'C')],
+    {
+      entities: [
+        heading('Focus-Heading', 'Focus', 2),
+        {
+          id: 'Focus-Block',
+          kind: 'block',
+          documentId: 'Focus',
+          parentId: 'Focus-Heading',
+          line: 3,
+        },
+      ],
+      hops: 1,
+      authored: 'Synthetic PATCH2 root-centroid and descendant exclusion case.',
+      expectation:
+        'Only the two non-root Files participate in folder attraction.',
+      inspect:
+        'The folder guide still includes the root, while the attraction centroid uses B and C only.',
+    },
+  ),
+  fixture(
+    'SC28',
+    'root-neutral ancestor scopes',
+    [
+      doc('Focus', 'ancestor/root-a'),
+      doc('A1', 'ancestor/root-a'),
+      doc('A2', 'ancestor/root-a'),
+      doc('B', 'ancestor/shared'),
+      doc('C', 'ancestor/shared'),
+      doc('D1', 'ancestor/root-b'),
+      doc('D2', 'ancestor/root-b'),
+    ],
+    [
+      ref('Focus', 'A1'),
+      ref('Focus', 'A2'),
+      ref('Focus', 'B'),
+      ref('Focus', 'C'),
+      ref('Focus', 'D1'),
+      ref('Focus', 'D2'),
+    ],
+    {
+      hops: 1,
+      authored: 'Synthetic PATCH2 normalized-decay ancestor exclusion case.',
+      expectation:
+        'Moving only the root between stable sibling folders cannot alter Soft geometry.',
+      inspect:
+        'Exact sibling groups and their shared ancestor contain only non-root force members.',
     },
   ),
 ];

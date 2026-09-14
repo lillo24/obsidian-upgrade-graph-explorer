@@ -3,9 +3,10 @@
 Status: **STABLE — KG11 live update, resync, capability, and controller gates pass.**
 
 This package owns the minimal Tauri v2 process around the existing
-`apps/web` Vite application. Rust registers only the dialog and filesystem
-plugins. Markdown parsing, resolution, stable identity, diagnostics, graph
-projection, and UI remain in the TypeScript workspace packages.
+`apps/web` Vite application. Rust registers the dialog/filesystem plugins and
+dedicated, read-only Git review-source commands. It exposes no general process
+API. Markdown parsing, resolution, stable identity, diagnostics, graph
+projection, review orchestration, and UI remain in TypeScript packages.
 
 ```text
 package.json                 Tauri CLI scripts and pinned CLI version.
@@ -17,6 +18,7 @@ src-tauri/
   tauri.global-renderer-spike.conf.json KG13A-only release harness override.
   capabilities/main.json     Dialog, selected-root read/watch, and app-data scope.
   src/lib.rs                 Tauri/plugin initialization.
+  src/review_source.rs       Authorized, pinned, bounded read-only Git capture and disposable-repository tests.
   src/main.rs                Desktop executable entry point.
   icons/                     Tauri-generated desktop icon formats.
 ```
@@ -40,12 +42,19 @@ npm/crates registries:
 | `tauri-build`               |   2.6.3 | MIT OR Apache-2.0 |
 | `tauri-plugin-dialog`       |   2.7.2 | MIT OR Apache-2.0 |
 | `tauri-plugin-fs`           |   2.5.1 | MIT OR Apache-2.0 |
+| `serde`                     | 1.0.229 | MIT OR Apache-2.0 |
+| `serde_json`                | 1.0.151 | MIT OR Apache-2.0 |
+| `uuid`                      |  1.26.0 | MIT OR Apache-2.0 |
 
 ```bash
 pnpm desktop:check
 pnpm desktop:dev
 pnpm desktop:build
 ```
+
+`desktop:check` includes the native test suite, including disposable real-Git
+capture cases; CI therefore validates behavior rather than only compiling the
+commands.
 
 KG13A additionally provides `pnpm desktop:global-renderer:build`. Tauri merges the
 explicit diagnostic config at build time, changes the window/product label, builds
@@ -82,9 +91,22 @@ restricted to private application state, and command permissions remain
 capability-gated. Keep these scopes aligned with `appLocalDataDir()` if the
 storage root changes.
 
+Live AI Review does not add a native command or network proxy. The web
+application calls OpenAI through its provider-neutral REVIEW1 boundary using a
+session-memory key entered by the user. The desktop shell never receives or
+persists that credential.
+See [`../../docs/REVIEW4_OPENAI_AGENTS_PROVIDER.md`](../../docs/REVIEW4_OPENAI_AGENTS_PROVIDER.md).
+
 Dialog-added scope is not durable. Restarting requires the user to select the
 vault again; an exact normalized private registry match then recovers its stable
 workspace identity. The web application controller applies coalesced provider
 plans transactionally to KG10, keeps the watcher active through recovery scans,
 and publishes a replacement graph/report only after stable catalog persistence.
 Source files and assets remain read-only; only app-local identity state changes.
+The Git capture module additionally requires the exact selected-root registry
+association before opening an opaque session. Associated main/linked-worktree
+metadata is accepted only in validated standard layouts; alternate object
+stores are refused. Git is launched internally with no shell, no inherited
+Git configuration environment, no helper execution, no lazy network fetch,
+finite output/time limits, and repository writes disabled. Capabilities still
+contain no shell or process permission.
