@@ -15,7 +15,12 @@ import { useWorkerServiceDisposal } from './use-worker-service-disposal';
 
 export type GlobalGraphViewProps = Omit<
   GlobalGraphCanvasProps,
-  'layoutCache' | 'layoutService' | 'physicsServiceFactory'
+  | 'layoutCache'
+  | 'layoutService'
+  | 'physicsServiceFactory'
+  | 'spatialInfluenceCache'
+  | 'spatialInfluenceService'
+  | 'spatialPullPreviewServiceFactory'
 >;
 
 // The lazy module survives component unmounts, so exact derived layouts remain
@@ -39,6 +44,9 @@ export default function GlobalGraphView(props: GlobalGraphViewProps) {
       physicsServiceFactory={createNetworkPhysicsWorkerService}
       spatialInfluenceCache={spatialInfluenceCache}
       spatialInfluenceService={spatialInfluenceService}
+      spatialPullPreviewServiceFactory={
+        createGlobalSpatialInfluenceWorkerService
+      }
     />
   );
 }

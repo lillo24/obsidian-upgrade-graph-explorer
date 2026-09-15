@@ -1390,3 +1390,24 @@ Pull releases successful: 832 iterations/47.435 ms, 2,304/127.458 ms, and
 the bundled small fixture; browser-level 100-node All/Focus evidence remains a
 native acceptance item rather than being inferred from the analyzer or the
 100-node Global renderer benchmark.
+
+## SPATIAL2C finite Pull-preview evidence
+
+`pnpm benchmark:spatial-pull-preview` runs the unchanged production
+`interleaved-centroid` algorithm with 6/12/18/30 iterations. The September 15,
+2026 synthetic rerun measured 12 iterations at 10.067/11.391 ms p50/p95 for 300
+nodes and 62.051/73.814 ms for 1,000 nodes. Its affected-cluster direction
+agreement against 30 iterations was 0.957 and 0.979 respectively, and connected
+nonmembers had nonzero displacement. At 3,000 nodes it measured
+193.443/217.519 ms with 0.977 direction agreement. Six iterations was faster but
+less faithful (0.849 at 300 nodes), while 18 and 30 increased latency without
+being necessary for directional authoring feedback. Production preview therefore
+uses 12 iterations; authoritative SPATIAL2A remains 30/20.
+
+These are pure Node compute measurements over deterministic aggregate synthetic
+graphs. They exclude browser Worker creation, clone/round-trip time, Sigma
+position adoption, paint cadence, and native pointer feel. The controller's
+separate operation counters distinguish raw schedules, actual worker requests,
+superseded desired/pending inputs, and preview adoptions. Timing remains local
+evidence rather than a CI gate; production browser and optimized-desktop QA are
+reported separately.

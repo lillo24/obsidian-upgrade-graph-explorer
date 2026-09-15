@@ -37,6 +37,7 @@ src/
   spatial.ts               Sigma logical-axis adapter and All Network override composition.
   spatial-influence.ts     Pure soft-attractor request, fingerprint, compute, validation, metrics.
   spatial-influence-cache.ts  Four-entry memory-only LRU of dynamic positions.
+  spatial-pull-preview.ts  Draft-only rAF coalescing, bounded worker ownership, and generation safety.
   arrangement.ts           Pure thresholded prime/drag/commit/cancel gesture reducer.
   temporary-node-constraint.ts  Serializable PHYSICS1 consumer port and strict test fake.
   file-move.ts             Pure File gesture reducer and frame-coalesced coordinator.
@@ -88,6 +89,7 @@ src/
   arrangement-session.test.ts  Exact-folder pointer ownership, sparse refresh, and commit contract.
   file-move-session.test.ts  All/Focus eligibility, arbitration, lifecycle, and fake-port contract.
   arrangement-canvas.test.tsx  Accessible nudge/save and write-failure rollback contract.
+  spatial-pull-preview.test.ts  One-active/one-pending scheduling and stale-generation regression.
   spatial-rule-canvas.test.tsx Pull/Place adoption, cache reuse, and zero-auto-layout regression.
   raw-viewport-frame.test.ts Sigma-transform camera preservation and ownership regression.
   node-size-session.test.ts  Initial display, sparse indexed refresh, and topology-race contracts.
@@ -264,13 +266,29 @@ The spatial target marker owns explicit pointer capture while dragged. Only that
 capture suppresses stage pan; stage drag and wheel/trackpad zoom remain available
 otherwise.
 
-Pull pointer and keyboard editing updates only the draft anchor, marker, and
-target text. It never calls rigid preview geometry or mutates a graph-node x/y.
-Release persists the complete rule, then the existing SPATIAL2A latest
-worker/cache path settles authoritative geometry. Place marker drag, or dragging
-one effective selected File, retains the sparse rigid preview and exact
-post-dynamic composition. A Place-only edit with unchanged Pull resolution uses
-zero dynamic workers; no rule edit enters the automatic layout fingerprint.
+SPATIAL2C adds a separate transient dynamic layer for dirty Pull drafts. Marker
+pointer capture and target text remain immediate. Anchor, keyboard, strength,
+scope preset, root-file, and exclusion changes schedule the complete effective
+draft registry at an animation-frame boundary. The controller retains at most
+one active request and one newest pending request; a completed current revision
+may paint useful progress before the pending revision starts. Every request is
+rebuilt from accepted automatic positions, topology, and settings, with the
+same-root confirmed rule replaced by the draft. Previous preview output, Sigma
+display coordinates, fixed Place output, camera state, and PHYSICS1 coordinates
+are never seeds.
+
+The preview owns a separately constructed spatial worker client, uses 12
+`interleaved-centroid` iterations, writes no authoritative cache or persistence,
+and composes effective fixed Place rules only after preview dynamic positions.
+One result adopts imperatively through the camera-neutral spatial-position seam.
+Cancel, editor/source/layout generation changes, Place takeover, failure, and
+disposal terminate or ignore preview work and restore confirmed geometry.
+Successful persistence stops preview work without restoring the old frame; the
+last preview stays displayed until the ordinary 30/20-iteration SPATIAL2A
+worker/cache result adopts. Place marker drag, or dragging one effective selected
+File, retains the sparse rigid preview and exact post-dynamic composition. A
+Place-only edit with unchanged Pull resolution uses zero dynamic workers; no
+rule edit enters the automatic layout fingerprint.
 The SPATIAL2A worker still performs its existing whole-graph ForceAtlas2
 refinement, so disconnected geometry movement is layout evidence rather than a
 camera fit. SPATIAL2B does not introduce a competing simulation lifecycle;

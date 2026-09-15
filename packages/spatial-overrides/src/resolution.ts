@@ -12,6 +12,20 @@ import type {
   WorkspaceFolderKey,
 } from './types';
 
+/**
+ * Builds the transient authoring registry for one draft. A same-root confirmed
+ * rule is replaced, while independent and more-specific rules stay intact.
+ */
+export function replaceFolderSpatialRuleWithDraft(
+  confirmedRules: readonly FolderSpatialRule[],
+  draftRule: FolderSpatialRule,
+): readonly FolderSpatialRule[] {
+  return Object.freeze([
+    ...confirmedRules.filter((rule) => rule.folderKey !== draftRule.folderKey),
+    draftRule,
+  ]);
+}
+
 function compareRules(
   left: FolderSpatialRule,
   right: FolderSpatialRule,
@@ -33,10 +47,10 @@ export function classifyFolderSpatialDraftScope({
   readonly draftRule: FolderSpatialRule;
   readonly folderKeyByNodeKey: ReadonlyMap<string, string>;
 }): FolderScopeVisualization {
-  const effectiveRules = [
-    ...confirmedRules.filter((rule) => rule.folderKey !== draftRule.folderKey),
+  const effectiveRules = replaceFolderSpatialRuleWithDraft(
+    confirmedRules,
     draftRule,
-  ];
+  );
   const resolved = resolveFolderSpatialRules({
     rules: effectiveRules,
     folderKeyByNodeKey,

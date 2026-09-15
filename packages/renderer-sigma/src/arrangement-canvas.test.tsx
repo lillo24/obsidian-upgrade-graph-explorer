@@ -4,7 +4,12 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { globalTestProjection } from './test-fixture';
-import type { GlobalLayoutRequest } from './types';
+import type {
+  GlobalLayoutRequest,
+  GlobalSpatialInfluenceRequest,
+  GlobalSpatialInfluenceResult,
+} from './types';
+import type { FolderSpatialRule } from '@icarus-graph-explorer/spatial-overrides';
 
 interface MockSessionApi {
   readonly applyPositions: ReturnType<typeof vi.fn>;
@@ -70,6 +75,7 @@ vi.mock('./session', () => ({
 }));
 
 import { GlobalGraphCanvas } from './GlobalGraphCanvas';
+import { GlobalSpatialInfluenceCache } from './spatial-influence-cache';
 
 const noop = () => undefined;
 
@@ -82,11 +88,20 @@ async function perform(action: () => void): Promise<void> {
 
 describe('All Network Arrange folders canvas', () => {
   let container: HTMLDivElement;
+  let previewFrames: FrameRequestCallback[];
   let root: Root;
 
   beforeEach(() => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     sessionInstances.length = 0;
+    previewFrames = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      previewFrames.push(callback);
+      return previewFrames.length;
+    });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((handle) => {
+      previewFrames[handle - 1] = () => undefined;
+    });
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -104,6 +119,11 @@ describe('All Network Arrange folders canvas', () => {
     readonly active?: boolean;
     readonly genericRules?: boolean;
     readonly scopeChildCount?: number;
+    readonly spatialRules?: readonly FolderSpatialRule[];
+    readonly previewLayout?: (
+      request: Omit<GlobalSpatialInfluenceRequest, 'requestId'>,
+    ) => Promise<GlobalSpatialInfluenceResult>;
+    readonly spatialInfluenceCache?: GlobalSpatialInfluenceCache;
   }) {
     const onAvailabilityChange = vi.fn();
     const onCommitAnchor = vi.fn(() => options?.commitFailure);
@@ -202,6 +222,20 @@ describe('All Network Arrange folders canvas', () => {
           projection={globalTestProjection()}
           selection={null}
           settings={{ folderClustering: true, spacingPreset: 'normal' }}
+          {...(options?.spatialInfluenceCache === undefined
+            ? {}
+            : { spatialInfluenceCache: options.spatialInfluenceCache })}
+          {...(options?.spatialRules === undefined
+            ? {}
+            : { spatialRules: options.spatialRules })}
+          {...(options?.previewLayout === undefined
+            ? {}
+            : {
+                spatialPullPreviewServiceFactory: () => ({
+                  dispose: noop,
+                  layout: options.previewLayout!,
+                }),
+              })}
           trackpadZoomMode="pinch-zoom"
         />,
       ),
@@ -215,6 +249,375 @@ describe('All Network Arrange folders canvas', () => {
       layout,
     };
   }
+
+  async function flushPreviewFrame(): Promise<void> {
+    const frames = previewFrames;
+    previewFrames = [];
+    await perform(() => {
+      for (const frame of frames) frame(0);
+    });
+  }
+
+  function previewResult(
+    request: Omit<GlobalSpatialInfluenceRequest, 'requestId'>,
+  ): GlobalSpatialInfluenceResult {
+    const pullX = request.attractors[0]?.targetX ?? 0;
+    return {
+      schemaVersion: 1,
+      kind: 'result',
+      requestId: 1,
+      algorithm: request.algorithm,
+      computeMs: 1,
+      forceAtlasMs: 0.5,
+      attractorMs: 0.5,
+      positions: request.nodes.map(({ key, x, y }) => ({
+        key,
+        x: x + pullX * 0.1,
+        y,
+      })),
+      metrics: {
+        meanTargetError: 0,
+        maxTargetError: 0,
+        meanAffectedDisplacement: 0,
+        meanUnaffectedDisplacement: 0,
+        meanCrossBoundaryReferenceLength: 0,
+        meanReferenceLength: 0,
+      },
+    };
+  }
+
+  it('does not preview merely because an unchanged confirmed Pull rule opens', async () => {
+    const previewLayout = vi.fn(async (request) => previewResult(request));
+    await renderArrangement({
+      genericRules: true,
+      spatialRules: [
+        {
+          folderKey: 'alpha',
+          behavior: 'pull',
+          scope: { kind: 'exact' },
+          anchor: { x: 0.25, y: -0.1 },
+          strength: 70,
+        },
+      ],
+      previewLayout,
+    });
+    await flushPreviewFrame();
+    expect(previewLayout).not.toHaveBeenCalled();
+  });
+
+  it('previews a Pull nudge from base geometry and holds it through successful commit', async () => {
+    const previewLayout = vi.fn(async (request) => previewResult(request));
+    const spatialInfluenceCache = new GlobalSpatialInfluenceCache();
+    const cacheSet = vi.spyOn(spatialInfluenceCache, 'set');
+    const callbacks = await renderArrangement({
+      genericRules: true,
+      spatialRules: [],
+      previewLayout,
+      spatialInfluenceCache,
+    });
+    const session = sessionInstances[0]!;
+    const spatialAppliesBefore =
+      session.applySpatialPositions.mock.calls.length;
+
+    await perform(() =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Nudge folder right"]')!
+        .click(),
+    );
+    expect(previewLayout).not.toHaveBeenCalled();
+    await flushPreviewFrame();
+
+    expect(previewLayout).toHaveBeenCalledTimes(1);
+    expect(previewLayout.mock.calls[0]![0].iterations).toBe(12);
+    expect(previewLayout.mock.calls[0]![0].nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'entity:doc-a' }),
+        expect.objectContaining({ key: 'entity:doc-b' }),
+      ]),
+    );
+    expect(previewLayout.mock.calls[0]![0].attractors[0]).toMatchObject({
+      ruleFolderKey: 'alpha',
+      strength: 70,
+    });
+    expect(session.applySpatialPositions).toHaveBeenCalledTimes(
+      spatialAppliesBefore + 1,
+    );
+    expect(session.fit).not.toHaveBeenCalled();
+    expect(session.center).not.toHaveBeenCalled();
+    expect(callbacks.layout).toHaveBeenCalledTimes(1);
+    expect(cacheSet).not.toHaveBeenCalled();
+
+    const firstBaseNodes = previewLayout.mock.calls[0]![0].nodes;
+    await perform(() =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Nudge folder right"]')!
+        .click(),
+    );
+    await flushPreviewFrame();
+    expect(previewLayout).toHaveBeenCalledTimes(2);
+    expect(previewLayout.mock.calls[1]![0].nodes).toEqual(firstBaseNodes);
+
+    const previewApplyCount = session.applySpatialPositions.mock.calls.length;
+    await perform(() =>
+      [...container.querySelectorAll('button')]
+        .find((button) => button.textContent === 'Apply changes')!
+        .click(),
+    );
+    expect(callbacks.onCommitRule).toHaveBeenCalledTimes(1);
+    expect(session.applySpatialPositions).toHaveBeenCalledTimes(
+      previewApplyCount,
+    );
+    expect(cacheSet).not.toHaveBeenCalled();
+  });
+
+  it('schedules live Pull preview for strength and every scope authoring field', async () => {
+    const previewLayout = vi.fn(async (request) => previewResult(request));
+    await renderArrangement({
+      genericRules: true,
+      scopeChildCount: 1,
+      spatialRules: [],
+      previewLayout,
+    });
+    const strength = container.querySelector<HTMLInputElement>(
+      '[aria-label="Pull strength"]',
+    )!;
+    await perform(() => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      )!.set!.call(strength, '30');
+      strength.dispatchEvent(new Event('input', { bubbles: true }));
+      strength.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await flushPreviewFrame();
+    expect(previewLayout.mock.calls.at(-1)![0].attractors[0]?.strength).toBe(
+      30,
+    );
+
+    for (const label of ['Folder + subfolders', 'Custom']) {
+      await perform(() =>
+        [...container.querySelectorAll('button')]
+          .find((button) => button.textContent === label)!
+          .click(),
+      );
+      await flushPreviewFrame();
+    }
+    const directFiles = [...container.querySelectorAll('label')]
+      .find((label) => label.textContent?.includes('Files directly in alpha'))!
+      .querySelector<HTMLInputElement>('input')!;
+    await perform(() => directFiles.click());
+    await flushPreviewFrame();
+    const child = container.querySelector<HTMLInputElement>(
+      '[aria-label="Included subfolders"] input[type="checkbox"]',
+    )!;
+    await perform(() => child.click());
+    await flushPreviewFrame();
+
+    expect(previewLayout).toHaveBeenCalledTimes(5);
+  });
+
+  it('restores confirmed geometry when Pull preview yields to Place', async () => {
+    const previewLayout = vi.fn(async (request) => previewResult(request));
+    await renderArrangement({
+      genericRules: true,
+      spatialRules: [],
+      previewLayout,
+    });
+    const session = sessionInstances[0]!;
+    await perform(() =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Nudge folder right"]')!
+        .click(),
+    );
+    await flushPreviewFrame();
+    const previewApplyCount = session.applySpatialPositions.mock.calls.length;
+
+    await perform(() =>
+      [...container.querySelectorAll('label')]
+        .find((label) => label.textContent?.includes('Fixed placement'))!
+        .querySelector<HTMLInputElement>('input')!
+        .click(),
+    );
+
+    expect(session.applySpatialPositions).toHaveBeenCalledTimes(
+      previewApplyCount + 1,
+    );
+    expect(previewLayout).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts Pull geometry before target release while the marker intent stays immediate', async () => {
+    let resolvePreview:
+      ((result: GlobalSpatialInfluenceResult) => void) | undefined;
+    let previewRequest:
+      Omit<GlobalSpatialInfluenceRequest, 'requestId'> | undefined;
+    const previewLayout = vi.fn(
+      (request: Omit<GlobalSpatialInfluenceRequest, 'requestId'>) => {
+        previewRequest = request;
+        return new Promise<GlobalSpatialInfluenceResult>((resolve) => {
+          resolvePreview = resolve;
+        });
+      },
+    );
+    const callbacks = await renderArrangement({
+      genericRules: true,
+      spatialRules: [],
+      previewLayout,
+    });
+    const session = sessionInstances[0]!;
+    const marker = container.querySelector<HTMLDivElement>(
+      '[aria-label="Spatial target for alpha"]',
+    )!;
+    Object.assign(marker, {
+      hasPointerCapture: vi.fn(() => true),
+      releasePointerCapture: vi.fn(),
+      setPointerCapture: vi.fn(),
+    });
+    await perform(() =>
+      marker.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 10,
+          clientY: 12,
+          pointerId: 17,
+        }),
+      ),
+    );
+    await perform(() =>
+      marker.dispatchEvent(
+        new PointerEvent('pointermove', {
+          bubbles: true,
+          clientX: 30,
+          clientY: 36,
+          pointerId: 17,
+        }),
+      ),
+    );
+
+    expect(container.textContent).toContain('40% right, 30% down');
+    expect(callbacks.onCommitRule).not.toHaveBeenCalled();
+    await flushPreviewFrame();
+    expect(previewLayout).toHaveBeenCalledTimes(1);
+    const applyCountBeforeWorkerResult =
+      session.applySpatialPositions.mock.calls.length;
+    if (previewRequest === undefined || resolvePreview === undefined) {
+      throw new Error('Expected live Pull preview work.');
+    }
+    resolvePreview(previewResult(previewRequest));
+    await perform(noop);
+    expect(session.applySpatialPositions).toHaveBeenCalledTimes(
+      applyCountBeforeWorkerResult + 1,
+    );
+    expect(callbacks.onCommitRule).not.toHaveBeenCalled();
+
+    await perform(() =>
+      marker.dispatchEvent(
+        new PointerEvent('pointerup', {
+          bubbles: true,
+          button: 0,
+          clientX: 30,
+          clientY: 36,
+          pointerId: 17,
+        }),
+      ),
+    );
+    expect(callbacks.onCommitRule).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores exact confirmed geometry when a live Pull draft is canceled', async () => {
+    const previewLayout = vi.fn(async (request) => previewResult(request));
+    const callbacks = await renderArrangement({
+      genericRules: true,
+      spatialRules: [],
+      previewLayout,
+    });
+    const session = sessionInstances[0]!;
+    const confirmed = session.applySpatialPositions.mock.calls.at(-1)?.[0];
+    await perform(() =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Nudge folder right"]')!
+        .click(),
+    );
+    await flushPreviewFrame();
+    expect(session.applySpatialPositions.mock.calls.at(-1)?.[0]).not.toEqual(
+      confirmed,
+    );
+
+    await perform(() =>
+      [...container.querySelectorAll('button')]
+        .find((button) => button.textContent === 'Cancel changes')!
+        .click(),
+    );
+
+    expect(session.applySpatialPositions.mock.calls.at(-1)?.[0]).toEqual(
+      confirmed,
+    );
+    expect(callbacks.onCommitRule).not.toHaveBeenCalled();
+  });
+
+  it('never leaves a live Pull preview presented after persistence fails', async () => {
+    const previewLayout = vi.fn(async (request) => previewResult(request));
+    await renderArrangement({
+      commitFailure: 'disk full',
+      genericRules: true,
+      spatialRules: [],
+      previewLayout,
+    });
+    const session = sessionInstances[0]!;
+    const confirmed = session.applySpatialPositions.mock.calls.at(-1)?.[0];
+    await perform(() =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Nudge folder right"]')!
+        .click(),
+    );
+    await flushPreviewFrame();
+    await perform(() =>
+      [...container.querySelectorAll('button')]
+        .find((button) => button.textContent === 'Apply changes')!
+        .click(),
+    );
+
+    expect(session.applySpatialPositions.mock.calls.at(-1)?.[0]).toEqual(
+      confirmed,
+    );
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      'Folder position was not saved: disk full',
+    );
+  });
+
+  it('keeps editing usable and retries after a preview worker failure', async () => {
+    const previewLayout = vi
+      .fn<
+        (
+          request: Omit<GlobalSpatialInfluenceRequest, 'requestId'>,
+        ) => Promise<GlobalSpatialInfluenceResult>
+      >()
+      .mockRejectedValueOnce(new Error('worker unavailable'))
+      .mockImplementation(async (request) => previewResult(request));
+    await renderArrangement({
+      genericRules: true,
+      spatialRules: [],
+      previewLayout,
+    });
+    await perform(() =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Nudge folder right"]')!
+        .click(),
+    );
+    await flushPreviewFrame();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      'Pull preview unavailable: worker unavailable',
+    );
+
+    await perform(() =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Nudge folder right"]')!
+        .click(),
+    );
+    await flushPreviewFrame();
+    expect(previewLayout).toHaveBeenCalledTimes(2);
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+  });
 
   it('nudges a Pull target without a rigid preview and saves it after layout', async () => {
     const callbacks = await renderArrangement();

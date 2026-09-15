@@ -29,7 +29,16 @@ not observe them.
 MOVE1A defines temporary File movement across All and Focus as a constraint
 contract, PHYSICS1 retains continuous simulation ownership, and MOVE1B mounts
 their direct production interaction plus accessible keyboard integration.
-Arrange Folders remains an explicit, mutually exclusive All-only tool. PIN1
+Arrange Folders remains an explicit, mutually exclusive All-only tool. Its
+SPATIAL2C Pull-preview controller owns a separate disposable instance of the
+existing finite spatial-influence worker client. Dirty draft revisions replace
+only their same-root confirmed rule, always seed from accepted automatic
+geometry, and compose fixed Place output downstream. Preview positions never
+enter persistence, final-geometry identity, automatic layout cache, or the
+authoritative Pull cache. Animation-frame sampling plus one active and one
+newest pending request bounds work; cancel restores confirmed geometry, while a
+successful write holds the last preview until ordinary authoritative settlement
+adopts. PIN1
 remains separate future persistence work.
 
 ## Stable domain shape
