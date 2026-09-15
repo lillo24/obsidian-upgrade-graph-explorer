@@ -24,8 +24,9 @@ simulation schedules no work. A new begin during cooling reheats the same Worker
 Frames carry a monotonic interaction revision plus gesture/File identity.
 Renderers may adopt lagging neighbor progress, but overlay the constrained File
 at the newest target; update transport retains at most one in-flight and one
-pending target. Renderers retain exact raw coordinates separately from bounded
-display catch-up, adopt presentation coordinates imperatively, expose only
+pending target. Renderers retain exact raw coordinates separately from the
+browser-owned velocity-preserving release follower, adopt presentation
+coordinates imperatively, expose only
 coarse raw lifecycle/presentation transitions, and must not persist frames.
 Failure preserves the last adopted graph and is recovered explicitly by a fresh
 initialization.

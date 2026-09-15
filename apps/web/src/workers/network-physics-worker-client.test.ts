@@ -11,6 +11,7 @@ import {
   createNetworkPhysicsWorkerService,
   type NetworkPhysicsWorkerTransport,
 } from './network-physics-worker-client';
+import { NetworkPhysicsPresentationFollower } from './network-physics-presentation-follower';
 
 class FakeWorker implements NetworkPhysicsWorkerTransport {
   onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
@@ -413,6 +414,111 @@ describe('createNetworkPhysicsWorkerService', () => {
     };
 
     expect(progressAt(60)).toBeCloseTo(progressAt(120), 10);
+  });
+
+  it('settles into a fixed raw result with a decelerating tail and no final rush', () => {
+    const worker = new FakeWorker();
+    const scheduler = new FakeFrameScheduler();
+    const onFrame = vi.fn();
+    const service = createNetworkPhysicsWorkerService({
+      createWorker: () => worker,
+      scheduler,
+      onFrame,
+      onConstraint: vi.fn(),
+      onFailure: vi.fn(),
+    });
+    service.initialize(seed());
+    service.begin(begin());
+    worker.emit(frame(1));
+    scheduler.step(0);
+    service.end(end());
+    worker.emit(
+      frame(2, {
+        state: 'sleeping',
+        commandSequence: 1,
+        constraintSequence: null,
+        positions: [
+          { key: 'a', x: 8, y: -4 },
+          { key: 'b', x: 70, y: 0 },
+        ],
+      }),
+    );
+    scheduler.step(16);
+    const samples = [onFrame.mock.calls.at(-1)?.[0].positions[1].x as number];
+    while (scheduler.pending > 0) {
+      scheduler.step(scheduler.nowValue + 16);
+      samples.push(onFrame.mock.calls.at(-1)?.[0].positions[1].x as number);
+    }
+    const increments = samples
+      .slice(1)
+      .map((value, index) => value - samples[index]!);
+    const peak = increments.indexOf(Math.max(...increments));
+    const tail = increments.slice(peak);
+
+    expect(samples.at(-1)).toBe(70);
+    expect(tail.length).toBeGreaterThan(4);
+    expect(
+      tail
+        .slice(0, -1)
+        .every(
+          (increment, index) =>
+            index === 0 || increment <= tail[index - 1]! + 1e-10,
+        ),
+    ).toBe(true);
+    expect(increments.at(-1)).toBeLessThan(0.002);
+  });
+
+  it('preserves nonzero presentation velocity when a cooling target retargets', () => {
+    const follower = new NetworkPhysicsPresentationFollower(
+      [{ key: 'a', x: 0, y: 0 }],
+      100,
+      0,
+    );
+    follower.retarget([{ key: 'a', x: 100, y: 0 }]);
+    const beforeRetarget = follower.sample(64).positions[0]!.x;
+    follower.retarget([{ key: 'a', x: 200, y: 0 }]);
+    const afterOneMillisecond = follower.sample(65).positions[0]!.x;
+
+    expect(beforeRetarget).toBeGreaterThan(0);
+    expect(afterOneMillisecond - beforeRetarget).toBeGreaterThan(0.5);
+  });
+
+  it.each([
+    ['30 Hz', Array.from({ length: 9 }, () => 1_000 / 30)],
+    ['60 Hz', Array.from({ length: 18 }, () => 1_000 / 60)],
+    ['120 Hz', Array.from({ length: 36 }, () => 1_000 / 120)],
+    ['dropped frames', [16, 16, 80, 24, 64, 40, 60]],
+  ] as const)('integrates the same elapsed release at %s', (_label, steps) => {
+    const follower = new NetworkPhysicsPresentationFollower(
+      [{ key: 'a', x: 0, y: 0 }],
+      100,
+      0,
+    );
+    follower.retarget([{ key: 'a', x: 100, y: 0 }]);
+    let timestamp = 0;
+    let x = 0;
+    for (const step of steps) {
+      timestamp += step;
+      x = follower.sample(timestamp).positions[0]!.x;
+    }
+
+    expect(timestamp).toBeCloseTo(300, 10);
+    expect(x).toBeCloseTo(97.109388, 5);
+  });
+
+  it('bounds a suspended frame without instability or a snap backlog', () => {
+    const follower = new NetworkPhysicsPresentationFollower(
+      [{ key: 'a', x: 0, y: 0 }],
+      100,
+      0,
+    );
+    follower.retarget([{ key: 'a', x: 100, y: 0 }]);
+    const resumed = follower.sample(5_000);
+
+    expect(resumed.atRest).toBe(false);
+    expect(resumed.positions[0]!.x).toBeGreaterThan(0);
+    expect(resumed.positions[0]!.x).toBeLessThan(100);
+    expect(Number.isFinite(resumed.positions[0]!.x)).toBe(true);
   });
 
   it('reduces decorative catch-up while preserving the accepted raw result', () => {

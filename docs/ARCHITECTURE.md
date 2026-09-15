@@ -1658,3 +1658,13 @@ cleanup only. Matching release is single-delivery, uses container-relative
 client coordinates without overlay clamping, suppresses only the immediate
 release click, and all existing cancellation/invalidation paths clear native
 ownership. Keyboard Move behavior is unchanged.
+
+Finally, MOVE300C replaces release presentation's per-target cubic smoothstep
+restart and 120 ms deadline with a single critically damped follower on the web
+client. Cooling retargets preserve visible position and velocity, elapsed-time
+integration is refresh-rate independent and bounds suspended-frame work, and
+only the newest target is retained. A sleeping raw frame remains authoritative
+while presentation continues until both scale-relative position error and
+velocity are negligible; only then does the client adopt exact raw coordinates
+and stop rAF work. The held File remains exact on re-grab and reduced-motion
+continues to bypass decorative catch-up.
