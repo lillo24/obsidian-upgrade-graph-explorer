@@ -41,6 +41,7 @@ src/
   arrangement.ts           Pure thresholded prime/drag/commit/cancel gesture reducer.
   temporary-node-constraint.ts  Serializable PHYSICS1 consumer port and strict test fake.
   file-move.ts             Pure File gesture reducer and frame-coalesced coordinator.
+  file-move-pointer-owner.ts  Native pointer-id capture/fallback ownership across HTML overlays.
   node-size.ts             Per-File multiplier composition and final display-only bounds.
   node-size-presentation.ts  Sparse override diff and topology-owned File-to-node key index.
   graph.ts                 Graphology construction, neighborhood index, and planned reconciliation.
@@ -88,6 +89,7 @@ src/
   network-wheel-pan-session.test.ts  Extent/rotation/delta-mode invariant Network pan regression.
   arrangement-session.test.ts  Exact-folder pointer ownership, sparse refresh, and commit contract.
   file-move-session.test.ts  All/Focus eligibility, arbitration, lifecycle, and fake-port contract.
+  file-move-pointer-owner.test.ts  Stop-propagating overlay, pointer identity, capture, and click-release contract.
   arrangement-canvas.test.tsx  Accessible nudge/save and write-failure rollback contract.
   spatial-pull-preview.test.ts  One-active/one-pending scheduling and stale-generation regression.
   spatial-rule-canvas.test.tsx Pull/Place adoption, cache reuse, and zero-auto-layout regression.
@@ -304,6 +306,17 @@ pointer-to-node offset and winning fixed Place translation, converts every live
 viewport sample through Sigma, and sends the dynamic target through a plain
 begin/update/end port. Raw updates coalesce to the latest animation frame;
 release flushes the latest update before one end command.
+
+MOVE300C keeps that ownership until the matching native pointer releases or is
+explicitly canceled. Sigma 3.0.3's document bubble-phase compatibility mouse
+listeners remain in place, but a shared All/Focus owner captures the real
+pointer ID on the stable graph container and also listens in document capture
+as the fallback. This crosses sibling Filters and other stop-propagating HTML
+overlays without treating `leaveStage` as pointer loss. Coordinates remain
+unclamped canvas coordinates derived from `clientX/clientY` and the graph
+container rectangle. The matching release is delivered once and suppresses
+only its immediate click; Escape, blur, visibility loss, `pointercancel`, lost
+capture, invalidation, and disposal clear capture/listeners deterministically.
 
 Folder arrangement and File movement are mutually exclusive; no global File
 editing mode exists. Below threshold,

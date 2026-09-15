@@ -1649,3 +1649,12 @@ anchor ratcheting. Convergence again observes the complete moving graph, and a
 released isolated File enters bounded cooling. Focus physics, Pull ownership,
 M2's output-only handoff, Place composition, limits, schemas, and safety caps
 remain unchanged.
+
+MOVE300C also moves File-drag pointer lifetime out of Sigma's stage-hover
+boundary. Both imperative sessions share a native pointer-ID owner that prefers
+capture on the stable graph container and keeps document-capture move/up/cancel
+listeners as the stop-propagation fallback. `leaveStage` now performs hover
+cleanup only. Matching release is single-delivery, uses container-relative
+client coordinates without overlay clamping, suppresses only the immediate
+release click, and all existing cancellation/invalidation paths clear native
+ownership. Keyboard Move behavior is unchanged.
