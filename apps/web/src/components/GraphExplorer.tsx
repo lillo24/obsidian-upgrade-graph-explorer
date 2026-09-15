@@ -173,6 +173,7 @@ import {
 import {
   loadGraphPreferences,
   normalizeModularFocusSoftFolderStrength,
+  normalizeModularFocusSoftSpacing,
   saveGraphPreferences,
   type FocusHierarchyImplementation,
   type GraphPreferences,
@@ -558,6 +559,7 @@ export function GraphExplorer({
     modularFocusInternalLayout,
     modularFocusMacroLayout,
     modularFocusSoftFolderStrength,
+    modularFocusSoftSpacing,
     modularFolderStripsVisible,
     modularConnectionStyle,
     trackpadZoomMode,
@@ -3577,6 +3579,14 @@ export function GraphExplorer({
     },
     [updateGraphPreferences],
   );
+  const changeModularFocusSoftSpacing = useCallback(
+    (spacing: number) => {
+      updateGraphPreferences({
+        modularFocusSoftSpacing: normalizeModularFocusSoftSpacing(spacing),
+      });
+    },
+    [updateGraphPreferences],
+  );
   const changeModularFolderStripsVisible = useCallback(
     (visible: GraphPreferences['modularFolderStripsVisible']) => {
       updateGraphPreferences({ modularFolderStripsVisible: visible });
@@ -4727,6 +4737,7 @@ export function GraphExplorer({
             modularFocusInternalLayout={modularFocusInternalLayout}
             modularFocusMacroLayout={modularFocusMacroLayout}
             modularFocusSoftFolderStrength={modularFocusSoftFolderStrength}
+            modularFocusSoftSpacing={modularFocusSoftSpacing}
             modularFolderStripsVisible={modularFolderStripsVisible}
             modularConnectionStyle={modularConnectionStyle}
             showExperimentalAllHierarchy={showExperimentalAllHierarchy}
@@ -4753,6 +4764,7 @@ export function GraphExplorer({
             onModularFocusSoftFolderStrengthChange={
               changeModularFocusSoftFolderStrength
             }
+            onModularFocusSoftSpacingChange={changeModularFocusSoftSpacing}
             onModularFolderStripsVisibleChange={
               changeModularFolderStripsVisible
             }
@@ -5027,6 +5039,7 @@ export function GraphExplorer({
                   modularFocusSoftFolderStrength={
                     modularFocusSoftFolderStrength
                   }
+                  modularFocusSoftSpacing={modularFocusSoftSpacing}
                   modularFolderStripsVisible={modularFolderStripsVisible}
                   modularConnectionStyle={modularConnectionStyle}
                   showExperimentalAllHierarchy={showExperimentalAllHierarchy}
@@ -5056,6 +5069,9 @@ export function GraphExplorer({
                   }
                   onModularFocusSoftFolderStrengthChange={
                     changeModularFocusSoftFolderStrength
+                  }
+                  onModularFocusSoftSpacingChange={
+                    changeModularFocusSoftSpacing
                   }
                   onModularFolderStripsVisibleChange={
                     changeModularFolderStripsVisible
@@ -5389,6 +5405,7 @@ export function GraphExplorer({
                 internalLayoutVariant={modularFocusInternalLayout}
                 macroLayout={modularFocusMacroLayout}
                 softFolderStrength={modularFocusSoftFolderStrength}
+                softSpacing={modularFocusSoftSpacing}
                 softFolderDisplayIntent={softFolderDisplay.displayIntent}
                 softFolderDisplayPersistenceError={
                   softFolderDisplay.session.error

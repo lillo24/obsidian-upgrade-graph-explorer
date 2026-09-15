@@ -99,6 +99,18 @@ sibling-branch pass; module X, dimensions, ownership, lanes, and exact endpoint
 identity stay fixed. The default remains Off until graphical approval selects
 the HIER4A candidate and visual Heading-order policy.
 
+HIER4B-SPACING keeps macro and internal Soft breathing room behind one typed
+policy. A 0–100 value resolves through Compact, Selected, and Spacious anchors
+at 0, 50, and 100 with deterministic piecewise integer interpolation. The
+selected 50 policy uses 600 hop spacing, 88 module clearance, 180 topology
+extra distance, 72 packing steps, and 104 radial jitter, plus 30/60 internal
+node/rank separation and 34/30 module padding. The 0 anchor preserves the old
+520/72/155/64/90 and 24/48/28/24 policy; the 100 anchor is the validated
+680/104/210/84/120 and 36/72/42/36 upper bound. The derived internal settings
+exist only during Soft computation; shared HIER settings and Adaptive Compass
+assignment/search/scoring remain unchanged. Hop-error evidence uses the
+resolved hop spacing.
+
 Directional physical sides retain HIER4A's signed-rank policy: a counterpart at
 a smaller rank attaches left, a counterpart at a larger rank attaches right,
 and same-rank secondary display uses `auto`. Soft Folder Clusters instead chooses
@@ -160,6 +172,8 @@ the bakeoff evidence if changed.
   packing, and bounded two-round internal-layout evidence. The Modular worker
   calls it only when the persisted Sandbox macro policy selects Soft Folder
   Clusters; Directional Bands remains the default.
+- `src/soft-cluster-spacing.ts` owns the three validated spacing anchors,
+  bounded 0–100 normalization, and deterministic piecewise interpolation.
 - `src/soft-folder-display.ts` owns strict sparse File-parent and flattened-layer
   intent, conservative reconciliation, the pure nested displayed tree,
   one-child-unit compression/provenance, action mutations, and bounded H0/H1/H2
@@ -171,9 +185,11 @@ the bakeoff evidence if changed.
   placeholder policy.
 - `src/selected.ts` maps the accepted A1 computed result to the compatible
   selected candidate/attempt API.
-- `src/worker-protocol.ts` owns the version-8 exact-shape production messages,
-  macro/strength/display-intent policy normalization, cardinal attachment evidence,
-  and originating-input result validation.
+- `src/worker-protocol.ts` owns the version-9 exact-shape production messages,
+  macro/strength/spacing/display-intent policy normalization, cardinal and Soft
+  Compass evidence, and originating-input result validation. Version 9 is
+  required because the exact serialized policy and evidence schemas now carry
+  Soft spacing alongside the merged Compass evidence.
 - `src/worker-runtime.ts` validates requests, computes A1, records phase
   timings, and returns either a complete validated result or an explicit
   failure.

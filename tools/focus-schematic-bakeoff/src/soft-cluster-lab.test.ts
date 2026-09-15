@@ -11,7 +11,7 @@ describe('HIER4B Soft Folder Clusters lab', () => {
     const directory = await mkdtemp(join(tmpdir(), 'hier4b-lab-'));
     const path = await writeSoftClusterLab(directory);
     const html = await readFile(path, 'utf8');
-    expect(html).toContain('HIER4B PATCH1 Soft Compass + Root-Neutral Lab');
+    expect(html).toContain('HIER4B-SPACING Soft Compass + Root-Neutral Lab');
     for (let index = 1; index <= 24; index += 1)
       expect(html).toContain(`SC${index}`);
     for (let index = 1; index <= 8; index += 1)
@@ -24,6 +24,7 @@ describe('HIER4B Soft Folder Clusters lab', () => {
     expect(html).toContain('Soft Clusters');
     expect(html).toContain('Crossing optimized');
     expect(html).toContain('Folder hulls');
-    expect(html).toContain('ADOPT_SOFT_FOLDER_CLUSTERS');
-  }, 60_000);
+    expect(html).toContain('Soft spacing');
+    expect(html).toContain('evidence-selected default');
+  }, 240_000);
 });

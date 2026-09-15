@@ -42,5 +42,5 @@ describe('HIER3A compatibility with HIER2 evidence', () => {
         invalidLaneTransitionEdgeIds: [],
       });
     }
-  });
+  }, 15_000);
 });

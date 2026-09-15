@@ -1,5 +1,6 @@
 export * from './types';
 export * from './policies';
+export * from './soft-cluster-spacing';
 export * from './soft-folder-display';
 export {
   FILTERED_MODULE_DIMENSIONS,

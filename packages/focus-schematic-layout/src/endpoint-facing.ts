@@ -61,6 +61,7 @@ import type {
   FocusSchematicNativeRoute,
 } from './types';
 import { validateFocusSchematicSoftFolderDisplayIntent } from './soft-folder-display';
+import { normalizeFocusSchematicSoftSpacing } from './soft-cluster-spacing';
 
 export { createFocusSchematicEndpointAttachments } from './attachments';
 
@@ -977,12 +978,36 @@ function validSoftClusterPolicyEvidence(
   const intentValidation = validateFocusSchematicSoftFolderDisplayIntent(
     evidence.displayIntent,
   );
+  const resolvedSpacing = evidence.resolvedSpacing as unknown;
+  const resolvedSpacingKeys = [
+    'hopSpacing',
+    'moduleGap',
+    'topologyExtraDistance',
+    'packingStep',
+    'radialJitter',
+    'internalNodeSeparation',
+    'internalRankSeparation',
+    'modulePaddingX',
+    'modulePaddingY',
+  ];
+  const validResolvedSpacing =
+    resolvedSpacing !== null &&
+    typeof resolvedSpacing === 'object' &&
+    !Array.isArray(resolvedSpacing) &&
+    Object.keys(resolvedSpacing).length === resolvedSpacingKeys.length &&
+    resolvedSpacingKeys.every((key) => key in resolvedSpacing) &&
+    Object.values(resolvedSpacing).every(
+      (value) => Number.isSafeInteger(value) && Number(value) > 0,
+    );
   return (
-    evidence.schemaVersion === 3 &&
+    evidence.schemaVersion === 4 &&
     evidence.layoutFamily === 'soft-folder-clusters' &&
     Number.isFinite(evidence.strength) &&
     evidence.strength >= 0 &&
     evidence.strength <= 100 &&
+    evidence.softSpacing ===
+      normalizeFocusSchematicSoftSpacing(evidence.softSpacing) &&
+    validResolvedSpacing &&
     (evidence.endpointOrderPolicy === 'crossing-optimized' ||
       evidence.endpointOrderPolicy === 'document-order') &&
     intentValidation.valid &&

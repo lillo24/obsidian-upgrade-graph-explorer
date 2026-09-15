@@ -13,6 +13,7 @@ import type {
   ProjectionNodeId,
   ViewProjection,
 } from '@icarus-graph-explorer/view-projection';
+import type { FocusSchematicSoftClusterSpacingPolicy } from './soft-cluster-spacing';
 
 export const FOCUS_SCHEMATIC_LAYOUT_PLAN_SCHEMA_VERSION = 1 as const;
 export const FOCUS_SCHEMATIC_ENDPOINT_PLAN_SCHEMA_VERSION = 1 as const;
@@ -413,9 +414,11 @@ export type FocusSchematicSoftHierarchyForcePolicy =
   'nearest-only' | 'normalized-decay' | 'normalized-equal';
 
 export interface FocusSchematicSoftClusterPolicyEvidence {
-  readonly schemaVersion: 3;
+  readonly schemaVersion: 4;
   readonly layoutFamily: 'soft-folder-clusters';
   readonly strength: FocusSchematicSoftClusterStrength;
+  readonly softSpacing: number;
+  readonly resolvedSpacing: FocusSchematicSoftClusterSpacingPolicy;
   readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
   readonly displayIntent: FocusSchematicSoftFolderDisplayIntent;
   readonly hierarchyForcePolicy: FocusSchematicSoftHierarchyForcePolicy;
@@ -426,6 +429,9 @@ export interface FocusSchematicSoftClusterPolicyEvidence {
 
 export interface FocusSchematicSoftClusterOptions {
   readonly strength?: FocusSchematicSoftClusterStrength;
+  readonly spacing?: number;
+  /** Development-benchmark comparator; production resolves the Sandbox value. */
+  readonly spacingPolicy?: FocusSchematicSoftClusterSpacingPolicy;
   readonly endpointOrderPolicy?: FocusSchematicEndpointOrderPolicy;
   readonly displayIntent?: FocusSchematicSoftFolderDisplayIntent;
   /** Development-benchmark comparator; production uses normalized-decay. */
@@ -499,10 +505,12 @@ export interface FocusSchematicSoftClusterRuntimeEvidence {
 }
 
 export interface FocusSchematicSoftClusterEvidence {
-  readonly schemaVersion: 3;
+  readonly schemaVersion: 4;
   readonly developmentOnly: true;
   readonly layoutFamily: 'soft-folder-clusters';
   readonly strength: FocusSchematicSoftClusterStrength;
+  readonly softSpacing: number;
+  readonly resolvedSpacing: FocusSchematicSoftClusterSpacingPolicy;
   readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
   readonly fileParentOverrideCount: number;
   readonly flattenedFolderCount: number;
