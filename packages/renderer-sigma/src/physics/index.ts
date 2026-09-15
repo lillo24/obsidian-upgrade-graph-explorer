@@ -37,11 +37,15 @@ export {
 } from './pull';
 export {
   ContinuousNetworkSimulation,
+  NETWORK_PHYSICS_ALL_SUPPORTED_NODE_LIMIT,
+  NETWORK_PHYSICS_COMPONENT_STABILIZATION_CAP_RATIO,
+  NETWORK_PHYSICS_COMPONENT_STABILIZATION_GAIN,
   NETWORK_PHYSICS_FOCUS_ROOT_DRIFT_THRESHOLD,
-  NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT,
+  NETWORK_PHYSICS_FOCUS_SUPPORTED_NODE_LIMIT,
   networkPhysicsFocusBatchIsStable,
   networkPhysicsCoolingMaxIterations,
   networkPhysicsNodeCountIsSupported,
+  networkPhysicsSupportedNodeLimit,
   nextNetworkPhysicsStableBatchCount,
   type NetworkPhysicsAdvanceResult,
 } from './simulation';

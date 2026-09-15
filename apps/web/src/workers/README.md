@@ -26,7 +26,8 @@ focus-schematic-layout.worker.ts  Stateless HIER3B A1 production entry.
 focus-schematic-layout-worker-client.ts  Strict latest-result-wins Modular Preview client.
 focus-schematic-layout-worker-client.test.ts  Supersession, stale, failure, responsiveness, and disposal tests.
 network-physics.worker.ts    Retained public-ForceAtlas2 sleeping/hot/cooling lifecycle.
-network-physics-worker-client.ts  Lazy constraint adapter with raw-state retention and bounded rAF presentation catch-up.
+network-physics-worker-client.ts  Lazy constraint adapter with raw-state retention and rAF presentation ownership.
+network-physics-presentation-follower.ts  Velocity-preserving critically damped release follower.
 network-physics-worker-client.test.ts  Laziness, ordering, continuity, refresh-rate, re-grab, reduced-motion, and disposal tests.
 ```
 
@@ -97,14 +98,19 @@ continues bounded convergence cooling after release, and schedules nothing
 once sleeping. Hot turns are paced to a 16 ms scheduling interval. The client
 bounds target transport, accepts lagging same-gesture neighbor progress,
 overlays the newest File target, and validates gesture identity both before and
-at adoption. Raw cooling may finish faster than display. A bounded,
-scale-relative catch-up starts from the last displayed coordinates, carries
-forward when newer raw targets arrive, and reaches the exact accepted result in
-at most 120 ms without a frame queue. Re-grab gives the active File immediate
-authority and bridges other nodes for at most 80 ms; reduced-motion adopts the
-raw result directly. Exact raw coordinates remain distinct for future seeds
-and never enter layout or spatial caches through the presentation path.
+at adoption. Raw cooling may finish faster than display. MOVE300C replaces the
+repeatedly restarted 120 ms cubic catch-up with one velocity-preserving
+critically damped follower. New raw frames retarget its position without
+resetting velocity, irregular and dropped display frames integrate elapsed time
+with a stable 100 ms maximum step, and only the newest raw target is retained.
+Raw sleep does not terminate display work: the follower reaches a
+scale-relative negligible position-and-velocity threshold, adopts the exact
+accepted coordinates, and then stops scheduling. Re-grab still gives the active
+File immediate authority; reduced-motion still adopts raw coordinates directly.
+Exact raw coordinates remain distinct for future seeds and never enter layout
+or spatial caches through the presentation path.
 
-Production canvases gate worker initialization at the shared 100-visible-node
-support limit. Larger views surface `graph-too-large` instead of starting work
-known to exceed Focus caps or All-with-Pull wall limits in the release probes.
+Production canvases gate worker initialization at mode-specific limits: 100
+visible simulation nodes for Focus and 300 for All. Views above the active limit
+surface `graph-too-large` instead of starting work. The 300-node All value is a
+conservative release/QA boundary, not a universal solver guarantee.

@@ -17,7 +17,9 @@ PHYSICS1 therefore retains one Graphology graph in a dedicated browser Worker
 and calls only public `forceAtlas2.assign`. While a constraint is hot it runs
 four one-iteration calls per worker turn. Before and after every physical
 iteration it reasserts the constrained target; one whole-graph frame is then
-published. Candidate public call quanta 1, 2, 4, and 8 were compared. A single
+published. In All, unrelated reference components are also reasserted at their
+gesture-start transient coordinates around each hot iteration. Candidate public
+call quanta 1, 2, 4, and 8 were compared. A single
 iteration is the only boundary that permits target reassertion between every
 physical step. Published target error was exactly zero on chain, star, weak,
 isolate, multiple-isolate, and medium fixtures, while adjacent nodes moved.
@@ -48,7 +50,9 @@ any nonterminal state → disposed
 - `update` requires the same gesture/node/generations and a strictly increasing
   sequence. The new target replaces the prior target.
 - `end` clears the target and starts cooling from current physical coordinates;
-  it never rolls back. Exact repeated cleanup is idempotent.
+  it never rolls back. A degree-zero one-node All region with no effective Pull
+  has no active relationship to cool and sleeps at its exact released coordinate.
+  Exact repeated cleanup is idempotent.
 - semantic input changes call `invalidate`, terminate stale work, and seed a
   new generation only when the capability is active again.
 - a malformed or execution failure is explicit. Failed work cannot look settled.
@@ -97,6 +101,15 @@ the change is session-only and the normal finite All layout restores the M2
 field after invalidation/remount. This is an explicit compatibility limit, not
 a claim that live physics retains the automatic field.
 
+All reference edges are indexed as undirected components inside the Worker. A
+gesture makes the constrained File's component dynamic. Positive-strength
+resolved Pull memberships extend that set transitively to every referenced
+component represented by the Pull group. Folder membership alone does not
+couple components. Nodes outside that closure remain in the retained graph so
+their repulsion still affects the active region, but their coordinates are
+reasserted around hot work and at every published cooling endpoint. A later
+gesture captures a fresh closure and fresh transient stabilization positions.
+
 The canvas integration is present behind `temporaryConstraintActive`, whose
 default is `false`. In production that compatibility prop means direct dragging
 is available: Web views enable it in supported Network layouts and suspend it
@@ -142,7 +155,9 @@ canonical 32-iteration endpoints and three consecutive full stable checks:
   guard prevents rigid visible translation from looking settled without
   forcing the root back to zero.
 - All uses centroid alignment, previous-centroid RMS normalization, the same
-  p90/low-degree guards, and normalized centroid drift `0.00512`.
+  p90/low-degree guards, and normalized centroid drift `0.00512`, evaluated on
+  the gesture's dynamic component closure. Unrelated stabilized components do
+  not make an unsettled active region appear converged.
 
 Focus retains its 1,000 / 600 / 240 deterministic iteration classes and
 two-second wall limit. Interactive All needs a distinct tail from the finite
@@ -195,10 +210,12 @@ gesture, leaves the last valid graph visible, and exposes an explicit retry that
 reinitializes the retained service. Exit and invalidation do not restore, freeze,
 or persist coordinates.
 
-Production Move is enabled only when the current simulation has at most 100
-visible nodes. Larger views report `graph-too-large`, construct no continuous
-Worker, and show the supported limit. The development lab and analyzer can
-still exercise larger retained simulations as explicit evidence.
+Production Move is enabled when the current simulation has at most 100 visible
+nodes in Focus or at most 300 in All. Views above the active mode's limit report
+`graph-too-large`, construct no continuous Worker, and show the mode-specific
+supported limit. The All 300-node boundary is a conservative real-vault QA
+boundary rather than a solver cliff. The development lab and analyzer can still
+exercise larger retained simulations as explicit evidence.
 
 The MOVE1B native-QA correction reproduced release independently of UI state.
 `handle(end)` was coordinate-identical to the last hot worker state on every
@@ -240,8 +257,9 @@ frame-rate evidence.
 The direct release probe slept for 100-node Focus, All, and All-with-Pull. Its
 500-node Focus and All-with-Pull cases failed at the iteration/wall guard, as did
 the 1,000-node Focus and 1,000/5,000-node All cases. Repeated 500-node All
-without Pull runs straddled the five-second wall boundary. This evidence selects
-the conservative 100-node product boundary.
+without Pull runs straddled the five-second wall boundary. MOVE300A therefore
+keeps Focus at 100 while adding fail-loud 300-node All and All-with-Pull
+begin/update/end probes for a conservative All-only QA boundary.
 No larger graph silently switches to neighborhood-only physics. End-to-end
 command latency, neighbor-frame age, dropped frames, structured cloning,
 validation/adoption, Sigma rendering, and release-to-sleep p50/p95 at supported
@@ -249,3 +267,12 @@ boundaries remain a release-evidence requirement. Until that browser/native
 measurement exists, the project does not claim continuous-drag scale readiness
 from the Node microbenchmark. Native pointer/touchpad acceptance remains the
 merge gate for MOVE1B.
+
+`pnpm analyze:network-physics-drift` adds MOVE300B's pre-settled 300-node
+fixture: an 80-node core, 190 isolates, and ten disconnected three-node
+components, with M2 off/on and Pull off/on. Its retained raw baseline reproduces
+monotonic isolate-ring expansion during a 1,024-iteration stationary hold; the
+production candidate must keep unrelated isolate displacement exactly zero,
+preserve connected/Pull-coupled response and exact targeting, and release every
+scenario to sleeping. The command writes ignored aggregate evidence only and
+sets no CI wall-clock threshold.

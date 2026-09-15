@@ -17,6 +17,7 @@ import {
   type TemporaryNodeConstraintCommandBase,
   type UpdateTemporaryNodeConstraintCommand,
 } from '@icarus-graph-explorer/renderer-sigma/core';
+import { NetworkPhysicsPresentationFollower } from './network-physics-presentation-follower';
 
 export interface NetworkPhysicsWorkerTransport {
   onmessage: ((event: MessageEvent<unknown>) => void) | null;
@@ -31,15 +32,11 @@ interface FrameScheduler {
   readonly cancel: (handle: number) => void;
 }
 
-const RELEASE_PRESENTATION_MAX_DURATION_MS = 120;
-const RELEASE_PRESENTATION_FULL_DURATION_DISTANCE = 0.5;
 const REGRAB_HANDOFF_DURATION_MS = 80;
 
 interface CoolingPresentation {
   readonly frame: NetworkPhysicsFrameResponse;
-  readonly start: readonly NetworkPhysicsPosition[];
-  readonly startedAt: number;
-  readonly durationMs: number;
+  readonly follower: NetworkPhysicsPresentationFollower;
 }
 
 interface HotHandoff {
@@ -66,23 +63,6 @@ function positionScale(positions: readonly NetworkPhysicsPosition[]): number {
       (position.x - centerX) ** 2 + (position.y - centerY) ** 2;
   }
   return Math.max(1e-6, Math.sqrt(squaredDistance / positions.length));
-}
-
-function maximumDisplacement(
-  start: readonly NetworkPhysicsPosition[],
-  target: readonly NetworkPhysicsPosition[],
-): number {
-  const startByKey = new Map(start.map((position) => [position.key, position]));
-  let maximum = 0;
-  for (const position of target) {
-    const prior = startByKey.get(position.key);
-    if (prior === undefined) continue;
-    maximum = Math.max(
-      maximum,
-      Math.hypot(position.x - prior.x, position.y - prior.y),
-    );
-  }
-  return maximum;
 }
 
 function interpolatePositions(
@@ -306,39 +286,6 @@ export function createNetworkPhysicsWorkerService(
     emitState(frame.state);
   }
 
-  function coolingDuration(
-    start: readonly NetworkPhysicsPosition[],
-    target: readonly NetworkPhysicsPosition[],
-  ): number {
-    if (reducedMotion) return 0;
-    const normalized =
-      maximumDisplacement(start, target) / simulationPositionScale;
-    return Math.min(
-      RELEASE_PRESENTATION_MAX_DURATION_MS,
-      (normalized / RELEASE_PRESENTATION_FULL_DURATION_DISTANCE) *
-        RELEASE_PRESENTATION_MAX_DURATION_MS,
-    );
-  }
-
-  function presentedCoolingPositions(
-    presentation: CoolingPresentation,
-    timestamp: number,
-  ): readonly NetworkPhysicsPosition[] {
-    const progress =
-      presentation.durationMs === 0
-        ? 1
-        : Math.min(
-            1,
-            Math.max(0, timestamp - presentation.startedAt) /
-              presentation.durationMs,
-          );
-    return interpolatePositions(
-      presentation.start,
-      presentation.frame.positions,
-      easedProgress(progress),
-    );
-  }
-
   function adoptLatestFrame(timestamp: number): void {
     scheduledFrame = undefined;
     const frame = latestFrame;
@@ -383,22 +330,34 @@ export function createNetworkPhysicsWorkerService(
         present({ ...adopted, positions });
         return;
       }
-      const start = coolingPresentation
-        ? presentedCoolingPositions(coolingPresentation, timestamp)
-        : (lastPresentedPositions ??
-          seed.nodes.map(({ key, x, y }) => ({ key, x, y })));
-      coolingPresentation = {
-        frame: adopted,
-        start: copyPositions(start),
-        startedAt: timestamp,
-        durationMs: coolingDuration(start, adopted.positions),
-      };
-      if (coolingPresentation.durationMs > 0) {
-        emitPresentationState('settling');
-        present({ ...adopted, positions: start });
-        scheduleFrame();
+      if (reducedMotion) {
+        coolingPresentation = undefined;
+        emitPresentationState('idle');
+        present(adopted);
         return;
       }
+      const previous = coolingPresentation;
+      const follower =
+        previous?.follower ??
+        new NetworkPhysicsPresentationFollower(
+          lastPresentedPositions ??
+            seed.nodes.map(({ key, x, y }) => ({ key, x, y })),
+          simulationPositionScale,
+          timestamp,
+        );
+      if (previous !== undefined) follower.sample(timestamp);
+      follower.retarget(adopted.positions);
+      const sample = follower.sample(timestamp);
+      coolingPresentation = { frame: adopted, follower };
+      present({ ...adopted, positions: sample.positions });
+      if (sample.atRest) {
+        coolingPresentation = undefined;
+        emitPresentationState('idle');
+      } else {
+        emitPresentationState('settling');
+        scheduleFrame();
+      }
+      return;
     }
     const presentation = coolingPresentation;
     if (presentation === undefined) return;
@@ -407,19 +366,12 @@ export function createNetworkPhysicsWorkerService(
       emitPresentationState('idle');
       return;
     }
-    const progress =
-      presentation.durationMs === 0
-        ? 1
-        : Math.min(
-            1,
-            Math.max(0, timestamp - presentation.startedAt) /
-              presentation.durationMs,
-          );
+    const sample = presentation.follower.sample(timestamp);
     present({
       ...presentation.frame,
-      positions: presentedCoolingPositions(presentation, timestamp),
+      positions: sample.positions,
     });
-    if (progress >= 1) {
+    if (sample.atRest) {
       coolingPresentation = undefined;
       emitPresentationState('idle');
     } else scheduleFrame();

@@ -1621,8 +1621,50 @@ frame gains cache, camera, history, spatial, source, or persistence ownership.
 An All seed begins from the current output-only M2 snapshot without reapplying
 the field, so activation is jump-free and feedback cannot accumulate. Automatic
 folder shaping may temporarily relax during Move and returns with the normal
-finite layout after invalidation/remount. Production canvases expose Move only
-at 100 or fewer visible nodes; larger graphs return `graph-too-large` before
-Worker construction. This boundary follows direct release probes where
-500-node Focus/All-with-Pull and the 1,000/5,000-node cases reached explicit
-caps or wall limits.
+finite layout after invalidation/remount. Production canvases expose Move for
+one to 100 visible simulation nodes in Focus and one to 300 in All; views above
+the active mode's boundary return `graph-too-large` before Worker construction.
+The 300-node All boundary is a conservative real-vault QA boundary backed by
+targeted retained-simulation All and All-with-Pull probes, not a claim of a
+physical solver cliff. Focus remains at 100 because the existing larger Focus
+release probes reached explicit caps.
+
+MOVE300B bounds All's live dynamic region by undirected reference components.
+The constrained File's component is active, and positive-strength resolved Pull
+memberships transitively activate every represented component; M2 folder
+membership does not. Other nodes stay in the retained graph for repulsion but
+are held at gesture-start transient coordinates through hot work and cooling.
+Convergence evaluates the active closure, and a degree-zero singleton without
+effective Pull sleeps directly on release. No new worker schema or lifecycle
+state is introduced.
+
+MOVE300C supersedes those MOVE300B product choices while retaining its
+component index and analyzer evidence. All nodes remain physically active;
+after each All ForceAtlas2/Pull step, a finite component-centroid correction
+uses seed-generation centroids as the stable reference frame. The 1.5% gain is
+capped at 1.5% of the seed RMS radius per physical iteration, with compounded
+gain for no-Pull cooling batches. This permits visible isolate/component
+response without an indefinitely expanding ring and avoids gesture-to-gesture
+anchor ratcheting. Convergence again observes the complete moving graph, and a
+released isolated File enters bounded cooling. Focus physics, Pull ownership,
+M2's output-only handoff, Place composition, limits, schemas, and safety caps
+remain unchanged.
+
+MOVE300C also moves File-drag pointer lifetime out of Sigma's stage-hover
+boundary. Both imperative sessions share a native pointer-ID owner that prefers
+capture on the stable graph container and keeps document-capture move/up/cancel
+listeners as the stop-propagation fallback. `leaveStage` now performs hover
+cleanup only. Matching release is single-delivery, uses container-relative
+client coordinates without overlay clamping, suppresses only the immediate
+release click, and all existing cancellation/invalidation paths clear native
+ownership. Keyboard Move behavior is unchanged.
+
+Finally, MOVE300C replaces release presentation's per-target cubic smoothstep
+restart and 120 ms deadline with a single critically damped follower on the web
+client. Cooling retargets preserve visible position and velocity, elapsed-time
+integration is refresh-rate independent and bounds suspended-frame work, and
+only the newest target is retained. A sleeping raw frame remains authoritative
+while presentation continues until both scale-relative position error and
+velocity are negligible; only then does the client adopt exact raw coordinates
+and stop rAF work. The held File remains exact on re-grab and reduced-motion
+continues to bypass decorative catch-up.

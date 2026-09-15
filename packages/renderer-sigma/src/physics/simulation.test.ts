@@ -6,10 +6,12 @@ import {
 } from './protocol';
 import {
   ContinuousNetworkSimulation,
-  NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT,
+  NETWORK_PHYSICS_ALL_SUPPORTED_NODE_LIMIT,
+  NETWORK_PHYSICS_FOCUS_SUPPORTED_NODE_LIMIT,
   networkPhysicsCoolingMaxIterations,
   networkPhysicsFocusBatchIsStable,
   networkPhysicsNodeCountIsSupported,
+  networkPhysicsSupportedNodeLimit,
   nextNetworkPhysicsStableBatchCount,
 } from './simulation';
 
@@ -42,6 +44,41 @@ function focusSeed(): NetworkPhysicsSeed {
   };
 }
 
+function allSeed(
+  input: {
+    readonly attractors?: NetworkPhysicsSeed['attractors'];
+    readonly automaticFolderFieldPolicy?: NetworkPhysicsSeed['automaticFolderFieldPolicy'];
+  } = {},
+): NetworkPhysicsSeed {
+  return {
+    schemaVersion: NETWORK_PHYSICS_SCHEMA_VERSION,
+    kind: 'initialize',
+    mode: 'all',
+    sessionGeneration: 'session-1',
+    simulationGeneration: 'simulation-1',
+    nodes: [
+      { key: 'a', x: 0, y: 0, size: 1, constraintEligible: true },
+      { key: 'b', x: 8, y: 0, size: 1, constraintEligible: true },
+      { key: 'c', x: -12, y: -4, size: 1, constraintEligible: true },
+      { key: 'd', x: -16, y: -4, size: 1, constraintEligible: true },
+      { key: 'e', x: 0, y: 15, size: 1, constraintEligible: true },
+    ],
+    edges: [
+      { key: 'ab', source: 'a', target: 'b', weight: 1 },
+      { key: 'cd', source: 'c', target: 'd', weight: 1 },
+    ],
+    settings: {
+      edgeWeightInfluence: 1,
+      scalingRatio: 1.15,
+      strongGravityMode: false,
+      gravity: 1,
+      barnesHutThreshold: 1_000,
+    },
+    attractors: input.attractors ?? [],
+    automaticFolderFieldPolicy: input.automaticFolderFieldPolicy ?? 'none',
+  };
+}
+
 function begin(sequence = 0) {
   return {
     schemaVersion: 1 as const,
@@ -69,13 +106,39 @@ function end(sequence = 2) {
 }
 
 describe('ContinuousNetworkSimulation', () => {
-  it('exposes the evidence-backed supported Move boundary', () => {
-    expect(NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT).toBe(100);
-    expect(networkPhysicsNodeCountIsSupported(0)).toBe(false);
-    expect(networkPhysicsNodeCountIsSupported(1)).toBe(true);
-    expect(networkPhysicsNodeCountIsSupported(100)).toBe(true);
-    expect(networkPhysicsNodeCountIsSupported(101)).toBe(false);
-    expect(() => networkPhysicsNodeCountIsSupported(-1)).toThrow(
+  it('exposes the mode-specific supported Move boundaries', () => {
+    expect(NETWORK_PHYSICS_FOCUS_SUPPORTED_NODE_LIMIT).toBe(100);
+    expect(NETWORK_PHYSICS_ALL_SUPPORTED_NODE_LIMIT).toBe(300);
+    expect(networkPhysicsSupportedNodeLimit('focus')).toBe(100);
+    expect(networkPhysicsSupportedNodeLimit('all')).toBe(300);
+    expect(() =>
+      networkPhysicsSupportedNodeLimit('invalid' as 'focus'),
+    ).toThrow('must be Focus or All');
+  });
+
+  it.each([
+    ['all', 0, false],
+    ['all', 1, true],
+    ['all', 100, true],
+    ['all', 101, true],
+    ['all', 299, true],
+    ['all', 300, true],
+    ['all', 301, false],
+    ['focus', 0, false],
+    ['focus', 1, true],
+    ['focus', 99, true],
+    ['focus', 100, true],
+    ['focus', 101, false],
+    ['focus', 300, false],
+  ] as const)('supports %s node count %i: %s', (mode, nodeCount, supported) => {
+    expect(networkPhysicsNodeCountIsSupported(mode, nodeCount)).toBe(supported);
+  });
+
+  it('rejects invalid support-policy node counts', () => {
+    expect(() => networkPhysicsNodeCountIsSupported('all', -1)).toThrow(
+      'non-negative safe integer',
+    );
+    expect(() => networkPhysicsNodeCountIsSupported('focus', 1.5)).toThrow(
       'non-negative safe integer',
     );
   });
@@ -361,6 +424,253 @@ describe('ContinuousNetworkSimulation', () => {
     });
 
     expect(activation.positions).toEqual(before);
+  });
+
+  it('lets unrelated All components respond naturally while their long-hold drift stays bounded', () => {
+    const simulation = new ContinuousNetworkSimulation(allSeed());
+    const before = new Map(
+      simulation.positions().map((position) => [position.key, position]),
+    );
+    simulation.handle(begin());
+    for (let count = 0; count < 256; count += 1) simulation.advance();
+    const after = new Map(
+      simulation.positions().map((position) => [position.key, position]),
+    );
+
+    expect(after.get('b')).not.toEqual(before.get('b'));
+    expect(after.get('c')).not.toEqual(before.get('c'));
+    expect(after.get('d')).not.toEqual(before.get('d'));
+    expect(after.get('e')).not.toEqual(before.get('e'));
+    expect(
+      Math.hypot(
+        after.get('e')!.x - before.get('e')!.x,
+        after.get('e')!.y - before.get('e')!.y,
+      ),
+    ).toBeLessThan(8);
+    expect(after.get('a')).toMatchObject({ x: 30, y: -20 });
+  });
+
+  it('attributes an isolate response to the moved component against an equal-work control', () => {
+    const control = new ContinuousNetworkSimulation(allSeed());
+    const moved = new ContinuousNetworkSimulation(allSeed());
+    control.handle({ ...begin(), target: { x: 0, y: 0 } });
+    moved.handle(begin());
+
+    for (let count = 0; count < 32; count += 1) {
+      control.advance();
+      moved.advance();
+    }
+
+    const controlIsolate = control.positions().find(({ key }) => key === 'e')!;
+    const movedIsolate = moved.positions().find(({ key }) => key === 'e')!;
+    expect(
+      Math.hypot(
+        controlIsolate.x - movedIsolate.x,
+        controlIsolate.y - movedIsolate.y,
+      ),
+    ).toBeGreaterThan(0.001);
+  });
+
+  it('preserves Pull-coupled response while uncoupled components remain softly bounded', () => {
+    const simulation = new ContinuousNetworkSimulation(
+      allSeed({
+        attractors: [
+          {
+            ruleFolderKey: 'cross-component',
+            memberNodeKeys: ['a', 'c'],
+            targetX: 40,
+            targetY: 12,
+            strength: 70,
+          },
+        ],
+        automaticFolderFieldPolicy: 'seeded-output-relaxation',
+      }),
+    );
+    const before = new Map(
+      simulation.positions().map((position) => [position.key, position]),
+    );
+    simulation.handle(begin());
+    for (let count = 0; count < 8; count += 1) simulation.advance();
+    const after = new Map(
+      simulation.positions().map((position) => [position.key, position]),
+    );
+
+    expect(after.get('b')).not.toEqual(before.get('b'));
+    expect(after.get('c')).not.toEqual(before.get('c'));
+    expect(after.get('d')).not.toEqual(before.get('d'));
+    expect(after.get('e')).not.toEqual(before.get('e'));
+    expect(
+      Math.hypot(
+        after.get('e')!.x - before.get('e')!.x,
+        after.get('e')!.y - before.get('e')!.y,
+      ),
+    ).toBeLessThan(8);
+  });
+
+  it('keeps unrelated All node motion bounded through cooling and then sleeps', () => {
+    const simulation = new ContinuousNetworkSimulation(allSeed());
+    const before = new Map(
+      simulation.positions().map((position) => [position.key, position]),
+    );
+    simulation.handle(begin());
+    simulation.advance();
+    simulation.handle(end());
+    for (
+      let count = 0;
+      count < 300 && simulation.hasScheduledWork;
+      count += 1
+    ) {
+      expect(simulation.advance().failure).toBeUndefined();
+      const positions = new Map(
+        simulation.positions().map((position) => [position.key, position]),
+      );
+      for (const key of ['c', 'd', 'e']) {
+        expect(
+          Math.hypot(
+            positions.get(key)!.x - before.get(key)!.x,
+            positions.get(key)!.y - before.get(key)!.y,
+          ),
+        ).toBeLessThan(12);
+      }
+    }
+    expect(simulation.state).toBe('sleeping');
+    expect(simulation.advance()).toEqual({});
+  });
+
+  it('does not hard-recapture components when a second All gesture begins', () => {
+    const simulation = new ContinuousNetworkSimulation(allSeed());
+    simulation.handle(begin());
+    simulation.advance();
+    simulation.handle(end());
+    const coreBeforeSecondGesture = new Map(
+      simulation
+        .positions()
+        .filter(({ key }) => key === 'a' || key === 'b')
+        .map((position) => [position.key, position]),
+    );
+
+    simulation.handle({
+      ...begin(),
+      gestureId: 'gesture-2',
+      nodeKey: 'e',
+      target: { x: 5, y: 20 },
+    });
+    simulation.advance();
+    const after = new Map(
+      simulation.positions().map((position) => [position.key, position]),
+    );
+    expect(after.get('a')).not.toEqual(coreBeforeSecondGesture.get('a'));
+    expect(after.get('b')).not.toEqual(coreBeforeSecondGesture.get('b'));
+    for (const key of ['a', 'b']) {
+      expect(
+        Math.hypot(
+          after.get(key)!.x - coreBeforeSecondGesture.get(key)!.x,
+          after.get(key)!.y - coreBeforeSecondGesture.get(key)!.y,
+        ),
+      ).toBeLessThan(8);
+    }
+    expect(after.get('e')).toMatchObject({ x: 5, y: 20 });
+  });
+
+  it('uses seed-lifetime component references without gesture-to-gesture ratcheting', () => {
+    const simulation = new ContinuousNetworkSimulation(allSeed());
+    const initialIsolate = simulation
+      .positions()
+      .find(({ key }) => key === 'e')!;
+
+    for (let gesture = 1; gesture <= 4; gesture += 1) {
+      const gestureId = `gesture-${gesture}`;
+      simulation.handle({
+        ...begin(),
+        gestureId,
+        target: gesture % 2 === 0 ? { x: -30, y: 20 } : { x: 30, y: -20 },
+      });
+      for (let turn = 0; turn < 32; turn += 1) simulation.advance();
+      simulation.handle({ ...end(1), gestureId });
+      for (let turn = 0; turn < 300 && simulation.hasScheduledWork; turn += 1) {
+        expect(simulation.advance().failure).toBeUndefined();
+      }
+      expect(simulation.state).toBe('sleeping');
+    }
+
+    const isolate = simulation.positions().find(({ key }) => key === 'e')!;
+    const displacement = Math.hypot(
+      isolate.x - initialIsolate.x,
+      isolate.y - initialIsolate.y,
+    );
+    expect(displacement).toBeGreaterThan(0.001);
+    expect(displacement).toBeLessThan(8);
+  });
+
+  it('releases an isolated constrained File back into bounded whole-graph cooling', () => {
+    const simulation = new ContinuousNetworkSimulation(allSeed());
+    const before = new Map(
+      simulation.positions().map((position) => [position.key, position]),
+    );
+    const isolatedBegin = {
+      ...begin(),
+      nodeKey: 'e',
+      target: { x: 7, y: 19 },
+    };
+    simulation.handle(isolatedBegin);
+    for (let count = 0; count < 8; count += 1) simulation.advance();
+    simulation.handle({ ...end(1), nodeKey: 'e' });
+    expect(simulation.state).toBe('cooling');
+    const released = simulation.positions().find(({ key }) => key === 'e')!;
+    for (
+      let count = 0;
+      count < 300 && simulation.hasScheduledWork;
+      count += 1
+    ) {
+      expect(simulation.advance().failure).toBeUndefined();
+    }
+
+    const after = new Map(
+      simulation.positions().map((position) => [position.key, position]),
+    );
+    expect(simulation.state).toBe('sleeping');
+    expect(after.get('e')).not.toEqual(released);
+    expect(after.get('e')).not.toEqual(before.get('e'));
+    for (const key of ['a', 'b', 'c', 'd']) {
+      expect(
+        Math.hypot(
+          after.get(key)!.x - before.get(key)!.x,
+          after.get(key)!.y - before.get(key)!.y,
+        ),
+      ).toBeLessThan(8);
+    }
+  });
+
+  it('retains bounded cooling for a Pull-bound isolated File', () => {
+    const simulation = new ContinuousNetworkSimulation(
+      allSeed({
+        attractors: [
+          {
+            ruleFolderKey: 'isolated-pull',
+            memberNodeKeys: ['e'],
+            targetX: 0,
+            targetY: 0,
+            strength: 70,
+          },
+        ],
+      }),
+    );
+    simulation.handle({
+      ...begin(),
+      nodeKey: 'e',
+      target: { x: 7, y: 19 },
+    });
+    simulation.advance();
+    simulation.handle({ ...end(1), nodeKey: 'e' });
+    expect(simulation.state).toBe('cooling');
+    for (
+      let count = 0;
+      count < 300 && simulation.hasScheduledWork;
+      count += 1
+    ) {
+      expect(simulation.advance().failure).toBeUndefined();
+    }
+    expect(simulation.state).toBe('sleeping');
   });
 
   it('makes disposal terminal', () => {

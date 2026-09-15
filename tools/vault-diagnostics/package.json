@@ -17,6 +17,7 @@
     "analyze:forceatlas2-convergence": "tsx src/forceatlas2-convergence-analysis.ts",
     "analyze:global-convergence": "tsx src/global-convergence-analysis.ts",
     "analyze:physics1": "tsx src/physics1-candidate-analysis.ts",
+    "analyze:network-physics-drift": "tsx src/network-physics-component-drift-analysis.ts",
     "benchmark:focus-schematic": "tsx src/focus-schematic-benchmark.ts",
     "benchmark:file-move": "tsx src/file-move-benchmark.ts",
     "benchmark:spatial-pull-preview": "tsx src/spatial-pull-preview-benchmark.ts",

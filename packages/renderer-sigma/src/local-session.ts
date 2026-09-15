@@ -13,6 +13,7 @@ import {
   type TemporaryFileMoveControllerStartResult,
   type TemporaryFileMoveSessionContext,
 } from './file-move';
+import { FileMovePointerOwner } from './file-move-pointer-owner';
 import type { TemporaryNodeConstraintEndReason } from './temporary-node-constraint';
 import { atomicAnchoredGraphMutation } from './anchored-refresh';
 import { NetworkPositionCameraIntentPolicy } from './network-camera-intent';
@@ -167,16 +168,13 @@ export class LocalRendererSession {
   private suppressFileMoveDoubleClick = false;
   private fileMoveLifecycleAttached = false;
   private readonly container?: HTMLElement;
+  private readonly fileMovePointerOwner?: FileMovePointerOwner;
 
   private readonly fileMoveKeyDownHandler = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') this.cancelTemporaryFileMove('cancelled');
   };
 
   private readonly fileMoveBlurHandler = (): void => {
-    this.cancelTemporaryFileMove('pointer-lost');
-  };
-
-  private readonly fileMovePointerLossHandler = (): void => {
     this.cancelTemporaryFileMove('pointer-lost');
   };
 
@@ -309,6 +307,13 @@ export class LocalRendererSession {
       stagePadding: 24,
       nodeReducer: (key, attributes) => this.reduceNode(key, attributes),
       edgeReducer: (key, attributes) => this.reduceEdge(key, attributes),
+    });
+    this.fileMovePointerOwner = new FileMovePointerOwner(container, {
+      onMove: (point) => this.moveTemporaryFileMove(point, () => undefined),
+      onRelease: () => this.finishTemporaryFileMove(),
+      onCancel: () => {
+        this.cancelTemporaryFileMove('pointer-lost');
+      },
     });
     if (options.initialAcceptedPositions !== undefined) {
       this.establishPositionFrame(options.initialAcceptedPositions);
@@ -492,9 +497,9 @@ export class LocalRendererSession {
     coordinator.move(viewportPoint, this.viewportToGraphPoint(viewportPoint));
   }
 
-  private finishTemporaryFileMove(): void {
+  private finishTemporaryFileMove(): boolean {
     const coordinator = this.fileMoveCoordinator;
-    if (coordinator === undefined) return;
+    if (coordinator === undefined) return false;
     const dragged = coordinator.release();
     if (dragged) {
       this.nodeClicks?.cancel();
@@ -502,12 +507,14 @@ export class LocalRendererSession {
     }
     this.keyboardFileMoveViewportPoint = undefined;
     this.updateTemporaryFileMoveCursor();
+    return dragged;
   }
 
   cancelTemporaryFileMove(
     reason: Exclude<TemporaryNodeConstraintEndReason, 'released'>,
   ): boolean {
     const cancelled = this.fileMoveCoordinator?.cancel(reason) ?? false;
+    this.fileMovePointerOwner?.reset();
     this.keyboardFileMoveViewportPoint = undefined;
     this.updateTemporaryFileMoveCursor();
     return cancelled;
@@ -561,13 +568,9 @@ export class LocalRendererSession {
   private attachFileMoveLifecycle(): void {
     if (this.fileMoveLifecycleAttached) return;
     this.fileMoveLifecycleAttached = true;
+    this.fileMovePointerOwner?.attach();
     window.addEventListener('keydown', this.fileMoveKeyDownHandler);
     window.addEventListener('blur', this.fileMoveBlurHandler);
-    window.addEventListener('pointercancel', this.fileMovePointerLossHandler);
-    window.addEventListener(
-      'lostpointercapture',
-      this.fileMovePointerLossHandler,
-    );
     document.addEventListener(
       'visibilitychange',
       this.fileMoveVisibilityHandler,
@@ -577,16 +580,9 @@ export class LocalRendererSession {
   private detachFileMoveLifecycle(): void {
     if (!this.fileMoveLifecycleAttached) return;
     this.fileMoveLifecycleAttached = false;
+    this.fileMovePointerOwner?.detach();
     window.removeEventListener('keydown', this.fileMoveKeyDownHandler);
     window.removeEventListener('blur', this.fileMoveBlurHandler);
-    window.removeEventListener(
-      'pointercancel',
-      this.fileMovePointerLossHandler,
-    );
-    window.removeEventListener(
-      'lostpointercapture',
-      this.fileMovePointerLossHandler,
-    );
     document.removeEventListener(
       'visibilitychange',
       this.fileMoveVisibilityHandler,
@@ -652,6 +648,9 @@ export class LocalRendererSession {
       ) {
         preventSigmaDefault();
         this.beginTemporaryFileMove(node, { x: event.x, y: event.y });
+        if (this.fileMoveCoordinator?.ownsPointerSequence === true) {
+          this.fileMovePointerOwner?.claim();
+        }
         return;
       }
       if (this.fileMoveContext?.capability.status === 'unavailable') {
@@ -659,17 +658,26 @@ export class LocalRendererSession {
       }
     });
     this.renderer.on('moveBody', ({ event, preventSigmaDefault }) => {
-      this.moveTemporaryFileMove(
-        { x: event.x, y: event.y },
-        preventSigmaDefault,
-      );
+      if (
+        this.fileMovePointerOwner?.ownsPointerSequence === true &&
+        this.fileMoveCoordinator?.ownsPointerSequence === true
+      ) {
+        preventSigmaDefault();
+      } else {
+        this.moveTemporaryFileMove(
+          { x: event.x, y: event.y },
+          preventSigmaDefault,
+        );
+      }
     });
-    const finishFileMove = () => this.finishTemporaryFileMove();
+    const finishFileMove = () => {
+      if (this.fileMovePointerOwner?.ownsPointerSequence !== true) {
+        this.finishTemporaryFileMove();
+      }
+    };
     this.renderer.on('upNode', finishFileMove);
     this.renderer.on('upStage', finishFileMove);
-    this.renderer.on('leaveStage', () => {
-      this.cancelTemporaryFileMove('pointer-lost');
-    });
+    this.renderer.on('leaveStage', () => undefined);
   }
 
   /** Temporary File movement seam; callers suspend it for competing tools. */

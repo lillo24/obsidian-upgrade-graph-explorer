@@ -3,12 +3,32 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
+
 import { GlobalGraphCanvas } from './GlobalGraphCanvas';
 import { LocalGraphCanvas } from './LocalGraphCanvas';
-import { createGlobalLayoutRequest } from './layout';
-import { createLocalLayoutRequest } from './local-layout';
-import { localLayoutSettingsFromNetworkSettings } from './local-network-settings';
+import {
+  createGlobalLayoutRequest,
+  globalLayoutFingerprint,
+  globalLayoutPositionsFromInput,
+} from './layout';
+import { GlobalLayoutCache } from './layout-cache';
+import {
+  createLocalLayoutRequest,
+  localLayoutFingerprint,
+} from './local-layout';
+import { LocalLayoutCache } from './local-layout-cache';
+import {
+  mapProjectionToLocalTopology,
+  seedLocalRendererInput,
+} from './local-mapping';
+import {
+  DEFAULT_RESOLVED_NETWORK_SETTINGS,
+  localLayoutSettingsFromNetworkSettings,
+} from './local-network-settings';
 import { localTestProjection } from './local-test-fixture';
+import { mapProjectionToGlobalTopology } from './mapping';
+import type { NetworkPhysicsServiceFactory } from './physics';
 import { globalTestProjection } from './test-fixture';
 import type {
   GlobalLayoutResult,
@@ -31,6 +51,8 @@ vi.mock('./session', () => ({
     commitInitialPresentation = globalCommitInitialPresentation;
     createLayoutRequest = createGlobalLayoutRequest;
     destroy = vi.fn();
+    applyPartialPositions = vi.fn();
+    setTemporaryFileMoveContext = vi.fn();
     setControlledSelection = vi.fn();
     update = vi.fn();
     updateSettings = vi.fn();
@@ -54,6 +76,8 @@ vi.mock('./local-session', () => ({
         localLayoutSettingsFromNetworkSettings(networkSettings),
       );
     destroy = vi.fn();
+    applyPartialPositions = vi.fn();
+    setTemporaryFileMoveContext = vi.fn();
     setControlledSelection = vi.fn();
     update = vi.fn();
     updateDensityFramingStrength = vi.fn();
@@ -61,6 +85,58 @@ vi.mock('./local-session', () => ({
     updateTrackpadZoomMode = vi.fn();
   },
 }));
+
+const globalSettings = {
+  folderClustering: true,
+  spacingPreset: 'normal',
+} as const;
+
+function networkProjection(nodeCount: number): ViewProjection {
+  return {
+    nodes: Array.from({ length: nodeCount }, (_, index) => ({
+      id: `entity:node-${index}`,
+      kind: 'entity' as const,
+      entityId: index === 0 ? 'root' : `node-${index}`,
+      entityKind: 'document' as const,
+      sourcePath: index === 0 ? 'Root.md' : `Folder/Node-${index}.md`,
+      sourceStartLine: 1,
+      title: null,
+      revealableDescendantCount: 0,
+      internalReferenceIds: [],
+      role: 'content' as const,
+      focusDistance: index === 0 ? 0 : 1,
+    })),
+    edges: [],
+    issues: [],
+  };
+}
+
+function globalCache(projection: ViewProjection): GlobalLayoutCache {
+  const input = mapProjectionToGlobalTopology(projection);
+  const request = createGlobalLayoutRequest(input, globalSettings);
+  const cache = new GlobalLayoutCache();
+  cache.set(
+    globalLayoutFingerprint(request),
+    globalLayoutPositionsFromInput(input),
+  );
+  return cache;
+}
+
+function localCache(projection: ViewProjection): LocalLayoutCache {
+  const input = seedLocalRendererInput(
+    mapProjectionToLocalTopology(projection, 'root'),
+  );
+  const request = createLocalLayoutRequest(
+    input,
+    localLayoutSettingsFromNetworkSettings(DEFAULT_RESOLVED_NETWORK_SETTINGS),
+  );
+  const cache = new LocalLayoutCache();
+  cache.set(
+    localLayoutFingerprint(request),
+    request.nodes.map(({ key, x, y }) => ({ key, x, y })),
+  );
+  return cache;
+}
 
 describe.each(['global', 'local'] as const)(
   'visible %s layout status lifecycle',
@@ -201,6 +277,96 @@ describe.each(['global', 'local'] as const)(
       expect(container.textContent).toContain(
         `The last valid ${mode === 'global' ? 'All' : 'Focus'} Network positions remain visible.`,
       );
+    });
+  },
+);
+
+describe.each([
+  ['global', 300, 'available'],
+  ['global', 301, 'graph-too-large'],
+  ['local', 100, 'available'],
+  ['local', 101, 'graph-too-large'],
+] as const)(
+  '%s Move capability at %i visible nodes',
+  (mode, nodeCount, result) => {
+    let container: HTMLDivElement;
+    let root: Root;
+
+    beforeEach(() => {
+      vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+      container = document.createElement('div');
+      document.body.append(container);
+      root = createRoot(container);
+    });
+
+    afterEach(async () => {
+      await act(() => root.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
+    });
+
+    it('uses the mode-specific boundary before initializing dormant physics', async () => {
+      const projection = networkProjection(nodeCount);
+      const initialize = vi.fn();
+      const begin = vi.fn();
+      const physicsServiceFactory: NetworkPhysicsServiceFactory = () => ({
+        begin,
+        update: vi.fn(),
+        end: vi.fn(),
+        initialize,
+        invalidate: vi.fn(),
+        dispose: vi.fn(),
+      });
+      const onCapability = vi.fn();
+
+      await act(async () => {
+        root.render(
+          mode === 'global' ? (
+            <GlobalGraphCanvas
+              fitRequestKey={0}
+              layoutCache={globalCache(projection)}
+              layoutRequestKey={0}
+              layoutService={{ dispose: vi.fn(), layout: vi.fn() }}
+              onFailure={vi.fn()}
+              onNodeActivate={vi.fn()}
+              onSelectionChange={vi.fn()}
+              onTemporaryFileMoveCapabilityChange={onCapability}
+              onViewportObservation={vi.fn()}
+              physicsServiceFactory={physicsServiceFactory}
+              projection={projection}
+              selection={null}
+              settings={globalSettings}
+              temporaryConstraintActive
+              trackpadZoomMode="pinch-zoom"
+            />
+          ) : (
+            <LocalGraphCanvas
+              layoutCache={localCache(projection)}
+              layoutRequestKey={0}
+              layoutService={{ dispose: vi.fn(), layout: vi.fn() }}
+              onFailure={vi.fn()}
+              onSelectionChange={vi.fn()}
+              onTemporaryFileMoveCapabilityChange={onCapability}
+              onViewportObservation={vi.fn()}
+              physicsServiceFactory={physicsServiceFactory}
+              projection={projection}
+              rootEntityId="root"
+              selection={null}
+              temporaryConstraintActive
+              trackpadZoomMode="pinch-zoom"
+            />
+          ),
+        );
+        for (let turn = 0; turn < 6; turn += 1) await Promise.resolve();
+      });
+
+      expect(onCapability).toHaveBeenLastCalledWith(
+        result === 'available'
+          ? { status: 'available' }
+          : { status: 'unavailable', reason: 'graph-too-large' },
+      );
+      expect(initialize).toHaveBeenCalledTimes(result === 'available' ? 1 : 0);
+      expect(begin).not.toHaveBeenCalled();
     });
   },
 );
