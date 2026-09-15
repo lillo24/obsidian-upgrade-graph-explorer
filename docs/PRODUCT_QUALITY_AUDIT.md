@@ -548,6 +548,10 @@ surface differentiates or groups them.
   on read. Apply reconciles current canonical IDs and durably commits any owned
   profile keys before clearing Back/Forward and selection, synchronizing the
   query editor, and restoring the semantic viewport as one graph transaction.
+- Successful Named Saved View Apply and one exact startup match receive a short,
+  pointer-transparent visual acknowledgement. Its token and timer are session
+  only; the overlay does not persist identity, announce again, or request graph,
+  layout, spatial-worker, or camera work.
 - Graph preferences persist focus appearance, Network layout/strength/spacing,
   trackpad mode, and preferred Focus layout independently from view history.
 - Saved Filters, Visual Groups, and size overrides remain independent. Spatial

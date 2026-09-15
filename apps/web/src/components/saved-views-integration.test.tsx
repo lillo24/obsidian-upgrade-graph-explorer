@@ -283,6 +283,10 @@ describe('GraphExplorer Named Saved Views integration', () => {
     });
   }
 
+  function transitionOverlay() {
+    return container.querySelector<HTMLElement>('.saved-view-transition');
+  }
+
   function statusCheckbox(status: string) {
     const result = document.body.querySelector<HTMLInputElement>(
       `[name="graph-status-${status}"]`,
@@ -640,6 +644,83 @@ describe('GraphExplorer Named Saved Views integration', () => {
     expect(container.querySelector('.graph-workspace')).not.toBeNull();
   });
 
+  it('does not animate unrelated manual filter changes', async () => {
+    await mount();
+    await click('Filters');
+    await setReferenceStatus('unresolved', false);
+
+    expect(transitionOverlay()).toBeNull();
+  });
+
+  it('uses the same successful Apply transition for quick switch and management', async () => {
+    await mount();
+
+    await quickApply('Focus hierarchy');
+    const quickTransition = transitionOverlay();
+    const quickToken = Number(
+      quickTransition?.dataset.savedViewTransitionToken,
+    );
+    expect(quickTransition?.dataset.savedViewTransitionOrigin).toBe('apply');
+    expect(
+      quickTransition?.querySelector('.saved-view-transition__title')
+        ?.textContent,
+    ).toBe('Focus hierarchy');
+
+    await applyNamedTarget();
+    const managedTransition = transitionOverlay();
+    expect(managedTransition?.dataset.savedViewTransitionOrigin).toBe('apply');
+    expect(Number(managedTransition?.dataset.savedViewTransitionToken)).toBe(
+      quickToken + 1,
+    );
+    expect(
+      managedTransition?.querySelector('.saved-view-transition__title')
+        ?.textContent,
+    ).toBe('Focus hierarchy');
+  });
+
+  it('keeps only the latest presentation during rapid Saved View switching', async () => {
+    const rapidViews = ['View A', 'View B', 'View C'].map((name) =>
+      captureSavedView({
+        name,
+        workspace,
+        state: targetState,
+        presentationMode: 'local',
+        layout: 'hierarchy',
+        viewports: {
+          local: {
+            anchorEntityId: source.id,
+            freeRatio: 0.44,
+            structuredZoom: 0.88,
+          },
+        },
+        preferences: DEFAULT_GRAPH_PREFERENCES,
+        spatial: emptySpatial,
+      }),
+    );
+    values.set(
+      savedViewStorageKey(snapshot.workspace.id),
+      serializeSavedViewRegistry({
+        schemaVersion: 2,
+        workspaceId: snapshot.workspace.id,
+        views: rapidViews,
+      }),
+    );
+    await mount();
+
+    await quickApply('View A');
+    await quickApply('View B');
+    await quickApply('View C');
+
+    expect(
+      transitionOverlay()?.querySelector('.saved-view-transition__title')
+        ?.textContent,
+    ).toBe('View C');
+    expect(transitionOverlay()?.dataset.savedViewTransitionToken).toBe('3');
+    expect(container.querySelectorAll('.saved-view-transition')).toHaveLength(
+      1,
+    );
+  });
+
   it('does not adopt semantic, presentation, selection, history, or preferences when profile persistence fails', async () => {
     const failedSpatial = setFolderSpatialRule(emptySpatial, {
       folderKey: 'Architecture',
@@ -726,6 +807,7 @@ describe('GraphExplorer Named Saved Views integration', () => {
     );
     expect(quickSwitch().value).toBe('');
     expect(document.body.textContent).toContain('quota exceeded');
+    expect(transitionOverlay()).toBeNull();
 
     await click('Network');
     expect(captured.global?.spatialRules).toEqual([]);
@@ -876,6 +958,10 @@ describe('GraphExplorer Named Saved Views integration', () => {
     expect(after['local-projections']).toBe(before['local-projections']);
     expect(captured.global?.centerRequest).toBeUndefined();
     expect(writes).toEqual([]);
+    expect(
+      transitionOverlay()?.querySelector('.saved-view-transition__title')
+        ?.textContent,
+    ).toBe('Current exact view');
   });
 
   it('derives an exact startup label without applying or writing a Saved View', async () => {
@@ -905,6 +991,21 @@ describe('GraphExplorer Named Saved Views integration', () => {
 
     expect(mode()).toBe('global');
     expect(quickSwitch().value).toBe('Startup exact');
+    expect(writes).toEqual([]);
+    const transition = transitionOverlay();
+    const transitionToken = transition?.dataset.savedViewTransitionToken;
+    expect(transition?.dataset.savedViewTransitionOrigin).toBe('startup-match');
+    expect(
+      transition?.querySelector('.saved-view-transition__title')?.textContent,
+    ).toBe('Startup exact');
+    const operations = performance.snapshot().operations;
+
+    await mount();
+
+    expect(transitionOverlay()?.dataset.savedViewTransitionToken).toBe(
+      transitionToken,
+    );
+    expect(performance.snapshot().operations).toEqual(operations);
     expect(writes).toEqual([]);
   });
 
@@ -942,6 +1043,7 @@ describe('GraphExplorer Named Saved Views integration', () => {
       persistedCurrent,
     );
     expect(writes).toEqual([]);
+    expect(transitionOverlay()).toBeNull();
   });
 
   it('commits an All Network preference and spatial profile before adopting it and leaves independent registries unchanged', async () => {
