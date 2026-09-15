@@ -5,8 +5,8 @@
 MOVE300C corrects the three failures reported during native QA while preserving
 the existing release boundaries: All + Network remains available through 300
 visible simulation nodes, and Focus + Network remains available through 100.
-The work stays in draft PR #103 and is not approved for merge until the native
-checklist below is accepted explicitly.
+The work stayed in draft PR #103 through native handoff. On September 15, 2026,
+the user explicitly instructed Codex to merge after receiving the checklist.
 
 The implementation is split into the requested reviewable units:
 
@@ -78,7 +78,8 @@ The raw failing baseline still reproduces monotonic p90 ring expansion:
 `299.427173 → 299.654906 → 302.237808 → 309.595613 → 334.121439`, or
 11.5869%. Production growth is 0.8445%–1.1296% on the same 300-node fixture.
 The directly dragged isolate held zero target error and then slept after seven
-cooling frames / 224 iterations / 115.7039 ms. Its final target error was
+cooling frames / 224 iterations / 105.6500 ms in the latest-main integration
+run. Its final target error was
 37.924780 versus a 41.620000 initial drag offset, proving that it rejoined the
 physical system without an exact teleport back. A later `advance()` returned no
 work.
@@ -147,19 +148,19 @@ interaction timings.
 ## Runtime evidence and limits
 
 The final 300-node drift run measured four-iteration hot-turn p50/p95 values of
-4.168850/9.690375 ms (unclustered no Pull), 4.102800/8.602325 ms (clustered no
-Pull), 3.024950/5.243175 ms (one Pull), and 3.154850/6.145400 ms
+1.680500/3.368550 ms (unclustered no Pull), 2.139500/3.439450 ms (clustered no
+Pull), 2.277550/3.711225 ms (one Pull), and 2.189150/4.047725 ms
 (cross-component Pull). These local Node timings fluctuate and are not gates.
 
 `analyze:physics1` slept at the supported boundaries:
 
 | Probe | Raw release-to-sleep | Cooling iterations | Neighbor response |
 | --- | ---: | ---: | ---: |
-| Focus 100 | 65.624 ms | 832 | covered by lifecycle fixtures |
-| All 100 | 81.922 ms | 1,152 | covered by lifecycle fixtures |
-| All 100 + Pull | 136.361 ms | 1,184 | covered by lifecycle fixtures |
-| All 300 | 900.943 ms | 2,208 | 36.834241 |
-| All 300 + Pull | 1,181.390 ms | 2,432 | 55.746358 |
+| Focus 100 | 55.794 ms | 832 | covered by lifecycle fixtures |
+| All 100 | 76.477 ms | 1,152 | covered by lifecycle fixtures |
+| All 100 + Pull | 130.961 ms | 1,184 | covered by lifecycle fixtures |
+| All 300 | 1,261.092 ms | 2,208 | 36.834241 |
+| All 300 + Pull | 1,686.060 ms | 2,432 | 55.746358 |
 
 The analyzer is synchronous Node evidence only: it does not include Worker
 transport, browser scheduling, Sigma adoption, or WebGL rendering. Browser and
@@ -180,21 +181,21 @@ runs the normal finite automatic-layout reset.
 ## Automated validation
 
 - `pnpm install --frozen-lockfile` — passed; lockfile already current.
-- `pnpm exec vitest run packages/renderer-sigma` — 59 files / 449 tests passed.
-- `pnpm exec vitest run apps/web` — 95 files / 717 tests passed.
+- `pnpm exec vitest run packages/renderer-sigma` — 60 files / 460 tests passed.
+- `pnpm exec vitest run apps/web` — 95 files / 723 tests passed.
 - `pnpm analyze:network-physics-drift` — passed the baseline reproduction,
   paired control, soft-gain, fixed-reference, Pull, repeated/reference-lifetime,
   direct-isolate release, convergence, and post-sleep gates.
 - `pnpm analyze:physics1` — passed all supported lifecycle and All 300/300+Pull
   probes; larger investigative fixtures retain their existing explicit caps.
 - `pnpm benchmark:file-move` — passed; 10,000 raw pointer samples coalesced to
-  three commands. No-Place conversion was 0.1299/0.2901 ms p50/p95; Place was
-  0.2599/2.6971 ms.
+  three commands. No-Place conversion was 0.1546/0.5923 ms p50/p95; Place was
+  0.3514/2.0039 ms.
 - `pnpm benchmark:global-renderer -- --profile small` — passed.
 - `pnpm benchmark:global-renderer -- --profile medium` — passed.
 - `pnpm benchmark:local-renderer -- --profile small` — passed.
-- `pnpm check` — passed formatting, lint, 35-workspace type checking, 262 test
-  files / 2,135 tests, and the production web build.
+- `pnpm check` — passed formatting, lint, 36-workspace type checking, 267 test
+  files / 2,199 tests, and the production web build.
 - `pnpm desktop:check` — passed formatting/check plus 16 Rust tests.
 - `pnpm desktop:build` — passed with a fresh optimized executable.
 - `git diff --check` — passed.
@@ -208,11 +209,12 @@ Fresh executable:
 
 `C:\Users\leona\Documents\GitHub\icarus-graph-explorer-move300a\apps\desktop\src-tauri\target\release\icarus-graph-explorer-desktop.exe`
 
-- Size: 13,528,576 bytes
-- SHA-256: `AA4CB62C91B5C8EE4B607E95DD2D5A0D20352D7B5E821BE45A502976A94447DC`
+- Size: 13,536,768 bytes
+- SHA-256: `F48089532417CF39D4D324D8A8CA742027AB6EF556E32058250FDBFBF801125A`
 
-Native automation was unavailable, so no native pass is claimed. Supply the
-following exact six-item real-vault checklist to the user:
+Native automation was unavailable, so this report does not independently claim
+a native pass. The following exact six-item real-vault checklist was supplied
+to the user before their explicit merge instruction:
 
 1. All Network on the real vault: drag near an isolated File. It can yield; it is not hard-frozen. Connected neighbors still react.
 2. Move continuously for 10–20 seconds, then hold still for about 10 seconds. The outer ring does not keep inflating. Repeat several gestures without a cumulative outward ratchet.
@@ -223,8 +225,8 @@ following exact six-item real-vault checklist to the user:
 
 ## Merge state
 
-Draft PR #103 remains the review and native-QA artifact. MOVE300B's hard-freeze
-and unconditional isolate-sleep decisions are superseded in current docs while
-its historical prompt/report remain unchanged. Do not merge, run post-merge
-verification, or remove the task worktree until the user reports native results
-and explicitly approves the merge.
+PR #103 is the review and native-QA artifact. MOVE300B's hard-freeze and
+unconditional isolate-sleep decisions are superseded in current docs while its
+historical prompt/report remain unchanged. The user explicitly instructed
+Codex to merge on September 15, 2026; no detailed native observations were
+provided in chat, so that approval is recorded without inventing test results.
