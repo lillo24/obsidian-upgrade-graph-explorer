@@ -43,6 +43,10 @@ type PhysicsGraph = MultiDirectedGraph<
 >;
 
 const HOT_ITERATIONS_PER_TURN = 4;
+/** Fraction of component-centroid error corrected per All physical step. */
+export const NETWORK_PHYSICS_COMPONENT_STABILIZATION_GAIN = 0.015;
+/** Maximum graph-space translation per step, relative to the seed RMS radius. */
+export const NETWORK_PHYSICS_COMPONENT_STABILIZATION_CAP_RATIO = 0.015;
 export const NETWORK_PHYSICS_FOCUS_SUPPORTED_NODE_LIMIT = 100 as const;
 export const NETWORK_PHYSICS_ALL_SUPPORTED_NODE_LIMIT = 300 as const;
 
@@ -171,8 +175,14 @@ export class ContinuousNetworkSimulation {
   private readonly graph: PhysicsGraph;
   private readonly nodeKeys: readonly string[];
   private readonly degreeByKey: ReadonlyMap<string, number>;
-  private readonly dynamicCoupling:
-    NetworkPhysicsDynamicCouplingIndex | undefined;
+  private readonly componentReferences:
+    | readonly {
+        readonly nodeKeys: readonly string[];
+        readonly x: number;
+        readonly y: number;
+      }[]
+    | undefined;
+  private readonly componentStabilizationStepCap: number;
   private stateValue: NetworkPhysicsLifecycleState = 'sleeping';
   private active: TemporaryNodeConstraintCommandBase | undefined;
   private target: { x: number; y: number } | undefined;
@@ -183,10 +193,6 @@ export class ContinuousNetworkSimulation {
   private iterationsCompleted = 0;
   private stableBatches = 0;
   private coolingStartedAt = 0;
-  private dynamicNodeKeys: readonly string[] | undefined;
-  private dynamicDegreeByKey: ReadonlyMap<string, number> | undefined;
-  private stabilizedPositions:
-    ReadonlyMap<string, NetworkPhysicsPosition> | undefined;
 
   constructor(
     readonly seed: NetworkPhysicsSeed,
@@ -207,10 +213,42 @@ export class ContinuousNetworkSimulation {
             seed.nodes.map(({ key }) => key),
             seed.edges,
           );
-    this.dynamicCoupling =
-      seed.mode === 'all'
-        ? new NetworkPhysicsDynamicCouplingIndex(this.nodeKeys, seed.edges)
-        : undefined;
+    if (seed.mode === 'all') {
+      const componentIndex = new NetworkPhysicsDynamicCouplingIndex(
+        this.nodeKeys,
+        seed.edges,
+      );
+      const seedByKey = new Map(seed.nodes.map((node) => [node.key, node]));
+      this.componentReferences = componentIndex.components().map((nodeKeys) => {
+        let x = 0;
+        let y = 0;
+        for (const key of nodeKeys) {
+          const node = seedByKey.get(key)!;
+          x += node.x / nodeKeys.length;
+          y += node.y / nodeKeys.length;
+        }
+        return { nodeKeys, x, y };
+      });
+      let centerX = 0;
+      let centerY = 0;
+      for (const node of seed.nodes) {
+        centerX += node.x / seed.nodes.length;
+        centerY += node.y / seed.nodes.length;
+      }
+      let squaredRadius = 0;
+      for (const node of seed.nodes) {
+        squaredRadius += (node.x - centerX) ** 2 + (node.y - centerY) ** 2;
+      }
+      const referenceScale = Math.max(
+        1,
+        Math.sqrt(squaredRadius / seed.nodes.length),
+      );
+      this.componentStabilizationStepCap =
+        referenceScale * NETWORK_PHYSICS_COMPONENT_STABILIZATION_CAP_RATIO;
+    } else {
+      this.componentReferences = undefined;
+      this.componentStabilizationStepCap = 0;
+    }
   }
 
   get state(): NetworkPhysicsLifecycleState {
@@ -268,7 +306,6 @@ export class ContinuousNetworkSimulation {
       this.stateValue = 'hot-constrained';
       this.iterationsCompleted = 0;
       this.stableBatches = 0;
-      this.beginDynamicCoupling(command.nodeKey);
     } else if (command.kind === 'update') {
       if (this.active === undefined || !sameConstraint(this.active, command)) {
         throw new Error(
@@ -304,18 +341,16 @@ export class ContinuousNetworkSimulation {
       if (command.sequence <= this.lastCommandSequence) {
         throw new Error('Temporary constraint end sequence is stale.');
       }
-      const settlesWithoutCooling = this.settlesWithoutCooling(command.nodeKey);
       this.lastCommandSequence = command.sequence;
       this.lastEnd = { ...command };
       this.active = undefined;
       this.target = undefined;
-      this.stateValue = settlesWithoutCooling ? 'sleeping' : 'cooling';
+      this.stateValue = 'cooling';
       this.iterationsCompleted = 0;
       this.stableBatches = 0;
-      if (settlesWithoutCooling) this.clearDynamicCoupling();
-      else this.coolingStartedAt = this.now();
+      this.coolingStartedAt = this.now();
     }
-    this.reassertGestureState();
+    this.reassertTarget();
     return this.frame();
   }
 
@@ -328,14 +363,12 @@ export class ContinuousNetworkSimulation {
     this.stateValue = 'sleeping';
     this.iterationsCompleted = 0;
     this.stableBatches = 0;
-    this.clearDynamicCoupling();
   }
 
   dispose(): void {
     this.active = undefined;
     this.target = undefined;
     this.stateValue = 'disposed';
-    this.clearDynamicCoupling();
   }
 
   advance(): NetworkPhysicsAdvanceResult {
@@ -343,12 +376,7 @@ export class ContinuousNetworkSimulation {
     try {
       if (this.stateValue === 'hot-constrained') {
         for (let index = 0; index < HOT_ITERATIONS_PER_TURN; index += 1) {
-          this.reassertGestureState();
-          this.assign(1);
-          if (this.seed.mode === 'all') {
-            applyNetworkPhysicsPullIteration(this.graph, this.seed.attractors);
-          }
-          this.reassertGestureState();
+          this.runPhysicalIteration();
         }
         this.iterationsCompleted += HOT_ITERATIONS_PER_TURN;
         return { frame: this.frame() };
@@ -387,15 +415,13 @@ export class ContinuousNetworkSimulation {
       this.seed.attractors.some(({ strength }) => strength > 0)
     ) {
       for (let index = 0; index < iterations; index += 1) {
-        this.reassertStabilizedPositions();
-        this.assign(1);
-        applyNetworkPhysicsPullIteration(this.graph, this.seed.attractors);
-        this.reassertStabilizedPositions();
+        this.runPhysicalIteration();
       }
-    } else {
-      this.reassertStabilizedPositions();
+    } else if (this.seed.mode === 'all') {
       this.assign(iterations);
-      this.reassertStabilizedPositions();
+      this.applyComponentStabilization(iterations);
+    } else {
+      this.assign(iterations);
     }
     this.iterationsCompleted += iterations;
     const after = this.convergencePositions();
@@ -411,7 +437,7 @@ export class ContinuousNetworkSimulation {
             measureGlobalConvergenceMovement({
               before,
               after,
-              degreeByKey: this.dynamicDegreeByKey ?? this.degreeByKey,
+              degreeByKey: this.degreeByKey,
             }),
           );
     this.stableBatches = nextNetworkPhysicsStableBatchCount({
@@ -426,7 +452,6 @@ export class ContinuousNetworkSimulation {
         : GLOBAL_CONVERGENCE_STABLE_MACRO_STEPS_REQUIRED;
     if (this.stableBatches >= required || this.graph.order === 1) {
       this.stateValue = 'sleeping';
-      this.clearDynamicCoupling();
     } else {
       const limit =
         this.seed.mode === 'focus'
@@ -470,62 +495,51 @@ export class ContinuousNetworkSimulation {
     this.graph.mergeNodeAttributes(this.active.nodeKey, this.target);
   }
 
-  private beginDynamicCoupling(constraintNodeKey: string): void {
-    if (this.dynamicCoupling === undefined) {
-      this.clearDynamicCoupling();
-      return;
-    }
-    const coupling = this.dynamicCoupling.resolve(
-      constraintNodeKey,
-      this.seed.attractors,
-    );
-    this.dynamicNodeKeys = coupling.activeNodeKeys;
-    this.dynamicDegreeByKey = new Map(
-      coupling.activeNodeKeys.map((key) => [key, this.degreeByKey.get(key)!]),
-    );
-    this.stabilizedPositions = new Map(
-      coupling.stabilizedNodeKeys.map((key) => {
-        const node = this.graph.getNodeAttributes(key);
-        return [key, { key, x: node.x, y: node.y }] as const;
-      }),
-    );
-  }
-
-  private settlesWithoutCooling(constraintNodeKey: string): boolean {
-    return (
-      this.seed.mode === 'all' &&
-      this.dynamicNodeKeys?.length === 1 &&
-      this.degreeByKey.get(constraintNodeKey) === 0 &&
-      !this.seed.attractors.some(
-        ({ memberNodeKeys, strength }) =>
-          strength > 0 && memberNodeKeys.includes(constraintNodeKey),
-      )
-    );
-  }
-
-  private reassertStabilizedPositions(): void {
-    if (this.stabilizedPositions === undefined) return;
-    for (const [key, position] of this.stabilizedPositions) {
-      this.graph.mergeNodeAttributes(key, {
-        x: position.x,
-        y: position.y,
-      });
-    }
-  }
-
-  private reassertGestureState(): void {
+  private runPhysicalIteration(): void {
     this.reassertTarget();
-    this.reassertStabilizedPositions();
+    this.assign(1);
+    if (this.seed.mode === 'all') {
+      applyNetworkPhysicsPullIteration(this.graph, this.seed.attractors);
+      this.applyComponentStabilization();
+    }
+    this.reassertTarget();
   }
 
   private convergencePositions(): readonly NetworkPhysicsPosition[] {
-    return graphPositions(this.graph, this.dynamicNodeKeys ?? this.nodeKeys);
+    return graphPositions(this.graph, this.nodeKeys);
   }
 
-  private clearDynamicCoupling(): void {
-    this.dynamicNodeKeys = undefined;
-    this.dynamicDegreeByKey = undefined;
-    this.stabilizedPositions = undefined;
+  /**
+   * Softly translates each reference component toward its seed centroid. This
+   * keeps every node in ForceAtlas2 while preventing repeated gestures from
+   * ratcheting disconnected components into an expanding outer ring.
+   */
+  private applyComponentStabilization(iterations = 1): void {
+    if (this.componentReferences === undefined) return;
+    const gain =
+      1 - (1 - NETWORK_PHYSICS_COMPONENT_STABILIZATION_GAIN) ** iterations;
+    const cap = this.componentStabilizationStepCap * iterations;
+    for (const reference of this.componentReferences) {
+      let currentX = 0;
+      let currentY = 0;
+      for (const key of reference.nodeKeys) {
+        const node = this.graph.getNodeAttributes(key);
+        currentX += node.x / reference.nodeKeys.length;
+        currentY += node.y / reference.nodeKeys.length;
+      }
+      const dx = reference.x - currentX;
+      const dy = reference.y - currentY;
+      const distance = Math.hypot(dx, dy);
+      if (distance === 0) continue;
+      const multiplier = Math.min(gain, cap / distance);
+      for (const key of reference.nodeKeys) {
+        const node = this.graph.getNodeAttributes(key);
+        this.graph.mergeNodeAttributes(key, {
+          x: node.x + dx * multiplier,
+          y: node.y + dy * multiplier,
+        });
+      }
+    }
   }
 
   private frame(): NetworkPhysicsFrameResponse {
@@ -565,7 +579,6 @@ export class ContinuousNetworkSimulation {
     this.stateValue = 'failed';
     this.active = undefined;
     this.target = undefined;
-    this.clearDynamicCoupling();
     return {
       failure: {
         schemaVersion: NETWORK_PHYSICS_SCHEMA_VERSION,

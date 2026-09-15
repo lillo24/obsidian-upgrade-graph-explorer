@@ -66,6 +66,15 @@ export class NetworkPhysicsDynamicCouplingIndex {
     this.nodeKeysByComponent = nodeKeysByComponent;
   }
 
+  /**
+   * Stable undirected components for the lifetime of one retained simulation.
+   * The returned membership is seed-derived and never re-captured from a
+   * gesture's released coordinates.
+   */
+  components(): readonly (readonly string[])[] {
+    return this.nodeKeysByComponent;
+  }
+
   resolve(
     constraintNodeKey: string,
     attractors: readonly NetworkPhysicsAttractor[],

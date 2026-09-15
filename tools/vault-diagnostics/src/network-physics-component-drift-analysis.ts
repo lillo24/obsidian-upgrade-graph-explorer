@@ -6,6 +6,8 @@ import forceAtlas2 from 'graphology-layout-forceatlas2';
 import {
   applyNetworkPhysicsPullIteration,
   ContinuousNetworkSimulation,
+  NETWORK_PHYSICS_COMPONENT_STABILIZATION_CAP_RATIO,
+  NETWORK_PHYSICS_COMPONENT_STABILIZATION_GAIN,
   NETWORK_PHYSICS_SCHEMA_VERSION,
   type NetworkPhysicsAttractor,
   type NetworkPhysicsPosition,
@@ -33,7 +35,12 @@ type Fixture = {
   readonly componentKeys: readonly (readonly string[])[];
 };
 type Candidate =
-  'unbounded-baseline' | 'A1-node-stabilization' | 'B-centroid-stabilization';
+  | 'unbounded-baseline'
+  | 'A1-node-stabilization'
+  | 'B-centroid-stabilization'
+  | 'C-soft-centroid-0.005'
+  | 'C-soft-centroid-0.015'
+  | 'C-soft-centroid-0.04';
 type PhysicsGraph = MultiDirectedGraph<
   { x: number; y: number; size: number; constraintEligible: boolean },
   { weight: number }
@@ -43,6 +50,7 @@ const HOT_TURNS = 256;
 const HOT_ITERATIONS = 4;
 const PRESETTLE_ITERATIONS = 640;
 const TARGET_OFFSET = { x: 34, y: -24 } as const;
+const PRODUCTION_MAX_NORMALIZED_RADIUS_GROWTH = 0.05;
 
 function mean(values: readonly number[]): number {
   return values.length === 0
@@ -306,6 +314,47 @@ function recenterComponents(
   });
 }
 
+function positionScale(positions: readonly Position[]): number {
+  const center = centroid(positions);
+  return Math.max(
+    1,
+    Math.sqrt(
+      mean(
+        positions.map(
+          (position) =>
+            (position.x - center.x) ** 2 + (position.y - center.y) ** 2,
+        ),
+      ),
+    ),
+  );
+}
+
+function softRecenterComponents(
+  graph: PhysicsGraph,
+  components: readonly (readonly string[])[],
+  initialCentroids: readonly { readonly x: number; readonly y: number }[],
+  scale: number,
+  gain: number,
+): void {
+  const cap = scale * NETWORK_PHYSICS_COMPONENT_STABILIZATION_CAP_RATIO;
+  components.forEach((keys, index) => {
+    const current = centroid(keys.map((key) => graph.getNodeAttributes(key)));
+    const reference = initialCentroids[index]!;
+    const dx = reference.x - current.x;
+    const dy = reference.y - current.y;
+    const error = Math.hypot(dx, dy);
+    if (error === 0) return;
+    const multiplier = Math.min(gain, cap / error);
+    for (const key of keys) {
+      const node = graph.getNodeAttributes(key);
+      graph.mergeNodeAttributes(key, {
+        x: node.x + dx * multiplier,
+        y: node.y + dy * multiplier,
+      });
+    }
+  });
+}
+
 function measure(
   fixture: Fixture,
   initial: ReadonlyMap<string, Position>,
@@ -315,8 +364,16 @@ function measure(
 ) {
   const current = new Map(currentValues.map((value) => [value.key, value]));
   const graphCenter = centroid(currentValues);
+  const initialValues = [...initial.values()];
+  const initialGraphCenter = centroid(initialValues);
+  const initialIsolateRadii = fixture.isolateKeys.map((key) =>
+    distance(initial.get(key)!, initialGraphCenter),
+  );
   const isolateRadii = fixture.isolateKeys.map((key) =>
     distance(current.get(key)!, graphCenter),
+  );
+  const isolateRadiiFromFixedReference = fixture.isolateKeys.map((key) =>
+    distance(current.get(key)!, initialGraphCenter),
   );
   const isolateDisplacements = fixture.isolateKeys.map((key) =>
     distance(initial.get(key)!, current.get(key)!),
@@ -340,6 +397,16 @@ function measure(
       p90: rounded(percentile(isolateRadii, 0.9)),
       maximum: rounded(Math.max(...isolateRadii)),
     },
+    isolateRadiusFromFixedReference: {
+      p50: rounded(percentile(isolateRadiiFromFixedReference, 0.5)),
+      p90: rounded(percentile(isolateRadiiFromFixedReference, 0.9)),
+      maximum: rounded(Math.max(...isolateRadiiFromFixedReference)),
+    },
+    isolateRadiusNormalizedGrowth: rounded(
+      (percentile(isolateRadiiFromFixedReference, 0.9) -
+        percentile(initialIsolateRadii, 0.9)) /
+        Math.max(1e-6, percentile(initialIsolateRadii, 0.9)),
+    ),
     isolateDisplacement: {
       p50: rounded(percentile(isolateDisplacements, 0.5)),
       p90: rounded(percentile(isolateDisplacements, 0.9)),
@@ -391,6 +458,23 @@ function manualTrial(input: {
   const componentCentroids = stabilizedComponents.map((keys) =>
     centroid(keys.map((key) => initial.get(key)!)),
   );
+  const allComponents = [
+    input.fixture.coreKeys,
+    ...input.fixture.componentKeys,
+    ...input.fixture.isolateKeys.map((key) => [key]),
+  ];
+  const allComponentCentroids = allComponents.map((keys) =>
+    centroid(keys.map((key) => initial.get(key)!)),
+  );
+  const softGain =
+    input.candidate === 'C-soft-centroid-0.005'
+      ? 0.005
+      : input.candidate === 'C-soft-centroid-0.015'
+        ? NETWORK_PHYSICS_COMPONENT_STABILIZATION_GAIN
+        : input.candidate === 'C-soft-centroid-0.04'
+          ? 0.04
+          : undefined;
+  const scale = positionScale(input.initial);
   const checkpoints = new Map<number, ReturnType<typeof measure>>();
   const turnTimes: number[] = [];
   checkpoints.set(
@@ -416,6 +500,14 @@ function manualTrial(input: {
         reassertPositions(graph, stabilized);
       } else if (input.candidate === 'B-centroid-stabilization') {
         recenterComponents(graph, stabilizedComponents, componentCentroids);
+      } else if (softGain !== undefined) {
+        softRecenterComponents(
+          graph,
+          allComponents,
+          allComponentCentroids,
+          scale,
+          softGain,
+        );
       }
       graph.mergeNodeAttributes(input.fixture.coreKeys[0]!, target);
     }
@@ -435,8 +527,9 @@ function manualTrial(input: {
   }
   return {
     candidate: input.candidate,
-    activeNodeCount: active.size,
-    stabilizedNodeCount: stabilized.size,
+    activeNodeCount:
+      softGain === undefined ? active.size : input.initial.length,
+    stabilizedNodeCount: softGain === undefined ? stabilized.size : 0,
     checkpointMetrics: Object.fromEntries(checkpoints),
     hotTurnMs: {
       p50: rounded(percentile(turnTimes, 0.5)),
@@ -451,6 +544,7 @@ function productionTrial(input: {
   readonly pull: readonly NetworkPhysicsAttractor[];
   readonly folderClustering: boolean;
   readonly draggedNodeKey?: string;
+  readonly targetOffset?: { readonly x: number; readonly y: number };
 }) {
   const settings = resolveGlobalPhysicsSettings({
     folderClustering: input.folderClustering,
@@ -484,8 +578,8 @@ function productionTrial(input: {
   const initial = new Map(input.initial.map((value) => [value.key, value]));
   const draggedKey = input.draggedNodeKey ?? input.fixture.coreKeys[0]!;
   const target = {
-    x: initial.get(draggedKey)!.x + TARGET_OFFSET.x,
-    y: initial.get(draggedKey)!.y + TARGET_OFFSET.y,
+    x: initial.get(draggedKey)!.x + (input.targetOffset?.x ?? TARGET_OFFSET.x),
+    y: initial.get(draggedKey)!.y + (input.targetOffset?.y ?? TARGET_OFFSET.y),
   };
   simulation.handle({
     schemaVersion: 1,
@@ -525,6 +619,7 @@ function productionTrial(input: {
       );
     }
   }
+  const hotPositions = simulation.positions();
   simulation.handle({
     schemaVersion: 1,
     kind: 'end',
@@ -560,6 +655,7 @@ function productionTrial(input: {
   const scheduledWorkAfterRelease = simulation.hasScheduledWork;
   const postSleepAdvance = simulation.advance();
   return {
+    hotPositions,
     checkpointMetrics: Object.fromEntries(checkpoints),
     hotTurnMs: {
       p50: rounded(percentile(turnTimes, 0.5)),
@@ -619,6 +715,23 @@ function layoutAudit(fixture: Fixture, positions: readonly Position[]) {
   };
 }
 
+function positionDifference(
+  keys: readonly string[],
+  left: readonly Position[],
+  right: readonly Position[],
+) {
+  const leftByKey = new Map(left.map((position) => [position.key, position]));
+  const rightByKey = new Map(right.map((position) => [position.key, position]));
+  const values = keys.map((key) =>
+    distance(leftByKey.get(key)!, rightByKey.get(key)!),
+  );
+  return {
+    p50: rounded(percentile(values, 0.5)),
+    p90: rounded(percentile(values, 0.9)),
+    maximum: rounded(Math.max(...values)),
+  };
+}
+
 function main(): void {
   const fixture = createFixture();
   const settled = presettle(fixture);
@@ -642,19 +755,46 @@ function main(): void {
   ].map((scenario) => {
     const initial = seedPositions(fixture, settled, scenario.folderClustering);
     const pull = attractors(fixture, scenario.pull);
+    const productionRun = productionTrial({
+      fixture,
+      initial,
+      pull,
+      folderClustering: scenario.folderClustering,
+    });
+    const controlRun = productionTrial({
+      fixture,
+      initial,
+      pull,
+      folderClustering: scenario.folderClustering,
+      targetOffset: { x: 0, y: 0 },
+    });
+    const { hotPositions: productionHotPositions, ...production } =
+      productionRun;
+    const { hotPositions: controlHotPositions, ...control } = controlRun;
     return {
       ...scenario,
-      production: productionTrial({
-        fixture,
-        initial,
-        pull,
-        folderClustering: scenario.folderClustering,
-      }),
+      production,
+      equalWorkControl: control,
+      pairedExperimentDifference: {
+        isolates: positionDifference(
+          fixture.isolateKeys,
+          productionHotPositions,
+          controlHotPositions,
+        ),
+        disconnectedComponents: positionDifference(
+          fixture.componentKeys.flat(),
+          productionHotPositions,
+          controlHotPositions,
+        ),
+      },
       candidates: (
         [
           'unbounded-baseline',
           'A1-node-stabilization',
           'B-centroid-stabilization',
+          'C-soft-centroid-0.005',
+          'C-soft-centroid-0.015',
+          'C-soft-centroid-0.04',
         ] as const
       ).map((candidate) => manualTrial({ fixture, initial, pull, candidate })),
     };
@@ -681,13 +821,18 @@ function main(): void {
   }
   const clustered = seedPositions(fixture, settled, true);
   const unclustered = seedPositions(fixture, settled, false);
-  const isolatedFileProduction = productionTrial({
+  const isolatedFileRun = productionTrial({
     fixture,
     initial: unclustered,
     pull: [],
     folderClustering: false,
     draggedNodeKey: fixture.isolateKeys[0]!,
   });
+  const isolatedFileProduction = {
+    checkpointMetrics: isolatedFileRun.checkpointMetrics,
+    hotTurnMs: isolatedFileRun.hotTurnMs,
+    release: isolatedFileRun.release,
+  };
   const report = {
     schemaVersion: 1,
     generatedBy: 'pnpm analyze:network-physics-drift',
@@ -715,11 +860,20 @@ function main(): void {
       baselineRadiusProgression,
       thresholdRatio: 1.1,
       observedRatio: rounded(baselineEnd / baselineStart),
-      productionUnrelatedIsolatesExact: scenarios.every(
+      selectedSoftCentroidGain: NETWORK_PHYSICS_COMPONENT_STABILIZATION_GAIN,
+      maximumNormalizedRadiusGrowth: PRODUCTION_MAX_NORMALIZED_RADIUS_GROWTH,
+      productionIsolatesRespondToMovedGeometry: scenarios.every(
+        ({ production, pairedExperimentDifference }) =>
+          production.checkpointMetrics[HOT_TURNS]!.isolateDisplacement.p90 >
+            0.001 && pairedExperimentDifference.isolates.maximum > 0.001,
+      ),
+      productionRadiusGrowthBounded: scenarios.every(
         ({ production }) =>
-          production.checkpointMetrics[HOT_TURNS]!.isolateDisplacement
-            .maximum === 0 &&
-          production.release.finalMetrics.isolateDisplacement.maximum === 0,
+          production.checkpointMetrics[HOT_TURNS]!
+            .isolateRadiusNormalizedGrowth <=
+            PRODUCTION_MAX_NORMALIZED_RADIUS_GROWTH &&
+          production.release.finalMetrics.isolateRadiusNormalizedGrowth <=
+            PRODUCTION_MAX_NORMALIZED_RADIUS_GROWTH,
       ),
       productionReleasedToSleep:
         scenarios.every(
@@ -731,7 +885,12 @@ function main(): void {
         ) &&
         isolatedFileProduction.release.state === 'sleeping' &&
         isolatedFileProduction.release.failure === null &&
-        isolatedFileProduction.release.coolingFrames === 0,
+        isolatedFileProduction.release.coolingFrames > 0,
+      isolatedFileRejoinedPhysicsWithoutExactUndo:
+        isolatedFileProduction.release.coolingFrames > 0 &&
+        isolatedFileProduction.release.finalMetrics.targetError > 0.001 &&
+        isolatedFileProduction.release.finalMetrics.targetError <
+          Math.hypot(TARGET_OFFSET.x, TARGET_OFFSET.y) * 0.95,
     },
   };
   if (!report.acceptance.productionReleasedToSleep) {
@@ -739,9 +898,19 @@ function main(): void {
       'A production isolate-heavy scenario did not release to sleep.',
     );
   }
-  if (!report.acceptance.productionUnrelatedIsolatesExact) {
+  if (!report.acceptance.productionIsolatesRespondToMovedGeometry) {
     throw new Error(
-      'Production moved an unrelated isolate during hold or cooling.',
+      'Production did not preserve a measurable isolate response to the moved geometry.',
+    );
+  }
+  if (!report.acceptance.productionRadiusGrowthBounded) {
+    throw new Error(
+      'Production exceeded the normalized isolate-radius growth boundary.',
+    );
+  }
+  if (!report.acceptance.isolatedFileRejoinedPhysicsWithoutExactUndo) {
+    throw new Error(
+      'The released isolated File did not rejoin physics naturally.',
     );
   }
   const outputDirectory = fileURLToPath(
@@ -764,46 +933,66 @@ function main(): void {
               .draggedComponentMotion.maximum,
           release: isolatedFileProduction.release,
         },
-        scenarios: scenarios.map(({ id, candidates, production }) => ({
-          id,
-          production: {
-            isolateRadiusP90Start:
-              production.checkpointMetrics[0]!.isolateRadius.p90,
-            isolateRadiusP90End:
-              production.checkpointMetrics[HOT_TURNS]!.isolateRadius.p90,
-            componentDriftP90:
-              production.checkpointMetrics[HOT_TURNS]!
-                .disconnectedComponentCentroidDrift.p90,
-            hotTurnMs: production.hotTurnMs,
-            isolateDisplacementMaximum:
-              production.checkpointMetrics[HOT_TURNS]!.isolateDisplacement
-                .maximum,
-            release: {
-              state: production.release.state,
-              failure: production.release.failure,
-              coolingFrames: production.release.coolingFrames,
-              coolingMs: production.release.coolingMs,
-              finalIsolateDisplacementMaximum:
-                production.release.finalMetrics.isolateDisplacement.maximum,
-              postSleepAdvanceWasEmpty:
-                production.release.postSleepAdvanceWasEmpty,
+        scenarios: scenarios.map(
+          ({
+            id,
+            candidates,
+            production,
+            equalWorkControl,
+            pairedExperimentDifference,
+          }) => ({
+            id,
+            production: {
+              isolateRadiusP90Start:
+                production.checkpointMetrics[0]!.isolateRadius.p90,
+              isolateRadiusP90End:
+                production.checkpointMetrics[HOT_TURNS]!.isolateRadius.p90,
+              isolateRadiusNormalizedGrowth:
+                production.checkpointMetrics[HOT_TURNS]!
+                  .isolateRadiusNormalizedGrowth,
+              componentDriftP90:
+                production.checkpointMetrics[HOT_TURNS]!
+                  .disconnectedComponentCentroidDrift.p90,
+              hotTurnMs: production.hotTurnMs,
+              isolateDisplacementMaximum:
+                production.checkpointMetrics[HOT_TURNS]!.isolateDisplacement
+                  .maximum,
+              release: {
+                state: production.release.state,
+                failure: production.release.failure,
+                coolingFrames: production.release.coolingFrames,
+                coolingMs: production.release.coolingMs,
+                finalIsolateDisplacementMaximum:
+                  production.release.finalMetrics.isolateDisplacement.maximum,
+                postSleepAdvanceWasEmpty:
+                  production.release.postSleepAdvanceWasEmpty,
+              },
             },
-          },
-          candidates: candidates.map((candidate) => ({
-            candidate: candidate.candidate,
-            activeNodeCount: candidate.activeNodeCount,
-            isolateRadiusP90End:
-              candidate.checkpointMetrics[HOT_TURNS]!.isolateRadius.p90,
-            componentDriftP90:
-              candidate.checkpointMetrics[HOT_TURNS]!
-                .disconnectedComponentCentroidDrift.p90,
-            coreMotionMean:
-              candidate.checkpointMetrics[HOT_TURNS]!.draggedComponentMotion
-                .mean,
-            targetError: candidate.checkpointMetrics[HOT_TURNS]!.targetError,
-            hotTurnMs: candidate.hotTurnMs,
-          })),
-        })),
+            equalWorkControl: {
+              isolateRadiusNormalizedGrowth:
+                equalWorkControl.checkpointMetrics[HOT_TURNS]!
+                  .isolateRadiusNormalizedGrowth,
+              isolateDisplacementP90:
+                equalWorkControl.checkpointMetrics[HOT_TURNS]!
+                  .isolateDisplacement.p90,
+            },
+            pairedExperimentDifference,
+            candidates: candidates.map((candidate) => ({
+              candidate: candidate.candidate,
+              activeNodeCount: candidate.activeNodeCount,
+              isolateRadiusP90End:
+                candidate.checkpointMetrics[HOT_TURNS]!.isolateRadius.p90,
+              componentDriftP90:
+                candidate.checkpointMetrics[HOT_TURNS]!
+                  .disconnectedComponentCentroidDrift.p90,
+              coreMotionMean:
+                candidate.checkpointMetrics[HOT_TURNS]!.draggedComponentMotion
+                  .mean,
+              targetError: candidate.checkpointMetrics[HOT_TURNS]!.targetError,
+              hotTurnMs: candidate.hotTurnMs,
+            })),
+          }),
+        ),
         outputPath,
       },
       null,
@@ -816,7 +1005,7 @@ try {
   main();
 } catch (error: unknown) {
   console.error(
-    `MOVE300B component-drift analysis failed: ${error instanceof Error ? error.message : String(error)}`,
+    `MOVE300C component-drift analysis failed: ${error instanceof Error ? error.message : String(error)}`,
   );
   process.exitCode = 1;
 }

@@ -7,8 +7,10 @@ saved layout caches, or persisted Place offsets.
 - `protocol.ts` defines and validates the versioned main-thread/worker boundary.
 - `pull.ts` applies the All-network folder Pull field with iteration-normalized
   strength, independent of how often frames are published.
-- `dynamic-coupling.ts` classifies undirected reference components and extends
-  the gesture-active set through effective Pull memberships.
+- `dynamic-coupling.ts` classifies stable undirected reference components. Its
+  active-closure resolver remains available for MOVE300B diagnostic comparison;
+  production MOVE300C uses the seed-lifetime component membership as a soft
+  reference frame instead of freezing the off-closure set.
 - `simulation.ts` owns the retained Graphology graph and the
   sleeping/hot/cooling/failed/disposed state machine. It uses only the public
   `forceAtlas2.assign` API.
@@ -33,20 +35,24 @@ snapshot. That automatic field may relax during transient Move; it is never
 reapplied into the solver, so the normal finite-layout field remains free of
 feedback accumulation.
 
-During All Move, only the constrained File's undirected reference component
-and components coupled to it through positive-strength resolved Pull
-memberships are dynamic. All other nodes stay at their gesture-start transient
-coordinates around every public ForceAtlas2 iteration, while remaining in the
-retained graph so their repulsion still affects the active region. This same
-stabilization remains in force through bounded cooling and is cleared only
-after sleep, invalidation, failure, disposal, or replacement by a new gesture.
-Folder membership alone never creates runtime coupling.
+MOVE300C supersedes MOVE300B's hard off-closure freeze. Every All node now
+participates in every physical ForceAtlas2 step, so isolates and disconnected
+components can respond to nearby moved geometry. A finite component-centroid
+stabilizer then translates each undirected reference component toward the
+centroid captured from the accepted simulation seed. The reference lasts for
+the retained simulation generation and is never re-captured at gesture start or
+release, preventing repeated-gesture ratcheting. Per physical iteration the
+correction is 1.5% of centroid error, capped at 1.5% of the seed's graph-space
+RMS radius. A multi-iteration no-Pull cooling batch uses the mathematically
+equivalent compounded gain and linearly accumulated cap; Pull cooling retains
+one-step cadence. This is deliberately weaker than authored Pull and is neither
+an exact recenter nor a per-node pin. Folder membership alone still creates no
+runtime coupling.
 
-On release, a one-node degree-zero All dynamic region with no effective Pull
-has no active relationship to cool. It therefore sleeps immediately at the
-exact released coordinate instead of repeatedly restarting whole-graph
-repulsion against the stabilized background. Multi-node and Pull-coupled
-regions retain normal bounded cooling.
+Cooling measures every node that continues to move. A released degree-zero File
+therefore rejoins the same whole-graph force system and cools normally instead
+of sleeping immediately or being restored to either its seed or released
+coordinate. Safety caps and lifecycle states are unchanged.
 
 Production canvases expose this lifecycle for one to 100 visible simulation
 nodes in Focus and one to 300 in All. An empty startup projection cannot

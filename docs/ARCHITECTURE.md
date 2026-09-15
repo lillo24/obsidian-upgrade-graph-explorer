@@ -1637,3 +1637,15 @@ are held at gesture-start transient coordinates through hot work and cooling.
 Convergence evaluates the active closure, and a degree-zero singleton without
 effective Pull sleeps directly on release. No new worker schema or lifecycle
 state is introduced.
+
+MOVE300C supersedes those MOVE300B product choices while retaining its
+component index and analyzer evidence. All nodes remain physically active;
+after each All ForceAtlas2/Pull step, a finite component-centroid correction
+uses seed-generation centroids as the stable reference frame. The 1.5% gain is
+capped at 1.5% of the seed RMS radius per physical iteration, with compounded
+gain for no-Pull cooling batches. This permits visible isolate/component
+response without an indefinitely expanding ring and avoids gesture-to-gesture
+anchor ratcheting. Convergence again observes the complete moving graph, and a
+released isolated File enters bounded cooling. Focus physics, Pull ownership,
+M2's output-only handoff, Place composition, limits, schemas, and safety caps
+remain unchanged.

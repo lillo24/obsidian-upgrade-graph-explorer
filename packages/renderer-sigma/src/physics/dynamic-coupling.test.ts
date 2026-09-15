@@ -28,6 +28,8 @@ describe('NetworkPhysicsDynamicCouplingIndex', () => {
       ],
     );
 
+    expect(index.components()).toEqual([['a', 'b', 'c'], ['isolate']]);
+
     expect(index.resolve('a', [])).toEqual({
       activeNodeKeys: ['a', 'b', 'c'],
       stabilizedNodeKeys: ['isolate'],

@@ -45,7 +45,7 @@ src/
   file-move-benchmark.ts MOVE1A inverse/index/coalescing aggregate microbenchmark.
   spatial-pull-preview-benchmark.ts SPATIAL2C finite Pull-preview iteration quality/latency bakeoff.
   physics1-candidate-analysis.ts PHYSICS1 public-call evidence plus fail-loud 300-node All Move probes.
-  network-physics-component-drift-analysis.ts MOVE300B 300-node isolate/component drift reproduction and candidate comparison.
+  network-physics-component-drift-analysis.ts MOVE300B reproduction plus MOVE300C soft-centroid gain comparison, paired controls, fixed/current-frame radius growth, and release evidence.
   convergence-fixtures.ts Synthetic Local and Global topology families for CONVERGENCE1A.
   convergence-metrics.ts Production-backed Local metrics plus Global diagnostic movement/quality.
   convergence-candidates.ts Public-batch runners and bounded stopping-policy evaluation.

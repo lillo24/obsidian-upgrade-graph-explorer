@@ -426,25 +426,52 @@ describe('ContinuousNetworkSimulation', () => {
     expect(activation.positions).toEqual(before);
   });
 
-  it('keeps unrelated All components exact while the reference component reacts', () => {
+  it('lets unrelated All components respond naturally while their long-hold drift stays bounded', () => {
     const simulation = new ContinuousNetworkSimulation(allSeed());
     const before = new Map(
       simulation.positions().map((position) => [position.key, position]),
     );
     simulation.handle(begin());
-    for (let count = 0; count < 16; count += 1) simulation.advance();
+    for (let count = 0; count < 256; count += 1) simulation.advance();
     const after = new Map(
       simulation.positions().map((position) => [position.key, position]),
     );
 
     expect(after.get('b')).not.toEqual(before.get('b'));
-    expect(after.get('c')).toEqual(before.get('c'));
-    expect(after.get('d')).toEqual(before.get('d'));
-    expect(after.get('e')).toEqual(before.get('e'));
+    expect(after.get('c')).not.toEqual(before.get('c'));
+    expect(after.get('d')).not.toEqual(before.get('d'));
+    expect(after.get('e')).not.toEqual(before.get('e'));
+    expect(
+      Math.hypot(
+        after.get('e')!.x - before.get('e')!.x,
+        after.get('e')!.y - before.get('e')!.y,
+      ),
+    ).toBeLessThan(8);
     expect(after.get('a')).toMatchObject({ x: 30, y: -20 });
   });
 
-  it('extends All dynamics through Pull-coupled reference components only', () => {
+  it('attributes an isolate response to the moved component against an equal-work control', () => {
+    const control = new ContinuousNetworkSimulation(allSeed());
+    const moved = new ContinuousNetworkSimulation(allSeed());
+    control.handle({ ...begin(), target: { x: 0, y: 0 } });
+    moved.handle(begin());
+
+    for (let count = 0; count < 32; count += 1) {
+      control.advance();
+      moved.advance();
+    }
+
+    const controlIsolate = control.positions().find(({ key }) => key === 'e')!;
+    const movedIsolate = moved.positions().find(({ key }) => key === 'e')!;
+    expect(
+      Math.hypot(
+        controlIsolate.x - movedIsolate.x,
+        controlIsolate.y - movedIsolate.y,
+      ),
+    ).toBeGreaterThan(0.001);
+  });
+
+  it('preserves Pull-coupled response while uncoupled components remain softly bounded', () => {
     const simulation = new ContinuousNetworkSimulation(
       allSeed({
         attractors: [
@@ -471,10 +498,16 @@ describe('ContinuousNetworkSimulation', () => {
     expect(after.get('b')).not.toEqual(before.get('b'));
     expect(after.get('c')).not.toEqual(before.get('c'));
     expect(after.get('d')).not.toEqual(before.get('d'));
-    expect(after.get('e')).toEqual(before.get('e'));
+    expect(after.get('e')).not.toEqual(before.get('e'));
+    expect(
+      Math.hypot(
+        after.get('e')!.x - before.get('e')!.x,
+        after.get('e')!.y - before.get('e')!.y,
+      ),
+    ).toBeLessThan(8);
   });
 
-  it('keeps unrelated All nodes stable through cooling and then sleeps', () => {
+  it('keeps unrelated All node motion bounded through cooling and then sleeps', () => {
     const simulation = new ContinuousNetworkSimulation(allSeed());
     const before = new Map(
       simulation.positions().map((position) => [position.key, position]),
@@ -491,15 +524,20 @@ describe('ContinuousNetworkSimulation', () => {
       const positions = new Map(
         simulation.positions().map((position) => [position.key, position]),
       );
-      expect(positions.get('c')).toEqual(before.get('c'));
-      expect(positions.get('d')).toEqual(before.get('d'));
-      expect(positions.get('e')).toEqual(before.get('e'));
+      for (const key of ['c', 'd', 'e']) {
+        expect(
+          Math.hypot(
+            positions.get(key)!.x - before.get(key)!.x,
+            positions.get(key)!.y - before.get(key)!.y,
+          ),
+        ).toBeLessThan(12);
+      }
     }
     expect(simulation.state).toBe('sleeping');
     expect(simulation.advance()).toEqual({});
   });
 
-  it('reclassifies and captures fresh transient positions for a new All gesture', () => {
+  it('does not hard-recapture components when a second All gesture begins', () => {
     const simulation = new ContinuousNetworkSimulation(allSeed());
     simulation.handle(begin());
     simulation.advance();
@@ -521,12 +559,50 @@ describe('ContinuousNetworkSimulation', () => {
     const after = new Map(
       simulation.positions().map((position) => [position.key, position]),
     );
-    expect(after.get('a')).toEqual(coreBeforeSecondGesture.get('a'));
-    expect(after.get('b')).toEqual(coreBeforeSecondGesture.get('b'));
+    expect(after.get('a')).not.toEqual(coreBeforeSecondGesture.get('a'));
+    expect(after.get('b')).not.toEqual(coreBeforeSecondGesture.get('b'));
+    for (const key of ['a', 'b']) {
+      expect(
+        Math.hypot(
+          after.get(key)!.x - coreBeforeSecondGesture.get(key)!.x,
+          after.get(key)!.y - coreBeforeSecondGesture.get(key)!.y,
+        ),
+      ).toBeLessThan(8);
+    }
     expect(after.get('e')).toMatchObject({ x: 5, y: 20 });
   });
 
-  it('settles an isolated constrained File without waking unrelated components', () => {
+  it('uses seed-lifetime component references without gesture-to-gesture ratcheting', () => {
+    const simulation = new ContinuousNetworkSimulation(allSeed());
+    const initialIsolate = simulation
+      .positions()
+      .find(({ key }) => key === 'e')!;
+
+    for (let gesture = 1; gesture <= 4; gesture += 1) {
+      const gestureId = `gesture-${gesture}`;
+      simulation.handle({
+        ...begin(),
+        gestureId,
+        target: gesture % 2 === 0 ? { x: -30, y: 20 } : { x: 30, y: -20 },
+      });
+      for (let turn = 0; turn < 32; turn += 1) simulation.advance();
+      simulation.handle({ ...end(1), gestureId });
+      for (let turn = 0; turn < 300 && simulation.hasScheduledWork; turn += 1) {
+        expect(simulation.advance().failure).toBeUndefined();
+      }
+      expect(simulation.state).toBe('sleeping');
+    }
+
+    const isolate = simulation.positions().find(({ key }) => key === 'e')!;
+    const displacement = Math.hypot(
+      isolate.x - initialIsolate.x,
+      isolate.y - initialIsolate.y,
+    );
+    expect(displacement).toBeGreaterThan(0.001);
+    expect(displacement).toBeLessThan(8);
+  });
+
+  it('releases an isolated constrained File back into bounded whole-graph cooling', () => {
     const simulation = new ContinuousNetworkSimulation(allSeed());
     const before = new Map(
       simulation.positions().map((position) => [position.key, position]),
@@ -539,6 +615,8 @@ describe('ContinuousNetworkSimulation', () => {
     simulation.handle(isolatedBegin);
     for (let count = 0; count < 8; count += 1) simulation.advance();
     simulation.handle({ ...end(1), nodeKey: 'e' });
+    expect(simulation.state).toBe('cooling');
+    const released = simulation.positions().find(({ key }) => key === 'e')!;
     for (
       let count = 0;
       count < 300 && simulation.hasScheduledWork;
@@ -551,10 +629,16 @@ describe('ContinuousNetworkSimulation', () => {
       simulation.positions().map((position) => [position.key, position]),
     );
     expect(simulation.state).toBe('sleeping');
-    expect(after.get('a')).toEqual(before.get('a'));
-    expect(after.get('b')).toEqual(before.get('b'));
-    expect(after.get('c')).toEqual(before.get('c'));
-    expect(after.get('d')).toEqual(before.get('d'));
+    expect(after.get('e')).not.toEqual(released);
+    expect(after.get('e')).not.toEqual(before.get('e'));
+    for (const key of ['a', 'b', 'c', 'd']) {
+      expect(
+        Math.hypot(
+          after.get(key)!.x - before.get(key)!.x,
+          after.get(key)!.y - before.get(key)!.y,
+        ),
+      ).toBeLessThan(8);
+    }
   });
 
   it('retains bounded cooling for a Pull-bound isolated File', () => {
