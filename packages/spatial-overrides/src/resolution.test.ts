@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   classifyFolderSpatialDraftScope,
+  replaceFolderSpatialRuleWithDraft,
   resolveFolderSpatialRules,
 } from './resolution';
 import type { FolderSpatialRule } from './types';
@@ -21,6 +22,18 @@ const child: FolderSpatialRule = {
 };
 
 describe('folder spatial rule resolution', () => {
+  it('replaces the same-root confirmed rule without dropping child rules', () => {
+    const draft: FolderSpatialRule = {
+      ...parent,
+      anchor: { x: -0.25, y: 0.75 },
+      strength: 30,
+    };
+    expect(replaceFolderSpatialRuleWithDraft([parent, child], draft)).toEqual([
+      child,
+      draft,
+    ]);
+  });
+
   it('assigns each document to its most-specific winning rule', () => {
     const result = resolveFolderSpatialRules({
       rules: [parent, child],

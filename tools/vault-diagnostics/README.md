@@ -43,6 +43,7 @@ src/
   focus-spacing-metrics.test.ts Transform, bounds, 15-fixture, and production-parity contracts.
   network-spacing-analysis.ts SPACING1B-GLOBAL final-geometry matrix, scale oracle, and density benchmark.
   file-move-benchmark.ts MOVE1A inverse/index/coalescing aggregate microbenchmark.
+  spatial-pull-preview-benchmark.ts SPATIAL2C finite Pull-preview iteration quality/latency bakeoff.
   convergence-fixtures.ts Synthetic Local and Global topology families for CONVERGENCE1A.
   convergence-metrics.ts Production-backed Local metrics plus Global diagnostic movement/quality.
   convergence-candidates.ts Public-batch runners and bounded stopping-policy evaluation.
@@ -148,6 +149,7 @@ pnpm benchmark:local-renderer -- --profile stress
 pnpm analyze:focus-spacing
 pnpm analyze:network-spacing
 pnpm benchmark:file-move
+pnpm benchmark:spatial-pull-preview
 pnpm analyze:forceatlas2-convergence
 ```
 
@@ -262,6 +264,13 @@ prebuilt applied-Place indexing/lookup, and frame coalescing for no-Place,
 Place, and 20,000-node synthetic cases. It emits aggregate timings and command
 counts, never graph IDs or coordinates. It deliberately does not benchmark the
 fake constraint consumer as evidence of production cooling or convergence.
+
+`benchmark:spatial-pull-preview` compares 6/12/18/30 iterations of the exact
+production `interleaved-centroid` Pull algorithm at 100, 300, 1,000, and 3,000
+synthetic nodes. It reports p50/p95 pure Node compute, direction agreement,
+distance from the 30-iteration result, and connected-nonmember reaction. It is
+an investigative iteration-selection aid, not a CI timing gate; browser worker
+startup, message round trip, and Sigma adoption remain separate QA evidence.
 
 `analyze:forceatlas2-convergence` retains the CONVERGENCE1A evidence contract
 and imports CONVERGENCE1B's production percentile, RMS, root-alignment,

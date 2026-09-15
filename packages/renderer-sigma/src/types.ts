@@ -349,6 +349,10 @@ export interface GlobalSpatialInfluenceService {
   readonly dispose: () => void;
 }
 
+/** Creates one independently disposable spatial-influence worker client. */
+export type GlobalSpatialInfluenceServiceFactory =
+  () => GlobalSpatialInfluenceService;
+
 export interface GlobalOperationCounts {
   readonly projections: number;
   readonly topologyReconciliations: number;
@@ -385,6 +389,12 @@ export type GlobalPerformancePhase =
   | 'spatial-pull-forceatlas'
   | 'spatial-pull-attractor'
   | 'spatial-pull-cache-hit'
+  | 'spatial-pull-preview-schedule'
+  | 'spatial-pull-preview-request'
+  | 'spatial-pull-preview-worker'
+  | 'spatial-pull-preview-adopt'
+  | 'spatial-pull-preview-end-to-end'
+  | 'spatial-pull-preview-superseded'
   | 'spatial-fixed-compose'
   | 'sigma-mount-render'
   | 'semantic-zoom-style'
@@ -404,6 +414,10 @@ export type GlobalPerformanceOperation =
   | 'spatial-rule-resolutions'
   | 'spatial-pull-requests'
   | 'spatial-pull-cache-hits'
+  | 'spatial-pull-preview-schedules'
+  | 'spatial-pull-preview-requests'
+  | 'spatial-pull-preview-adopts'
+  | 'spatial-pull-preview-superseded'
   | 'spatial-fixed-compositions'
   | 'global-style-updates'
   | 'global-visual-refreshes'
