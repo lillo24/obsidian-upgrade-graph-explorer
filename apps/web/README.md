@@ -152,14 +152,17 @@ current view remains App-owned, while bounded past/future stacks retain at most
 100 checkpoints and reconcile an entry only when traversed after a live update.
 
 Vite 8.2 client resolution includes the `browser` condition for Dedicated
-Worker builds. A worker-only pre-resolution plugin in `vite.config.ts` routes
-the pinned Markdown named-reference decoder to its published worker-safe
-implementation instead of the DOM implementation that initializes with
-`document.createElement`. The package is already a transitive parser runtime;
-its direct development declaration makes that build-time resolution explicit
-without adding a new external package. The same plugin rejects emitted worker
-chunks containing DOM construction, so this boundary is enforced by every
-production build.
+Workers. In production, `worker.plugins` gives the worker bundle a dedicated
+pre-resolution plugin. During development, Vite serves worker modules through
+the ordinary client pipeline instead, so `vite.config.ts` also installs the
+same resolver for `serve` and excludes the named-reference decoder from
+dependency optimization. Both paths therefore route the pinned Markdown
+decoder to its published worker-safe implementation instead of the DOM
+implementation that initializes with `document.createElement`. The package is
+already a transitive parser runtime; its direct development declaration makes
+that resolution boundary explicit without adding a new external package. The
+production worker plugin still rejects emitted worker chunks containing DOM
+construction.
 
 ## Report loading and privacy
 
