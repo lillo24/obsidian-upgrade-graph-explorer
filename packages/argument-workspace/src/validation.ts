@@ -395,6 +395,7 @@ function validateTopic(
   value: unknown,
   path: string,
   issues: ArgumentLibraryValidationIssue[],
+  schemaVersion: 1 | 2 = 2,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected a Topic.');
@@ -408,9 +409,10 @@ function validateTopic(
       'summary',
       'retrieval',
       'axiomIds',
+      ...(schemaVersion === 2 ? ['argumentIds'] : []),
       'counterArgumentIds',
     ],
-    [],
+    schemaVersion === 2 ? ['currentArgumentId'] : [],
     path,
     issues,
   );
@@ -419,7 +421,167 @@ function validateTopic(
   nonEmptyString(value.summary, `${path}.summary`, issues);
   validateRetrieval(value.retrieval, `${path}.retrieval`, issues);
   stringArray(value.axiomIds, `${path}.axiomIds`, issues);
+  if (schemaVersion === 2) {
+    stringArray(value.argumentIds, `${path}.argumentIds`, issues);
+    if (Object.hasOwn(value, 'currentArgumentId')) {
+      nonEmptyString(
+        value.currentArgumentId,
+        `${path}.currentArgumentId`,
+        issues,
+      );
+    }
+  }
   stringArray(value.counterArgumentIds, `${path}.counterArgumentIds`, issues);
+}
+
+function validateArgumentPremise(
+  value: unknown,
+  path: string,
+  ownerId: unknown,
+  issues: ArgumentLibraryValidationIssue[],
+): void {
+  if (!isRecord(value)) {
+    issue(issues, path, 'invalid-type', 'Expected an Argument premise.');
+    return;
+  }
+  if (value.kind === 'text') {
+    fields(value, ['id', 'kind', 'text'], [], path, issues);
+    nonEmptyString(value.id, `${path}.id`, issues);
+    nonEmptyString(value.text, `${path}.text`, issues);
+    return;
+  }
+  if (value.kind === 'axiom') {
+    fields(
+      value,
+      ['id', 'kind', 'axiomId', 'reliedOnRevision'],
+      [],
+      path,
+      issues,
+    );
+    nonEmptyString(value.id, `${path}.id`, issues);
+    nonEmptyString(value.axiomId, `${path}.axiomId`, issues);
+    positiveRevision(
+      value.reliedOnRevision,
+      `${path}.reliedOnRevision`,
+      issues,
+    );
+    return;
+  }
+  if (value.kind === 'argument-conclusion') {
+    fields(
+      value,
+      ['id', 'kind', 'argumentId', 'reliedOnRevision'],
+      [],
+      path,
+      issues,
+    );
+    nonEmptyString(value.id, `${path}.id`, issues);
+    if (
+      nonEmptyString(value.argumentId, `${path}.argumentId`, issues) &&
+      value.argumentId === ownerId
+    ) {
+      issue(
+        issues,
+        `${path}.argumentId`,
+        'self-reference',
+        'An Argument cannot use its own conclusion as a premise.',
+      );
+    }
+    positiveRevision(
+      value.reliedOnRevision,
+      `${path}.reliedOnRevision`,
+      issues,
+    );
+    return;
+  }
+  issue(issues, `${path}.kind`, 'invalid-value', 'Unsupported premise kind.');
+}
+
+function validateArgument(
+  value: unknown,
+  path: string,
+  issues: ArgumentLibraryValidationIssue[],
+  sourceIds: Set<string>,
+): void {
+  if (!isRecord(value)) {
+    issue(issues, path, 'invalid-type', 'Expected an Argument.');
+    return;
+  }
+  fields(
+    value,
+    [
+      ...METADATA_FIELDS,
+      'title',
+      'premises',
+      'conclusion',
+      'retrieval',
+      'sourceReferences',
+    ],
+    ['reasoning', 'supersedesArgumentId'],
+    path,
+    issues,
+  );
+  validateMetadata(value, path, issues);
+  nonEmptyString(value.title, `${path}.title`, issues);
+  if (!Array.isArray(value.premises)) {
+    issue(issues, `${path}.premises`, 'invalid-type', 'Expected an array.');
+  } else {
+    const premiseIds = new Set<string>();
+    value.premises.forEach((premise, index) => {
+      const premisePath = `${path}.premises[${index}]`;
+      validateArgumentPremise(premise, premisePath, value.id, issues);
+      if (isRecord(premise) && typeof premise.id === 'string') {
+        if (premiseIds.has(premise.id)) {
+          issue(
+            issues,
+            `${premisePath}.id`,
+            'duplicate-id',
+            'Premise IDs must be unique within an Argument.',
+          );
+        }
+        premiseIds.add(premise.id);
+      }
+    });
+  }
+  if (Object.hasOwn(value, 'reasoning')) {
+    nonEmptyString(value.reasoning, `${path}.reasoning`, issues);
+  }
+  nonEmptyString(value.conclusion, `${path}.conclusion`, issues);
+  validateRetrieval(value.retrieval, `${path}.retrieval`, issues);
+  if (Object.hasOwn(value, 'supersedesArgumentId')) {
+    if (
+      nonEmptyString(
+        value.supersedesArgumentId,
+        `${path}.supersedesArgumentId`,
+        issues,
+      ) &&
+      value.supersedesArgumentId === value.id
+    ) {
+      issue(
+        issues,
+        `${path}.supersedesArgumentId`,
+        'self-reference',
+        'An Argument cannot supersede itself.',
+      );
+    }
+  }
+  if (!Array.isArray(value.sourceReferences)) {
+    issue(
+      issues,
+      `${path}.sourceReferences`,
+      'invalid-type',
+      'Expected an array.',
+    );
+  } else {
+    value.sourceReferences.forEach((entry, index) =>
+      validateSourceReference(
+        entry,
+        `${path}.sourceReferences[${index}]`,
+        issues,
+        sourceIds,
+      ),
+    );
+  }
 }
 
 function validateAxiom(
@@ -475,6 +637,7 @@ function validateTarget(
   path: string,
   ownerId: unknown,
   issues: ArgumentLibraryValidationIssue[],
+  allowArgumentTarget = true,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected a Counter-Argument target.');
@@ -501,6 +664,33 @@ function validateTarget(
         `${path}.counterArgumentId`,
         'self-reference',
         'A Counter-Argument cannot target itself.',
+      );
+    }
+  } else if (value.kind === 'argument' && allowArgumentTarget) {
+    fields(value, ['kind', 'argumentId', 'part'], [], path, issues);
+    nonEmptyString(value.argumentId, `${path}.argumentId`, issues);
+    if (!isRecord(value.part)) {
+      issue(
+        issues,
+        `${path}.part`,
+        'invalid-type',
+        'Expected an Argument target part.',
+      );
+    } else if (
+      value.part.kind === 'argument' ||
+      value.part.kind === 'reasoning' ||
+      value.part.kind === 'conclusion'
+    ) {
+      fields(value.part, ['kind'], [], `${path}.part`, issues);
+    } else if (value.part.kind === 'premise') {
+      fields(value.part, ['kind', 'premiseId'], [], `${path}.part`, issues);
+      nonEmptyString(value.part.premiseId, `${path}.part.premiseId`, issues);
+    } else {
+      issue(
+        issues,
+        `${path}.part.kind`,
+        'invalid-value',
+        'Unsupported Argument target part.',
       );
     }
   } else {
@@ -595,6 +785,7 @@ function validateCounterArgument(
   path: string,
   issues: ArgumentLibraryValidationIssue[],
   sourceIds: Set<string>,
+  allowArgumentTarget = true,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected a Counter-Argument.');
@@ -620,7 +811,13 @@ function validateCounterArgument(
   nonEmptyString(value.observation, `${path}.observation`, issues);
   nonEmptyString(value.challengedClaim, `${path}.challengedClaim`, issues);
   if (Object.hasOwn(value, 'target'))
-    validateTarget(value.target, `${path}.target`, value.id, issues);
+    validateTarget(
+      value.target,
+      `${path}.target`,
+      value.id,
+      issues,
+      allowArgumentTarget,
+    );
   validateRetrieval(value.retrieval, `${path}.retrieval`, issues);
   if (!Array.isArray(value.sourceReferences)) {
     issue(
@@ -673,9 +870,19 @@ function validateIntegrity(
   library: PlainRecord,
   topicIds: ReadonlySet<string>,
   axiomIds: ReadonlySet<string>,
+  argumentIds: ReadonlySet<string>,
   counterIds: ReadonlySet<string>,
   issues: ArgumentLibraryValidationIssue[],
 ): void {
+  const argumentsById = new Map<string, PlainRecord>();
+  const argumentIndexById = new Map<string, number>();
+  if (Array.isArray(library.arguments)) {
+    library.arguments.forEach((entry, index) => {
+      if (!isRecord(entry) || typeof entry.id !== 'string') return;
+      argumentsById.set(entry.id, entry);
+      argumentIndexById.set(entry.id, index);
+    });
+  }
   if (Array.isArray(library.topics)) {
     library.topics.forEach((entry, index) => {
       if (!isRecord(entry)) return;
@@ -703,6 +910,91 @@ function validateIntegrity(
           }
         });
       }
+      if (Array.isArray(entry.argumentIds)) {
+        entry.argumentIds.forEach((id, memberIndex) => {
+          if (typeof id === 'string' && !argumentIds.has(id)) {
+            issue(
+              issues,
+              `$.topics[${index}].argumentIds[${memberIndex}]`,
+              'missing-reference',
+              `Unknown Argument "${id}".`,
+            );
+          }
+        });
+      }
+      if (typeof entry.currentArgumentId === 'string') {
+        const current = argumentsById.get(entry.currentArgumentId);
+        if (!argumentIds.has(entry.currentArgumentId)) {
+          issue(
+            issues,
+            `$.topics[${index}].currentArgumentId`,
+            'missing-reference',
+            `Unknown current Argument "${entry.currentArgumentId}".`,
+          );
+        } else if (
+          !Array.isArray(entry.argumentIds) ||
+          !entry.argumentIds.includes(entry.currentArgumentId)
+        ) {
+          issue(
+            issues,
+            `$.topics[${index}].currentArgumentId`,
+            'invalid-value',
+            'The current Argument must belong to the Topic.',
+          );
+        } else if (current?.archived === true) {
+          issue(
+            issues,
+            `$.topics[${index}].currentArgumentId`,
+            'invalid-value',
+            'The current Argument cannot be archived.',
+          );
+        }
+      }
+    });
+  }
+  if (Array.isArray(library.arguments)) {
+    library.arguments.forEach((entry, index) => {
+      if (!isRecord(entry)) return;
+      if (Array.isArray(entry.premises)) {
+        entry.premises.forEach((premise, premiseIndex) => {
+          if (!isRecord(premise)) return;
+          let referencedId: unknown;
+          let referencedIds: ReadonlySet<string> | undefined;
+          let referencedKind: 'Axiom' | 'Argument' | undefined;
+          if (premise.kind === 'axiom') {
+            referencedId = premise.axiomId;
+            referencedIds = axiomIds;
+            referencedKind = 'Axiom';
+          } else if (premise.kind === 'argument-conclusion') {
+            referencedId = premise.argumentId;
+            referencedIds = argumentIds;
+            referencedKind = 'Argument';
+          }
+          if (
+            typeof referencedId === 'string' &&
+            referencedIds !== undefined &&
+            !referencedIds.has(referencedId)
+          ) {
+            issue(
+              issues,
+              `$.arguments[${index}].premises[${premiseIndex}]`,
+              'missing-reference',
+              `Unknown ${referencedKind} "${referencedId}".`,
+            );
+          }
+        });
+      }
+      if (
+        typeof entry.supersedesArgumentId === 'string' &&
+        !argumentIds.has(entry.supersedesArgumentId)
+      ) {
+        issue(
+          issues,
+          `$.arguments[${index}].supersedesArgumentId`,
+          'missing-reference',
+          `Unknown superseded Argument "${entry.supersedesArgumentId}".`,
+        );
+      }
     });
   }
   if (!Array.isArray(library.counterArguments)) return;
@@ -720,6 +1012,9 @@ function validateIntegrity(
       } else if (entry.target.kind === 'counter-argument') {
         targetId = entry.target.counterArgumentId;
         targetSet = counterIds;
+      } else if (entry.target.kind === 'argument') {
+        targetId = entry.target.argumentId;
+        targetSet = argumentIds;
       }
       if (
         typeof targetId === 'string' &&
@@ -732,6 +1027,43 @@ function validateIntegrity(
           'missing-reference',
           `Unknown target "${targetId}".`,
         );
+      }
+      if (
+        entry.target.kind === 'argument' &&
+        typeof entry.target.argumentId === 'string' &&
+        isRecord(entry.target.part)
+      ) {
+        const targetArgument = argumentsById.get(entry.target.argumentId);
+        const targetPart = entry.target.part;
+        if (
+          targetArgument !== undefined &&
+          targetPart.kind === 'premise' &&
+          typeof targetPart.premiseId === 'string' &&
+          (!Array.isArray(targetArgument.premises) ||
+            !targetArgument.premises.some(
+              (premise) =>
+                isRecord(premise) && premise.id === targetPart.premiseId,
+            ))
+        ) {
+          issue(
+            issues,
+            `$.counterArguments[${index}].target.part.premiseId`,
+            'missing-reference',
+            `Unknown target premise "${targetPart.premiseId}".`,
+          );
+        }
+        if (
+          targetArgument !== undefined &&
+          targetPart.kind === 'reasoning' &&
+          typeof targetArgument.reasoning !== 'string'
+        ) {
+          issue(
+            issues,
+            `$.counterArguments[${index}].target.part`,
+            'missing-reference',
+            'The target Argument has no reasoning section.',
+          );
+        }
       }
     }
     if (
@@ -754,6 +1086,59 @@ function validateIntegrity(
       });
     }
   });
+
+  const visitGraph = (
+    edgeKind: 'premise' | 'supersession',
+    edgesFor: (record: PlainRecord) => readonly string[],
+  ): void => {
+    const state = new Map<string, 'visiting' | 'visited'>();
+    const visit = (id: string): void => {
+      const current = state.get(id);
+      if (current === 'visited') return;
+      if (current === 'visiting') return;
+      state.set(id, 'visiting');
+      const record = argumentsById.get(id);
+      if (record !== undefined) {
+        for (const dependencyId of edgesFor(record)) {
+          if (!argumentsById.has(dependencyId)) continue;
+          if (state.get(dependencyId) === 'visiting') {
+            const recordIndex = argumentIndexById.get(id);
+            issue(
+              issues,
+              recordIndex === undefined
+                ? '$.arguments'
+                : `$.arguments[${recordIndex}]`,
+              'dependency-cycle',
+              edgeKind === 'premise'
+                ? 'Argument conclusion premises must not form a dependency cycle.'
+                : 'Argument supersession links must not form a cycle.',
+            );
+            continue;
+          }
+          visit(dependencyId);
+        }
+      }
+      state.set(id, 'visited');
+    };
+    for (const id of argumentsById.keys()) visit(id);
+  };
+
+  visitGraph('premise', (record) =>
+    Array.isArray(record.premises)
+      ? record.premises.flatMap((premise) =>
+          isRecord(premise) &&
+          premise.kind === 'argument-conclusion' &&
+          typeof premise.argumentId === 'string'
+            ? [premise.argumentId]
+            : [],
+        )
+      : [],
+  );
+  visitGraph('supersession', (record) =>
+    typeof record.supersedesArgumentId === 'string'
+      ? [record.supersedesArgumentId]
+      : [],
+  );
 }
 
 export function validateArgumentLibrary(
@@ -782,6 +1167,7 @@ export function validateArgumentLibrary(
       'updatedAt',
       'topics',
       'axioms',
+      'arguments',
       'counterArguments',
     ],
     [],
@@ -813,6 +1199,12 @@ export function validateArgumentLibrary(
   const globalIds = new Set<string>();
   const topicIds = collectIds(value.topics, '$.topics', issues, globalIds);
   const axiomIds = collectIds(value.axioms, '$.axioms', issues, globalIds);
+  const argumentIds = collectIds(
+    value.arguments,
+    '$.arguments',
+    issues,
+    globalIds,
+  );
   const counterIds = collectIds(
     value.counterArguments,
     '$.counterArguments',
@@ -828,6 +1220,10 @@ export function validateArgumentLibrary(
     value.axioms.forEach((entry, index) =>
       validateAxiom(entry, `$.axioms[${index}]`, issues, sourceIds),
     );
+  if (Array.isArray(value.arguments))
+    value.arguments.forEach((entry, index) =>
+      validateArgument(entry, `$.arguments[${index}]`, issues, sourceIds),
+    );
   if (Array.isArray(value.counterArguments))
     value.counterArguments.forEach((entry, index) =>
       validateCounterArgument(
@@ -837,9 +1233,109 @@ export function validateArgumentLibrary(
         sourceIds,
       ),
     );
-  validateIntegrity(value, topicIds, axiomIds, counterIds, issues);
+  validateIntegrity(value, topicIds, axiomIds, argumentIds, counterIds, issues);
   return issues.length === 0
     ? { valid: true, value: value as unknown as ArgumentLibrary, issues: [] }
+    : { valid: false, issues };
+}
+
+export type ArgumentLibraryV1ValidationResult =
+  | {
+      readonly valid: true;
+      readonly value: PlainRecord;
+      readonly issues: readonly [];
+    }
+  | {
+      readonly valid: false;
+      readonly issues: readonly ArgumentLibraryValidationIssue[];
+    };
+
+/** Strictly validates the legacy shape before a deterministic v1-to-v2 migration. */
+export function validateArgumentLibraryV1(
+  value: unknown,
+): ArgumentLibraryV1ValidationResult {
+  const issues: ArgumentLibraryValidationIssue[] = [];
+  if (!isRecord(value)) {
+    return {
+      valid: false,
+      issues: [
+        {
+          path: '$',
+          code: 'invalid-type',
+          message: 'Expected an Argument Library object.',
+        },
+      ],
+    };
+  }
+  fields(
+    value,
+    [
+      'schemaVersion',
+      'libraryId',
+      'libraryRevision',
+      'createdAt',
+      'updatedAt',
+      'topics',
+      'axioms',
+      'counterArguments',
+    ],
+    [],
+    '$',
+    issues,
+  );
+  if (value.schemaVersion !== 1) {
+    issue(
+      issues,
+      '$.schemaVersion',
+      'invalid-value',
+      'Expected Argument Library schema version 1.',
+    );
+  }
+  nonEmptyString(value.libraryId, '$.libraryId', issues);
+  positiveRevision(value.libraryRevision, '$.libraryRevision', issues);
+  timestamp(value.createdAt, '$.createdAt', issues);
+  timestamp(value.updatedAt, '$.updatedAt', issues);
+  const globalIds = new Set<string>();
+  const topicIds = collectIds(value.topics, '$.topics', issues, globalIds);
+  const axiomIds = collectIds(value.axioms, '$.axioms', issues, globalIds);
+  const counterIds = collectIds(
+    value.counterArguments,
+    '$.counterArguments',
+    issues,
+    globalIds,
+  );
+  const sourceIds = new Set<string>();
+  if (Array.isArray(value.topics)) {
+    value.topics.forEach((entry, index) =>
+      validateTopic(entry, `$.topics[${index}]`, issues, 1),
+    );
+  }
+  if (Array.isArray(value.axioms)) {
+    value.axioms.forEach((entry, index) =>
+      validateAxiom(entry, `$.axioms[${index}]`, issues, sourceIds),
+    );
+  }
+  if (Array.isArray(value.counterArguments)) {
+    value.counterArguments.forEach((entry, index) =>
+      validateCounterArgument(
+        entry,
+        `$.counterArguments[${index}]`,
+        issues,
+        sourceIds,
+        false,
+      ),
+    );
+  }
+  validateIntegrity(
+    value,
+    topicIds,
+    axiomIds,
+    new Set<string>(),
+    counterIds,
+    issues,
+  );
+  return issues.length === 0
+    ? { valid: true, value, issues: [] }
     : { valid: false, issues };
 }
 

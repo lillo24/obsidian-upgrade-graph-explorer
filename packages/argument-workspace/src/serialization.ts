@@ -12,7 +12,10 @@ import type {
   ArgumentRuntime,
   SnapshotDescriptor,
 } from './types';
-import { validateArgumentLibrary } from './validation';
+import {
+  validateArgumentLibrary,
+  validateArgumentLibraryV1,
+} from './validation';
 
 export function serializeArgumentLibrary(library: ArgumentLibrary): string {
   const validation = validateArgumentLibrary(library);
@@ -43,6 +46,25 @@ export function parseArgumentLibraryJson(
       preservedSource: source,
     };
   }
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value as { readonly schemaVersion?: unknown }).schemaVersion === 1
+  ) {
+    const migration = migrateArgumentLibraryV1(value);
+    if (migration.status === 'valid') {
+      return {
+        status: 'valid',
+        value: migration.value,
+        migratedFromSchemaVersion: 1,
+      };
+    }
+    return {
+      ...migration,
+      preservedSource: source,
+    };
+  }
   const validation = validateArgumentLibrary(value);
   if (validation.valid) return { status: 'valid', value: validation.value };
   const future = validation.issues.some(({ code }) => code === 'future-schema');
@@ -55,6 +77,52 @@ export function parseArgumentLibraryJson(
     issues: validation.issues,
     preservedSource: source,
   };
+}
+
+type ArgumentLibraryMigrationResult =
+  | { readonly status: 'valid'; readonly value: ArgumentLibrary }
+  | {
+      readonly status: 'invalid-library';
+      readonly message: string;
+      readonly issues: ReturnType<typeof validateArgumentLibraryV1>['issues'];
+    };
+
+/** Deterministically upgrades valid v1 data without inventing theory content. */
+export function migrateArgumentLibraryV1(
+  value: unknown,
+): ArgumentLibraryMigrationResult {
+  const legacyValidation = validateArgumentLibraryV1(value);
+  if (!legacyValidation.valid) {
+    const first = legacyValidation.issues[0];
+    return {
+      status: 'invalid-library',
+      message: `Argument Library v1 is invalid${
+        first === undefined ? '.' : ` at ${first.path}: ${first.message}`
+      }`,
+      issues: legacyValidation.issues,
+    };
+  }
+  const legacy = clonePlainData(legacyValidation.value);
+  const candidate = {
+    ...legacy,
+    schemaVersion: 2,
+    topics: (legacy.topics as readonly Record<string, unknown>[]).map(
+      (topic) => ({ ...topic, argumentIds: [] }),
+    ),
+    arguments: [],
+  };
+  const migratedValidation = validateArgumentLibrary(candidate);
+  if (!migratedValidation.valid) {
+    const first = migratedValidation.issues[0];
+    return {
+      status: 'invalid-library',
+      message: `Migrated Argument Library is invalid${
+        first === undefined ? '.' : ` at ${first.path}: ${first.message}`
+      }`,
+      issues: migratedValidation.issues,
+    };
+  }
+  return { status: 'valid', value: migratedValidation.value };
 }
 
 export type ArgumentImportPreview =
@@ -87,6 +155,7 @@ function recordsByKind(library: ArgumentLibrary): readonly {
   return [
     { kind: 'topic', values: library.topics },
     { kind: 'axiom', values: library.axioms },
+    { kind: 'argument', values: library.arguments },
     { kind: 'counter-argument', values: library.counterArguments },
   ];
 }
@@ -174,10 +243,25 @@ export function previewArgumentLibraryImport(
   }
   const sourceOwners = (library: ArgumentLibrary) => [
     ...library.axioms.flatMap((record) =>
-      record.sourceReferences.map((source) => ({ source, owner: record.id })),
+      record.sourceReferences.map((source) => ({
+        source,
+        owner: record.id,
+        kind: 'axiom' as const,
+      })),
+    ),
+    ...library.arguments.flatMap((record) =>
+      record.sourceReferences.map((source) => ({
+        source,
+        owner: record.id,
+        kind: 'argument' as const,
+      })),
     ),
     ...library.counterArguments.flatMap((record) =>
-      record.sourceReferences.map((source) => ({ source, owner: record.id })),
+      record.sourceReferences.map((source) => ({
+        source,
+        owner: record.id,
+        kind: 'counter-argument' as const,
+      })),
     ),
   ];
   const currentSources = new Map(
@@ -186,16 +270,15 @@ export function previewArgumentLibraryImport(
       { source, owner },
     ]),
   );
-  for (const { source, owner } of sourceOwners(incoming)) {
+  for (const { source, owner, kind } of sourceOwners(incoming)) {
     const existing = currentSources.get(source.id);
     if (
       existing !== undefined &&
       (existing.owner !== owner ||
         canonicalJson(existing.source) !== canonicalJson(source))
     ) {
-      const ownerRecord = incoming.axioms.find(({ id }) => id === owner);
       conflicts.push({
-        kind: ownerRecord === undefined ? 'counter-argument' : 'axiom',
+        kind,
         id: owner,
         message: `Source-reference ID "${source.id}" is already owned by another record or locator.`,
       });
@@ -237,6 +320,7 @@ export function mergeArgumentLibraries(
     updatedAt: now,
     topics: merge(current.topics, incoming.topics),
     axioms: merge(current.axioms, incoming.axioms),
+    arguments: merge(current.arguments, incoming.arguments),
     counterArguments: merge(
       current.counterArguments,
       incoming.counterArguments,

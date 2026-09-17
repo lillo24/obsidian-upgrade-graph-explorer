@@ -23,6 +23,64 @@ import {
 } from './test-fixture';
 
 describe('Argument Library interchange', () => {
+  const legacyV1 = {
+    schemaVersion: 1,
+    libraryId: 'library-v1-fixture',
+    libraryRevision: 7,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-02T00:00:00.000Z',
+    topics: [
+      {
+        id: 'T-V1',
+        revision: 1,
+        reviewState: 'accepted',
+        archived: false,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        title: 'Legacy topic',
+        summary: 'A legacy summary.',
+        retrieval: { aliases: [], keywords: ['legacy'], phrases: [] },
+        axiomIds: ['AX-V1'],
+        counterArgumentIds: ['CA-V1'],
+      },
+    ],
+    axioms: [
+      {
+        id: 'AX-V1',
+        revision: 2,
+        reviewState: 'accepted',
+        archived: false,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+        title: 'Legacy axiom',
+        statement: 'Legacy content remains unchanged.',
+        retrieval: { aliases: [], keywords: [], phrases: [] },
+        sourceReferences: [],
+      },
+    ],
+    counterArguments: [
+      {
+        id: 'CA-V1',
+        revision: 3,
+        reviewState: 'accepted',
+        archived: false,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+        title: 'Legacy counter',
+        observation: 'A legacy observation.',
+        challengedClaim: 'A legacy challenged claim.',
+        target: { kind: 'topic-claim', topicId: 'T-V1' },
+        retrieval: { aliases: [], keywords: [], phrases: [] },
+        sourceReferences: [],
+        response: {
+          answeringAxioms: [{ axiomId: 'AX-V1', reliedOnRevision: 2 }],
+          explanation: 'A legacy response.',
+          outcome: 'standing',
+        },
+      },
+    ],
+  } as const;
+
   it('implements SHA-256 and exact JSON round trips deterministically', () => {
     expect(sha256('abc')).toBe(
       'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
@@ -51,9 +109,32 @@ describe('Argument Library interchange', () => {
     });
     expect(
       parseArgumentLibraryJson(
-        JSON.stringify({ ...createNeutralArgumentLibrary(), schemaVersion: 2 }),
+        JSON.stringify({ ...createNeutralArgumentLibrary(), schemaVersion: 3 }),
       ),
     ).toMatchObject({ status: 'future-schema' });
+  });
+
+  it('migrates v1 deterministically without inventing reasoning content', () => {
+    const source = JSON.stringify(legacyV1);
+    const first = parseArgumentLibraryJson(source);
+    const second = parseArgumentLibraryJson(source);
+    expect(first).toMatchObject({
+      status: 'valid',
+      migratedFromSchemaVersion: 1,
+      value: {
+        schemaVersion: 2,
+        libraryId: 'library-v1-fixture',
+        libraryRevision: 7,
+        arguments: [],
+        topics: [{ id: 'T-V1', argumentIds: [] }],
+      },
+    });
+    expect(second).toEqual(first);
+    if (first.status !== 'valid') return;
+    expect(first.value.axioms).toEqual(legacyV1.axioms);
+    expect(first.value.counterArguments).toEqual(legacyV1.counterArguments);
+    expect(first.value.topics[0]).not.toHaveProperty('currentArgumentId');
+    expect(JSON.stringify(first.value)).not.toContain('reasoning');
   });
 
   it('treats identical import as idempotent and same-lineage altered content as conflict', () => {
@@ -112,7 +193,7 @@ describe('Argument Library interchange', () => {
     const exported = exportArgumentLibraryMarkdown(
       createNeutralArgumentLibrary(),
     );
-    expect(exported.files).toHaveLength(3);
+    expect(exported.files).toHaveLength(4);
     expect(exported.files.every(({ path }) => !/[<>:"\\|?*]/u.test(path))).toBe(
       true,
     );
@@ -125,6 +206,12 @@ describe('Argument Library interchange', () => {
     expect(counter.text).toContain('id: "CA-NEUTRAL"');
     expect(counter.text).toContain('AX-NEUTRAL, assessed at revision 1');
     expect(counter.text).toContain('inapplicable-under-stated-scope');
+    const argument = exported.files.find(({ path }) =>
+      path.startsWith('arguments/'),
+    )!;
+    expect(argument.text).toContain('## Premises');
+    expect(argument.text).toContain('## Reasoning');
+    expect(argument.text).toContain('## Conclusion');
     expect(safeMarkdownFileName('CON', 'id:unsafe')).toBe(
       'record--id-unsafe.md',
     );

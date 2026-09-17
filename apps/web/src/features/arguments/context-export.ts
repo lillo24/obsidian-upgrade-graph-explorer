@@ -22,7 +22,11 @@ function target(value: CounterArgumentTarget | undefined): string {
   if (value === undefined) return 'No structured target recorded.';
   if (value.kind === 'topic-claim') return `Topic claim: ${value.topicId}`;
   if (value.kind === 'axiom') return `Axiom: ${value.axiomId}`;
-  return `Counter-Argument: ${value.counterArgumentId}`;
+  if (value.kind === 'counter-argument')
+    return `Counter-Argument: ${value.counterArgumentId}`;
+  return `Argument: ${value.argumentId} (${value.part.kind}${
+    value.part.kind === 'premise' ? ` ${value.part.premiseId}` : ''
+  })`;
 }
 
 export function formatArgumentBundle(
@@ -46,7 +50,49 @@ export function formatArgumentBundle(
       `Human review state: ${topic.reviewState}`,
       `Archived: ${topic.archived ? 'yes' : 'no'}`,
       `Axiom memberships: ${topic.axiomIds.join(', ') || 'none'}`,
+      `Argument memberships: ${topic.argumentIds.join(', ') || 'none'}`,
+      `Current Argument: ${topic.currentArgumentId ?? 'none'}`,
       `Counter-Argument memberships: ${topic.counterArgumentIds.join(', ') || 'none'}`,
+    );
+  }
+  for (const argument of bundle.arguments) {
+    sections.push(
+      '',
+      `## Argument — ${argument.title} (${argument.id})`,
+      '',
+      '### Premises',
+      '',
+      ...(argument.premises.length === 0
+        ? ['None.']
+        : argument.premises.map((premise, index) => {
+            if (premise.kind === 'text') {
+              return `${index + 1}. [${premise.id}] ${premise.text}`;
+            }
+            const reference =
+              premise.kind === 'axiom'
+                ? `Axiom ${premise.axiomId}`
+                : `Argument conclusion ${premise.argumentId}`;
+            return `${index + 1}. [${premise.id}] ${reference} @ relied-on revision ${premise.reliedOnRevision}`;
+          })),
+      ...prose('Reasoning', argument.reasoning),
+      '',
+      '### Conclusion',
+      '',
+      argument.conclusion,
+      '',
+      `Human review state: ${argument.reviewState}`,
+      `Archived: ${argument.archived ? 'yes' : 'no'}`,
+      `Premises stale: ${argument.argumentStale ? 'yes' : 'no'}`,
+      `Stale premise IDs: ${argument.stalePremiseIds.join(', ') || 'none'}`,
+      `Topic memberships: ${argument.topicIds.join(', ') || 'none'}`,
+      `Current for Topics: ${argument.currentTopicIds.join(', ') || 'none'}`,
+      `Supersedes: ${argument.supersedesArgumentId ?? 'none'}`,
+      `Superseded by: ${argument.supersededByArgumentIds.join(', ') || 'none'}`,
+      `Targeting Counter-Arguments: ${argument.targetingCounterArgumentIds.join(', ') || 'none'}`,
+      ...argument.sourceReferences.map(
+        (source) =>
+          `Source locator (not read): ${formatTheorySourceLocator(source)} [${source.role}; ${source.id}]`,
+      ),
     );
   }
   for (const axiom of bundle.axioms) {

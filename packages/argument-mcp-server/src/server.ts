@@ -179,6 +179,7 @@ export function createArgumentMcpServer(
         recordCounts: {
           topics: loaded.library.topics.length,
           axioms: loaded.library.axioms.length,
+          arguments: loaded.library.arguments.length,
           counterArguments: loaded.library.counterArguments.length,
         },
         knowledgeReaderContractVersion: KNOWLEDGE_READER_CONTRACT_VERSION,

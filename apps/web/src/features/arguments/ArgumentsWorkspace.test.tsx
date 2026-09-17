@@ -15,9 +15,11 @@ import {
   attachAnsweringAxiom,
   captureArgumentLibrarySnapshot,
   createAxiom,
+  createArgument,
   createCounterArgument,
   createEmptyArgumentLibrary,
   createTopic,
+  promoteArgumentToCurrent,
   sameSnapshot,
   setTopicMembership,
   updateCounterArgumentResponse,
@@ -71,7 +73,35 @@ function fixture(): ArgumentLibrary {
     clock,
   );
   library = createCounterArgument(
-    library,
+    createArgument(
+      createArgument(
+        library,
+        {
+          id: 'AR-UI',
+          title: 'Compatibility reasoning',
+          premises: [
+            {
+              id: 'P-UI',
+              kind: 'axiom',
+              axiomId: 'AX-UI',
+              reliedOnRevision: library.axioms[0]!.revision,
+            },
+          ],
+          reasoning: 'Comparable units are required before comparison.',
+          conclusion: 'Convert units before concluding a contradiction.',
+          reviewState: 'accepted',
+        },
+        clock,
+      ),
+      {
+        id: 'AR-UI-NEXT',
+        title: 'Replacement reasoning',
+        premises: [],
+        conclusion: 'A replacement Current conclusion.',
+        reviewState: 'accepted',
+      },
+      clock,
+    ),
     {
       id: 'CA-UI',
       title: 'Numeric mismatch',
@@ -93,6 +123,23 @@ function fixture(): ArgumentLibrary {
     clock,
   );
   library = setTopicMembership(library, 'T-UI', 'axiom', 'AX-UI', true, clock);
+  library = setTopicMembership(
+    library,
+    'T-UI',
+    'argument',
+    'AR-UI',
+    true,
+    clock,
+  );
+  library = setTopicMembership(
+    library,
+    'T-UI',
+    'argument',
+    'AR-UI-NEXT',
+    true,
+    clock,
+  );
+  library = promoteArgumentToCurrent(library, 'T-UI', 'AR-UI', clock);
   return setTopicMembership(
     library,
     'T-UI',
@@ -279,6 +326,29 @@ describe('standalone Arguments workspace', () => {
     );
     expect(preview.value).toContain('AX-UI@');
     expect(preview.value).toContain('Consultation receipt');
+  });
+
+  it('shows Current reasoning and promotes an accepted member explicitly', async () => {
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true),
+    );
+    await mount();
+    expect(container.textContent).toContain('Current reasoning');
+    expect(container.textContent).toContain('Compatibility reasoning');
+
+    await click('Replacement reasoning');
+    expect(container.textContent).toContain(
+      'A replacement Current conclusion.',
+    );
+    await click('Promote to Current');
+
+    expect(store.snapshot.library.topics[0]!.currentArgumentId).toBe(
+      'AR-UI-NEXT',
+    );
+    expect(
+      store.snapshot.library.arguments.find(({ id }) => id === 'AR-UI-NEXT'),
+    ).toMatchObject({ supersedesArgumentId: 'AR-UI' });
   });
 
   it('keeps dirty drafts through nested Escape and performs one confirmed Save', async () => {

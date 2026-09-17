@@ -34,7 +34,7 @@ import type {
   ArgumentSourceCapture,
 } from '../arguments/source-capture';
 
-const SNAPSHOT_ID_PREFIX = 'argument-library-snapshot-v1:';
+const SNAPSHOT_ID_PREFIX = 'argument-library-snapshot-v2:';
 const MAX_SOURCE_CHARACTERS = 100_000;
 const LIBRARY_CAPABILITIES: readonly CompilerCapability[] = [
   'list-index',
@@ -179,6 +179,9 @@ function sourceReferences(
 ): readonly TheorySourceReference[] {
   return [
     ...snapshot.library.axioms.flatMap(
+      ({ sourceReferences }) => sourceReferences,
+    ),
+    ...snapshot.library.arguments.flatMap(
       ({ sourceReferences }) => sourceReferences,
     ),
     ...snapshot.library.counterArguments.flatMap(

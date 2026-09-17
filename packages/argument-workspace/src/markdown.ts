@@ -75,6 +75,12 @@ export function exportArgumentLibraryMarkdown(
       safeMarkdownFileName(record.title, record.id),
     ]),
   );
+  const argumentFiles = new Map(
+    library.arguments.map((record) => [
+      record.id,
+      safeMarkdownFileName(record.title, record.id),
+    ]),
+  );
   const counterFiles = new Map(
     library.counterArguments.map((record) => [
       record.id,
@@ -83,6 +89,9 @@ export function exportArgumentLibraryMarkdown(
   );
   const axiomTitles = new Map(
     library.axioms.map(({ id, title }) => [id, title]),
+  );
+  const argumentTitles = new Map(
+    library.arguments.map(({ id, title }) => [id, title]),
   );
   const counterTitles = new Map(
     library.counterArguments.map(({ id, title }) => [id, title]),
@@ -110,6 +119,23 @@ export function exportArgumentLibraryMarkdown(
           : topic.axiomIds.map(
               (id) =>
                 `- [[axioms/${axiomFiles.get(id)!}|${axiomTitles.get(id)!}]] (${id})`,
+            )),
+        '',
+        '## Current Argument',
+        '',
+        ...(topic.currentArgumentId === undefined
+          ? ['_None._']
+          : [
+              `[[arguments/${argumentFiles.get(topic.currentArgumentId)!}|${argumentTitles.get(topic.currentArgumentId)!}]] (${topic.currentArgumentId})`,
+            ]),
+        '',
+        '## Arguments',
+        '',
+        ...(topic.argumentIds.length === 0
+          ? ['_None._']
+          : topic.argumentIds.map(
+              (id) =>
+                `- [[arguments/${argumentFiles.get(id)!}|${argumentTitles.get(id)!}]] (${id})${id === topic.currentArgumentId ? ' — Current' : ''}`,
             )),
         '',
         '## Counter-Arguments',
@@ -156,6 +182,57 @@ export function exportArgumentLibraryMarkdown(
             )),
       ].join('\n')}\n`,
     })),
+    ...library.arguments.map((argument) => ({
+      path: `arguments/${argumentFiles.get(argument.id)!}`,
+      text: `${[
+        frontmatter({
+          type: 'argument',
+          id: argument.id,
+          revision: argument.revision,
+          reviewState: argument.reviewState,
+          archived: argument.archived,
+        }),
+        '',
+        `# ${argument.title}`,
+        '',
+        '## Premises',
+        '',
+        ...(argument.premises.length === 0
+          ? ['_None._']
+          : argument.premises.map((premise, index) => {
+              const prefix = `${index + 1}. **${premise.id}** — `;
+              if (premise.kind === 'text') return `${prefix}${premise.text}`;
+              if (premise.kind === 'axiom') {
+                return `${prefix}[[axioms/${axiomFiles.get(premise.axiomId)!}|${axiomTitles.get(premise.axiomId)!}]] (${premise.axiomId}, relied on revision ${premise.reliedOnRevision})`;
+              }
+              return `${prefix}[[arguments/${argumentFiles.get(premise.argumentId)!}|${argumentTitles.get(premise.argumentId)!}]] conclusion (${premise.argumentId}, relied on revision ${premise.reliedOnRevision})`;
+            })),
+        ...(argument.reasoning === undefined
+          ? []
+          : ['', '## Reasoning', '', argument.reasoning]),
+        '',
+        '## Conclusion',
+        '',
+        argument.conclusion,
+        ...(argument.supersedesArgumentId === undefined
+          ? []
+          : [
+              '',
+              '## Supersedes',
+              '',
+              `[[arguments/${argumentFiles.get(argument.supersedesArgumentId)!}|${argumentTitles.get(argument.supersedesArgumentId)!}]] (${argument.supersedesArgumentId})`,
+            ]),
+        '',
+        '## Theory sources',
+        '',
+        ...(argument.sourceReferences.length === 0
+          ? ['_None._']
+          : argument.sourceReferences.map(
+              (reference) =>
+                `- ${formatTheorySourceLocator(reference)} — ${reference.role} (${reference.id})`,
+            )),
+      ].join('\n')}\n`,
+    })),
     ...library.counterArguments.map((counter) => {
       const target =
         counter.target === undefined
@@ -164,7 +241,13 @@ export function exportArgumentLibraryMarkdown(
             ? `Topic claim: ${counter.target.topicId}`
             : counter.target.kind === 'axiom'
               ? `Axiom: ${counter.target.axiomId}`
-              : `Counter-Argument: ${counter.target.counterArgumentId}`;
+              : counter.target.kind === 'counter-argument'
+                ? `Counter-Argument: ${counter.target.counterArgumentId}`
+                : `Argument: ${counter.target.argumentId} (${counter.target.part.kind}${
+                    counter.target.part.kind === 'premise'
+                      ? ` ${counter.target.part.premiseId}`
+                      : ''
+                  })`;
       return {
         path: `counter-arguments/${counterFiles.get(counter.id)!}`,
         text: `${[

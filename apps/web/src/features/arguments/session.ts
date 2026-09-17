@@ -4,21 +4,26 @@ import {
   attachAnsweringAxiom,
   captureArgumentLibrarySnapshot,
   createAxiom,
+  createArgument,
   createCounterArgument,
   createKnowledgeReader,
   createTopic,
   detachAnsweringAxiom,
   editAxiom,
+  editArgument,
   editCounterArgument,
   editTopic,
   parseArgumentLibraryJson,
+  promoteArgumentToCurrent,
   previewArgumentLibraryImport,
   reassessCounterArgumentResponse,
+  reassessArgumentPremises,
   sameSnapshot,
   setRecordArchived,
   setRecordReviewState,
   setTopicMembership,
   updateCounterArgumentResponse,
+  type Argument,
   type ArgumentAxiom,
   type ArgumentCounterArgument,
   type ArgumentImportPreview,
@@ -27,6 +32,7 @@ import {
   type ArgumentLibrarySnapshot,
   type ArgumentLibraryStore,
   type ArgumentRecordKind,
+  type ArgumentPremise,
   type ArgumentRuntime,
   type ArgumentTopic,
   type CounterArgumentOutcome,
@@ -79,6 +85,7 @@ export interface TopicRecordDraft extends DraftBase {
   readonly summary: string;
   readonly retrieval: RetrievalMetadata;
   readonly axiomIds: readonly string[];
+  readonly argumentIds: readonly string[];
   readonly counterArgumentIds: readonly string[];
 }
 
@@ -108,8 +115,22 @@ export interface CounterArgumentRecordDraft extends DraftBase {
   readonly reopeningCondition?: string | undefined;
 }
 
+export interface ArgumentRecordEditorDraft extends DraftBase {
+  readonly kind: 'argument';
+  readonly title: string;
+  readonly premises: readonly ArgumentPremise[];
+  readonly reasoning?: string | undefined;
+  readonly conclusion: string;
+  readonly retrieval: RetrievalMetadata;
+  readonly sourceReferences: readonly TheorySourceReference[];
+  readonly supersedesArgumentId?: string | undefined;
+}
+
 export type ArgumentRecordDraft =
-  TopicRecordDraft | AxiomRecordDraft | CounterArgumentRecordDraft;
+  | TopicRecordDraft
+  | AxiomRecordDraft
+  | ArgumentRecordEditorDraft
+  | CounterArgumentRecordDraft;
 
 export interface ArgumentImportPlan {
   readonly source: string;
@@ -117,6 +138,7 @@ export interface ArgumentImportPlan {
   readonly mode: 'merge' | 'replace';
   readonly preview: ArgumentImportPreview;
   readonly base: SnapshotDescriptor;
+  readonly migratedFromSchemaVersion?: 1;
 }
 
 export type ArgumentWorkspaceActionResult =
@@ -138,7 +160,7 @@ function optional(value: string | undefined): string | undefined {
 
 function syncTopicMemberships(
   library: ArgumentLibrary,
-  kind: 'axiom' | 'counter-argument',
+  kind: 'axiom' | 'argument' | 'counter-argument',
   id: string,
   selectedTopicIds: readonly string[],
   runtime: ArgumentRuntime,
@@ -149,7 +171,9 @@ function syncTopicMemberships(
     const current =
       kind === 'axiom'
         ? topic.axiomIds.includes(id)
-        : topic.counterArgumentIds.includes(id);
+        : kind === 'argument'
+          ? topic.argumentIds.includes(id)
+          : topic.counterArgumentIds.includes(id);
     const wanted = selected.has(topic.id);
     if (current !== wanted) {
       next = setTopicMembership(next, topic.id, kind, id, wanted, runtime);
@@ -165,6 +189,7 @@ function syncTopicRecordMemberships(
 ): ArgumentLibrary {
   let next = library;
   const axiomIds = new Set(draft.axiomIds);
+  const argumentIds = new Set(draft.argumentIds);
   const counterIds = new Set(draft.counterArgumentIds);
   const topic = next.topics.find(({ id }) => id === draft.id)!;
   for (const axiom of next.axioms) {
@@ -176,6 +201,20 @@ function syncTopicRecordMemberships(
         draft.id,
         'axiom',
         axiom.id,
+        wanted,
+        runtime,
+      );
+    }
+  }
+  for (const argument of next.arguments) {
+    const current = topic.argumentIds.includes(argument.id);
+    const wanted = argumentIds.has(argument.id);
+    if (current !== wanted) {
+      next = setTopicMembership(
+        next,
+        draft.id,
+        'argument',
+        argument.id,
         wanted,
         runtime,
       );
@@ -269,6 +308,49 @@ function saveDraft(
     next = syncTopicMemberships(
       next,
       'axiom',
+      draft.id,
+      draft.topicIds,
+      runtime,
+    );
+  } else if (draft.kind === 'argument') {
+    const reasoning = optional(draft.reasoning);
+    const supersedesArgumentId = optional(draft.supersedesArgumentId);
+    next =
+      draft.mode === 'create'
+        ? createArgument(
+            next,
+            {
+              id: draft.id,
+              title: draft.title,
+              premises: draft.premises,
+              ...(reasoning === undefined ? {} : { reasoning }),
+              conclusion: draft.conclusion,
+              retrieval: draft.retrieval,
+              sourceReferences: draft.sourceReferences,
+              ...(supersedesArgumentId === undefined
+                ? {}
+                : { supersedesArgumentId }),
+              reviewState: draft.reviewState,
+            },
+            runtime,
+          )
+        : editArgument(
+            next,
+            draft.id,
+            {
+              title: draft.title,
+              premises: draft.premises,
+              reasoning: reasoning ?? null,
+              conclusion: draft.conclusion,
+              retrieval: draft.retrieval,
+              sourceReferences: draft.sourceReferences,
+              supersedesArgumentId: supersedesArgumentId ?? null,
+            },
+            runtime,
+          );
+    next = syncTopicMemberships(
+      next,
+      'argument',
       draft.id,
       draft.topicIds,
       runtime,
@@ -381,6 +463,11 @@ export function findRecord(
 ): ArgumentAxiom;
 export function findRecord(
   library: ArgumentLibrary,
+  kind: 'argument',
+  id: string,
+): Argument;
+export function findRecord(
+  library: ArgumentLibrary,
   kind: 'counter-argument',
   id: string,
 ): ArgumentCounterArgument;
@@ -388,18 +475,20 @@ export function findRecord(
   library: ArgumentLibrary,
   kind: ArgumentRecordKind,
   id: string,
-): ArgumentTopic | ArgumentAxiom | ArgumentCounterArgument;
+): ArgumentTopic | ArgumentAxiom | Argument | ArgumentCounterArgument;
 export function findRecord(
   library: ArgumentLibrary,
   kind: ArgumentRecordKind,
   id: string,
-): ArgumentTopic | ArgumentAxiom | ArgumentCounterArgument {
+): ArgumentTopic | ArgumentAxiom | Argument | ArgumentCounterArgument {
   const record =
     kind === 'topic'
       ? library.topics.find((candidate) => candidate.id === id)
       : kind === 'axiom'
         ? library.axioms.find((candidate) => candidate.id === id)
-        : library.counterArguments.find((candidate) => candidate.id === id);
+        : kind === 'argument'
+          ? library.arguments.find((candidate) => candidate.id === id)
+          : library.counterArguments.find((candidate) => candidate.id === id);
   if (record === undefined) throw new Error(`${kind} "${id}" does not exist.`);
   return record;
 }
@@ -573,18 +662,24 @@ export class ArgumentWorkspaceSession {
     if (parsed.status !== 'valid') {
       return Promise.resolve({ status: 'invalid', message: parsed.message });
     }
-    return this.#initialize(parsed.value);
+    return this.#initialize(
+      parsed.value,
+      parsed.migratedFromSchemaVersion === undefined
+        ? undefined
+        : 'Migrated schema v1 to v2 and saved',
+    );
   }
 
   #initialize(
     seed: ArgumentLibrary | undefined,
+    successMessage = 'Saved',
   ): Promise<ArgumentWorkspaceActionResult> {
     return this.#schedule(async () => {
       this.#publish({ phase: 'missing', busy: true });
       const result = resultFromCommit(
         await this.#repository.initialize(this.runtime, seed),
       );
-      if (result.status === 'ok') this.#ready(result.snapshot, 'Saved');
+      if (result.status === 'ok') this.#ready(result.snapshot, successMessage);
       else
         this.#publish({
           phase: 'missing',
@@ -632,6 +727,25 @@ export class ArgumentWorkspaceSession {
     );
   }
 
+  reassessArgument(
+    expected: SnapshotDescriptor,
+    id: string,
+  ): Promise<ArgumentWorkspaceActionResult> {
+    return this.#commit(expected, (library) =>
+      reassessArgumentPremises(library, id, this.runtime),
+    );
+  }
+
+  promoteArgument(
+    expected: SnapshotDescriptor,
+    topicId: string,
+    argumentId: string,
+  ): Promise<ArgumentWorkspaceActionResult> {
+    return this.#commit(expected, (library) =>
+      promoteArgumentToCurrent(library, topicId, argumentId, this.runtime),
+    );
+  }
+
   recordSourceVersion(
     expected: SnapshotDescriptor,
     input: RecordTheorySourceVersionInput,
@@ -676,6 +790,11 @@ export class ArgumentWorkspaceSession {
           mode,
         ),
         base: state.snapshot.descriptor,
+        ...(parsed.migratedFromSchemaVersion === undefined
+          ? {}
+          : {
+              migratedFromSchemaVersion: parsed.migratedFromSchemaVersion,
+            }),
       },
     };
   }
@@ -747,14 +866,16 @@ export class ArgumentWorkspaceSession {
 
 export function recordTopicIds(
   library: ArgumentLibrary,
-  kind: 'axiom' | 'counter-argument',
+  kind: 'axiom' | 'argument' | 'counter-argument',
   id: string,
 ): readonly string[] {
   return library.topics
     .filter((topic) =>
       kind === 'axiom'
         ? topic.axiomIds.includes(id)
-        : topic.counterArgumentIds.includes(id),
+        : kind === 'argument'
+          ? topic.argumentIds.includes(id)
+          : topic.counterArgumentIds.includes(id),
     )
     .map(({ id: topicId }) => topicId);
 }
