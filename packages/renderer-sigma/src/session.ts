@@ -332,7 +332,7 @@ export class GlobalRendererSession {
       this.arrangementGesture.phase === 'primed' ||
       this.arrangementGesture.phase === 'dragging' ||
       this.arrangementTargetPointerActive ||
-      this.fileMoveCoordinator?.ownsPointerSequence === true
+      this.fileMoveCoordinator?.hasActiveGesture === true
     ) {
       preventSigmaWheelDefault(coordinates);
       return;
@@ -988,10 +988,10 @@ export class GlobalRendererSession {
       this.eligibleFileMoveNode(this.hoveredNode);
     this.container?.setAttribute(
       'data-file-move-cursor',
-      this.fileMoveCoordinator?.ownsPointerSequence === true
+      this.fileMovePointerOwner?.ownsPointerSequence === true
         ? 'grabbing'
         : eligibleHover
-          ? 'grab'
+          ? 'pointer'
           : 'idle',
     );
   }
@@ -1021,7 +1021,7 @@ export class GlobalRendererSession {
     preventSigmaDefault: () => void,
   ): void {
     const coordinator = this.fileMoveCoordinator;
-    if (coordinator?.ownsPointerSequence !== true) return;
+    if (coordinator?.hasActiveGesture !== true) return;
     preventSigmaDefault();
     coordinator.move(viewportPoint, this.viewportToGraphPoint(viewportPoint));
   }
@@ -1067,7 +1067,7 @@ export class GlobalRendererSession {
     }
     this.cancelTemporaryFileMove('cancelled');
     this.beginTemporaryFileMove(nodeKey, point);
-    if (this.fileMoveCoordinator?.ownsPointerSequence !== true) {
+    if (this.fileMoveCoordinator?.hasActiveGesture !== true) {
       return { status: 'unavailable', reason: 'simulation-unavailable' };
     }
     this.keyboardFileMoveViewportPoint = point;
@@ -1078,7 +1078,7 @@ export class GlobalRendererSession {
   nudgeKeyboardTemporaryFileMove(delta: SpatialPoint): boolean {
     const point = this.keyboardFileMoveViewportPoint;
     const coordinator = this.fileMoveCoordinator;
-    if (point === undefined || coordinator?.ownsPointerSequence !== true) {
+    if (point === undefined || coordinator?.hasActiveGesture !== true) {
       return false;
     }
     const next = { x: point.x + delta.x, y: point.y + delta.y };
@@ -1192,7 +1192,7 @@ export class GlobalRendererSession {
     this.renderer.on('rightClickNode', ({ preventSigmaDefault }) => {
       if (
         this.arrangementContext?.active === true ||
-        this.fileMoveCoordinator?.ownsPointerSequence === true
+        this.fileMoveCoordinator?.hasActiveGesture === true
       ) {
         preventSigmaDefault();
       }
@@ -1202,11 +1202,7 @@ export class GlobalRendererSession {
         this.fileMoveContext?.capability.status === 'available' &&
         this.eligibleFileMoveNode(node)
       ) {
-        preventSigmaDefault();
         this.beginTemporaryFileMove(node, { x: event.x, y: event.y });
-        if (this.fileMoveCoordinator?.ownsPointerSequence === true) {
-          this.fileMovePointerOwner?.claim();
-        }
         return;
       }
       if (this.fileMoveContext?.capability.status === 'unavailable') {
@@ -1230,7 +1226,7 @@ export class GlobalRendererSession {
     this.renderer.on('moveBody', ({ event, preventSigmaDefault }) => {
       if (
         this.fileMovePointerOwner?.ownsPointerSequence === true &&
-        this.fileMoveCoordinator?.ownsPointerSequence === true
+        this.fileMoveCoordinator?.isDragging === true
       ) {
         preventSigmaDefault();
       } else {
@@ -1307,6 +1303,8 @@ export class GlobalRendererSession {
         context,
         count: (operation) => this.options.instrumentation?.count(operation),
         onDragStart: (nodeKey) => {
+          this.fileMovePointerOwner?.claim();
+          this.updateTemporaryFileMoveCursor();
           this.nodeClicks?.cancel();
           this.selectNode(nodeKey);
         },

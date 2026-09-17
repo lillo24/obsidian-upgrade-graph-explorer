@@ -78,7 +78,8 @@ describe('temporary File move renderer sessions', () => {
     const onNodeSelected = vi.fn();
     const onNodeSingleClick = vi.fn();
     const count = vi.fn();
-    const session = new GlobalRendererSession(testContainer(), input, {
+    const container = testContainer();
+    const session = new GlobalRendererSession(container, input, {
       settings: { folderClustering: false, spacingPreset: 'normal' },
       trackpadZoomMode: 'pinch-zoom',
       onNodeActivated,
@@ -103,6 +104,7 @@ describe('temporary File move renderer sessions', () => {
     return {
       input,
       count,
+      container,
       onNodeActivated,
       onNodeSelected,
       onNodeSingleClick,
@@ -117,7 +119,8 @@ describe('temporary File move renderer sessions', () => {
     const onNodeActivated = vi.fn();
     const onNodeSelected = vi.fn();
     const onNodeSingleClick = vi.fn();
-    const session = new LocalRendererSession(testContainer(), input, {
+    const container = testContainer();
+    const session = new LocalRendererSession(container, input, {
       rootNodeKey: input.rootNodeKey,
       trackpadZoomMode: 'pinch-zoom',
       onNodeActivated,
@@ -136,6 +139,7 @@ describe('temporary File move renderer sessions', () => {
     });
     return {
       input,
+      container,
       onNodeActivated,
       onNodeSelected,
       onNodeSingleClick,
@@ -174,7 +178,7 @@ describe('temporary File move renderer sessions', () => {
       preventSigmaDefault: moveDefault,
     });
     renderer.handlers.get('upStage')!({});
-    expect(downDefault).toHaveBeenCalledOnce();
+    expect(downDefault).not.toHaveBeenCalled();
     expect(moveDefault).toHaveBeenCalledTimes(2);
     expect(port.commands).toEqual([
       expect.objectContaining({ kind: 'begin', sequence: 0 }),
@@ -247,6 +251,109 @@ describe('temporary File move renderer sessions', () => {
     expect(idleRightClickDefault).not.toHaveBeenCalled();
   });
 
+  it('keeps a native below-threshold press/release as a real single click', () => {
+    const { container, onNodeSingleClick, port, renderer } = globalHarness();
+    const node = renderer.graph.getNodeAttributes('entity:doc-a') as {
+      x: number;
+      y: number;
+    };
+    renderer.handlers.get('enterNode')!({ node: 'entity:doc-a' });
+    containerListeners.get('pointerdown')!({
+      pointerId: 31,
+      button: 0,
+      buttons: 1,
+      isPrimary: true,
+    });
+    const downDefault = vi.fn();
+    renderer.handlers.get('downNode')!({
+      node: 'entity:doc-a',
+      event: node,
+      preventSigmaDefault: downDefault,
+    });
+    expect(vi.mocked(container.setAttribute).mock.calls.at(-1)).toEqual([
+      'data-file-move-cursor',
+      'pointer',
+    ]);
+    const moveDefault = vi.fn();
+    renderer.handlers.get('moveBody')!({
+      event: { x: node.x + 2, y: node.y },
+      preventSigmaDefault: moveDefault,
+    });
+    const pointerUp = {
+      pointerId: 31,
+      button: 0,
+      buttons: 0,
+      cancelable: true,
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+    };
+    documentListeners.get('pointerup')!(pointerUp);
+    renderer.handlers.get('upNode')!({});
+    renderer.handlers.get('clickNode')!({ node: 'entity:doc-a' });
+
+    expect(downDefault).not.toHaveBeenCalled();
+    expect(moveDefault).toHaveBeenCalledOnce();
+    expect(container.hasPointerCapture(31)).toBe(false);
+    expect(pointerUp.preventDefault).not.toHaveBeenCalled();
+    expect(pointerUp.stopPropagation).not.toHaveBeenCalled();
+    expect(port.commands).toEqual([]);
+    expect(vi.mocked(container.setAttribute).mock.calls).not.toContainEqual([
+      'data-file-move-cursor',
+      'grabbing',
+    ]);
+    vi.advanceTimersByTime(300);
+    expect(onNodeSingleClick).toHaveBeenCalledOnce();
+  });
+
+  it('preserves the native two-click sequence and activates exactly once', () => {
+    const { container, onNodeActivated, onNodeSingleClick, port, renderer } =
+      globalHarness();
+    const node = renderer.graph.getNodeAttributes('entity:doc-a') as {
+      x: number;
+      y: number;
+    };
+    const click = (pointerId: number) => {
+      containerListeners.get('pointerdown')!({
+        pointerId,
+        button: 0,
+        buttons: 1,
+        isPrimary: true,
+      });
+      renderer.handlers.get('downNode')!({
+        node: 'entity:doc-a',
+        event: node,
+        preventSigmaDefault: vi.fn(),
+      });
+      documentListeners.get('pointerup')!({
+        pointerId,
+        button: 0,
+        buttons: 0,
+        cancelable: true,
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      });
+      renderer.handlers.get('upNode')!({});
+      renderer.handlers.get('clickNode')!({ node: 'entity:doc-a' });
+    };
+
+    click(41);
+    click(42);
+    const preventDoubleClickZoom = vi.fn();
+    renderer.handlers.get('doubleClickNode')!({
+      node: 'entity:doc-a',
+      preventSigmaDefault: preventDoubleClickZoom,
+    });
+    vi.advanceTimersByTime(300);
+
+    expect(preventDoubleClickZoom).toHaveBeenCalledOnce();
+    expect(onNodeActivated).toHaveBeenCalledOnce();
+    expect(onNodeSingleClick).not.toHaveBeenCalled();
+    expect(port.commands).toEqual([]);
+    expect(container.hasPointerCapture(41)).toBe(false);
+    expect(container.hasPointerCapture(42)).toBe(false);
+    expect(renderer.camera.animate).not.toHaveBeenCalled();
+  });
+
   it('uses the live viewport transform again after camera state changes', () => {
     const { port, renderer } = globalHarness();
     const node = renderer.graph.getNodeAttributes('entity:doc-a') as {
@@ -310,7 +417,7 @@ describe('temporary File move renderer sessions', () => {
       event: { x: root.x + 3, y: root.y },
       preventSigmaDefault,
     });
-    expect(preventSigmaDefault).toHaveBeenCalledTimes(2);
+    expect(preventSigmaDefault).toHaveBeenCalledOnce();
     expect(port.commands[0]).toMatchObject({
       kind: 'begin',
       nodeKey: 'entity:root',
@@ -378,7 +485,7 @@ describe('temporary File move renderer sessions', () => {
   });
 
   it('keeps native pointer ownership across leaveStage and a stop-propagating HTML overlay', () => {
-    const { port, renderer } = globalHarness();
+    const { container, port, renderer } = globalHarness();
     const node = renderer.graph.getNodeAttributes('entity:doc-a') as {
       x: number;
       y: number;
@@ -395,8 +502,21 @@ describe('temporary File move renderer sessions', () => {
       preventSigmaDefault: vi.fn(),
     });
 
+    expect(container.hasPointerCapture(7)).toBe(false);
+    const thresholdMoveDefault = vi.fn();
+    renderer.handlers.get('moveBody')!({
+      event: { x: node.x + 3, y: node.y },
+      preventSigmaDefault: thresholdMoveDefault,
+    });
+    expect(thresholdMoveDefault).toHaveBeenCalledOnce();
+    expect(container.hasPointerCapture(7)).toBe(true);
+    expect(vi.mocked(container.setAttribute).mock.calls.at(-1)).toEqual([
+      'data-file-move-cursor',
+      'grabbing',
+    ]);
+    expect(port.commands[0]).toMatchObject({ kind: 'begin', sequence: 0 });
+
     renderer.handlers.get('leaveStage')!({});
-    expect(port.commands).toEqual([]);
     documentListeners.get('pointermove')!({
       pointerId: 99,
       buttons: 1,
@@ -405,7 +525,7 @@ describe('temporary File move renderer sessions', () => {
       cancelable: true,
       preventDefault: vi.fn(),
     });
-    expect(port.commands).toEqual([]);
+    expect(port.commands).toHaveLength(1);
     documentListeners.get('pointermove')!({
       pointerId: 7,
       buttons: 1,
@@ -414,7 +534,7 @@ describe('temporary File move renderer sessions', () => {
       cancelable: true,
       preventDefault: vi.fn(),
     });
-    expect(port.commands[0]).toMatchObject({ kind: 'begin', sequence: 0 });
+    expect(port.commands).toHaveLength(1);
 
     const stopPropagation = vi.fn();
     documentListeners.get('pointerup')!({
@@ -426,6 +546,7 @@ describe('temporary File move renderer sessions', () => {
       stopPropagation,
     });
     expect(stopPropagation).toHaveBeenCalledOnce();
+    expect(port.commands[1]).toMatchObject({ kind: 'update', sequence: 1 });
     expect(port.commands.at(-1)).toMatchObject({
       kind: 'end',
       reason: 'released',
