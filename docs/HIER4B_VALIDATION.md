@@ -243,13 +243,13 @@ visible horizontal straight segment derived from the rounded path itself.
 Folder-strength behavior is unchanged and remains future work for dense graphs.
 
 Final local validation passes 159 layout tests, 127 renderer tests, 171 web
-component tests, 10 layout-cache tests, and the complete 270-file/2264-test
+component tests, 10 layout-cache tests, and the complete 272-file/2293-test
 `pnpm check` gate. The Soft benchmark passes all hard gates across 135 fixture,
 15 stress, 21 hierarchy-force, 35 hierarchy-strength, 32 Compass-demand, and 40
 Compass-strength rows. Desktop Rust check/test and the optimized release build
 also pass. The QA executable is
 `output/hier4b-spacing-fix2-native-candidate.exe`; its SHA-256 is
-`893E63D938C79E50C4B883F81E40D06010C3D3998E2DD326E6A4A18F247C5BFC`.
+`17C0ECB73361FC46303ABA6BA5CA11B8B80EFD9583BFEE6D1E856067375893FC`.
 
 ## Commands
 
