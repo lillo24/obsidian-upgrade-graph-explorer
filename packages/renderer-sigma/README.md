@@ -112,11 +112,14 @@ All and Focus share one renderer-only Network presentation policy. Qualifying
 labels are centered below their rendered nodes using the Obsidian 1.11.5
 `14 + radius / 4` formula, capped to the rendered node diameter because Icarus
 supports smaller nodes than Obsidian. The Network surfaces and Sigma defaults
-use the resolved Obsidian default-dark graph palette; semantic diagnostics,
-hierarchy/reference distinctions, and explicit Visual Group accents remain
-Icarus-owned layers. These presentation values do not enter layout requests,
-fingerprints, position caches, camera policy, or persistence. The source audit
-is recorded in `docs/OBSIDIAN_GRAPH_VISUAL_REFERENCE.md`.
+use the resolved Obsidian default-dark graph palette. Ordinary labels adapt
+Obsidian's zoom fade to Sigma's rendered-radius threshold: opacity rises from 0
+at the current hard-cull boundary to 1 at `sqrt(2)` times that boundary, while
+forced labels remain fully opaque. Semantic diagnostics, hierarchy/reference
+distinctions, and explicit Visual Group accents remain Icarus-owned layers.
+These presentation values do not enter layout requests, fingerprints, position
+caches, camera policy, or persistence. The source audit is recorded in
+`docs/OBSIDIAN_GRAPH_VISUAL_REFERENCE.md`.
 
 Network layout progress remains visible while preparing/refining; success clears
 the status, while layout failure retains the error and last-position recovery text.

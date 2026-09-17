@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   drawNetworkNodeHover,
   drawNetworkNodeLabel,
+  NETWORK_LABEL_FULL_OPACITY_RATIO,
   placeNetworkLabel,
+  resolveNetworkLabelOpacity,
 } from './network-label';
 
 const BASE = {
@@ -65,6 +67,7 @@ describe('shared All/Focus Network label placement', () => {
       beginPath: vi.fn(),
       canvas: { width: 320, height: 180 },
       fillText,
+      globalAlpha: 1,
       getTransform: () => ({ a: 1, d: 1 }),
       measureText: () => ({ width: 72 }),
       restore: vi.fn(),
@@ -81,6 +84,7 @@ describe('shared All/Focus Network label placement', () => {
     const settings = {
       labelColor: { color: '#dadada' },
       labelFont: 'sans-serif',
+      labelRenderedSizeThreshold: 4,
       labelWeight: 'normal',
     };
 
@@ -91,3 +95,139 @@ describe('shared All/Focus Network label placement', () => {
     expect(fillText.mock.calls[0]).toEqual(fillText.mock.calls[1]);
   });
 });
+
+describe('shared All/Focus Network label opacity', () => {
+  const opacity = (
+    renderedNodeSize: number,
+    labelRenderedSizeThreshold = 4,
+    forceLabel = false,
+  ) =>
+    resolveNetworkLabelOpacity({
+      renderedNodeSize,
+      labelRenderedSizeThreshold,
+      forceLabel,
+    });
+
+  it('is transparent below and at the existing hard threshold', () => {
+    expect(opacity(3.9)).toBe(0);
+    expect(opacity(4)).toBe(0);
+  });
+
+  it('rises continuously through the Obsidian-derived fade window', () => {
+    const justAbove = opacity(4.01);
+    const midpoint = opacity(4 * 2 ** 0.25);
+    expect(justAbove).toBeGreaterThan(0);
+    expect(justAbove).toBeLessThan(midpoint);
+    expect(midpoint).toBeCloseTo(0.5);
+  });
+
+  it('is fully opaque at and above the rendered-size boundary', () => {
+    expect(opacity(4 * NETWORK_LABEL_FULL_OPACITY_RATIO)).toBe(1);
+    expect(opacity(40)).toBe(1);
+  });
+
+  it('returns a safe deterministic value for invalid ordinary sizes', () => {
+    expect(opacity(-1)).toBe(0);
+    expect(opacity(Number.NaN)).toBe(0);
+  });
+
+  it('moves the fade window with the current threshold', () => {
+    expect(opacity(6, 4)).toBe(1);
+    expect(opacity(6, 6)).toBe(0);
+    expect(opacity(6 * 2 ** 0.25, 6)).toBeCloseTo(0.5);
+  });
+
+  it('keeps forced labels fully opaque below the ordinary threshold', () => {
+    expect(opacity(1, 4, true)).toBe(1);
+  });
+
+  it('applies zoom alpha only to ordinary drawing while hover stays full', () => {
+    const ordinaryContext = drawingContext();
+    const hoverContext = drawingContext();
+    const data = {
+      color: '#8a5cf5',
+      forceLabel: false,
+      label: 'Node',
+      size: 4 * 2 ** 0.25,
+      x: 120,
+      y: 80,
+    };
+    const settings = {
+      labelColor: { color: '#dadada' },
+      labelFont: 'sans-serif',
+      labelRenderedSizeThreshold: 4,
+      labelWeight: 'normal',
+    };
+
+    drawNetworkNodeLabel(ordinaryContext.context, data, settings as never);
+    drawNetworkNodeHover(hoverContext.context, data, settings as never);
+
+    expect(ordinaryContext.alphaAtFill()).toBeCloseTo(0.5);
+    expect(hoverContext.alphaAtFill()).toBe(1);
+    expect(ordinaryContext.fillText.mock.calls[0]).toEqual(
+      hoverContext.fillText.mock.calls[0],
+    );
+  });
+
+  it('draws a forced ordinary label at full opacity with unchanged geometry', () => {
+    const ordinaryContext = drawingContext();
+    const forcedContext = drawingContext();
+    const settings = {
+      labelColor: { color: '#dadada' },
+      labelFont: 'sans-serif',
+      labelRenderedSizeThreshold: 4,
+      labelWeight: 'normal',
+    };
+    const data = {
+      color: '#8a5cf5',
+      label: 'Node',
+      size: 4.01,
+      x: 120,
+      y: 80,
+    };
+
+    drawNetworkNodeLabel(
+      ordinaryContext.context,
+      { ...data, forceLabel: false },
+      settings as never,
+    );
+    drawNetworkNodeLabel(
+      forcedContext.context,
+      { ...data, forceLabel: true },
+      settings as never,
+    );
+
+    expect(ordinaryContext.alphaAtFill()).toBeLessThan(1);
+    expect(forcedContext.alphaAtFill()).toBe(1);
+    expect(ordinaryContext.fillText.mock.calls[0]).toEqual(
+      forcedContext.fillText.mock.calls[0],
+    );
+  });
+});
+
+function drawingContext() {
+  const fillText = vi.fn();
+  const alphaAtFill = vi.fn<() => number>();
+  const state = { globalAlpha: 1 };
+  const context = {
+    arc: vi.fn(),
+    beginPath: vi.fn(),
+    canvas: { width: 320, height: 180 },
+    fillText: (...args: unknown[]) => {
+      alphaAtFill.mockReturnValue(state.globalAlpha);
+      fillText(...args);
+    },
+    get globalAlpha() {
+      return state.globalAlpha;
+    },
+    set globalAlpha(value: number) {
+      state.globalAlpha = value;
+    },
+    getTransform: () => ({ a: 1, d: 1 }),
+    measureText: () => ({ width: 72 }),
+    restore: vi.fn(),
+    save: vi.fn(),
+    stroke: vi.fn(),
+  } as unknown as CanvasRenderingContext2D;
+  return { alphaAtFill, context, fillText };
+}

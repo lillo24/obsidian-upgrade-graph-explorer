@@ -27,12 +27,27 @@ not cause a label jump. Sigma's one-line canvas API also cannot reproduce Pixi
 word wrapping exactly; Icarus retains a centered single line capped to the same
 300-pixel width.
 
+The GRAPHVIS-OBSIDIAN1B follow-up recovered Obsidian's exact zoom-opacity path:
+`textAlpha = clamp(log2(rendererScale) + 1 - textFadeMultiplier, 0, 1)`.
+The default multiplier is 1, and highlighted text bypasses that fade. Because
+Obsidian's effective rendered node/text size grows with `sqrt(rendererScale)`,
+its default scale 1–2 fade maps to a rendered-size window of 1–`sqrt(2)`.
+
 ## Icarus implementation
 
 - `network-label.ts` owns one All/Focus canvas drawer and placement policy. It
   centers qualifying labels below rendered nodes, preserves the five-pixel gap,
   and uses `min(14 + renderedRadius / 4, renderedDiameter)` so Icarus's smaller
   nodes still satisfy the required font-size invariant.
+- The same module now adapts Obsidian's recovered logarithmic fade to Sigma's
+  current hard threshold as
+  `clamp(2 * log2(renderedRadius / threshold), 0, 1)`. Ordinary labels are
+  transparent at the threshold, reach full opacity at `sqrt(2) * threshold`,
+  and remain hard-culled below the threshold by Sigma. The window follows each
+  session's live Label Threshold rather than a fixed default.
+- Existing forced-label states—including selected, hovered, Focus root,
+  arrangement members, and always-labelled small graphs—bypass zoom fading and
+  stay fully opaque. Hover uses the same geometry and font as ordinary drawing.
 - `GlobalRendererSession` and `LocalRendererSession` install that same label and
   hover drawer. Existing label thresholds, semantic LOD, forced labels, and
   `hideLabelsOnMove: false` remain unchanged.
@@ -69,13 +84,16 @@ its coordinate-sensitive cases passed.
 ## Validation
 
 - `pnpm install --frozen-lockfile` passed.
-- Renderer-focused tests passed: **61 files / 466 tests**.
-- Web tests passed: **95 files / 725 tests**.
+- Renderer-focused tests passed: **61 files / 474 tests**.
+- Web tests passed: **95 files / 726 tests**.
 - `pnpm benchmark:global-renderer -- --profile small` passed; example mapping
-  median was 0.323 ms and graph build median was 0.154 ms.
+  median was 0.262 ms, graph build median was 0.111 ms, and visual label
+  threshold median was 0.039 ms. Its visual operation contract recorded zero
+  projection, topology mapping, graph reconciliation, layout, and coordinate
+  writes, with exactly one Sigma visual refresh.
 - `pnpm benchmark:local-renderer -- --profile small` passed.
 - `pnpm check` passed formatting, lint, all workspace typechecks, **268 files /
-  2,213 tests**, and the production web build.
+  2,229 tests**, and the production web build.
 - `pnpm desktop:check` passed, including **16 Rust tests**.
 - `pnpm desktop:build` produced a fresh optimized Windows executable.
 - `git diff --check` passed.
@@ -86,8 +104,18 @@ surface. At fitted, zoomed-in, and zoomed-out scales, visible labels remained
 centered below their nodes; small labels did not dominate their nodes; selected
 All and Focus nodes gained accent rings without changing the text anchor or
 adding a white callout; muted edges and ordinary/Visual Group/root colors remained
-legible. Automated drawer tests additionally cover hover anchor equality, long
-labels, small/large/enlarged nodes, and all viewport edges.
+legible. In the Focus view, an ordinary label progressed from readable, through
+faint and nearly transparent states, to clean culling over small wheel steps,
+while the forced root and selected labels stayed fully readable. The persisted
+All fixture contains only five nodes and therefore intentionally activates the
+existing always-label-small-graph policy; ordinary All fading was instead
+exercised with 309 nodes and 1,200 edges through the built production
+`GlobalRendererSession` harness, where labels likewise appeared and disappeared
+continuously as zoom crossed the live threshold. No label jump, flicker, hue
+change, layout request, or camera reframe was observed. Automated drawer tests
+additionally cover hover anchor equality, fade endpoints and midpoint, a moving
+threshold, forced-label bypass, long labels, small/large/enlarged nodes, and all
+viewport edges.
 
 The available computer-use surface was browser-only, so the optimized native
 window could not be inspected programmatically. Native desktop appearance is
@@ -102,17 +130,21 @@ Fresh executable:
 C:\Users\leona\Documents\GitHub\icarus-graph-explorer-graphvis-obsidian1\apps\desktop\src-tauri\target\release\icarus-graph-explorer-desktop.exe
 ```
 
-Size: **13,542,400 bytes**  
-SHA-256: `BA90B832930F979E4DC70F5C398CD28034093094282F5CE3C0B3FA56FBAC50C7`
+Size: **13,545,472 bytes**
+
+SHA-256: `1F9CCAB695C86A41A0FC1D8F3F50644BA60312238BB505B90B8821C57A8A04AE`
 
 Side-by-side acceptance checklist:
 
 1. Compare ordinary, small, and high-degree File nodes in Obsidian dark Graph,
    Icarus All Network, and Icarus Focus Network.
-2. At far, normal, and close zoom, confirm labels stay centered underneath and
+2. Starting at normal zoom, zoom out slowly and confirm ordinary labels fade
+   smoothly before disappearing instead of popping off abruptly.
+3. At far, normal, and close zoom, confirm labels stay centered underneath and
    never visually exceed node diameter.
-3. Hover and select nodes; confirm the label does not jump and no white callout
+4. Hover and select nodes; confirm their forced labels remain fully readable,
+   the label does not jump, and no white callout
    appears.
-4. Confirm muted edges, ordinary nodes, focused/root accents, diagnostics, and
+5. Confirm muted edges, ordinary nodes, focused/root accents, diagnostics, and
    Visual Group colors remain distinguishable.
-5. Exercise Move and Arrange Folders and inspect labels near every canvas edge.
+6. Exercise Move and Arrange Folders and inspect labels near every canvas edge.

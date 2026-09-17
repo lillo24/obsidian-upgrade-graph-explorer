@@ -48,9 +48,31 @@ because Icarus supports nodes smaller than Obsidian's radius floor.
 
 Obsidian does not draw a label backing rectangle or text shadow. Highlighting
 changes the node fill to the accent and draws a focused-color circle. Label
-opacity follows graph zoom/text fade, becomes fully opaque for the highlighted
-node, and otherwise participates in the renderer's related-node fade. The
-renderer culls offscreen nodes/text and uses the 300-unit word-wrap width.
+opacity is owned by the renderer's `setScale` path. Stable tokens in
+`formatted/app.pretty.js` are `fTextShowMult`, `textAlpha`, `nodeScale`, and
+`setScale`. The exact calculation is:
+
+```text
+nodeScale = sqrt(1 / rendererScale)
+textAlpha = clamp(log2(rendererScale) + 1 - textFadeMultiplier, 0, 1)
+```
+
+`textFadeMultiplier` defaults to `1`, so default text alpha is
+`clamp(log2(rendererScale), 0, 1)`: zero at renderer scale 1, fully opaque at
+scale 2, and continuous between them. The Graph display slider changes the
+multiplier from -3 to 3 in 0.1 increments. A non-highlighted label's final alpha
+is `textAlpha * fadeAlpha * graphTextColorAlpha`. `fadeAlpha` animates unrelated
+nodes toward 0.2 during highlighting. The highlighted node replaces that
+intermediate result with 1 before applying the theme color alpha, so it bypasses
+both zoom and related-node fading. Text visibility is then culled when final
+alpha is not greater than `0.001`, in addition to viewport culling.
+
+The holder scales by `rendererScale`, while node/text children scale by
+`sqrt(1 / rendererScale)`. Their effective rendered size therefore grows with
+`sqrt(rendererScale)`. The default fade from renderer scale 1 to 2 corresponds
+to a rendered node/text size increase from 1 to `sqrt(2)`. Obsidian does not use
+Sigma's per-node rendered-size threshold; that part of the Icarus mapping is an
+adaptation.
 
 ## Default-dark graph palette
 
@@ -78,7 +100,23 @@ toward 0.2 alpha while a node is highlighted.
 ## Icarus compatibility decisions
 
 - Icarus retains its existing Sigma label threshold, semantic LOD, and forced
-  labels; only the geometry and drawing of an already-qualified label change.
+  labels. Ordinary label opacity adapts the recovered Obsidian curve to Sigma's
+  rendered-radius domain:
+
+  ```text
+  ratio = rendered node radius / current label threshold
+  opacity = clamp(2 * log2(ratio), 0, 1)
+  ```
+
+  This is zero at the existing threshold and fully opaque at
+  `sqrt(2) * threshold`; Sigma still hard-culls ordinary labels below the
+  threshold. Because the current threshold is supplied to every draw, changing
+  Label Threshold moves the fade window coherently rather than relying on a
+  hard-coded default.
+
+- Selected, hovered, Focus-root, arrangement-member, always-labelled, and other
+  existing `forceLabel` states stay fully opaque. This preserves the product's
+  forced-label contract and matches Obsidian's highlighted-label bypass.
 - Icarus Visual Group accents remain renderer inputs. Selected, hovered, and
   Focus-root states remain authoritative interaction layers, as in Obsidian.
 - Icarus unresolved/ambiguous/invalid and hierarchy/reference distinctions use
