@@ -14,6 +14,7 @@ import * as localLayout from './local-layout';
 import { LocalLayoutCache } from './local-layout-cache';
 import { LocalGraphCanvas } from './LocalGraphCanvas';
 import { localTestProjection } from './local-test-fixture';
+import { OBSIDIAN_DARK_NETWORK_THEME } from './network-theme';
 import {
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
   resolveNetworkSettings,
@@ -128,6 +129,13 @@ it('keeps shared visual controls render-only and relayouts only for Reference Pu
     referenceWeight: 1,
   });
   const renderer = SigmaTestRenderer.instances[0]!;
+  expect(renderer.settings).toMatchObject({
+    defaultEdgeColor: OBSIDIAN_DARK_NETWORK_THEME.edge,
+    defaultNodeColor: OBSIDIAN_DARK_NETWORK_THEME.node,
+    labelColor: { color: OBSIDIAN_DARK_NETWORK_THEME.label },
+  });
+  expect(renderer.settings.defaultDrawNodeHover).toEqual(expect.any(Function));
+  expect(renderer.settings.defaultDrawNodeLabel).toEqual(expect.any(Function));
   const rootKey = renderer.graph
     .nodes()
     .find((key) => renderer.graph.getNodeAttribute(key, 'root') === true)!;

@@ -42,6 +42,7 @@ import {
 } from './local-mapping';
 import { LocalRendererSession } from './local-session';
 import { NetworkViewportControls } from './NetworkViewportControls';
+import { NETWORK_GRAPH_THEME_ID } from './network-theme';
 import type {
   LocalCenterRequest,
   LocalDensityQaDiagnostics,
@@ -810,6 +811,7 @@ export function LocalGraphCanvas({
     <div
       className="local-graph-canvas"
       data-initial-presentation={initialPresentationReady ? 'ready' : 'pending'}
+      data-network-theme={NETWORK_GRAPH_THEME_ID}
     >
       <div className="local-graph-canvas__surface" ref={containerRef} />
       <NetworkViewportControls

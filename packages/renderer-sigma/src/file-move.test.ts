@@ -289,7 +289,7 @@ describe('File move frame coordinator', () => {
     expect(frame).toBeDefined();
     (frame as () => void)();
     expect(commands).toEqual(['begin', 'end:error']);
-    expect(coordinator.ownsPointerSequence).toBe(false);
+    expect(coordinator.hasActiveGesture).toBe(false);
     expect(onError).toHaveBeenCalledWith(
       'File move was canceled: consumer unavailable',
     );

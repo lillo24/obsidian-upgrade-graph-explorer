@@ -64,9 +64,14 @@ import {
   type GlobalFolderArrangementGestureState,
 } from './arrangement';
 import {
-  drawViewportAwareGlobalNodeHover,
-  drawViewportAwareGlobalNodeLabel,
-} from './global-label';
+  createNetworkLabelDrawers,
+  NetworkLabelHoverController,
+  scheduleNetworkLabelHoverFrame,
+} from './network-label';
+import {
+  NETWORK_LABEL_FONT_FAMILY,
+  OBSIDIAN_DARK_NETWORK_THEME,
+} from './network-theme';
 import { createGlobalLayoutRequestFromAutomaticPositions } from './layout';
 import { automaticGlobalEdgeSize, automaticGlobalNodeSize } from './mapping';
 import {
@@ -204,6 +209,7 @@ export class GlobalRendererSession {
     GlobalNodeAttributes,
     Parameters<typeof resolveGlobalEdgeStyle>[0]
   >;
+  private readonly labelHover: NetworkLabelHoverController;
   private neighborhoods: ReadonlyMap<string, ReadonlySet<string>>;
   private hoveredNode: string | undefined;
   private selectedNode: string | undefined;
@@ -331,7 +337,7 @@ export class GlobalRendererSession {
       this.arrangementGesture.phase === 'primed' ||
       this.arrangementGesture.phase === 'dragging' ||
       this.arrangementTargetPointerActive ||
-      this.fileMoveCoordinator?.ownsPointerSequence === true
+      this.fileMoveCoordinator?.hasActiveGesture === true
     ) {
       preventSigmaWheelDefault(coordinates);
       return;
@@ -399,13 +405,29 @@ export class GlobalRendererSession {
     this.neighborhoods = createGlobalNeighborhoodIndex(input);
     const mountStart = performance.now();
     container.setAttribute('aria-hidden', 'true');
-    this.renderer = new Sigma(this.graph, container, {
+    this.labelHover = new NetworkLabelHoverController({
+      onFrame: () => scheduleNetworkLabelHoverFrame(this.renderer),
+      onSettled: (nodeKeys) => this.refreshNodeStyles(...nodeKeys),
+      reducedMotion: () =>
+        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ===
+        true,
+    });
+    const labelDrawers = createNetworkLabelDrawers<
+      GlobalNodeAttributes,
+      Parameters<typeof resolveGlobalEdgeStyle>[0]
+    >(this.labelHover);
+    this.renderer = new Sigma<
+      GlobalNodeAttributes,
+      Parameters<typeof resolveGlobalEdgeStyle>[0]
+    >(this.graph, container, {
       allowInvalidContainer: false,
       doubleClickTimeout: NODE_DOUBLE_CLICK_TIMEOUT_MS,
       enableEdgeEvents: options.edgeEvents ?? false,
       hideEdgesOnMove: this.graph.size > 20_000,
       hideLabelsOnMove: false,
       labelDensity: 0.08,
+      labelColor: { color: OBSIDIAN_DARK_NETWORK_THEME.label },
+      labelFont: NETWORK_LABEL_FONT_FAMILY,
       labelGridCellSize: 120,
       labelRenderedSizeThreshold: this.settings.labelThreshold,
       minCameraRatio: 0.02,
@@ -413,8 +435,10 @@ export class GlobalRendererSession {
       renderEdgeLabels: false,
       renderLabels: options.labels ?? true,
       stagePadding: 24,
-      defaultDrawNodeHover: drawViewportAwareGlobalNodeHover,
-      defaultDrawNodeLabel: drawViewportAwareGlobalNodeLabel,
+      defaultDrawNodeHover: labelDrawers.drawHover,
+      defaultDrawNodeLabel: labelDrawers.drawLabel,
+      defaultEdgeColor: OBSIDIAN_DARK_NETWORK_THEME.edge,
+      defaultNodeColor: OBSIDIAN_DARK_NETWORK_THEME.node,
       nodeReducer: (key, attributes) => this.reduceNode(key, attributes),
       edgeReducer: (key, attributes) => this.reduceEdge(key, attributes),
     });
@@ -720,7 +744,7 @@ export class GlobalRendererSession {
       this.referenceDegrees.get(key) ?? 0,
       this.settings,
     );
-    return resolveGlobalNodeStyle(attributes, {
+    const resolved = resolveGlobalNodeStyle(attributes, {
       arrangementActive: this.arrangementContext?.active === true,
       ...(arrangementFolderKey === undefined
         ? {}
@@ -739,6 +763,10 @@ export class GlobalRendererSession {
       ...(visualGroup === undefined ? {} : { visualGroup }),
       ...(sizeScale === undefined ? {} : { sizeScale }),
     });
+    return {
+      ...resolved,
+      highlighted: resolved.highlighted || this.labelHover.hasOverlay(key),
+    };
   }
 
   private reduceEdge(
@@ -983,10 +1011,10 @@ export class GlobalRendererSession {
       this.eligibleFileMoveNode(this.hoveredNode);
     this.container?.setAttribute(
       'data-file-move-cursor',
-      this.fileMoveCoordinator?.ownsPointerSequence === true
+      this.fileMovePointerOwner?.ownsPointerSequence === true
         ? 'grabbing'
         : eligibleHover
-          ? 'grab'
+          ? 'pointer'
           : 'idle',
     );
   }
@@ -1016,7 +1044,7 @@ export class GlobalRendererSession {
     preventSigmaDefault: () => void,
   ): void {
     const coordinator = this.fileMoveCoordinator;
-    if (coordinator?.ownsPointerSequence !== true) return;
+    if (coordinator?.hasActiveGesture !== true) return;
     preventSigmaDefault();
     coordinator.move(viewportPoint, this.viewportToGraphPoint(viewportPoint));
   }
@@ -1062,7 +1090,7 @@ export class GlobalRendererSession {
     }
     this.cancelTemporaryFileMove('cancelled');
     this.beginTemporaryFileMove(nodeKey, point);
-    if (this.fileMoveCoordinator?.ownsPointerSequence !== true) {
+    if (this.fileMoveCoordinator?.hasActiveGesture !== true) {
       return { status: 'unavailable', reason: 'simulation-unavailable' };
     }
     this.keyboardFileMoveViewportPoint = point;
@@ -1073,7 +1101,7 @@ export class GlobalRendererSession {
   nudgeKeyboardTemporaryFileMove(delta: SpatialPoint): boolean {
     const point = this.keyboardFileMoveViewportPoint;
     const coordinator = this.fileMoveCoordinator;
-    if (point === undefined || coordinator?.ownsPointerSequence !== true) {
+    if (point === undefined || coordinator?.hasActiveGesture !== true) {
       return false;
     }
     const next = { x: point.x + delta.x, y: point.y + delta.y };
@@ -1120,9 +1148,10 @@ export class GlobalRendererSession {
       const started = performance.now();
       const previous = this.hoveredNode;
       this.hoveredNode = node;
+      this.labelHover.setHovered(previous, node);
       this.options.onNodeHovered?.(node);
       this.options.instrumentation?.count('global-hover-applications');
-      this.refreshNodeStyles(previous, node);
+      this.refreshHoverStyles(previous, node);
       this.updateTemporaryFileMoveCursor();
       this.options.instrumentation?.record(
         'global-hover',
@@ -1132,12 +1161,13 @@ export class GlobalRendererSession {
     this.renderer.on('leaveNode', () => {
       const previous = this.hoveredNode;
       this.hoveredNode = undefined;
+      this.labelHover.setHovered(previous, undefined);
       const arrangementActive = this.arrangementContext?.active === true;
       if (arrangementActive) this.arrangementHoveredFolder = undefined;
       this.options.onNodeHovered?.(undefined);
       this.options.instrumentation?.count('global-hover-applications');
       if (arrangementActive) this.refreshArrangementStyles();
-      else this.refreshNodeStyles(previous);
+      else this.refreshHoverStyles(previous);
       this.updateTemporaryFileMoveCursor();
     });
     this.renderer.on('clickNode', ({ node }) => {
@@ -1187,7 +1217,7 @@ export class GlobalRendererSession {
     this.renderer.on('rightClickNode', ({ preventSigmaDefault }) => {
       if (
         this.arrangementContext?.active === true ||
-        this.fileMoveCoordinator?.ownsPointerSequence === true
+        this.fileMoveCoordinator?.hasActiveGesture === true
       ) {
         preventSigmaDefault();
       }
@@ -1197,11 +1227,7 @@ export class GlobalRendererSession {
         this.fileMoveContext?.capability.status === 'available' &&
         this.eligibleFileMoveNode(node)
       ) {
-        preventSigmaDefault();
         this.beginTemporaryFileMove(node, { x: event.x, y: event.y });
-        if (this.fileMoveCoordinator?.ownsPointerSequence === true) {
-          this.fileMovePointerOwner?.claim();
-        }
         return;
       }
       if (this.fileMoveContext?.capability.status === 'unavailable') {
@@ -1225,7 +1251,7 @@ export class GlobalRendererSession {
     this.renderer.on('moveBody', ({ event, preventSigmaDefault }) => {
       if (
         this.fileMovePointerOwner?.ownsPointerSequence === true &&
-        this.fileMoveCoordinator?.ownsPointerSequence === true
+        this.fileMoveCoordinator?.isDragging === true
       ) {
         preventSigmaDefault();
       } else {
@@ -1302,6 +1328,8 @@ export class GlobalRendererSession {
         context,
         count: (operation) => this.options.instrumentation?.count(operation),
         onDragStart: (nodeKey) => {
+          this.fileMovePointerOwner?.claim();
+          this.updateTemporaryFileMoveCursor();
           this.nodeClicks?.cancel();
           this.selectNode(nodeKey);
         },
@@ -1801,8 +1829,9 @@ export class GlobalRendererSession {
     }
     const previous = this.hoveredNode;
     this.hoveredNode = key;
+    this.labelHover.setHovered(previous, key);
     return this.measureNextRender('hover-reducer', () =>
-      this.refreshNodeStyles(previous, key),
+      this.refreshHoverStyles(previous, key),
     );
   }
 
@@ -1901,6 +1930,25 @@ export class GlobalRendererSession {
     }
     this.renderer.refresh({
       partialGraph: { nodes },
+      skipIndexation: true,
+      schedule: true,
+    });
+  }
+
+  private refreshHoverStyles(...keys: (string | undefined)[]): void {
+    const nodes = [...new Set(keys)].filter(
+      (key): key is string => key !== undefined && this.graph.hasNode(key),
+    );
+    if (nodes.length === 0) {
+      this.renderer.scheduleRender();
+      return;
+    }
+    const edges = new Set<string>();
+    for (const node of nodes) {
+      this.graph.forEachEdge(node, (edge) => edges.add(edge));
+    }
+    this.renderer.refresh({
+      partialGraph: { nodes, edges: [...edges] },
       skipIndexation: true,
       schedule: true,
     });
@@ -2405,6 +2453,7 @@ export class GlobalRendererSession {
     this.fileMoveCoordinator = undefined;
     this.fileMoveContext = undefined;
     this.nodeClicks?.cancel();
+    this.labelHover?.dispose();
     this.renderer.getMouseCaptor().off('wheel', this.precisionWheelHandler);
     this.renderer.getMouseCaptor().off('mousemovebody', this.mouseDragHandler);
     this.renderer.getTouchCaptor().off('touchmove', this.touchMoveHandler);

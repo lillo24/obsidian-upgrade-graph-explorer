@@ -7,6 +7,10 @@ import type {
 import type { VisualGroupNodePresentation } from '@icarus-graph-explorer/visual-groups';
 import type { FolderScopeVisualizationState } from '@icarus-graph-explorer/spatial-overrides';
 import { applyNetworkNodeSizeScale } from './node-size';
+import {
+  OBSIDIAN_DARK_NETWORK_THEME,
+  resolveIncidentEdgeColor,
+} from './network-theme';
 
 export const GLOBAL_ALWAYS_LABELED_NODE_LIMIT = 12;
 
@@ -82,28 +86,27 @@ export function resolveGlobalNodeStyle(
       : size >= context.settings.labelThreshold);
   const color = arrangementFocused
     ? context.selected
-      ? '#d7a126'
+      ? OBSIDIAN_DARK_NETWORK_THEME.focusedNode
       : context.hovered
-        ? '#55a8c2'
+        ? OBSIDIAN_DARK_NETWORK_THEME.highlight
         : arrangementMember
           ? baseColor
           : context.scopeState === undefined
-            ? '#e1e6e7'
+            ? OBSIDIAN_DARK_NETWORK_THEME.dimmedNode
             : context.scopeState === 'shadowed-by-child'
-              ? '#9baec7'
+              ? OBSIDIAN_DARK_NETWORK_THEME.scopeShadowed
               : context.scopeState === 'excluded-candidate'
-                ? '#d9dfe1'
-                : '#edf0f1'
+                ? OBSIDIAN_DARK_NETWORK_THEME.scopeExcluded
+                : OBSIDIAN_DARK_NETWORK_THEME.scopeInactive
     : context.selected
-      ? '#d7a126'
+      ? OBSIDIAN_DARK_NETWORK_THEME.focusedNode
       : context.hovered
-        ? '#55a8c2'
-        : context.relatedToHover
-          ? baseColor
-          : '#d8e0e3';
+        ? OBSIDIAN_DARK_NETWORK_THEME.highlight
+        : baseColor;
   return {
     ...attributes,
     size,
+    networkLabelLogicalSize: size,
     color,
     forceLabel,
     highlighted:
@@ -129,13 +132,13 @@ export function resolveGlobalEdgeStyle(
       ? arrangementRelation === 'internal'
         ? attributes.color
         : arrangementRelation === 'boundary'
-          ? '#aebdc1'
+          ? OBSIDIAN_DARK_NETWORK_THEME.hierarchyEdge
           : arrangementRelation === 'child-owned'
-            ? '#a7b6cb'
-            : '#edf0f1'
-      : context.relatedToHover
-        ? attributes.color
-        : '#e3e9eb',
+            ? OBSIDIAN_DARK_NETWORK_THEME.scopeShadowed
+            : OBSIDIAN_DARK_NETWORK_THEME.dimmedEdge
+      : context.hoverActive && context.relatedToHover
+        ? resolveIncidentEdgeColor(attributes.color)
+        : attributes.color,
     hidden:
       !arrangementActive &&
       weakFarEdge &&
@@ -150,11 +153,11 @@ export function resolveGlobalEdgeStyle(
             : arrangementRelation === 'child-owned'
               ? 0.72
               : 0.38
-        : context.lod === 'far'
-          ? 0.55
-          : context.lod === 'regional'
-            ? 0.78
-            : 1),
+        : (context.lod === 'far'
+            ? 0.55
+            : context.lod === 'regional'
+              ? 0.78
+              : 1) * (context.hoverActive && context.relatedToHover ? 1.3 : 1)),
     zIndex:
       arrangementRelation === 'internal' ||
       arrangementRelation === 'boundary' ||

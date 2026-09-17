@@ -1,23 +1,21 @@
-.global-graph-canvas {
+.global-graph-canvas,
+.local-graph-canvas {
+  --network-graph-background: #1e1e1e;
+  --network-graph-control-background: #262626;
+  --network-graph-control-border: #3f3f3f;
+  --network-graph-control-hover: #363636;
+  --network-graph-text: #dadada;
   position: relative;
   width: 100%;
   height: 100%;
   min-height: 26rem;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 25% 20%, rgb(32 94 113 / 8%), transparent 34%),
-    var(--surface, #f8faf9);
+  background: var(--network-graph-background);
 }
 
-.local-graph-canvas {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  min-height: 26rem;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 48% 44%, rgb(108 99 168 / 8%), transparent 36%),
-    var(--surface, #f8faf9);
+.global-graph-canvas[data-network-theme='obsidian-dark'],
+.local-graph-canvas[data-network-theme='obsidian-dark'] {
+  background: var(--network-graph-background);
 }
 
 .global-graph-canvas__surface {
@@ -59,14 +57,14 @@
   background: radial-gradient(
     circle 8.5rem at var(--arrange-x) var(--arrange-y),
     transparent 0 50%,
-    rgb(21 43 49 / 6%) 100%
+    rgb(166 138 249 / 10%) 100%
   );
   pointer-events: none;
   transition: background-color 120ms ease;
 }
 
 .global-graph-canvas__arrangement-spotlight--dragging {
-  background-color: rgb(31 105 124 / 3%);
+  background-color: rgb(138 92 245 / 8%);
 }
 
 .global-graph-canvas__target-marker {
@@ -78,10 +76,10 @@
   left: var(--arrange-target-x);
   width: 1.1rem;
   height: 1.1rem;
-  border: 2px solid #28788d;
+  border: 2px solid #a68af9;
   border-radius: 50%;
-  background: rgb(255 255 255 / 72%);
-  box-shadow: 0 0 0 0.35rem rgb(40 120 141 / 14%);
+  background: rgb(30 30 30 / 82%);
+  box-shadow: 0 0 0 0.35rem rgb(138 92 245 / 18%);
   cursor: grab;
   pointer-events: auto;
   touch-action: none;
@@ -90,7 +88,7 @@
 }
 
 .global-graph-canvas__target-marker:focus-visible {
-  outline: 3px solid rgb(40 120 141 / 38%);
+  outline: 3px solid rgb(166 138 249 / 48%);
   outline-offset: 0.42rem;
 }
 
@@ -119,13 +117,13 @@
   align-content: center;
   gap: 0.35rem;
   padding: 1rem;
-  color: #43565b;
+  color: #b3b3b3;
   text-align: center;
   pointer-events: none;
 }
 
 .global-graph-empty strong {
-  color: #243f46;
+  color: #dadada;
   font-size: 1rem;
 }
 
@@ -134,9 +132,9 @@
   inset: 0;
 }
 
-.global-graph-canvas__surface[data-file-move-cursor='grab'],
-.local-graph-canvas__surface[data-file-move-cursor='grab'] {
-  cursor: grab;
+.global-graph-canvas__surface[data-file-move-cursor='pointer'],
+.local-graph-canvas__surface[data-file-move-cursor='pointer'] {
+  cursor: pointer;
 }
 
 .global-graph-canvas__surface[data-file-move-cursor='grabbing'],
@@ -152,10 +150,10 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid #a8b8c0;
+  border: 1px solid var(--network-graph-control-border);
   border-radius: 0.6rem;
-  background: #ffffff;
-  box-shadow: 0 0.55rem 1.2rem rgb(16 23 35 / 14%);
+  background: var(--network-graph-control-background);
+  box-shadow: 0 0.55rem 1.2rem rgb(0 0 0 / 36%);
 }
 
 .network-viewport-controls button {
@@ -167,10 +165,10 @@
   place-items: center;
   padding: 0;
   border: 0;
-  border-bottom: 1px solid #d4dde1;
+  border-bottom: 1px solid var(--network-graph-control-border);
   border-radius: 0;
-  color: #183b4b;
-  background: #ffffff;
+  color: var(--network-graph-text);
+  background: var(--network-graph-control-background);
 }
 
 .network-viewport-controls button:last-child {
@@ -178,13 +176,13 @@
 }
 
 .network-viewport-controls button:hover {
-  background: #e8f1f3;
+  background: var(--network-graph-control-hover);
 }
 
 .network-viewport-controls button:focus-visible {
   position: relative;
   z-index: 1;
-  outline: 3px solid #c78310;
+  outline: 3px solid #a68af9;
   outline-offset: -3px;
 }
 
@@ -463,11 +461,11 @@
   max-width: min(30rem, calc(100% - 2rem));
   margin: 0;
   padding: 0.35rem 0.65rem;
-  border: 1px solid rgb(36 63 70 / 14%);
+  border: 1px solid var(--network-graph-control-border);
   border-radius: 999px;
-  background: rgb(255 255 255 / 88%);
-  box-shadow: 0 0.15rem 0.6rem rgb(23 42 47 / 8%);
-  color: #43565b;
+  background: rgb(38 38 38 / 92%);
+  box-shadow: 0 0.15rem 0.6rem rgb(0 0 0 / 24%);
+  color: var(--network-graph-text);
   font-size: 0.78rem;
   line-height: 1.25;
   text-align: center;
@@ -483,11 +481,11 @@
   max-width: min(30rem, calc(100% - 2rem));
   margin: 0;
   padding: 0.35rem 0.65rem;
-  border: 1px solid rgb(36 63 70 / 14%);
+  border: 1px solid var(--network-graph-control-border);
   border-radius: 999px;
-  background: rgb(255 255 255 / 88%);
-  box-shadow: 0 0.15rem 0.6rem rgb(23 42 47 / 8%);
-  color: #43565b;
+  background: rgb(38 38 38 / 92%);
+  box-shadow: 0 0.15rem 0.6rem rgb(0 0 0 / 24%);
+  color: var(--network-graph-text);
   font-size: 0.78rem;
   line-height: 1.25;
   text-align: center;

@@ -12,9 +12,10 @@ type OwnedPointer = {
 };
 
 /**
- * Owns one native pointer from graph press through release. Sigma 3.0.3 uses
- * document bubble-phase mouse listeners, so HTML overlays can otherwise stop
- * the compatibility event before File Move sees it.
+ * Arms one native pointer on graph press, then owns it only after File Move
+ * crosses its drag threshold. Sigma 3.0.3 uses document bubble-phase mouse
+ * listeners, so capture-phase pointer continuation keeps a real drag alive
+ * across HTML overlays without stealing ordinary click/double-click sequences.
  */
 export class FileMovePointerOwner {
   private candidatePointerId: number | undefined;
@@ -60,7 +61,7 @@ export class FileMovePointerOwner {
     this.reset();
   }
 
-  /** Claims the primary pointerdown that synchronously produced downNode. */
+  /** Claims the armed primary pointer once the coordinator starts dragging. */
   claim(): boolean {
     const pointerId = this.candidatePointerId;
     this.candidatePointerId = undefined;

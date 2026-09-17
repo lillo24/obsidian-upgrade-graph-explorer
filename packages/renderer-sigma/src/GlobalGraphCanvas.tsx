@@ -51,6 +51,7 @@ import {
 } from './layout';
 import { GlobalGraphEmptyState } from './GlobalGraphEmptyState';
 import { NetworkViewportControls } from './NetworkViewportControls';
+import { NETWORK_GRAPH_THEME_ID } from './network-theme';
 import { mountGlobalRendererSession } from './lifecycle';
 import {
   mapProjectionToGlobal,
@@ -2890,6 +2891,7 @@ export function GlobalGraphCanvas({
       className={`global-graph-canvas${folderArrangement?.active === true ? ' global-graph-canvas--arranging' : ''}`}
       data-arrangement-phase={arrangementGesturePhase}
       data-initial-presentation={initialPresentationReady ? 'ready' : 'pending'}
+      data-network-theme={NETWORK_GRAPH_THEME_ID}
     >
       <div
         aria-hidden="true"

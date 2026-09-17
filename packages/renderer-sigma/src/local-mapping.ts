@@ -5,6 +5,7 @@ import type {
 } from '@icarus-graph-explorer/view-projection';
 
 import { stableUnit } from './deterministic';
+import { OBSIDIAN_DARK_NETWORK_THEME } from './network-theme';
 import type {
   LocalEdgeAttributes,
   LocalInputNode,
@@ -14,10 +15,10 @@ import type {
 } from './local-types';
 
 const NODE_COLORS = {
-  document: '#176f8a',
-  section: '#6c63a8',
-  block: '#6c7b80',
-  diagnostic: '#c45b50',
+  document: OBSIDIAN_DARK_NETWORK_THEME.node,
+  section: '#a882ff',
+  block: '#999999',
+  diagnostic: OBSIDIAN_DARK_NETWORK_THEME.diagnosticInvalid,
 } as const satisfies Record<LocalNodeKind, string>;
 
 function entityLabel(node: ProjectedEntityNode): string {
@@ -55,10 +56,10 @@ function mappedNode(node: ProjectedNode, rootEntityId: string): LocalInputNode {
     color:
       node.kind === 'reference-target'
         ? node.status === 'unresolved'
-          ? '#d6a23f'
+          ? OBSIDIAN_DARK_NETWORK_THEME.unresolvedNode
           : node.status === 'ambiguous'
-            ? '#d97832'
-            : '#c34f5d'
+            ? OBSIDIAN_DARK_NETWORK_THEME.diagnosticAmbiguous
+            : OBSIDIAN_DARK_NETWORK_THEME.diagnosticInvalid
         : NODE_COLORS[kind],
     label: node.kind === 'entity' ? entityLabel(node) : node.rawTarget,
     nodeKind: kind,
@@ -88,7 +89,10 @@ function mappedEdge(
       edge.kind === 'hierarchy'
         ? 1.25
         : 0.65 + Math.min(1.6, Math.log2(referenceCount + 1) * 0.35),
-    color: edge.kind === 'hierarchy' ? '#8b96a0' : '#91aab2',
+    color:
+      edge.kind === 'hierarchy'
+        ? OBSIDIAN_DARK_NETWORK_THEME.hierarchyEdge
+        : OBSIDIAN_DARK_NETWORK_THEME.edge,
   };
   return {
     key: edge.id,
