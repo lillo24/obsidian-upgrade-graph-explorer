@@ -4,7 +4,9 @@ import {
   type Argument,
   type ArgumentAxiom,
   type ArgumentCounterArgument,
+  type ArgumentDependencyPathStep,
   type ArgumentLibrary,
+  type ArgumentPremiseStalenessCause,
   type ArgumentRecordKind,
   type ArgumentTopic,
 } from '@icarus-graph-explorer/argument-workspace';
@@ -17,6 +19,26 @@ export interface ArgumentSelection {
 
 function MarkdownText({ children }: { readonly children: string }) {
   return <div className="arguments-markdown-text">{children}</div>;
+}
+
+function dependencyStepLabel(step: ArgumentDependencyPathStep): string {
+  const owner = `${step.argumentId}.${step.premiseId}`;
+  if (step.kind === 'axiom') return `${owner} → ${step.axiomId}`;
+  if (step.kind === 'argument-conclusion') {
+    return `${owner} → ${step.sourceArgumentId}.conclusion`;
+  }
+  return `${owner} → ${step.sourceArgumentId}.${step.sourcePremiseId}`;
+}
+
+function dependencyCauseLabel(cause: ArgumentPremiseStalenessCause): string {
+  const root = cause.root;
+  const rootLabel =
+    root.kind === 'revision-mismatch'
+      ? `${root.recordKind} ${root.recordId} changed from revision ${root.reliedOnRevision} to ${root.currentRevision}`
+      : root.kind === 'missing-reference'
+        ? `${root.recordKind} ${root.recordId} is missing`
+        : `defensive dependency-cycle guard reached ${root.argumentId}.${root.premiseId}`;
+  return `${cause.kind}: ${cause.path.map(dependencyStepLabel).join('; ')} — ${rootLabel}`;
 }
 
 function Metadata({
@@ -219,6 +241,9 @@ export function ArgumentView({
   readonly sourceSection: ReactNode;
 }) {
   const stale = argumentStaleness(library, argument);
+  const hasInheritedPremiseStaleness = stale.premiseStaleness.some(
+    ({ inherited }) => inherited,
+  );
   const topicMemberships = library.topics.filter(({ argumentIds }) =>
     argumentIds.includes(argument.id),
   );
@@ -295,7 +320,9 @@ export function ArgumentView({
                     )!;
               const referencedKind =
                 premise.kind === 'axiom' ? 'axiom' : 'argument';
-              const premiseStale = stale.premiseIds.includes(premise.id);
+              const premiseStaleness = stale.premiseStaleness.find(
+                ({ premiseId }) => premiseId === premise.id,
+              )!;
               return (
                 <li key={premise.id}>
                   <button
@@ -312,11 +339,29 @@ export function ArgumentView({
                         : ''}
                   </button>
                   <small>
-                    Relied on revision {premise.reliedOnRevision}; current
-                    revision {referenced.revision}
-                    {premiseStale ? ' — changed' : ''}
+                    {premiseStaleness.direct
+                      ? `Direct stale — relied on revision ${premise.reliedOnRevision}; current revision ${referenced.revision}`
+                      : `Pinned revision metadata — relied on revision ${premise.reliedOnRevision}; current revision ${referenced.revision}`}
                     {referenced.archived ? '; archived' : ''}.
                   </small>
+                  {premiseStaleness.inherited ? (
+                    <>
+                      <small>
+                        Inherited stale — the referenced inference has
+                        unresolved upstream premise support.
+                      </small>
+                      <details>
+                        <summary>Dependency causes</summary>
+                        <ul>
+                          {premiseStaleness.causes.map((cause, index) => (
+                            <li key={`${premise.id}-cause-${index}`}>
+                              {dependencyCauseLabel(cause)}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    </>
+                  ) : null}
                   {premise.exampleIds?.length ? (
                     <small>
                       Grounded in local Examples:{' '}
@@ -331,10 +376,20 @@ export function ArgumentView({
         {stale.premiseIds.length > 0 ? (
           <div className="arguments-callout">
             <p>
-              Changed premises: {stale.premiseIds.join(', ')}. This does not
-              automatically change the conclusion.
+              Stale inference premises: {stale.premiseIds.join(', ')}. This does
+              not automatically change the conclusion.
             </p>
-            <button onClick={onReassess} type="button">
+            {hasInheritedPremiseStaleness ? (
+              <p>
+                Resolve and reassess upstream inference dependencies before
+                reassessing this Argument.
+              </p>
+            ) : null}
+            <button
+              disabled={hasInheritedPremiseStaleness}
+              onClick={onReassess}
+              type="button"
+            >
               Reassess against current premise versions
             </button>
           </div>

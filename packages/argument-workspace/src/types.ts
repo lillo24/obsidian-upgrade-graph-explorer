@@ -1,5 +1,5 @@
 export const ARGUMENT_LIBRARY_SCHEMA_VERSION = 3 as const;
-export const KNOWLEDGE_READER_CONTRACT_VERSION = 3 as const;
+export const KNOWLEDGE_READER_CONTRACT_VERSION = 4 as const;
 export const CONTENT_FINGERPRINT_ALGORITHM =
   'sha256-canonical-json-v1' as const;
 
@@ -120,6 +120,67 @@ export type ArgumentPremise =
   | AxiomArgumentPremise
   | ArgumentConclusionPremise
   | ArgumentPremiseReference;
+
+export type ArgumentDependencyPathStep =
+  | {
+      readonly argumentId: string;
+      readonly premiseId: string;
+      readonly kind: 'axiom';
+      readonly axiomId: string;
+    }
+  | {
+      readonly argumentId: string;
+      readonly premiseId: string;
+      readonly kind: 'argument-conclusion';
+      readonly sourceArgumentId: string;
+    }
+  | {
+      readonly argumentId: string;
+      readonly premiseId: string;
+      readonly kind: 'argument-premise';
+      readonly sourceArgumentId: string;
+      readonly sourcePremiseId: string;
+    };
+
+export type ArgumentDependencyRootCause =
+  | {
+      readonly kind: 'revision-mismatch';
+      readonly recordKind: 'axiom' | 'argument';
+      readonly recordId: string;
+      readonly reliedOnRevision: number;
+      readonly currentRevision: number;
+    }
+  | {
+      readonly kind: 'missing-reference';
+      readonly recordKind: 'axiom' | 'argument' | 'premise';
+      readonly recordId: string;
+    }
+  | {
+      readonly kind: 'dependency-cycle';
+      readonly argumentId: string;
+      readonly premiseId: string;
+    };
+
+export interface ArgumentPremiseStalenessCause {
+  readonly kind: 'direct' | 'inherited';
+  readonly root: ArgumentDependencyRootCause;
+  readonly path: readonly ArgumentDependencyPathStep[];
+}
+
+export interface ArgumentPremiseStaleness {
+  readonly premiseId: string;
+  readonly stale: boolean;
+  readonly direct: boolean;
+  readonly inherited: boolean;
+  readonly causes: readonly ArgumentPremiseStalenessCause[];
+}
+
+export interface ArgumentStalenessResult {
+  readonly stale: boolean;
+  readonly premiseIds: readonly string[];
+  readonly relationIds: readonly string[];
+  readonly premiseStaleness: readonly ArgumentPremiseStaleness[];
+}
 
 export interface ArgumentTopic extends ArgumentRecordMetadata {
   readonly title: string;
@@ -450,6 +511,7 @@ export interface ArgumentBundle {
     readonly argumentStale: boolean;
     readonly stalePremiseIds: readonly string[];
     readonly staleRelationIds: readonly string[];
+    readonly premiseStaleness: readonly ArgumentPremiseStaleness[];
     readonly topicIds: readonly string[];
     readonly currentTopicIds: readonly string[];
     readonly supersededByArgumentIds: readonly string[];

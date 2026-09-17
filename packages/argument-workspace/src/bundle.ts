@@ -1,5 +1,5 @@
 import { clonePlainData } from './canonical';
-import { argumentStaleness, responseStaleness } from './library';
+import { createArgumentStalenessEvaluator, responseStaleness } from './library';
 import type {
   ArgumentBundle,
   ArgumentLibrary,
@@ -72,6 +72,7 @@ export function assembleArgumentBundle(
   const argumentsById = new Map(
     library.arguments.map((record) => [record.id, record]),
   );
+  const evaluateArgumentStaleness = createArgumentStalenessEvaluator(library);
   const counters = new Map(
     library.counterArguments.map((record) => [record.id, record]),
   );
@@ -307,7 +308,7 @@ export function assembleArgumentBundle(
   const bundleArguments = [...argumentIds]
     .map((id) => {
       const argument = argumentsById.get(id)!;
-      const stale = argumentStaleness(library, argument);
+      const stale = evaluateArgumentStaleness(argument);
       const membershipTopics = library.topics
         .filter(({ argumentIds: memberIds }) => memberIds.includes(id))
         .map(({ id: topicId }) => topicId)
@@ -390,6 +391,7 @@ export function assembleArgumentBundle(
         argumentStale: stale.stale,
         stalePremiseIds: stale.premiseIds,
         staleRelationIds: stale.relationIds,
+        premiseStaleness: stale.premiseStaleness,
         topicIds: membershipTopics,
         currentTopicIds,
         supersededByArgumentIds,
@@ -425,9 +427,22 @@ export function assembleArgumentBundle(
   for (const argument of bundleArguments) {
     if (argument.argumentStale) {
       if (argument.stalePremiseIds.length > 0) {
-        warnings.add(
-          `${argument.id} relies on older premise revisions: ${argument.stalePremiseIds.join(', ')}.`,
-        );
+        const directIds = argument.premiseStaleness
+          .filter(({ direct }) => direct)
+          .map(({ premiseId }) => premiseId);
+        const inheritedIds = argument.premiseStaleness
+          .filter(({ inherited }) => inherited)
+          .map(({ premiseId }) => premiseId);
+        if (directIds.length > 0) {
+          warnings.add(
+            `${argument.id} has direct premise revision mismatches: ${directIds.join(', ')}.`,
+          );
+        }
+        if (inheritedIds.length > 0) {
+          warnings.add(
+            `${argument.id} inherits stale inference support: ${inheritedIds.join(', ')}.`,
+          );
+        }
       }
       if (argument.staleRelationIds.length > 0) {
         warnings.add(
