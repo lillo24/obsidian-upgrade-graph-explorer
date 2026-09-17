@@ -40,6 +40,7 @@ const manualTree = (
 ): FocusSchematicSoftFolderDisplayTree => ({
   rootFolderKey: '.',
   folders,
+  preCompressionFolders: folders,
   files: [],
   reconciledIntent: { fileParentOverrides: [], flattenedFolderKeys: [] },
   automaticallyCompressedFolderKeys: [],
@@ -64,6 +65,92 @@ const folder = (
 });
 
 describe('nested Soft folder guides', () => {
+  it('D1-D3 renders named singleton Direct guides from pre-compression parents', () => {
+    const chain = tree([{ fileId: 'only', exactFolderKey: 'A/B/C' }]);
+    const chainGuides = focusSchematicFolderClusterGuides(
+      chain,
+      [node('only', 0, 0)],
+      { directFoldersOnly: true },
+    );
+    expect(chainGuides).toHaveLength(1);
+    expect(chainGuides[0]).toMatchObject({
+      folderKey: 'A/B/C',
+      label: 'C',
+      shape: 'singleton',
+      memberModuleIds: ['only'],
+    });
+
+    const parentAndChild = tree([
+      { fileId: 'parent-file', exactFolderKey: 'Folder2' },
+      { fileId: 'child-file', exactFolderKey: 'Folder2/Folder1' },
+    ]);
+    const guides = focusSchematicFolderClusterGuides(
+      parentAndChild,
+      [node('parent-file', 0, 0), node('child-file', 340, 0)],
+      { directFoldersOnly: true },
+    );
+    expect(
+      guides.map(({ folderKey, memberModuleIds }) => ({
+        folderKey,
+        memberModuleIds,
+      })),
+    ).toEqual([
+      { folderKey: 'Folder2', memberModuleIds: ['parent-file'] },
+      {
+        folderKey: 'Folder2/Folder1',
+        memberModuleIds: ['child-file'],
+      },
+    ]);
+    expect(
+      hitTestFocusSchematicFolderGuideRegion(guides, {
+        x: guides[1]!.x + guides[1]!.width / 2,
+        y: guides[1]!.y + guides[1]!.height / 2,
+      })?.folderKey,
+    ).toBe('Folder2/Folder1');
+  });
+
+  it('D4-D6 reflects promotion, flattening, and genuine root placement in Direct guides', () => {
+    const promoted = buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles: [{ fileId: 'promoted', exactFolderKey: 'A/B/C' }],
+      intent: {
+        fileParentOverrides: [
+          { fileId: 'promoted', displayParentFolderKey: 'A/B' },
+        ],
+        flattenedFolderKeys: [],
+      },
+    });
+    expect(
+      focusSchematicFolderClusterGuides(promoted, [node('promoted', 0, 0)], {
+        directFoldersOnly: true,
+      })[0]?.folderKey,
+    ).toBe('A/B');
+
+    const flattened = buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles: [
+        { fileId: 'one', exactFolderKey: 'A/B' },
+        { fileId: 'two', exactFolderKey: 'A/B' },
+      ],
+      intent: {
+        fileParentOverrides: [],
+        flattenedFolderKeys: ['A/B'],
+      },
+    });
+    expect(
+      focusSchematicFolderClusterGuides(
+        flattened,
+        [node('one', 0, 0), node('two', 140, 0)],
+        { directFoldersOnly: true },
+      )[0]?.folderKey,
+    ).toBe('A');
+
+    const root = tree([{ fileId: 'root-file', exactFolderKey: '.' }]);
+    expect(
+      focusSchematicFolderClusterGuides(root, [node('root-file', 0, 0)], {
+        directFoldersOnly: true,
+      })[0],
+    ).toMatchObject({ folderKey: '.', root: true });
+  });
+
   it('renders Direct-only guides from direct Files without ancestor wrappers or tree mutation', () => {
     const displayTree = tree([
       { fileId: 'outer-1', exactFolderKey: 'A' },
@@ -130,6 +217,87 @@ describe('nested Soft folder guides', () => {
     expect(parent.y + parent.height).toBeGreaterThanOrEqual(
       child.y + child.height,
     );
+  });
+
+  it('L1 anchors a diagonal hull label to its actual upper horizontal segment', () => {
+    const displayTree = tree([
+      { fileId: 'lower-left', exactFolderKey: 'A' },
+      { fileId: 'top-left', exactFolderKey: 'A' },
+      { fileId: 'top-right', exactFolderKey: 'A' },
+    ]);
+    const [guide] = focusSchematicFolderClusterGuides(displayTree, [
+      node('lower-left', -100, 180),
+      node('top-left', 100, 0),
+      node('top-right', 240, 0),
+    ]);
+    expect(guide?.shape).toBe('hull');
+    expect(guide!.labelX).toBeGreaterThan(guide!.x + 150);
+    expect(guide!.labelY).toBeCloseTo(guide!.y - 9, 8);
+  });
+
+  it('L2 accounts for rounded-corner trim on a rectangular capsule label', () => {
+    const displayTree = tree([
+      { fileId: 'left', exactFolderKey: 'A' },
+      { fileId: 'right', exactFolderKey: 'A' },
+    ]);
+    const [guide] = focusSchematicFolderClusterGuides(displayTree, [
+      node('left', 0, 0),
+      node('right', 140, 0),
+    ]);
+    expect(guide?.shape).toBe('capsule');
+    expect(guide!.labelX).toBeCloseTo(guide!.x + guide!.radius + 12, 8);
+  });
+
+  it('L3 retains the rectangle anchor fallback for a singleton guide', () => {
+    const displayTree = tree([
+      { fileId: 'only', exactFolderKey: 'NamedFolder' },
+    ]);
+    const [guide] = focusSchematicFolderClusterGuides(
+      displayTree,
+      [node('only', 40, 60)],
+      { directFoldersOnly: true },
+    );
+    expect(guide?.shape).toBe('singleton');
+    expect(guide!.labelX).toBe(guide!.x + 12);
+    expect(guide!.labelY).toBe(guide!.y - 9);
+  });
+
+  it('L4 keeps rounded hull geometry and label anchors stable under input permutation', () => {
+    const displayTree = tree([
+      { fileId: 'a', exactFolderKey: 'A' },
+      { fileId: 'b', exactFolderKey: 'A' },
+      { fileId: 'c', exactFolderKey: 'A' },
+    ]);
+    const nodes = [node('a', -100, 180), node('b', 100, 0), node('c', 240, 0)];
+    const first = focusSchematicFolderClusterGuides(displayTree, nodes);
+    const second = focusSchematicFolderClusterGuides(
+      displayTree,
+      [...nodes].reverse(),
+    );
+    expect(second).toEqual(first);
+  });
+
+  it('L5 anchors each disconnected island label to that island region', () => {
+    const displayTree = tree([
+      { fileId: 'a1', exactFolderKey: 'A' },
+      { fileId: 'a2', exactFolderKey: 'A' },
+      { fileId: 'a3', exactFolderKey: 'A' },
+      { fileId: 'a4', exactFolderKey: 'A' },
+    ]);
+    const guides = focusSchematicFolderClusterGuides(displayTree, [
+      node('a1', 0, 0),
+      node('a2', 140, 0),
+      node('a3', 800, 120),
+      node('a4', 940, 120),
+    ]);
+    expect(guides).toHaveLength(2);
+    for (const guide of guides) {
+      expect(guide.regionCount).toBe(2);
+      expect(guide.label).toBe('A');
+      expect(guide.labelX).toBeGreaterThan(guide.x);
+      expect(guide.labelX).toBeLessThan(guide.x + guide.width);
+      expect(guide.labelY).toBeCloseTo(guide.y - 9, 8);
+    }
   });
 
   it('LR3 suppresses far same-folder islands that each contain one File', () => {

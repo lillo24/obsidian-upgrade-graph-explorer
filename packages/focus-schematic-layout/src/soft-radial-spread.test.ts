@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildEndpointFixture } from './endpoint-fixtures';
+import { validateFocusSchematicComputedLayout } from './endpoint-facing';
 import { SOFT_CLUSTER_FIXTURES } from './soft-cluster-fixtures';
 import { computeFocusSchematicSoftClusterLayoutAttempt } from './soft-clusters';
 import { FOCUS_SCHEMATIC_LAYOUT_SETTINGS } from './settings';
@@ -38,6 +39,7 @@ function baseLayout() {
     ({ id }) => id === input.model.rootModuleId,
   )!;
   return {
+    input,
     result: attempt.result,
     rootDocumentProjectionNodeId: rootModule.documentProjectionNodeId,
   };
@@ -47,11 +49,11 @@ describe('Soft radial post-layout spread', () => {
   it.each([0, 25, 50, 71, 72, 73, 75, 100] as const)(
     'translates complete modules at spacing %i without changing structural decisions',
     (spacing) => {
-      const { result, rootDocumentProjectionNodeId } = baseLayout();
+      const { input, result, rootDocumentProjectionNodeId } = baseLayout();
       const spread = applyFocusSchematicSoftRadialSpread(
+        input,
         result,
         spacing,
-        rootDocumentProjectionNodeId,
       );
       const scale = focusSchematicSoftRadialSpreadScale(spacing);
       const rootFile = result.candidate.nodes.find(
@@ -76,7 +78,9 @@ describe('Soft radial post-layout spread', () => {
       );
       expect(spread.internalLayoutEvidence).toBe(result.internalLayoutEvidence);
       expect(spread.endpointPlan).toBe(result.endpointPlan);
-      expect(spread.quality).toBe(result.quality);
+      expect(validateFocusSchematicComputedLayout(input, spread).valid).toBe(
+        true,
+      );
       for (const beforeModule of result.candidate.modules) {
         const afterModule = spread.candidate.modules.find(
           ({ moduleId }) => moduleId === beforeModule.moduleId,
@@ -117,22 +121,27 @@ describe('Soft radial post-layout spread', () => {
             10,
           );
         }
-        for (const beforeAttachment of result.attachments.filter(
+        for (const attachment of spread.attachments.filter(
           ({ moduleId }) => moduleId === beforeModule.moduleId,
         )) {
-          const afterAttachment = spread.attachments.find(
-            ({ connectionId, endpoint }) =>
-              connectionId === beforeAttachment.connectionId &&
-              endpoint === beforeAttachment.endpoint,
-          )!;
-          expect(afterAttachment.x - beforeAttachment.x).toBeCloseTo(
-            afterModule.x - beforeModule.x,
-            10,
-          );
-          expect(afterAttachment.y - beforeAttachment.y).toBeCloseTo(
-            afterModule.y - beforeModule.y,
-            10,
-          );
+          const rectangle =
+            attachment.projectionNodeId === null
+              ? afterModule
+              : spread.candidate.nodes.find(
+                  ({ projectionNodeId }) =>
+                    projectionNodeId === attachment.projectionNodeId,
+                )!;
+          if (attachment.side === 'left')
+            expect(attachment.x).toBeCloseTo(rectangle.x, 10);
+          if (attachment.side === 'right')
+            expect(attachment.x).toBeCloseTo(rectangle.x + rectangle.width, 10);
+          if (attachment.side === 'top')
+            expect(attachment.y).toBeCloseTo(rectangle.y, 10);
+          if (attachment.side === 'bottom')
+            expect(attachment.y).toBeCloseTo(
+              rectangle.y + rectangle.height,
+              10,
+            );
         }
       }
       for (let left = 0; left < spread.candidate.modules.length; left += 1)
@@ -152,13 +161,9 @@ describe('Soft radial post-layout spread', () => {
   );
 
   it('keeps 71/72/73 structurally identical and changes only radial scale', () => {
-    const { result, rootDocumentProjectionNodeId } = baseLayout();
+    const { input, result } = baseLayout();
     const values = [71, 72, 73].map((spacing) =>
-      applyFocusSchematicSoftRadialSpread(
-        result,
-        spacing,
-        rootDocumentProjectionNodeId,
-      ),
+      applyFocusSchematicSoftRadialSpread(input, result, spacing),
     );
     for (const value of values) {
       expect(

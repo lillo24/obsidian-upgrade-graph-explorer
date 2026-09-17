@@ -267,7 +267,7 @@ describe('nested Soft folder display tree', () => {
     });
   });
 
-  it('bounds each File hierarchy-force budget for H0/H1/H2 and disables compressed scopes', () => {
+  it('bounds each File hierarchy-force budget for H0/H1/H2', () => {
     const tree = buildFocusSchematicSoftFolderDisplayTree({
       visibleFiles: [file('a', 'A'), file('b', 'A/B'), file('c', 'A/B')],
     });
@@ -324,6 +324,100 @@ describe('nested Soft folder display tree', () => {
         'deep-a',
       ),
     ).toEqual([{ folderKey: 'A/B/C', weight: 1 }]);
+  });
+
+  it('D1-D3 keeps the immediate displayed parent before singleton compression for Direct scope', () => {
+    const chain = buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles: [file('only', 'A/B/C')],
+    });
+    expect(chain.files[0]).toMatchObject({
+      displayParentFolderKey: '.',
+      directDisplayParentFolderKey: 'A/B/C',
+    });
+    expect(
+      chain.preCompressionFolders.map(({ folderKey }) => folderKey),
+    ).toEqual(['.', 'A', 'A/B', 'A/B/C']);
+    expect(
+      focusSchematicSoftFolderScopeMemberships(chain, 'nearest-only').get(
+        'only',
+      ),
+    ).toEqual([{ folderKey: 'A/B/C', weight: 1 }]);
+
+    const parentAndChild = buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles: [
+        file('parent-file', 'Folder2'),
+        file('child-file', 'Folder2/Folder1'),
+      ],
+    });
+    const direct = focusSchematicSoftFolderScopeMemberships(
+      parentAndChild,
+      'nearest-only',
+    );
+    expect(direct.get('parent-file')).toEqual([
+      { folderKey: 'Folder2', weight: 1 },
+    ]);
+    expect(direct.get('child-file')).toEqual([
+      { folderKey: 'Folder2/Folder1', weight: 1 },
+    ]);
+  });
+
+  it('D4-D6 applies promotion and flattening before Direct scope while preserving genuine root membership', () => {
+    const promoted = buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles: [file('promoted', 'A/B/C')],
+      intent: {
+        fileParentOverrides: [
+          { fileId: 'promoted', displayParentFolderKey: 'A/B' },
+        ],
+        flattenedFolderKeys: [],
+      },
+    });
+    expect(promoted.files[0]?.directDisplayParentFolderKey).toBe('A/B');
+
+    const flattened = buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles: [file('one', 'A/B'), file('two', 'A/B')],
+      intent: {
+        fileParentOverrides: [],
+        flattenedFolderKeys: ['A/B'],
+      },
+    });
+    expect(
+      flattened.files.map(
+        ({ directDisplayParentFolderKey }) => directDisplayParentFolderKey,
+      ),
+    ).toEqual(['A', 'A']);
+    expect(
+      focusSchematicSoftFolderScopeMemberships(flattened, 'nearest-only').get(
+        'one',
+      ),
+    ).toEqual([{ folderKey: 'A', weight: 1 }]);
+
+    const genuineRoot = buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles: [file('root-file', '.')],
+    });
+    expect(genuineRoot.files[0]?.directDisplayParentFolderKey).toBe('.');
+    expect(
+      focusSchematicSoftFolderScopeMemberships(genuineRoot, 'nearest-only').get(
+        'root-file',
+      ),
+    ).toEqual([]);
+  });
+
+  it('keeps Nested membership based on the final displayed hierarchy', () => {
+    const tree = buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles: [
+        file('outer', 'A'),
+        file('deep-a', 'A/B/C'),
+        file('deep-b', 'A/B/C'),
+      ],
+    });
+    expect(
+      focusSchematicSoftFolderScopeMemberships(tree, 'normalized-equal').get(
+        'deep-a',
+      ),
+    ).toEqual([
+      { folderKey: 'A/B/C', weight: 0.5 },
+      { folderKey: 'A', weight: 0.5 },
+    ]);
   });
 
   it('remains deterministic under deep chains, many singleton folders, and sparse manual intent', () => {

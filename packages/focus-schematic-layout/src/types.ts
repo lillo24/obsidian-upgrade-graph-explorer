@@ -386,6 +386,8 @@ export interface FocusSchematicSoftFolderDisplayFile {
   readonly exactFolderKey: WorkspaceFolderKey;
   readonly displayParentFolderKey: WorkspaceFolderKey;
   readonly manualDisplayParentFolderKey: WorkspaceFolderKey;
+  /** Parent after manual intent and before automatic singleton compression. */
+  readonly directDisplayParentFolderKey: WorkspaceFolderKey;
   readonly suppressedAncestorFolderKeys: readonly WorkspaceFolderKey[];
   readonly provenance: readonly FocusSchematicSoftFolderPlacementProvenance[];
 }
@@ -404,6 +406,8 @@ export interface FocusSchematicSoftFolderDisplayNode {
 
 export interface FocusSchematicSoftFolderDisplayTree {
   readonly rootFolderKey: '.';
+  /** Display hierarchy after manual intent and before automatic compression. */
+  readonly preCompressionFolders: readonly FocusSchematicSoftFolderDisplayNode[];
   readonly folders: readonly FocusSchematicSoftFolderDisplayNode[];
   readonly files: readonly FocusSchematicSoftFolderDisplayFile[];
   readonly reconciledIntent: FocusSchematicSoftFolderDisplayIntent;

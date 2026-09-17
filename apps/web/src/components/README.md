@@ -377,20 +377,24 @@ geometry-relevant values. Disclosure, reroot, filtering, exact hover, Secondary
 presentation, and camera behavior continue through the existing projection and
 React Flow seams.
 
-HIER4B-SPACING-FIX1 adds `Direct folders only`, Nested ancestor pull 1/3 or
+HIER4B-SPACING-FIX2 retains `Direct folders only`, Nested ancestor pull 1/3 or
 1/4, and `Soft spacing` beside Folder strength while Focus + Hierarchy +
 Modular Preview + Soft Folder Clusters is active. Direct-only hides the decay
 comparison while retaining its stored value. `GraphExplorer.tsx` persists and
 normalizes these controls, and Reset Sandbox restores Nested, 1/3, and spacing 50. Scope and decay enter the typed structural worker policy; direct mode
-canonicalizes decay.
+canonicalizes decay. Direct mode groups by the post-manual/pre-compression
+parent and therefore retains named singleton guides.
 
-`ModularStructuredGraphView.tsx` applies Soft spacing only after adopting the
-cached structural graph. The 0–100 value maps continuously from 1.0× to 2.4×
-root-relative radius and translates complete non-root modules plus endpoint
-attachments. It never enters the worker request or cache key, so rapid spread
-input creates no projection, model, worker, Adaptive Compass, force, crossing,
-or collision recomputation. Folder guides consume the transformed rectangles.
-Directional mode ignores all Soft-only controls.
+`focus-schematic-presentation.ts` applies Soft spacing after structural
+adoption and owns the exact transformed-computed → prepared-RendererGraph seam
+used by `GraphCanvas`. The 0–100 value maps continuously from 1.0× to 2.4×
+root-relative radius. It never enters the worker request or cache key, so rapid
+spread input creates no projection, model, worker, Adaptive Compass, force, or
+collision recomputation. Geometry-derived attachments and quality refresh
+before strict preparation. `ModularStructuredGraphView.tsx` exposes any
+presentation failure while retaining the validated adopted graph. Folder
+guides consume the transformed rectangles. Directional mode ignores all
+Soft-only controls.
 
 HIER4B-FIX2 keeps exact folders as source truth while `GraphExplorer.tsx`
 derives stable File identity/folder pairs from the canonical snapshot and owns

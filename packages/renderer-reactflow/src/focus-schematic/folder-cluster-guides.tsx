@@ -335,8 +335,21 @@ function toward(from: Point, to: Point, distance: number): Point {
   };
 }
 
-function roundedPolygonPath(points: readonly Point[], radius: number): string {
-  if (points.length < 3) return '';
+interface RoundedPolygonGeometry {
+  readonly path: string;
+  readonly hitPoints: readonly Point[];
+  readonly straightSegments: readonly {
+    readonly start: Point;
+    readonly end: Point;
+  }[];
+}
+
+function roundedPolygonGeometry(
+  points: readonly Point[],
+  radius: number,
+): RoundedPolygonGeometry {
+  if (points.length < 3)
+    return { path: '', hitPoints: points, straightSegments: [] };
   const entries = points.map((point, index) => {
     const previous = points[(index + points.length - 1) % points.length]!;
     const next = points[(index + 1) % points.length]!;
@@ -347,27 +360,16 @@ function roundedPolygonPath(points: readonly Point[], radius: number): string {
     };
   });
   const last = entries.at(-1)!;
-  return [
-    `M ${last.end.x} ${last.end.y}`,
-    ...entries.flatMap(({ point, start, end }) => [
-      `L ${start.x} ${start.y}`,
-      `Q ${point.x} ${point.y} ${end.x} ${end.y}`,
-    ]),
-    'Z',
-  ].join(' ');
-}
-
-function roundedPolygonHitPoints(
-  points: readonly Point[],
-  radius: number,
-): readonly Point[] {
-  if (points.length < 3) return points;
-  return points.flatMap((point, index) => {
-    const previous = points[(index + points.length - 1) % points.length]!;
-    const next = points[(index + 1) % points.length]!;
-    const start = toward(point, previous, radius);
-    const end = toward(point, next, radius);
-    return [
+  return {
+    path: [
+      `M ${last.end.x} ${last.end.y}`,
+      ...entries.flatMap(({ point, start, end }) => [
+        `L ${start.x} ${start.y}`,
+        `Q ${point.x} ${point.y} ${end.x} ${end.y}`,
+      ]),
+      'Z',
+    ].join(' '),
+    hitPoints: entries.flatMap(({ point, start, end }) => [
       start,
       ...Array.from({ length: 6 }, (_, step) => {
         const t = (step + 1) / 6;
@@ -383,8 +385,28 @@ function roundedPolygonHitPoints(
             t * t * end.y,
         };
       }),
-    ];
-  });
+    ]),
+    straightSegments: entries.map((entry, index) => ({
+      start: entries[(index + entries.length - 1) % entries.length]!.end,
+      end: entry.start,
+    })),
+  };
+}
+
+function upperHorizontalSegmentStart(
+  geometry: RoundedPolygonGeometry,
+): Point | undefined {
+  return geometry.straightSegments
+    .filter(
+      ({ start, end }) =>
+        Math.abs(start.y - end.y) <= 1e-7 &&
+        Math.hypot(end.x - start.x, end.y - start.y) > 1e-7,
+    )
+    .map(({ start, end }) => ({
+      x: Math.min(start.x, end.x),
+      y: (start.y + end.y) / 2,
+    }))
+    .sort((left, right) => left.y - right.y || left.x - right.x)[0];
 }
 
 function guideForIsland(
@@ -410,8 +432,11 @@ function guideForIsland(
     .filter((key) => key !== folder.folderKey)
     .sort(compareText);
   const radius = GUIDE_CORNER_RADIUS;
-  const hitPolygon =
-    shape === 'singleton' ? hull : roundedPolygonHitPoints(hull, radius);
+  const rounded =
+    shape === 'singleton' ? undefined : roundedPolygonGeometry(hull, radius);
+  const hitPolygon = rounded?.hitPoints ?? hull;
+  const labelAnchor =
+    rounded === undefined ? undefined : upperHorizontalSegmentStart(rounded);
   const area =
     shape === 'singleton'
       ? (right - x) * (bottom - y) - (4 - Math.PI) * radius ** 2
@@ -443,14 +468,11 @@ function guideForIsland(
     width: right - x,
     height: bottom - y,
     radius,
-    path:
-      shape === 'singleton'
-        ? null
-        : roundedPolygonPath(hull, GUIDE_CORNER_RADIUS),
+    path: rounded?.path ?? null,
     hullPoints: hitPolygon,
     area,
-    labelX: x + 12,
-    labelY: y - 9,
+    labelX: (labelAnchor?.x ?? x) + 12,
+    labelY: (labelAnchor?.y ?? y) - 9,
   };
 }
 
@@ -475,12 +497,15 @@ export function focusSchematicFolderClusterGuides(
       ...size,
     });
   }
+  const displayedFolders = directFoldersOnly
+    ? tree.preCompressionFolders
+    : tree.folders;
   const byKey = new Map(
-    tree.folders.map((folder) => [folder.folderKey, folder]),
+    displayedFolders.map((folder) => [folder.folderKey, folder]),
   );
   const resultByFolder = new Map<string, FolderGuideBuildResult>();
   const localSuppressedAncestorsByGuideId = new Map<string, Set<string>>();
-  const ordered = [...tree.folders].sort(
+  const ordered = [...displayedFolders].sort(
     (left, right) =>
       right.displayDepth - left.displayDepth ||
       compareText(left.folderKey, right.folderKey),
@@ -514,11 +539,13 @@ export function focusSchematicFolderClusterGuides(
       .filter(([moduleId]) => !descendants.has(moduleId))
       .map(([, rectangle]) => rectangle);
     const islands = splitIntoIslands(units, blockers);
-    // Root keeps its existing direct-File structural policy. Named folders
-    // expose only regions that locally group at least two direct visual units.
-    const renderedIslands = islands.filter(
-      (island) => folder.folderKey === '.' || island.length >= 2,
-    );
+    // Nested keeps its accepted local wrapper suppression. Direct renders every
+    // truthful group because a singleton is that File's only folder identity.
+    const renderedIslands = directFoldersOnly
+      ? islands
+      : islands.filter(
+          (island) => folder.folderKey === '.' || island.length >= 2,
+        );
     const guides = renderedIslands.map((island, regionIndex) =>
       guideForIsland(
         folder,

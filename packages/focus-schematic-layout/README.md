@@ -99,21 +99,23 @@ sibling-branch pass; module X, dimensions, ownership, lanes, and exact endpoint
 identity stay fixed. The default remains Off until graphical approval selects
 the HIER4A candidate and visual Heading-order policy.
 
-HIER4B-SPACING-FIX1 freezes one Soft structural policy at 600 hop spacing,
+HIER4B-SPACING-FIX2 retains one Soft structural policy at 600 hop spacing,
 88 module clearance, 180 topology distance, 72 packing steps, 104 radial
 jitter, 30/60 internal node/rank separation, and 34/30 module padding. The
 0–100 Sandbox spacing value is a post-layout radial transform with scale
-`1 + 1.4 × value/100`. It translates complete non-root modules, their nodes,
-and endpoint attachments around the fixed root without changing dimensions,
-internal offsets, Adaptive Compass, crossing order, folder force, or packing.
-It is excluded from the worker request and structural cache key.
+`1 + 1.4 × value/100`. It translates complete non-root modules and their nodes
+around the fixed root, then recomputes cardinal attachments and
+geometry-derived quality without changing dimensions, internal offsets,
+Adaptive Compass, folder force, or packing. It is excluded from the worker
+request and structural cache key.
 
 Nested Soft force uses normalized `1 / base ** index` membership with selectable
-base 3 (default) or 4. Direct-only selects each File's nearest/current displayed
-folder and canonicalizes decay out of the cache identity. Both modes exclude the
-root File before active force-group assembly while retaining it in display
-membership. The fixed `[36, 18]` schedule and secondary zero-influence rule are
-unchanged.
+base 3 (default) or 4. Direct-only selects each File's immediate displayed
+parent after manual promotion/flattening and before automatic singleton
+compression, then canonicalizes decay out of the cache identity. Both modes
+exclude the root File before active force-group assembly while retaining it in
+display membership. The fixed `[36, 18]` schedule and secondary zero-influence
+rule are unchanged.
 Directional physical sides retain HIER4A's signed-rank policy: a counterpart at
 a smaller rank attaches left, a counterpart at a larger rank attaches right,
 and same-rank secondary display uses `auto`. Soft Folder Clusters instead chooses
@@ -177,13 +179,15 @@ the bakeoff evidence if changed.
   Clusters; Directional Bands remains the default.
 - `src/soft-cluster-spacing.ts` owns the fixed structural policy, bounded 0–100
   radial-spread normalization, and continuous 1.0×–2.4× scale mapping.
-- `src/soft-radial-spread.ts` translates complete non-root module geometry and
-  endpoint attachments around the fixed root after structural computation.
+- `src/soft-radial-spread.ts` translates complete non-root module geometry
+  around the fixed root after structural computation, then refreshes cardinal
+  attachments and strict geometry-derived quality.
 - `src/soft-folder-display.ts` owns strict sparse File-parent and flattened-layer
   intent, conservative reconciliation, the pure nested displayed tree,
-  one-child-unit compression/provenance, action mutations, nearest-only scope,
-  and normalized 1/3 or 1/4 ancestor weights. It contains no storage, renderer,
-  or source-provider logic.
+  pre-compression Direct-parent snapshot, one-child-unit
+  compression/provenance, action mutations, nearest-only scope, and normalized
+  1/3 or 1/4 ancestor weights. It contains no storage, renderer, or
+  source-provider logic.
 - `src/soft-cluster-fixtures.ts` owns SC1–SC24 plus SC17–SC19 stability pairs.
 - `src/source-order.ts` derives public Dagre adjacent-sibling constraints from
   canonical source order.

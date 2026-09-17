@@ -1,4 +1,11 @@
-import type { FocusSchematicComputedLayout } from './types';
+import { createFocusSchematicEndpointAttachments } from './attachments';
+import { evaluateFocusSchematicEndpointLayoutQuality } from './endpoint-facing';
+import { evaluateFocusSchematicFolderBandQuality } from './folder-bands';
+import type {
+  FocusSchematicComputedLayout,
+  FocusSchematicEndpointLayoutQuality,
+  FocusSchematicLayoutInput,
+} from './types';
 import { focusSchematicSoftRadialSpreadScale } from './soft-cluster-spacing';
 
 interface Translation {
@@ -22,9 +29,9 @@ const center = (rectangle: {
  * decision remain byte-identical to the cached base result.
  */
 export function applyFocusSchematicSoftRadialSpread(
+  input: FocusSchematicLayoutInput,
   computed: FocusSchematicComputedLayout,
   spacing: unknown,
-  rootDocumentProjectionNodeId?: string | null,
 ): FocusSchematicComputedLayout {
   const scale = focusSchematicSoftRadialSpreadScale(spacing);
   if (scale === 1) return computed;
@@ -34,7 +41,10 @@ export function applyFocusSchematicSoftRadialSpread(
   if (root === undefined)
     throw new Error('Soft radial spread requires the root module geometry.');
   const rootFile = computed.candidate.nodes.find(
-    ({ projectionNodeId }) => projectionNodeId === rootDocumentProjectionNodeId,
+    ({ projectionNodeId }) =>
+      projectionNodeId ===
+      input.model.modules.find(({ id }) => id === input.model.rootModuleId)
+        ?.documentProjectionNodeId,
   );
   const rootCenter = center(rootFile ?? root);
   const translations = new Map<string, Translation>();
@@ -63,24 +73,48 @@ export function applyFocusSchematicSoftRadialSpread(
       y: (rectangle as Rectangle & { readonly y: number }).y + delta.y,
     };
   };
+  const candidate = {
+    ...computed.candidate,
+    modules: computed.candidate.modules.map(translate),
+    nodes: computed.candidate.nodes.map(translate),
+  };
+  const attachments = createFocusSchematicEndpointAttachments(
+    computed.endpointPlan,
+    candidate,
+    'soft-cardinal-files',
+  );
+  const quality = evaluateFocusSchematicEndpointLayoutQuality(
+    input,
+    computed.modulePlan,
+    computed.endpointPlan,
+    computed.internalLanePlan,
+    candidate,
+    attachments,
+    'soft-cardinal-files',
+  );
+  const baselineQuality: FocusSchematicEndpointLayoutQuality = {
+    ...quality,
+    exactEndpointCrossingCount:
+      computed.folderBandQuality.baselineExactEndpointCrossingCount,
+    adjacentRankOrderInversionCount:
+      computed.folderBandQuality.baselineAdjacentRankOrderInversionCount,
+    meanPreciseEndpointVerticalError:
+      computed.folderBandQuality.baselineMeanEndpointVerticalError,
+    p95PreciseEndpointVerticalError:
+      computed.folderBandQuality.baselineP95EndpointVerticalError,
+  };
   return {
     ...computed,
-    candidate: {
-      ...computed.candidate,
-      modules: computed.candidate.modules.map(translate),
-      nodes: computed.candidate.nodes.map(translate),
-    },
-    attachments: computed.attachments.map((attachment) => {
-      const delta = translations.get(attachment.moduleId);
-      if (delta === undefined)
-        throw new Error(
-          `Soft radial spread cannot resolve attachment module "${attachment.moduleId}".`,
-        );
-      return {
-        ...attachment,
-        x: attachment.x + delta.x,
-        y: attachment.y + delta.y,
-      };
-    }),
+    candidate,
+    attachments,
+    quality,
+    folderBandQuality: evaluateFocusSchematicFolderBandQuality(
+      input,
+      computed.modulePlan,
+      computed.folderBandPlan,
+      candidate,
+      baselineQuality,
+      quality,
+    ),
   };
 }

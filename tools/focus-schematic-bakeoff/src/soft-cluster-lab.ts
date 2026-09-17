@@ -157,11 +157,9 @@ function artifact(spec: EndpointFixtureSpec) {
                       `${spec.id}/${policy}/${internal}/spacing-${spacing}/strength-${strength}: ${attempt.reason}`,
                     );
                   const displayed = applyFocusSchematicSoftRadialSpread(
+                    softInput,
                     attempt.result,
                     spacing,
-                    softInput.model.modules.find(
-                      ({ id }) => id === softInput.model.rootModuleId,
-                    )?.documentProjectionNodeId,
                   );
                   return [
                     strength,

@@ -58,6 +58,7 @@ interface MutableFile {
   readonly exactFolderKey: WorkspaceFolderKey;
   displayParentFolderKey: WorkspaceFolderKey;
   readonly manualDisplayParentFolderKey: WorkspaceFolderKey;
+  directDisplayParentFolderKey: WorkspaceFolderKey;
   readonly suppressedAncestorFolderKeys: WorkspaceFolderKey[];
   readonly provenance: Set<FocusSchematicSoftFolderPlacementProvenance>;
 }
@@ -327,6 +328,56 @@ function orderedProvenance(
   return order.filter((value) => values.has(value));
 }
 
+function immutableFolderValues(
+  folders: ReadonlyMap<WorkspaceFolderKey, MutableFolder>,
+): readonly FocusSchematicSoftFolderDisplayNode[] {
+  const descendantMemo = new Map<WorkspaceFolderKey, readonly EntityId[]>();
+  const descendants = (folderKey: WorkspaceFolderKey): readonly EntityId[] => {
+    const cached = descendantMemo.get(folderKey);
+    if (cached !== undefined) return cached;
+    const folder = folders.get(folderKey)!;
+    const value = [
+      ...folder.directFileIds,
+      ...[...folder.childFolderKeys].flatMap((childKey) =>
+        descendants(childKey),
+      ),
+    ].sort(compareText);
+    descendantMemo.set(folderKey, value);
+    return value;
+  };
+  const displayDepthMemo = new Map<WorkspaceFolderKey, number>();
+  const displayDepth = (folderKey: WorkspaceFolderKey): number => {
+    const cached = displayDepthMemo.get(folderKey);
+    if (cached !== undefined) return cached;
+    const parent = folders.get(folderKey)?.displayParentFolderKey;
+    const value =
+      parent === null || parent === undefined ? 0 : displayDepth(parent) + 1;
+    displayDepthMemo.set(folderKey, value);
+    return value;
+  };
+  return [...folders.values()]
+    .sort(
+      (left, right) =>
+        folderDepth(left.folderKey) - folderDepth(right.folderKey) ||
+        compareText(left.folderKey, right.folderKey),
+    )
+    .map((folder) => ({
+      folderKey: folder.folderKey,
+      displayParentFolderKey: folder.displayParentFolderKey,
+      displayDepth: displayDepth(folder.folderKey),
+      directFileIds: [...folder.directFileIds].sort(compareText),
+      childFolderKeys: [...folder.childFolderKeys].sort(compareText),
+      descendantFileIds: descendants(folder.folderKey),
+      suppressedAncestorFolderKeys: [
+        ...folder.suppressedAncestorFolderKeys,
+      ].sort(
+        (left, right) =>
+          folderDepth(left) - folderDepth(right) || compareText(left, right),
+      ),
+      provenance: orderedProvenance(folder.provenance),
+    }));
+}
+
 /** Pure canonical-to-displayed transformation shared by layout and renderer. */
 export function buildFocusSchematicSoftFolderDisplayTree({
   visibleFiles,
@@ -369,6 +420,7 @@ export function buildFocusSchematicSoftFolderDisplayTree({
       ...inputFile,
       displayParentFolderKey: manualParent,
       manualDisplayParentFolderKey: manualParent,
+      directDisplayParentFolderKey: manualParent,
       suppressedAncestorFolderKeys: [],
       provenance: new Set([
         'exact',
@@ -413,6 +465,10 @@ export function buildFocusSchematicSoftFolderDisplayTree({
   ))
     liftFolderLayer(folderKey, folders, files, 'manual-folder-flatten');
 
+  for (const file of files.values())
+    file.directDisplayParentFolderKey = file.displayParentFolderKey;
+  const preCompressionFolders = immutableFolderValues(folders);
+
   const automaticallyCompressedFolderKeys: WorkspaceFolderKey[] = [];
   let changed = true;
   while (changed) {
@@ -442,53 +498,7 @@ export function buildFocusSchematicSoftFolderDisplayTree({
     }
   }
 
-  const descendantMemo = new Map<WorkspaceFolderKey, readonly EntityId[]>();
-  const descendants = (folderKey: WorkspaceFolderKey): readonly EntityId[] => {
-    const cached = descendantMemo.get(folderKey);
-    if (cached !== undefined) return cached;
-    const folder = folders.get(folderKey)!;
-    const value = [
-      ...folder.directFileIds,
-      ...[...folder.childFolderKeys].flatMap((childKey) =>
-        descendants(childKey),
-      ),
-    ].sort(compareText);
-    descendantMemo.set(folderKey, value);
-    return value;
-  };
-  const displayDepthMemo = new Map<WorkspaceFolderKey, number>();
-  const displayDepth = (folderKey: WorkspaceFolderKey): number => {
-    const cached = displayDepthMemo.get(folderKey);
-    if (cached !== undefined) return cached;
-    const parent = folders.get(folderKey)?.displayParentFolderKey;
-    const value =
-      parent === null || parent === undefined ? 0 : displayDepth(parent) + 1;
-    displayDepthMemo.set(folderKey, value);
-    return value;
-  };
-  const folderValues: FocusSchematicSoftFolderDisplayNode[] = [
-    ...folders.values(),
-  ]
-    .sort(
-      (left, right) =>
-        folderDepth(left.folderKey) - folderDepth(right.folderKey) ||
-        compareText(left.folderKey, right.folderKey),
-    )
-    .map((folder) => ({
-      folderKey: folder.folderKey,
-      displayParentFolderKey: folder.displayParentFolderKey,
-      displayDepth: displayDepth(folder.folderKey),
-      directFileIds: [...folder.directFileIds].sort(compareText),
-      childFolderKeys: [...folder.childFolderKeys].sort(compareText),
-      descendantFileIds: descendants(folder.folderKey),
-      suppressedAncestorFolderKeys: [
-        ...folder.suppressedAncestorFolderKeys,
-      ].sort(
-        (left, right) =>
-          folderDepth(left) - folderDepth(right) || compareText(left, right),
-      ),
-      provenance: orderedProvenance(folder.provenance),
-    }));
+  const folderValues = immutableFolderValues(folders);
   const fileValues: FocusSchematicSoftFolderDisplayFile[] = [...files.values()]
     .sort((left, right) => compareText(left.fileId, right.fileId))
     .map((file) => ({
@@ -496,6 +506,7 @@ export function buildFocusSchematicSoftFolderDisplayTree({
       exactFolderKey: file.exactFolderKey,
       displayParentFolderKey: file.displayParentFolderKey,
       manualDisplayParentFolderKey: file.manualDisplayParentFolderKey,
+      directDisplayParentFolderKey: file.directDisplayParentFolderKey,
       suppressedAncestorFolderKeys: [...file.suppressedAncestorFolderKeys].sort(
         (left, right) =>
           folderDepth(left) - folderDepth(right) || compareText(left, right),
@@ -504,6 +515,7 @@ export function buildFocusSchematicSoftFolderDisplayTree({
     }));
   return {
     rootFolderKey: '.',
+    preCompressionFolders,
     folders: folderValues,
     files: fileValues,
     reconciledIntent,
@@ -524,15 +536,18 @@ export function focusSchematicSoftFolderScopeMemberships(
   return new Map(
     tree.files.map((file) => {
       const scopes: WorkspaceFolderKey[] = [];
+      if (policy === 'nearest-only') {
+        if (file.directDisplayParentFolderKey !== '.')
+          scopes.push(file.directDisplayParentFolderKey);
+      }
       let current: WorkspaceFolderKey | null = file.displayParentFolderKey;
-      while (current !== null) {
+      while (policy !== 'nearest-only' && current !== null) {
         const folder = folderByKey.get(current);
         if (folder === undefined) break;
         if (current !== '.') scopes.push(current);
         current = folder.displayParentFolderKey;
       }
-      const selected = policy === 'nearest-only' ? scopes.slice(0, 1) : scopes;
-      const raw = selected.map((folderKey, index) => ({
+      const raw = scopes.map((folderKey, index) => ({
         folderKey,
         weight:
           policy === 'normalized-decay' ? 1 / ancestorDecayBase ** index : 1,
@@ -600,12 +615,20 @@ export function flattenFocusSchematicSoftFolder(
   tree: FocusSchematicSoftFolderDisplayTree,
   folderKey: WorkspaceFolderKey,
   includeSiblings = false,
+  usePreCompressionProjection = false,
 ): FocusSchematicSoftFolderDisplayIntent {
-  const folder = tree.folders.find((item) => item.folderKey === folderKey);
+  const finalFolder = tree.folders.find((item) => item.folderKey === folderKey);
+  const folder =
+    (usePreCompressionProjection ? undefined : finalFolder) ??
+    tree.preCompressionFolders.find((item) => item.folderKey === folderKey);
   if (folder === undefined || folder.displayParentFolderKey === null)
     return tree.reconciledIntent;
+  const folderProjection =
+    usePreCompressionProjection || finalFolder === undefined
+      ? tree.preCompressionFolders
+      : tree.folders;
   const targets = includeSiblings
-    ? tree.folders
+    ? folderProjection
         .filter(
           (item) =>
             item.folderKey !== '.' &&

@@ -1460,7 +1460,7 @@ records per-module cardinal counts, demand matches and hard-guard overrides,
 pass-to-pass region and bounds changes, and pass-two crossing/span deltas. A
 separate perturbation diagnostic compares Adaptive and Vertical internal
 rectangles with final File-center displacement and recognizes legitimate
-second-pass region changes. Soft algorithm version 7 covers root-neutral scope,
+second-pass region changes. Soft algorithm version 8 covers root-neutral scope,
 normalized decay, and the fixed structural policy; worker protocol 10 and Soft
 evidence schema 5 isolate those changes while the Directional algorithm version
 remains 4.
@@ -1483,8 +1483,9 @@ inside the real Modular Preview for live-vault evaluation. It aggregates
 selected-backbone and Focus-path connections as undirected module pairs, uses
 minimum undirected Focus hops as a soft radial prior, and applies normalized
 decaying attraction across visible displayed ancestor scopes. Nested mode uses
-selectable base 3 (default) or 4; Direct-only selects just the nearest/current
-displayed folder. Each File's total folder-force weight is at most one,
+selectable base 3 (default) or 4; Direct-only selects the immediate parent after
+manual promotion/flattening and before automatic singleton compression. Each
+File's total folder-force weight is at most one,
 preventing depth amplification, and the root is excluded from active groups. A stable identity seed,
 fixed 36 + 18 relaxation schedule, bounded variable-rectangle collision pack,
 and two internal-layout rounds make the result stateless and reproducible.
@@ -1495,10 +1496,12 @@ The 24-entry exact cache includes macro family plus normalized strength,
 scope/decay, and canonical sparse display intent only for Soft Clusters.
 Direct-only canonicalizes decay. The 0–100 spacing preference is excluded: the
 web applies a continuous 1.0×–2.4× root-relative translation to complete
-non-root modules and endpoint attachments after structural cache adoption.
-Spread therefore does not rerun Adaptive Compass, ordering, force, collision,
-or the worker, and changing stored Soft state cannot miss or perturb a
-Directional layout. Structural policy changes use the existing terminating
+non-root modules after structural cache adoption, then refreshes cardinal
+attachments and geometry-derived validation quality. Spread therefore does not
+rerun Adaptive Compass, ordering, force, collision, or the worker. Strict
+renderer rejection keeps the validated adopted graph visible and surfaces an
+explicit presentation warning. Changing stored Soft state cannot miss or
+perturb a Directional layout. Structural policy changes use the existing terminating
 latest-result-wins worker lifecycle. The worker response carries aggregate Soft
 solver, Compass, and collision evidence while computed geometry carries only a
 deterministic policy identity. The real projection continues to own disclosure,
@@ -1521,8 +1524,9 @@ HIER4B-FIX3 adds empty-guide area targeting, composed File/current-folder menus,
 short accessible labels, and displayed-depth styling to FIX2 while retaining
 FIX1's cardinal File ports. POLISH1 then hides empty painted module boundaries
 and makes folder labels visually passive without changing geometry or menu
-behavior. HIER4B-SPACING-FIX1 now awaits native QA for Direct-only flat guides,
-1/3 vs 1/4 ancestor pull, and radial spread in PR #106. Unified folder-region
+behavior. HIER4B-SPACING-FIX2 now awaits native QA for corrected radial
+adoption, pre-compression Direct groups and singleton guides, and top-edge label
+anchoring in PR #106. Unified folder-region
 policy and MODULAR-CONTEXT1 remain separate later work;
 HIER5 follows HIER4B, and HIER3C follows HIER5.
 

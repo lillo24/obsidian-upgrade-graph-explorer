@@ -185,7 +185,7 @@ describe('page-lifetime Focus Schematic layout cache', () => {
       }) as const;
     expect(
       exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)),
-    ).toContain('"algorithmVersion":7');
+    ).toContain('"algorithmVersion":8');
     expect(
       exactFocusSchematicLayoutCacheKey(
         directionalInput,
@@ -316,8 +316,8 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     const base = structural();
     for (const spacing of [0, 25, 50, 71, 72, 73, 75, 100])
       expect(
-        applyFocusSchematicSoftRadialSpread(structural(), spacing).candidate
-          .modules,
+        applyFocusSchematicSoftRadialSpread(softInput, structural(), spacing)
+          .candidate.modules,
       ).toHaveLength(base.candidate.modules.length);
     expect(structuralComputeCount).toBe(1);
     expect(cache.size).toBe(1);

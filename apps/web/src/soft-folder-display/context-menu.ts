@@ -82,9 +82,11 @@ function fileActions(
 function folderActions(
   tree: FocusSchematicSoftFolderDisplayTree,
   folderKey: string,
+  directFoldersOnly = false,
 ): readonly GraphContextMenuAction<SoftFolderDisplayMenuActionId>[] {
-  const folder = tree.folders.find((item) => item.folderKey === folderKey);
-  const siblingCount = tree.folders.filter(
+  const folders = directFoldersOnly ? tree.preCompressionFolders : tree.folders;
+  const folder = folders.find((item) => item.folderKey === folderKey);
+  const siblingCount = folders.filter(
     (item) =>
       item.folderKey !== folder?.folderKey &&
       item.folderKey !== '.' &&
@@ -140,8 +142,14 @@ function folderActions(
 export function softFolderDisplayMenuItems(
   tree: FocusSchematicSoftFolderDisplayTree,
   target: SoftFolderDisplayContextTarget,
+  options: { readonly directFoldersOnly?: boolean } = {},
 ): readonly GraphContextMenuItem<SoftFolderDisplayMenuActionId>[] {
-  if (target.kind === 'folder') return folderActions(tree, target.folderKey);
+  if (target.kind === 'folder')
+    return folderActions(
+      tree,
+      target.folderKey,
+      options.directFoldersOnly === true,
+    );
   const file = tree.files.find(({ fileId }) => fileId === target.fileId);
   const upper = fileActions(tree, target.fileId);
   if (
@@ -169,6 +177,7 @@ export function applySoftFolderDisplayMenuAction(
   tree: FocusSchematicSoftFolderDisplayTree,
   target: SoftFolderDisplayContextTarget,
   action: SoftFolderDisplayMenuActionId,
+  options: { readonly directFoldersOnly?: boolean } = {},
 ): SoftFolderDisplayMenuResult {
   if (action === 'folder:reset') return { kind: 'reset' };
   if (action.startsWith('folder:restore-layer:'))
@@ -198,6 +207,7 @@ export function applySoftFolderDisplayMenuAction(
           tree,
           folderKey,
           action === 'folder:flatten-siblings',
+          options.directFoldersOnly === true && target.kind === 'folder',
         ),
       };
   }

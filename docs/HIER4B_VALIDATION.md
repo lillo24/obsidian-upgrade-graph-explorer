@@ -45,7 +45,7 @@ non-root Files only, and the root module is labeled `DISPLAY MEMBER ·
 FORCE-NEUTRAL`. SC26 shows that a root plus one peer cannot create an attraction
 group; SC27 shows two peers attracting around their own centroid; SC28 covers
 normalized-decay ancestor scopes. These scenarios display strengths 0, 25, 50,
-75, and 100 side by side. Soft cache algorithm version 7 separates the combined
+75, and 100 side by side. Soft cache algorithm version 8 separates the combined
 root-neutral, spatial-Compass, scope/decay, and fixed structural geometry from
 the earlier branches; radial spread remains outside this identity.
 
@@ -209,6 +209,48 @@ it as a first-pass semantic no-op; production geometry is unchanged.
 
 Native graphical QA remains required before merge.
 
+## HIER4B-SPACING-FIX2 candidate
+
+The native slider appeared inert because radial spread changed candidate and
+attachment coordinates while leaving endpoint and folder-band quality derived
+from the base geometry. Strict renderer preparation rejected spacing 50 and
+100 with `Computed layout is invalid: Endpoint quality does not match computed
+geometry.` The component's broad catch then silently returned the unspread
+adopted graph. FIX2 recomputes cardinal attachments and only the
+geometry-derived quality fields after translation. The structural Soft result,
+Adaptive Compass decisions, force relaxation, packing, and cache entry are
+reused. A remaining presentation failure now exposes its error while retaining
+the validated adopted graph.
+
+Renderer and web presentation regressions execute the complete structural Soft
+result → radial transform → strict renderer preparation seam at 0/50/100. They
+verify fixed root geometry, increasing non-root radius, changed prepared React
+Flow positions, valid edge handles, and one structural compute. Existing
+71/72/73 and cache tests retain continuous scale and spread-independent cache
+identity.
+
+Direct scope now captures every File's parent after manual promotion and folder
+flattening but before automatic singleton compression. D1–D7 cover a deep
+singleton chain, distinct parent/child immediate folders, a named singleton
+guide, promotion, flattening, genuine root membership, and root-neutral force.
+Nested memberships and the final compressed display tree remain unchanged.
+Direct guide context actions resolve against the same pre-compression folder
+projection.
+
+Guide L1–L5 cover steep diagonal hulls, rounded rectangles, singleton fallback,
+permutation determinism, and disconnected regions. Labels use the uppermost
+visible horizontal straight segment derived from the rounded path itself.
+Folder-strength behavior is unchanged and remains future work for dense graphs.
+
+Final local validation passes 159 layout tests, 127 renderer tests, 171 web
+component tests, 10 layout-cache tests, and the complete 270-file/2264-test
+`pnpm check` gate. The Soft benchmark passes all hard gates across 135 fixture,
+15 stress, 21 hierarchy-force, 35 hierarchy-strength, 32 Compass-demand, and 40
+Compass-strength rows. Desktop Rust check/test and the optimized release build
+also pass. The QA executable is
+`output/hier4b-spacing-fix2-native-candidate.exe`; its SHA-256 is
+`893E63D938C79E50C4B883F81E40D06010C3D3998E2DD326E6A4A18F247C5BFC`.
+
 ## Commands
 
 ```text
@@ -258,3 +300,8 @@ The exact HIER4B-SPACING prompt is archived at
 `history-implementations/HIER4B_SPACING_soft_cluster_bakeoff_sandbox_slider_codex_prompt.md`.
 Its SHA-256 is
 `23845CB4420871AB06AEA263627C79636391EDF7D2EC2410387B2AC86146934C`.
+
+The exact HIER4B-SPACING-FIX2 prompt is archived at
+`history-implementations/HIER4B_SPACING_FIX2_spread_adoption_direct_parent_labels_codex_prompt.md`.
+Its SHA-256 is
+`75B852EA005DB43973247D439B53B8D8B8148CAFACFBEA884E3FCC3304C1D0F5`.

@@ -158,4 +158,23 @@ describe('Soft folder display context actions', () => {
         ),
     ).toBe(true);
   });
+
+  it('uses a pre-compression Direct guide as the folder context target', () => {
+    const tree = buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles: [{ fileId: 'only', exactFolderKey: 'A/B/C' }],
+    });
+    const target = { kind: 'folder', folderKey: 'A/B/C' } as const;
+    expect(
+      ids(
+        softFolderDisplayMenuItems(tree, target, {
+          directFoldersOnly: true,
+        }),
+      ),
+    ).toEqual(['folder:flatten', 'folder:flatten-siblings', 'folder:reset']);
+    expect(
+      applySoftFolderDisplayMenuAction(tree, target, 'folder:flatten', {
+        directFoldersOnly: true,
+      }),
+    ).toMatchObject({ value: { flattenedFolderKeys: ['A/B/C'] } });
+  });
 });
