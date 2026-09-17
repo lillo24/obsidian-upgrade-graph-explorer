@@ -5,6 +5,8 @@ import {
   editAxiom,
   editCounterArgument,
   createCounterArgument,
+  createArgument,
+  setTopicMembership,
 } from './library';
 import {
   createKnowledgeReader,
@@ -38,7 +40,9 @@ describe('snapshot-bound knowledge reader', () => {
     const second = reader.listIndex({ limit: 2, cursor: firstCursor });
     expect(second).toMatchObject({
       status: 'ok',
-      value: { candidates: [{ id: 'T-NEUTRAL' }] },
+      value: {
+        candidates: [{ id: 'CA-NEUTRAL' }, { id: 'T-NEUTRAL' }],
+      },
     });
 
     const phrase = reader.searchIndex({
@@ -112,6 +116,14 @@ describe('snapshot-bound knowledge reader', () => {
       value: {
         topics: [expect.objectContaining({ id: 'T-NEUTRAL' })],
         axioms: [expect.objectContaining({ id: 'AX-NEUTRAL' })],
+        arguments: [
+          expect.objectContaining({
+            id: 'AR-NEUTRAL',
+            argumentStale: false,
+            currentTopicIds: ['T-NEUTRAL'],
+            targetingCounterArgumentIds: ['CA-NEUTRAL'],
+          }),
+        ],
         counterArguments: [
           expect.objectContaining({
             id: 'CA-NEUTRAL',
@@ -157,6 +169,64 @@ describe('snapshot-bound knowledge reader', () => {
             staleAxiomIds: ['AX-NEUTRAL'],
           }),
         ],
+      },
+    });
+  });
+
+  it('reads Current reasoning without expanding every historical Topic Argument', () => {
+    const runtime = deterministicRuntime('current-bundle');
+    let library = createArgument(
+      createNeutralArgumentLibrary(),
+      {
+        id: 'AR-HISTORICAL',
+        title: 'Historical alternative',
+        premises: [],
+        conclusion: 'A historical alternative conclusion.',
+        reviewState: 'accepted',
+      },
+      runtime,
+    );
+    library = setTopicMembership(
+      library,
+      'T-NEUTRAL',
+      'argument',
+      'AR-HISTORICAL',
+      true,
+      runtime,
+    );
+    const reader = createKnowledgeReader(
+      captureArgumentLibrarySnapshot(library),
+    );
+
+    expect(
+      reader.readArgumentBundle({ kind: 'topic', id: 'T-NEUTRAL' }),
+    ).toMatchObject({
+      status: 'ok',
+      value: {
+        arguments: [expect.objectContaining({ id: 'AR-NEUTRAL' })],
+      },
+    });
+    expect(
+      reader.readArgumentBundle({ kind: 'argument', id: 'AR-NEUTRAL' }),
+    ).toMatchObject({
+      status: 'ok',
+      value: {
+        axioms: [expect.objectContaining({ id: 'AX-NEUTRAL' })],
+        arguments: [
+          expect.objectContaining({
+            id: 'AR-NEUTRAL',
+            resolvedPremises: expect.arrayContaining([
+              expect.objectContaining({
+                premiseId: 'P-NEUTRAL-AXIOM',
+                referencedRecord: expect.objectContaining({
+                  kind: 'axiom',
+                  id: 'AX-NEUTRAL',
+                }),
+              }),
+            ]),
+          }),
+        ],
+        counterArguments: [expect.objectContaining({ id: 'CA-NEUTRAL' })],
       },
     });
   });
@@ -282,7 +352,7 @@ describe('snapshot-bound knowledge reader', () => {
     if (result.status !== 'ok') return;
     expect(() => JSON.stringify(result.value.receipt)).not.toThrow();
     expect(result.value.receipt).toMatchObject({
-      contractVersion: 1,
+      contractVersion: 2,
       operation: 'read-argument-bundle',
       snapshot: reader.snapshot,
       returnedRecords: expect.arrayContaining([

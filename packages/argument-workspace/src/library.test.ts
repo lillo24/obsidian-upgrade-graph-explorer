@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { captureArgumentLibrarySnapshot } from './canonical';
+import { captureArgumentLibrarySnapshot, clonePlainData } from './canonical';
 import {
+  argumentStaleness,
   createAxiom,
+  createArgument,
   createCounterArgument,
   createTopic,
   editAxiom,
+  editArgument,
   editCounterArgument,
   editTopic,
+  promoteArgumentToCurrent,
+  reassessArgumentPremises,
   reassessCounterArgumentResponse,
   recordTheorySourceVersion,
   responseStaleness,
@@ -79,6 +84,7 @@ describe('Argument Library domain operations', () => {
     const beforeRevision = library.libraryRevision;
     const topicRevision = library.topics[0]!.revision;
     const axiomRevision = library.axioms[0]!.revision;
+    const argumentRevision = library.arguments[0]!.revision;
     const counterRevision = library.counterArguments[0]!.revision;
     library = editTopic(
       library,
@@ -92,6 +98,12 @@ describe('Argument Library domain operations', () => {
       { title: 'Renamed axiom' },
       runtime,
     );
+    library = editArgument(
+      library,
+      'AR-NEUTRAL',
+      { title: 'Renamed argument' },
+      runtime,
+    );
     library = editCounterArgument(
       library,
       'CA-NEUTRAL',
@@ -99,7 +111,7 @@ describe('Argument Library domain operations', () => {
       runtime,
     );
 
-    expect(library.libraryRevision).toBe(beforeRevision + 3);
+    expect(library.libraryRevision).toBe(beforeRevision + 4);
     expect(library.topics[0]).toMatchObject({
       id: 'T-NEUTRAL',
       title: 'Renamed topic',
@@ -109,6 +121,11 @@ describe('Argument Library domain operations', () => {
       id: 'AX-NEUTRAL',
       title: 'Renamed axiom',
       revision: axiomRevision + 1,
+    });
+    expect(library.arguments[0]).toMatchObject({
+      id: 'AR-NEUTRAL',
+      title: 'Renamed argument',
+      revision: argumentRevision + 1,
     });
     expect(library.counterArguments[0]).toMatchObject({
       id: 'CA-NEUTRAL',
@@ -283,6 +300,177 @@ describe('Argument Library domain operations', () => {
         },
       ],
     });
+  });
+
+  it('marks referenced Argument premises stale and clears them only on explicit reassessment', () => {
+    const runtime = deterministicRuntime('argument-stale');
+    let library = createNeutralArgumentLibrary();
+    library = createArgument(
+      library,
+      {
+        id: 'AR-FOLLOWUP',
+        title: 'Follow-up reasoning',
+        premises: [
+          {
+            id: 'P-FOLLOWUP',
+            kind: 'argument-conclusion',
+            argumentId: 'AR-NEUTRAL',
+            reliedOnRevision: library.arguments[0]!.revision,
+          },
+        ],
+        conclusion: 'The earlier conclusion can be reused explicitly.',
+      },
+      runtime,
+    );
+    const original = library.arguments.find(({ id }) => id === 'AR-FOLLOWUP')!;
+    library = editArgument(
+      library,
+      'AR-NEUTRAL',
+      { conclusion: 'A revised compatible-units conclusion.' },
+      runtime,
+    );
+    const stale = library.arguments.find(({ id }) => id === 'AR-FOLLOWUP')!;
+    expect(argumentStaleness(library, stale)).toEqual({
+      stale: true,
+      premiseIds: ['P-FOLLOWUP'],
+    });
+    expect(stale.conclusion).toBe(original.conclusion);
+
+    library = reassessArgumentPremises(library, 'AR-FOLLOWUP', runtime);
+    const reassessed = library.arguments.find(
+      ({ id }) => id === 'AR-FOLLOWUP',
+    )!;
+    expect(argumentStaleness(library, reassessed)).toEqual({
+      stale: false,
+      premiseIds: [],
+    });
+    expect(reassessed).toMatchObject({
+      conclusion: original.conclusion,
+      reviewState: original.reviewState,
+    });
+  });
+
+  it('promotes only accepted Topic members and preserves the supersession chain', () => {
+    const runtime = deterministicRuntime('promotion');
+    let library = createNeutralArgumentLibrary();
+    library = createArgument(
+      library,
+      {
+        id: 'AR-NEXT',
+        title: 'Replacement reasoning',
+        premises: [],
+        conclusion: 'A replacement conclusion.',
+        reviewState: 'accepted',
+      },
+      runtime,
+    );
+    expect(() =>
+      promoteArgumentToCurrent(library, 'T-NEUTRAL', 'AR-NEXT', runtime),
+    ).toThrow(/must belong/i);
+    library = setTopicMembership(
+      library,
+      'T-NEUTRAL',
+      'argument',
+      'AR-NEXT',
+      true,
+      runtime,
+    );
+    library = promoteArgumentToCurrent(
+      library,
+      'T-NEUTRAL',
+      'AR-NEXT',
+      runtime,
+    );
+    expect(library.topics[0]!.currentArgumentId).toBe('AR-NEXT');
+    expect(library.arguments.find(({ id }) => id === 'AR-NEXT')).toMatchObject({
+      supersedesArgumentId: 'AR-NEUTRAL',
+    });
+    expect(library.arguments.some(({ id }) => id === 'AR-NEUTRAL')).toBe(true);
+    expect(() =>
+      setRecordArchived(library, 'argument', 'AR-NEXT', true, runtime),
+    ).toThrow(/current.*cannot be archived/i);
+    expect(() =>
+      setTopicMembership(
+        library,
+        'T-NEUTRAL',
+        'argument',
+        'AR-NEXT',
+        false,
+        runtime,
+      ),
+    ).toThrow(/current.*cannot be removed/i);
+  });
+
+  it('validates Argument target parts and rejects premise dependency cycles', () => {
+    const runtime = deterministicRuntime('argument-target');
+    let library = createCounterArgument(
+      createNeutralArgumentLibrary(),
+      {
+        id: 'CA-PREMISE',
+        title: 'Premise challenge',
+        observation: 'The premise needs qualification.',
+        challengedClaim: 'The premise applies without a boundary.',
+        target: {
+          kind: 'argument',
+          argumentId: 'AR-NEUTRAL',
+          part: { kind: 'premise', premiseId: 'P-NEUTRAL-TEXT' },
+        },
+      },
+      runtime,
+    );
+    expect(validateArgumentLibrary(library).valid).toBe(true);
+    expect(() =>
+      editCounterArgument(
+        library,
+        'CA-PREMISE',
+        {
+          target: {
+            kind: 'argument',
+            argumentId: 'AR-NEUTRAL',
+            part: { kind: 'premise', premiseId: 'P-MISSING' },
+          },
+        },
+        runtime,
+      ),
+    ).toThrow(/unknown target premise/i);
+
+    library = createArgument(
+      library,
+      {
+        id: 'AR-CYCLE',
+        title: 'Cycle candidate',
+        premises: [],
+        conclusion: 'A cycle candidate conclusion.',
+      },
+      runtime,
+    );
+    const cyclic = clonePlainData(library) as unknown as {
+      arguments: { id: string; premises: unknown[] }[];
+    };
+    cyclic.arguments
+      .find(({ id }) => id === 'AR-NEUTRAL')!
+      .premises.push({
+        id: 'P-CYCLE-A',
+        kind: 'argument-conclusion',
+        argumentId: 'AR-CYCLE',
+        reliedOnRevision: 1,
+      });
+    cyclic.arguments
+      .find(({ id }) => id === 'AR-CYCLE')!
+      .premises.push({
+        id: 'P-CYCLE-B',
+        kind: 'argument-conclusion',
+        argumentId: 'AR-NEUTRAL',
+        reliedOnRevision: 1,
+      });
+    const validation = validateArgumentLibrary(cyclic);
+    expect(validation.valid).toBe(false);
+    if (validation.valid) return;
+    expect(validation.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'dependency-cycle' }),
+      ]),
+    );
   });
 
   it('changes snapshot identity for response, status, and membership edits', () => {

@@ -32,7 +32,10 @@ import type {
   SnapshotDescriptor,
   TheorySourceReference,
 } from './types';
-import { KNOWLEDGE_READER_CONTRACT_VERSION } from './types';
+import {
+  ARGUMENT_LIBRARY_SCHEMA_VERSION,
+  KNOWLEDGE_READER_CONTRACT_VERSION,
+} from './types';
 import { assertValidArgumentLibrary } from './validation';
 
 export interface KnowledgeReaderOptions {
@@ -118,8 +121,10 @@ function validateExpectedSnapshot(value: unknown, issues: string[]): void {
   if (typeof value.libraryId !== 'string' || value.libraryId.trim() === '') {
     issues.push('expectedSnapshot.libraryId must be a non-empty string.');
   }
-  if (value.schemaVersion !== 1) {
-    issues.push('expectedSnapshot.schemaVersion must be 1.');
+  if (value.schemaVersion !== ARGUMENT_LIBRARY_SCHEMA_VERSION) {
+    issues.push(
+      `expectedSnapshot.schemaVersion must be ${ARGUMENT_LIBRARY_SCHEMA_VERSION}.`,
+    );
   }
   boundedInteger(
     value.libraryRevision,
@@ -196,6 +201,7 @@ function validateBundleInput(
     value.kind !== undefined &&
     value.kind !== 'topic' &&
     value.kind !== 'axiom' &&
+    value.kind !== 'argument' &&
     value.kind !== 'counter-argument'
   ) {
     issues.push('kind is unsupported.');
@@ -300,6 +306,18 @@ function sourceReferences(library: ArgumentLibrary): ReadonlyMap<
       result.set(locator.id, {
         locator,
         owner: { kind: 'axiom', id: axiom.id, revision: axiom.revision },
+      });
+    }
+  }
+  for (const argument of library.arguments) {
+    for (const locator of argument.sourceReferences) {
+      result.set(locator.id, {
+        locator,
+        owner: {
+          kind: 'argument',
+          id: argument.id,
+          revision: argument.revision,
+        },
       });
     }
   }

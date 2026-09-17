@@ -2,7 +2,7 @@
 
 ## Status and ownership
 
-`packages/ai-review` is a headless orchestration package. It owns immutable review inputs, stage execution/history, run-local evidence, result validation, and exports. It does not own the compiler's Topics, Axioms, Counter-Arguments, responses, statuses, indexes, or durable storage.
+`packages/ai-review` is a headless orchestration package. It owns immutable review inputs, stage execution/history, run-local evidence, result validation, and exports. It does not own the compiler's Topics, Axioms, Arguments, Counter-Arguments, responses, statuses, indexes, or durable storage.
 
 `packages/argument-workspace` owns those records and exposes an immutable,
 retained `KnowledgeReader`. The application composition adapter in
@@ -90,7 +90,7 @@ contracts require a small application-owned translation:
 - Review's `workspaceId` is an authorization/source-capture context. It is not
   the Argument Library's `libraryId`, and an adapter must not derive or replace
   one identity with the other.
-- Review's `snapshotId` starts with `argument-library-snapshot-v1:` and appends
+- Review's `snapshotId` starts with `argument-library-snapshot-v2:` and appends
   the canonical core descriptor JSON encoded as lowercase hexadecimal UTF-16
   code units. It therefore losslessly contains `libraryId`, schema version,
   library revision, fingerprint algorithm, and SHA-256 content fingerprint.

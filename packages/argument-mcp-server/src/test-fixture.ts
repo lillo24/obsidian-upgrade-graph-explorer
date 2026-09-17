@@ -1,9 +1,11 @@
 import {
   attachAnsweringAxiom,
   createAxiom,
+  createArgument,
   createCounterArgument,
   createEmptyArgumentLibrary,
   createTopic,
+  promoteArgumentToCurrent,
   setTopicMembership,
   updateCounterArgumentResponse,
   type ArgumentLibrary,
@@ -72,14 +74,38 @@ export function createSyntheticLibrary(): {
     runtime,
   );
   library = createCounterArgument(
-    library,
+    createArgument(
+      library,
+      {
+        id: 'AR-COMPATIBILITY',
+        title: 'Compatibility precedes contradiction testing',
+        premises: [
+          {
+            id: 'P-UNITS',
+            kind: 'axiom',
+            axiomId: 'AX-UNITS',
+            reliedOnRevision: library.axioms[0]!.revision,
+          },
+        ],
+        reasoning:
+          'A numeric difference is not a contradiction until the quantities are comparable.',
+        conclusion:
+          'Compatibility must be established before unequal values can support a contradiction claim.',
+        reviewState: 'accepted',
+      },
+      runtime,
+    ),
     {
       id: 'CA-CONTRADICTION',
       title: 'Different numbers imply a contradiction',
       observation: 'A length and duration can have different numeric values.',
       challengedClaim:
         'Therefore any two unequal measurements contradict each other.',
-      target: { kind: 'topic-claim', topicId: 'T-MEASUREMENT' },
+      target: {
+        kind: 'argument',
+        argumentId: 'AR-COMPATIBILITY',
+        part: { kind: 'conclusion' },
+      },
       retrieval: {
         keywords: ['contradiction'],
         phrases: ['different numbers'],
@@ -113,6 +139,20 @@ export function createSyntheticLibrary(): {
     'axiom',
     'AX-UNITS',
     true,
+    runtime,
+  );
+  library = setTopicMembership(
+    library,
+    'T-MEASUREMENT',
+    'argument',
+    'AR-COMPATIBILITY',
+    true,
+    runtime,
+  );
+  library = promoteArgumentToCurrent(
+    library,
+    'T-MEASUREMENT',
+    'AR-COMPATIBILITY',
     runtime,
   );
   library = setTopicMembership(

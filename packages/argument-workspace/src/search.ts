@@ -63,9 +63,11 @@ function fields(
 
 function topicMemberships(library: ArgumentLibrary): {
   readonly axioms: ReadonlyMap<string, readonly string[]>;
+  readonly arguments: ReadonlyMap<string, readonly string[]>;
   readonly counters: ReadonlyMap<string, readonly string[]>;
 } {
   const axioms = new Map<string, string[]>();
+  const argumentsByTopic = new Map<string, string[]>();
   const counters = new Map<string, string[]>();
   for (const topic of library.topics) {
     for (const id of topic.axiomIds) {
@@ -78,10 +80,20 @@ function topicMemberships(library: ArgumentLibrary): {
       values.push(topic.id);
       counters.set(id, values);
     }
+    for (const id of topic.argumentIds) {
+      const values = argumentsByTopic.get(id) ?? [];
+      values.push(topic.id);
+      argumentsByTopic.set(id, values);
+    }
   }
   return {
     axioms: new Map(
       [...axioms].map(([id, values]) => [id, [...values].sort()] as const),
+    ),
+    arguments: new Map(
+      [...argumentsByTopic].map(
+        ([id, values]) => [id, [...values].sort()] as const,
+      ),
     ),
     counters: new Map(
       [...counters].map(([id, values]) => [id, [...values].sort()] as const),
@@ -132,6 +144,52 @@ export function buildDescriptiveIndex(
       ]),
     });
   }
+  const axiomTitles = new Map(
+    library.axioms.map(({ id, title }) => [id, title]),
+  );
+  const argumentTitles = new Map(
+    library.arguments.map(({ id, title }) => [id, title]),
+  );
+  for (const argument of library.arguments) {
+    const textPremises = argument.premises.flatMap((premise) =>
+      premise.kind === 'text' ? [premise.text] : [],
+    );
+    const referenceIds = argument.premises.flatMap((premise) =>
+      premise.kind === 'axiom'
+        ? [premise.axiomId]
+        : premise.kind === 'argument-conclusion'
+          ? [premise.argumentId]
+          : [],
+    );
+    const referenceTitles = argument.premises.flatMap((premise) => {
+      const title =
+        premise.kind === 'axiom'
+          ? axiomTitles.get(premise.axiomId)
+          : premise.kind === 'argument-conclusion'
+            ? argumentTitles.get(premise.argumentId)
+            : undefined;
+      return title === undefined ? [] : [title];
+    });
+    entries.push({
+      kind: 'argument',
+      id: argument.id,
+      revision: argument.revision,
+      title: argument.title,
+      topicIds: memberships.arguments.get(argument.id) ?? [],
+      archived: argument.archived,
+      fields: fields([
+        ['title', argument.title, 12],
+        ['premises', textPremises.join(' '), 8],
+        ['reasoning', argument.reasoning, 8],
+        ['conclusion', argument.conclusion, 10],
+        ['referencedIds', referenceIds.join(' '), 2],
+        ['referencedTitles', referenceTitles.join(' '), 4],
+        ['aliases', argument.retrieval.aliases.join(' '), 8],
+        ['keywords', argument.retrieval.keywords.join(' '), 6],
+        ['phrases', argument.retrieval.phrases.join(' '), 9],
+      ]),
+    });
+  }
   for (const counter of library.counterArguments) {
     entries.push({
       kind: 'counter-argument',
@@ -156,7 +214,12 @@ export function buildDescriptiveIndex(
   return {
     descriptor,
     entries: entries.sort((left, right) => {
-      const kindOrder = { topic: 0, axiom: 1, 'counter-argument': 2 } as const;
+      const kindOrder = {
+        topic: 0,
+        axiom: 1,
+        argument: 2,
+        'counter-argument': 3,
+      } as const;
       return (
         kindOrder[left.kind] - kindOrder[right.kind] ||
         left.id.localeCompare(right.id)

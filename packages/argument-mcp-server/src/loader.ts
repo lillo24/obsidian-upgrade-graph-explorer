@@ -18,7 +18,7 @@ const APP_IDENTIFIER = 'com.icarus.graph-explorer';
 const LIBRARY_PARTS = [
   APP_IDENTIFIER,
   'argument-workspace',
-  'library-v1.json',
+  'library-v2.json',
 ] as const;
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -249,7 +249,7 @@ export class ArgumentLibraryLoader {
           ? 'The Argument Library is not valid JSON.'
           : code === 'future-schema'
             ? 'The Argument Library uses an unsupported future schema version.'
-            : 'The Argument Library does not satisfy the schema-v1 contract.';
+            : 'The Argument Library does not satisfy the schema-v2 contract.';
       return fixedLoadError(code, message);
     }
 

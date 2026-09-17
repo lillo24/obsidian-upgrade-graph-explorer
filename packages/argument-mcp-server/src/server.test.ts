@@ -23,7 +23,7 @@ async function temporaryLibrary(): Promise<{
 }> {
   const directory = await mkdtemp(join(tmpdir(), 'icarus-argument-mcp-'));
   temporaryDirectories.push(directory);
-  return { directory, path: join(directory, 'library-v1.json') };
+  return { directory, path: join(directory, 'library-v2.json') };
 }
 
 async function connect(server: McpServer): Promise<{
@@ -105,7 +105,12 @@ describe('Argument Library MCP tools', () => {
       expect(structured(status)).toMatchObject({
         available: true,
         libraryId: 'library-mcp-test',
-        recordCounts: { topics: 1, axioms: 1, counterArguments: 1 },
+        recordCounts: {
+          topics: 1,
+          axioms: 1,
+          arguments: 1,
+          counterArguments: 1,
+        },
       });
       expect(JSON.stringify(status)).not.toContain(path);
 
@@ -245,7 +250,7 @@ describe('Argument Library MCP tools', () => {
 
       for (const [source, code] of [
         ['{broken', 'invalid-json'],
-        [JSON.stringify({ schemaVersion: 2 }), 'future-schema'],
+        [JSON.stringify({ schemaVersion: 3 }), 'future-schema'],
       ] as const) {
         await writeFile(path, source, 'utf8');
         const failed = await session.client.callTool({

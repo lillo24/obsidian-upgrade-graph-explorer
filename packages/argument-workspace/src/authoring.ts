@@ -1,13 +1,17 @@
 import {
   attachAnsweringAxiom,
   createAxiom,
+  createArgument,
   createCounterArgument,
   createTopic,
   detachAnsweringAxiom,
   editAxiom,
+  editArgument,
   editCounterArgument,
   editTopic,
   reassessCounterArgumentResponse,
+  reassessArgumentPremises,
+  promoteArgumentToCurrent,
   recordTheorySourceVersion,
   setRecordArchived,
   setRecordReviewState,
@@ -25,9 +29,11 @@ import type {
   ArgumentRecordKind,
   ArgumentRuntime,
   CreateAxiomInput,
+  CreateArgumentInput,
   CreateCounterArgumentInput,
   CreateTopicInput,
   EditAxiomInput,
+  EditArgumentInput,
   EditCounterArgumentInput,
   EditTopicInput,
   HumanReviewState,
@@ -86,6 +92,44 @@ export class ArgumentLibraryAuthoringService {
   ): Promise<ArgumentLibraryCommitResult> {
     return this.commit(expected, (library) =>
       editAxiom(library, axiomId, input, this.runtime),
+    );
+  }
+
+  createArgument(
+    expected: SnapshotDescriptor,
+    input: CreateArgumentInput,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      createArgument(library, input, this.runtime),
+    );
+  }
+
+  editArgument(
+    expected: SnapshotDescriptor,
+    argumentId: string,
+    input: EditArgumentInput,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      editArgument(library, argumentId, input, this.runtime),
+    );
+  }
+
+  reassessArgumentPremises(
+    expected: SnapshotDescriptor,
+    argumentId: string,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      reassessArgumentPremises(library, argumentId, this.runtime),
+    );
+  }
+
+  promoteArgumentToCurrent(
+    expected: SnapshotDescriptor,
+    topicId: string,
+    argumentId: string,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      promoteArgumentToCurrent(library, topicId, argumentId, this.runtime),
     );
   }
 
