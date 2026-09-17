@@ -61,7 +61,11 @@ import {
   resolveLocalNodeStyle,
   resolveLocalVisualLod,
 } from './local-style';
-import { drawNetworkNodeHover, drawNetworkNodeLabel } from './network-label';
+import {
+  createNetworkLabelDrawers,
+  NetworkLabelHoverController,
+  scheduleNetworkLabelHoverFrame,
+} from './network-label';
 import {
   NETWORK_LABEL_FONT_FAMILY,
   OBSIDIAN_DARK_NETWORK_THEME,
@@ -129,6 +133,7 @@ export class LocalRendererSession {
     LocalNodeAttributes,
     Parameters<typeof resolveLocalEdgeStyle>[0]
   >;
+  private readonly labelHover: NetworkLabelHoverController;
   private rootNodeKey: string;
   private densityInput: LocalRendererInput;
   private densityFramingStrength: number;
@@ -296,7 +301,21 @@ export class LocalRendererSession {
     this.neighborhoods = createLocalNeighborhoodIndex(input);
     const mountStarted = performance.now();
     container.setAttribute('aria-hidden', 'true');
-    this.renderer = new Sigma(this.graph, container, {
+    this.labelHover = new NetworkLabelHoverController({
+      onFrame: () => scheduleNetworkLabelHoverFrame(this.renderer),
+      onSettled: (nodeKeys) => this.refreshNodeStyles(...nodeKeys),
+      reducedMotion: () =>
+        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ===
+        true,
+    });
+    const labelDrawers = createNetworkLabelDrawers<
+      LocalNodeAttributes,
+      Parameters<typeof resolveLocalEdgeStyle>[0]
+    >(this.labelHover);
+    this.renderer = new Sigma<
+      LocalNodeAttributes,
+      Parameters<typeof resolveLocalEdgeStyle>[0]
+    >(this.graph, container, {
       allowInvalidContainer: false,
       doubleClickTimeout: NODE_DOUBLE_CLICK_TIMEOUT_MS,
       enableEdgeEvents: false,
@@ -312,8 +331,8 @@ export class LocalRendererSession {
       maxCameraRatio: 6,
       renderEdgeLabels: false,
       stagePadding: 24,
-      defaultDrawNodeHover: drawNetworkNodeHover,
-      defaultDrawNodeLabel: drawNetworkNodeLabel,
+      defaultDrawNodeHover: labelDrawers.drawHover,
+      defaultDrawNodeLabel: labelDrawers.drawLabel,
       defaultEdgeColor: OBSIDIAN_DARK_NETWORK_THEME.edge,
       defaultNodeColor: OBSIDIAN_DARK_NETWORK_THEME.node,
       nodeReducer: (key, attributes) => this.reduceNode(key, attributes),
@@ -411,7 +430,7 @@ export class LocalRendererSession {
       attributes.entityId === null
         ? undefined
         : this.visualGroupStyles?.get(attributes.entityId);
-    return resolveLocalNodeStyle(attributes, {
+    const resolved = resolveLocalNodeStyle(attributes, {
       hovered,
       relatedToHover:
         this.hoveredNode === undefined ||
@@ -423,6 +442,10 @@ export class LocalRendererSession {
       ...(sizeScale === undefined ? {} : { sizeScale }),
       baseNodeSizeScale: this.networkVisualSettings.nodeSizeScale,
     });
+    return {
+      ...resolved,
+      highlighted: resolved.highlighted || this.labelHover.hasOverlay(key),
+    };
   }
 
   private reduceEdge(
@@ -605,9 +628,11 @@ export class LocalRendererSession {
     this.nodeClicks = nodeClicks;
     this.renderer.on('enterNode', ({ node }) => {
       const started = performance.now();
+      const previous = this.hoveredNode;
       this.hoveredNode = node;
+      this.labelHover.setHovered(previous, node);
       this.options.instrumentation?.count('local-hover-applications');
-      this.renderer.scheduleRender();
+      this.refreshHoverStyles(previous, node);
       this.updateTemporaryFileMoveCursor();
       this.options.instrumentation?.record(
         'local-hover',
@@ -615,9 +640,11 @@ export class LocalRendererSession {
       );
     });
     this.renderer.on('leaveNode', () => {
+      const previous = this.hoveredNode;
       this.hoveredNode = undefined;
+      this.labelHover.setHovered(previous, undefined);
       this.options.instrumentation?.count('local-hover-applications');
-      this.renderer.scheduleRender();
+      this.refreshHoverStyles(previous);
       this.updateTemporaryFileMoveCursor();
     });
     this.renderer.on('clickNode', ({ node }) => {
@@ -931,6 +958,40 @@ export class LocalRendererSession {
       'local-selection',
       performance.now() - started,
     );
+  }
+
+  private refreshNodeStyles(...keys: (string | undefined)[]): void {
+    const nodes = [...new Set(keys)].filter(
+      (key): key is string => key !== undefined && this.graph.hasNode(key),
+    );
+    if (nodes.length === 0) {
+      this.renderer.scheduleRender();
+      return;
+    }
+    this.renderer.refresh({
+      partialGraph: { nodes },
+      skipIndexation: true,
+      schedule: true,
+    });
+  }
+
+  private refreshHoverStyles(...keys: (string | undefined)[]): void {
+    const nodes = [...new Set(keys)].filter(
+      (key): key is string => key !== undefined && this.graph.hasNode(key),
+    );
+    if (nodes.length === 0) {
+      this.renderer.scheduleRender();
+      return;
+    }
+    const edges = new Set<string>();
+    for (const node of nodes) {
+      for (const edge of this.graph.edges(node)) edges.add(edge);
+    }
+    this.renderer.refresh({
+      partialGraph: { nodes, edges: [...edges] },
+      skipIndexation: true,
+      schedule: true,
+    });
   }
 
   createLayoutRequest(
@@ -1371,6 +1432,7 @@ export class LocalRendererSession {
     this.fileMoveCoordinator = undefined;
     this.fileMoveContext = undefined;
     this.nodeClicks?.cancel();
+    this.labelHover?.dispose();
     this.renderer.getMouseCaptor().off('wheel', this.precisionWheelHandler);
     this.renderer.getMouseCaptor().off('mousemovebody', this.mouseDragHandler);
     this.renderer.getTouchCaptor().off('touchmove', this.touchMoveHandler);

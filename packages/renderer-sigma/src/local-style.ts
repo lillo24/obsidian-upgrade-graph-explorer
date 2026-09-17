@@ -5,7 +5,10 @@ import type {
 } from './local-types';
 import type { VisualGroupNodePresentation } from '@icarus-graph-explorer/visual-groups';
 import { applyNetworkNodeSizeScale } from './node-size';
-import { OBSIDIAN_DARK_NETWORK_THEME } from './network-theme';
+import {
+  OBSIDIAN_DARK_NETWORK_THEME,
+  resolveIncidentEdgeColor,
+} from './network-theme';
 
 export function resolveLocalVisualLod(cameraRatio: number): LocalVisualLod {
   if (!Number.isFinite(cameraRatio) || cameraRatio <= 0) {
@@ -41,25 +44,25 @@ export function resolveLocalNodeStyle(
     (context.lod === 'normal-local' && attributes.nodeKind !== 'block') ||
     (context.lod === 'far-local' && attributes.nodeKind === 'document');
   const automaticSize = attributes.size * (context.baseNodeSizeScale ?? 1);
+  const size =
+    attributes.nodeKind === 'document' && attributes.entityId !== null
+      ? applyNetworkNodeSizeScale(
+          automaticSize,
+          context.sizeScale,
+          attributes.root,
+        )
+      : automaticSize;
   return {
     ...attributes,
-    size:
-      attributes.nodeKind === 'document' && attributes.entityId !== null
-        ? applyNetworkNodeSizeScale(
-            automaticSize,
-            context.sizeScale,
-            attributes.root,
-          )
-        : automaticSize,
+    size,
+    networkLabelLogicalSize: size,
     color: context.selected
       ? OBSIDIAN_DARK_NETWORK_THEME.focusedNode
       : context.hovered
         ? OBSIDIAN_DARK_NETWORK_THEME.highlight
         : attributes.root
           ? OBSIDIAN_DARK_NETWORK_THEME.focusedNode
-          : context.relatedToHover
-            ? baseColor
-            : OBSIDIAN_DARK_NETWORK_THEME.dimmedNode,
+          : baseColor,
     forceLabel: emphasized || attributes.root,
     highlighted: emphasized,
     label: labelVisible ? attributes.label : '',
@@ -80,11 +83,16 @@ export function resolveLocalEdgeStyle(
   const hierarchy = attributes.edgeKind === 'hierarchy';
   return {
     ...attributes,
-    color: context.relatedToHover
-      ? hierarchy
-        ? OBSIDIAN_DARK_NETWORK_THEME.hierarchyEdge
-        : attributes.color
-      : OBSIDIAN_DARK_NETWORK_THEME.dimmedEdge,
+    color:
+      context.hoverActive && context.relatedToHover
+        ? resolveIncidentEdgeColor(
+            hierarchy
+              ? OBSIDIAN_DARK_NETWORK_THEME.hierarchyEdge
+              : attributes.color,
+          )
+        : hierarchy
+          ? OBSIDIAN_DARK_NETWORK_THEME.hierarchyEdge
+          : attributes.color,
     // Focus is already a bounded projection: far LOD simplifies styling, never
     // removes its reference relationships. All Network has a separate policy.
     hidden: false,
@@ -97,7 +105,8 @@ export function resolveLocalEdgeStyle(
           : 0.45
         : context.lod === 'normal-local'
           ? 0.84
-          : 1),
+          : 1) *
+      (context.hoverActive && context.relatedToHover ? 1.3 : 1),
     zIndex: context.hoverActive && context.relatedToHover ? 1 : 0,
   };
 }

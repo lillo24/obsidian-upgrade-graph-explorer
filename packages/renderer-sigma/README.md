@@ -110,13 +110,22 @@ pending reveals. The renderer never scrolls sidebar DOM.
 
 All and Focus share one renderer-only Network presentation policy. Qualifying
 labels are centered below their rendered nodes using the Obsidian 1.11.5
-`14 + radius / 4` formula, capped to the rendered node diameter because Icarus
-supports smaller nodes than Obsidian. The Network surfaces and Sigma defaults
-use the resolved Obsidian default-dark graph palette. Ordinary labels adapt
+`14 + radius / 4` formula. Sigma 3.0.3 supplies the camera-scaled rendered
+radius, while the reducer carries the final logical presentation radius; their
+ratio scales both font and five-unit gap, with font still capped to the rendered
+diameter because Icarus supports smaller nodes than Obsidian. Labels wider than
+the current-font width of `Creativity - Initiative - Curiosity.md` (or the
+remaining viewport) are ellipsized and drawn at natural glyph width. The
+Network surfaces and Sigma defaults use the resolved Obsidian default-dark
+graph palette. Ordinary labels adapt
 Obsidian's zoom fade to Sigma's rendered-radius threshold: opacity rises from 0
 at the current hard-cull boundary to 1 at `sqrt(2)` times that boundary, while
 forced labels remain fully opaque. Semantic diagnostics, hierarchy/reference
 distinctions, and explicit Visual Group accents remain Icarus-owned layers.
+Hover keeps unrelated nodes and edges at their ordinary styles, brightens only
+direct incident edges, and moves only the hovered/just-left label downward by a
+bounded 3 px over a 120 ms renderer-local ease-out. Reduced-motion mode snaps;
+hover frames use Sigma's highlight canvas and never mutate graph/camera state.
 These presentation values do not enter layout requests, fingerprints, position
 caches, camera policy, or persistence. The source audit is recorded in
 `docs/OBSIDIAN_GRAPH_VISUAL_REFERENCE.md`.
@@ -323,10 +332,13 @@ release flushes the latest update before one end command.
 
 MOVE300C keeps that ownership until the matching native pointer releases or is
 explicitly canceled. Sigma 3.0.3's document bubble-phase compatibility mouse
-listeners remain in place, but a shared All/Focus owner captures the real
-pointer ID on the stable graph container and also listens in document capture
-as the fallback. This crosses sibling Filters and other stop-propagating HTML
-overlays without treating `leaveStage` as pointer loss. Coordinates remain
+listeners remain in place. The shared All/Focus owner arms the real pointer ID
+on press but captures it only when the existing 3 px coordinator threshold
+transitions from primed to dragging. Primed clicks therefore retain Sigma's
+single/double-click sequence and show `pointer`; only a real drag shows
+`grabbing` and takes exclusive ownership. Document-capture listeners remain the
+fallback after ownership, crossing sibling Filters and other stop-propagating
+HTML overlays without treating `leaveStage` as pointer loss. Coordinates remain
 unclamped canvas coordinates derived from `clientX/clientY` and the graph
 container rectangle. The matching release is delivered once and suppresses
 only its immediate click; Escape, blur, visibility loss, `pointercancel`, lost

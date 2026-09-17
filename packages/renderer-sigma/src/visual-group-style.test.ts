@@ -123,7 +123,7 @@ describe('cross-Sigma Visual Group style contract', () => {
         settings,
         visualGroup: presentation,
       }).color,
-    ).toBe(OBSIDIAN_DARK_NETWORK_THEME.dimmedNode);
+    ).toBe(presentation.accent);
     expect(
       resolveGlobalNodeStyle(globalDiagnostic, {
         hovered: false,

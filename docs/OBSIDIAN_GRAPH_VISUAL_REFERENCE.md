@@ -41,10 +41,13 @@ The node radius is clamped by Obsidian to 8–30 before its display multiplier,
 so the formula is no larger than the node diameter at the minimum radius. Node
 and text use the same renderer scale, preserving that relationship through
 zoom. The highlighted node keeps the same centered/below anchor; it animates
-the text farther down by up to 15 graph/display units and may keep highlighted
-text readable when zoomed out. Icarus intentionally does not add that vertical
-jump and additionally clamps font pixels to its actual rendered diameter,
-because Icarus supports nodes smaller than Obsidian's radius floor.
+the text farther down toward a target of 15 graph/display units. The recovered
+interpolator is `next = old * 0.9 + target * 0.1`; the text y calculation adds
+that transient value after the ordinary `(radius + 5) * nodeScale` offset.
+Obsidian may also keep highlighted text readable when zoomed out. Icarus adapts
+the motion to a bounded few-pixel offset and additionally clamps font pixels to
+its actual rendered diameter because Icarus supports nodes smaller than
+Obsidian's radius floor.
 
 Obsidian does not draw a label backing rectangle or text shadow. Highlighting
 changes the node fill to the accent and draws a focused-color circle. Label
@@ -114,6 +117,19 @@ toward 0.2 alpha while a node is highlighted.
   Label Threshold moves the fade window coherently rather than relying on a
   hard-coded default.
 
+- Sigma 3.0.3 passes the camera-scaled screen radius to its label drawer while
+  retaining the reducer's final logical presentation radius on the cached draw
+  data. Icarus therefore applies the shared Obsidian-style transform as:
+
+  ```text
+  render scale = rendered radius / logical radius
+  font px = min((14 + logical radius / 4) * render scale,
+                rendered radius * 2)
+  gap px = 5 * render scale
+  ```
+
+  Font/gap scaling and the opacity fade are independent presentation steps.
+
 - Selected, hovered, Focus-root, arrangement-member, always-labelled, and other
   existing `forceLabel` states stay fully opaque. This preserves the product's
   forced-label contract and matches Obsidian's highlighted-label bypass.
@@ -123,5 +139,16 @@ toward 0.2 alpha while a node is highlighted.
   dark-safe variants around the Obsidian base palette. These states have no
   exact one-to-one Obsidian representation.
 - Exact Obsidian Pixi word wrapping is not available in Sigma's one-line canvas
-  label API. Icarus keeps a centered one-line label capped to the same 300 px
-  width and the viewport rather than moving it to a side.
+  label API. Icarus keeps a centered single line, measures the current-font
+  width of `Creativity - Initiative - Curiosity.md`, and ellipsizes by Unicode
+  code point when a label or the available viewport is wider. Canvas receives
+  the resulting text at natural width; no `fillText` compression width is used.
+- Outside Arrange Folders, Icarus deliberately does not reproduce Obsidian's
+  unrelated-graph fade. Hover retains every unrelated node/edge's ordinary
+  style and brightens only directly incident edges. Neutral incident lines use
+  the recovered `#8a5cf5` interactive accent; explicit semantic hues are
+  lightened without being replaced.
+- Icarus adapts Obsidian's label displacement to at most 3 screen pixels or 35%
+  of rendered radius, whichever is smaller, over 120 ms with cubic ease-out.
+  Leave reverses smoothly. Reduced-motion mode snaps to the final hover state.
+  The state is renderer-local and never changes graph coordinates or camera.

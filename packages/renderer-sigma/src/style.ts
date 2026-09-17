@@ -7,7 +7,10 @@ import type {
 import type { VisualGroupNodePresentation } from '@icarus-graph-explorer/visual-groups';
 import type { FolderScopeVisualizationState } from '@icarus-graph-explorer/spatial-overrides';
 import { applyNetworkNodeSizeScale } from './node-size';
-import { OBSIDIAN_DARK_NETWORK_THEME } from './network-theme';
+import {
+  OBSIDIAN_DARK_NETWORK_THEME,
+  resolveIncidentEdgeColor,
+} from './network-theme';
 
 export const GLOBAL_ALWAYS_LABELED_NODE_LIMIT = 12;
 
@@ -99,12 +102,11 @@ export function resolveGlobalNodeStyle(
       ? OBSIDIAN_DARK_NETWORK_THEME.focusedNode
       : context.hovered
         ? OBSIDIAN_DARK_NETWORK_THEME.highlight
-        : context.relatedToHover
-          ? baseColor
-          : OBSIDIAN_DARK_NETWORK_THEME.dimmedNode;
+        : baseColor;
   return {
     ...attributes,
     size,
+    networkLabelLogicalSize: size,
     color,
     forceLabel,
     highlighted:
@@ -134,9 +136,9 @@ export function resolveGlobalEdgeStyle(
           : arrangementRelation === 'child-owned'
             ? OBSIDIAN_DARK_NETWORK_THEME.scopeShadowed
             : OBSIDIAN_DARK_NETWORK_THEME.dimmedEdge
-      : context.relatedToHover
-        ? attributes.color
-        : OBSIDIAN_DARK_NETWORK_THEME.dimmedEdge,
+      : context.hoverActive && context.relatedToHover
+        ? resolveIncidentEdgeColor(attributes.color)
+        : attributes.color,
     hidden:
       !arrangementActive &&
       weakFarEdge &&
@@ -151,11 +153,11 @@ export function resolveGlobalEdgeStyle(
             : arrangementRelation === 'child-owned'
               ? 0.72
               : 0.38
-        : context.lod === 'far'
-          ? 0.55
-          : context.lod === 'regional'
-            ? 0.78
-            : 1),
+        : (context.lod === 'far'
+            ? 0.55
+            : context.lod === 'regional'
+              ? 0.78
+              : 1) * (context.hoverActive && context.relatedToHover ? 1.3 : 1)),
     zIndex:
       arrangementRelation === 'internal' ||
       arrangementRelation === 'boundary' ||

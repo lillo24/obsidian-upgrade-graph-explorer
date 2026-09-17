@@ -89,6 +89,7 @@ export class SigmaTestRenderer {
     if (!this.deferProcess) this.finishProcess();
   });
   readonly scheduleRender = vi.fn();
+  readonly scheduleHighlightedNodesRender = vi.fn();
   readonly setSetting = vi.fn();
   readonly kill = vi.fn();
   constructor(

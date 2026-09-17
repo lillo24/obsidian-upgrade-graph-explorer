@@ -47,30 +47,66 @@ describe('Focus reference visibility', () => {
     });
     expect(related).toMatchObject({
       hidden: false,
-      color: reference.color,
+      color: '#6ea3a6',
       zIndex: 1,
     });
     expect(unrelated).toMatchObject({
       hidden: false,
-      color: OBSIDIAN_DARK_NETWORK_THEME.dimmedEdge,
+      color: reference.color,
       zIndex: 0,
     });
+    expect(related.size).toBeCloseTo(unrelated.size * 1.3);
+  });
+
+  it('keeps unrelated nodes ordinary while focusing the hovered node', () => {
+    const node: LocalNodeAttributes = {
+      x: 0,
+      y: 0,
+      size: 6,
+      color: '#367f83',
+      label: 'Neighbor',
+      nodeKind: 'document',
+      entityId: 'neighbor',
+      sourcePath: 'Neighbor.md',
+      status: null,
+      root: false,
+      revealableDescendantCount: 0,
+    };
+    const base = resolveLocalNodeStyle(node, {
+      hovered: false,
+      relatedToHover: true,
+      selected: false,
+      lod: 'near-local',
+    });
+    const unrelated = resolveLocalNodeStyle(node, {
+      hovered: false,
+      relatedToHover: false,
+      selected: false,
+      lod: 'near-local',
+    });
+    const hovered = resolveLocalNodeStyle(node, {
+      hovered: true,
+      relatedToHover: true,
+      selected: false,
+      lod: 'near-local',
+    });
+    expect(unrelated.color).toBe(base.color);
+    expect(hovered.color).toBe(OBSIDIAN_DARK_NETWORK_THEME.highlight);
   });
 
   it('preserves hierarchy widths and non-reference emphasis', () => {
     const hierarchy = { ...reference, edgeKind: 'hierarchy' } as const;
-    expect(
-      resolveLocalEdgeStyle(hierarchy, {
-        lod: 'far-local',
-        relatedToHover: true,
-        hoverActive: true,
-      }),
-    ).toMatchObject({
+    const styled = resolveLocalEdgeStyle(hierarchy, {
+      lod: 'far-local',
+      relatedToHover: true,
+      hoverActive: true,
+    });
+    expect(styled).toMatchObject({
       hidden: false,
-      size: 1.44,
-      color: OBSIDIAN_DARK_NETWORK_THEME.hierarchyEdge,
+      color: OBSIDIAN_DARK_NETWORK_THEME.highlight,
       zIndex: 1,
     });
+    expect(styled.size).toBeCloseTo(1.872);
   });
 
   it('keeps far-local label simplification and root/selection emphasis', () => {

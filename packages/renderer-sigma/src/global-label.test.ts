@@ -1,11 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  createNetworkLabelDrawers,
   drawNetworkNodeHover,
   drawNetworkNodeLabel,
+  NetworkLabelHoverController,
   NETWORK_LABEL_FULL_OPACITY_RATIO,
+  NETWORK_LABEL_REFERENCE_TEXT,
   placeNetworkLabel,
+  resolveNetworkLabelHoverOffset,
+  resolveNetworkLabelHoverProgress,
   resolveNetworkLabelOpacity,
+  resolveNetworkLabelScale,
+  truncateNetworkLabel,
 } from './network-label';
 
 const BASE = {
@@ -41,9 +48,18 @@ describe('shared All/Focus Network label placement', () => {
       nodeX: 160,
       textWidth: 1_000,
     });
-    expect(placement.maxTextWidth).toBe(300);
+    expect(placement.maxTextWidth).toBe(312);
     expect(placement.textX).toBe(160);
     expect(placement.textY).toBeGreaterThan(BASE.nodeY + BASE.nodeSize);
+  });
+
+  it('scales font and gap with Sigma rendered/logical node scale', () => {
+    expect(
+      resolveNetworkLabelScale({ renderedNodeSize: 4, logicalNodeSize: 8 }),
+    ).toMatchObject({ fontSize: 8, gap: 2.5, renderScale: 0.5 });
+    expect(
+      resolveNetworkLabelScale({ renderedNodeSize: 16, logicalNodeSize: 8 }),
+    ).toMatchObject({ fontSize: 32, gap: 10, renderScale: 2 });
   });
 
   it('keeps edge labels below while clamping their horizontal center', () => {
@@ -93,6 +109,179 @@ describe('shared All/Focus Network label placement', () => {
 
     expect(fillText).toHaveBeenCalledTimes(2);
     expect(fillText.mock.calls[0]).toEqual(fillText.mock.calls[1]);
+  });
+});
+
+describe('shared All/Focus Network label truncation', () => {
+  const measureText = (value: string) => ({
+    width: Array.from(value).length * 8,
+  });
+
+  it('keeps short and reference-width labels unchanged', () => {
+    expect(truncateNetworkLabel({ measureText }, 'Short.md', 500)).toBe(
+      'Short.md',
+    );
+    const referenceWidth = measureText(NETWORK_LABEL_REFERENCE_TEXT).width;
+    expect(
+      truncateNetworkLabel(
+        { measureText },
+        NETWORK_LABEL_REFERENCE_TEXT,
+        referenceWidth,
+      ),
+    ).toBe(NETWORK_LABEL_REFERENCE_TEXT);
+  });
+
+  it('ellipsizes long labels by measured width without splitting Unicode', () => {
+    const referenceWidth = measureText(NETWORK_LABEL_REFERENCE_TEXT).width;
+    const long = 'Hippocampus as a reward predictor + Cerebellum.md';
+    const truncated = truncateNetworkLabel(
+      { measureText },
+      long,
+      referenceWidth,
+    );
+    expect(truncated.endsWith('…')).toBe(true);
+    expect(measureText(truncated).width).toBeLessThanOrEqual(referenceWidth);
+    expect(truncateNetworkLabel({ measureText }, 'A🧠BC.md', 3 * 8)).toBe(
+      'A🧠…',
+    );
+  });
+
+  it('draws natural-width text with no Canvas maxWidth compression argument', () => {
+    const drawn = drawingContext();
+    drawNetworkNodeLabel(
+      drawn.context,
+      {
+        color: '#8a5cf5',
+        label: 'Hippocampus as a reward predictor + Cerebellum.md',
+        networkLabelLogicalSize: 8,
+        size: 8,
+        x: 120,
+        y: 80,
+      },
+      labelSettings() as never,
+    );
+    expect(drawn.fillText).toHaveBeenCalledOnce();
+    expect(drawn.fillText.mock.calls[0]).toHaveLength(3);
+    expect(drawn.fillText.mock.calls[0]?.[0]).toMatch(/…$/);
+  });
+
+  it('truncates further for a narrow viewport instead of squeezing glyphs', () => {
+    const drawn = drawingContext(80);
+    drawNetworkNodeLabel(
+      drawn.context,
+      {
+        color: '#8a5cf5',
+        label: NETWORK_LABEL_REFERENCE_TEXT,
+        networkLabelLogicalSize: 8,
+        size: 8,
+        x: 40,
+        y: 40,
+      },
+      labelSettings() as never,
+    );
+    const rendered = drawn.fillText.mock.calls[0]?.[0] as string;
+    expect(rendered.endsWith('…')).toBe(true);
+    expect(Array.from(rendered).length).toBeLessThan(
+      Array.from(NETWORK_LABEL_REFERENCE_TEXT).length,
+    );
+    expect(drawn.fillText.mock.calls[0]).toHaveLength(3);
+  });
+});
+
+describe('renderer-local hover label motion', () => {
+  it('uses bounded monotonic ease-out and reduced-motion snapping', () => {
+    const at = (elapsedMs: number) =>
+      resolveNetworkLabelHoverProgress({
+        elapsedMs,
+        from: 0,
+        to: 1,
+      });
+    expect(at(0)).toBe(0);
+    expect(at(30)).toBeGreaterThan(0);
+    expect(at(60)).toBeGreaterThan(at(30));
+    expect(at(120)).toBe(1);
+    expect(at(1_000)).toBe(1);
+    expect(
+      resolveNetworkLabelHoverProgress({
+        elapsedMs: 0,
+        from: 0,
+        to: 1,
+        reducedMotion: true,
+      }),
+    ).toBe(1);
+    expect(resolveNetworkLabelHoverOffset(8, 1)).toBe(2.8);
+    expect(resolveNetworkLabelHoverOffset(100, 1)).toBe(3);
+  });
+
+  it('animates entry and return, then releases the transient overlay', () => {
+    let now = 0;
+    let handle = 0;
+    const frames: (() => void)[] = [];
+    const onFrame = vi.fn();
+    const onSettled = vi.fn();
+    const hover = new NetworkLabelHoverController({
+      now: () => now,
+      onFrame,
+      onSettled,
+      requestFrame: (callback) => {
+        frames.push(callback);
+        return ++handle;
+      },
+    });
+
+    hover.setHovered(undefined, 'node');
+    expect(hover.ownsLabelLayer('node')).toBe(true);
+    expect(hover.progress('node')).toBe(0);
+    now = 60;
+    expect(hover.progress('node')).toBeGreaterThan(0.5);
+    frames.shift()?.();
+    now = 120;
+    frames.shift()?.();
+    expect(hover.progress('node')).toBe(1);
+
+    hover.setHovered('node', undefined);
+    now = 180;
+    expect(hover.progress('node')).toBeLessThan(0.5);
+    frames.shift()?.();
+    now = 240;
+    frames.shift()?.();
+    expect(hover.ownsLabelLayer('node')).toBe(false);
+    expect(onFrame).toHaveBeenCalled();
+    expect(onSettled).toHaveBeenCalledWith(['node']);
+  });
+
+  it('changes only label y while preserving text, x, and font', () => {
+    let now = 0;
+    const hover = new NetworkLabelHoverController({
+      now: () => now,
+      onFrame: () => undefined,
+      onSettled: () => undefined,
+      requestFrame: () => 1,
+    });
+    hover.setHovered(undefined, 'node');
+    now = 120;
+    const drawers = createNetworkLabelDrawers(hover);
+    const ordinary = drawingContext();
+    const animated = drawingContext();
+    const data = {
+      color: '#8a5cf5',
+      key: 'node',
+      label: 'Node',
+      networkLabelLogicalSize: 8,
+      size: 8,
+      x: 120,
+      y: 80,
+    };
+
+    drawNetworkNodeLabel(ordinary.context, data, labelSettings() as never);
+    drawers.drawHover(animated.context, data, labelSettings() as never);
+
+    const baseCall = ordinary.fillText.mock.calls[0]!;
+    const hoverCall = animated.fillText.mock.calls[0]!;
+    expect(hoverCall[0]).toBe(baseCall[0]);
+    expect(hoverCall[1]).toBe(baseCall[1]);
+    expect(hoverCall[2]).toBeGreaterThan(baseCall[2] as number);
+    expect(animated.fontAtFill()).toBe(ordinary.fontAtFill());
   });
 });
 
@@ -205,17 +394,25 @@ describe('shared All/Focus Network label opacity', () => {
   });
 });
 
-function drawingContext() {
+function drawingContext(width = 320) {
   const fillText = vi.fn();
   const alphaAtFill = vi.fn<() => number>();
-  const state = { globalAlpha: 1 };
+  const fontAtFill = vi.fn<() => string>();
+  const state = { font: '', globalAlpha: 1 };
   const context = {
     arc: vi.fn(),
     beginPath: vi.fn(),
-    canvas: { width: 320, height: 180 },
+    canvas: { width, height: 180 },
     fillText: (...args: unknown[]) => {
       alphaAtFill.mockReturnValue(state.globalAlpha);
+      fontAtFill.mockReturnValue(state.font);
       fillText(...args);
+    },
+    get font() {
+      return state.font;
+    },
+    set font(value: string) {
+      state.font = value;
     },
     get globalAlpha() {
       return state.globalAlpha;
@@ -224,10 +421,19 @@ function drawingContext() {
       state.globalAlpha = value;
     },
     getTransform: () => ({ a: 1, d: 1 }),
-    measureText: () => ({ width: 72 }),
+    measureText: (value: string) => ({ width: Array.from(value).length * 8 }),
     restore: vi.fn(),
     save: vi.fn(),
     stroke: vi.fn(),
   } as unknown as CanvasRenderingContext2D;
-  return { alphaAtFill, context, fillText };
+  return { alphaAtFill, context, fillText, fontAtFill };
+}
+
+function labelSettings() {
+  return {
+    labelColor: { color: '#dadada' },
+    labelFont: 'sans-serif',
+    labelRenderedSizeThreshold: 4,
+    labelWeight: 'normal',
+  };
 }
