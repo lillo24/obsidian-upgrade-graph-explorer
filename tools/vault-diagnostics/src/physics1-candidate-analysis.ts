@@ -8,7 +8,10 @@ import {
   ContinuousNetworkSimulation,
   createAllNetworkPhysicsSeed,
   createFocusNetworkPhysicsSeed,
-  NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT,
+  NETWORK_PHYSICS_ALL_SUPPORTED_NODE_LIMIT,
+  NETWORK_PHYSICS_FOCUS_SUPPORTED_NODE_LIMIT,
+  networkPhysicsNodeCountIsSupported,
+  validateNetworkPhysicsWorkerResponse,
   type NetworkPhysicsAttractor,
   type NetworkPhysicsFrameResponse,
   type NetworkPhysicsSeed,
@@ -38,6 +41,7 @@ type Fixture = {
 
 const PUBLIC_QUANTA = [1, 2, 4, 8] as const;
 const TARGET = { x: 38, y: -27 } as const;
+const UPDATED_TARGET = { x: 43, y: -31 } as const;
 const PULL_STRENGTH = 70;
 
 function mean(values: readonly number[]): number {
@@ -368,14 +372,32 @@ function lifecycleTrial(input: {
   readonly mode: 'focus' | 'all';
   readonly attractors?: readonly NetworkPhysicsAttractor[];
   readonly hotTurns?: number;
+  readonly exerciseUpdate?: boolean;
 }) {
   const seed = simulationSeed(input.fixture, input.mode, input.attractors);
   const simulation = new ContinuousNetworkSimulation(seed);
   const beforeNeighbor = simulation
     .positions()
     .find(({ key }) => key === 'n1')!;
-  const target = { x: 38, y: -27 };
-  simulation.handle({
+  const validateFrame = (frame: NetworkPhysicsFrameResponse): void => {
+    validateNetworkPhysicsWorkerResponse(frame);
+    if (
+      frame.sessionGeneration !== seed.sessionGeneration ||
+      frame.simulationGeneration !== seed.simulationGeneration
+    ) {
+      throw new Error(`${input.id} returned a stale simulation generation.`);
+    }
+    const expectedKeys = new Set(seed.nodes.map(({ key }) => key));
+    const actualKeys = new Set(frame.positions.map(({ key }) => key));
+    if (
+      actualKeys.size !== expectedKeys.size ||
+      [...expectedKeys].some((key) => !actualKeys.has(key))
+    ) {
+      throw new Error(`${input.id} returned a malformed physics node set.`);
+    }
+  };
+  let target: { readonly x: number; readonly y: number } = TARGET;
+  const beginFrame = simulation.handle({
     schemaVersion: 1,
     kind: 'begin',
     sessionGeneration: seed.sessionGeneration,
@@ -385,11 +407,29 @@ function lifecycleTrial(input: {
     nodeKey: 'n0',
     target,
   });
+  validateFrame(beginFrame);
   const hotFrames: NetworkPhysicsFrameResponse[] = [];
   const started = performance.now();
   for (let index = 0; index < (input.hotTurns ?? 12); index += 1) {
+    if (input.exerciseUpdate === true && index === 1) {
+      target = UPDATED_TARGET;
+      const updateFrame = simulation.handle({
+        schemaVersion: 1,
+        kind: 'update',
+        sessionGeneration: seed.sessionGeneration,
+        simulationGeneration: seed.simulationGeneration,
+        gestureId: 'analysis-gesture',
+        sequence: 1,
+        nodeKey: 'n0',
+        target,
+      });
+      validateFrame(updateFrame);
+    }
     const frame = simulation.advance().frame;
-    if (frame !== undefined) hotFrames.push(frame);
+    if (frame !== undefined) {
+      validateFrame(frame);
+      hotFrames.push(frame);
+    }
   }
   const hotMs = performance.now() - started;
   const finalHot = hotFrames.at(-1)!;
@@ -400,22 +440,27 @@ function lifecycleTrial(input: {
     const after = frame.positions.find(({ key }) => key === 'n1')!;
     return distance(before, after);
   });
-  simulation.handle({
+  const endFrame = simulation.handle({
     schemaVersion: 1,
     kind: 'end',
     sessionGeneration: seed.sessionGeneration,
     simulationGeneration: seed.simulationGeneration,
     gestureId: 'analysis-gesture',
-    sequence: 1,
+    sequence: input.exerciseUpdate === true ? 2 : 1,
     nodeKey: 'n0',
     reason: 'released',
   });
+  validateFrame(endFrame);
   let coolingFrames = 0;
   let coolingIterations = 0;
   let failure: string | undefined;
   const coolingStarted = performance.now();
   while (simulation.hasScheduledWork && coolingFrames < 300) {
     const result = simulation.advance();
+    if (result.frame !== undefined) validateFrame(result.frame);
+    if (result.failure !== undefined) {
+      validateNetworkPhysicsWorkerResponse(result.failure);
+    }
     coolingFrames += result.frame === undefined ? 0 : 1;
     coolingIterations = result.frame?.iterationsCompleted ?? coolingIterations;
     failure = result.failure?.code;
@@ -432,6 +477,11 @@ function lifecycleTrial(input: {
     nodes: input.fixture.nodes.length,
     edges: input.fixture.edges.length,
     targetError: distance(constrained, target),
+    commands: {
+      begin: true,
+      update: input.exerciseUpdate === true,
+      end: true,
+    },
     neighborResponse: distance(beforeNeighbor, afterNeighbor),
     neighborDistanceToTargetChange:
       distance(beforeNeighbor, target) - distance(afterNeighbor, target),
@@ -455,6 +505,10 @@ function lifecycleTrial(input: {
     coolingMs: Number(coolingMs.toFixed(3)),
     finalState: simulation.state,
     failure: failure ?? null,
+    finiteCoordinates: simulation
+      .positions()
+      .every(({ x, y }) => Number.isFinite(x) && Number.isFinite(y)),
+    protocolFramesValid: true,
     finalPositions: simulation.positions(),
   };
 }
@@ -608,6 +662,7 @@ function main(): void {
     return { ...result, deterministicMaximumDifference };
   });
   const scale500 = scaleFixture(500);
+  const scale300 = scaleFixture(300);
   const scale100 = scaleFixture(100);
   const largeReleaseInputs = [
     {
@@ -678,6 +733,62 @@ function main(): void {
     void finalPositions;
     return result;
   });
+  const moveBoundary300 = [
+    {
+      id: 'all-supported-release-300',
+      fixture: scale300,
+      mode: 'all' as const,
+    },
+    {
+      id: 'all-supported-release-300-pull',
+      fixture: scale300,
+      mode: 'all' as const,
+      attractors: [
+        {
+          ruleFolderKey: 'supported-left',
+          memberNodeKeys: scale300.nodes.slice(0, 100).map(({ key }) => key),
+          targetX: -42,
+          targetY: 18,
+          strength: 70,
+        },
+      ],
+    },
+  ].map((input) => {
+    const { finalPositions, ...result } = lifecycleTrial({
+      ...input,
+      exerciseUpdate: true,
+    });
+    void finalPositions;
+    return result;
+  });
+  const moveBoundary300Accepted =
+    networkPhysicsNodeCountIsSupported('all', 300) &&
+    !networkPhysicsNodeCountIsSupported('all', 301) &&
+    moveBoundary300.every(
+      ({
+        commands,
+        failure,
+        finalState,
+        finiteCoordinates,
+        neighborResponse,
+        protocolFramesValid,
+        targetError,
+      }) =>
+        commands.begin &&
+        commands.update &&
+        commands.end &&
+        failure === null &&
+        finalState === 'sleeping' &&
+        finiteCoordinates &&
+        neighborResponse > 0 &&
+        protocolFramesValid &&
+        targetError === 0,
+    );
+  if (!moveBoundary300Accepted) {
+    throw new Error(
+      'The 300-node All Move probe did not satisfy the existing physics lifecycle contract.',
+    );
+  }
   const selected = hardConstraint
     .filter(({ quantum }) => quantum === 1)
     .every(
@@ -690,9 +801,12 @@ function main(): void {
     );
   }
   const report = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     generatedBy: 'pnpm analyze:physics1',
-    productionSupportedNodeLimit: NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT,
+    productionSupportedNodeLimits: {
+      focus: NETWORK_PHYSICS_FOCUS_SUPPORTED_NODE_LIMIT,
+      all: NETWORK_PHYSICS_ALL_SUPPORTED_NODE_LIMIT,
+    },
     dependencyVersions: {
       graphology: '0.26.0',
       graphologyForceAtlas2: '0.10.1',
@@ -729,6 +843,14 @@ function main(): void {
       results: largeRelease,
       limitation:
         'Direct retained-simulation probe only; it does not measure browser Worker transport, structured cloning, requestAnimationFrame adoption, Sigma, or rendering.',
+    },
+    moveBoundary300Probe: {
+      accepted: moveBoundary300Accepted,
+      results: moveBoundary300,
+      sideEffectBoundary:
+        'The retained simulation accepts no layout cache, persistence, source, history, or camera owner; this probe cannot mutate those surfaces.',
+      timingPolicy:
+        'Wall-clock timings are local evidence only and have no CI threshold.',
     },
     placeComposition: {
       simulationTarget: TARGET,
@@ -770,6 +892,25 @@ function main(): void {
             failure,
             coolingIterations,
             coolingMs,
+          }),
+        ),
+        moveBoundary300: moveBoundary300.map(
+          ({
+            id,
+            finalState,
+            failure,
+            coolingIterations,
+            coolingMs,
+            targetError,
+            neighborResponse,
+          }) => ({
+            id,
+            finalState,
+            failure,
+            coolingIterations,
+            coolingMs,
+            targetError,
+            neighborResponse,
           }),
         ),
         assignScaleMicrobenchmark: scale,

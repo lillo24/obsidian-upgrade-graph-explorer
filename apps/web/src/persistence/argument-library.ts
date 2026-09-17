@@ -15,6 +15,9 @@ import type { StorageLike } from './storage';
 export const ARGUMENT_LIBRARY_BROWSER_STORAGE_KEY =
   'icarus-graph-explorer:argument-library:v1';
 
+// The stable key is retained so existing browser data is migrated in place on
+// its next successful save instead of being mistaken for a missing library.
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }

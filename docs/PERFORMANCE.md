@@ -1300,8 +1300,10 @@ Pull reached `max-wall-time`; and 1,000-node Focus plus 1,000/5,000-node All
 reached explicit cap or wall failures. Repeated no-Pull 500-node All runs
 straddled the five-second wall boundary, so that size is not a reliable
 cross-mode product guarantee. These probes still omit browser Worker and Sigma
-costs. They select a conservative 100-visible-node product limit rather than a
-hidden neighborhood-only simulation or success-shaped failure.
+costs. They originally selected a shared 100-visible-node product limit rather
+than a hidden neighborhood-only simulation or success-shaped failure;
+MOVE300A's targeted 300-node evidence supports only the separate All QA
+boundary described below.
 
 ## MOVE1B production interaction boundary
 
@@ -1322,10 +1324,12 @@ stops scheduling when caught up. The Network Explorer keyboard controller uses
 the same coordinator and service, so it does not introduce a second simulation
 or a row-local controller.
 
-Direct File movement is available only at 100 or fewer visible simulation nodes
-in this release. Larger views expose `graph-too-large`, never create the
-continuous Worker, and show the limit near the Network controls. This is a release
-boundary, not a claim that every topology under the boundary must converge.
+Direct File movement is available at up to 100 visible simulation nodes in
+Focus and up to 300 in All in this release. Views above the active mode's limit
+expose `graph-too-large`, never create the continuous Worker, and show the
+mode-specific limit near the Network controls. The All 300-node value is a
+conservative real-vault QA boundary, not a universal performance limit or a
+claim that every topology under the boundary must converge.
 Unexpected cap/wall/runtime failures remain explicit and retryable. Production
 browser evidence and a fresh optimized Windows build are required for the
 MOVE1B draft; native pointer/touchpad acceptance remains a separate mandatory
@@ -1384,9 +1388,47 @@ final presentation callback arrived at 200.2 ms. Fifteen raw cooling frames were
 reduced to 11 visible presentations. These pixel observations describe the fixed
 fixture and camera, not a universal per-frame motion threshold.
 
-The analyzer separately kept the supported 100-node Focus, All, and All-with-
-Pull releases successful: 832 iterations/47.435 ms, 2,304/127.458 ms, and
-4,832/418.608 ms respectively on this run. Production browser interaction used
-the bundled small fixture; browser-level 100-node All/Focus evidence remains a
+The analyzer separately keeps the 100-node Focus release case and adds targeted
+300-node All and All-with-Pull begin/update/end probes. Each 300-node probe must
+keep the constrained File exact, move a neighbor, return only valid current-
+generation finite frames, and sleep after release; a failure aborts the
+analysis instead of weakening the solver contracts. Its local timings have no
+CI threshold. Production browser interaction still uses the bundled small
+fixture, so real-vault All behavior at the 300-node release boundary remains a
 native acceptance item rather than being inferred from the analyzer or the
 100-node Global renderer benchmark.
+
+## SPATIAL2C finite Pull-preview evidence
+
+`pnpm benchmark:spatial-pull-preview` runs the unchanged production
+`interleaved-centroid` algorithm with 6/12/18/30 iterations. The September 15,
+2026 synthetic rerun measured 12 iterations at 10.067/11.391 ms p50/p95 for 300
+nodes and 62.051/73.814 ms for 1,000 nodes. Its affected-cluster direction
+agreement against 30 iterations was 0.957 and 0.979 respectively, and connected
+nonmembers had nonzero displacement. At 3,000 nodes it measured
+193.443/217.519 ms with 0.977 direction agreement. Six iterations was faster but
+less faithful (0.849 at 300 nodes), while 18 and 30 increased latency without
+being necessary for directional authoring feedback. Production preview therefore
+uses 12 iterations; authoritative SPATIAL2A remains 30/20.
+
+These are pure Node compute measurements over deterministic aggregate synthetic
+graphs. They exclude browser Worker creation, clone/round-trip time, Sigma
+position adoption, paint cadence, and native pointer feel. The controller's
+separate operation counters distinguish raw schedules, actual worker requests,
+superseded desired/pending inputs, and preview adoptions. Timing remains local
+evidence rather than a CI gate; production browser and optimized-desktop QA are
+reported separately.
+
+MOVE300B adds `pnpm analyze:network-physics-drift`. Its pre-settled 300-node
+fixture contains an 80-node connected core, 190 isolates, and ten disconnected
+three-node components. Over a 1,024-iteration stationary hold, the unbounded
+production analogue increased unclustered isolate p90 radius from `299.427173`
+to `334.121439` monotonically and moved disconnected-component centroids p90
+`42.252904`. Component-bounded production kept unrelated isolate displacement
+at exactly zero with or without the output-only M2 handoff and Pull. The
+unclustered A1 hot-turn p50/p95 sample was `1.29885/2.027125 ms` versus
+`1.1764/1.909675 ms` for the raw baseline; timings are local evidence, not CI
+limits. Connected-core mean response remained `11.791331` versus `11.762995`,
+the target error stayed zero, and all production scenarios reached sleeping
+with zero post-sleep work. Native interaction and rendering remain the release
+gate.

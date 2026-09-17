@@ -60,8 +60,24 @@ export class CanvasTestHarness {
     }>;
     if (props.ref != null && props.ref.current === null) {
       props.ref.current = {
+        addEventListener: () => undefined,
         focus: () => undefined,
+        getBoundingClientRect: () => ({
+          bottom: 0,
+          height: 0,
+          left: 0,
+          right: 0,
+          top: 0,
+          width: 0,
+          x: 0,
+          y: 0,
+          toJSON: () => undefined,
+        }),
+        hasPointerCapture: () => false,
+        releasePointerCapture: () => undefined,
+        removeEventListener: () => undefined,
         setAttribute: () => undefined,
+        setPointerCapture: () => undefined,
         style: { setProperty: () => undefined },
       };
     }

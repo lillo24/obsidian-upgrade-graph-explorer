@@ -8,14 +8,16 @@ requests open/close transitions.
   binding/previews, imports, and confirmed-snapshot exports. It exposes a
   narrow leave guard and embedded panel to the shared workspace modal while
   retaining a standalone wrapper for tests.
-- `ArgumentRecordView.tsx` presents Topic, Axiom, Counter-Argument, source
-  status, and metadata reading views. The injected source section remains an
-  application concern.
+- `ArgumentRecordView.tsx` presents Topic, Axiom, Argument, Counter-Argument,
+  Current/staleness/source status, and metadata reading views. The injected
+  source section remains an application concern.
 - `TheorySourceReferences.tsx` presents registered locators, safe plain-text
   source previews, full-file version/freshness disclosure, and explicit source
   baseline controls.
 - `ArgumentRecordEditor.tsx` owns schema-shaped authoring controls, including
-  reusable memberships, response links, targets, and the advanced lossless
+  scoped stable-ID Examples, ordered stable-ID premises and Example provenance,
+  prior-premise reuse, attack/support relations, Boundary/Invariance,
+  reusable memberships, part-level response targets, and the advanced lossless
   source-reference JSON field.
 - `retrieval-editor.ts` retains raw retrieval textarea text during editing and
   normalizes it into the existing arrays only at Save.
@@ -44,6 +46,12 @@ requests open/close transitions.
 - `arguments.css` owns the responsive 94vw by 93dvh two-pane surface.
 
 Imports are explicitly selected at runtime and limited to 5 MiB before parsing.
+Schema-v1/v2 imports surface a migration notice and use the core deterministic
+migration; no Argument, Example/provenance, relation, or Current pointer is
+inferred. Pending-review Arguments
+and Counter-Arguments are available through the Proposals-only filter. Current
+promotion and premise/relation reassessment require explicit confirmation and remain
+expected-snapshot commits.
 Source capture is limited to 24 registered references, 16 Markdown files, one
 million UTF-16 characters per file, four million captured characters total,
 and four concurrent reads. Packets request at most 64,000 characters per

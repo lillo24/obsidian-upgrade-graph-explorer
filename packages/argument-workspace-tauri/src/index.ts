@@ -56,14 +56,20 @@ function nativeBridge(): ArgumentLibraryTauriBridge {
 
 const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true });
 
-async function libraryPath(
-  bridge: ArgumentLibraryTauriBridge,
-): Promise<string> {
-  return bridge.joinPath(
+async function libraryPaths(bridge: ArgumentLibraryTauriBridge): Promise<{
+  readonly current: string;
+  readonly legacy: string;
+  readonly legacyV1: string;
+}> {
+  const directory = await bridge.joinPath(
     await bridge.appLocalDataDirectory(),
     'argument-workspace',
-    'library-v1.json',
   );
+  return {
+    current: await bridge.joinPath(directory, 'library-v3.json'),
+    legacy: await bridge.joinPath(directory, 'library-v2.json'),
+    legacyV1: await bridge.joinPath(directory, 'library-v1.json'),
+  };
 }
 
 function message(error: unknown): string {
@@ -139,16 +145,39 @@ export function createTauriArgumentLibraryStore(
   const token =
     options.temporaryToken ??
     (() => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`);
+  const loadCurrent = async (): Promise<ArgumentLibraryStoreLoadResult> => {
+    const paths = await libraryPaths(bridge);
+    const current = await loadAt(bridge, paths.current);
+    if (current.status !== 'missing') return current;
+    const v2 = await loadAt(bridge, paths.legacy);
+    const legacy =
+      v2.status === 'missing' ? await loadAt(bridge, paths.legacyV1) : v2;
+    if (legacy.status !== 'loaded') return legacy;
+    try {
+      await writeAtomically(
+        bridge,
+        paths.current,
+        serializeArgumentLibrary(legacy.snapshot.library),
+        token(),
+      );
+      return legacy;
+    } catch (error: unknown) {
+      return {
+        status: 'unreadable',
+        message: `Could not migrate the private Argument Library to schema v3: ${message(error)} The recoverable prior-version file was preserved.`,
+      };
+    }
+  };
   return {
     async load() {
-      return loadAt(bridge, await libraryPath(bridge));
+      return loadCurrent();
     },
     async save(
       library: ArgumentLibrary,
       expected: SnapshotDescriptor | 'missing',
     ): Promise<ArgumentLibraryStoreSaveResult> {
-      const path = await libraryPath(bridge);
-      const current = await loadAt(bridge, path);
+      const paths = await libraryPaths(bridge);
+      const current = await loadCurrent();
       if (
         current.status === 'unreadable' ||
         current.status === 'corrupt' ||
@@ -187,7 +216,7 @@ export function createTauriArgumentLibraryStore(
         snapshot = captureArgumentLibrarySnapshot(library);
         await writeAtomically(
           bridge,
-          path,
+          paths.current,
           serializeArgumentLibrary(library),
           token(),
         );

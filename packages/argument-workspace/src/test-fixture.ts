@@ -1,9 +1,11 @@
 import {
   attachAnsweringAxiom,
   createAxiom,
+  createArgument,
   createCounterArgument,
   createEmptyArgumentLibrary,
   createTopic,
+  promoteArgumentToCurrent,
   setTopicMembership,
   updateCounterArgumentResponse,
 } from './library';
@@ -66,14 +68,46 @@ export function createNeutralArgumentLibrary(): ArgumentLibrary {
     runtime,
   );
   library = createCounterArgument(
-    library,
+    createArgument(
+      library,
+      {
+        id: 'AR-NEUTRAL',
+        title: 'Compatibility precedes contradiction testing',
+        premises: [
+          {
+            id: 'P-NEUTRAL-AXIOM',
+            kind: 'axiom',
+            axiomId: 'AX-NEUTRAL',
+            reliedOnRevision: library.axioms.find(
+              ({ id }) => id === 'AX-NEUTRAL',
+            )!.revision,
+          },
+          {
+            id: 'P-NEUTRAL-TEXT',
+            kind: 'text',
+            text: 'The compared measurements use different dimensions.',
+          },
+        ],
+        reasoning:
+          'A numeric difference alone is not a contradiction when the quantities are not directly comparable.',
+        conclusion:
+          'Compatibility must be established before unequal measurements can support a contradiction claim.',
+        retrieval: { keywords: ['compatibility', 'reasoning'] },
+        reviewState: 'accepted',
+      },
+      runtime,
+    ),
     {
       id: 'CA-NEUTRAL',
       title: 'Different numbers imply a contradiction',
       observation: 'A length and a duration can have different numeric values.',
       challengedClaim:
         'Therefore any two unequal measurements contradict each other.',
-      target: { kind: 'topic-claim', topicId: 'T-NEUTRAL' },
+      target: {
+        kind: 'argument',
+        argumentId: 'AR-NEUTRAL',
+        part: { kind: 'conclusion' },
+      },
       retrieval: {
         keywords: ['contradiction'],
         phrases: ['an approximation initially seems inconsistent'],
@@ -102,6 +136,20 @@ export function createNeutralArgumentLibrary(): ArgumentLibrary {
     'axiom',
     'AX-NEUTRAL',
     true,
+    runtime,
+  );
+  library = setTopicMembership(
+    library,
+    'T-NEUTRAL',
+    'argument',
+    'AR-NEUTRAL',
+    true,
+    runtime,
+  );
+  library = promoteArgumentToCurrent(
+    library,
+    'T-NEUTRAL',
+    'AR-NEUTRAL',
     runtime,
   );
   return setTopicMembership(

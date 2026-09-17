@@ -1,9 +1,10 @@
-export const ARGUMENT_LIBRARY_SCHEMA_VERSION = 1 as const;
-export const KNOWLEDGE_READER_CONTRACT_VERSION = 1 as const;
+export const ARGUMENT_LIBRARY_SCHEMA_VERSION = 3 as const;
+export const KNOWLEDGE_READER_CONTRACT_VERSION = 3 as const;
 export const CONTENT_FINGERPRINT_ALGORITHM =
   'sha256-canonical-json-v1' as const;
 
-export type ArgumentRecordKind = 'topic' | 'axiom' | 'counter-argument';
+export type ArgumentRecordKind =
+  'topic' | 'axiom' | 'argument' | 'counter-argument';
 export type HumanReviewState =
   'draft' | 'pending-review' | 'accepted' | 'reopened' | 'rejected';
 export type CounterArgumentOutcome =
@@ -41,7 +42,7 @@ export interface RecordedSourceVersion {
 }
 
 export interface RecordTheorySourceVersionInput {
-  readonly recordKind: 'axiom' | 'counter-argument';
+  readonly recordKind: 'axiom' | 'argument' | 'counter-argument';
   readonly recordId: string;
   readonly sourceReferenceId: string;
   readonly sourceSpaceId: string;
@@ -77,11 +78,56 @@ export interface RetrievalMetadata {
   readonly phrases: readonly string[];
 }
 
+export interface ArgumentExample {
+  readonly id: string;
+  readonly text: string;
+}
+
+export interface ArgumentPremiseExampleProvenance {
+  readonly exampleIds?: readonly string[];
+}
+
+export interface TextArgumentPremise extends ArgumentPremiseExampleProvenance {
+  readonly id: string;
+  readonly kind: 'text';
+  readonly text: string;
+}
+
+export interface AxiomArgumentPremise extends ArgumentPremiseExampleProvenance {
+  readonly id: string;
+  readonly kind: 'axiom';
+  readonly axiomId: string;
+  readonly reliedOnRevision: number;
+}
+
+export interface ArgumentConclusionPremise extends ArgumentPremiseExampleProvenance {
+  readonly id: string;
+  readonly kind: 'argument-conclusion';
+  readonly argumentId: string;
+  readonly reliedOnRevision: number;
+}
+
+export interface ArgumentPremiseReference extends ArgumentPremiseExampleProvenance {
+  readonly id: string;
+  readonly kind: 'argument-premise';
+  readonly argumentId: string;
+  readonly premiseId: string;
+  readonly reliedOnRevision: number;
+}
+
+export type ArgumentPremise =
+  | TextArgumentPremise
+  | AxiomArgumentPremise
+  | ArgumentConclusionPremise
+  | ArgumentPremiseReference;
+
 export interface ArgumentTopic extends ArgumentRecordMetadata {
   readonly title: string;
   readonly summary: string;
   readonly retrieval: RetrievalMetadata;
   readonly axiomIds: readonly string[];
+  readonly argumentIds: readonly string[];
+  readonly currentArgumentId?: string;
   readonly counterArgumentIds: readonly string[];
 }
 
@@ -95,12 +141,46 @@ export interface ArgumentAxiom extends ArgumentRecordMetadata {
   readonly sourceReferences: readonly TheorySourceReference[];
 }
 
+export type ArgumentTargetPart =
+  | { readonly kind: 'argument' }
+  | { readonly kind: 'premise'; readonly premiseId: string }
+  | { readonly kind: 'reasoning' }
+  | { readonly kind: 'conclusion' };
+
+export type ArgumentRelationKind = 'attack' | 'support';
+
+export interface ArgumentRelation {
+  readonly id: string;
+  readonly kind: ArgumentRelationKind;
+  readonly targetArgumentId: string;
+  readonly targetPart: ArgumentTargetPart;
+  readonly reliedOnRevision: number;
+}
+
+export interface Argument extends ArgumentRecordMetadata {
+  readonly title: string;
+  readonly examples: readonly ArgumentExample[];
+  readonly premises: readonly ArgumentPremise[];
+  readonly reasoning?: string;
+  readonly conclusion: string;
+  readonly boundary?: string;
+  readonly relations: readonly ArgumentRelation[];
+  readonly retrieval: RetrievalMetadata;
+  readonly sourceReferences: readonly TheorySourceReference[];
+  readonly supersedesArgumentId?: string;
+}
+
 export type CounterArgumentTarget =
   | { readonly kind: 'topic-claim'; readonly topicId: string }
   | { readonly kind: 'axiom'; readonly axiomId: string }
   | {
       readonly kind: 'counter-argument';
       readonly counterArgumentId: string;
+    }
+  | {
+      readonly kind: 'argument';
+      readonly argumentId: string;
+      readonly part: ArgumentTargetPart;
     };
 
 export interface AnsweringAxiomReference {
@@ -134,6 +214,7 @@ export interface ArgumentLibrary {
   readonly updatedAt: string;
   readonly topics: readonly ArgumentTopic[];
   readonly axioms: readonly ArgumentAxiom[];
+  readonly arguments: readonly Argument[];
   readonly counterArguments: readonly ArgumentCounterArgument[];
 }
 
@@ -158,6 +239,7 @@ export interface ArgumentLibraryValidationIssue {
     | 'missing-reference'
     | 'duplicate-id'
     | 'self-reference'
+    | 'dependency-cycle'
     | 'future-schema';
   readonly message: string;
 }
@@ -175,7 +257,13 @@ export type ArgumentLibraryValidationResult =
 
 export interface ArgumentRuntime {
   readonly createId: (
-    kind: 'library' | ArgumentRecordKind | 'source',
+    kind:
+      | 'library'
+      | ArgumentRecordKind
+      | 'source'
+      | 'example'
+      | 'premise'
+      | 'relation',
   ) => string;
   readonly now: () => string;
 }
@@ -216,6 +304,34 @@ export interface EditAxiomInput {
   readonly sourceReferences?: readonly TheorySourceReference[];
 }
 
+export interface CreateArgumentInput {
+  readonly id?: string;
+  readonly title: string;
+  readonly examples?: readonly ArgumentExample[];
+  readonly premises: readonly ArgumentPremise[];
+  readonly reasoning?: string;
+  readonly conclusion: string;
+  readonly boundary?: string;
+  readonly relations?: readonly ArgumentRelation[];
+  readonly retrieval?: Partial<RetrievalMetadata>;
+  readonly sourceReferences?: readonly TheorySourceReference[];
+  readonly supersedesArgumentId?: string;
+  readonly reviewState?: HumanReviewState;
+}
+
+export interface EditArgumentInput {
+  readonly title?: string;
+  readonly examples?: readonly ArgumentExample[];
+  readonly premises?: readonly ArgumentPremise[];
+  readonly reasoning?: string | null;
+  readonly conclusion?: string;
+  readonly boundary?: string | null;
+  readonly relations?: readonly ArgumentRelation[];
+  readonly retrieval?: RetrievalMetadata;
+  readonly sourceReferences?: readonly TheorySourceReference[];
+  readonly supersedesArgumentId?: string | null;
+}
+
 export interface CreateCounterArgumentInput {
   readonly id?: string;
   readonly title: string;
@@ -244,7 +360,7 @@ export interface UpdateCounterArgumentResponseInput {
   readonly reopeningCondition?: string | null;
 }
 
-export type TopicMembershipKind = 'axiom' | 'counter-argument';
+export type TopicMembershipKind = 'axiom' | 'argument' | 'counter-argument';
 
 export interface ReturnedRecordIdentity {
   readonly kind: ArgumentRecordKind;
@@ -329,6 +445,40 @@ export interface ArgumentBundle {
   readonly topics: readonly ArgumentTopic[];
   readonly axioms: readonly (ArgumentAxiom & {
     readonly linkedCounterArgumentIds: readonly string[];
+  })[];
+  readonly arguments: readonly (Argument & {
+    readonly argumentStale: boolean;
+    readonly stalePremiseIds: readonly string[];
+    readonly staleRelationIds: readonly string[];
+    readonly topicIds: readonly string[];
+    readonly currentTopicIds: readonly string[];
+    readonly supersededByArgumentIds: readonly string[];
+    readonly targetingCounterArgumentIds: readonly string[];
+    readonly incomingRelationIds: readonly string[];
+    readonly resolvedPremises: readonly {
+      readonly premiseId: string;
+      readonly kind: ArgumentPremise['kind'];
+      readonly referencedRecord?: {
+        readonly kind: 'axiom' | 'argument';
+        readonly id: string;
+        readonly revision: number;
+        readonly title: string;
+        readonly archived: boolean;
+      };
+      readonly referencedPremise?: ArgumentPremise;
+    }[];
+    readonly resolvedRelations: readonly {
+      readonly relationId: string;
+      readonly kind: ArgumentRelationKind;
+      readonly stale: boolean;
+      readonly targetArgument: {
+        readonly id: string;
+        readonly revision: number;
+        readonly title: string;
+        readonly archived: boolean;
+      };
+      readonly targetPart: ArgumentTargetPart;
+    }[];
   })[];
   readonly counterArguments: readonly (ArgumentCounterArgument & {
     readonly responseStale: boolean;
@@ -496,7 +646,11 @@ export interface KnowledgeReader {
 }
 
 export type ArgumentLibraryJsonParseResult =
-  | { readonly status: 'valid'; readonly value: ArgumentLibrary }
+  | {
+      readonly status: 'valid';
+      readonly value: ArgumentLibrary;
+      readonly migratedFromSchemaVersion?: 1 | 2;
+    }
   | {
       readonly status: 'invalid-json' | 'future-schema' | 'invalid-library';
       readonly message: string;

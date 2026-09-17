@@ -29,7 +29,16 @@ not observe them.
 MOVE1A defines temporary File movement across All and Focus as a constraint
 contract, PHYSICS1 retains continuous simulation ownership, and MOVE1B mounts
 their direct production interaction plus accessible keyboard integration.
-Arrange Folders remains an explicit, mutually exclusive All-only tool. PIN1
+Arrange Folders remains an explicit, mutually exclusive All-only tool. Its
+SPATIAL2C Pull-preview controller owns a separate disposable instance of the
+existing finite spatial-influence worker client. Dirty draft revisions replace
+only their same-root confirmed rule, always seed from accepted automatic
+geometry, and compose fixed Place output downstream. Preview positions never
+enter persistence, final-geometry identity, automatic layout cache, or the
+authoritative Pull cache. Animation-frame sampling plus one active and one
+newest pending request bounds work; cancel restores confirmed geometry, while a
+successful write holds the last preview until ordinary authoritative settlement
+adopts. PIN1
 remains separate future persistence work.
 
 ## Stable domain shape
@@ -181,18 +190,24 @@ narrow bridge and scheduler keep all provider tests independent of a native
 runtime.
 
 `packages/argument-workspace` is an independent source-neutral domain and
-application boundary for one local Argument Library. Its schema-v1
-Topic/Axiom/Counter-Argument data is not added to the canonical Markdown graph.
-The package owns strict validation, stable record/library revisions, portable
-source locators, stale-response detection, deterministic descriptive indexing,
-JSON/Markdown interchange, serialized expected-snapshot authoring commits, and
-immutable snapshot-bound read/bundle/source-dispatch contracts. Authoring and
-consumer facades are separate. The consumer has no store access, agent role,
-review stage, graph/view state, or model dependency.
+application boundary for one local Argument Library. Its schema-v3
+Topic/Axiom/Argument/Counter-Argument data is not added to the canonical
+Markdown graph. Arguments own scoped Examples, ordered authored or
+revision-pinned Axiom/conclusion/prior-premise dependencies, optional reasoning,
+conclusions, Boundary/Invariance prose, explicit attack/support relations, and
+separate supersession links; Topics expose an explicit Current pointer without
+truth semantics. The package owns strict validation and v1/v2 migration, stable
+record/library revisions, portable source locators, premise/relation/response
+staleness and explicit reassessment, deterministic
+descriptive indexing, JSON/Markdown interchange, serialized expected-snapshot
+authoring commits, and immutable snapshot-bound read/bundle/source-dispatch
+contracts. Authoring and consumer facades are separate. The consumer has no
+store access, agent role, review stage, graph/view state, or model dependency.
 
 `apps/web/src/persistence/argument-library.ts` adapts that store contract to one
-profile-level localStorage key. `packages/argument-workspace-tauri` adapts it to
-dedicated private app-local JSON using validated temporary-sibling replacement.
+stable profile-level localStorage key. `packages/argument-workspace-tauri`
+adapts it to dedicated private app-local schema-v3 JSON using validated
+temporary-sibling replacement and preserves migrated schema-v1/v2 files.
 Neither adapter uses the graph view registry, selected-vault Markdown, or
 workspace identity catalog. Live theory-source acquisition remains a later host
 adapter behind the Argument Workspace's narrow registered-reference reader; it
@@ -1613,8 +1628,50 @@ frame gains cache, camera, history, spatial, source, or persistence ownership.
 An All seed begins from the current output-only M2 snapshot without reapplying
 the field, so activation is jump-free and feedback cannot accumulate. Automatic
 folder shaping may temporarily relax during Move and returns with the normal
-finite layout after invalidation/remount. Production canvases expose Move only
-at 100 or fewer visible nodes; larger graphs return `graph-too-large` before
-Worker construction. This boundary follows direct release probes where
-500-node Focus/All-with-Pull and the 1,000/5,000-node cases reached explicit
-caps or wall limits.
+finite layout after invalidation/remount. Production canvases expose Move for
+one to 100 visible simulation nodes in Focus and one to 300 in All; views above
+the active mode's boundary return `graph-too-large` before Worker construction.
+The 300-node All boundary is a conservative real-vault QA boundary backed by
+targeted retained-simulation All and All-with-Pull probes, not a claim of a
+physical solver cliff. Focus remains at 100 because the existing larger Focus
+release probes reached explicit caps.
+
+MOVE300B bounds All's live dynamic region by undirected reference components.
+The constrained File's component is active, and positive-strength resolved Pull
+memberships transitively activate every represented component; M2 folder
+membership does not. Other nodes stay in the retained graph for repulsion but
+are held at gesture-start transient coordinates through hot work and cooling.
+Convergence evaluates the active closure, and a degree-zero singleton without
+effective Pull sleeps directly on release. No new worker schema or lifecycle
+state is introduced.
+
+MOVE300C supersedes those MOVE300B product choices while retaining its
+component index and analyzer evidence. All nodes remain physically active;
+after each All ForceAtlas2/Pull step, a finite component-centroid correction
+uses seed-generation centroids as the stable reference frame. The 1.5% gain is
+capped at 1.5% of the seed RMS radius per physical iteration, with compounded
+gain for no-Pull cooling batches. This permits visible isolate/component
+response without an indefinitely expanding ring and avoids gesture-to-gesture
+anchor ratcheting. Convergence again observes the complete moving graph, and a
+released isolated File enters bounded cooling. Focus physics, Pull ownership,
+M2's output-only handoff, Place composition, limits, schemas, and safety caps
+remain unchanged.
+
+MOVE300C also moves File-drag pointer lifetime out of Sigma's stage-hover
+boundary. Both imperative sessions share a native pointer-ID owner that prefers
+capture on the stable graph container and keeps document-capture move/up/cancel
+listeners as the stop-propagation fallback. `leaveStage` now performs hover
+cleanup only. Matching release is single-delivery, uses container-relative
+client coordinates without overlay clamping, suppresses only the immediate
+release click, and all existing cancellation/invalidation paths clear native
+ownership. Keyboard Move behavior is unchanged.
+
+Finally, MOVE300C replaces release presentation's per-target cubic smoothstep
+restart and 120 ms deadline with a single critically damped follower on the web
+client. Cooling retargets preserve visible position and velocity, elapsed-time
+integration is refresh-rate independent and bounds suspended-frame work, and
+only the newest target is retained. A sleeping raw frame remains authoritative
+while presentation continues until both scale-relative position error and
+velocity are negligible; only then does the client adopt exact raw coordinates
+and stop rAF work. The held File remains exact on re-grab and reduced-motion
+continues to bypass decorative catch-up.

@@ -10,7 +10,7 @@ import type { ArgumentSourceIdentity } from './source-capture';
 export interface ArgumentSourcePreview {
   readonly recordKind: Extract<
     ArgumentRecordKind,
-    'axiom' | 'counter-argument'
+    'axiom' | 'argument' | 'counter-argument'
   >;
   readonly recordId: string;
   readonly reference: TheorySourceReference;

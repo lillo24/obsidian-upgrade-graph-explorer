@@ -1,16 +1,21 @@
 import { canonicalJson, clonePlainData } from './canonical';
 import {
   ARGUMENT_LIBRARY_SCHEMA_VERSION,
+  type Argument,
   type ArgumentAxiom,
   type ArgumentCounterArgument,
+  type ArgumentExample,
   type ArgumentLibrary,
   type ArgumentRecordKind,
+  type ArgumentRelation,
   type ArgumentRuntime,
   type ArgumentTopic,
   type CreateAxiomInput,
+  type CreateArgumentInput,
   type CreateCounterArgumentInput,
   type CreateTopicInput,
   type EditAxiomInput,
+  type EditArgumentInput,
   type EditCounterArgumentInput,
   type EditTopicInput,
   type HumanReviewState,
@@ -63,6 +68,7 @@ function nextId(
   const exists = [
     ...library.topics,
     ...library.axioms,
+    ...library.arguments,
     ...library.counterArguments,
   ].some((record) => record.id === id);
   if (exists) throw new Error(`Argument record ID "${id}" already exists.`);
@@ -72,7 +78,10 @@ function nextId(
 function adopt(
   previous: ArgumentLibrary,
   runtime: ArgumentRuntime,
-  patch: Pick<ArgumentLibrary, 'topics' | 'axioms' | 'counterArguments'>,
+  patch: Pick<
+    ArgumentLibrary,
+    'topics' | 'axioms' | 'arguments' | 'counterArguments'
+  >,
 ): ArgumentLibrary {
   const updatedAt = runtimeTimestamp(runtime);
   const next = clonePlainData<ArgumentLibrary>({
@@ -83,6 +92,9 @@ function adopt(
       left.id.localeCompare(right.id),
     ),
     axioms: [...patch.axioms].sort((left, right) =>
+      left.id.localeCompare(right.id),
+    ),
+    arguments: [...patch.arguments].sort((left, right) =>
       left.id.localeCompare(right.id),
     ),
     counterArguments: [...patch.counterArguments].sort((left, right) =>
@@ -133,6 +145,7 @@ export function createEmptyArgumentLibrary(
     updatedAt: now,
     topics: [],
     axioms: [],
+    arguments: [],
     counterArguments: [],
   });
 }
@@ -154,11 +167,13 @@ export function createTopic(
     summary: requiredText(input.summary, 'Topic summary'),
     retrieval: retrieval(input.retrieval),
     axiomIds: [],
+    argumentIds: [],
     counterArgumentIds: [],
   };
   return adopt(library, runtime, {
     topics: [...library.topics, topic],
     axioms: library.axioms,
+    arguments: library.arguments,
     counterArguments: library.counterArguments,
   });
 }
@@ -197,6 +212,7 @@ export function editTopic(
       topic.id === topicId ? next : topic,
     ),
     axioms: library.axioms,
+    arguments: library.arguments,
     counterArguments: library.counterArguments,
   });
 }
@@ -246,6 +262,7 @@ export function createAxiom(
   return adopt(library, runtime, {
     topics: library.topics,
     axioms: [...library.axioms, axiom],
+    arguments: library.arguments,
     counterArguments: library.counterArguments,
   });
 }
@@ -306,7 +323,355 @@ export function editAxiom(
     axioms: library.axioms.map((axiom) =>
       axiom.id === axiomId ? next : axiom,
     ),
+    arguments: library.arguments,
     counterArguments: library.counterArguments,
+  });
+}
+
+function updateArgument(
+  library: ArgumentLibrary,
+  argumentId: string,
+  runtime: ArgumentRuntime,
+  update: (record: Argument) => Readonly<Record<string, unknown>>,
+): ArgumentLibrary {
+  const previous = library.arguments.find(({ id }) => id === argumentId);
+  if (previous === undefined) {
+    throw new Error(`Argument "${argumentId}" does not exist.`);
+  }
+  const next = recordUpdate(previous, update(previous), runtime);
+  if (next === previous) return library;
+  return adopt(library, runtime, {
+    topics: library.topics,
+    axioms: library.axioms,
+    arguments: library.arguments.map((record) =>
+      record.id === argumentId ? next : record,
+    ),
+    counterArguments: library.counterArguments,
+  });
+}
+
+export function createArgument(
+  library: ArgumentLibrary,
+  input: CreateArgumentInput,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  const now = runtimeTimestamp(runtime);
+  const argument: Argument = {
+    id: nextId(library, 'argument', input.id, runtime),
+    revision: 1,
+    reviewState: input.reviewState ?? 'draft',
+    archived: false,
+    createdAt: now,
+    updatedAt: now,
+    title: requiredText(input.title, 'Argument title'),
+    examples: clonePlainData(input.examples ?? []),
+    premises: clonePlainData(input.premises),
+    ...(input.reasoning === undefined
+      ? {}
+      : { reasoning: requiredText(input.reasoning, 'Argument reasoning') }),
+    conclusion: requiredText(input.conclusion, 'Argument conclusion'),
+    ...(input.boundary === undefined
+      ? {}
+      : { boundary: requiredText(input.boundary, 'Boundary / Invariance') }),
+    relations: clonePlainData(input.relations ?? []),
+    retrieval: retrieval(input.retrieval),
+    sourceReferences: clonePlainData(input.sourceReferences ?? []),
+    ...(input.supersedesArgumentId === undefined
+      ? {}
+      : {
+          supersedesArgumentId: requiredText(
+            input.supersedesArgumentId,
+            'Superseded Argument ID',
+          ),
+        }),
+  };
+  return adopt(library, runtime, {
+    topics: library.topics,
+    axioms: library.axioms,
+    arguments: [...library.arguments, argument],
+    counterArguments: library.counterArguments,
+  });
+}
+
+export function editArgument(
+  library: ArgumentLibrary,
+  argumentId: string,
+  input: EditArgumentInput,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  return updateArgument(library, argumentId, runtime, (previous) => {
+    const reasoning = optionalField(
+      previous.reasoning,
+      input.reasoning,
+      'Argument reasoning',
+    );
+    const boundary = optionalField(
+      previous.boundary,
+      input.boundary,
+      'Boundary / Invariance',
+    );
+    const supersedesArgumentId = optionalField(
+      previous.supersedesArgumentId,
+      input.supersedesArgumentId,
+      'Superseded Argument ID',
+    );
+    return {
+      ...previous,
+      title:
+        input.title === undefined
+          ? previous.title
+          : requiredText(input.title, 'Argument title'),
+      examples:
+        input.examples === undefined
+          ? previous.examples
+          : clonePlainData(input.examples),
+      premises:
+        input.premises === undefined
+          ? previous.premises
+          : clonePlainData(input.premises),
+      ...(reasoning === undefined ? { reasoning: undefined } : { reasoning }),
+      conclusion:
+        input.conclusion === undefined
+          ? previous.conclusion
+          : requiredText(input.conclusion, 'Argument conclusion'),
+      ...(boundary === undefined ? { boundary: undefined } : { boundary }),
+      relations:
+        input.relations === undefined
+          ? previous.relations
+          : clonePlainData(input.relations),
+      retrieval:
+        input.retrieval === undefined
+          ? previous.retrieval
+          : retrieval(input.retrieval),
+      sourceReferences:
+        input.sourceReferences === undefined
+          ? previous.sourceReferences
+          : clonePlainData(input.sourceReferences),
+      ...(supersedesArgumentId === undefined
+        ? { supersedesArgumentId: undefined }
+        : { supersedesArgumentId }),
+    };
+  });
+}
+
+export function argumentStaleness(
+  library: ArgumentLibrary,
+  argument: Argument,
+): {
+  readonly stale: boolean;
+  readonly premiseIds: readonly string[];
+  readonly relationIds: readonly string[];
+} {
+  const axiomRevisions = new Map(
+    library.axioms.map((axiom) => [axiom.id, axiom.revision]),
+  );
+  const argumentRevisions = new Map(
+    library.arguments.map((record) => [record.id, record.revision]),
+  );
+  const premiseIds = argument.premises
+    .filter((premise) => {
+      if (premise.kind === 'text') return false;
+      const currentRevision =
+        premise.kind === 'axiom'
+          ? axiomRevisions.get(premise.axiomId)
+          : argumentRevisions.get(premise.argumentId);
+      return currentRevision !== premise.reliedOnRevision;
+    })
+    .map(({ id }) => id);
+  const relationIds = argument.relations
+    .filter(
+      (relation) =>
+        argumentRevisions.get(relation.targetArgumentId) !==
+        relation.reliedOnRevision,
+    )
+    .map(({ id }) => id);
+  return {
+    stale: premiseIds.length > 0 || relationIds.length > 0,
+    premiseIds,
+    relationIds,
+  };
+}
+
+/** Explicitly records that every referenced premise was re-evaluated. */
+export function reassessArgumentPremises(
+  library: ArgumentLibrary,
+  argumentId: string,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  const axiomRevisions = new Map(
+    library.axioms.map((axiom) => [axiom.id, axiom.revision]),
+  );
+  const argumentRevisions = new Map(
+    library.arguments.map((argument) => [argument.id, argument.revision]),
+  );
+  return updateArgument(library, argumentId, runtime, (previous) => ({
+    ...previous,
+    premises: previous.premises.map((premise) => {
+      if (premise.kind === 'text') return premise;
+      return {
+        ...premise,
+        reliedOnRevision:
+          premise.kind === 'axiom'
+            ? axiomRevisions.get(premise.axiomId)!
+            : argumentRevisions.get(premise.argumentId)!,
+      };
+    }),
+  }));
+}
+
+/** Explicitly records that every outgoing relation target was re-evaluated. */
+export function reassessArgumentRelations(
+  library: ArgumentLibrary,
+  argumentId: string,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  const argumentRevisions = new Map(
+    library.arguments.map((argument) => [argument.id, argument.revision]),
+  );
+  return updateArgument(library, argumentId, runtime, (previous) => ({
+    ...previous,
+    relations: previous.relations.map((relation) => ({
+      ...relation,
+      reliedOnRevision: argumentRevisions.get(relation.targetArgumentId)!,
+    })),
+  }));
+}
+
+export function addArgumentExample(
+  library: ArgumentLibrary,
+  argumentId: string,
+  example: ArgumentExample,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  return updateArgument(library, argumentId, runtime, (previous) => ({
+    ...previous,
+    examples: [...previous.examples, clonePlainData(example)],
+  }));
+}
+
+export function editArgumentExample(
+  library: ArgumentLibrary,
+  argumentId: string,
+  exampleId: string,
+  text: string,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  return updateArgument(library, argumentId, runtime, (previous) => {
+    if (!previous.examples.some(({ id }) => id === exampleId)) {
+      throw new Error(`Example "${exampleId}" does not exist.`);
+    }
+    return {
+      ...previous,
+      examples: previous.examples.map((example) =>
+        example.id === exampleId
+          ? { ...example, text: requiredText(text, 'Example text') }
+          : example,
+      ),
+    };
+  });
+}
+
+export function moveArgumentExample(
+  library: ArgumentLibrary,
+  argumentId: string,
+  exampleId: string,
+  destinationIndex: number,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  return updateArgument(library, argumentId, runtime, (previous) => {
+    const sourceIndex = previous.examples.findIndex(
+      ({ id }) => id === exampleId,
+    );
+    if (sourceIndex < 0)
+      throw new Error(`Example "${exampleId}" does not exist.`);
+    if (
+      !Number.isInteger(destinationIndex) ||
+      destinationIndex < 0 ||
+      destinationIndex >= previous.examples.length
+    ) {
+      throw new Error('Example destination index is out of range.');
+    }
+    const examples = [...previous.examples];
+    const [example] = examples.splice(sourceIndex, 1);
+    examples.splice(destinationIndex, 0, example!);
+    return { ...previous, examples };
+  });
+}
+
+export function removeArgumentExample(
+  library: ArgumentLibrary,
+  argumentId: string,
+  exampleId: string,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  return updateArgument(library, argumentId, runtime, (previous) => {
+    if (!previous.examples.some(({ id }) => id === exampleId)) {
+      throw new Error(`Example "${exampleId}" does not exist.`);
+    }
+    if (
+      previous.premises.some(({ exampleIds }) =>
+        exampleIds?.includes(exampleId),
+      )
+    ) {
+      throw new Error(
+        `Example "${exampleId}" is referenced by a premise and cannot be removed.`,
+      );
+    }
+    return {
+      ...previous,
+      examples: previous.examples.filter(({ id }) => id !== exampleId),
+    };
+  });
+}
+
+export function addArgumentRelation(
+  library: ArgumentLibrary,
+  argumentId: string,
+  relation: ArgumentRelation,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  return updateArgument(library, argumentId, runtime, (previous) => ({
+    ...previous,
+    relations: [...previous.relations, clonePlainData(relation)],
+  }));
+}
+
+export function editArgumentRelation(
+  library: ArgumentLibrary,
+  argumentId: string,
+  relationId: string,
+  relation: ArgumentRelation,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  return updateArgument(library, argumentId, runtime, (previous) => {
+    if (!previous.relations.some(({ id }) => id === relationId)) {
+      throw new Error(`Argument relation "${relationId}" does not exist.`);
+    }
+    return {
+      ...previous,
+      relations: previous.relations.map((current) =>
+        current.id === relationId
+          ? clonePlainData({ ...relation, id: relationId })
+          : current,
+      ),
+    };
+  });
+}
+
+export function removeArgumentRelation(
+  library: ArgumentLibrary,
+  argumentId: string,
+  relationId: string,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  return updateArgument(library, argumentId, runtime, (previous) => {
+    if (!previous.relations.some(({ id }) => id === relationId)) {
+      throw new Error(`Argument relation "${relationId}" does not exist.`);
+    }
+    return {
+      ...previous,
+      relations: previous.relations.filter(({ id }) => id !== relationId),
+    };
   });
 }
 
@@ -359,6 +724,7 @@ export function createCounterArgument(
   return adopt(library, runtime, {
     topics: library.topics,
     axioms: library.axioms,
+    arguments: library.arguments,
     counterArguments: [...library.counterArguments, counterArgument],
   });
 }
@@ -411,6 +777,7 @@ export function editCounterArgument(
   return adopt(library, runtime, {
     topics: library.topics,
     axioms: library.axioms,
+    arguments: library.arguments,
     counterArguments: library.counterArguments.map((record) =>
       record.id === counterArgumentId ? next : record,
     ),
@@ -431,7 +798,9 @@ export function recordTheorySourceVersion(
   const record =
     input.recordKind === 'axiom'
       ? library.axioms.find(({ id }) => id === input.recordId)
-      : library.counterArguments.find(({ id }) => id === input.recordId);
+      : input.recordKind === 'argument'
+        ? library.arguments.find(({ id }) => id === input.recordId)
+        : library.counterArguments.find(({ id }) => id === input.recordId);
   if (record === undefined) {
     throw new Error(`${input.recordKind} "${input.recordId}" does not exist.`);
   }
@@ -465,12 +834,14 @@ export function recordTheorySourceVersion(
   );
   return input.recordKind === 'axiom'
     ? editAxiom(library, input.recordId, { sourceReferences }, runtime)
-    : editCounterArgument(
-        library,
-        input.recordId,
-        { sourceReferences },
-        runtime,
-      );
+    : input.recordKind === 'argument'
+      ? editArgument(library, input.recordId, { sourceReferences }, runtime)
+      : editCounterArgument(
+          library,
+          input.recordId,
+          { sourceReferences },
+          runtime,
+        );
 }
 
 function updateCounterArgument(
@@ -492,6 +863,7 @@ function updateCounterArgument(
   return adopt(library, runtime, {
     topics: library.topics,
     axioms: library.axioms,
+    arguments: library.arguments,
     counterArguments: library.counterArguments.map((record) =>
       record.id === counterArgumentId ? next : record,
     ),
@@ -628,14 +1000,28 @@ export function setTopicMembership(
   if (topic === undefined)
     throw new Error(`Topic "${topicId}" does not exist.`);
   const collection =
-    kind === 'axiom' ? library.axioms : library.counterArguments;
+    kind === 'axiom'
+      ? library.axioms
+      : kind === 'argument'
+        ? library.arguments
+        : library.counterArguments;
   if (!collection.some(({ id }) => id === recordId)) {
     throw new Error(
-      `${kind === 'axiom' ? 'Axiom' : 'Counter-Argument'} "${recordId}" does not exist.`,
+      `${kind === 'axiom' ? 'Axiom' : kind === 'argument' ? 'Argument' : 'Counter-Argument'} "${recordId}" does not exist.`,
     );
   }
-  const field = kind === 'axiom' ? 'axiomIds' : 'counterArgumentIds';
+  const field =
+    kind === 'axiom'
+      ? 'axiomIds'
+      : kind === 'argument'
+        ? 'argumentIds'
+        : 'counterArgumentIds';
   const values = topic[field];
+  if (!member && kind === 'argument' && topic.currentArgumentId === recordId) {
+    throw new Error(
+      `Current Argument "${recordId}" cannot be removed from Topic "${topicId}".`,
+    );
+  }
   const nextValues = member
     ? sortedUnique([...values, recordId])
     : values.filter((id) => id !== recordId);
@@ -646,6 +1032,69 @@ export function setTopicMembership(
       record.id === topicId ? next : record,
     ),
     axioms: library.axioms,
+    arguments: library.arguments,
+    counterArguments: library.counterArguments,
+  });
+}
+
+export function promoteArgumentToCurrent(
+  library: ArgumentLibrary,
+  topicId: string,
+  argumentId: string,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  const topic = library.topics.find(({ id }) => id === topicId);
+  if (topic === undefined) {
+    throw new Error(`Topic "${topicId}" does not exist.`);
+  }
+  const candidate = library.arguments.find(({ id }) => id === argumentId);
+  if (candidate === undefined) {
+    throw new Error(`Argument "${argumentId}" does not exist.`);
+  }
+  if (!topic.argumentIds.includes(argumentId)) {
+    throw new Error(
+      `Argument "${argumentId}" must belong to Topic "${topicId}" before promotion.`,
+    );
+  }
+  if (candidate.archived) {
+    throw new Error('An archived Argument cannot be promoted to Current.');
+  }
+  if (candidate.reviewState !== 'accepted') {
+    throw new Error('Only an accepted Argument can be promoted to Current.');
+  }
+  const previousCurrentId = topic.currentArgumentId;
+  if (previousCurrentId === argumentId) return library;
+  if (
+    previousCurrentId !== undefined &&
+    candidate.supersedesArgumentId !== undefined &&
+    candidate.supersedesArgumentId !== previousCurrentId
+  ) {
+    throw new Error(
+      `Argument "${argumentId}" already supersedes a different predecessor.`,
+    );
+  }
+  const nextArgument =
+    previousCurrentId === undefined ||
+    candidate.supersedesArgumentId === previousCurrentId
+      ? candidate
+      : recordUpdate(
+          candidate,
+          { ...candidate, supersedesArgumentId: previousCurrentId },
+          runtime,
+        );
+  const nextTopic = recordUpdate(
+    topic,
+    { ...topic, currentArgumentId: argumentId },
+    runtime,
+  );
+  return adopt(library, runtime, {
+    topics: library.topics.map((record) =>
+      record.id === topicId ? nextTopic : record,
+    ),
+    axioms: library.axioms,
+    arguments: library.arguments.map((record) =>
+      record.id === argumentId ? nextArgument : record,
+    ),
     counterArguments: library.counterArguments,
   });
 }
@@ -657,12 +1106,23 @@ export function setRecordArchived(
   archived: boolean,
   runtime: ArgumentRuntime,
 ): ArgumentLibrary {
+  if (
+    kind === 'argument' &&
+    archived &&
+    library.topics.some(
+      ({ currentArgumentId }) => currentArgumentId === recordId,
+    )
+  ) {
+    throw new Error(`Current Argument "${recordId}" cannot be archived.`);
+  }
   const collectionName =
     kind === 'topic'
       ? 'topics'
       : kind === 'axiom'
         ? 'axioms'
-        : 'counterArguments';
+        : kind === 'argument'
+          ? 'arguments'
+          : 'counterArguments';
   const collection = library[collectionName];
   const previous = collection.find(({ id }) => id === recordId);
   if (previous === undefined)
@@ -682,6 +1142,12 @@ export function setRecordArchived(
             record.id === recordId ? (next as ArgumentAxiom) : record,
           )
         : library.axioms,
+    arguments:
+      kind === 'argument'
+        ? library.arguments.map((record) =>
+            record.id === recordId ? (next as Argument) : record,
+          )
+        : library.arguments,
     counterArguments:
       kind === 'counter-argument'
         ? library.counterArguments.map((record) =>
@@ -703,7 +1169,9 @@ export function setRecordReviewState(
       ? 'topics'
       : kind === 'axiom'
         ? 'axioms'
-        : 'counterArguments';
+        : kind === 'argument'
+          ? 'arguments'
+          : 'counterArguments';
   const collection = library[collectionName];
   const previous = collection.find(({ id }) => id === recordId);
   if (previous === undefined)
@@ -723,6 +1191,12 @@ export function setRecordReviewState(
             record.id === recordId ? (next as ArgumentAxiom) : record,
           )
         : library.axioms,
+    arguments:
+      kind === 'argument'
+        ? library.arguments.map((record) =>
+            record.id === recordId ? (next as Argument) : record,
+          )
+        : library.arguments,
     counterArguments:
       kind === 'counter-argument'
         ? library.counterArguments.map((record) =>

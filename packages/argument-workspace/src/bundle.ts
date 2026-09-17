@@ -1,5 +1,5 @@
 import { clonePlainData } from './canonical';
-import { responseStaleness } from './library';
+import { argumentStaleness, responseStaleness } from './library';
 import type {
   ArgumentBundle,
   ArgumentLibrary,
@@ -42,6 +42,9 @@ function recordKinds(
   const kinds: ArgumentRecordKind[] = [];
   if (library.topics.some((record) => record.id === id)) kinds.push('topic');
   if (library.axioms.some((record) => record.id === id)) kinds.push('axiom');
+  if (library.arguments.some((record) => record.id === id)) {
+    kinds.push('argument');
+  }
   if (library.counterArguments.some((record) => record.id === id)) {
     kinds.push('counter-argument');
   }
@@ -66,22 +69,27 @@ export function assembleArgumentBundle(
   const maxDepth = request.maxDepth ?? 8;
   const topics = new Map(library.topics.map((record) => [record.id, record]));
   const axioms = new Map(library.axioms.map((record) => [record.id, record]));
+  const argumentsById = new Map(
+    library.arguments.map((record) => [record.id, record]),
+  );
   const counters = new Map(
     library.counterArguments.map((record) => [record.id, record]),
   );
   const topicIds = new Set<string>();
   const axiomIds = new Set<string>();
+  const argumentIds = new Set<string>();
   const counterIds = new Set<string>();
   const warnings = new Set<string>();
   const omissions = new Set<string>();
 
   const addMembershipTopics = (
-    recordKind: 'axiom' | 'counter-argument',
+    recordKind: 'axiom' | 'argument' | 'counter-argument',
     id: string,
-  ) => {
+  ): void => {
     for (const topic of library.topics) {
       if (
         (recordKind === 'axiom' && topic.axiomIds.includes(id)) ||
+        (recordKind === 'argument' && topic.argumentIds.includes(id)) ||
         (recordKind === 'counter-argument' &&
           topic.counterArgumentIds.includes(id))
       ) {
@@ -90,7 +98,70 @@ export function assembleArgumentBundle(
     }
   };
 
-  const visiting = new Set<string>();
+  const visitingArguments = new Set<string>();
+  const visitingCounters = new Set<string>();
+
+  const addArgument = (
+    id: string,
+    depth: number,
+    includeSupersession: boolean,
+    includeRelations = true,
+  ): void => {
+    const argument = argumentsById.get(id);
+    if (argument === undefined) return;
+    argumentIds.add(id);
+    addMembershipTopics('argument', id);
+    if (visitingArguments.has(id)) {
+      warnings.add(`Argument dependency cycle detected at ${id}.`);
+      return;
+    }
+    visitingArguments.add(id);
+    for (const premise of argument.premises) {
+      if (premise.kind === 'axiom') {
+        axiomIds.add(premise.axiomId);
+        addMembershipTopics('axiom', premise.axiomId);
+      } else if (
+        premise.kind === 'argument-conclusion' ||
+        premise.kind === 'argument-premise'
+      ) {
+        if (depth >= maxDepth) {
+          omissions.add(`Premise chain beyond depth ${maxDepth} from ${id}.`);
+        } else {
+          addArgument(premise.argumentId, depth + 1, false);
+        }
+      }
+    }
+    if (includeRelations) {
+      for (const relation of argument.relations) {
+        if (depth >= maxDepth) {
+          omissions.add(`Relation target beyond depth ${maxDepth} from ${id}.`);
+        } else {
+          addArgument(relation.targetArgumentId, depth + 1, false, false);
+        }
+      }
+    }
+    if (includeSupersession) {
+      const relatedIds = [
+        ...(argument.supersedesArgumentId === undefined
+          ? []
+          : [argument.supersedesArgumentId]),
+        ...library.arguments
+          .filter(({ supersedesArgumentId }) => supersedesArgumentId === id)
+          .map(({ id: successorId }) => successorId),
+      ].sort();
+      for (const relatedId of relatedIds) {
+        if (depth >= maxDepth) {
+          omissions.add(
+            `Supersession chain beyond depth ${maxDepth} from ${id}.`,
+          );
+        } else {
+          addArgument(relatedId, depth + 1, true);
+        }
+      }
+    }
+    visitingArguments.delete(id);
+  };
+
   const addCounter = (id: string, depth: number): void => {
     const counter = counters.get(id);
     if (counter === undefined) return;
@@ -106,8 +177,14 @@ export function assembleArgumentBundle(
     } else if (target?.kind === 'axiom') {
       axiomIds.add(target.axiomId);
       addMembershipTopics('axiom', target.axiomId);
+    } else if (target?.kind === 'argument') {
+      if (depth >= maxDepth) {
+        omissions.add(`Target chain beyond depth ${maxDepth} from ${id}.`);
+      } else {
+        addArgument(target.argumentId, depth + 1, false);
+      }
     } else if (target?.kind === 'counter-argument') {
-      if (visiting.has(target.counterArgumentId)) {
+      if (visitingCounters.has(target.counterArgumentId)) {
         warnings.add(
           `Counter-Argument target cycle detected at ${target.counterArgumentId}.`,
         );
@@ -117,9 +194,20 @@ export function assembleArgumentBundle(
         omissions.add(`Target chain beyond depth ${maxDepth} from ${id}.`);
         return;
       }
-      visiting.add(id);
+      visitingCounters.add(id);
       addCounter(target.counterArgumentId, depth + 1);
-      visiting.delete(id);
+      visitingCounters.delete(id);
+    }
+  };
+
+  const addDirectArgumentCounters = (argumentId: string): void => {
+    for (const counter of library.counterArguments) {
+      if (
+        counter.target?.kind === 'argument' &&
+        counter.target.argumentId === argumentId
+      ) {
+        addCounter(counter.id, 0);
+      }
     }
   };
 
@@ -128,6 +216,10 @@ export function assembleArgumentBundle(
     topicIds.add(topic.id);
     topic.axiomIds.forEach((id) => axiomIds.add(id));
     topic.counterArgumentIds.forEach((id) => addCounter(id, 0));
+    if (topic.currentArgumentId !== undefined) {
+      addArgument(topic.currentArgumentId, 0, false);
+      addDirectArgumentCounters(topic.currentArgumentId);
+    }
   } else if (kind === 'axiom') {
     axiomIds.add(request.id);
     addMembershipTopics('axiom', request.id);
@@ -142,6 +234,9 @@ export function assembleArgumentBundle(
         addCounter(counter.id, 0);
       }
     }
+  } else if (kind === 'argument') {
+    addArgument(request.id, 0, true);
+    addDirectArgumentCounters(request.id);
   } else {
     addCounter(request.id, 0);
   }
@@ -154,6 +249,10 @@ export function assembleArgumentBundle(
     ...[...axiomIds].map((id) => ({
       kind: 'axiom' as const,
       record: axioms.get(id)!,
+    })),
+    ...[...argumentIds].map((id) => ({
+      kind: 'argument' as const,
+      record: argumentsById.get(id)!,
     })),
     ...[...counterIds].map((id) => ({
       kind: 'counter-argument' as const,
@@ -205,6 +304,102 @@ export function assembleArgumentBundle(
       return { ...axiom, linkedCounterArgumentIds };
     })
     .sort((left, right) => left.id.localeCompare(right.id));
+  const bundleArguments = [...argumentIds]
+    .map((id) => {
+      const argument = argumentsById.get(id)!;
+      const stale = argumentStaleness(library, argument);
+      const membershipTopics = library.topics
+        .filter(({ argumentIds: memberIds }) => memberIds.includes(id))
+        .map(({ id: topicId }) => topicId)
+        .sort();
+      const currentTopicIds = library.topics
+        .filter(({ currentArgumentId }) => currentArgumentId === id)
+        .map(({ id: topicId }) => topicId)
+        .sort();
+      const supersededByArgumentIds = library.arguments
+        .filter(({ supersedesArgumentId }) => supersedesArgumentId === id)
+        .map(({ id: successorId }) => successorId)
+        .sort();
+      const targetingCounterArgumentIds = library.counterArguments
+        .filter(
+          ({ target }) =>
+            target?.kind === 'argument' && target.argumentId === id,
+        )
+        .map(({ id: counterId }) => counterId)
+        .sort();
+      const incomingRelationIds = library.arguments
+        .flatMap((source) =>
+          source.relations
+            .filter(({ targetArgumentId }) => targetArgumentId === id)
+            .map((relation) => `${source.id}:${relation.id}`),
+        )
+        .sort();
+      const resolvedPremises = argument.premises.map((premise) => {
+        const referenced =
+          premise.kind === 'axiom'
+            ? axioms.get(premise.axiomId)
+            : premise.kind === 'argument-conclusion' ||
+                premise.kind === 'argument-premise'
+              ? argumentsById.get(premise.argumentId)
+              : undefined;
+        const referencedPremise =
+          premise.kind === 'argument-premise'
+            ? argumentsById
+                .get(premise.argumentId)
+                ?.premises.find(
+                  ({ id: premiseId }) => premiseId === premise.premiseId,
+                )
+            : undefined;
+        return {
+          premiseId: premise.id,
+          kind: premise.kind,
+          ...(referenced === undefined
+            ? {}
+            : {
+                referencedRecord: {
+                  kind:
+                    premise.kind === 'axiom'
+                      ? ('axiom' as const)
+                      : ('argument' as const),
+                  id: referenced.id,
+                  revision: referenced.revision,
+                  title: referenced.title,
+                  archived: referenced.archived,
+                },
+              }),
+          ...(referencedPremise === undefined ? {} : { referencedPremise }),
+        };
+      });
+      const resolvedRelations = argument.relations.map((relation) => {
+        const target = argumentsById.get(relation.targetArgumentId)!;
+        return {
+          relationId: relation.id,
+          kind: relation.kind,
+          stale: relation.reliedOnRevision !== target.revision,
+          targetArgument: {
+            id: target.id,
+            revision: target.revision,
+            title: target.title,
+            archived: target.archived,
+          },
+          targetPart: relation.targetPart,
+        };
+      });
+      return {
+        ...argument,
+        argumentStale: stale.stale,
+        stalePremiseIds: stale.premiseIds,
+        staleRelationIds: stale.relationIds,
+        topicIds: membershipTopics,
+        currentTopicIds,
+        supersededByArgumentIds,
+        targetingCounterArgumentIds,
+        incomingRelationIds,
+        resolvedPremises,
+        resolvedRelations,
+      };
+    })
+    .sort((left, right) => left.id.localeCompare(right.id));
   const bundleCounters = [...counterIds]
     .map((id) => {
       const counter = counters.get(id)!;
@@ -216,10 +411,29 @@ export function assembleArgumentBundle(
       };
     })
     .sort((left, right) => left.id.localeCompare(right.id));
-  for (const record of [...bundleTopics, ...bundleAxioms, ...bundleCounters]) {
+  for (const record of [
+    ...bundleTopics,
+    ...bundleAxioms,
+    ...bundleArguments,
+    ...bundleCounters,
+  ]) {
     if (record.archived) warnings.add(`${record.id} is archived.`);
     if (record.reviewState !== 'accepted') {
       warnings.add(`${record.id} human review state is ${record.reviewState}.`);
+    }
+  }
+  for (const argument of bundleArguments) {
+    if (argument.argumentStale) {
+      if (argument.stalePremiseIds.length > 0) {
+        warnings.add(
+          `${argument.id} relies on older premise revisions: ${argument.stalePremiseIds.join(', ')}.`,
+        );
+      }
+      if (argument.staleRelationIds.length > 0) {
+        warnings.add(
+          `${argument.id} relations target older revisions: ${argument.staleRelationIds.join(', ')}.`,
+        );
+      }
     }
   }
   for (const counter of bundleCounters) {
@@ -235,6 +449,7 @@ export function assembleArgumentBundle(
       selector: { kind, id: request.id },
       topics: bundleTopics,
       axioms: bundleAxioms,
+      arguments: bundleArguments,
       counterArguments: bundleCounters,
       completeness: {
         status: 'complete',

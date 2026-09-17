@@ -17,6 +17,7 @@ import { RecordingTemporaryNodeConstraintPort } from './temporary-node-constrain
 describe('temporary File move renderer sessions', () => {
   const windowListeners = new Map<string, (event: unknown) => void>();
   const documentListeners = new Map<string, (event: unknown) => void>();
+  const containerListeners = new Map<string, (event: unknown) => void>();
   let frames: FrameRequestCallback[];
 
   beforeEach(() => {
@@ -24,6 +25,7 @@ describe('temporary File move renderer sessions', () => {
     frames = [];
     windowListeners.clear();
     documentListeners.clear();
+    containerListeners.clear();
     vi.useFakeTimers();
     vi.stubGlobal('window', {
       matchMedia: () => ({ matches: true }),
@@ -46,6 +48,21 @@ describe('temporary File move renderer sessions', () => {
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
   });
 
+  function testContainer(): HTMLElement {
+    const capturedPointers = new Set<number>();
+    return {
+      setAttribute: vi.fn(),
+      addEventListener: (type: string, callback: (event: unknown) => void) =>
+        containerListeners.set(type, callback),
+      removeEventListener: (type: string) => containerListeners.delete(type),
+      getBoundingClientRect: () => ({ left: 10, top: 20 }),
+      setPointerCapture: (pointerId: number) => capturedPointers.add(pointerId),
+      hasPointerCapture: (pointerId: number) => capturedPointers.has(pointerId),
+      releasePointerCapture: (pointerId: number) =>
+        capturedPointers.delete(pointerId),
+    } as unknown as HTMLElement;
+  }
+
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
@@ -61,22 +78,18 @@ describe('temporary File move renderer sessions', () => {
     const onNodeSelected = vi.fn();
     const onNodeSingleClick = vi.fn();
     const count = vi.fn();
-    const session = new GlobalRendererSession(
-      { setAttribute: vi.fn() } as unknown as HTMLElement,
-      input,
-      {
-        settings: { folderClustering: false, spacingPreset: 'normal' },
-        trackpadZoomMode: 'pinch-zoom',
-        onNodeActivated,
-        onNodeSelected,
-        onNodeSingleClick,
-        instrumentation: {
-          count,
-          measure: (_phase, _operation, run) => run(),
-          record: vi.fn(),
-        },
+    const session = new GlobalRendererSession(testContainer(), input, {
+      settings: { folderClustering: false, spacingPreset: 'normal' },
+      trackpadZoomMode: 'pinch-zoom',
+      onNodeActivated,
+      onNodeSelected,
+      onNodeSingleClick,
+      instrumentation: {
+        count,
+        measure: (_phase, _operation, run) => run(),
+        record: vi.fn(),
       },
-    );
+    });
     const port = new RecordingTemporaryNodeConstraintPort();
     session.setTemporaryFileMoveContext({
       active: true,
@@ -104,17 +117,13 @@ describe('temporary File move renderer sessions', () => {
     const onNodeActivated = vi.fn();
     const onNodeSelected = vi.fn();
     const onNodeSingleClick = vi.fn();
-    const session = new LocalRendererSession(
-      { setAttribute: vi.fn() } as unknown as HTMLElement,
-      input,
-      {
-        rootNodeKey: input.rootNodeKey,
-        trackpadZoomMode: 'pinch-zoom',
-        onNodeActivated,
-        onNodeSelected,
-        onNodeSingleClick,
-      },
-    );
+    const session = new LocalRendererSession(testContainer(), input, {
+      rootNodeKey: input.rootNodeKey,
+      trackpadZoomMode: 'pinch-zoom',
+      onNodeActivated,
+      onNodeSelected,
+      onNodeSingleClick,
+    });
     const port = new RecordingTemporaryNodeConstraintPort();
     session.setTemporaryFileMoveContext({
       active: true,
@@ -366,6 +375,70 @@ describe('temporary File move renderer sessions', () => {
     });
     expect(preventSigmaDefault).not.toHaveBeenCalled();
     expect(count).toHaveBeenCalledWith('file-move-unavailable-attempts');
+  });
+
+  it('keeps native pointer ownership across leaveStage and a stop-propagating HTML overlay', () => {
+    const { port, renderer } = globalHarness();
+    const node = renderer.graph.getNodeAttributes('entity:doc-a') as {
+      x: number;
+      y: number;
+    };
+    containerListeners.get('pointerdown')!({
+      pointerId: 7,
+      button: 0,
+      buttons: 1,
+      isPrimary: true,
+    });
+    renderer.handlers.get('downNode')!({
+      node: 'entity:doc-a',
+      event: node,
+      preventSigmaDefault: vi.fn(),
+    });
+
+    renderer.handlers.get('leaveStage')!({});
+    expect(port.commands).toEqual([]);
+    documentListeners.get('pointermove')!({
+      pointerId: 99,
+      buttons: 1,
+      clientX: 200,
+      clientY: 200,
+      cancelable: true,
+      preventDefault: vi.fn(),
+    });
+    expect(port.commands).toEqual([]);
+    documentListeners.get('pointermove')!({
+      pointerId: 7,
+      buttons: 1,
+      clientX: 60,
+      clientY: 70,
+      cancelable: true,
+      preventDefault: vi.fn(),
+    });
+    expect(port.commands[0]).toMatchObject({ kind: 'begin', sequence: 0 });
+
+    const stopPropagation = vi.fn();
+    documentListeners.get('pointerup')!({
+      pointerId: 7,
+      button: 0,
+      buttons: 0,
+      cancelable: true,
+      preventDefault: vi.fn(),
+      stopPropagation,
+    });
+    expect(stopPropagation).toHaveBeenCalledOnce();
+    expect(port.commands.at(-1)).toMatchObject({
+      kind: 'end',
+      reason: 'released',
+    });
+
+    const releasedClick = {
+      preventDefault: vi.fn(),
+      stopImmediatePropagation: vi.fn(),
+    };
+    documentListeners.get('click')!(releasedClick);
+    expect(releasedClick.preventDefault).toHaveBeenCalledOnce();
+    expect(releasedClick.stopImmediatePropagation).toHaveBeenCalledOnce();
+    expect(documentListeners.has('click')).toBe(false);
   });
 
   it('ends active work on Escape, topology change, mode arbitration, and disposal', () => {

@@ -25,12 +25,14 @@ import {
   type TemporaryNodeConstraintCommandBase,
 } from '../temporary-node-constraint';
 import { applyNetworkPhysicsPullIteration } from './pull';
+import { NetworkPhysicsDynamicCouplingIndex } from './dynamic-coupling';
 import {
   NETWORK_PHYSICS_SCHEMA_VERSION,
   validateNetworkPhysicsSeed,
   type NetworkPhysicsFailureResponse,
   type NetworkPhysicsFrameResponse,
   type NetworkPhysicsLifecycleState,
+  type NetworkPhysicsMode,
   type NetworkPhysicsPosition,
   type NetworkPhysicsSeed,
 } from './protocol';
@@ -41,15 +43,31 @@ type PhysicsGraph = MultiDirectedGraph<
 >;
 
 const HOT_ITERATIONS_PER_TURN = 4;
-export const NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT = 100 as const;
+/** Fraction of component-centroid error corrected per All physical step. */
+export const NETWORK_PHYSICS_COMPONENT_STABILIZATION_GAIN = 0.015;
+/** Maximum graph-space translation per step, relative to the seed RMS radius. */
+export const NETWORK_PHYSICS_COMPONENT_STABILIZATION_CAP_RATIO = 0.015;
+export const NETWORK_PHYSICS_FOCUS_SUPPORTED_NODE_LIMIT = 100 as const;
+export const NETWORK_PHYSICS_ALL_SUPPORTED_NODE_LIMIT = 300 as const;
 
-export function networkPhysicsNodeCountIsSupported(nodeCount: number): boolean {
+export function networkPhysicsSupportedNodeLimit(
+  mode: NetworkPhysicsMode,
+): number {
+  if (mode === 'focus') return NETWORK_PHYSICS_FOCUS_SUPPORTED_NODE_LIMIT;
+  if (mode === 'all') return NETWORK_PHYSICS_ALL_SUPPORTED_NODE_LIMIT;
+  throw new Error('Network physics mode must be Focus or All.');
+}
+
+export function networkPhysicsNodeCountIsSupported(
+  mode: NetworkPhysicsMode,
+  nodeCount: number,
+): boolean {
   if (!Number.isSafeInteger(nodeCount) || nodeCount < 0) {
     throw new Error(
       'Network physics node count must be a non-negative safe integer.',
     );
   }
-  return nodeCount > 0 && nodeCount <= NETWORK_PHYSICS_SUPPORTED_NODE_LIMIT;
+  return nodeCount > 0 && nodeCount <= networkPhysicsSupportedNodeLimit(mode);
 }
 
 /** Live Focus must settle in the displayed fixed frame as well as in shape. */
@@ -157,6 +175,14 @@ export class ContinuousNetworkSimulation {
   private readonly graph: PhysicsGraph;
   private readonly nodeKeys: readonly string[];
   private readonly degreeByKey: ReadonlyMap<string, number>;
+  private readonly componentReferences:
+    | readonly {
+        readonly nodeKeys: readonly string[];
+        readonly x: number;
+        readonly y: number;
+      }[]
+    | undefined;
+  private readonly componentStabilizationStepCap: number;
   private stateValue: NetworkPhysicsLifecycleState = 'sleeping';
   private active: TemporaryNodeConstraintCommandBase | undefined;
   private target: { x: number; y: number } | undefined;
@@ -187,6 +213,42 @@ export class ContinuousNetworkSimulation {
             seed.nodes.map(({ key }) => key),
             seed.edges,
           );
+    if (seed.mode === 'all') {
+      const componentIndex = new NetworkPhysicsDynamicCouplingIndex(
+        this.nodeKeys,
+        seed.edges,
+      );
+      const seedByKey = new Map(seed.nodes.map((node) => [node.key, node]));
+      this.componentReferences = componentIndex.components().map((nodeKeys) => {
+        let x = 0;
+        let y = 0;
+        for (const key of nodeKeys) {
+          const node = seedByKey.get(key)!;
+          x += node.x / nodeKeys.length;
+          y += node.y / nodeKeys.length;
+        }
+        return { nodeKeys, x, y };
+      });
+      let centerX = 0;
+      let centerY = 0;
+      for (const node of seed.nodes) {
+        centerX += node.x / seed.nodes.length;
+        centerY += node.y / seed.nodes.length;
+      }
+      let squaredRadius = 0;
+      for (const node of seed.nodes) {
+        squaredRadius += (node.x - centerX) ** 2 + (node.y - centerY) ** 2;
+      }
+      const referenceScale = Math.max(
+        1,
+        Math.sqrt(squaredRadius / seed.nodes.length),
+      );
+      this.componentStabilizationStepCap =
+        referenceScale * NETWORK_PHYSICS_COMPONENT_STABILIZATION_CAP_RATIO;
+    } else {
+      this.componentReferences = undefined;
+      this.componentStabilizationStepCap = 0;
+    }
   }
 
   get state(): NetworkPhysicsLifecycleState {
@@ -314,12 +376,7 @@ export class ContinuousNetworkSimulation {
     try {
       if (this.stateValue === 'hot-constrained') {
         for (let index = 0; index < HOT_ITERATIONS_PER_TURN; index += 1) {
-          this.reassertTarget();
-          this.assign(1);
-          if (this.seed.mode === 'all') {
-            applyNetworkPhysicsPullIteration(this.graph, this.seed.attractors);
-          }
-          this.reassertTarget();
+          this.runPhysicalIteration();
         }
         this.iterationsCompleted += HOT_ITERATIONS_PER_TURN;
         return { frame: this.frame() };
@@ -334,7 +391,7 @@ export class ContinuousNetworkSimulation {
   }
 
   private advanceCooling(): NetworkPhysicsAdvanceResult {
-    const before = this.positions();
+    const before = this.convergencePositions();
     const batchIterations =
       this.seed.mode === 'focus'
         ? LOCAL_CONVERGENCE_BATCH_ITERATIONS
@@ -358,12 +415,16 @@ export class ContinuousNetworkSimulation {
       this.seed.attractors.some(({ strength }) => strength > 0)
     ) {
       for (let index = 0; index < iterations; index += 1) {
-        this.assign(1);
-        applyNetworkPhysicsPullIteration(this.graph, this.seed.attractors);
+        this.runPhysicalIteration();
       }
-    } else this.assign(iterations);
+    } else if (this.seed.mode === 'all') {
+      this.assign(iterations);
+      this.applyComponentStabilization(iterations);
+    } else {
+      this.assign(iterations);
+    }
     this.iterationsCompleted += iterations;
-    const after = this.positions();
+    const after = this.convergencePositions();
     const stable =
       this.seed.mode === 'focus'
         ? networkPhysicsFocusBatchIsStable({
@@ -432,6 +493,53 @@ export class ContinuousNetworkSimulation {
   private reassertTarget(): void {
     if (this.active === undefined || this.target === undefined) return;
     this.graph.mergeNodeAttributes(this.active.nodeKey, this.target);
+  }
+
+  private runPhysicalIteration(): void {
+    this.reassertTarget();
+    this.assign(1);
+    if (this.seed.mode === 'all') {
+      applyNetworkPhysicsPullIteration(this.graph, this.seed.attractors);
+      this.applyComponentStabilization();
+    }
+    this.reassertTarget();
+  }
+
+  private convergencePositions(): readonly NetworkPhysicsPosition[] {
+    return graphPositions(this.graph, this.nodeKeys);
+  }
+
+  /**
+   * Softly translates each reference component toward its seed centroid. This
+   * keeps every node in ForceAtlas2 while preventing repeated gestures from
+   * ratcheting disconnected components into an expanding outer ring.
+   */
+  private applyComponentStabilization(iterations = 1): void {
+    if (this.componentReferences === undefined) return;
+    const gain =
+      1 - (1 - NETWORK_PHYSICS_COMPONENT_STABILIZATION_GAIN) ** iterations;
+    const cap = this.componentStabilizationStepCap * iterations;
+    for (const reference of this.componentReferences) {
+      let currentX = 0;
+      let currentY = 0;
+      for (const key of reference.nodeKeys) {
+        const node = this.graph.getNodeAttributes(key);
+        currentX += node.x / reference.nodeKeys.length;
+        currentY += node.y / reference.nodeKeys.length;
+      }
+      const dx = reference.x - currentX;
+      const dy = reference.y - currentY;
+      const distance = Math.hypot(dx, dy);
+      if (distance === 0) continue;
+      const multiplier = Math.min(gain, cap / distance);
+      for (const key of reference.nodeKeys) {
+        const node = this.graph.getNodeAttributes(key);
+        this.graph.mergeNodeAttributes(key, {
+          x: node.x + dx * multiplier,
+          y: node.y + dy * multiplier,
+        });
+      }
+    }
   }
 
   private frame(): NetworkPhysicsFrameResponse {

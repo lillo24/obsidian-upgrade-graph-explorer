@@ -360,7 +360,7 @@ describe('GraphExplorer experimental availability integration', () => {
       }),
     );
     expect(container.textContent).toContain(
-      'File movement supports up to 100 visible nodes in this release.',
+      'File movement supports up to 300 visible nodes in All Network in this release.',
     );
 
     await act(() =>
@@ -412,6 +412,20 @@ describe('GraphExplorer experimental availability integration', () => {
     await act(() => captured.global!.onNodeActivate(source.id));
     expect(mode()).toBe('local-free');
     expect(captured.local!.temporaryConstraintActive).toBe(true);
+    await act(() =>
+      captured.local!.onTemporaryFileMoveCapabilityChange?.({
+        status: 'unavailable',
+        reason: 'graph-too-large',
+      }),
+    );
+    expect(container.textContent).toContain(
+      'File movement supports up to 100 visible nodes in Focus Network in this release.',
+    );
+    await act(() =>
+      captured.local!.onTemporaryFileMoveCapabilityChange?.({
+        status: 'available',
+      }),
+    );
     expect(
       [...container.querySelectorAll('button')].some(
         (candidate) => candidate.textContent?.trim() === 'Arrange Folders',

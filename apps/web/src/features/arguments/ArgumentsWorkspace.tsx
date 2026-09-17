@@ -37,6 +37,7 @@ import {
   ArgumentAxiomView,
   ArgumentCounterArgumentView,
   ArgumentTopicView,
+  ArgumentView,
   type ArgumentSelection,
 } from './ArgumentRecordView';
 import { activateArgumentWorkspaceOverlay } from './argument-overlay';
@@ -136,6 +137,9 @@ function firstSelection(
   const axiom =
     library.axioms.find(({ archived }) => !archived) ?? library.axioms[0];
   if (axiom !== undefined) return { kind: 'axiom', id: axiom.id };
+  const argument =
+    library.arguments.find(({ archived }) => !archived) ?? library.arguments[0];
+  if (argument !== undefined) return { kind: 'argument', id: argument.id };
   const counter =
     library.counterArguments.find(({ archived }) => !archived) ??
     library.counterArguments[0];
@@ -171,6 +175,7 @@ function editDraft(
         reviewState: topic.reviewState,
         topicIds: [topic.id],
         axiomIds: topic.axiomIds,
+        argumentIds: topic.argumentIds,
         counterArgumentIds: topic.counterArgumentIds,
       },
     };
@@ -196,6 +201,33 @@ function editDraft(
         sourceReferences: axiom.sourceReferences,
         reviewState: axiom.reviewState,
         topicIds: recordTopicIds(library, 'axiom', axiom.id),
+      },
+    };
+  }
+  if (selection.kind === 'argument') {
+    const argument = findRecord(library, 'argument', selection.id);
+    return {
+      dirty: false,
+      errors: [],
+      retrievalText: retrievalEditorText(argument.retrieval),
+      source: sourceJson(argument.sourceReferences),
+      record: {
+        kind: 'argument',
+        mode: 'edit',
+        id: argument.id,
+        expected: descriptor,
+        title: argument.title,
+        examples: argument.examples,
+        premises: argument.premises,
+        reasoning: argument.reasoning,
+        conclusion: argument.conclusion,
+        boundary: argument.boundary,
+        relations: argument.relations,
+        retrieval: argument.retrieval,
+        sourceReferences: argument.sourceReferences,
+        supersedesArgumentId: argument.supersedesArgumentId,
+        reviewState: argument.reviewState,
+        topicIds: recordTopicIds(library, 'argument', argument.id),
       },
     };
   }
@@ -257,6 +289,7 @@ function newDraft(
         kind,
         summary: '',
         axiomIds: [],
+        argumentIds: [],
         counterArgumentIds: [],
       },
     };
@@ -268,6 +301,23 @@ function newDraft(
       retrievalText: emptyRetrievalText,
       source: '[]',
       record: { ...base, kind, statement: '', sourceReferences: [] },
+    };
+  }
+  if (kind === 'argument') {
+    return {
+      dirty: true,
+      errors: [],
+      retrievalText: emptyRetrievalText,
+      source: '[]',
+      record: {
+        ...base,
+        kind,
+        examples: [],
+        premises: [],
+        conclusion: '',
+        relations: [],
+        sourceReferences: [],
+      },
     };
   }
   return {
@@ -300,6 +350,16 @@ function parseSources(
   }
   if (editor.record.kind === 'axiom' && editor.record.statement.trim() === '') {
     errors.push('Statement is required.');
+  }
+  if (editor.record.kind === 'argument') {
+    if (editor.record.conclusion.trim() === '') {
+      errors.push('Conclusion is required.');
+    }
+    editor.record.premises.forEach((premise, index) => {
+      if (premise.kind === 'text' && premise.text.trim() === '') {
+        errors.push(`Premise ${index + 1} text is required.`);
+      }
+    });
   }
   if (editor.record.kind === 'counter-argument') {
     if (editor.record.observation.trim() === '')
@@ -354,7 +414,7 @@ async function copyText(text: string): Promise<void> {
 }
 
 function counts(library: ArgumentLibrary): string {
-  return `${library.topics.length} Topic${library.topics.length === 1 ? '' : 's'}, ${library.axioms.length} Axiom${library.axioms.length === 1 ? '' : 's'}, ${library.counterArguments.length} Counter-Argument${library.counterArguments.length === 1 ? '' : 's'}`;
+  return `${library.topics.length} Topic${library.topics.length === 1 ? '' : 's'}, ${library.axioms.length} Axiom${library.axioms.length === 1 ? '' : 's'}, ${library.arguments.length} Argument${library.arguments.length === 1 ? '' : 's'}, ${library.counterArguments.length} Counter-Argument${library.counterArguments.length === 1 ? '' : 's'}`;
 }
 
 function WorkspaceOnboarding({
@@ -372,6 +432,7 @@ function WorkspaceOnboarding({
     source: string;
     fileName: string;
     library: ArgumentLibrary;
+    migratedFromSchemaVersion?: 1 | 2;
   }>();
   const [error, setError] = useState<string>();
   async function select(event: ChangeEvent<HTMLInputElement>) {
@@ -390,7 +451,16 @@ function WorkspaceOnboarding({
       return;
     }
     setError(undefined);
-    setPreview({ source, fileName: file.name, library: parsed.value });
+    setPreview({
+      source,
+      fileName: file.name,
+      library: parsed.value,
+      ...(parsed.migratedFromSchemaVersion === undefined
+        ? {}
+        : {
+            migratedFromSchemaVersion: parsed.migratedFromSchemaVersion,
+          }),
+    });
   }
   return (
     <section className="arguments-onboarding">
@@ -424,6 +494,13 @@ function WorkspaceOnboarding({
             Lineage <code>{preview.library.libraryId}</code>, revision{' '}
             {preview.library.libraryRevision}.
           </p>
+          {preview.migratedFromSchemaVersion === undefined ? null : (
+            <p className="arguments-disclosure">
+              Schema v{preview.migratedFromSchemaVersion} will be migrated
+              deterministically to v3. Existing records remain intact; no
+              Examples, relations, Arguments, or Current pointer are inferred.
+            </p>
+          )}
           <button
             disabled={busy}
             onClick={() => onImport(preview.source, preview.fileName)}
@@ -461,6 +538,7 @@ function SearchPane({
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
   const [includeArchived, setIncludeArchived] = useState(false);
+  const [proposalsOnly, setProposalsOnly] = useState(false);
   const key = `${snapshot.contentFingerprint.value}\0${deferredQuery}\0${includeArchived}`;
   const firstPage = useMemo(
     () =>
@@ -501,6 +579,15 @@ function SearchPane({
   const topicTitles = new Map(
     library.topics.map((topic) => [topic.id, topic.title]),
   );
+  const displayedCandidates = proposalsOnly
+    ? current.candidates.filter(
+        (candidate) =>
+          (candidate.kind === 'argument' ||
+            candidate.kind === 'counter-argument') &&
+          findRecord(library, candidate.kind, candidate.id).reviewState ===
+            'pending-review',
+      )
+    : current.candidates;
   function loadMore() {
     if (current.cursor === undefined) return;
     const page =
@@ -546,12 +633,20 @@ function SearchPane({
         />{' '}
         Show archived
       </label>
+      <label className="arguments-archive-toggle">
+        <input
+          checked={proposalsOnly}
+          onChange={(event) => setProposalsOnly(event.currentTarget.checked)}
+          type="checkbox"
+        />{' '}
+        Proposals only
+      </label>
       <div className="arguments-search-results" aria-live="polite">
-        {current.candidates.length === 0 ? (
+        {displayedCandidates.length === 0 ? (
           <p className="arguments-empty">No matching records.</p>
         ) : (
           <ul>
-            {current.candidates.map((candidate) => (
+            {displayedCandidates.map((candidate) => (
               <li key={`${candidate.kind}:${candidate.id}`}>
                 <button
                   onClick={() =>
@@ -1144,11 +1239,13 @@ const ArgumentsWorkspaceContent = forwardRef<
     const record =
       preview.recordKind === 'axiom'
         ? findRecord(state.snapshot.library, 'axiom', preview.recordId)
-        : findRecord(
-            state.snapshot.library,
-            'counter-argument',
-            preview.recordId,
-          );
+        : preview.recordKind === 'argument'
+          ? findRecord(state.snapshot.library, 'argument', preview.recordId)
+          : findRecord(
+              state.snapshot.library,
+              'counter-argument',
+              preview.recordId,
+            );
     const currentReference = record.sourceReferences.find(
       ({ id }) => id === preview.reference.id,
     );
@@ -1287,6 +1384,74 @@ const ArgumentsWorkspaceContent = forwardRef<
     setNotice(
       result.status === 'ok'
         ? 'Reassessment saved; response prose and outcome were retained.'
+        : result.message,
+    );
+  }
+
+  async function reassessArgument() {
+    if (state.phase !== 'ready' || currentSelection?.kind !== 'argument') {
+      return;
+    }
+    if (
+      !window.confirm(
+        'Confirm that you inspected the current referenced premise versions and want to record this reassessment.',
+      )
+    ) {
+      return;
+    }
+    const result = await session.reassessArgument(
+      state.snapshot.descriptor,
+      currentSelection.id,
+    );
+    setNotice(
+      result.status === 'ok'
+        ? 'Reassessment saved; premises, reasoning, conclusion, review state, and Current status were retained.'
+        : result.message,
+    );
+  }
+
+  async function reassessArgumentRelations() {
+    if (state.phase !== 'ready' || currentSelection?.kind !== 'argument') {
+      return;
+    }
+    if (
+      !window.confirm(
+        'Confirm that you inspected the current relation targets and want to advance their relied-on revisions.',
+      )
+    ) {
+      return;
+    }
+    const result = await session.reassessArgumentRelations(
+      state.snapshot.descriptor,
+      currentSelection.id,
+    );
+    setNotice(
+      result.status === 'ok'
+        ? 'Relation reassessment saved; attack/support and supersession remain independent.'
+        : result.message,
+    );
+  }
+
+  async function promoteArgument(topicId: string) {
+    if (state.phase !== 'ready' || currentSelection?.kind !== 'argument') {
+      return;
+    }
+    const topic = findRecord(state.snapshot.library, 'topic', topicId);
+    if (
+      !window.confirm(
+        `Promote this accepted Argument to Current for ${topic.title}? The previous Current Argument will be preserved.`,
+      )
+    ) {
+      return;
+    }
+    const result = await session.promoteArgument(
+      state.snapshot.descriptor,
+      topicId,
+      currentSelection.id,
+    );
+    setNotice(
+      result.status === 'ok'
+        ? `Current reasoning updated for ${topic.title}.`
         : result.message,
     );
   }
@@ -1444,6 +1609,9 @@ const ArgumentsWorkspaceContent = forwardRef<
                 </button>
                 <button onClick={() => beginCreate('axiom')} type="button">
                   New Axiom
+                </button>
+                <button onClick={() => beginCreate('argument')} type="button">
+                  New Argument
                 </button>
                 <button
                   onClick={() => beginCreate('counter-argument')}
@@ -1609,7 +1777,10 @@ const ArgumentsWorkspaceContent = forwardRef<
                 selectedRecord === undefined ? (
                   <section className="arguments-empty-workspace">
                     <h2>Empty library</h2>
-                    <p>Create a Topic, Axiom, or Counter-Argument to begin.</p>
+                    <p>
+                      Create a Topic, Axiom, Argument, or Counter-Argument to
+                      begin.
+                    </p>
                   </section>
                 ) : currentSelection?.kind === 'topic' ? (
                   <ArgumentTopicView
@@ -1657,6 +1828,51 @@ const ArgumentsWorkspaceContent = forwardRef<
                           findRecord(
                             state.snapshot.library,
                             'axiom',
+                            currentSelection.id,
+                          ).sourceReferences
+                        }
+                      />
+                    }
+                  />
+                ) : currentSelection?.kind === 'argument' ? (
+                  <ArgumentView
+                    argument={findRecord(
+                      state.snapshot.library,
+                      'argument',
+                      currentSelection.id,
+                    )}
+                    library={state.snapshot.library}
+                    onNavigate={navigate}
+                    onPromote={(topicId) => void promoteArgument(topicId)}
+                    onReassess={() => void reassessArgument()}
+                    onReassessRelations={() => void reassessArgumentRelations()}
+                    sourceSection={
+                      <TheorySourceReferences
+                        currentLibrary={state.snapshot.descriptor}
+                        currentSourceGeneration={
+                          sourceState.status === 'unavailable'
+                            ? undefined
+                            : sourceState.source.sourceGeneration
+                        }
+                        onCopy={(value, message) => void copy(value, message)}
+                        onExport={exportTheorySource}
+                        onRead={(kind, id, reference) =>
+                          void readTheorySource(kind, id, reference)
+                        }
+                        onRecord={(preview) =>
+                          void recordTheorySourceBaseline(preview)
+                        }
+                        previews={sourcePreviews}
+                        readAvailable={
+                          sourceState.status === 'bound' &&
+                          sourceState.freshReadAvailable
+                        }
+                        recordId={currentSelection.id}
+                        recordKind="argument"
+                        references={
+                          findRecord(
+                            state.snapshot.library,
+                            'argument',
                             currentSelection.id,
                           ).sourceReferences
                         }
@@ -1718,6 +1934,11 @@ const ArgumentsWorkspaceContent = forwardRef<
                         ? current
                         : { ...current, dirty: true, errors: [], record },
                     )
+                  }
+                  onCreateExampleId={() => session.runtime.createId('example')}
+                  onCreatePremiseId={() => session.runtime.createId('premise')}
+                  onCreateRelationId={() =>
+                    session.runtime.createId('relation')
                   }
                   onRetrievalTextChange={(retrievalText) =>
                     setEditor((current) =>
@@ -1801,6 +2022,15 @@ const ArgumentsWorkspaceContent = forwardRef<
               {importPreview.merge === undefined ? null : (
                 <div>
                   <h3>Merge</h3>
+                  {importPreview.merge.migratedFromSchemaVersion ===
+                  undefined ? null : (
+                    <p className="arguments-disclosure">
+                      Incoming schema v
+                      {importPreview.merge.migratedFromSchemaVersion} was
+                      migrated to v3 without inferring Examples, relations,
+                      Arguments, or Current pointers.
+                    </p>
+                  )}
                   <p>Status: {importPreview.merge.preview.status}</p>
                   {importPreview.merge.preview.status === 'conflict' ? (
                     <ul>
@@ -1907,9 +2137,10 @@ const ArgumentsWorkspaceContent = forwardRef<
               </ul>
               <p className="arguments-disclosure">
                 If folder selection is unavailable, preserve each shown{' '}
-                <code>topics/</code>, <code>axioms/</code>, or{' '}
-                <code>counter-arguments/</code> path when arranging individual
-                downloads so reusable links remain valid.
+                <code>topics/</code>, <code>axioms/</code>,{' '}
+                <code>arguments/</code>, or <code>counter-arguments/</code> path
+                when arranging individual downloads so reusable links remain
+                valid.
               </p>
               <button onClick={() => setMarkdownFiles(undefined)} type="button">
                 Close export

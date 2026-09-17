@@ -28,7 +28,7 @@ export const ARGUMENT_SOURCE_PACKET_LIMITS = Object.freeze({
 export interface SourceReferenceOrigin {
   readonly recordKind: Extract<
     ArgumentRecordKind,
-    'axiom' | 'counter-argument'
+    'axiom' | 'argument' | 'counter-argument'
   >;
   readonly recordId: string;
   readonly sourceReferenceId: string;
@@ -91,6 +91,15 @@ export function sourceOrigins(
     ...bundle.axioms.flatMap((record) =>
       record.sourceReferences.map((locator) => ({
         recordKind: 'axiom' as const,
+        recordId: record.id,
+        sourceReferenceId: locator.id,
+        role: locator.role,
+        locator,
+      })),
+    ),
+    ...bundle.arguments.flatMap((record) =>
+      record.sourceReferences.map((locator) => ({
+        recordKind: 'argument' as const,
         recordId: record.id,
         sourceReferenceId: locator.id,
         role: locator.role,

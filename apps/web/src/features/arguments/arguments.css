@@ -366,6 +366,12 @@
   margin-top: 0.55rem;
 }
 
+.arguments-premises small,
+.arguments-record-links small {
+  display: block;
+  margin-top: 0.25rem;
+}
+
 .arguments-record-links button {
   min-height: 0;
   padding: 0;
@@ -542,6 +548,43 @@
   color: #294a5a;
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.arguments-premise-editor {
+  display: grid;
+  gap: 0.8rem;
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.arguments-premise-editor > li {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border: 1px solid #d7e0e4;
+  border-radius: 0.5rem;
+}
+
+.arguments-premise-editor > li > label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.arguments-premise-editor__controls {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.arguments-premise-editor__controls code {
+  margin-right: auto;
+  overflow-wrap: anywhere;
+}
+
+.arguments-premise-editor__controls button {
+  min-height: 2rem;
+  padding: 0.35rem 0.55rem;
 }
 
 .arguments-editor__checks label {

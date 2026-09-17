@@ -116,6 +116,12 @@ export const PERFORMANCE_PHASES = [
   'spatial-pull-forceatlas',
   'spatial-pull-attractor',
   'spatial-pull-cache-hit',
+  'spatial-pull-preview-schedule',
+  'spatial-pull-preview-request',
+  'spatial-pull-preview-worker',
+  'spatial-pull-preview-adopt',
+  'spatial-pull-preview-end-to-end',
+  'spatial-pull-preview-superseded',
   'spatial-fixed-compose',
   'sigma-mount-render',
   'semantic-zoom-style',
@@ -161,6 +167,10 @@ export const PERFORMANCE_OPERATIONS = [
   'spatial-rule-resolutions',
   'spatial-pull-requests',
   'spatial-pull-cache-hits',
+  'spatial-pull-preview-schedules',
+  'spatial-pull-preview-requests',
+  'spatial-pull-preview-adopts',
+  'spatial-pull-preview-superseded',
   'spatial-fixed-compositions',
   'global-style-updates',
   'global-visual-refreshes',
@@ -235,6 +245,10 @@ export interface PerformanceOperationCounts {
   readonly 'spatial-rule-resolutions': number;
   readonly 'spatial-pull-requests': number;
   readonly 'spatial-pull-cache-hits': number;
+  readonly 'spatial-pull-preview-schedules': number;
+  readonly 'spatial-pull-preview-requests': number;
+  readonly 'spatial-pull-preview-adopts': number;
+  readonly 'spatial-pull-preview-superseded': number;
   readonly 'spatial-fixed-compositions': number;
   readonly 'global-style-updates': number;
   readonly 'global-visual-refreshes': number;
@@ -369,6 +383,10 @@ export function emptyPerformanceOperationCounts(): PerformanceOperationCounts {
     'spatial-rule-resolutions': 0,
     'spatial-pull-requests': 0,
     'spatial-pull-cache-hits': 0,
+    'spatial-pull-preview-schedules': 0,
+    'spatial-pull-preview-requests': 0,
+    'spatial-pull-preview-adopts': 0,
+    'spatial-pull-preview-superseded': 0,
     'spatial-fixed-compositions': 0,
     'global-style-updates': 0,
     'global-visual-refreshes': 0,

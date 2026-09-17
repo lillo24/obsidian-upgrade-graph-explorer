@@ -54,6 +54,16 @@ export {
 export { GlobalLayoutCache } from './layout-cache';
 export { GlobalSpatialInfluenceCache } from './spatial-influence-cache';
 export {
+  GLOBAL_SPATIAL_PULL_PREVIEW_ITERATIONS,
+  GlobalSpatialPullPreviewController,
+} from './spatial-pull-preview';
+export type {
+  GlobalSpatialPullPreviewAdoption,
+  GlobalSpatialPullPreviewControllerOptions,
+  GlobalSpatialPullPreviewFrameScheduler,
+  GlobalSpatialPullPreviewInput,
+} from './spatial-pull-preview';
+export {
   GLOBAL_DENSITY_RATIO_BOUNDS,
   GLOBAL_DENSITY_TARGETS,
   resolveGlobalDensityFit,

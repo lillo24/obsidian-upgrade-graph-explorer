@@ -115,10 +115,45 @@ Do not push directly to `main` unless the active user/task instruction explicitl
 ### Parallel tasks
 
 Parallel Codex tasks must use separate branches/worktrees.
+
 The first finished task may merge first.
+
 Every later task must update from latest `main` before merging.
 
 When the coding environment manages worktrees automatically, preserve that isolation and focus on the integration rule above rather than recreating the worktree manually.
+
+## CI / GitHub Actions Resource Discipline
+
+Treat CI as a finite project resource, especially in private repositories where hosted-runner usage may be limited or billed.
+
+Default to **change-scoped validation**:
+
+- run all checks that can reasonably be affected by the changed files/areas;
+- do not run expensive unrelated validation merely because a PR changed;
+- shared/root/tooling/configuration files must trigger every area they can affect;
+- cross-cutting changes should run multiple areas when appropriate.
+
+Expensive integration, database, end-to-end, build, or platform-specific suites should not run on unrelated changes.
+
+Avoid duplicate validation on both the PR and the resulting push to `main` unless the post-merge run has a distinct purpose.
+
+Keep an explicit way to run the **complete validation suite manually** for:
+
+- releases;
+- integration checkpoints;
+- CI/workflow changes;
+- difficult debugging;
+- cases where full validation is explicitly requested.
+
+Do not reduce CI cost by weakening meaningful test coverage. Prefer reducing unnecessary trigger frequency and redundant execution.
+
+When changing CI:
+
+- inspect repository dependencies before defining path boundaries;
+- preserve required-status-check / branch-protection behavior;
+- do not use path filtering in a way that can leave a required check permanently pending;
+- document non-obvious CI trigger behavior near the repository's CI configuration;
+- justify changes that substantially broaden recurring CI cost.
 
 —
 
@@ -240,7 +275,8 @@ This file defines the minimum checks that must pass before a task is considered 
 
 - Run the smallest complete set of formatting, static-analysis, build, test, migration, integration, or smoke checks that validates **every changed area**.
 - Use the repository’s standard commands when they exist.
-- Full repository CI should pass before merge unless the repository explicitly defines a narrower merge policy.
+- The repository's required, change-relevant CI must pass before merge. Full-repository CI is required when the repository defines it for that change, when the change is cross-cutting or CI/infrastructure-related, or when a full validation checkpoint is explicitly requested.
+- When a repository uses scoped CI, “the smallest complete set of checks” means every check that can reasonably be affected by the change, not every check in the repository.
 - Do not state that a check passed if it was not run.
 - If a required check cannot run because of an environment/tool limitation, report the limitation clearly and distinguish it from a failing check.
 

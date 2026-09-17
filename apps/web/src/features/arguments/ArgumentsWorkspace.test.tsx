@@ -15,9 +15,11 @@ import {
   attachAnsweringAxiom,
   captureArgumentLibrarySnapshot,
   createAxiom,
+  createArgument,
   createCounterArgument,
   createEmptyArgumentLibrary,
   createTopic,
+  promoteArgumentToCurrent,
   sameSnapshot,
   setTopicMembership,
   updateCounterArgumentResponse,
@@ -71,7 +73,60 @@ function fixture(): ArgumentLibrary {
     clock,
   );
   library = createCounterArgument(
-    library,
+    createArgument(
+      createArgument(
+        library,
+        {
+          id: 'AR-UI',
+          title: 'Compatibility reasoning',
+          examples: [
+            {
+              id: 'E-UI',
+              text: 'A neutral sample uses one measurement unit.',
+            },
+          ],
+          premises: [
+            {
+              id: 'P-UI',
+              kind: 'axiom',
+              axiomId: 'AX-UI',
+              reliedOnRevision: library.axioms[0]!.revision,
+              exampleIds: ['E-UI'],
+            },
+          ],
+          reasoning: 'Comparable units are required before comparison.',
+          conclusion: 'Convert units before concluding a contradiction.',
+          boundary: 'The conclusion does not depend on display formatting.',
+          reviewState: 'accepted',
+        },
+        clock,
+      ),
+      {
+        id: 'AR-UI-NEXT',
+        title: 'Replacement reasoning',
+        premises: [
+          {
+            id: 'P-UI-REUSED',
+            kind: 'argument-premise',
+            argumentId: 'AR-UI',
+            premiseId: 'P-UI',
+            reliedOnRevision: 1,
+          },
+        ],
+        relations: [
+          {
+            id: 'REL-UI',
+            kind: 'attack',
+            targetArgumentId: 'AR-UI',
+            targetPart: { kind: 'reasoning' },
+            reliedOnRevision: 1,
+          },
+        ],
+        conclusion: 'A replacement Current conclusion.',
+        reviewState: 'accepted',
+      },
+      clock,
+    ),
     {
       id: 'CA-UI',
       title: 'Numeric mismatch',
@@ -93,6 +148,23 @@ function fixture(): ArgumentLibrary {
     clock,
   );
   library = setTopicMembership(library, 'T-UI', 'axiom', 'AX-UI', true, clock);
+  library = setTopicMembership(
+    library,
+    'T-UI',
+    'argument',
+    'AR-UI',
+    true,
+    clock,
+  );
+  library = setTopicMembership(
+    library,
+    'T-UI',
+    'argument',
+    'AR-UI-NEXT',
+    true,
+    clock,
+  );
+  library = promoteArgumentToCurrent(library, 'T-UI', 'AR-UI', clock);
   return setTopicMembership(
     library,
     'T-UI',
@@ -279,6 +351,82 @@ describe('standalone Arguments workspace', () => {
     );
     expect(preview.value).toContain('AX-UI@');
     expect(preview.value).toContain('Consultation receipt');
+  });
+
+  it('shows Current reasoning and promotes an accepted member explicitly', async () => {
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true),
+    );
+    await mount();
+    expect(container.textContent).toContain('Current reasoning');
+    expect(container.textContent).toContain('Compatibility reasoning');
+
+    await click('Compatibility reasoning');
+    expect(container.textContent).toContain(
+      'A neutral sample uses one measurement unit.',
+    );
+    expect(container.textContent).toContain('Grounded in local Examples: E-UI');
+    expect(container.textContent).toContain(
+      'The conclusion does not depend on display formatting.',
+    );
+
+    await click('Back');
+    await click('Replacement reasoning');
+    expect(container.textContent).toContain(
+      'A replacement Current conclusion.',
+    );
+    expect(container.textContent).toContain('premise P-UI');
+    expect(container.textContent).toContain('attack');
+    expect(container.textContent).toContain('reasoning');
+    await click('Promote to Current');
+
+    expect(store.snapshot.library.topics[0]!.currentArgumentId).toBe(
+      'AR-UI-NEXT',
+    );
+    expect(
+      store.snapshot.library.arguments.find(({ id }) => id === 'AR-UI-NEXT'),
+    ).toMatchObject({ supersedesArgumentId: 'AR-UI' });
+  });
+
+  it('edits Examples, Boundary/Invariance, provenance, premise reuse, and relations in one Argument editor', async () => {
+    await mount();
+    await click('Compatibility reasoning');
+    await click('Edit');
+    expect(container.textContent).toContain('Grounded in local Examples');
+    expect(container.textContent).toContain('Add Example');
+    expect(container.textContent).toContain('Add relation');
+    await typeCharacters(textarea('Example text'), ' Extended.');
+    await act(() =>
+      setValue(
+        textarea('Boundary / Invariance'),
+        'The result is invariant under neutral display changes.',
+      ),
+    );
+    await click('Add relation');
+    await click('Save');
+
+    const saved = store.snapshot.library.arguments.find(
+      ({ id }) => id === 'AR-UI',
+    )!;
+    expect(saved.examples[0]!.text).toContain('Extended.');
+    expect(saved.premises[0]!.exampleIds).toEqual(['E-UI']);
+    expect(saved.boundary).toBe(
+      'The result is invariant under neutral display changes.',
+    );
+    expect(saved.relations).toEqual([
+      expect.objectContaining({
+        kind: 'attack',
+        targetArgumentId: 'AR-UI-NEXT',
+        targetPart: { kind: 'argument' },
+      }),
+    ]);
+
+    await click('Back');
+    await click('Replacement reasoning');
+    await click('Edit');
+    expect(container.textContent).toContain('Prior Argument premise');
+    expect(container.textContent).toContain('Source premise');
   });
 
   it('keeps dirty drafts through nested Escape and performs one confirmed Save', async () => {

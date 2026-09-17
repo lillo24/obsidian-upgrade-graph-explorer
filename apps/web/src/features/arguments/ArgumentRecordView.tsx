@@ -1,5 +1,7 @@
 import {
+  argumentStaleness,
   responseStaleness,
+  type Argument,
   type ArgumentAxiom,
   type ArgumentCounterArgument,
   type ArgumentLibrary,
@@ -21,7 +23,8 @@ function Metadata({
   record,
   library,
 }: {
-  readonly record: ArgumentTopic | ArgumentAxiom | ArgumentCounterArgument;
+  readonly record:
+    ArgumentTopic | ArgumentAxiom | Argument | ArgumentCounterArgument;
   readonly library: ArgumentLibrary;
 }) {
   return (
@@ -93,6 +96,13 @@ export function ArgumentTopicView({
   const counters = topic.counterArgumentIds.map((id) =>
     library.counterArguments.find((record) => record.id === id)!,
   );
+  const argumentsByTopic = topic.argumentIds.map((id) =>
+    library.arguments.find((record) => record.id === id)!,
+  );
+  const currentArgument =
+    topic.currentArgumentId === undefined
+      ? undefined
+      : library.arguments.find(({ id }) => id === topic.currentArgumentId);
   return (
     <article className="arguments-record">
       <RecordHeader
@@ -102,6 +112,21 @@ export function ArgumentTopicView({
         title={topic.title}
       />
       <MarkdownText>{topic.summary}</MarkdownText>
+      <section className="arguments-reading-section arguments-current">
+        <h3>Current reasoning</h3>
+        {currentArgument === undefined ? (
+          <p className="arguments-empty">No Current Argument selected.</p>
+        ) : (
+          <button
+            onClick={() =>
+              onNavigate({ kind: 'argument', id: currentArgument.id })
+            }
+            type="button"
+          >
+            {currentArgument.title}
+          </button>
+        )}
+      </section>
       <div className="arguments-topic-columns">
         <section className="arguments-reading-section">
           <h3>Axioms</h3>
@@ -117,6 +142,31 @@ export function ArgumentTopicView({
                   >
                     {axiom.title}
                     {axiom.archived ? ' — archived' : ''}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        <section className="arguments-reading-section">
+          <h3>Arguments</h3>
+          {argumentsByTopic.length === 0 ? (
+            <p className="arguments-empty">No Arguments assigned.</p>
+          ) : (
+            <ul className="arguments-record-links">
+              {argumentsByTopic.map((argument) => (
+                <li key={argument.id}>
+                  <button
+                    onClick={() =>
+                      onNavigate({ kind: 'argument', id: argument.id })
+                    }
+                    type="button"
+                  >
+                    {argument.title}
+                    {argument.id === topic.currentArgumentId
+                      ? ' — Current'
+                      : ''}
+                    {argument.archived ? ' — archived' : ''}
                   </button>
                 </li>
               ))}
@@ -147,6 +197,304 @@ export function ArgumentTopicView({
         </section>
       </div>
       <Metadata library={library} record={topic} />
+    </article>
+  );
+}
+
+export function ArgumentView({
+  argument,
+  library,
+  onNavigate,
+  onPromote,
+  onReassess,
+  onReassessRelations,
+  sourceSection,
+}: {
+  readonly argument: Argument;
+  readonly library: ArgumentLibrary;
+  readonly onNavigate: (selection: ArgumentSelection) => void;
+  readonly onPromote: (topicId: string) => void;
+  readonly onReassess: () => void;
+  readonly onReassessRelations: () => void;
+  readonly sourceSection: ReactNode;
+}) {
+  const stale = argumentStaleness(library, argument);
+  const topicMemberships = library.topics.filter(({ argumentIds }) =>
+    argumentIds.includes(argument.id),
+  );
+  const currentTopics = topicMemberships.filter(
+    ({ currentArgumentId }) => currentArgumentId === argument.id,
+  );
+  const successors = library.arguments.filter(
+    ({ supersedesArgumentId }) => supersedesArgumentId === argument.id,
+  );
+  const targetingCounters = library.counterArguments.filter(
+    ({ target }) =>
+      target?.kind === 'argument' && target.argumentId === argument.id,
+  );
+  return (
+    <article className="arguments-record">
+      <RecordHeader
+        archived={argument.archived}
+        eyebrow="Reasoning Argument"
+        reviewState={argument.reviewState}
+        title={argument.title}
+      />
+      <div className="arguments-badges">
+        <span
+          className={`arguments-badge ${stale.stale ? 'arguments-badge--stale' : 'arguments-badge--fresh'}`}
+        >
+          Dependencies{' '}
+          {stale.stale ? 'need reassessment' : 'match referenced revisions'}
+        </span>
+        {currentTopics.length === 0 ? null : (
+          <span className="arguments-badge">
+            Current for {currentTopics.map(({ title }) => title).join(', ')}
+          </span>
+        )}
+      </div>
+      <section className="arguments-reading-section">
+        <h3>Examples</h3>
+        {argument.examples.length === 0 ? (
+          <p className="arguments-empty">No concrete Examples recorded.</p>
+        ) : (
+          <ol className="arguments-premises">
+            {argument.examples.map((example) => (
+              <li key={example.id}>
+                <code>{example.id}</code>
+                <MarkdownText>{example.text}</MarkdownText>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+      <section className="arguments-reading-section">
+        <h3>Premises</h3>
+        {argument.premises.length === 0 ? (
+          <p className="arguments-empty">No premises recorded.</p>
+        ) : (
+          <ol className="arguments-premises">
+            {argument.premises.map((premise) => {
+              if (premise.kind === 'text') {
+                return (
+                  <li key={premise.id}>
+                    <MarkdownText>{premise.text}</MarkdownText>
+                    {premise.exampleIds?.length ? (
+                      <small>
+                        Grounded in Examples: {premise.exampleIds.join(', ')}.
+                      </small>
+                    ) : null}
+                  </li>
+                );
+              }
+              const referenced =
+                premise.kind === 'axiom'
+                  ? library.axioms.find(({ id }) => id === premise.axiomId)!
+                  : library.arguments.find(
+                      ({ id }) => id === premise.argumentId,
+                    )!;
+              const referencedKind =
+                premise.kind === 'axiom' ? 'axiom' : 'argument';
+              const premiseStale = stale.premiseIds.includes(premise.id);
+              return (
+                <li key={premise.id}>
+                  <button
+                    onClick={() =>
+                      onNavigate({ kind: referencedKind, id: referenced.id })
+                    }
+                    type="button"
+                  >
+                    {referenced.title}
+                    {premise.kind === 'argument-conclusion'
+                      ? ' — conclusion'
+                      : premise.kind === 'argument-premise'
+                        ? ` — premise ${premise.premiseId}`
+                        : ''}
+                  </button>
+                  <small>
+                    Relied on revision {premise.reliedOnRevision}; current
+                    revision {referenced.revision}
+                    {premiseStale ? ' — changed' : ''}
+                    {referenced.archived ? '; archived' : ''}.
+                  </small>
+                  {premise.exampleIds?.length ? (
+                    <small>
+                      Grounded in local Examples:{' '}
+                      {premise.exampleIds.join(', ')}.
+                    </small>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        {stale.premiseIds.length > 0 ? (
+          <div className="arguments-callout">
+            <p>
+              Changed premises: {stale.premiseIds.join(', ')}. This does not
+              automatically change the conclusion.
+            </p>
+            <button onClick={onReassess} type="button">
+              Reassess against current premise versions
+            </button>
+          </div>
+        ) : null}
+      </section>
+      {argument.reasoning === undefined ? null : (
+        <section className="arguments-reading-section">
+          <h3>Reasoning</h3>
+          <MarkdownText>{argument.reasoning}</MarkdownText>
+        </section>
+      )}
+      <section className="arguments-reading-section">
+        <h3>Conclusion</h3>
+        <MarkdownText>{argument.conclusion}</MarkdownText>
+      </section>
+      {argument.boundary === undefined ? null : (
+        <section className="arguments-reading-section">
+          <h3>Boundary / Invariance</h3>
+          <MarkdownText>{argument.boundary}</MarkdownText>
+        </section>
+      )}
+      <section className="arguments-reading-section">
+        <h3>Argument relations</h3>
+        {argument.relations.length === 0 ? (
+          <p className="arguments-empty">No attack or support relation.</p>
+        ) : (
+          <ul className="arguments-record-links">
+            {argument.relations.map((relation) => {
+              const target = library.arguments.find(
+                ({ id }) => id === relation.targetArgumentId,
+              )!;
+              const relationStale = stale.relationIds.includes(relation.id);
+              const part =
+                relation.targetPart.kind === 'premise'
+                  ? `premise ${relation.targetPart.premiseId}`
+                  : relation.targetPart.kind;
+              return (
+                <li key={relation.id}>
+                  <strong>{relation.kind}</strong>{' '}
+                  <button
+                    onClick={() =>
+                      onNavigate({ kind: 'argument', id: target.id })
+                    }
+                    type="button"
+                  >
+                    {target.title} — {part}
+                  </button>
+                  <small>
+                    Relied on revision {relation.reliedOnRevision}; current
+                    revision {target.revision}
+                    {relationStale ? ' — changed' : ''}.
+                  </small>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {stale.relationIds.length > 0 ? (
+          <div className="arguments-callout">
+            <p>
+              Changed relation targets: {stale.relationIds.join(', ')}. The
+              relations were not silently retargeted.
+            </p>
+            <button onClick={onReassessRelations} type="button">
+              Reassess relation target versions
+            </button>
+          </div>
+        ) : null}
+      </section>
+      <section className="arguments-reading-section">
+        <h3>Topic status</h3>
+        {topicMemberships.length === 0 ? (
+          <p className="arguments-empty">Not assigned to a Topic.</p>
+        ) : (
+          <ul className="arguments-record-links">
+            {topicMemberships.map((topic) => (
+              <li key={topic.id}>
+                <button
+                  onClick={() => onNavigate({ kind: 'topic', id: topic.id })}
+                  type="button"
+                >
+                  {topic.title}
+                  {topic.currentArgumentId === argument.id ? ' — Current' : ''}
+                </button>
+                {topic.currentArgumentId !== argument.id &&
+                argument.reviewState === 'accepted' &&
+                !argument.archived ? (
+                  <button onClick={() => onPromote(topic.id)} type="button">
+                    Promote to Current
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      {argument.supersedesArgumentId === undefined &&
+      successors.length === 0 ? null : (
+        <section className="arguments-reading-section">
+          <h3>Supersession history</h3>
+          <ul className="arguments-record-links">
+            {argument.supersedesArgumentId === undefined ? null : (
+              <li>
+                Supersedes{' '}
+                <button
+                  onClick={() =>
+                    onNavigate({
+                      kind: 'argument',
+                      id: argument.supersedesArgumentId!,
+                    })
+                  }
+                  type="button"
+                >
+                  {
+                    library.arguments.find(
+                      ({ id }) => id === argument.supersedesArgumentId,
+                    )!.title
+                  }
+                </button>
+              </li>
+            )}
+            {successors.map((successor) => (
+              <li key={successor.id}>
+                Superseded by{' '}
+                <button
+                  onClick={() =>
+                    onNavigate({ kind: 'argument', id: successor.id })
+                  }
+                  type="button"
+                >
+                  {successor.title}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <section className="arguments-reading-section">
+        <h3>Targeting Counter-Arguments</h3>
+        {targetingCounters.length === 0 ? (
+          <p className="arguments-empty">None.</p>
+        ) : (
+          <ul className="arguments-record-links">
+            {targetingCounters.map((counter) => (
+              <li key={counter.id}>
+                <button
+                  onClick={() =>
+                    onNavigate({ kind: 'counter-argument', id: counter.id })
+                  }
+                  type="button"
+                >
+                  {counter.title}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      {sourceSection}
+      <Metadata library={library} record={argument} />
     </article>
   );
 }
@@ -233,7 +581,13 @@ function targetLabel(counter: ArgumentCounterArgument): string {
     return `Topic claim: ${counter.target.topicId}`;
   if (counter.target.kind === 'axiom')
     return `Axiom: ${counter.target.axiomId}`;
-  return `Counter-Argument: ${counter.target.counterArgumentId}`;
+  if (counter.target.kind === 'counter-argument')
+    return `Counter-Argument: ${counter.target.counterArgumentId}`;
+  return `Argument: ${counter.target.argumentId} (${counter.target.part.kind}${
+    counter.target.part.kind === 'premise'
+      ? ` ${counter.target.part.premiseId}`
+      : ''
+  })`;
 }
 
 export function ArgumentCounterArgumentView({

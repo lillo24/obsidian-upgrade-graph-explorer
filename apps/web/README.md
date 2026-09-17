@@ -128,9 +128,16 @@ and child-rule handoff. Its full folder tree comes from canonical snapshot paths
 instead of the filtered projection, so hidden folders remain authorable. The
 canvas makes the spatial target directly draggable and adds keyboard nudge,
 Apply/Cancel, one/all reset, and corrupt-recovery surfaces. Pull target editing
-changes only draft intent; Place may rigidly preview effective members. Neither
+changes only draft rule intent even when its transient renderer preview moves;
+Place may rigidly preview effective members. Neither
 path adds folder entities, File-ID membership, raw coordinates, or graph history
-checkpoints.
+checkpoints. SPATIAL2C gives dirty Pull drafts a second, lazily constructed
+spatial-influence worker client so preview can never supersede the authoritative
+Pull client. Animation-frame input coalescing plus one active/one newest pending
+request bounds churn. Preview results remain renderer-only, bypass both layout
+caches and the authoritative Pull cache, and are discarded on cancel/failure;
+successful persistence hands the displayed preview directly to the ordinary
+full confirmed settlement without an old-geometry flash.
 
 MOVE1B arms MOVE1A directly in every supported, ready All or Focus Network;
 there is no Edit Network or Move Files prerequisite. Clicking and

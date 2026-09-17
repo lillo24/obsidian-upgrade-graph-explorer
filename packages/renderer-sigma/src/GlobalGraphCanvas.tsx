@@ -7,6 +7,7 @@ import {
   folderSpatialRuleFromDraft,
   nearestExcludedFolder,
   offsetNormalizedFolderAnchor,
+  replaceFolderSpatialRuleWithDraft,
   setFolderSpatialDraftAnchor,
   setFolderSpatialDraftBehavior,
   setFolderSpatialDraftRootFiles,
@@ -84,6 +85,10 @@ import {
   globalSpatialInfluenceFingerprint,
 } from './spatial-influence';
 import {
+  GLOBAL_SPATIAL_PULL_PREVIEW_ITERATIONS,
+  GlobalSpatialPullPreviewController,
+} from './spatial-pull-preview';
+import {
   initialViewportSatisfiesGlobalCenterRequest,
   shouldApplyGlobalViewportRequest,
 } from './viewport-request';
@@ -99,6 +104,7 @@ import type {
   GlobalTrackpadZoomMode,
   GlobalTransitionAnchorApi,
   GlobalSpatialInfluenceService,
+  GlobalSpatialInfluenceServiceFactory,
   SemanticGlobalViewport,
 } from './types';
 import type { NetworkStartupNetworkState } from './startup-trace';
@@ -183,6 +189,8 @@ export interface GlobalGraphCanvasProps {
   readonly temporaryConstraintRetryKey?: number;
   /** Separate latest-result worker for schema-v2 dynamic pull rules. */
   readonly spatialInfluenceService?: GlobalSpatialInfluenceService;
+  /** Lazily creates workers owned only by transient Pull draft preview. */
+  readonly spatialPullPreviewServiceFactory?: GlobalSpatialInfluenceServiceFactory;
   readonly spatialInfluenceCache?: GlobalSpatialInfluenceCache;
   readonly spatialSourceKey?: string;
   readonly onFailure: (message: string) => void;
@@ -454,6 +462,7 @@ export function GlobalGraphCanvas({
   maximized,
   physicsServiceFactory,
   spatialInfluenceService,
+  spatialPullPreviewServiceFactory,
   spatialInfluenceCache,
   spatialSourceKey,
   onFailure,
@@ -960,7 +969,7 @@ export function GlobalGraphCanvas({
           ? { status: 'unavailable', reason: 'simulation-not-running' }
           : physicsNodeCount === 0
             ? { status: 'unavailable', reason: 'simulation-not-running' }
-            : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+            : !networkPhysicsNodeCountIsSupported('all', physicsNodeCount)
               ? { status: 'unavailable', reason: 'graph-too-large' }
               : { status: 'available' };
     if (startupTrace !== undefined) {
@@ -1022,6 +1031,12 @@ export function GlobalGraphCanvas({
     useState(SCOPE_TREE_PAGE_SIZE);
   const [arrangementError, setArrangementError] = useState<string>();
   const [confirmResetAll, setConfirmResetAll] = useState(false);
+  const pullPreviewControllerRef = useRef<
+    GlobalSpatialPullPreviewController | undefined
+  >(undefined);
+  const pullPreviewDisplayActive = useRef(false);
+  const pullPreviewHandoffActive = useRef(false);
+  const pullPreviewOwnerKeyRef = useRef<string | undefined>(undefined);
 
   const activeConfirmedRule = useMemo(
     () =>
@@ -1157,9 +1172,83 @@ export function GlobalGraphCanvas({
     });
   }, [instrumentation]);
 
+  useEffect(() => {
+    if (spatialPullPreviewServiceFactory === undefined) {
+      pullPreviewControllerRef.current = undefined;
+      return;
+    }
+    const controller = new GlobalSpatialPullPreviewController({
+      createService: spatialPullPreviewServiceFactory,
+      ...(instrumentation === undefined ? {} : { instrumentation }),
+      onAdopt: async ({ input: preview, result }) => {
+        const session = sessionRef.current;
+        if (session === undefined) return;
+        const compose = () =>
+          composeGlobalFolderSpatialRules(
+            preview.basePositions,
+            result.positions,
+            preview.input,
+            preview.resolvedRules,
+          ).displayedPositions;
+        const positions =
+          instrumentation === undefined
+            ? compose()
+            : instrumentation.measure(
+                'spatial-fixed-compose',
+                'spatial-fixed-compositions',
+                compose,
+              );
+        const apply = () => session.applySpatialPositions(positions);
+        await (instrumentation === undefined
+          ? apply()
+          : instrumentation.measure(
+              'spatial-preview-apply',
+              'spatial-preview-applies',
+              apply,
+            ));
+        pullPreviewDisplayActive.current = true;
+        setArrangementError((current) =>
+          current?.startsWith('Pull preview unavailable:')
+            ? undefined
+            : current,
+        );
+      },
+      onError: (message) => {
+        pullPreviewDisplayActive.current = false;
+        restoreArrangementDisplay();
+        setArrangementError(`Pull preview unavailable: ${message}`);
+      },
+    });
+    pullPreviewControllerRef.current = controller;
+    return () => {
+      if (pullPreviewControllerRef.current === controller) {
+        pullPreviewControllerRef.current = undefined;
+      }
+      controller.dispose();
+    };
+  }, [
+    instrumentation,
+    restoreArrangementDisplay,
+    spatialPullPreviewServiceFactory,
+  ]);
+
+  const resetPullPreview = useCallback(
+    (restoreConfirmed: boolean): boolean => {
+      const controller = pullPreviewControllerRef.current;
+      const hadPreview =
+        pullPreviewDisplayActive.current || controller?.hasWork === true;
+      controller?.reset();
+      pullPreviewDisplayActive.current = false;
+      if (restoreConfirmed && hadPreview) restoreArrangementDisplay();
+      return hadPreview;
+    },
+    [restoreArrangementDisplay],
+  );
+
   const cancelArrangementPreview = useCallback(
     (announcement?: string): boolean => {
       if (callbacks.current.folderArrangement === undefined) return false;
+      const pullPreviewCancelled = resetPullPreview(true);
       const targetDrag = targetPointerDragRef.current;
       if (targetDrag !== undefined) {
         targetPointerDragRef.current = undefined;
@@ -1178,18 +1267,20 @@ export function GlobalGraphCanvas({
       if (targetDrag !== undefined) {
         sessionRef.current?.positionFolderTargetAnchor(targetDrag.startAnchor);
       }
-      if (!cancelled && keyboardPreviewRef.current === undefined) return false;
+      if (!cancelled && keyboardPreviewRef.current === undefined) {
+        return pullPreviewCancelled;
+      }
       pendingArrangementCommit.current = undefined;
       keyboardPreviewRef.current = undefined;
       setKeyboardPreview(undefined);
       setArrangementGesturePhase('idle');
-      restoreArrangementDisplay();
+      if (!pullPreviewCancelled) restoreArrangementDisplay();
       if (announcement !== undefined) {
         callbacks.current.folderArrangement?.onAnnouncement(announcement);
       }
       return true;
     },
-    [restoreArrangementDisplay],
+    [resetPullPreview, restoreArrangementDisplay],
   );
 
   const commitArrangementAnchor = useCallback(
@@ -1228,15 +1319,19 @@ export function GlobalGraphCanvas({
         failure = errorMessage(error);
       }
       if (failure !== undefined) {
+        const restoredPreview = resetPullPreview(true);
+        pullPreviewHandoffActive.current = false;
         pendingArrangementCommit.current = undefined;
         sessionRef.current?.cancelFolderArrangementGesture();
         keyboardPreviewRef.current = undefined;
         setKeyboardPreview(undefined);
         setArrangementGesturePhase('idle');
         setArrangementError(`Folder position was not saved: ${failure}`);
-        restoreArrangementDisplay();
+        if (!restoredPreview) restoreArrangementDisplay();
         return;
       }
+      pullPreviewHandoffActive.current = pullPreviewDisplayActive.current;
+      pullPreviewControllerRef.current?.reset();
       pendingArrangementCommit.current = { folderKey, anchor, rule };
       setRuleDraft(nextDraft);
       keyboardPreviewRef.current = undefined;
@@ -1252,7 +1347,7 @@ export function GlobalGraphCanvas({
             : 'Spatial rule saved',
       );
     },
-    [instrumentation, restoreArrangementDisplay],
+    [instrumentation, resetPullPreview, restoreArrangementDisplay],
   );
 
   useLayoutEffect(() => {
@@ -1443,6 +1538,91 @@ export function GlobalGraphCanvas({
   const arrangementAvailable =
     folderArrangement !== undefined &&
     arrangementUnavailableReason === undefined;
+
+  const pullPreviewOwnerKey =
+    folderArrangement?.active === true && arrangementAvailable
+      ? `${fingerprint}:${layoutRequestKey}:${spatialSourceKey ?? 'no-source'}:${folderArrangement.activeFolderKey ?? 'no-folder'}`
+      : undefined;
+
+  useEffect(() => {
+    const previous = pullPreviewOwnerKeyRef.current;
+    pullPreviewOwnerKeyRef.current = pullPreviewOwnerKey;
+    if (previous === undefined || previous === pullPreviewOwnerKey) return;
+    resetPullPreview(!pullPreviewHandoffActive.current);
+  }, [pullPreviewOwnerKey, resetPullPreview]);
+
+  useEffect(() => {
+    const controller = pullPreviewControllerRef.current;
+    const eligible =
+      controller !== undefined &&
+      folderArrangement?.active === true &&
+      arrangementAvailable &&
+      folderArrangement.activeFolderKey !== undefined &&
+      draftDirty &&
+      draftRule?.behavior === 'pull' &&
+      spatialRules !== undefined &&
+      ready &&
+      !layoutPending.current &&
+      !layoutPendingState &&
+      pendingArrangementCommit.current === undefined &&
+      sessionRef.current !== undefined;
+    if (!eligible) {
+      if (
+        !pullPreviewHandoffActive.current &&
+        (pullPreviewDisplayActive.current || controller?.hasWork === true)
+      ) {
+        resetPullPreview(true);
+      }
+      return;
+    }
+    const effectiveRules = replaceFolderSpatialRuleWithDraft(
+      spatialRules,
+      draftRule,
+    );
+    const resolve = () =>
+      resolveGlobalFolderSpatialRules(input, effectiveRules);
+    const resolvedRules =
+      instrumentation === undefined
+        ? resolve()
+        : instrumentation.measure(
+            'spatial-rule-resolution',
+            'spatial-rule-resolutions',
+            resolve,
+          );
+    const basePositions = latestAutomaticPositions.current;
+    const request = createGlobalSpatialInfluenceRequest(
+      input,
+      spatialInfluenceSettings,
+      GLOBAL_SPATIAL_PULL_PREVIEW_ITERATIONS,
+      basePositions,
+      fingerprint,
+      resolvedRules,
+    );
+    controller.schedule({
+      request,
+      basePositions,
+      input,
+      resolvedRules,
+    });
+    setArrangementError((current) =>
+      current?.startsWith('Pull preview unavailable:') ? undefined : current,
+    );
+  }, [
+    arrangementAvailable,
+    draftDirty,
+    draftRule,
+    fingerprint,
+    folderArrangement?.active,
+    folderArrangement?.activeFolderKey,
+    input,
+    instrumentation,
+    layoutCommitKey,
+    layoutPendingState,
+    ready,
+    resetPullPreview,
+    spatialInfluenceSettings,
+    spatialRules,
+  ]);
 
   useEffect(() => {
     folderArrangement?.onAvailabilityChange(
@@ -1845,6 +2025,8 @@ export function GlobalGraphCanvas({
             );
       await session.applySpatialPositions(positions);
       if (cancelled || generation !== spatialGeneration.current) return;
+      pullPreviewDisplayActive.current = false;
+      pullPreviewHandoffActive.current = false;
       latestDisplayedPositions.current = positions;
       if (startupTrace !== undefined) {
         session.traceStartupEvent(
@@ -2155,7 +2337,7 @@ export function GlobalGraphCanvas({
       // generation handoff before physics can compose adjacent node sets.
       layoutPending.current ||
       layoutPendingState ||
-      !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+      !networkPhysicsNodeCountIsSupported('all', physicsNodeCount)
     ) {
       session.setTemporaryFileMoveContext({
         active: true,
@@ -2166,7 +2348,7 @@ export function GlobalGraphCanvas({
               ? 'simulation-unavailable'
               : physicsNodeCount === 0
                 ? 'simulation-not-running'
-                : !networkPhysicsNodeCountIsSupported(physicsNodeCount)
+                : !networkPhysicsNodeCountIsSupported('all', physicsNodeCount)
                   ? 'graph-too-large'
                   : 'simulation-not-running',
         },
@@ -2615,6 +2797,8 @@ export function GlobalGraphCanvas({
   const resetActiveFolder = useCallback(() => {
     const folderKey = folderArrangement?.activeFolderKey;
     if (folderArrangement === undefined || folderKey === undefined) return;
+    resetPullPreview(true);
+    pullPreviewHandoffActive.current = false;
     const failure = folderArrangement.onRemoveRule
       ? folderArrangement.onRemoveRule(folderKey)
       : folderArrangement.onResetFolder(folderKey);
@@ -2630,10 +2814,12 @@ export function GlobalGraphCanvas({
     folderArrangement.onAnnouncement(
       `${folderLabel(folderKey)} spatial rule removed`,
     );
-  }, [folderArrangement]);
+  }, [folderArrangement, resetPullPreview]);
 
   const resetAllFolders = useCallback(() => {
     if (folderArrangement === undefined) return;
+    resetPullPreview(true);
+    pullPreviewHandoffActive.current = false;
     const failure = folderArrangement.onClearRules
       ? folderArrangement.onClearRules()
       : folderArrangement.onResetAll();
@@ -2648,7 +2834,7 @@ export function GlobalGraphCanvas({
     setConfirmResetAll(false);
     setArrangementError(undefined);
     folderArrangement.onAnnouncement('All spatial rules removed');
-  }, [folderArrangement]);
+  }, [folderArrangement, resetPullPreview]);
 
   const recoverCorruptArrangement = useCallback(() => {
     const failure = folderArrangement?.onRecoverCorrupt?.();
@@ -2869,16 +3055,17 @@ export function GlobalGraphCanvas({
                         aria-label="Pull strength"
                         max="100"
                         min="0"
-                        onChange={(event) =>
+                        onChange={(event) => {
+                          const strength = Number(event.currentTarget.value);
                           setRuleDraft((current) =>
                             current === undefined
                               ? current
                               : setFolderSpatialDraftStrength(
                                   current,
-                                  Number(event.currentTarget.value),
+                                  strength,
                                 ),
-                          )
-                        }
+                          );
+                        }}
                         step="1"
                         type="range"
                         value={ruleDraft.strength}
@@ -2924,12 +3111,14 @@ export function GlobalGraphCanvas({
                         <input
                           checked={ruleDraft.customScope.includeRootFiles}
                           onChange={(event) => {
+                            const includeRootFiles =
+                              event.currentTarget.checked;
                             setRuleDraft((current) =>
                               current === undefined
                                 ? current
                                 : setFolderSpatialDraftRootFiles(
                                     current,
-                                    event.currentTarget.checked,
+                                    includeRootFiles,
                                   ),
                             );
                             pulseScope(ruleDraft.folderKey);

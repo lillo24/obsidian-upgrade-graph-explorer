@@ -38,6 +38,38 @@ function runtime(): ArgumentRuntime {
 }
 
 describe('browser Argument Library storage', () => {
+  it('loads v1 from the stable key and upgrades it on the next save', async () => {
+    const storage = new MemoryStorage();
+    const legacy = JSON.stringify({
+      schemaVersion: 1,
+      libraryId: 'browser-legacy',
+      libraryRevision: 2,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      topics: [],
+      axioms: [],
+      counterArguments: [],
+    });
+    storage.values.set(ARGUMENT_LIBRARY_BROWSER_STORAGE_KEY, legacy);
+    const store = createBrowserArgumentLibraryStore(storage);
+
+    const loaded = await store.load();
+    expect(loaded).toMatchObject({
+      status: 'loaded',
+      snapshot: { library: { schemaVersion: 3, arguments: [] } },
+    });
+    expect(storage.values.get(ARGUMENT_LIBRARY_BROWSER_STORAGE_KEY)).toBe(
+      legacy,
+    );
+    if (loaded.status !== 'loaded') return;
+    expect(
+      await store.save(loaded.snapshot.library, loaded.snapshot.descriptor),
+    ).toMatchObject({ status: 'saved' });
+    expect(
+      JSON.parse(storage.values.get(ARGUMENT_LIBRARY_BROWSER_STORAGE_KEY)!),
+    ).toMatchObject({ schemaVersion: 3, arguments: [] });
+  });
+
   it('uses one profile key and checks the expected snapshot', async () => {
     const storage = new MemoryStorage();
     const store = createBrowserArgumentLibraryStore(storage);
