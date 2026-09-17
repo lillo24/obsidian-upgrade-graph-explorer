@@ -70,6 +70,8 @@ describe('graph preferences', () => {
       modularFocusHeadingOrder: 'crossing-optimized',
       modularFocusMacroLayout: 'directional-bands',
       modularFocusSoftFolderStrength: 50,
+      modularFocusDirectFoldersOnly: false,
+      modularFocusSoftAncestorDecayBase: 3,
       modularFocusSoftSpacing: 50,
       modularFolderStripsVisible: true,
       modularConnectionStyle: 'direct',
@@ -87,6 +89,8 @@ describe('graph preferences', () => {
         modularFocusHeadingOrder: 'document-order',
         modularFocusMacroLayout: 'soft-folder-clusters',
         modularFocusSoftFolderStrength: 75,
+        modularFocusDirectFoldersOnly: true,
+        modularFocusSoftAncestorDecayBase: 4,
         modularFocusSoftSpacing: 63,
         modularFolderStripsVisible: false,
         modularConnectionStyle: 'electronic',
@@ -95,7 +99,7 @@ describe('graph preferences', () => {
       }),
     ).toEqual({ ok: true });
     expect(storage.value).toBe(
-      '{"focusAppearance":"minimal","focusHierarchyImplementation":"modular-preview","globalLayoutSettings":{"folderClustering":true,"spacingPreset":"normal"},"localLayoutMode":"free","modularFocusInternalLayout":"vertical-spine","modularFocusHeadingOrder":"document-order","modularFocusMacroLayout":"soft-folder-clusters","modularFocusSoftFolderStrength":75,"modularFocusSoftSpacing":63,"modularFolderStripsVisible":false,"modularConnectionStyle":"electronic","showExperimentalAllHierarchy":false,"trackpadZoomMode":"scroll-zoom"}',
+      '{"focusAppearance":"minimal","focusHierarchyImplementation":"modular-preview","globalLayoutSettings":{"folderClustering":true,"spacingPreset":"normal"},"localLayoutMode":"free","modularFocusInternalLayout":"vertical-spine","modularFocusHeadingOrder":"document-order","modularFocusMacroLayout":"soft-folder-clusters","modularFocusSoftFolderStrength":75,"modularFocusDirectFoldersOnly":true,"modularFocusSoftAncestorDecayBase":4,"modularFocusSoftSpacing":63,"modularFolderStripsVisible":false,"modularConnectionStyle":"electronic","showExperimentalAllHierarchy":false,"trackpadZoomMode":"scroll-zoom"}',
     );
   });
 
@@ -133,6 +137,8 @@ describe('graph preferences', () => {
       modularFocusHeadingOrder: 'crossing-optimized',
       modularFocusMacroLayout: 'directional-bands',
       modularFocusSoftFolderStrength: 50,
+      modularFocusDirectFoldersOnly: false,
+      modularFocusSoftAncestorDecayBase: 3,
       modularFocusSoftSpacing: 50,
       modularFolderStripsVisible: true,
       modularConnectionStyle: 'direct',
@@ -154,6 +160,8 @@ describe('graph preferences', () => {
       modularFocusHeadingOrder: 'crossing-optimized',
       modularFocusMacroLayout: 'directional-bands',
       modularFocusSoftFolderStrength: 50,
+      modularFocusDirectFoldersOnly: false,
+      modularFocusSoftAncestorDecayBase: 3,
       modularFocusSoftSpacing: 50,
       modularFolderStripsVisible: true,
       modularConnectionStyle: 'direct',
@@ -308,6 +316,8 @@ describe('graph preferences', () => {
         modularFocusHeadingOrder: 'crossing-optimized',
         modularFocusMacroLayout: 'directional-bands',
         modularFocusSoftFolderStrength: 50,
+        modularFocusDirectFoldersOnly: false,
+        modularFocusSoftAncestorDecayBase: 3,
         modularFocusSoftSpacing: 50,
         modularFolderStripsVisible: true,
         modularConnectionStyle: 'direct',
@@ -491,6 +501,22 @@ describe('Modular Focus Hierarchy production layout policies', () => {
     ).toBe(expected);
   });
 
+  it.each([
+    [undefined, 3],
+    [3, 3],
+    [4, 4],
+    [2, 3],
+    ['4', 3],
+  ])('normalizes stored Soft ancestor decay %j to %j', (value, expected) => {
+    const storage = memoryStorage(
+      JSON.stringify({ modularFocusSoftAncestorDecayBase: value }),
+    );
+    expect(
+      loadGraphPreferences(storage).preferences
+        .modularFocusSoftAncestorDecayBase,
+    ).toBe(expected);
+  });
+
   it('persists all eight supported policy combinations under the v1 key', () => {
     const storage = memoryStorage();
     for (const modularFocusMacroLayout of [
@@ -577,6 +603,8 @@ describe('Focus Hierarchy Saved View profile boundary', () => {
       modularFocusHeadingOrder: 'document-order' as const,
       modularFocusMacroLayout: 'soft-folder-clusters' as const,
       modularFocusSoftFolderStrength: 81,
+      modularFocusDirectFoldersOnly: true,
+      modularFocusSoftAncestorDecayBase: 4 as const,
       modularFocusSoftSpacing: 81,
       modularFolderStripsVisible: false,
       modularConnectionStyle: 'electronic' as const,
@@ -602,7 +630,31 @@ describe('Focus Hierarchy Saved View profile boundary', () => {
     expect(applied.showExperimentalAllHierarchy).toBe(true);
     expect(applied.trackpadZoomMode).toBe('pinch-zoom');
     expect(applied.modularFocusSoftSpacing).toBe(19);
+    expect(applied.modularFocusDirectFoldersOnly).toBe(true);
+    expect(applied.modularFocusSoftAncestorDecayBase).toBe(4);
     expect(profile).not.toHaveProperty('modularFocusSoftSpacing');
+  });
+
+  it('accepts legacy Saved Views without scope controls and restores defaults', () => {
+    const current = {
+      ...DEFAULT_GRAPH_PREFERENCES,
+      modularFocusDirectFoldersOnly: true,
+      modularFocusSoftAncestorDecayBase: 4 as const,
+    };
+    const currentProfile = captureFocusHierarchySettings(
+      DEFAULT_GRAPH_PREFERENCES,
+    );
+    const legacy = Object.fromEntries(
+      Object.entries(currentProfile).filter(
+        ([key]) =>
+          key !== 'modularFocusDirectFoldersOnly' &&
+          key !== 'modularFocusSoftAncestorDecayBase',
+      ),
+    );
+    expect(applyFocusHierarchySettings(current, legacy)).toMatchObject({
+      modularFocusDirectFoldersOnly: false,
+      modularFocusSoftAncestorDecayBase: 3,
+    });
   });
 
   it('rejects unknown and out-of-range profile fields', () => {

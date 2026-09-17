@@ -61,7 +61,6 @@ import type {
   FocusSchematicNativeRoute,
 } from './types';
 import { validateFocusSchematicSoftFolderDisplayIntent } from './soft-folder-display';
-import { normalizeFocusSchematicSoftSpacing } from './soft-cluster-spacing';
 
 export { createFocusSchematicEndpointAttachments } from './attachments';
 
@@ -978,7 +977,7 @@ function validSoftClusterPolicyEvidence(
   const intentValidation = validateFocusSchematicSoftFolderDisplayIntent(
     evidence.displayIntent,
   );
-  const resolvedSpacing = evidence.resolvedSpacing as unknown;
+  const resolvedSpacing = evidence.structuralSpacing as unknown;
   const resolvedSpacingKeys = [
     'hopSpacing',
     'moduleGap',
@@ -1000,19 +999,25 @@ function validSoftClusterPolicyEvidence(
       (value) => Number.isSafeInteger(value) && Number(value) > 0,
     );
   return (
-    evidence.schemaVersion === 4 &&
+    evidence.schemaVersion === 5 &&
     evidence.layoutFamily === 'soft-folder-clusters' &&
     Number.isFinite(evidence.strength) &&
     evidence.strength >= 0 &&
     evidence.strength <= 100 &&
-    evidence.softSpacing ===
-      normalizeFocusSchematicSoftSpacing(evidence.softSpacing) &&
     validResolvedSpacing &&
     (evidence.endpointOrderPolicy === 'crossing-optimized' ||
       evidence.endpointOrderPolicy === 'document-order') &&
     intentValidation.valid &&
     JSON.stringify(intentValidation.value) ===
       JSON.stringify(evidence.displayIntent) &&
+    (evidence.folderScopeMode === 'nested' ||
+      evidence.folderScopeMode === 'nearest-only') &&
+    (evidence.folderScopeMode === 'nearest-only'
+      ? evidence.ancestorDecayBase === null &&
+        evidence.hierarchyForcePolicy === 'nearest-only'
+      : (evidence.ancestorDecayBase === 3 ||
+          evidence.ancestorDecayBase === 4) &&
+        evidence.hierarchyForcePolicy !== 'nearest-only') &&
     (evidence.hierarchyForcePolicy === 'nearest-only' ||
       evidence.hierarchyForcePolicy === 'normalized-decay' ||
       evidence.hierarchyForcePolicy === 'normalized-equal') &&

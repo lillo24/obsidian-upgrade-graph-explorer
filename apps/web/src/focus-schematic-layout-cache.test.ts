@@ -8,6 +8,7 @@ import {
   computeFocusSchematicComputedLayout,
   computeFocusSchematicComputedLayoutAttempt,
   computeFocusSchematicSoftClusterLayoutAttempt,
+  applyFocusSchematicSoftRadialSpread,
   type FocusSchematicLayoutInput,
   type FocusSchematicProductLayoutPolicies,
 } from '@icarus-graph-explorer/focus-schematic-layout';
@@ -37,8 +38,8 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     const key = exactFocusSchematicLayoutCacheKey(input);
     expect(key).toContain('modular-focus-hierarchy');
     expect(key).toContain('"algorithmVersion":4');
-    expect(key).toContain('"protocolVersion":9');
-    expect(key.replace('"protocolVersion":9', '"protocolVersion":8')).not.toBe(
+    expect(key).toContain('"protocolVersion":10');
+    expect(key.replace('"protocolVersion":10', '"protocolVersion":9')).not.toBe(
       key,
     );
     expect(exactFocusSchematicLayoutCacheKey(input, 1)).not.toBe(key);
@@ -184,7 +185,7 @@ describe('page-lifetime Focus Schematic layout cache', () => {
       }) as const;
     expect(
       exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)),
-    ).toContain('"algorithmVersion":6');
+    ).toContain('"algorithmVersion":7');
     expect(
       exactFocusSchematicLayoutCacheKey(
         directionalInput,
@@ -220,7 +221,7 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     ).not.toBe(exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)));
   });
 
-  it('keys Soft spacing independently while Directional ignores the retained value', () => {
+  it('keys nested decay, canonicalizes Direct-only decay, and excludes radial spread', () => {
     const directionalInput = fixtureInput(4);
     const softInput = {
       ...directionalInput,
@@ -230,51 +231,96 @@ describe('page-lifetime Focus Schematic layout cache', () => {
       },
     };
     const policiesAt = (
-      softSpacing: number,
+      softFolderScopeMode: 'nested' | 'nearest-only',
+      softAncestorDecayBase: 3 | 4,
       macroLayout:
         'soft-folder-clusters' | 'directional-bands' = 'soft-folder-clusters',
     ) => ({
       ...DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
       macroLayout,
-      softSpacing,
+      softFolderScopeMode,
+      softAncestorDecayBase,
     });
     expect(
       exactFocusSchematicLayoutCacheKey(
         directionalInput,
-        policiesAt(25, 'directional-bands'),
+        policiesAt('nested', 3, 'directional-bands'),
       ),
     ).toBe(
       exactFocusSchematicLayoutCacheKey(
         directionalInput,
-        policiesAt(75, 'directional-bands'),
+        policiesAt('nearest-only', 4, 'directional-bands'),
       ),
     );
     expect(
-      exactFocusSchematicLayoutCacheKey(softInput, policiesAt(25)),
-    ).not.toBe(exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)));
+      exactFocusSchematicLayoutCacheKey(softInput, policiesAt('nested', 3)),
+    ).not.toBe(
+      exactFocusSchematicLayoutCacheKey(softInput, policiesAt('nested', 4)),
+    );
     expect(
-      exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)),
-    ).not.toBe(exactFocusSchematicLayoutCacheKey(softInput, policiesAt(75)));
+      exactFocusSchematicLayoutCacheKey(
+        softInput,
+        policiesAt('nearest-only', 3),
+      ),
+    ).toBe(
+      exactFocusSchematicLayoutCacheKey(
+        softInput,
+        policiesAt('nearest-only', 4),
+      ),
+    );
 
-    const at25 = computeFocusSchematicSoftClusterLayoutAttempt(softInput, {
-      spacing: 25,
+    const nested = computeFocusSchematicSoftClusterLayoutAttempt(softInput, {
+      folderScopeMode: 'nested',
+      ancestorDecayBase: 3,
     });
-    const at75 = computeFocusSchematicSoftClusterLayoutAttempt(softInput, {
-      spacing: 75,
+    const direct = computeFocusSchematicSoftClusterLayoutAttempt(softInput, {
+      folderScopeMode: 'nearest-only',
+      ancestorDecayBase: 4,
     });
-    if (at25.status !== 'success' || at75.status !== 'success')
-      throw new Error('Expected Soft spacing cache fixtures to compute.');
+    if (nested.status !== 'success' || direct.status !== 'success')
+      throw new Error('Expected Soft scope cache fixtures to compute.');
     const cache = new FocusSchematicLayoutCache();
-    cache.set(softInput, policiesAt(25), at25.result);
-    cache.set(softInput, policiesAt(75), at75.result);
-    expect(cache.get(softInput, policiesAt(25))).toMatchObject({
+    cache.set(softInput, policiesAt('nested', 3), nested.result);
+    cache.set(softInput, policiesAt('nearest-only', 4), direct.result);
+    expect(cache.get(softInput, policiesAt('nested', 3))).toMatchObject({
       status: 'hit',
-      value: at25.result,
+      value: nested.result,
     });
-    expect(cache.get(softInput, policiesAt(75))).toMatchObject({
+    expect(cache.get(softInput, policiesAt('nearest-only', 3))).toMatchObject({
       status: 'hit',
-      value: at75.result,
+      value: direct.result,
     });
+  });
+
+  it('reuses one structural Soft compute across many radial spread values', () => {
+    const input = fixtureInput(4);
+    const softInput = {
+      ...input,
+      settings: { ...input.settings, directionalFolderBandsEnabled: false },
+    };
+    const policies = {
+      ...DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+      macroLayout: 'soft-folder-clusters',
+    } as const;
+    const cache = new FocusSchematicLayoutCache();
+    let structuralComputeCount = 0;
+    const structural = () => {
+      const lookup = cache.get(softInput, policies);
+      if (lookup.status === 'hit') return lookup.value!;
+      structuralComputeCount += 1;
+      const attempt = computeFocusSchematicSoftClusterLayoutAttempt(softInput);
+      if (attempt.status !== 'success') throw new Error(attempt.reason);
+      cache.set(softInput, policies, attempt.result);
+      return attempt.result;
+    };
+    const base = structural();
+    for (const spacing of [0, 25, 50, 71, 72, 73, 75, 100])
+      expect(
+        applyFocusSchematicSoftRadialSpread(structural(), spacing).candidate
+          .modules,
+      ).toHaveLength(base.candidate.modules.length);
+    expect(structuralComputeCount).toBe(1);
+    expect(cache.size).toBe(1);
   });
 
   it('keys canonical manual display intent only in Soft mode', () => {

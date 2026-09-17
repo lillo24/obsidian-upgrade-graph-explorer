@@ -175,6 +175,7 @@ import {
 } from '../persistence/storage';
 import {
   loadGraphPreferences,
+  normalizeModularFocusSoftAncestorDecayBase,
   normalizeModularFocusSoftFolderStrength,
   normalizeModularFocusSoftSpacing,
   saveGraphPreferences,
@@ -566,6 +567,8 @@ export function GraphExplorer({
     modularFocusHeadingOrder,
     modularFocusInternalLayout,
     modularFocusMacroLayout,
+    modularFocusDirectFoldersOnly,
+    modularFocusSoftAncestorDecayBase,
     modularFocusSoftFolderStrength,
     modularFocusSoftSpacing,
     modularFolderStripsVisible,
@@ -3588,6 +3591,21 @@ export function GraphExplorer({
     },
     [updateGraphPreferences],
   );
+  const changeModularFocusDirectFoldersOnly = useCallback(
+    (direct: boolean) => {
+      updateGraphPreferences({ modularFocusDirectFoldersOnly: direct });
+    },
+    [updateGraphPreferences],
+  );
+  const changeModularFocusSoftAncestorDecayBase = useCallback(
+    (base: 3 | 4) => {
+      updateGraphPreferences({
+        modularFocusSoftAncestorDecayBase:
+          normalizeModularFocusSoftAncestorDecayBase(base),
+      });
+    },
+    [updateGraphPreferences],
+  );
   const changeModularFocusSoftSpacing = useCallback(
     (spacing: number) => {
       updateGraphPreferences({
@@ -4745,6 +4763,10 @@ export function GraphExplorer({
             modularFocusHeadingOrder={modularFocusHeadingOrder}
             modularFocusInternalLayout={modularFocusInternalLayout}
             modularFocusMacroLayout={modularFocusMacroLayout}
+            modularFocusDirectFoldersOnly={modularFocusDirectFoldersOnly}
+            modularFocusSoftAncestorDecayBase={
+              modularFocusSoftAncestorDecayBase
+            }
             modularFocusSoftFolderStrength={modularFocusSoftFolderStrength}
             modularFocusSoftSpacing={modularFocusSoftSpacing}
             modularFolderStripsVisible={modularFolderStripsVisible}
@@ -4770,6 +4792,12 @@ export function GraphExplorer({
               changeModularFocusInternalLayout
             }
             onModularFocusMacroLayoutChange={changeModularFocusMacroLayout}
+            onModularFocusDirectFoldersOnlyChange={
+              changeModularFocusDirectFoldersOnly
+            }
+            onModularFocusSoftAncestorDecayBaseChange={
+              changeModularFocusSoftAncestorDecayBase
+            }
             onModularFocusSoftFolderStrengthChange={
               changeModularFocusSoftFolderStrength
             }
@@ -5045,6 +5073,10 @@ export function GraphExplorer({
                   modularFocusHeadingOrder={modularFocusHeadingOrder}
                   modularFocusInternalLayout={modularFocusInternalLayout}
                   modularFocusMacroLayout={modularFocusMacroLayout}
+                  modularFocusDirectFoldersOnly={modularFocusDirectFoldersOnly}
+                  modularFocusSoftAncestorDecayBase={
+                    modularFocusSoftAncestorDecayBase
+                  }
                   modularFocusSoftFolderStrength={
                     modularFocusSoftFolderStrength
                   }
@@ -5075,6 +5107,12 @@ export function GraphExplorer({
                   }
                   onModularFocusMacroLayoutChange={
                     changeModularFocusMacroLayout
+                  }
+                  onModularFocusDirectFoldersOnlyChange={
+                    changeModularFocusDirectFoldersOnly
+                  }
+                  onModularFocusSoftAncestorDecayBaseChange={
+                    changeModularFocusSoftAncestorDecayBase
                   }
                   onModularFocusSoftFolderStrengthChange={
                     changeModularFocusSoftFolderStrength
@@ -5413,6 +5451,8 @@ export function GraphExplorer({
                 folderGuidesVisible={modularFolderStripsVisible}
                 internalLayoutVariant={modularFocusInternalLayout}
                 macroLayout={modularFocusMacroLayout}
+                directFoldersOnly={modularFocusDirectFoldersOnly}
+                softAncestorDecayBase={modularFocusSoftAncestorDecayBase}
                 softFolderStrength={modularFocusSoftFolderStrength}
                 softSpacing={modularFocusSoftSpacing}
                 softFolderDisplayIntent={softFolderDisplay.displayIntent}

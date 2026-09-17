@@ -18,9 +18,8 @@ import {
   FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
   SOFT_ADAPTIVE_COMPASS_FIXTURES,
   FOCUS_SCHEMATIC_SOFT_CLUSTER_BASELINE_SPACING,
-  FOCUS_SCHEMATIC_SOFT_SPACING_COMPACT,
-  FOCUS_SCHEMATIC_SOFT_SPACING_SELECTED,
-  FOCUS_SCHEMATIC_SOFT_SPACING_SPACIOUS,
+  FOCUS_SCHEMATIC_SOFT_CLUSTER_STRUCTURAL_SPACING,
+  focusSchematicSoftRadialSpreadScale,
   SOFT_CLUSTER_FIXTURES,
   SOFT_CLUSTER_STABILITY_PAIRS,
   type EndpointFixtureSpec,
@@ -29,7 +28,6 @@ import {
   type FocusSchematicSoftHierarchyForcePolicy,
   type FocusSchematicSoftClusterStrength,
   type FocusSchematicSoftClusterOptions,
-  type FocusSchematicSoftClusterSpacingPolicy,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 
 import { createLayoutInput } from './dimensions';
@@ -85,8 +83,7 @@ function soft(
     fixtureId: spec.id,
     fixtureLabel: spec.label,
     strength,
-    softSpacing: first.evidence.softSpacing,
-    resolvedSpacing: first.evidence.resolvedSpacing,
+    structuralSpacing: first.evidence.structuralSpacing,
     deterministic:
       JSON.stringify(first.result.candidate) ===
       JSON.stringify(second.result.candidate),
@@ -110,6 +107,8 @@ function soft(
     automaticallyCompressedFolderCount:
       first.evidence.automaticallyCompressedFolderCount,
     hierarchyForcePolicy: first.evidence.hierarchyForcePolicy,
+    folderScopeMode: first.evidence.folderScopeMode,
+    ancestorDecayBase: first.evidence.ancestorDecayBase,
     maximumPerFileFolderWeight: first.evidence.maximumPerFileFolderWeight,
     attachmentSideCounts: Object.fromEntries(
       ['left', 'right', 'top', 'bottom'].map((side) => [
@@ -448,6 +447,25 @@ const hierarchyStrengthRows = hierarchyForceFixtures.flatMap(
       ...soft(spec, strength, intent, 'normalized-decay'),
     })),
 );
+const scopeDecayRows = hierarchyForceFixtures.flatMap(({ id, spec, intent }) =>
+  [
+    { folderScopeMode: 'nested' as const, ancestorDecayBase: 3 as const },
+    { folderScopeMode: 'nested' as const, ancestorDecayBase: 4 as const },
+    {
+      folderScopeMode: 'nearest-only' as const,
+      ancestorDecayBase: 3 as const,
+    },
+    {
+      folderScopeMode: 'nearest-only' as const,
+      ancestorDecayBase: 4 as const,
+    },
+  ].map((options) => ({
+    id,
+    requestedScopeMode: options.folderScopeMode,
+    requestedDecayBase: options.ancestorDecayBase,
+    ...soft(spec, 50, intent, 'normalized-decay', options),
+  })),
+);
 
 function cardinalPlan(
   connections: readonly {
@@ -731,61 +749,6 @@ const emptyDisplayIntent: FocusSchematicSoftFolderDisplayIntent = {
   flattenedFolderKeys: [],
 };
 
-const macroSpacingCandidates = {
-  baseline: {
-    hopSpacing: 520,
-    moduleGap: 72,
-    topologyExtraDistance: 155,
-    packingStep: 64,
-    radialJitter: 90,
-  },
-  moderate: {
-    hopSpacing: 600,
-    moduleGap: 88,
-    topologyExtraDistance: 180,
-    packingStep: 72,
-    radialJitter: 104,
-  },
-  wide: {
-    hopSpacing: 680,
-    moduleGap: 104,
-    topologyExtraDistance: 210,
-    packingStep: 84,
-    radialJitter: 120,
-  },
-} as const;
-
-const internalSpacingCandidates = {
-  baseline: {
-    internalNodeSeparation: 24,
-    internalRankSeparation: 48,
-    modulePaddingX: 28,
-    modulePaddingY: 24,
-  },
-  moderate: {
-    internalNodeSeparation: 30,
-    internalRankSeparation: 60,
-    modulePaddingX: 34,
-    modulePaddingY: 30,
-  },
-  wide: {
-    internalNodeSeparation: 36,
-    internalRankSeparation: 72,
-    modulePaddingX: 42,
-    modulePaddingY: 36,
-  },
-} as const;
-
-function candidateSpacing(
-  macro: keyof typeof macroSpacingCandidates,
-  internal: keyof typeof internalSpacingCandidates,
-): FocusSchematicSoftClusterSpacingPolicy {
-  return {
-    ...macroSpacingCandidates[macro],
-    ...internalSpacingCandidates[internal],
-  };
-}
-
 const representativeSpacingFixtures = [
   'SC1',
   'SC2',
@@ -796,21 +759,8 @@ const representativeSpacingFixtures = [
   'SC16',
 ].map((id) => SOFT_CLUSTER_FIXTURES.find((spec) => spec.id === id)!);
 
-const spacingCandidateRows = Object.keys(macroSpacingCandidates).flatMap(
-  (macro) =>
-    Object.keys(internalSpacingCandidates).flatMap((internal) =>
-      representativeSpacingFixtures.map((spec) => ({
-        macro,
-        internal,
-        ...soft(spec, 50, emptyDisplayIntent, 'normalized-decay', {
-          spacing: 50,
-          spacingPolicy: candidateSpacing(
-            macro as keyof typeof macroSpacingCandidates,
-            internal as keyof typeof internalSpacingCandidates,
-          ),
-        }),
-      })),
-    ),
+const fixedStructuralRows = representativeSpacingFixtures.map((spec) =>
+  soft(spec, 50, emptyDisplayIntent, 'normalized-decay'),
 );
 
 type SoftRow = ReturnType<typeof soft>;
@@ -903,46 +853,27 @@ function summarizeSpacingRows(rows: readonly SoftRow[]) {
   };
 }
 
-const spacingCandidateSummaries = Object.keys(macroSpacingCandidates).flatMap(
-  (macro) =>
-    Object.keys(internalSpacingCandidates).map((internal) => ({
-      macro,
-      internal,
-      policy: candidateSpacing(
-        macro as keyof typeof macroSpacingCandidates,
-        internal as keyof typeof internalSpacingCandidates,
-      ),
-      summary: summarizeSpacingRows(
-        spacingCandidateRows.filter(
-          (row) => row.macro === macro && row.internal === internal,
-        ),
-      ),
-    })),
-);
+const fixedStructuralSummary = summarizeSpacingRows(fixedStructuralRows);
 
 const spacingSamples = [0, 25, 50, 75, 100] as const;
 const spacingRows = spacingSamples.flatMap((spacing) =>
   SOFT_CLUSTER_FIXTURES.map((spec) => ({
     spacing,
-    ...soft(spec, 50, emptyDisplayIntent, 'normalized-decay', { spacing }),
+    radialScale: focusSchematicSoftRadialSpreadScale(spacing),
+    ...soft(spec, 50, emptyDisplayIntent, 'normalized-decay'),
   })),
 );
 const adaptiveSpacingRows = [0, 50, 100].flatMap((spacing) =>
   SOFT_ADAPTIVE_COMPASS_FIXTURES.map((spec) => ({
     spacing,
-    ...soft(spec, 50, emptyDisplayIntent, 'normalized-decay', { spacing }),
+    radialScale: focusSchematicSoftRadialSpreadScale(spacing),
+    ...soft(spec, 50, emptyDisplayIntent, 'normalized-decay'),
   })),
 );
 const spacingAnchorSummaries = spacingSamples.map((spacing) => ({
   spacing,
-  policy:
-    spacing === 0
-      ? FOCUS_SCHEMATIC_SOFT_SPACING_COMPACT
-      : spacing === 50
-        ? FOCUS_SCHEMATIC_SOFT_SPACING_SELECTED
-        : spacing === 100
-          ? FOCUS_SCHEMATIC_SOFT_SPACING_SPACIOUS
-          : spacingRows.find((row) => row.spacing === spacing)!.resolvedSpacing,
+  structuralPolicy: FOCUS_SCHEMATIC_SOFT_CLUSTER_STRUCTURAL_SPACING,
+  radialScale: focusSchematicSoftRadialSpreadScale(spacing),
   summary: summarizeSpacingRows(
     spacingRows.filter((row) => row.spacing === spacing),
   ),
@@ -963,7 +894,6 @@ const strengthSpacingRows = [0, 50, 100].flatMap((strength) =>
       strength,
       emptyDisplayIntent,
       'normalized-decay',
-      { spacing },
     ),
   })),
 );
@@ -976,14 +906,12 @@ const compassDemandBakeoffRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.flatMap(
     {
       strategy: 'D0-directional-horizontal',
       ...soft(spec, 50, undefined, undefined, {
-        spacing: 0,
         compassDemandPolicy: 'directional-horizontal',
       }),
     },
     {
       strategy: 'S1-dominant-cardinal',
       ...soft(spec, 50, undefined, undefined, {
-        spacing: 0,
         compassDemandPolicy: 'spatial-cardinal',
         spatialDemandSummary: 'dominant-cardinal',
       }),
@@ -991,7 +919,6 @@ const compassDemandBakeoffRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.flatMap(
     {
       strategy: 'S2-aggregate-vector',
       ...soft(spec, 50, undefined, undefined, {
-        spacing: 0,
         compassDemandPolicy: 'spatial-cardinal',
         spatialDemandSummary: 'aggregate-vector',
       }),
@@ -999,22 +926,17 @@ const compassDemandBakeoffRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.flatMap(
     {
       strategy: 'V-vertical-control',
       ...soft(spec, 50, undefined, undefined, {
-        spacing: 0,
         internalLayoutVariant: 'vertical-spine',
       }),
     },
   ],
 );
 const compassStrengthRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.flatMap((spec) =>
-  strengths.map((strength) =>
-    soft(spec, strength, undefined, undefined, { spacing: 0 }),
-  ),
+  strengths.map((strength) => soft(spec, strength, undefined, undefined)),
 );
 const macroPerturbationRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.map((spec) => ({
   fixtureId: spec.id,
-  ...compareFocusSchematicSoftInternalVariants(inputFor(spec, false), {
-    spacing: 0,
-  }),
+  ...compareFocusSchematicSoftInternalVariants(inputFor(spec, false)),
 }));
 const stressRows = [20, 50, 100].flatMap((count) =>
   strengths.map((strength) => ({
@@ -1052,6 +974,10 @@ const hardGatesPass =
     ({ deterministic, hardGates, maximumPerFileFolderWeight }) =>
       deterministic && hardGates.overlapFree && maximumPerFileFolderWeight <= 1,
   ) &&
+  scopeDecayRows.every(
+    ({ deterministic, hardGates, maximumPerFileFolderWeight }) =>
+      deterministic && hardGates.overlapFree && maximumPerFileFolderWeight <= 1,
+  ) &&
   compassDemandBakeoffRows.every(
     ({ deterministic, hardGates }) => deterministic && hardGates.overlapFree,
   ) &&
@@ -1064,7 +990,7 @@ const hardGatesPass =
   zeroFolderMutation.byteIdentical;
 const completeHardGatesPass =
   hardGatesPass &&
-  spacingCandidateSummaries.every(({ summary }) => summary.hardGatesPass) &&
+  fixedStructuralSummary.hardGatesPass &&
   spacingAnchorSummaries.every(({ summary }) => summary.hardGatesPass) &&
   summarizeSpacingRows(strengthSpacingRows).hardGatesPass &&
   secondaryInvariant.byteIdentical &&
@@ -1088,17 +1014,15 @@ const report = {
   strengths,
   fixedIterationSchedule: [36, 18],
   oldBaselineSpacing: FOCUS_SCHEMATIC_SOFT_CLUSTER_BASELINE_SPACING,
-  spacingCandidateMatrix: {
+  frozenStructuralSpacing: {
     representativeFixtureIds: representativeSpacingFixtures.map(({ id }) => id),
-    macroCandidates: macroSpacingCandidates,
-    internalCandidates: internalSpacingCandidates,
-    selected: { macro: 'moderate', internal: 'moderate' },
-    summaries: spacingCandidateSummaries,
+    policy: FOCUS_SCHEMATIC_SOFT_CLUSTER_STRUCTURAL_SPACING,
+    summary: fixedStructuralSummary,
   },
   spacingAnchors: {
-    compact: FOCUS_SCHEMATIC_SOFT_SPACING_COMPACT,
-    selected: FOCUS_SCHEMATIC_SOFT_SPACING_SELECTED,
-    spacious: FOCUS_SCHEMATIC_SOFT_SPACING_SPACIOUS,
+    baseScale: focusSchematicSoftRadialSpreadScale(0),
+    defaultScale: focusSchematicSoftRadialSpreadScale(50),
+    strongScale: focusSchematicSoftRadialSpreadScale(100),
   },
   spacingRows,
   adaptiveSpacingRows,
@@ -1115,11 +1039,12 @@ const report = {
   multiplicityRows,
   fix2IntentRows,
   hierarchyForceBakeoff: {
-    selectedPolicy: 'normalized-decay',
+    selectedPolicy: 'nested-normalized-decay-1/3',
     rationale:
       'Nearest scopes receive more weight while every File has one normalized total folder-force budget.',
     rows: hierarchyForceRows,
   },
+  scopeDecayRows,
   hierarchyStrengthRows,
   cardinalGeometryRows,
   adaptiveCompassPatch: {

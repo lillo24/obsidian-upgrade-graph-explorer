@@ -516,6 +516,7 @@ export function buildFocusSchematicSoftFolderDisplayTree({
 export function focusSchematicSoftFolderScopeMemberships(
   tree: FocusSchematicSoftFolderDisplayTree,
   policy: FocusSchematicSoftHierarchyForcePolicy,
+  ancestorDecayBase: 3 | 4 = 3,
 ): ReadonlyMap<EntityId, readonly FocusSchematicSoftFolderScopeMembership[]> {
   const folderByKey = new Map(
     tree.folders.map((folder) => [folder.folderKey, folder]),
@@ -533,7 +534,8 @@ export function focusSchematicSoftFolderScopeMemberships(
       const selected = policy === 'nearest-only' ? scopes.slice(0, 1) : scopes;
       const raw = selected.map((folderKey, index) => ({
         folderKey,
-        weight: policy === 'normalized-decay' ? 1 / 2 ** index : 1,
+        weight:
+          policy === 'normalized-decay' ? 1 / ancestorDecayBase ** index : 1,
       }));
       const total = raw.reduce((sum, item) => sum + item.weight, 0);
       return [

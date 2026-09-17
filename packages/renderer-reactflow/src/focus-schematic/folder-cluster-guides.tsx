@@ -35,6 +35,11 @@ interface FolderGuideBuildResult {
   readonly unitsForParent: readonly GuideUnit[];
 }
 
+export interface FocusSchematicFolderClusterGuideOptions {
+  /** Render each displayed folder from its direct Files without child regions. */
+  readonly directFoldersOnly?: boolean;
+}
+
 export interface FocusSchematicFolderClusterGuide {
   readonly folderKey: string;
   readonly parentFolderKey: string | null;
@@ -453,7 +458,9 @@ function guideForIsland(
 export function focusSchematicFolderClusterGuides(
   tree: FocusSchematicSoftFolderDisplayTree,
   nodes: readonly GraphFlowNode[],
+  options: FocusSchematicFolderClusterGuideOptions = {},
 ): readonly FocusSchematicFolderClusterGuide[] {
+  const directFoldersOnly = options.directFoldersOnly === true;
   const rectangleByModuleId = new Map<string, GuideUnit>();
   for (const node of nodes) {
     if (node.type !== 'module') continue;
@@ -483,9 +490,11 @@ export function focusSchematicFolderClusterGuides(
       const rectangle = rectangleByModuleId.get(fileId);
       return rectangle === undefined ? [] : [rectangle];
     });
-    const children = folder.childFolderKeys.flatMap(
-      (childKey) => resultByFolder.get(childKey)?.unitsForParent ?? [],
-    );
+    const children = directFoldersOnly
+      ? []
+      : folder.childFolderKeys.flatMap(
+          (childKey) => resultByFolder.get(childKey)?.unitsForParent ?? [],
+        );
     const units = [...direct, ...children];
     // Workspace root is structural unless it contains a directly displayed File.
     if (
@@ -498,7 +507,9 @@ export function focusSchematicFolderClusterGuides(
       });
       continue;
     }
-    const descendants = new Set(folder.descendantFileIds);
+    const descendants = new Set(
+      directFoldersOnly ? folder.directFileIds : folder.descendantFileIds,
+    );
     const blockers = [...rectangleByModuleId]
       .filter(([moduleId]) => !descendants.has(moduleId))
       .map(([, rectangle]) => rectangle);
@@ -531,19 +542,24 @@ export function focusSchematicFolderClusterGuides(
         height: guide.height,
       });
     }
-    const unitsForParent = islands.map((island) => {
-      const rendered = unitByIsland.get(island);
-      if (rendered !== undefined) return rendered;
-      const survivingUnit = island[0]!;
-      for (const representedGuideId of survivingUnit.representedGuideIds) {
-        const ancestors =
-          localSuppressedAncestorsByGuideId.get(representedGuideId) ??
-          new Set<string>();
-        ancestors.add(folder.folderKey);
-        localSuppressedAncestorsByGuideId.set(representedGuideId, ancestors);
-      }
-      return survivingUnit;
-    });
+    const unitsForParent = directFoldersOnly
+      ? []
+      : islands.map((island) => {
+          const rendered = unitByIsland.get(island);
+          if (rendered !== undefined) return rendered;
+          const survivingUnit = island[0]!;
+          for (const representedGuideId of survivingUnit.representedGuideIds) {
+            const ancestors =
+              localSuppressedAncestorsByGuideId.get(representedGuideId) ??
+              new Set<string>();
+            ancestors.add(folder.folderKey);
+            localSuppressedAncestorsByGuideId.set(
+              representedGuideId,
+              ancestors,
+            );
+          }
+          return survivingUnit;
+        });
     resultByFolder.set(folder.folderKey, { guides, unitsForParent });
   }
   return [...resultByFolder.values()]

@@ -275,16 +275,55 @@ describe('nested Soft folder display tree', () => {
       'nearest-only',
       'normalized-decay',
       'normalized-equal',
-    ] as const) {
-      const memberships = focusSchematicSoftFolderScopeMemberships(
-        tree,
-        policy,
-      );
-      for (const values of memberships.values())
-        expect(values.reduce((sum, { weight }) => sum + weight, 0)).toBeCloseTo(
-          1,
+    ] as const)
+      for (const base of [3, 4] as const) {
+        const memberships = focusSchematicSoftFolderScopeMemberships(
+          tree,
+          policy,
+          base,
         );
-    }
+        for (const values of memberships.values())
+          expect(
+            values.reduce((sum, { weight }) => sum + weight, 0),
+          ).toBeCloseTo(1);
+      }
+  });
+
+  it('normalizes 1/3 and 1/4 ancestor decay and supports nearest-only membership', () => {
+    const tree = buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles: [
+        file('outer', 'A'),
+        file('middle', 'A/B'),
+        file('deep-a', 'A/B/C'),
+        file('deep-b', 'A/B/C'),
+      ],
+    });
+    const thirds = focusSchematicSoftFolderScopeMemberships(
+      tree,
+      'normalized-decay',
+      3,
+    ).get('deep-a')!;
+    expect(thirds.map(({ folderKey }) => folderKey)).toEqual([
+      'A/B/C',
+      'A/B',
+      'A',
+    ]);
+    expect(thirds[0]!.weight).toBeCloseTo(9 / 13);
+    expect(thirds[1]!.weight).toBeCloseTo(3 / 13);
+    expect(thirds[2]!.weight).toBeCloseTo(1 / 13);
+    const fourths = focusSchematicSoftFolderScopeMemberships(
+      tree,
+      'normalized-decay',
+      4,
+    ).get('deep-a')!;
+    expect(fourths[0]!.weight).toBeCloseTo(16 / 21);
+    expect(fourths[1]!.weight).toBeCloseTo(4 / 21);
+    expect(fourths[2]!.weight).toBeCloseTo(1 / 21);
+    expect(
+      focusSchematicSoftFolderScopeMemberships(tree, 'nearest-only', 4).get(
+        'deep-a',
+      ),
+    ).toEqual([{ folderKey: 'A/B/C', weight: 1 }]);
   });
 
   it('remains deterministic under deep chains, many singleton folders, and sparse manual intent', () => {

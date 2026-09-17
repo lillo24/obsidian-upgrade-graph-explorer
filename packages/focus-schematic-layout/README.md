@@ -99,18 +99,21 @@ sibling-branch pass; module X, dimensions, ownership, lanes, and exact endpoint
 identity stay fixed. The default remains Off until graphical approval selects
 the HIER4A candidate and visual Heading-order policy.
 
-HIER4B-SPACING keeps macro and internal Soft breathing room behind one typed
-policy. A 0–100 value resolves through Compact, Selected, and Spacious anchors
-at 0, 50, and 100 with deterministic piecewise integer interpolation. The
-selected 50 policy uses 600 hop spacing, 88 module clearance, 180 topology
-extra distance, 72 packing steps, and 104 radial jitter, plus 30/60 internal
-node/rank separation and 34/30 module padding. The 0 anchor preserves the old
-520/72/155/64/90 and 24/48/28/24 policy; the 100 anchor is the validated
-680/104/210/84/120 and 36/72/42/36 upper bound. The derived internal settings
-exist only during Soft computation; shared HIER settings and Adaptive Compass
-assignment/search/scoring remain unchanged. Hop-error evidence uses the
-resolved hop spacing.
+HIER4B-SPACING-FIX1 freezes one Soft structural policy at 600 hop spacing,
+88 module clearance, 180 topology distance, 72 packing steps, 104 radial
+jitter, 30/60 internal node/rank separation, and 34/30 module padding. The
+0–100 Sandbox spacing value is a post-layout radial transform with scale
+`1 + 1.4 × value/100`. It translates complete non-root modules, their nodes,
+and endpoint attachments around the fixed root without changing dimensions,
+internal offsets, Adaptive Compass, crossing order, folder force, or packing.
+It is excluded from the worker request and structural cache key.
 
+Nested Soft force uses normalized `1 / base ** index` membership with selectable
+base 3 (default) or 4. Direct-only selects each File's nearest/current displayed
+folder and canonicalizes decay out of the cache identity. Both modes exclude the
+root File before active force-group assembly while retaining it in display
+membership. The fixed `[36, 18]` schedule and secondary zero-influence rule are
+unchanged.
 Directional physical sides retain HIER4A's signed-rank policy: a counterpart at
 a smaller rank attaches left, a counterpart at a larger rank attaches right,
 and same-rank secondary display uses `auto`. Soft Folder Clusters instead chooses
@@ -172,12 +175,15 @@ the bakeoff evidence if changed.
   packing, and bounded two-round internal-layout evidence. The Modular worker
   calls it only when the persisted Sandbox macro policy selects Soft Folder
   Clusters; Directional Bands remains the default.
-- `src/soft-cluster-spacing.ts` owns the three validated spacing anchors,
-  bounded 0–100 normalization, and deterministic piecewise interpolation.
+- `src/soft-cluster-spacing.ts` owns the fixed structural policy, bounded 0–100
+  radial-spread normalization, and continuous 1.0×–2.4× scale mapping.
+- `src/soft-radial-spread.ts` translates complete non-root module geometry and
+  endpoint attachments around the fixed root after structural computation.
 - `src/soft-folder-display.ts` owns strict sparse File-parent and flattened-layer
   intent, conservative reconciliation, the pure nested displayed tree,
-  one-child-unit compression/provenance, action mutations, and bounded H0/H1/H2
-  membership weights. It contains no storage, renderer, or source-provider logic.
+  one-child-unit compression/provenance, action mutations, nearest-only scope,
+  and normalized 1/3 or 1/4 ancestor weights. It contains no storage, renderer,
+  or source-provider logic.
 - `src/soft-cluster-fixtures.ts` owns SC1–SC24 plus SC17–SC19 stability pairs.
 - `src/source-order.ts` derives public Dagre adjacent-sibling constraints from
   canonical source order.
@@ -185,11 +191,11 @@ the bakeoff evidence if changed.
   placeholder policy.
 - `src/selected.ts` maps the accepted A1 computed result to the compatible
   selected candidate/attempt API.
-- `src/worker-protocol.ts` owns the version-9 exact-shape production messages,
-  macro/strength/spacing/display-intent policy normalization, cardinal and Soft
-  Compass evidence, and originating-input result validation. Version 9 is
-  required because the exact serialized policy and evidence schemas now carry
-  Soft spacing alongside the merged Compass evidence.
+- `src/worker-protocol.ts` owns the version-10 exact-shape production messages,
+  macro/strength/scope/decay/display-intent policy normalization, cardinal and
+  Soft Compass evidence, and originating-input result validation. Version 10
+  and Soft evidence schema 5 carry structural scope/decay while radial spread
+  stays outside worker input.
 - `src/worker-runtime.ts` validates requests, computes A1, records phase
   timings, and returns either a complete validated result or an explicit
   failure.

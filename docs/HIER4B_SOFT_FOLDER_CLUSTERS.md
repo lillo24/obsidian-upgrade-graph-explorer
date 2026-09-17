@@ -1,6 +1,6 @@
 # HIER4B Soft Folder Clusters
 
-Status: **MERGED IMPLEMENTATION — accepted folder behavior and root-neutral folder force are on `main`; PATCH1 Adaptive Compass compatibility awaits graphical QA.**
+Status: **HIER4B-SPACING-FIX1 CANDIDATE — Direct-only scope, normalized 1/3 or 1/4 ancestor pull, and radial spread await native graphical QA in PR #106.**
 
 HIER4B evaluates a second macro-layout family for Modular Focus Hierarchy.
 Directional Folder Bands remains the Modular Preview default, and Classic Focus
@@ -43,17 +43,23 @@ variable-rectangle collision packing. Secondary connections remain at zero
 geometry influence.
 
 Each visible File retains truthful membership in its displayed ancestor scopes.
-For attraction, each non-root File participates in those scopes. FIX2 compared:
+For attraction, each non-root File participates in those scopes. The Sandbox
+can compare two scope modes without changing the displayed tree or persisted
+folder intent:
 
 - H0: nearest displayed folder only;
-- H1: normalized decaying ancestor weights;
-- H2: normalized equal ancestor shares.
+- H1: normalized decaying ancestor weights (Nested, the default);
+- Direct folders only: nearest displayed folder only.
 
-H1 is selected internally. The nearest displayed folder receives the strongest
-share while all shares for one File sum to at most one, so depth cannot amplify
-the global Folder strength. At strength 0 the solver builds no folder-force
-groups. Manually promoted Files leave their former child scope; flattened and
-automatically compressed layers receive no separate force.
+Nested mode offers geometric raw decay of `1 / base ** index`, with 1/3 as the
+default and 1/4 as the comparison. The selected raw weights are normalized per
+File: two scopes produce `.75/.25` or `.80/.20`, and three produce about
+`.6923/.2308/.0769` or `.7619/.1905/.0476`. Total force weight therefore stays
+at most one. Direct-only mode selects one nearest/current displayed parent and
+canonicalizes the stored decay choice out of structural identity. At strength
+0 the solver builds no folder-force groups. Manually promoted Files leave their
+former child scope; flattened and automatically compressed layers receive no
+separate force.
 
 In Focus Soft Folder Clusters, the Focus/root File remains a topology anchor
 and visible folder member but is excluded from folder-attraction centroids and
@@ -98,53 +104,48 @@ with lateral or vertical-only branches, demand matches, hard-guard overrides,
 pass-one/pass-two region and bounds churn, and before/after pass-two crossings
 and span. The macro perturbation diagnostic distinguishes visible region,
 internal rectangle, and module-bound changes from a true geometric no-op. When
-Adaptive and Vertical input rectangles are identical, the downstream Soft
-candidate is byte-identical. Soft cache algorithm version 6 covers the combined spatial-Compass, root-neutral
-force, and spacing geometry, while worker protocol version 9 isolates the
-combined evidence and policy shape without invalidating the Directional
-algorithm version.
+Adaptive and Vertical input rectangles are identical across both bounded passes,
+the downstream Soft candidate is byte-identical. Soft cache algorithm version 7
+covers the root-neutral scope and decay semantics. Worker protocol version 10
+and Soft evidence schema 5 carry the structural scope, decay, and fixed-spacing
+policy without invalidating the Directional algorithm version.
 
 ## Soft spacing
 
-HIER4B-SPACING adds a separate Sandbox `Soft spacing` value from 0 to 100.
-It controls geometric breathing room; `Folder strength` continues to control
-only repeated-folder attraction. The default value is 50. Values use piecewise
-integer interpolation through three benchmarked policies:
+HIER4B-SPACING-FIX1 keeps one fixed structural policy: 600 hop spacing, 88
+module gap, 180 topology distance, 72 packing step, 104 radial jitter, 30/60
+internal node/rank separation, and 34/30 module padding. The `[36, 18]`
+schedule, Adaptive Compass, endpoint ordering, folder relaxation, collision
+packing, and root-neutral force are decided once by that structural result.
 
-| Property                  | 0 Compact | 50 Selected | 100 Spacious |
-| ------------------------- | --------: | ----------: | -----------: |
-| Hop spacing               |       520 |         600 |          680 |
-| Module gap                |        72 |          88 |          104 |
-| Topology extra distance   |       155 |         180 |          210 |
-| Packing step              |        64 |          72 |           84 |
-| Radial jitter range       |        90 |         104 |          120 |
-| Internal node separation  |        24 |          30 |           36 |
-| Internal rank separation  |        48 |          60 |           72 |
-| Horizontal module padding |        28 |          34 |           42 |
-| Vertical module padding   |        24 |          30 |           36 |
+The Sandbox `Soft spacing` value from 0 to 100 is now a post-layout radial
+spread. Its linear scale is `1 + 1.4 × value/100`: 0 is 1.0× base radius, 50 is
+1.7×, and 100 is 2.4×. Every non-root module and all its File/Heading/Block/
+Diagnostic rectangles and endpoint attachments receive the same translation
+from the fixed root center. The root, module dimensions, internal offsets,
+angular direction, branch assignments, force groups, and structural evidence
+remain unchanged. Folder guides derive from the transformed rectangles.
 
-The 0 anchor preserves the pre-spacing Soft geometry. The selected 50 anchor
-raises the hard module clearance from 72 to 88 while keeping bounds, endpoint
-span, hop error, cohesion, collision work, and runtime within the validated
-bakeoff range. The 100 anchor provides a bounded exploratory upper limit.
-All values keep the fixed `[36, 18]` schedule and root-neutral force behavior.
-
-The internal values are applied through a derived Soft-only input and never
-change the shared HIER settings. Soft cache identity includes the normalized
-spacing value. Directional requests replace it with the default and exclude it
-from cache identity, so a retained hidden value has no Directional geometry or
-worker influence. Adaptive Compass assignment, search, scoring, and tie-breaks
-are unchanged; region-use observations belong only to the development evidence.
+Radial spread is absent from worker requests and structural cache identity, so
+changing it causes zero projection/model/worker/solver work and reuses one
+base result. Directional requests ignore all Soft-only scope, decay, strength,
+and radial values. Native graphical QA is pending.
 
 ## Nested Folder guides
 
 Folder guides remain a renderer-only overlay derived from the final displayed
-module rectangles and the pure display tree. Child regions are built first;
-their rectangles then enter parent guide geometry along with the parent's
-direct Files. This makes child containment structural. Fixed per-level padding
-keeps deep nesting bounded. Logical folders may retain multiple disconnected
-regions when topology separates their Files, avoiding a misleading hull across
-unrelated modules.
+module rectangles and the pure display tree. In Nested mode, child regions are
+built first; their rectangles then enter parent guide geometry along with the
+parent's direct Files. This makes child containment structural. Fixed per-level
+padding keeps deep nesting bounded. Logical folders may retain multiple
+disconnected regions when topology separates their Files, avoiding a misleading
+hull across unrelated modules.
+
+In Direct-only mode, each folder guide uses only its direct displayed Files.
+Child-folder regions never become parent-guide units, so a parent with its own
+Files may render independently without wrapping a child folder. One-unit
+suppression, area targeting, nearest displayed File context, and the underlying
+display tree and manual intent remain unchanged.
 
 The hull SVG remains pointer-inert and behind graph edges and nodes. The graph
 pane converts a context-menu point through React Flow's screen-to-world helper

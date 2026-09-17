@@ -438,6 +438,8 @@ describe('Named Saved View semantic composition', () => {
         modularFocusHeadingOrder: 'document-order',
         modularFocusMacroLayout: 'soft-folder-clusters',
         modularFocusSoftFolderStrength: 74,
+        modularFocusDirectFoldersOnly: false,
+        modularFocusSoftAncestorDecayBase: 3,
         modularFolderStripsVisible: false,
         modularConnectionStyle: 'electronic',
       },

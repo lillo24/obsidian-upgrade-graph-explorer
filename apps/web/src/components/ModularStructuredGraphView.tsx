@@ -12,6 +12,7 @@ import { createFocusSchematicModel } from '@icarus-graph-explorer/focus-schemati
 import {
   FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
   DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+  applyFocusSchematicSoftRadialSpread,
   buildFocusSchematicSoftFolderDisplayTree,
   normalizeFocusSchematicSoftFolderStrength,
   normalizeFocusSchematicSoftSpacing,
@@ -79,6 +80,8 @@ export interface ModularStructuredGraphViewProps {
   readonly initialTransitionAnchor?: GraphTransitionAnchor;
   readonly internalLayoutVariant: FocusSchematicProductInternalLayoutVariant;
   readonly macroLayout: FocusSchematicProductMacroLayout;
+  readonly directFoldersOnly: boolean;
+  readonly softAncestorDecayBase: 3 | 4;
   readonly softFolderStrength: number;
   readonly softSpacing: number;
   readonly softFolderDisplayIntent: FocusSchematicProductLayoutPolicies['softFolderDisplayIntent'];
@@ -293,6 +296,8 @@ export default function ModularStructuredGraphView(
     instrumentation,
     internalLayoutVariant,
     macroLayout,
+    directFoldersOnly,
+    softAncestorDecayBase,
     onFatalFailure,
     onViewportObservation,
     projection,
@@ -346,12 +351,19 @@ export default function ModularStructuredGraphView(
   const effectiveSoftSpacing =
     macroLayout === 'soft-folder-clusters'
       ? normalizeFocusSchematicSoftSpacing(softSpacing)
-      : DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softSpacing;
+      : 50;
   const layoutPolicies = useMemo<FocusSchematicProductLayoutPolicies>(
     () => ({
       macroLayout,
       softFolderStrength: effectiveSoftFolderStrength,
-      softSpacing: effectiveSoftSpacing,
+      softFolderScopeMode:
+        macroLayout === 'soft-folder-clusters' && directFoldersOnly
+          ? 'nearest-only'
+          : 'nested',
+      softAncestorDecayBase:
+        macroLayout === 'soft-folder-clusters' && !directFoldersOnly
+          ? softAncestorDecayBase
+          : DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softAncestorDecayBase,
       softFolderDisplayIntent:
         macroLayout === 'soft-folder-clusters'
           ? softFolderDisplayIntent
@@ -361,10 +373,11 @@ export default function ModularStructuredGraphView(
     }),
     [
       effectiveSoftFolderStrength,
-      effectiveSoftSpacing,
+      directFoldersOnly,
       endpointOrderPolicy,
       internalLayoutVariant,
       macroLayout,
+      softAncestorDecayBase,
       softFolderDisplayIntent,
     ],
   );
@@ -632,8 +645,17 @@ export default function ModularStructuredGraphView(
       );
     }
     try {
+      const displayedComputed =
+        macroLayout === 'soft-folder-clusters'
+          ? applyFocusSchematicSoftRadialSpread(
+              lifecycle.adopted.computed,
+              effectiveSoftSpacing,
+              model.modules.find(({ id }) => id === model.rootModuleId)
+                ?.documentProjectionNodeId,
+            )
+          : lifecycle.adopted.computed;
       return prepareGraph(
-        lifecycle.adopted.computed,
+        displayedComputed,
         secondaryRelationshipsVisible,
         routeStyle,
       );
@@ -643,7 +665,10 @@ export default function ModularStructuredGraphView(
   }, [
     layoutKey,
     lifecycle.adopted,
+    effectiveSoftSpacing,
+    macroLayout,
     model.modules,
+    model.rootModuleId,
     prepareGraph,
     projection,
     secondaryRelationshipsVisible,
@@ -654,8 +679,9 @@ export default function ModularStructuredGraphView(
       focusSchematicFolderClusterGuides(
         softFolderDisplayTree,
         displayedGraph.nodes,
+        { directFoldersOnly },
       ),
-    [displayedGraph.nodes, softFolderDisplayTree],
+    [directFoldersOnly, displayedGraph.nodes, softFolderDisplayTree],
   );
   const activeSoftFolderContext =
     softFolderContext === null ||

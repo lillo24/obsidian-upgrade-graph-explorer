@@ -16,11 +16,12 @@ import {
   evaluateFocusSchematicEndpointLayoutQuality,
 } from './endpoint-facing';
 import { evaluateFocusSchematicFolderBandQuality } from './folder-bands';
-import { normalizeFocusSchematicSoftFolderStrength } from './policies';
 import {
-  normalizeFocusSchematicSoftSpacing,
-  resolveFocusSchematicSoftClusterSpacing,
-  validateFocusSchematicSoftClusterSpacingPolicy,
+  normalizeFocusSchematicSoftAncestorDecayBase,
+  normalizeFocusSchematicSoftFolderStrength,
+} from './policies';
+import {
+  FOCUS_SCHEMATIC_SOFT_CLUSTER_STRUCTURAL_SPACING,
   type FocusSchematicSoftClusterSpacingPolicy,
 } from './soft-cluster-spacing';
 import {
@@ -48,7 +49,7 @@ import type {
 export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE = [
   36, 18,
 ] as const;
-export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 6 as const;
+export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 7 as const;
 
 const STRATEGY_ID = 'HIER4B-soft-folder-clusters' as const;
 const EPSILON = 1e-6;
@@ -318,6 +319,7 @@ function hierarchyFolderGroups(
   strength: FocusSchematicSoftClusterStrength,
   policy: FocusSchematicSoftHierarchyForcePolicy,
   rootModuleId: string,
+  ancestorDecayBase: 3 | 4,
 ) {
   if (strength === 0)
     return new Map<
@@ -328,6 +330,7 @@ function hierarchyFolderGroups(
   for (const [id, memberships] of focusSchematicSoftFolderScopeMemberships(
     tree,
     policy,
+    ancestorDecayBase,
   )) {
     // The Focus File remains a displayed folder member, but it is the neutral
     // topology anchor and must not bias Soft folder-attraction centroids.
@@ -467,6 +470,7 @@ function relax(
   strength: FocusSchematicSoftClusterStrength,
   tree: FocusSchematicSoftFolderDisplayTree,
   hierarchyForcePolicy: FocusSchematicSoftHierarchyForcePolicy,
+  ancestorDecayBase: 3 | 4,
   iterations: number,
   stats: RelaxationStats,
   spacing: FocusSchematicSoftClusterSpacingPolicy,
@@ -482,6 +486,7 @@ function relax(
     strength,
     hierarchyForcePolicy,
     input.model.rootModuleId,
+    ancestorDecayBase,
   );
   const folderFactor = strength / 100;
   for (let iteration = 0; iteration < iterations; iteration += 1) {
@@ -674,6 +679,7 @@ function regionDifferenceCount(
 
 export interface FocusSchematicSoftMacroPerturbationDiagnostic {
   readonly internalRegionAssignmentDifferenceCount: number;
+  readonly adaptivePassRegionChangeCount: number;
   readonly internalNodeGeometryDifferenceCount: number;
   readonly moduleBoundsDifferenceCount: number;
   readonly finalNodeGeometryDifferenceCount: number;
@@ -733,6 +739,7 @@ function metrics(
   hops: ReadonlyMap<string, number>,
   tree: FocusSchematicSoftFolderDisplayTree,
   hierarchyForcePolicy: FocusSchematicSoftHierarchyForcePolicy,
+  ancestorDecayBase: 3 | 4,
   spacing: FocusSchematicSoftClusterSpacingPolicy,
 ): FocusSchematicSoftClusterMetrics {
   const positions = new Map(
@@ -743,6 +750,7 @@ function metrics(
     100,
     hierarchyForcePolicy,
     input.model.rootModuleId,
+    ancestorDecayBase,
   );
   const folderRadiiByKey = [...repeated].map(([folderKey, members]) => {
     const centroid = members.reduce(
@@ -864,11 +872,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
   options: FocusSchematicSoftClusterOptions = {},
 ): FocusSchematicSoftClusterLayoutAttempt {
   const strength = normalizeFocusSchematicSoftFolderStrength(options.strength);
-  const softSpacing = normalizeFocusSchematicSoftSpacing(options.spacing);
-  const spacing =
-    options.spacingPolicy === undefined
-      ? resolveFocusSchematicSoftClusterSpacing(softSpacing)
-      : validateFocusSchematicSoftClusterSpacingPolicy(options.spacingPolicy);
+  const spacing = FOCUS_SCHEMATIC_SOFT_CLUSTER_STRUCTURAL_SPACING;
   const internalLayoutVariant =
     options.internalLayoutVariant ?? 'adaptive-compass';
   const compassDemandPolicy: FocusSchematicCompassDemandPolicy =
@@ -880,19 +884,26 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
   const displayIntent = canonicalFocusSchematicSoftFolderDisplayIntent(
     options.displayIntent ?? EMPTY_FOCUS_SCHEMATIC_SOFT_FOLDER_DISPLAY_INTENT,
   );
+  const folderScopeMode =
+    options.folderScopeMode ??
+    (options.hierarchyForcePolicy === 'nearest-only'
+      ? 'nearest-only'
+      : 'nested');
+  const ancestorDecayBase = normalizeFocusSchematicSoftAncestorDecayBase(
+    options.ancestorDecayBase,
+  );
   const hierarchyForcePolicy =
-    options.hierarchyForcePolicy ?? 'normalized-decay';
+    folderScopeMode === 'nearest-only'
+      ? 'nearest-only'
+      : (options.hierarchyForcePolicy ?? 'normalized-decay');
   const intentFingerprint = Math.floor(
     hashUnit(JSON.stringify(displayIntent)) * 0x1_0000_0000,
   )
     .toString(16)
     .padStart(8, '0');
-  const spacingFingerprint = Math.floor(
-    hashUnit(JSON.stringify(spacing)) * 0x1_0000_0000,
-  )
-    .toString(16)
-    .padStart(8, '0');
-  const configId = `HIER4Bv${FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION}-soft-clusters-s${strength}-spacing-${softSpacing}-${spacingFingerprint}-${internalLayoutVariant}-${endpointOrderPolicy}-${hierarchyForcePolicy}-${compassDemandPolicy}-${spatialDemandSummary}-intent-${displayIntent.fileParentOverrides.length}-${displayIntent.flattenedFolderKeys.length}-${intentFingerprint}`;
+  const decayIdentity =
+    folderScopeMode === 'nearest-only' ? 'direct' : ancestorDecayBase;
+  const configId = `HIER4Bv${FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION}-soft-clusters-s${strength}-${internalLayoutVariant}-${endpointOrderPolicy}-${folderScopeMode}-decay-${decayIdentity}-${hierarchyForcePolicy}-${compassDemandPolicy}-${spatialDemandSummary}-intent-${displayIntent.fileParentOverrides.length}-${displayIntent.flattenedFolderKeys.length}-${intentFingerprint}`;
   const started = performance.now();
   try {
     const baseAttempt = computeFocusSchematicRevision2LayoutAttempt(input);
@@ -913,12 +924,14 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
     const memberships = focusSchematicSoftFolderScopeMemberships(
       tree,
       hierarchyForcePolicy,
+      ancestorDecayBase,
     );
     const forceGroups = hierarchyFolderGroups(
       tree,
       100,
       hierarchyForcePolicy,
       input.model.rootModuleId,
+      ancestorDecayBase,
     );
     const pairs = primaryPairs(base.endpointPlan);
     const moduleIds = base.candidate.modules
@@ -958,6 +971,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       strength,
       tree,
       hierarchyForcePolicy,
+      ancestorDecayBase,
       FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE[0],
       relaxation,
       spacing,
@@ -990,6 +1004,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       strength,
       tree,
       hierarchyForcePolicy,
+      ancestorDecayBase,
       FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE[1],
       relaxation,
       spacing,
@@ -1073,12 +1088,11 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       0,
     );
     const evidence: FocusSchematicSoftClusterEvidence = {
-      schemaVersion: 4,
+      schemaVersion: 5,
       developmentOnly: true,
       layoutFamily: 'soft-folder-clusters',
       strength,
-      softSpacing,
-      resolvedSpacing: spacing,
+      structuralSpacing: spacing,
       endpointOrderPolicy,
       fileParentOverrideCount: tree.reconciledIntent.fileParentOverrides.length,
       flattenedFolderCount: tree.reconciledIntent.flattenedFolderKeys.length,
@@ -1089,6 +1103,9 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
         0,
         ...tree.files.map(({ fileId }) => memberships.get(fileId)?.length ?? 0),
       ),
+      folderScopeMode,
+      ancestorDecayBase:
+        folderScopeMode === 'nearest-only' ? null : ancestorDecayBase,
       hierarchyForcePolicy,
       maximumPerFileFolderWeight: Math.max(
         0,
@@ -1165,6 +1182,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
         hops,
         tree,
         hierarchyForcePolicy,
+        ancestorDecayBase,
         spacing,
       ),
       runtime: {
@@ -1189,13 +1207,15 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       internalLayoutEvidence: {
         ...internalLayoutEvidence,
         softClusterPolicyEvidence: {
-          schemaVersion: 4,
+          schemaVersion: 5,
           layoutFamily: 'soft-folder-clusters',
           strength,
-          softSpacing,
-          resolvedSpacing: spacing,
+          structuralSpacing: spacing,
           endpointOrderPolicy,
           displayIntent,
+          folderScopeMode,
+          ancestorDecayBase:
+            folderScopeMode === 'nearest-only' ? null : ancestorDecayBase,
           hierarchyForcePolicy,
           fileAttachmentPolicy: 'spatial-cardinal',
           compassDemandPolicy,
@@ -1241,11 +1261,7 @@ export function compareFocusSchematicSoftInternalVariants(
     .map(({ moduleId }) => moduleId)
     .sort(compareText);
   const hops = hopDistances(input.model.rootModuleId, moduleIds, pairs);
-  const softSpacing = normalizeFocusSchematicSoftSpacing(options.spacing);
-  const spacing =
-    options.spacingPolicy === undefined
-      ? resolveFocusSchematicSoftClusterSpacing(softSpacing)
-      : validateFocusSchematicSoftClusterSpacingPolicy(options.spacingPolicy);
+  const spacing = FOCUS_SCHEMATIC_SOFT_CLUSTER_STRUCTURAL_SPACING;
   const softInput: FocusSchematicLayoutInput = {
     ...input,
     settings: {
@@ -1346,11 +1362,14 @@ export function compareFocusSchematicSoftInternalVariants(
   const initialInternalGeometryIdentical =
     internalNodeGeometryDifferenceCount === 0 &&
     moduleBoundsDifferenceCount === 0;
+  const adaptivePassRegionChangeCount =
+    adaptiveAttempt.evidence.compass.pass1ToPass2BranchRegionChangeCount;
   const finalGeometryIdentical =
     finalNodeGeometryDifferenceCount === 0 &&
     finalModuleGeometryDifferenceCount === 0;
   return {
     internalRegionAssignmentDifferenceCount,
+    adaptivePassRegionChangeCount,
     internalNodeGeometryDifferenceCount,
     moduleBoundsDifferenceCount,
     finalNodeGeometryDifferenceCount,
@@ -1364,7 +1383,9 @@ export function compareFocusSchematicSoftInternalVariants(
     initialInternalGeometryIdentical,
     finalGeometryIdentical,
     semanticNoOpSatisfied:
-      !initialInternalGeometryIdentical || finalGeometryIdentical,
+      !initialInternalGeometryIdentical ||
+      adaptivePassRegionChangeCount > 0 ||
+      finalGeometryIdentical,
   };
 }
 

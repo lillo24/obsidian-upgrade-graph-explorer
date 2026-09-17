@@ -64,6 +64,47 @@ const folder = (
 });
 
 describe('nested Soft folder guides', () => {
+  it('renders Direct-only guides from direct Files without ancestor wrappers or tree mutation', () => {
+    const displayTree = tree([
+      { fileId: 'outer-1', exactFolderKey: 'A' },
+      { fileId: 'outer-2', exactFolderKey: 'A' },
+      { fileId: 'inner-1', exactFolderKey: 'A/B' },
+      { fileId: 'inner-2', exactFolderKey: 'A/B' },
+    ]);
+    const before = JSON.stringify(displayTree);
+    const nodes = [
+      node('outer-1', 0, 0),
+      node('outer-2', 140, 0),
+      node('inner-1', 320, 0),
+      node('inner-2', 460, 0),
+    ];
+    const nested = focusSchematicFolderClusterGuides(displayTree, nodes);
+    const direct = focusSchematicFolderClusterGuides(displayTree, nodes, {
+      directFoldersOnly: true,
+    });
+    const nestedParent = nested.find(({ folderKey }) => folderKey === 'A')!;
+    const directParent = direct.find(({ folderKey }) => folderKey === 'A')!;
+    const directChild = direct.find(({ folderKey }) => folderKey === 'A/B')!;
+    expect(nestedParent.memberModuleIds).toEqual([
+      'inner-1',
+      'inner-2',
+      'outer-1',
+      'outer-2',
+    ]);
+    expect(directParent.memberModuleIds).toEqual(['outer-1', 'outer-2']);
+    expect(directChild.memberModuleIds).toEqual(['inner-1', 'inner-2']);
+    expect(JSON.stringify(displayTree)).toBe(before);
+    expect(focusSchematicFolderClusterGuides(displayTree, nodes)).toEqual(
+      nested,
+    );
+    expect(
+      hitTestFocusSchematicFolderGuideRegion(direct, {
+        x: directChild.x + directChild.width / 2,
+        y: directChild.y + directChild.height / 2,
+      })?.folderKey,
+    ).toBe('A/B');
+  });
+
   it('G1-G3 contains child guides inside labeled parents with direct Files', () => {
     const displayTree = tree([
       { fileId: 'outer', exactFolderKey: 'A' },

@@ -45,8 +45,9 @@ non-root Files only, and the root module is labeled `DISPLAY MEMBER ·
 FORCE-NEUTRAL`. SC26 shows that a root plus one peer cannot create an attraction
 group; SC27 shows two peers attracting around their own centroid; SC28 covers
 normalized-decay ancestor scopes. These scenarios display strengths 0, 25, 50,
-75, and 100 side by side. Soft cache algorithm version 6 separates the combined
-root-neutral, spatial-Compass, and spacing geometry from the earlier branches.
+75, and 100 side by side. Soft cache algorithm version 7 separates the combined
+root-neutral, spatial-Compass, scope/decay, and fixed structural geometry from
+the earlier branches; radial spread remains outside this identity.
 
 ## Display-tree cases
 
@@ -175,31 +176,38 @@ merged `bfc4b1c` baseline. All six SHA-256 values remain byte-identical. The
 shared Compass engine still owns both policies; no algorithm copy or dependency
 was added.
 
-## HIER4B-SPACING candidate
+## HIER4B-SPACING-FIX1 candidate
 
-The spacing run first captured the version-5 baseline, then compared baseline,
-moderate, and wide macro policies independently against baseline, moderate, and
-wide internal policies on seven representative fixtures. The selected
-moderate/moderate default raises minimum module clearance from 72 to 88. On the
-representative matrix, mean bounds area rises about 16.8%, connected-pair P95
-about 10%, and exact endpoint-span P95 about 10.2% from the old baseline. The
-wide/wide upper anchor raises clearance to 104 without overlap, containment,
-root-centering, determinism, secondary-influence, schedule, or packing failure.
+The corrected candidate freezes the evidence-selected moderate structural
+policy at 600/88/180/72/104 macro values and 30/60/34/30 internal values. The
+solver still uses the fixed `[36, 18]` schedule. Soft spacing is measured only
+as a post-layout radial scale: 0 = 1.0×, 50 = 1.7×, and 100 = 2.4×. The direct
+71/72/73 regression proves identical module sizes, node-to-module offsets,
+angular order, branch/crossing evidence, and base structural result; coordinates
+differ only by the expected continuous root-relative scale. The web cache test
+observes one structural compute across repeated radial changes.
 
-The benchmark additionally runs all SC1–SC24 fixtures at spacing
-0/25/50/75/100, the 3×3 Folder strength × Soft spacing matrix, and
-development-only Adaptive region-use observations at the three anchors. Every
-sample uses the fixed `[36, 18]` schedule. Hop-radius error is measured against
-the currently resolved hop spacing. Root-neutral force regressions run at
-spacing 0, 50, and 100. Directional byte hashes and algorithm version remain
-unchanged. Native graphical QA is still required before merge.
+Nested scope now has normalized 1/3 and 1/4 decay rows. Two-scope weights are
+`.75/.25` and `.80/.20`; three-scope weights are approximately
+`.6923077/.2307692/.0769231` and `.7619048/.1904762/.0476190`. Direct-only
+selects one nearest displayed scope and produces identical cache identity for
+stored base 3 or 4. All force evidence excludes the root before active group
+assembly while display membership and guides retain it. Direct-guide tests show
+that parents with direct Files remain independently targetable and never wrap
+child-folder regions; switching modes leaves the display tree and intent byte
+identical.
 
-Adaptive Compass remains diagnostic for this task. The dedicated AC-S1–AC-S8
-rows preserve the merged Compass oracle at spacing 0 and separately record
-branch-region use and exact crossings at spacing 50 and 100. AC-S6 has zero
-crossings at 0 and one at both wider anchors, so native review must assess that
-visible interaction; HIER4B-SPACING does not change Compass assignment or
-scoring to conceal it.
+The generated benchmark passes its aggregate hard gate and remains
+`REQUIRES_GRAPHICAL_REVIEW`. It covers 135 fixture/spacing rows, 15 hub stress
+rows, 21 hierarchy-force rows, 35 hierarchy-strength rows, 28 scope/decay rows,
+32 Compass-demand rows, 40 Compass-strength rows, the 3×3 strength/spacing
+matrix, secondary and permutation identity, root centering, containment,
+determinism, overlap freedom, bounded per-File folder weight, and unchanged
+Directional reference hashes. AC-S4 now records its legitimate second-pass
+region change in the macro perturbation diagnostic instead of misclassifying
+it as a first-pass semantic no-op; production geometry is unchanged.
+
+Native graphical QA remains required before merge.
 
 ## Commands
 

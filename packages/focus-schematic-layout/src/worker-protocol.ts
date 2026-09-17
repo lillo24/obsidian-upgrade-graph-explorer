@@ -6,9 +6,10 @@ import {
   isFocusSchematicEndpointOrderPolicy,
   isFocusSchematicProductMacroLayout,
   isFocusSchematicProductInternalLayoutVariant,
+  isFocusSchematicSoftFolderScopeMode,
+  normalizeFocusSchematicSoftAncestorDecayBase,
   normalizeFocusSchematicSoftFolderDisplayIntent,
   normalizeFocusSchematicSoftFolderStrength,
-  normalizeFocusSchematicSoftSpacing,
   type FocusSchematicProductLayoutPolicies,
 } from './policies';
 import type {
@@ -18,7 +19,7 @@ import type {
   FocusSchematicSoftClusterEvidence,
 } from './types';
 
-export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 9 as const;
+export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 10 as const;
 
 export interface FocusSchematicLayoutWorkerRequest {
   readonly protocolVersion: typeof FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION;
@@ -126,14 +127,15 @@ function validateSoftClusterEvidence(
       'developmentOnly',
       'layoutFamily',
       'strength',
-      'softSpacing',
-      'resolvedSpacing',
+      'structuralSpacing',
       'endpointOrderPolicy',
       'fileParentOverrideCount',
       'flattenedFolderCount',
       'displayedFolderCount',
       'automaticallyCompressedFolderCount',
       'maximumDisplayedDepth',
+      'folderScopeMode',
+      'ancestorDecayBase',
       'hierarchyForcePolicy',
       'maximumPerFileFolderWeight',
       'fileAttachmentPolicy',
@@ -148,13 +150,11 @@ function validateSoftClusterEvidence(
     'Soft Cluster evidence',
   );
   if (
-    evidence.schemaVersion !== 4 ||
+    evidence.schemaVersion !== 5 ||
     evidence.developmentOnly !== true ||
     evidence.layoutFamily !== 'soft-folder-clusters' ||
     evidence.strength !==
       normalizeFocusSchematicSoftFolderStrength(policies.softFolderStrength) ||
-    evidence.softSpacing !==
-      normalizeFocusSchematicSoftSpacing(policies.softSpacing) ||
     evidence.endpointOrderPolicy !== policies.endpointOrderPolicy ||
     !Number.isSafeInteger(evidence.fileParentOverrideCount) ||
     Number(evidence.fileParentOverrideCount) < 0 ||
@@ -166,7 +166,17 @@ function validateSoftClusterEvidence(
     Number(evidence.automaticallyCompressedFolderCount) < 0 ||
     !Number.isSafeInteger(evidence.maximumDisplayedDepth) ||
     Number(evidence.maximumDisplayedDepth) < 0 ||
-    evidence.hierarchyForcePolicy !== 'normalized-decay' ||
+    evidence.folderScopeMode !== policies.softFolderScopeMode ||
+    evidence.ancestorDecayBase !==
+      (policies.softFolderScopeMode === 'nearest-only'
+        ? null
+        : normalizeFocusSchematicSoftAncestorDecayBase(
+            policies.softAncestorDecayBase,
+          )) ||
+    evidence.hierarchyForcePolicy !==
+      (policies.softFolderScopeMode === 'nearest-only'
+        ? 'nearest-only'
+        : 'normalized-decay') ||
     finiteNonNegative(
       evidence.maximumPerFileFolderWeight,
       'maximumPerFileFolderWeight',
@@ -230,8 +240,8 @@ function validateSoftClusterEvidence(
       'Soft Compass demand matches exceed demanded branches.',
     );
   const resolvedSpacing = record(
-    evidence.resolvedSpacing,
-    'Soft Cluster resolved spacing',
+    evidence.structuralSpacing,
+    'Soft Cluster structural spacing',
   );
   exactKeys(
     resolvedSpacing,
@@ -246,12 +256,12 @@ function validateSoftClusterEvidence(
       'modulePaddingX',
       'modulePaddingY',
     ],
-    'Soft Cluster resolved spacing',
+    'Soft Cluster structural spacing',
   );
   for (const [key, spacing] of Object.entries(resolvedSpacing)) {
     if (!Number.isSafeInteger(spacing) || Number(spacing) <= 0)
       throw new FocusSchematicLayoutProtocolError(
-        `Soft Cluster resolved spacing.${key} must be a positive integer.`,
+        `Soft Cluster structural spacing.${key} must be a positive integer.`,
       );
   }
   const metrics = record(evidence.metrics, 'Soft Cluster metrics');
@@ -349,7 +359,8 @@ export function validateFocusSchematicLayoutWorkerRequest(
     [
       'macroLayout',
       'softFolderStrength',
-      'softSpacing',
+      'softFolderScopeMode',
+      'softAncestorDecayBase',
       'softFolderDisplayIntent',
       'endpointOrderPolicy',
       'internalLayoutVariant',
@@ -373,6 +384,10 @@ export function validateFocusSchematicLayoutWorkerRequest(
       'Focus Schematic internal layout policy is invalid.',
     );
   const directional = policies.macroLayout === 'directional-bands';
+  if (!isFocusSchematicSoftFolderScopeMode(policies.softFolderScopeMode))
+    throw new FocusSchematicLayoutProtocolError(
+      'Focus Schematic Soft folder scope mode is invalid.',
+    );
   if (validation.value.settings.directionalFolderBandsEnabled !== directional)
     throw new FocusSchematicLayoutProtocolError(
       'Focus Schematic macro-layout policy does not match the layout input settings.',
@@ -397,9 +412,15 @@ export function validateFocusSchematicLayoutWorkerRequest(
       softFolderStrength: normalizeFocusSchematicSoftFolderStrength(
         policies.softFolderStrength,
       ),
-      softSpacing: directional
-        ? DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softSpacing
-        : normalizeFocusSchematicSoftSpacing(policies.softSpacing),
+      softFolderScopeMode: directional
+        ? DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softFolderScopeMode
+        : policies.softFolderScopeMode,
+      softAncestorDecayBase:
+        directional || policies.softFolderScopeMode === 'nearest-only'
+          ? DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softAncestorDecayBase
+          : normalizeFocusSchematicSoftAncestorDecayBase(
+              policies.softAncestorDecayBase,
+            ),
       softFolderDisplayIntent: directional
         ? { fileParentOverrides: [], flattenedFolderKeys: [] }
         : softFolderDisplayIntent,

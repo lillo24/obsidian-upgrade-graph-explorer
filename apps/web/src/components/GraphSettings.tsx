@@ -55,6 +55,10 @@ interface GraphSettingsProps {
   ) => void;
   readonly modularFocusSoftFolderStrength?: number;
   readonly onModularFocusSoftFolderStrengthChange?: (strength: number) => void;
+  readonly modularFocusDirectFoldersOnly?: boolean;
+  readonly onModularFocusDirectFoldersOnlyChange?: (direct: boolean) => void;
+  readonly modularFocusSoftAncestorDecayBase?: 3 | 4;
+  readonly onModularFocusSoftAncestorDecayBaseChange?: (base: 3 | 4) => void;
   readonly modularFocusSoftSpacing?: number;
   readonly onModularFocusSoftSpacingChange?: (spacing: number) => void;
   readonly modularFolderStripsVisible?: GraphPreferences['modularFolderStripsVisible'];
@@ -175,6 +179,10 @@ export const GraphSettings = memo(function GraphSettings({
   onModularFocusMacroLayoutChange,
   modularFocusSoftFolderStrength = 50,
   onModularFocusSoftFolderStrengthChange,
+  modularFocusDirectFoldersOnly = false,
+  onModularFocusDirectFoldersOnlyChange,
+  modularFocusSoftAncestorDecayBase = 3,
+  onModularFocusSoftAncestorDecayBaseChange,
   modularFocusSoftSpacing = 50,
   onModularFocusSoftSpacingChange,
   modularFolderStripsVisible = true,
@@ -798,6 +806,60 @@ export const GraphSettings = memo(function GraphSettings({
                                 <span>100</span>
                               </small>
                             </label>
+                            <label>
+                              <input
+                                aria-label="Direct folders only"
+                                checked={modularFocusDirectFoldersOnly}
+                                onChange={(event) =>
+                                  onModularFocusDirectFoldersOnlyChange?.(
+                                    event.currentTarget.checked,
+                                  )
+                                }
+                                type="checkbox"
+                              />
+                              <span>
+                                <strong>Direct folders only</strong>
+                                <small>
+                                  Uses each File’s nearest displayed folder and
+                                  draws flat folder guides.
+                                </small>
+                              </span>
+                            </label>
+                            {!modularFocusDirectFoldersOnly ? (
+                              <div
+                                aria-label="Ancestor pull"
+                                className="graph-settings__soft-ancestor-pull"
+                                role="radiogroup"
+                              >
+                                <strong>Ancestor pull</strong>
+                                {([3, 4] as const).map((base) => (
+                                  <label key={base}>
+                                    <input
+                                      checked={
+                                        modularFocusSoftAncestorDecayBase ===
+                                        base
+                                      }
+                                      name="modular-focus-soft-ancestor-decay"
+                                      onChange={() =>
+                                        onModularFocusSoftAncestorDecayBaseChange?.(
+                                          base,
+                                        )
+                                      }
+                                      type="radio"
+                                      value={base}
+                                    />
+                                    <span>
+                                      <strong>1/{base}</strong>
+                                      <small>
+                                        Each ancestor level receives one {base}
+                                        th of the previous raw pull, normalized
+                                        per File.
+                                      </small>
+                                    </span>
+                                  </label>
+                                ))}
+                              </div>
+                            ) : null}
                             <label className="global-layout-strength">
                               <span>
                                 Soft spacing{' '}
@@ -809,12 +871,12 @@ export const GraphSettings = memo(function GraphSettings({
                                 aria-label="Soft spacing"
                                 aria-valuetext={
                                   modularFocusSoftSpacing === 0
-                                    ? 'compact spacing'
+                                    ? 'base radius'
                                     : modularFocusSoftSpacing === 50
-                                      ? 'selected spacing'
+                                      ? '1.7 times base radius'
                                       : modularFocusSoftSpacing === 100
-                                        ? 'spacious spacing'
-                                        : `${modularFocusSoftSpacing} percent between Compact and Spacious`
+                                        ? '2.4 times base radius'
+                                        : `${modularFocusSoftSpacing} percent radial spread`
                                 }
                                 id="modular-focus-soft-spacing"
                                 list="modular-focus-soft-spacing-marks"
@@ -835,9 +897,13 @@ export const GraphSettings = memo(function GraphSettings({
                                 <option value="100" />
                               </datalist>
                               <small>
-                                <span>Compact</span>
-                                <span>Selected</span>
-                                <span>Spacious</span>
+                                <span>Base</span>
+                                <span>1.7×</span>
+                                <span>Strong spread</span>
+                              </small>
+                              <small>
+                                Spread File modules outward from the Focus
+                                without changing layout decisions.
                               </small>
                             </label>
                           </>

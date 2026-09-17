@@ -413,14 +413,18 @@ export interface FocusSchematicSoftFolderDisplayTree {
 export type FocusSchematicSoftHierarchyForcePolicy =
   'nearest-only' | 'normalized-decay' | 'normalized-equal';
 
+export type FocusSchematicSoftFolderScopeMode = 'nested' | 'nearest-only';
+export type FocusSchematicSoftAncestorDecayBase = 3 | 4;
+
 export interface FocusSchematicSoftClusterPolicyEvidence {
-  readonly schemaVersion: 4;
+  readonly schemaVersion: 5;
   readonly layoutFamily: 'soft-folder-clusters';
   readonly strength: FocusSchematicSoftClusterStrength;
-  readonly softSpacing: number;
-  readonly resolvedSpacing: FocusSchematicSoftClusterSpacingPolicy;
+  readonly structuralSpacing: FocusSchematicSoftClusterSpacingPolicy;
   readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
   readonly displayIntent: FocusSchematicSoftFolderDisplayIntent;
+  readonly folderScopeMode: FocusSchematicSoftFolderScopeMode;
+  readonly ancestorDecayBase: FocusSchematicSoftAncestorDecayBase | null;
   readonly hierarchyForcePolicy: FocusSchematicSoftHierarchyForcePolicy;
   readonly fileAttachmentPolicy: 'spatial-cardinal';
   readonly compassDemandPolicy: FocusSchematicCompassDemandPolicy;
@@ -429,11 +433,10 @@ export interface FocusSchematicSoftClusterPolicyEvidence {
 
 export interface FocusSchematicSoftClusterOptions {
   readonly strength?: FocusSchematicSoftClusterStrength;
-  readonly spacing?: number;
-  /** Development-benchmark comparator; production resolves the Sandbox value. */
-  readonly spacingPolicy?: FocusSchematicSoftClusterSpacingPolicy;
   readonly endpointOrderPolicy?: FocusSchematicEndpointOrderPolicy;
   readonly displayIntent?: FocusSchematicSoftFolderDisplayIntent;
+  readonly folderScopeMode?: FocusSchematicSoftFolderScopeMode;
+  readonly ancestorDecayBase?: FocusSchematicSoftAncestorDecayBase;
   /** Development-benchmark comparator; production uses normalized-decay. */
   readonly hierarchyForcePolicy?: FocusSchematicSoftHierarchyForcePolicy;
   /** Development-lab comparator; Adaptive Compass is the HIER4B default. */
@@ -505,18 +508,19 @@ export interface FocusSchematicSoftClusterRuntimeEvidence {
 }
 
 export interface FocusSchematicSoftClusterEvidence {
-  readonly schemaVersion: 4;
+  readonly schemaVersion: 5;
   readonly developmentOnly: true;
   readonly layoutFamily: 'soft-folder-clusters';
   readonly strength: FocusSchematicSoftClusterStrength;
-  readonly softSpacing: number;
-  readonly resolvedSpacing: FocusSchematicSoftClusterSpacingPolicy;
+  readonly structuralSpacing: FocusSchematicSoftClusterSpacingPolicy;
   readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
   readonly fileParentOverrideCount: number;
   readonly flattenedFolderCount: number;
   readonly displayedFolderCount: number;
   readonly automaticallyCompressedFolderCount: number;
   readonly maximumDisplayedDepth: number;
+  readonly folderScopeMode: FocusSchematicSoftFolderScopeMode;
+  readonly ancestorDecayBase: FocusSchematicSoftAncestorDecayBase | null;
   readonly hierarchyForcePolicy: FocusSchematicSoftHierarchyForcePolicy;
   readonly maximumPerFileFolderWeight: number;
   readonly fileAttachmentPolicy: 'spatial-cardinal';

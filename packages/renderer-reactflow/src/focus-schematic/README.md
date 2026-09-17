@@ -22,7 +22,11 @@ renderer-neutral result to validated React Flow data.
   labels, displayed-depth styling, and renderer-only current/parent/sibling
   emphasis. Its pure actual-shape helper resolves pane context points by depth,
   area, and stable identity. Folder management is supplied through the shared
-  context-menu request seam.
+  context-menu request seam. In Direct-only mode it instead builds each guide
+  from that folder's direct displayed Files, never passes child regions into a
+  parent wrapper, and preserves the same one-unit suppression and context
+  identity. Both modes derive from the post-spread module rectangles, so guide
+  visibility never influences layout.
 
 The mapper is the sole owner of optional modular entity metadata. It derives
 module membership from HIER1 and direct-File ring visibility from the final
