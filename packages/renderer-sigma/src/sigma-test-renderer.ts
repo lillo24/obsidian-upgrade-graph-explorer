@@ -89,6 +89,7 @@ export class SigmaTestRenderer {
     if (!this.deferProcess) this.finishProcess();
   });
   readonly scheduleRender = vi.fn();
+  readonly scheduleHighlightedNodesRender = vi.fn();
   readonly setSetting = vi.fn();
   readonly kill = vi.fn();
   constructor(
@@ -98,7 +99,13 @@ export class SigmaTestRenderer {
       nodeReducer: (key: string, attributes: Attributes) => Attributes;
       edgeReducer?: (key: string, attributes: Attributes) => Attributes;
       hideLabelsOnMove?: boolean;
+      defaultDrawNodeHover?: unknown;
+      defaultDrawNodeLabel?: unknown;
+      defaultEdgeColor?: string;
+      defaultNodeColor?: string;
+      labelColor?: { readonly color?: string; readonly attribute?: string };
       labelDensity?: number;
+      labelFont?: string;
       labelGridCellSize?: number;
       labelRenderedSizeThreshold?: number;
       stagePadding?: number;

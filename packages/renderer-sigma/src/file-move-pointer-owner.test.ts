@@ -12,6 +12,47 @@ describe('FileMovePointerOwner', () => {
     document.body.replaceChildren();
   });
 
+  it('only arms on pointerdown so an unclaimed click sequence remains untouched', () => {
+    const container = document.createElement('div');
+    document.body.append(container);
+    const captured = new Set<number>();
+    container.setPointerCapture = (pointerId) => captured.add(pointerId);
+    container.hasPointerCapture = (pointerId) => captured.has(pointerId);
+    container.releasePointerCapture = (pointerId) => captured.delete(pointerId);
+    const release = vi.fn(() => false);
+    const owner = new FileMovePointerOwner(container, {
+      onMove: vi.fn(),
+      onRelease: release,
+      onCancel: vi.fn(),
+    });
+    owner.attach();
+
+    container.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        bubbles: true,
+        pointerId: 5,
+        button: 0,
+        buttons: 1,
+        isPrimary: true,
+      }),
+    );
+    expect(owner.ownsPointerSequence).toBe(false);
+    expect(captured.size).toBe(0);
+
+    document.dispatchEvent(
+      new PointerEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 5,
+        button: 0,
+      }),
+    );
+    expect(release).not.toHaveBeenCalled();
+    expect(owner.claim()).toBe(false);
+
+    owner.detach();
+  });
+
   it('retains one pointer across a stop-propagating overlay and suppresses only its release click', () => {
     const container = document.createElement('div');
     const overlay = document.createElement('button');

@@ -4,10 +4,13 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ViewProjection } from '@icarus-graph-explorer/view-projection';
 
 vi.mock('./session', () => ({ GlobalRendererSession: class {} }));
+vi.mock('./local-session', () => ({ LocalRendererSession: class {} }));
 
 import { GlobalGraphCanvas } from './GlobalGraphCanvas';
 import { GlobalLayoutCache } from './layout-cache';
 import { createGlobalLayoutRequest, globalLayoutFingerprint } from './layout';
+import { LocalGraphCanvas } from './LocalGraphCanvas';
+import { localTestProjection } from './local-test-fixture';
 import { mapProjectionToGlobal } from './mapping';
 import { globalTestProjection } from './test-fixture';
 
@@ -42,7 +45,27 @@ describe('GlobalGraphCanvas empty state', () => {
       'Clear or adjust the graph filters to restore results.',
     );
     expect(markup).toContain('global-graph-canvas__surface');
+    expect(markup).toContain('data-network-theme="obsidian-dark"');
     expect(markup).not.toContain('All Network canvas controls');
+  });
+
+  it('marks Focus Network with the same dark graph theme', () => {
+    const markup = renderToStaticMarkup(
+      <LocalGraphCanvas
+        layoutRequestKey={0}
+        layoutService={{ dispose: vi.fn(), layout: vi.fn() }}
+        onFailure={vi.fn()}
+        onSelectionChange={vi.fn()}
+        onViewportObservation={vi.fn()}
+        projection={localTestProjection()}
+        rootEntityId="root"
+        selection={null}
+        trackpadZoomMode="pinch-zoom"
+      />,
+    );
+
+    expect(markup).toContain('local-graph-canvas__surface');
+    expect(markup).toContain('data-network-theme="obsidian-dark"');
   });
 
   it('keeps exact in-memory cache restoration out of the user-facing status', () => {

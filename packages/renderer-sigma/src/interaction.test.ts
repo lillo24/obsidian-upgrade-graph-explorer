@@ -14,6 +14,7 @@ import {
   WheelDirectionStabilizer,
 } from './precision-wheel-zoom';
 import { resolveGlobalLayoutSettings } from './settings';
+import { OBSIDIAN_DARK_NETWORK_THEME } from './network-theme';
 import {
   resolveGlobalEdgeStyle,
   resolveGlobalNodeStyle,
@@ -381,6 +382,59 @@ describe('Global visual interactions', () => {
     expect(selected.y).toBe(node.y);
   });
 
+  it('focuses only the hovered node and its directly incident edges', () => {
+    const settings = resolveGlobalLayoutSettings({
+      folderClustering: true,
+      spacingPreset: 'normal',
+    });
+    const baseNode = resolveGlobalNodeStyle(node, {
+      hovered: false,
+      relatedToHover: true,
+      selected: false,
+      lod: 'near',
+      settings,
+    });
+    const unrelatedNode = resolveGlobalNodeStyle(node, {
+      hovered: false,
+      relatedToHover: false,
+      selected: false,
+      lod: 'near',
+      settings,
+    });
+    const hoveredNode = resolveGlobalNodeStyle(node, {
+      hovered: true,
+      relatedToHover: true,
+      selected: false,
+      lod: 'near',
+      settings,
+    });
+    const baseEdge = resolveGlobalEdgeStyle(edge, {
+      hoverActive: false,
+      relatedToHover: true,
+      lod: 'near',
+    });
+    const incidentEdge = resolveGlobalEdgeStyle(edge, {
+      hoverActive: true,
+      relatedToHover: true,
+      lod: 'near',
+    });
+    const unrelatedEdge = resolveGlobalEdgeStyle(edge, {
+      hoverActive: true,
+      relatedToHover: false,
+      lod: 'near',
+    });
+
+    expect(hoveredNode.color).toBe(OBSIDIAN_DARK_NETWORK_THEME.highlight);
+    expect(unrelatedNode.color).toBe(baseNode.color);
+    expect(unrelatedEdge).toMatchObject({
+      color: baseEdge.color,
+      hidden: baseEdge.hidden,
+      size: baseEdge.size,
+    });
+    expect(incidentEdge.color).not.toBe(baseEdge.color);
+    expect(incidentEdge.size).toBeGreaterThan(baseEdge.size);
+  });
+
   it('layers arrangement emphasis after group color without changing size', () => {
     const settings = resolveGlobalLayoutSettings({
       folderClustering: true,
@@ -418,7 +472,7 @@ describe('Global visual interactions', () => {
     });
     expect(member.color).toBe('#0f766e');
     expect(member.forceLabel).toBe(true);
-    expect(unrelated.color).toBe('#e1e6e7');
+    expect(unrelated.color).toBe(OBSIDIAN_DARK_NETWORK_THEME.dimmedNode);
     expect(member.size).toBe(unrelated.size);
   });
 

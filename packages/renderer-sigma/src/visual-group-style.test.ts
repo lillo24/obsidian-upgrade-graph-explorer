@@ -7,6 +7,7 @@ import { LOCAL_INTERACTION_OPERATION_CONTRACTS } from './local-interaction-contr
 import { LocalRendererSession } from './local-session';
 import { buildGlobalGraph } from './graph';
 import { mapProjectionToGlobal } from './mapping';
+import { OBSIDIAN_DARK_NETWORK_THEME } from './network-theme';
 import { resolveLocalEdgeStyle, resolveLocalNodeStyle } from './local-style';
 import { resolveGlobalLayoutSettings } from './settings';
 import { GlobalRendererSession } from './session';
@@ -58,7 +59,7 @@ const localEntity = (
   entityId: nodeKind,
   sourcePath: `${nodeKind}.md`,
   status: null,
-  root: nodeKind === 'document',
+  root: false,
   revealableDescendantCount: 0,
 });
 const localDiagnostic: LocalNodeAttributes = {
@@ -102,7 +103,7 @@ describe('cross-Sigma Visual Group style contract', () => {
         settings,
         visualGroup: presentation,
       }).color,
-    ).toBe('#55a8c2');
+    ).toBe(OBSIDIAN_DARK_NETWORK_THEME.highlight);
     expect(
       resolveGlobalNodeStyle(globalDocument, {
         hovered: false,
@@ -112,7 +113,7 @@ describe('cross-Sigma Visual Group style contract', () => {
         settings,
         visualGroup: presentation,
       }).color,
-    ).toBe('#d7a126');
+    ).toBe(OBSIDIAN_DARK_NETWORK_THEME.focusedNode);
     expect(
       resolveGlobalNodeStyle(globalDocument, {
         hovered: false,
@@ -122,7 +123,7 @@ describe('cross-Sigma Visual Group style contract', () => {
         settings,
         visualGroup: presentation,
       }).color,
-    ).toBe('#d8e0e3');
+    ).toBe(presentation.accent);
     expect(
       resolveGlobalNodeStyle(globalDiagnostic, {
         hovered: false,
@@ -166,7 +167,7 @@ describe('cross-Sigma Visual Group style contract', () => {
         visualGroup: presentation,
       }).color,
     ).toBe(localDiagnostic.color);
-    const root = localEntity('document');
+    const root = { ...localEntity('document'), root: true };
     expect(
       resolveLocalNodeStyle(root, {
         hovered: false,
@@ -175,7 +176,11 @@ describe('cross-Sigma Visual Group style contract', () => {
         lod: 'far-local',
         visualGroup: presentation,
       }),
-    ).toMatchObject({ forceLabel: true, zIndex: 2 });
+    ).toMatchObject({
+      color: OBSIDIAN_DARK_NETWORK_THEME.focusedNode,
+      forceLabel: true,
+      zIndex: 2,
+    });
     expect(
       resolveLocalNodeStyle(root, {
         hovered: true,
@@ -184,7 +189,7 @@ describe('cross-Sigma Visual Group style contract', () => {
         lod: 'near-local',
         visualGroup: presentation,
       }).color,
-    ).toBe('#38a5c2');
+    ).toBe(OBSIDIAN_DARK_NETWORK_THEME.highlight);
     expect(
       resolveLocalNodeStyle(root, {
         hovered: false,
@@ -193,7 +198,7 @@ describe('cross-Sigma Visual Group style contract', () => {
         lod: 'near-local',
         visualGroup: presentation,
       }).color,
-    ).toBe('#d29b22');
+    ).toBe(OBSIDIAN_DARK_NETWORK_THEME.focusedNode);
     const edge: LocalEdgeAttributes = {
       size: 1,
       color: '#91aab2',

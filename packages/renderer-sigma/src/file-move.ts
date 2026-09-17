@@ -383,7 +383,8 @@ export class TemporaryFileMoveCoordinator {
     return this.state.phase;
   }
 
-  get ownsPointerSequence(): boolean {
+  /** A primed click candidate or an active drag; native ownership is separate. */
+  get hasActiveGesture(): boolean {
     return this.state.phase === 'primed' || this.state.phase === 'dragging';
   }
 
