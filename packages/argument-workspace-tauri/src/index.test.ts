@@ -62,7 +62,7 @@ describe('Tauri Argument Library storage', () => {
   it('migrates a legacy file atomically and keeps the v1 source recoverable', async () => {
     const bridge = new MemoryBridge();
     const legacyPath = '/app-local/argument-workspace/library-v1.json';
-    const currentPath = '/app-local/argument-workspace/library-v2.json';
+    const currentPath = '/app-local/argument-workspace/library-v3.json';
     const legacy = JSON.stringify({
       schemaVersion: 1,
       libraryId: 'legacy-library',
@@ -83,14 +83,48 @@ describe('Tauri Argument Library storage', () => {
 
     expect(loaded).toMatchObject({
       status: 'loaded',
-      snapshot: { library: { schemaVersion: 2, arguments: [] } },
+      snapshot: { library: { schemaVersion: 3, arguments: [] } },
     });
     expect(bridge.files.get(legacyPath)).toBe(legacy);
     const current = bridge.files.get(currentPath);
     expect(current).toBeTypeOf('string');
     expect(parseArgumentLibraryJson(current!)).toMatchObject({
       status: 'valid',
-      value: { schemaVersion: 2, libraryId: 'legacy-library' },
+      value: { schemaVersion: 3, libraryId: 'legacy-library' },
+    });
+  });
+
+  it('prefers and preserves a recoverable v2 file while creating v3', async () => {
+    const bridge = new MemoryBridge();
+    const legacyPath = '/app-local/argument-workspace/library-v2.json';
+    const currentPath = '/app-local/argument-workspace/library-v3.json';
+    const legacy = JSON.stringify({
+      schemaVersion: 2,
+      libraryId: 'legacy-v2-library',
+      libraryRevision: 2,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      topics: [],
+      axioms: [],
+      arguments: [],
+      counterArguments: [],
+    });
+    bridge.files.set(legacyPath, legacy);
+    const store = createTauriArgumentLibraryStore({
+      bridge,
+      temporaryToken: () => 'v2-migration',
+    });
+
+    expect(await store.load()).toMatchObject({
+      status: 'loaded',
+      snapshot: { library: { schemaVersion: 3 } },
+    });
+    expect(bridge.files.get(legacyPath)).toBe(legacy);
+    expect(
+      parseArgumentLibraryJson(bridge.files.get(currentPath)!),
+    ).toMatchObject({
+      status: 'valid',
+      value: { schemaVersion: 3, libraryId: 'legacy-v2-library' },
     });
   });
 
@@ -104,7 +138,7 @@ describe('Tauri Argument Library storage', () => {
     const saved = await store.save(first, 'missing');
     expect(saved.status).toBe('saved');
     expect([...bridge.files.keys()]).toEqual([
-      '/app-local/argument-workspace/library-v2.json',
+      '/app-local/argument-workspace/library-v3.json',
     ]);
     if (saved.status !== 'saved') return;
     const second = createTopic(

@@ -9,7 +9,7 @@ has no UI, renderer, vault, platform, agent, or model dependency.
 
 - `types.ts` defines Topic, Axiom, Argument, Counter-Argument, source locator,
   persistence, snapshot, bundle, source-read, and receipt contracts.
-- `validation.ts` strictly validates schema-v2 libraries and legacy-v1 migration
+- `validation.ts` strictly validates schema-v3 libraries and legacy-v1/v2 migration
   input, portable relative locators, global record/source-reference identities,
   and relationship/dependency integrity.
 - `canonical.ts` owns canonical JSON, browser/worker/Node-neutral SHA-256,
@@ -21,8 +21,8 @@ has no UI, renderer, vault, platform, agent, or model dependency.
 - `storage.ts` serializes expected-snapshot commits and adopts data only after a
   store confirms persistence.
 - `authoring.ts` exposes the mutation-only service over that repository.
-- `serialization.ts` owns lossless schema-v2 JSON parsing/export, deterministic
-  schema-v1 migration, non-mutating historical validation, import preview,
+- `serialization.ts` owns lossless schema-v3 JSON parsing/export, deterministic
+  schema-v1/v2 migration, non-mutating historical validation, import preview,
   collision checks, and merge preparation.
 - `search.ts` builds one deterministic descriptive index per snapshot and owns
   snapshot/query-bound pagination cursors.
@@ -37,13 +37,16 @@ has no UI, renderer, vault, platform, agent, or model dependency.
 
 ## Schema and revisions
 
-Schema v2 stores one library identity/revision and arrays of Topics, Axioms,
+Schema v3 stores one library identity/revision and arrays of Topics, Axioms,
 Arguments, and Counter-Arguments. Every record has a stable ID, independent
 record revision, human review state, archive state, and timestamps. Topic
-membership is by ID. An Argument has ordered stable-ID authored-text,
-Axiom-reference, or prior-Argument-conclusion premises; optional reasoning; a
-required conclusion; retrieval metadata; sources; and an optional predecessor.
-Referenced premises retain the record revision relied upon. Topics may expose
+membership is by ID. An Argument has scoped stable-ID Examples; ordered
+stable-ID authored-text, Axiom-reference, prior-Argument-conclusion, or
+prior-Argument-premise dependencies; optional reasoning; a required
+conclusion; optional Boundary/Invariance prose; explicit attack/support
+relations; retrieval metadata; sources; and an optional predecessor. Premises
+may identify the local Examples that ground them. Referenced premises and
+relations retain the target Argument revision relied upon. Topics may expose
 one non-archived member as `currentArgumentId`; explicit promotion requires an
 accepted Argument and records the prior Current as its predecessor without
 deleting history. The pointer means Current, not true or proven.
@@ -55,13 +58,19 @@ same record. A response has a multi-valued outcome, application explanation,
 boundary/reopening text, and answering Axiom IDs plus the Axiom revisions used
 for that assessment.
 
+Attack/support and supersession are independent: neither creates, implies, or
+promotes the other. Relation cycles are allowed as debate structure and are
+not included in inference-cycle validation.
+
 Human review state, Current status, recorded argumentative outcome, structural
 staleness, and live source freshness are separate values. Editing a referenced
 Axiom or Argument makes dependent premises stale; it does not change their
 text, reasoning, conclusion, review state, or Current status.
-`reassessArgumentPremises` is the only operation that advances referenced
-premise revisions after explicit review. Self-reference, missing dependencies,
-and Argument premise/supersession cycles are rejected.
+`reassessArgumentPremises` and `reassessArgumentRelations` are the only
+operations that advance their respective relied-on revisions after explicit
+review. Self-reference, dangling local Example links, missing source premises,
+and Argument premise/supersession cycles are rejected. Removing a referenced
+Example is rejected instead of leaving a dangling ID.
 
 Editing an answering Axiom also makes a dependent response stale; it does not
 change the stored outcome.
@@ -103,23 +112,34 @@ returned explicitly without adopting the candidate. Desktop storage lives in
 with validated temporary-sibling replacement. Neither adapter stores data in a
 vault, graph view state, or workspace identity catalog.
 
-Valid schema-v1 JSON is accepted only through a strict deterministic migration:
+Valid schema-v1 and schema-v2 JSON are accepted only through strict
+deterministic migrations:
 record content/revisions/timestamps remain unchanged, each Topic receives an
 empty `argumentIds`, the library receives an empty `arguments`, and no Current
-pointer or theory content is invented. Browser data stays under its established
-profile key and is rewritten as v2 only after a successful save. Desktop load
-prefers `library-v2.json`; when only valid `library-v1.json` exists it atomically
-writes v2 and retains the v1 file as a recoverable copy.
+pointer or theory content is invented. V2 Arguments receive empty `examples`
+and `relations`; premises and every existing ID, revision, timestamp, review
+state, membership, Current pointer, and supersession link remain unchanged.
+No Example provenance or Counter-Argument conversion is inferred. Browser data
+stays under its established profile key and is rewritten as v3 only after a
+successful save. Desktop load prefers `library-v3.json`, then migrates a valid
+`library-v2.json` or `library-v1.json` atomically while retaining the source
+file as a recoverable copy.
 
 ## Authoring and interchange
 
 `ArgumentLibraryAuthoringService` supports all four record kinds, Topic
-membership, explicit Current promotion, Argument-premise reassessment,
+membership, explicit Current promotion, Example and relation mutations,
+Argument premise/relation reassessment,
 answering-Axiom attach/detach, response updates/reassessment, source-version
 baseline recording, archive/restore, human review/reopen, and validated merge
 imports. All calls take an expected snapshot descriptor and return an explicit
 commit/conflict/failure. `pending-review` Arguments and Counter-Arguments are
 proposal records; acceptance never promotes automatically.
+
+Canonical authoring stores the proposition being evaluated directly (for
+example, `X is Y`). Revisability is represented structurally by human review,
+supersession, audit history, and explicit Current selection; authoring does not
+mechanically hedge every claim or add a truth/confidence field.
 
 JSON is the authoritative lossless interchange. Exact export/import reproduces
 the descriptor. Historical JSON may be validated and opened in an isolated
@@ -153,7 +173,8 @@ Readers never follow later authoring changes. A requested descriptor must match
 or returns `snapshot-mismatch`; cursors also bind snapshot, normalized query,
 archive policy, and offset. Search is deterministic lexical retrieval over
 titles, summaries, statements, challenged claims, observations, response text,
-Argument premises/reasoning/conclusions, aliases, keywords, and phrases. It
+Argument Examples/premises/reasoning/conclusions/Boundary text and relation
+targets, aliases, keywords, and phrases. It
 preserves authored text and useful numeric
 and operator tokens. Search candidates report score and matched fields, never a
 new verdict.
@@ -161,9 +182,12 @@ new verdict.
 Bundle closure is deliberately bounded. A Topic includes its direct Axioms and
 Counter-Arguments plus only its Current Argument and that Argument's premise
 dependencies; it does not expand every historical member. An Argument includes
-resolved premise identities, staleness, Topic/Current memberships,
-predecessor/successor context, and directly targeting Counter-Arguments with
-their complete responses. A Counter-Argument includes memberships, structured
+resolved premise identities and source-premise provenance, Examples, outgoing
+relations and direct targets, dependency/relation staleness, Topic/Current
+memberships, predecessor/successor context, and directly targeting
+Counter-Arguments with their complete responses. Relation targets are included
+directly but their debate networks are not recursively expanded. A
+Counter-Argument includes memberships, structured
 target chain, response, and answering Axioms. An Axiom includes memberships and
 directly targeting/answering objections with their responses and answering
 Axioms. Membership context does not recursively expand every sibling of a
@@ -173,7 +197,7 @@ record/depth limit that would split required context returns `limit-exceeded`
 with omissions rather than a success-shaped partial bundle. `theorySources:
 not-read` distinguishes library completeness from live source acquisition.
 
-Every successful index/bundle/source response has a contract-v2 receipt with
+Every successful index/bundle/source response has a contract-v3 receipt with
 the normalized request, exact snapshot, returned record identities/revisions,
 source observations when present, completeness/omissions/warnings, and a
 SHA-256 payload fingerprint computed without the receipt. The retained snapshot

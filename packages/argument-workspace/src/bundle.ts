@@ -105,6 +105,7 @@ export function assembleArgumentBundle(
     id: string,
     depth: number,
     includeSupersession: boolean,
+    includeRelations = true,
   ): void => {
     const argument = argumentsById.get(id);
     if (argument === undefined) return;
@@ -119,11 +120,23 @@ export function assembleArgumentBundle(
       if (premise.kind === 'axiom') {
         axiomIds.add(premise.axiomId);
         addMembershipTopics('axiom', premise.axiomId);
-      } else if (premise.kind === 'argument-conclusion') {
+      } else if (
+        premise.kind === 'argument-conclusion' ||
+        premise.kind === 'argument-premise'
+      ) {
         if (depth >= maxDepth) {
           omissions.add(`Premise chain beyond depth ${maxDepth} from ${id}.`);
         } else {
           addArgument(premise.argumentId, depth + 1, false);
+        }
+      }
+    }
+    if (includeRelations) {
+      for (const relation of argument.relations) {
+        if (depth >= maxDepth) {
+          omissions.add(`Relation target beyond depth ${maxDepth} from ${id}.`);
+        } else {
+          addArgument(relation.targetArgumentId, depth + 1, false, false);
         }
       }
     }
@@ -314,13 +327,29 @@ export function assembleArgumentBundle(
         )
         .map(({ id: counterId }) => counterId)
         .sort();
+      const incomingRelationIds = library.arguments
+        .flatMap((source) =>
+          source.relations
+            .filter(({ targetArgumentId }) => targetArgumentId === id)
+            .map((relation) => `${source.id}:${relation.id}`),
+        )
+        .sort();
       const resolvedPremises = argument.premises.map((premise) => {
         const referenced =
           premise.kind === 'axiom'
             ? axioms.get(premise.axiomId)
-            : premise.kind === 'argument-conclusion'
+            : premise.kind === 'argument-conclusion' ||
+                premise.kind === 'argument-premise'
               ? argumentsById.get(premise.argumentId)
               : undefined;
+        const referencedPremise =
+          premise.kind === 'argument-premise'
+            ? argumentsById
+                .get(premise.argumentId)
+                ?.premises.find(
+                  ({ id: premiseId }) => premiseId === premise.premiseId,
+                )
+            : undefined;
         return {
           premiseId: premise.id,
           kind: premise.kind,
@@ -338,17 +367,36 @@ export function assembleArgumentBundle(
                   archived: referenced.archived,
                 },
               }),
+          ...(referencedPremise === undefined ? {} : { referencedPremise }),
+        };
+      });
+      const resolvedRelations = argument.relations.map((relation) => {
+        const target = argumentsById.get(relation.targetArgumentId)!;
+        return {
+          relationId: relation.id,
+          kind: relation.kind,
+          stale: relation.reliedOnRevision !== target.revision,
+          targetArgument: {
+            id: target.id,
+            revision: target.revision,
+            title: target.title,
+            archived: target.archived,
+          },
+          targetPart: relation.targetPart,
         };
       });
       return {
         ...argument,
         argumentStale: stale.stale,
         stalePremiseIds: stale.premiseIds,
+        staleRelationIds: stale.relationIds,
         topicIds: membershipTopics,
         currentTopicIds,
         supersededByArgumentIds,
         targetingCounterArgumentIds,
+        incomingRelationIds,
         resolvedPremises,
+        resolvedRelations,
       };
     })
     .sort((left, right) => left.id.localeCompare(right.id));
@@ -376,9 +424,16 @@ export function assembleArgumentBundle(
   }
   for (const argument of bundleArguments) {
     if (argument.argumentStale) {
-      warnings.add(
-        `${argument.id} relies on older premise revisions: ${argument.stalePremiseIds.join(', ')}.`,
-      );
+      if (argument.stalePremiseIds.length > 0) {
+        warnings.add(
+          `${argument.id} relies on older premise revisions: ${argument.stalePremiseIds.join(', ')}.`,
+        );
+      }
+      if (argument.staleRelationIds.length > 0) {
+        warnings.add(
+          `${argument.id} relations target older revisions: ${argument.staleRelationIds.join(', ')}.`,
+        );
+      }
     }
   }
   for (const counter of bundleCounters) {

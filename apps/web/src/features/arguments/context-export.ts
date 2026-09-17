@@ -60,30 +60,63 @@ export function formatArgumentBundle(
       '',
       `## Argument — ${argument.title} (${argument.id})`,
       '',
+      '### Examples',
+      '',
+      ...(argument.examples.length === 0
+        ? ['None.']
+        : argument.examples.map(
+            (example, index) => `${index + 1}. [${example.id}] ${example.text}`,
+          )),
+      '',
       '### Premises',
       '',
       ...(argument.premises.length === 0
         ? ['None.']
         : argument.premises.map((premise, index) => {
             if (premise.kind === 'text') {
-              return `${index + 1}. [${premise.id}] ${premise.text}`;
+              return `${index + 1}. [${premise.id}] ${premise.text}${
+                premise.exampleIds?.length
+                  ? ` [Examples: ${premise.exampleIds.join(', ')}]`
+                  : ''
+              }`;
             }
             const reference =
               premise.kind === 'axiom'
                 ? `Axiom ${premise.axiomId}`
-                : `Argument conclusion ${premise.argumentId}`;
-            return `${index + 1}. [${premise.id}] ${reference} @ relied-on revision ${premise.reliedOnRevision}`;
+                : premise.kind === 'argument-conclusion'
+                  ? `Argument conclusion ${premise.argumentId}`
+                  : `Argument premise ${premise.argumentId}.${premise.premiseId}`;
+            return `${index + 1}. [${premise.id}] ${reference} @ relied-on revision ${premise.reliedOnRevision}${
+              premise.exampleIds?.length
+                ? ` [Local Examples: ${premise.exampleIds.join(', ')}]`
+                : ''
+            }`;
           })),
       ...prose('Reasoning', argument.reasoning),
       '',
       '### Conclusion',
       '',
       argument.conclusion,
+      ...prose('Boundary / Invariance', argument.boundary),
+      '',
+      '### Argument relations',
+      '',
+      ...(argument.relations.length === 0
+        ? ['None.']
+        : argument.relations.map(
+            (relation) =>
+              `${relation.kind} ${relation.targetArgumentId}.${
+                relation.targetPart.kind === 'premise'
+                  ? `premise:${relation.targetPart.premiseId}`
+                  : relation.targetPart.kind
+              } @ relied-on revision ${relation.reliedOnRevision}`,
+          )),
       '',
       `Human review state: ${argument.reviewState}`,
       `Archived: ${argument.archived ? 'yes' : 'no'}`,
-      `Premises stale: ${argument.argumentStale ? 'yes' : 'no'}`,
+      `Dependencies stale: ${argument.argumentStale ? 'yes' : 'no'}`,
       `Stale premise IDs: ${argument.stalePremiseIds.join(', ') || 'none'}`,
+      `Stale relation IDs: ${argument.staleRelationIds.join(', ') || 'none'}`,
       `Topic memberships: ${argument.topicIds.join(', ') || 'none'}`,
       `Current for Topics: ${argument.currentTopicIds.join(', ') || 'none'}`,
       `Supersedes: ${argument.supersedesArgumentId ?? 'none'}`,

@@ -4,8 +4,10 @@ import {
   type Argument,
   type ArgumentAxiom,
   type ArgumentCounterArgument,
+  type ArgumentExample,
   type ArgumentLibrary,
   type ArgumentRecordKind,
+  type ArgumentRelation,
   type ArgumentRuntime,
   type ArgumentTopic,
   type CreateAxiomInput,
@@ -362,11 +364,16 @@ export function createArgument(
     createdAt: now,
     updatedAt: now,
     title: requiredText(input.title, 'Argument title'),
+    examples: clonePlainData(input.examples ?? []),
     premises: clonePlainData(input.premises),
     ...(input.reasoning === undefined
       ? {}
       : { reasoning: requiredText(input.reasoning, 'Argument reasoning') }),
     conclusion: requiredText(input.conclusion, 'Argument conclusion'),
+    ...(input.boundary === undefined
+      ? {}
+      : { boundary: requiredText(input.boundary, 'Boundary / Invariance') }),
+    relations: clonePlainData(input.relations ?? []),
     retrieval: retrieval(input.retrieval),
     sourceReferences: clonePlainData(input.sourceReferences ?? []),
     ...(input.supersedesArgumentId === undefined
@@ -398,6 +405,11 @@ export function editArgument(
       input.reasoning,
       'Argument reasoning',
     );
+    const boundary = optionalField(
+      previous.boundary,
+      input.boundary,
+      'Boundary / Invariance',
+    );
     const supersedesArgumentId = optionalField(
       previous.supersedesArgumentId,
       input.supersedesArgumentId,
@@ -409,6 +421,10 @@ export function editArgument(
         input.title === undefined
           ? previous.title
           : requiredText(input.title, 'Argument title'),
+      examples:
+        input.examples === undefined
+          ? previous.examples
+          : clonePlainData(input.examples),
       premises:
         input.premises === undefined
           ? previous.premises
@@ -418,6 +434,11 @@ export function editArgument(
         input.conclusion === undefined
           ? previous.conclusion
           : requiredText(input.conclusion, 'Argument conclusion'),
+      ...(boundary === undefined ? { boundary: undefined } : { boundary }),
+      relations:
+        input.relations === undefined
+          ? previous.relations
+          : clonePlainData(input.relations),
       retrieval:
         input.retrieval === undefined
           ? previous.retrieval
@@ -436,7 +457,11 @@ export function editArgument(
 export function argumentStaleness(
   library: ArgumentLibrary,
   argument: Argument,
-): { readonly stale: boolean; readonly premiseIds: readonly string[] } {
+): {
+  readonly stale: boolean;
+  readonly premiseIds: readonly string[];
+  readonly relationIds: readonly string[];
+} {
   const axiomRevisions = new Map(
     library.axioms.map((axiom) => [axiom.id, axiom.revision]),
   );
@@ -453,7 +478,18 @@ export function argumentStaleness(
       return currentRevision !== premise.reliedOnRevision;
     })
     .map(({ id }) => id);
-  return { stale: premiseIds.length > 0, premiseIds };
+  const relationIds = argument.relations
+    .filter(
+      (relation) =>
+        argumentRevisions.get(relation.targetArgumentId) !==
+        relation.reliedOnRevision,
+    )
+    .map(({ id }) => id);
+  return {
+    stale: premiseIds.length > 0 || relationIds.length > 0,
+    premiseIds,
+    relationIds,
+  };
 }
 
 /** Explicitly records that every referenced premise was re-evaluated. */
@@ -481,6 +517,162 @@ export function reassessArgumentPremises(
       };
     }),
   }));
+}
+
+/** Explicitly records that every outgoing relation target was re-evaluated. */
+export function reassessArgumentRelations(
+  library: ArgumentLibrary,
+  argumentId: string,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  const argumentRevisions = new Map(
+    library.arguments.map((argument) => [argument.id, argument.revision]),
+  );
+  return updateArgument(library, argumentId, runtime, (previous) => ({
+    ...previous,
+    relations: previous.relations.map((relation) => ({
+      ...relation,
+      reliedOnRevision: argumentRevisions.get(relation.targetArgumentId)!,
+    })),
+  }));
+}
+
+export function addArgumentExample(
+  library: ArgumentLibrary,
+  argumentId: string,
+  example: ArgumentExample,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  return updateArgument(library, argumentId, runtime, (previous) => ({
+    ...previous,
+    examples: [...previous.examples, clonePlainData(example)],
+  }));
+}
+
+export function editArgumentExample(
+  library: ArgumentLibrary,
+  argumentId: string,
+  exampleId: string,
+  text: string,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  return updateArgument(library, argumentId, runtime, (previous) => {
+    if (!previous.examples.some(({ id }) => id === exampleId)) {
+      throw new Error(`Example "${exampleId}" does not exist.`);
+    }
+    return {
+      ...previous,
+      examples: previous.examples.map((example) =>
+        example.id === exampleId
+          ? { ...example, text: requiredText(text, 'Example text') }
+          : example,
+      ),
+    };
+  });
+}
+
+export function moveArgumentExample(
+  library: ArgumentLibrary,
+  argumentId: string,
+  exampleId: string,
+  destinationIndex: number,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  return updateArgument(library, argumentId, runtime, (previous) => {
+    const sourceIndex = previous.examples.findIndex(
+      ({ id }) => id === exampleId,
+    );
+    if (sourceIndex < 0)
+      throw new Error(`Example "${exampleId}" does not exist.`);
+    if (
+      !Number.isInteger(destinationIndex) ||
+      destinationIndex < 0 ||
+      destinationIndex >= previous.examples.length
+    ) {
+      throw new Error('Example destination index is out of range.');
+    }
+    const examples = [...previous.examples];
+    const [example] = examples.splice(sourceIndex, 1);
+    examples.splice(destinationIndex, 0, example!);
+    return { ...previous, examples };
+  });
+}
+
+export function removeArgumentExample(
+  library: ArgumentLibrary,
+  argumentId: string,
+  exampleId: string,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  return updateArgument(library, argumentId, runtime, (previous) => {
+    if (!previous.examples.some(({ id }) => id === exampleId)) {
+      throw new Error(`Example "${exampleId}" does not exist.`);
+    }
+    if (
+      previous.premises.some(({ exampleIds }) =>
+        exampleIds?.includes(exampleId),
+      )
+    ) {
+      throw new Error(
+        `Example "${exampleId}" is referenced by a premise and cannot be removed.`,
+      );
+    }
+    return {
+      ...previous,
+      examples: previous.examples.filter(({ id }) => id !== exampleId),
+    };
+  });
+}
+
+export function addArgumentRelation(
+  library: ArgumentLibrary,
+  argumentId: string,
+  relation: ArgumentRelation,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  return updateArgument(library, argumentId, runtime, (previous) => ({
+    ...previous,
+    relations: [...previous.relations, clonePlainData(relation)],
+  }));
+}
+
+export function editArgumentRelation(
+  library: ArgumentLibrary,
+  argumentId: string,
+  relationId: string,
+  relation: ArgumentRelation,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  return updateArgument(library, argumentId, runtime, (previous) => {
+    if (!previous.relations.some(({ id }) => id === relationId)) {
+      throw new Error(`Argument relation "${relationId}" does not exist.`);
+    }
+    return {
+      ...previous,
+      relations: previous.relations.map((current) =>
+        current.id === relationId
+          ? clonePlainData({ ...relation, id: relationId })
+          : current,
+      ),
+    };
+  });
+}
+
+export function removeArgumentRelation(
+  library: ArgumentLibrary,
+  argumentId: string,
+  relationId: string,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  return updateArgument(library, argumentId, runtime, (previous) => {
+    if (!previous.relations.some(({ id }) => id === relationId)) {
+      throw new Error(`Argument relation "${relationId}" does not exist.`);
+    }
+    return {
+      ...previous,
+      relations: previous.relations.filter(({ id }) => id !== relationId),
+    };
+  });
 }
 
 export function createCounterArgument(

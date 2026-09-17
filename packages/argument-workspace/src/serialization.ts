@@ -15,6 +15,7 @@ import type {
 import {
   validateArgumentLibrary,
   validateArgumentLibraryV1,
+  validateArgumentLibraryV2,
 } from './validation';
 
 export function serializeArgumentLibrary(library: ArgumentLibrary): string {
@@ -65,6 +66,25 @@ export function parseArgumentLibraryJson(
       preservedSource: source,
     };
   }
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value as { readonly schemaVersion?: unknown }).schemaVersion === 2
+  ) {
+    const migration = migrateArgumentLibraryV2(value);
+    if (migration.status === 'valid') {
+      return {
+        status: 'valid',
+        value: migration.value,
+        migratedFromSchemaVersion: 2,
+      };
+    }
+    return {
+      ...migration,
+      preservedSource: source,
+    };
+  }
   const validation = validateArgumentLibrary(value);
   if (validation.valid) return { status: 'valid', value: validation.value };
   const future = validation.issues.some(({ code }) => code === 'future-schema');
@@ -103,13 +123,54 @@ export function migrateArgumentLibraryV1(
     };
   }
   const legacy = clonePlainData(legacyValidation.value);
-  const candidate = {
+  const candidateV2 = {
     ...legacy,
     schemaVersion: 2,
     topics: (legacy.topics as readonly Record<string, unknown>[]).map(
       (topic) => ({ ...topic, argumentIds: [] }),
     ),
     arguments: [],
+  };
+  const migration = migrateArgumentLibraryV2(candidateV2);
+  if (migration.status !== 'valid') {
+    const first = migration.issues[0];
+    return {
+      status: 'invalid-library',
+      message: `Migrated Argument Library is invalid${
+        first === undefined ? '.' : ` at ${first.path}: ${first.message}`
+      }`,
+      issues: migration.issues,
+    };
+  }
+  return migration;
+}
+
+/** Deterministically adds empty v3 structures without inferring semantics. */
+export function migrateArgumentLibraryV2(
+  value: unknown,
+): ArgumentLibraryMigrationResult {
+  const legacyValidation = validateArgumentLibraryV2(value);
+  if (!legacyValidation.valid) {
+    const first = legacyValidation.issues[0];
+    return {
+      status: 'invalid-library',
+      message: `Argument Library v2 is invalid${
+        first === undefined ? '.' : ` at ${first.path}: ${first.message}`
+      }`,
+      issues: legacyValidation.issues,
+    };
+  }
+  const legacy = clonePlainData(legacyValidation.value);
+  const candidate = {
+    ...legacy,
+    schemaVersion: 3,
+    arguments: (legacy.arguments as readonly Record<string, unknown>[]).map(
+      (argument) => ({
+        ...argument,
+        examples: [],
+        relations: [],
+      }),
+    ),
   };
   const migratedValidation = validateArgumentLibrary(candidate);
   if (!migratedValidation.valid) {

@@ -207,6 +207,7 @@ export function ArgumentView({
   onNavigate,
   onPromote,
   onReassess,
+  onReassessRelations,
   sourceSection,
 }: {
   readonly argument: Argument;
@@ -214,6 +215,7 @@ export function ArgumentView({
   readonly onNavigate: (selection: ArgumentSelection) => void;
   readonly onPromote: (topicId: string) => void;
   readonly onReassess: () => void;
+  readonly onReassessRelations: () => void;
   readonly sourceSection: ReactNode;
 }) {
   const stale = argumentStaleness(library, argument);
@@ -242,7 +244,7 @@ export function ArgumentView({
         <span
           className={`arguments-badge ${stale.stale ? 'arguments-badge--stale' : 'arguments-badge--fresh'}`}
         >
-          Premises{' '}
+          Dependencies{' '}
           {stale.stale ? 'need reassessment' : 'match referenced revisions'}
         </span>
         {currentTopics.length === 0 ? null : (
@@ -251,6 +253,21 @@ export function ArgumentView({
           </span>
         )}
       </div>
+      <section className="arguments-reading-section">
+        <h3>Examples</h3>
+        {argument.examples.length === 0 ? (
+          <p className="arguments-empty">No concrete Examples recorded.</p>
+        ) : (
+          <ol className="arguments-premises">
+            {argument.examples.map((example) => (
+              <li key={example.id}>
+                <code>{example.id}</code>
+                <MarkdownText>{example.text}</MarkdownText>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
       <section className="arguments-reading-section">
         <h3>Premises</h3>
         {argument.premises.length === 0 ? (
@@ -262,6 +279,11 @@ export function ArgumentView({
                 return (
                   <li key={premise.id}>
                     <MarkdownText>{premise.text}</MarkdownText>
+                    {premise.exampleIds?.length ? (
+                      <small>
+                        Grounded in Examples: {premise.exampleIds.join(', ')}.
+                      </small>
+                    ) : null}
                   </li>
                 );
               }
@@ -285,7 +307,9 @@ export function ArgumentView({
                     {referenced.title}
                     {premise.kind === 'argument-conclusion'
                       ? ' — conclusion'
-                      : ''}
+                      : premise.kind === 'argument-premise'
+                        ? ` — premise ${premise.premiseId}`
+                        : ''}
                   </button>
                   <small>
                     Relied on revision {premise.reliedOnRevision}; current
@@ -293,12 +317,18 @@ export function ArgumentView({
                     {premiseStale ? ' — changed' : ''}
                     {referenced.archived ? '; archived' : ''}.
                   </small>
+                  {premise.exampleIds?.length ? (
+                    <small>
+                      Grounded in local Examples:{' '}
+                      {premise.exampleIds.join(', ')}.
+                    </small>
+                  ) : null}
                 </li>
               );
             })}
           </ol>
         )}
-        {stale.stale ? (
+        {stale.premiseIds.length > 0 ? (
           <div className="arguments-callout">
             <p>
               Changed premises: {stale.premiseIds.join(', ')}. This does not
@@ -319,6 +349,60 @@ export function ArgumentView({
       <section className="arguments-reading-section">
         <h3>Conclusion</h3>
         <MarkdownText>{argument.conclusion}</MarkdownText>
+      </section>
+      {argument.boundary === undefined ? null : (
+        <section className="arguments-reading-section">
+          <h3>Boundary / Invariance</h3>
+          <MarkdownText>{argument.boundary}</MarkdownText>
+        </section>
+      )}
+      <section className="arguments-reading-section">
+        <h3>Argument relations</h3>
+        {argument.relations.length === 0 ? (
+          <p className="arguments-empty">No attack or support relation.</p>
+        ) : (
+          <ul className="arguments-record-links">
+            {argument.relations.map((relation) => {
+              const target = library.arguments.find(
+                ({ id }) => id === relation.targetArgumentId,
+              )!;
+              const relationStale = stale.relationIds.includes(relation.id);
+              const part =
+                relation.targetPart.kind === 'premise'
+                  ? `premise ${relation.targetPart.premiseId}`
+                  : relation.targetPart.kind;
+              return (
+                <li key={relation.id}>
+                  <strong>{relation.kind}</strong>{' '}
+                  <button
+                    onClick={() =>
+                      onNavigate({ kind: 'argument', id: target.id })
+                    }
+                    type="button"
+                  >
+                    {target.title} — {part}
+                  </button>
+                  <small>
+                    Relied on revision {relation.reliedOnRevision}; current
+                    revision {target.revision}
+                    {relationStale ? ' — changed' : ''}.
+                  </small>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {stale.relationIds.length > 0 ? (
+          <div className="arguments-callout">
+            <p>
+              Changed relation targets: {stale.relationIds.join(', ')}. The
+              relations were not silently retargeted.
+            </p>
+            <button onClick={onReassessRelations} type="button">
+              Reassess relation target versions
+            </button>
+          </div>
+        ) : null}
       </section>
       <section className="arguments-reading-section">
         <h3>Topic status</h3>

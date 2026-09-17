@@ -90,7 +90,7 @@ contracts require a small application-owned translation:
 - Review's `workspaceId` is an authorization/source-capture context. It is not
   the Argument Library's `libraryId`, and an adapter must not derive or replace
   one identity with the other.
-- Review's `snapshotId` starts with `argument-library-snapshot-v2:` and appends
+- Review's `snapshotId` starts with `argument-library-snapshot-v3:` and appends
   the canonical core descriptor JSON encoded as lowercase hexadecimal UTF-16
   code units. It therefore losslessly contains `libraryId`, schema version,
   library revision, fingerprint algorithm, and SHA-256 content fingerprint.
@@ -138,6 +138,13 @@ contracts require a small application-owned translation:
   full-file version metadata only. Ordinary reads/refreshes/exports are
   read-only; no source body, verdict, review state, reassessment, or theory file
   is changed.
+- Argument Examples, premise provenance/reuse, attack/support relations,
+  supersession, Boundary/Invariance, and Current remain canonical library data
+  behind the existing authoring boundary. Review may read them through the
+  bounded bundle but cannot mutate them directly. Compiler guidance should
+  store the proposition being evaluated directly (`X is Y`) rather than
+  mechanically hedging every sentence; revisability remains structural through
+  review, supersession, audit history, and explicit Current selection.
 - Abort/cancellation, per-call byte limits, placement, model-visible shaping,
   and saving Review artifacts remain Review/adapter responsibilities. Live
   source acquisition remains the host's authorized source-provider

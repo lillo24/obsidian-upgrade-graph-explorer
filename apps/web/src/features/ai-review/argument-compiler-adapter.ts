@@ -34,7 +34,7 @@ import type {
   ArgumentSourceCapture,
 } from '../arguments/source-capture';
 
-const SNAPSHOT_ID_PREFIX = 'argument-library-snapshot-v2:';
+const SNAPSHOT_ID_PREFIX = 'argument-library-snapshot-v3:';
 const MAX_SOURCE_CHARACTERS = 100_000;
 const LIBRARY_CAPABILITIES: readonly CompilerCapability[] = [
   'list-index',
