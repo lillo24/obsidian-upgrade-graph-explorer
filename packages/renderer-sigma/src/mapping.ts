@@ -22,12 +22,20 @@ import type {
   ResolvedGlobalVisualSettings,
 } from './types';
 import { stableUnit } from './deterministic';
+import { OBSIDIAN_DARK_NETWORK_THEME } from './network-theme';
 
-const STATUS_COLORS = {
-  resolved: '#7b8d96',
-  unresolved: '#d6a23f',
-  ambiguous: '#d97832',
-  invalid: '#c34f5d',
+const DIAGNOSTIC_NODE_COLORS = {
+  resolved: OBSIDIAN_DARK_NETWORK_THEME.node,
+  unresolved: OBSIDIAN_DARK_NETWORK_THEME.unresolvedNode,
+  ambiguous: OBSIDIAN_DARK_NETWORK_THEME.diagnosticAmbiguous,
+  invalid: OBSIDIAN_DARK_NETWORK_THEME.diagnosticInvalid,
+} as const satisfies Record<GlobalReferenceStatus, string>;
+
+const REFERENCE_EDGE_COLORS = {
+  resolved: OBSIDIAN_DARK_NETWORK_THEME.edge,
+  unresolved: OBSIDIAN_DARK_NETWORK_THEME.attachmentNode,
+  ambiguous: OBSIDIAN_DARK_NETWORK_THEME.diagnosticAmbiguous,
+  invalid: OBSIDIAN_DARK_NETWORK_THEME.diagnosticInvalid,
 } as const satisfies Record<GlobalReferenceStatus, string>;
 
 /** Deterministic warm seed only; never persisted as knowledge or view truth. */
@@ -104,7 +112,7 @@ function nodeAttributes(
         nodeSize,
         referenceDegreeSizeInfluence,
       }),
-      color: STATUS_COLORS[node.status],
+      color: DIAGNOSTIC_NODE_COLORS[node.status],
       label: node.rawTarget,
       nodeKind: 'diagnostic',
       entityId: null,
@@ -125,7 +133,7 @@ function nodeAttributes(
       nodeSize,
       referenceDegreeSizeInfluence,
     }),
-    color: '#277b95',
+    color: OBSIDIAN_DARK_NETWORK_THEME.node,
     label: entityLabel(node),
     nodeKind: 'document',
     entityId: node.entityId,
@@ -204,7 +212,7 @@ function edgeAttributes(
     size: automaticGlobalEdgeSize(edge.referenceIds.length, {
       linkThickness,
     }),
-    color: STATUS_COLORS[edge.status],
+    color: REFERENCE_EDGE_COLORS[edge.status],
     edgeKind: 'reference',
     status: edge.status,
     referenceCount: edge.referenceIds.length,

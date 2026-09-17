@@ -51,7 +51,8 @@ src/
   layout-cache.ts          Four-entry memory-only LRU of automatic derived positions.
   lifecycle.ts             WebGL construction result and idempotent session lease.
   style.ts                 Far/Regional/Near LOD and GROUP1A base-accent layer.
-  global-label.ts          Viewport-aware Global label/hover placement after adaptive culling.
+  network-label.ts         Shared All/Focus below-node label and hover drawing after adaptive culling.
+  network-theme.ts         Evidence-backed Obsidian dark graph palette and shared font tokens.
   raw-viewport-frame.ts    Raw graph-space center/scale diagnostics and bounded repair primitive.
   network-camera-intent.ts One-shot initial framing versus camera-neutral position-adoption policy.
   network-position-frame.ts Validates the stable presented-position normalization extent.
@@ -106,6 +107,16 @@ Node double-click cancels reveal, suppresses Sigma's default zoom, and invokes t
 existing application Focus action once (diagnostics do not activate). Projection
 updates, controlled selection changes, stage clicks, and session disposal cancel
 pending reveals. The renderer never scrolls sidebar DOM.
+
+All and Focus share one renderer-only Network presentation policy. Qualifying
+labels are centered below their rendered nodes using the Obsidian 1.11.5
+`14 + radius / 4` formula, capped to the rendered node diameter because Icarus
+supports smaller nodes than Obsidian. The Network surfaces and Sigma defaults
+use the resolved Obsidian default-dark graph palette; semantic diagnostics,
+hierarchy/reference distinctions, and explicit Visual Group accents remain
+Icarus-owned layers. These presentation values do not enter layout requests,
+fingerprints, position caches, camera policy, or persistence. The source audit
+is recorded in `docs/OBSIDIAN_GRAPH_VISUAL_REFERENCE.md`.
 
 Network layout progress remains visible while preparing/refining; success clears
 the status, while layout failure retains the error and last-position recovery text.

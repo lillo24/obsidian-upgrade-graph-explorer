@@ -14,6 +14,7 @@ import {
   WheelDirectionStabilizer,
 } from './precision-wheel-zoom';
 import { resolveGlobalLayoutSettings } from './settings';
+import { OBSIDIAN_DARK_NETWORK_THEME } from './network-theme';
 import {
   resolveGlobalEdgeStyle,
   resolveGlobalNodeStyle,
@@ -418,7 +419,7 @@ describe('Global visual interactions', () => {
     });
     expect(member.color).toBe('#0f766e');
     expect(member.forceLabel).toBe(true);
-    expect(unrelated.color).toBe('#e1e6e7');
+    expect(unrelated.color).toBe(OBSIDIAN_DARK_NETWORK_THEME.dimmedNode);
     expect(member.size).toBe(unrelated.size);
   });
 

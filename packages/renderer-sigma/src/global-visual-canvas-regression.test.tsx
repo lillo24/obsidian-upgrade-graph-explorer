@@ -23,6 +23,8 @@ import {
 } from './mapping';
 import { createGlobalReferenceDegreeIndex } from './graph';
 import { captureRawViewportFrame } from './raw-viewport-frame';
+import { drawNetworkNodeHover, drawNetworkNodeLabel } from './network-label';
+import { OBSIDIAN_DARK_NETWORK_THEME } from './network-theme';
 import { customGlobalLayoutSettings } from './settings';
 import { SigmaTestRenderer } from './sigma-test-renderer';
 import { globalTestProjection } from './test-fixture';
@@ -130,6 +132,13 @@ describe('All Network global visual settings ownership', () => {
       },
     );
     const renderer = SigmaTestRenderer.instances.at(-1)!;
+    expect(renderer.settings).toMatchObject({
+      defaultDrawNodeHover: drawNetworkNodeHover,
+      defaultDrawNodeLabel: drawNetworkNodeLabel,
+      defaultEdgeColor: OBSIDIAN_DARK_NETWORK_THEME.edge,
+      defaultNodeColor: OBSIDIAN_DARK_NETWORK_THEME.node,
+      labelColor: { color: OBSIDIAN_DARK_NETWORK_THEME.label },
+    });
     const refreshesBefore = renderer.refresh.mock.calls.length;
     const before = coordinates(renderer);
 

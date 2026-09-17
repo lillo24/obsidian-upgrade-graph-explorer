@@ -63,10 +63,11 @@ import {
   reduceGlobalFolderArrangementGesture,
   type GlobalFolderArrangementGestureState,
 } from './arrangement';
+import { drawNetworkNodeHover, drawNetworkNodeLabel } from './network-label';
 import {
-  drawViewportAwareGlobalNodeHover,
-  drawViewportAwareGlobalNodeLabel,
-} from './global-label';
+  NETWORK_LABEL_FONT_FAMILY,
+  OBSIDIAN_DARK_NETWORK_THEME,
+} from './network-theme';
 import { createGlobalLayoutRequestFromAutomaticPositions } from './layout';
 import { automaticGlobalEdgeSize, automaticGlobalNodeSize } from './mapping';
 import {
@@ -406,6 +407,8 @@ export class GlobalRendererSession {
       hideEdgesOnMove: this.graph.size > 20_000,
       hideLabelsOnMove: false,
       labelDensity: 0.08,
+      labelColor: { color: OBSIDIAN_DARK_NETWORK_THEME.label },
+      labelFont: NETWORK_LABEL_FONT_FAMILY,
       labelGridCellSize: 120,
       labelRenderedSizeThreshold: this.settings.labelThreshold,
       minCameraRatio: 0.02,
@@ -413,8 +416,10 @@ export class GlobalRendererSession {
       renderEdgeLabels: false,
       renderLabels: options.labels ?? true,
       stagePadding: 24,
-      defaultDrawNodeHover: drawViewportAwareGlobalNodeHover,
-      defaultDrawNodeLabel: drawViewportAwareGlobalNodeLabel,
+      defaultDrawNodeHover: drawNetworkNodeHover,
+      defaultDrawNodeLabel: drawNetworkNodeLabel,
+      defaultEdgeColor: OBSIDIAN_DARK_NETWORK_THEME.edge,
+      defaultNodeColor: OBSIDIAN_DARK_NETWORK_THEME.node,
       nodeReducer: (key, attributes) => this.reduceNode(key, attributes),
       edgeReducer: (key, attributes) => this.reduceEdge(key, attributes),
     });

@@ -61,6 +61,11 @@ import {
   resolveLocalNodeStyle,
   resolveLocalVisualLod,
 } from './local-style';
+import { drawNetworkNodeHover, drawNetworkNodeLabel } from './network-label';
+import {
+  NETWORK_LABEL_FONT_FAMILY,
+  OBSIDIAN_DARK_NETWORK_THEME,
+} from './network-theme';
 import type {
   LocalCenterRequest,
   LocalDensityQaDiagnostics,
@@ -298,6 +303,8 @@ export class LocalRendererSession {
       hideEdgesOnMove: this.graph.size > 4_000,
       hideLabelsOnMove: false,
       labelDensity: 0.12,
+      labelColor: { color: OBSIDIAN_DARK_NETWORK_THEME.label },
+      labelFont: NETWORK_LABEL_FONT_FAMILY,
       labelGridCellSize: 100,
       labelRenderedSizeThreshold:
         this.networkVisualSettings.labelRenderedSizeThreshold,
@@ -305,6 +312,10 @@ export class LocalRendererSession {
       maxCameraRatio: 6,
       renderEdgeLabels: false,
       stagePadding: 24,
+      defaultDrawNodeHover: drawNetworkNodeHover,
+      defaultDrawNodeLabel: drawNetworkNodeLabel,
+      defaultEdgeColor: OBSIDIAN_DARK_NETWORK_THEME.edge,
+      defaultNodeColor: OBSIDIAN_DARK_NETWORK_THEME.node,
       nodeReducer: (key, attributes) => this.reduceNode(key, attributes),
       edgeReducer: (key, attributes) => this.reduceEdge(key, attributes),
     });

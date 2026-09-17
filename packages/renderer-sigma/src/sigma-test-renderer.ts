@@ -98,7 +98,13 @@ export class SigmaTestRenderer {
       nodeReducer: (key: string, attributes: Attributes) => Attributes;
       edgeReducer?: (key: string, attributes: Attributes) => Attributes;
       hideLabelsOnMove?: boolean;
+      defaultDrawNodeHover?: unknown;
+      defaultDrawNodeLabel?: unknown;
+      defaultEdgeColor?: string;
+      defaultNodeColor?: string;
+      labelColor?: { readonly color?: string; readonly attribute?: string };
       labelDensity?: number;
+      labelFont?: string;
       labelGridCellSize?: number;
       labelRenderedSizeThreshold?: number;
       stagePadding?: number;

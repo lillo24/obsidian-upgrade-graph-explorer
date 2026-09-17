@@ -5,6 +5,7 @@ import type {
 } from './local-types';
 import type { VisualGroupNodePresentation } from '@icarus-graph-explorer/visual-groups';
 import { applyNetworkNodeSizeScale } from './node-size';
+import { OBSIDIAN_DARK_NETWORK_THEME } from './network-theme';
 
 export function resolveLocalVisualLod(cameraRatio: number): LocalVisualLod {
   if (!Number.isFinite(cameraRatio) || cameraRatio <= 0) {
@@ -51,12 +52,14 @@ export function resolveLocalNodeStyle(
           )
         : automaticSize,
     color: context.selected
-      ? '#d29b22'
+      ? OBSIDIAN_DARK_NETWORK_THEME.focusedNode
       : context.hovered
-        ? '#38a5c2'
-        : context.relatedToHover
-          ? baseColor
-          : '#dce4e6',
+        ? OBSIDIAN_DARK_NETWORK_THEME.highlight
+        : attributes.root
+          ? OBSIDIAN_DARK_NETWORK_THEME.focusedNode
+          : context.relatedToHover
+            ? baseColor
+            : OBSIDIAN_DARK_NETWORK_THEME.dimmedNode,
     forceLabel: emphasized || attributes.root,
     highlighted: emphasized,
     label: labelVisible ? attributes.label : '',
@@ -79,9 +82,9 @@ export function resolveLocalEdgeStyle(
     ...attributes,
     color: context.relatedToHover
       ? hierarchy
-        ? '#7c8790'
+        ? OBSIDIAN_DARK_NETWORK_THEME.hierarchyEdge
         : attributes.color
-      : '#e1e8ea',
+      : OBSIDIAN_DARK_NETWORK_THEME.dimmedEdge,
     // Focus is already a bounded projection: far LOD simplifies styling, never
     // removes its reference relationships. All Network has a separate policy.
     hidden: false,

@@ -5,6 +5,7 @@ import {
   resolveLocalVisualLod,
 } from './local-style';
 import type { LocalEdgeAttributes, LocalNodeAttributes } from './local-types';
+import { OBSIDIAN_DARK_NETWORK_THEME } from './network-theme';
 
 const reference: LocalEdgeAttributes = {
   size: 2,
@@ -51,7 +52,7 @@ describe('Focus reference visibility', () => {
     });
     expect(unrelated).toMatchObject({
       hidden: false,
-      color: '#e1e8ea',
+      color: OBSIDIAN_DARK_NETWORK_THEME.dimmedEdge,
       zIndex: 0,
     });
   });
@@ -64,7 +65,12 @@ describe('Focus reference visibility', () => {
         relatedToHover: true,
         hoverActive: true,
       }),
-    ).toMatchObject({ hidden: false, size: 1.44, color: '#7c8790', zIndex: 1 });
+    ).toMatchObject({
+      hidden: false,
+      size: 1.44,
+      color: OBSIDIAN_DARK_NETWORK_THEME.hierarchyEdge,
+      zIndex: 1,
+    });
   });
 
   it('keeps far-local label simplification and root/selection emphasis', () => {
