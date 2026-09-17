@@ -1,5 +1,8 @@
 import type {
   ArgumentBundle,
+  ArgumentDependencyPathStep,
+  ArgumentPremiseStaleness,
+  ArgumentPremiseStalenessCause,
   CounterArgumentTarget,
   ReadArgumentBundleResult,
 } from '@icarus-graph-explorer/argument-workspace';
@@ -27,6 +30,41 @@ function target(value: CounterArgumentTarget | undefined): string {
   return `Argument: ${value.argumentId} (${value.part.kind}${
     value.part.kind === 'premise' ? ` ${value.part.premiseId}` : ''
   })`;
+}
+
+function dependencyStep(step: ArgumentDependencyPathStep): string {
+  const owner = `${step.argumentId}.${step.premiseId}`;
+  if (step.kind === 'axiom') return `${owner} -> ${step.axiomId}`;
+  if (step.kind === 'argument-conclusion') {
+    return `${owner} -> ${step.sourceArgumentId}.conclusion`;
+  }
+  return `${owner} -> ${step.sourceArgumentId}.${step.sourcePremiseId}`;
+}
+
+function stalenessCause(cause: ArgumentPremiseStalenessCause): string {
+  const root = cause.root;
+  const rootLabel =
+    root.kind === 'revision-mismatch'
+      ? `${root.recordKind} ${root.recordId} revision ${root.reliedOnRevision} -> ${root.currentRevision}`
+      : root.kind === 'missing-reference'
+        ? `missing ${root.recordKind} ${root.recordId}`
+        : `dependency cycle at ${root.argumentId}.${root.premiseId}`;
+  return `${cause.kind} [${cause.path.map(dependencyStep).join('; ')}] root: ${rootLabel}`;
+}
+
+function premiseStaleness(
+  results: readonly ArgumentPremiseStaleness[],
+): readonly string[] {
+  const stale = results.filter((result) => result.stale);
+  return stale.length === 0
+    ? ['Premise staleness diagnostics: none']
+    : [
+        'Premise staleness diagnostics:',
+        ...stale.map(
+          (result) =>
+            `- ${result.premiseId}: direct=${result.direct ? 'yes' : 'no'}; inherited=${result.inherited ? 'yes' : 'no'}; ${result.causes.map(stalenessCause).join('; ')}`,
+        ),
+      ];
 }
 
 export function formatArgumentBundle(
@@ -117,6 +155,7 @@ export function formatArgumentBundle(
       `Dependencies stale: ${argument.argumentStale ? 'yes' : 'no'}`,
       `Stale premise IDs: ${argument.stalePremiseIds.join(', ') || 'none'}`,
       `Stale relation IDs: ${argument.staleRelationIds.join(', ') || 'none'}`,
+      ...premiseStaleness(argument.premiseStaleness),
       `Topic memberships: ${argument.topicIds.join(', ') || 'none'}`,
       `Current for Topics: ${argument.currentTopicIds.join(', ') || 'none'}`,
       `Supersedes: ${argument.supersedesArgumentId ?? 'none'}`,

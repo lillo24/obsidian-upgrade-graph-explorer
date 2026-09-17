@@ -4,11 +4,17 @@ import {
   type Argument,
   type ArgumentAxiom,
   type ArgumentCounterArgument,
+  type ArgumentDependencyPathStep,
+  type ArgumentDependencyRootCause,
   type ArgumentExample,
   type ArgumentLibrary,
+  type ArgumentPremise,
+  type ArgumentPremiseStaleness,
+  type ArgumentPremiseStalenessCause,
   type ArgumentRecordKind,
   type ArgumentRelation,
   type ArgumentRuntime,
+  type ArgumentStalenessResult,
   type ArgumentTopic,
   type CreateAxiomInput,
   type CreateArgumentInput,
@@ -454,42 +460,251 @@ export function editArgument(
   });
 }
 
+function dependencyPathStep(
+  argumentId: string,
+  premise: Exclude<ArgumentPremise, { readonly kind: 'text' }>,
+): ArgumentDependencyPathStep {
+  if (premise.kind === 'axiom') {
+    return {
+      argumentId,
+      premiseId: premise.id,
+      kind: premise.kind,
+      axiomId: premise.axiomId,
+    };
+  }
+  if (premise.kind === 'argument-conclusion') {
+    return {
+      argumentId,
+      premiseId: premise.id,
+      kind: premise.kind,
+      sourceArgumentId: premise.argumentId,
+    };
+  }
+  return {
+    argumentId,
+    premiseId: premise.id,
+    kind: premise.kind,
+    sourceArgumentId: premise.argumentId,
+    sourcePremiseId: premise.premiseId,
+  };
+}
+
+function stalePremiseResult(
+  premiseId: string,
+  causes: readonly ArgumentPremiseStalenessCause[],
+): ArgumentPremiseStaleness {
+  return {
+    premiseId,
+    stale: causes.length > 0,
+    direct: causes.some(({ kind }) => kind === 'direct'),
+    inherited: causes.some(({ kind }) => kind === 'inherited'),
+    causes,
+  };
+}
+
+/**
+ * Creates one memoized evaluator for a library snapshot. Only inference-premise
+ * dependencies propagate; relation and supersession state are intentionally
+ * excluded from recursive evaluation.
+ */
+export function createArgumentStalenessEvaluator(
+  library: ArgumentLibrary,
+): (argument: Argument) => ArgumentStalenessResult {
+  const axiomsById = new Map(library.axioms.map((axiom) => [axiom.id, axiom]));
+  const argumentsById = new Map(
+    library.arguments.map((argument) => [argument.id, argument]),
+  );
+  const premiseMemo = new Map<string, Map<string, ArgumentPremiseStaleness>>();
+  const visiting = new Map<string, Set<string>>();
+
+  const memoized = (
+    argumentId: string,
+    premiseId: string,
+  ): ArgumentPremiseStaleness | undefined =>
+    premiseMemo.get(argumentId)?.get(premiseId);
+
+  const remember = (
+    argumentId: string,
+    result: ArgumentPremiseStaleness,
+  ): ArgumentPremiseStaleness => {
+    const argumentMemo = premiseMemo.get(argumentId) ?? new Map();
+    argumentMemo.set(result.premiseId, result);
+    premiseMemo.set(argumentId, argumentMemo);
+    return result;
+  };
+
+  const markVisiting = (
+    argumentId: string,
+    premiseId: string,
+    active: boolean,
+  ): void => {
+    const argumentVisiting = visiting.get(argumentId) ?? new Set();
+    if (active) {
+      argumentVisiting.add(premiseId);
+      visiting.set(argumentId, argumentVisiting);
+    } else {
+      argumentVisiting.delete(premiseId);
+      if (argumentVisiting.size === 0) visiting.delete(argumentId);
+    }
+  };
+
+  const directCause = (
+    root: ArgumentDependencyRootCause,
+    path: ArgumentDependencyPathStep,
+  ): ArgumentPremiseStalenessCause => ({
+    kind: 'direct',
+    root,
+    path: [path],
+  });
+
+  const evaluatePremise = (
+    argumentId: string,
+    premise: ArgumentPremise,
+  ): ArgumentPremiseStaleness => {
+    const cached = memoized(argumentId, premise.id);
+    if (cached !== undefined) return cached;
+    if (premise.kind === 'text') {
+      return remember(argumentId, stalePremiseResult(premise.id, []));
+    }
+
+    const step = dependencyPathStep(argumentId, premise);
+    if (visiting.get(argumentId)?.has(premise.id) === true) {
+      return stalePremiseResult(premise.id, [
+        {
+          kind: 'inherited',
+          root: { kind: 'dependency-cycle', argumentId, premiseId: premise.id },
+          path: [step],
+        },
+      ]);
+    }
+    markVisiting(argumentId, premise.id, true);
+
+    const causes: ArgumentPremiseStalenessCause[] = [];
+    if (premise.kind === 'axiom') {
+      const axiom = axiomsById.get(premise.axiomId);
+      if (axiom === undefined) {
+        causes.push(
+          directCause(
+            {
+              kind: 'missing-reference',
+              recordKind: 'axiom',
+              recordId: premise.axiomId,
+            },
+            step,
+          ),
+        );
+      } else if (axiom.revision !== premise.reliedOnRevision) {
+        causes.push(
+          directCause(
+            {
+              kind: 'revision-mismatch',
+              recordKind: 'axiom',
+              recordId: axiom.id,
+              reliedOnRevision: premise.reliedOnRevision,
+              currentRevision: axiom.revision,
+            },
+            step,
+          ),
+        );
+      }
+    } else {
+      const sourceArgument = argumentsById.get(premise.argumentId);
+      if (sourceArgument === undefined) {
+        causes.push(
+          directCause(
+            {
+              kind: 'missing-reference',
+              recordKind: 'argument',
+              recordId: premise.argumentId,
+            },
+            step,
+          ),
+        );
+      } else {
+        if (sourceArgument.revision !== premise.reliedOnRevision) {
+          causes.push(
+            directCause(
+              {
+                kind: 'revision-mismatch',
+                recordKind: 'argument',
+                recordId: sourceArgument.id,
+                reliedOnRevision: premise.reliedOnRevision,
+                currentRevision: sourceArgument.revision,
+              },
+              step,
+            ),
+          );
+        }
+
+        const sourcePremises =
+          premise.kind === 'argument-conclusion'
+            ? sourceArgument.premises
+            : sourceArgument.premises.filter(
+                ({ id }) => id === premise.premiseId,
+              );
+        if (
+          premise.kind === 'argument-premise' &&
+          sourcePremises.length === 0
+        ) {
+          causes.push(
+            directCause(
+              {
+                kind: 'missing-reference',
+                recordKind: 'premise',
+                recordId: `${sourceArgument.id}.${premise.premiseId}`,
+              },
+              step,
+            ),
+          );
+        }
+        for (const sourcePremise of sourcePremises) {
+          const sourceStaleness = evaluatePremise(
+            sourceArgument.id,
+            sourcePremise,
+          );
+          for (const cause of sourceStaleness.causes) {
+            causes.push({
+              kind: 'inherited',
+              root: cause.root,
+              path: [step, ...cause.path],
+            });
+          }
+        }
+      }
+    }
+
+    markVisiting(argumentId, premise.id, false);
+    return remember(argumentId, stalePremiseResult(premise.id, causes));
+  };
+
+  return (argument) => {
+    const premiseStaleness = argument.premises.map((premise) =>
+      evaluatePremise(argument.id, premise),
+    );
+    const premiseIds = premiseStaleness
+      .filter(({ stale }) => stale)
+      .map(({ premiseId }) => premiseId);
+    const relationIds = argument.relations
+      .filter(
+        (relation) =>
+          argumentsById.get(relation.targetArgumentId)?.revision !==
+          relation.reliedOnRevision,
+      )
+      .map(({ id }) => id);
+    return {
+      stale: premiseIds.length > 0 || relationIds.length > 0,
+      premiseIds,
+      relationIds,
+      premiseStaleness,
+    };
+  };
+}
+
 export function argumentStaleness(
   library: ArgumentLibrary,
   argument: Argument,
-): {
-  readonly stale: boolean;
-  readonly premiseIds: readonly string[];
-  readonly relationIds: readonly string[];
-} {
-  const axiomRevisions = new Map(
-    library.axioms.map((axiom) => [axiom.id, axiom.revision]),
-  );
-  const argumentRevisions = new Map(
-    library.arguments.map((record) => [record.id, record.revision]),
-  );
-  const premiseIds = argument.premises
-    .filter((premise) => {
-      if (premise.kind === 'text') return false;
-      const currentRevision =
-        premise.kind === 'axiom'
-          ? axiomRevisions.get(premise.axiomId)
-          : argumentRevisions.get(premise.argumentId);
-      return currentRevision !== premise.reliedOnRevision;
-    })
-    .map(({ id }) => id);
-  const relationIds = argument.relations
-    .filter(
-      (relation) =>
-        argumentRevisions.get(relation.targetArgumentId) !==
-        relation.reliedOnRevision,
-    )
-    .map(({ id }) => id);
-  return {
-    stale: premiseIds.length > 0 || relationIds.length > 0,
-    premiseIds,
-    relationIds,
-  };
+): ArgumentStalenessResult {
+  return createArgumentStalenessEvaluator(library)(argument);
 }
 
 /** Explicitly records that every referenced premise was re-evaluated. */
@@ -498,6 +713,18 @@ export function reassessArgumentPremises(
   argumentId: string,
   runtime: ArgumentRuntime,
 ): ArgumentLibrary {
+  const argument = library.arguments.find(({ id }) => id === argumentId);
+  if (argument === undefined) {
+    throw new Error(`Argument "${argumentId}" does not exist.`);
+  }
+  const inheritedPremiseIds = argumentStaleness(library, argument)
+    .premiseStaleness.filter(({ inherited }) => inherited)
+    .map(({ premiseId }) => premiseId);
+  if (inheritedPremiseIds.length > 0) {
+    throw new Error(
+      `Argument "${argumentId}" has inherited stale premises (${inheritedPremiseIds.join(', ')}). Reassess upstream inference dependencies first.`,
+    );
+  }
   const axiomRevisions = new Map(
     library.axioms.map((axiom) => [axiom.id, axiom.revision]),
   );

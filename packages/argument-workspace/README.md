@@ -15,9 +15,9 @@ has no UI, renderer, vault, platform, agent, or model dependency.
 - `canonical.ts` owns canonical JSON, browser/worker/Node-neutral SHA-256,
   content descriptors, cloning, and immutable snapshot capture.
 - `library.ts` owns pure record creation/editing, membership, Current promotion,
-  response, archive/review mutations, revision increments, Argument and
-  stale-response detection, explicit reassessment, and confirmed full-file
-  source-baseline recording.
+  response, archive/review mutations, revision increments, memoized direct and
+  transitive Argument dependency staleness, stale-response detection, explicit
+  reassessment, and confirmed full-file source-baseline recording.
 - `storage.ts` serializes expected-snapshot commits and adopts data only after a
   store confirms persistence.
 - `authoring.ts` exposes the mutation-only service over that repository.
@@ -63,14 +63,25 @@ promotes the other. Relation cycles are allowed as debate structure and are
 not included in inference-cycle validation.
 
 Human review state, Current status, recorded argumentative outcome, structural
-staleness, and live source freshness are separate values. Editing a referenced
-Axiom or Argument makes dependent premises stale; it does not change their
-text, reasoning, conclusion, review state, or Current status.
-`reassessArgumentPremises` and `reassessArgumentRelations` are the only
-operations that advance their respective relied-on revisions after explicit
-review. Self-reference, dangling local Example links, missing source premises,
-and Argument premise/supersession cycles are rejected. Removing a referenced
-Example is rejected instead of leaving a dangling ID.
+staleness, and live source freshness are separate values. Direct premise
+staleness records a referenced Axiom or Argument revision mismatch. Inherited
+premise staleness follows only the acyclic inference graph: a reused conclusion
+inherits any stale source premise, while a reused specific premise inherits only
+that premise's staleness. Structured causes retain every dependency path and
+root revision mismatch. Attack/support relations, supersession, membership,
+Current, review, and archive state do not propagate into inference staleness;
+relation revision staleness remains a separate diagnostic.
+
+Staleness evaluation is derived and never edits Arguments. Editing a referenced
+Axiom or Argument does not change dependent text, reasoning, conclusion, review
+state, or Current status. `reassessArgumentPremises` rejects an Argument while
+any inherited premise staleness remains, so review proceeds explicitly from
+upstream support to downstream conclusions. `reassessArgumentPremises` and
+`reassessArgumentRelations` are the only operations that advance their
+respective relied-on revisions after explicit review. Self-reference, dangling
+local Example links, missing source premises, and Argument premise/supersession
+cycles are rejected. Removing a referenced Example is rejected instead of
+leaving a dangling ID.
 
 Editing an answering Axiom also makes a dependent response stale; it does not
 change the stored outcome.
@@ -183,7 +194,8 @@ Bundle closure is deliberately bounded. A Topic includes its direct Axioms and
 Counter-Arguments plus only its Current Argument and that Argument's premise
 dependencies; it does not expand every historical member. An Argument includes
 resolved premise identities and source-premise provenance, Examples, outgoing
-relations and direct targets, dependency/relation staleness, Topic/Current
+relations and direct targets, direct/inherited premise cause paths, separate
+relation staleness, Topic/Current
 memberships, predecessor/successor context, and directly targeting
 Counter-Arguments with their complete responses. Relation targets are included
 directly but their debate networks are not recursively expanded. A
@@ -197,7 +209,7 @@ record/depth limit that would split required context returns `limit-exceeded`
 with omissions rather than a success-shaped partial bundle. `theorySources:
 not-read` distinguishes library completeness from live source acquisition.
 
-Every successful index/bundle/source response has a contract-v3 receipt with
+Every successful index/bundle/source response has a contract-v4 receipt with
 the normalized request, exact snapshot, returned record identities/revisions,
 source observations when present, completeness/omissions/warnings, and a
 SHA-256 payload fingerprint computed without the receipt. The retained snapshot
