@@ -395,7 +395,7 @@ function validateTopic(
   value: unknown,
   path: string,
   issues: ArgumentLibraryValidationIssue[],
-  schemaVersion: 1 | 2 = 2,
+  schemaVersion: 1 | 2 | 3 = 3,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected a Topic.');
@@ -409,10 +409,10 @@ function validateTopic(
       'summary',
       'retrieval',
       'axiomIds',
-      ...(schemaVersion === 2 ? ['argumentIds'] : []),
+      ...(schemaVersion >= 2 ? ['argumentIds'] : []),
       'counterArgumentIds',
     ],
-    schemaVersion === 2 ? ['currentArgumentId'] : [],
+    schemaVersion >= 2 ? ['currentArgumentId'] : [],
     path,
     issues,
   );
@@ -421,7 +421,7 @@ function validateTopic(
   nonEmptyString(value.summary, `${path}.summary`, issues);
   validateRetrieval(value.retrieval, `${path}.retrieval`, issues);
   stringArray(value.axiomIds, `${path}.axiomIds`, issues);
-  if (schemaVersion === 2) {
+  if (schemaVersion >= 2) {
     stringArray(value.argumentIds, `${path}.argumentIds`, issues);
     if (Object.hasOwn(value, 'currentArgumentId')) {
       nonEmptyString(
@@ -439,22 +439,32 @@ function validateArgumentPremise(
   path: string,
   ownerId: unknown,
   issues: ArgumentLibraryValidationIssue[],
+  schemaVersion: 2 | 3 = 3,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected an Argument premise.');
     return;
   }
   if (value.kind === 'text') {
-    fields(value, ['id', 'kind', 'text'], [], path, issues);
+    fields(
+      value,
+      ['id', 'kind', 'text'],
+      schemaVersion === 3 ? ['exampleIds'] : [],
+      path,
+      issues,
+    );
     nonEmptyString(value.id, `${path}.id`, issues);
     nonEmptyString(value.text, `${path}.text`, issues);
+    if (schemaVersion === 3 && Object.hasOwn(value, 'exampleIds')) {
+      stringArray(value.exampleIds, `${path}.exampleIds`, issues);
+    }
     return;
   }
   if (value.kind === 'axiom') {
     fields(
       value,
       ['id', 'kind', 'axiomId', 'reliedOnRevision'],
-      [],
+      schemaVersion === 3 ? ['exampleIds'] : [],
       path,
       issues,
     );
@@ -465,13 +475,16 @@ function validateArgumentPremise(
       `${path}.reliedOnRevision`,
       issues,
     );
+    if (schemaVersion === 3 && Object.hasOwn(value, 'exampleIds')) {
+      stringArray(value.exampleIds, `${path}.exampleIds`, issues);
+    }
     return;
   }
   if (value.kind === 'argument-conclusion') {
     fields(
       value,
       ['id', 'kind', 'argumentId', 'reliedOnRevision'],
-      [],
+      schemaVersion === 3 ? ['exampleIds'] : [],
       path,
       issues,
     );
@@ -492,6 +505,40 @@ function validateArgumentPremise(
       `${path}.reliedOnRevision`,
       issues,
     );
+    if (schemaVersion === 3 && Object.hasOwn(value, 'exampleIds')) {
+      stringArray(value.exampleIds, `${path}.exampleIds`, issues);
+    }
+    return;
+  }
+  if (value.kind === 'argument-premise' && schemaVersion === 3) {
+    fields(
+      value,
+      ['id', 'kind', 'argumentId', 'premiseId', 'reliedOnRevision'],
+      ['exampleIds'],
+      path,
+      issues,
+    );
+    nonEmptyString(value.id, `${path}.id`, issues);
+    if (
+      nonEmptyString(value.argumentId, `${path}.argumentId`, issues) &&
+      value.argumentId === ownerId
+    ) {
+      issue(
+        issues,
+        `${path}.argumentId`,
+        'self-reference',
+        'An Argument cannot use one of its own premises as an external premise dependency.',
+      );
+    }
+    nonEmptyString(value.premiseId, `${path}.premiseId`, issues);
+    positiveRevision(
+      value.reliedOnRevision,
+      `${path}.reliedOnRevision`,
+      issues,
+    );
+    if (Object.hasOwn(value, 'exampleIds')) {
+      stringArray(value.exampleIds, `${path}.exampleIds`, issues);
+    }
     return;
   }
   issue(issues, `${path}.kind`, 'invalid-value', 'Unsupported premise kind.');
@@ -502,6 +549,7 @@ function validateArgument(
   path: string,
   issues: ArgumentLibraryValidationIssue[],
   sourceIds: Set<string>,
+  schemaVersion: 2 | 3 = 3,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected an Argument.');
@@ -512,24 +560,64 @@ function validateArgument(
     [
       ...METADATA_FIELDS,
       'title',
+      ...(schemaVersion === 3 ? ['examples'] : []),
       'premises',
       'conclusion',
+      ...(schemaVersion === 3 ? ['relations'] : []),
       'retrieval',
       'sourceReferences',
     ],
-    ['reasoning', 'supersedesArgumentId'],
+    [
+      'reasoning',
+      ...(schemaVersion === 3 ? ['boundary'] : []),
+      'supersedesArgumentId',
+    ],
     path,
     issues,
   );
   validateMetadata(value, path, issues);
   nonEmptyString(value.title, `${path}.title`, issues);
+  if (schemaVersion === 3) {
+    if (!Array.isArray(value.examples)) {
+      issue(issues, `${path}.examples`, 'invalid-type', 'Expected an array.');
+    } else {
+      const exampleIds = new Set<string>();
+      value.examples.forEach((example, index) => {
+        const examplePath = `${path}.examples[${index}]`;
+        if (!isRecord(example)) {
+          issue(issues, examplePath, 'invalid-type', 'Expected an Example.');
+          return;
+        }
+        fields(example, ['id', 'text'], [], examplePath, issues);
+        nonEmptyString(example.id, `${examplePath}.id`, issues);
+        nonEmptyString(example.text, `${examplePath}.text`, issues);
+        if (typeof example.id === 'string') {
+          if (exampleIds.has(example.id)) {
+            issue(
+              issues,
+              `${examplePath}.id`,
+              'duplicate-id',
+              'Example IDs must be unique within an Argument.',
+            );
+          }
+          exampleIds.add(example.id);
+        }
+      });
+    }
+  }
   if (!Array.isArray(value.premises)) {
     issue(issues, `${path}.premises`, 'invalid-type', 'Expected an array.');
   } else {
     const premiseIds = new Set<string>();
     value.premises.forEach((premise, index) => {
       const premisePath = `${path}.premises[${index}]`;
-      validateArgumentPremise(premise, premisePath, value.id, issues);
+      validateArgumentPremise(
+        premise,
+        premisePath,
+        value.id,
+        issues,
+        schemaVersion,
+      );
       if (isRecord(premise) && typeof premise.id === 'string') {
         if (premiseIds.has(premise.id)) {
           issue(
@@ -547,6 +635,80 @@ function validateArgument(
     nonEmptyString(value.reasoning, `${path}.reasoning`, issues);
   }
   nonEmptyString(value.conclusion, `${path}.conclusion`, issues);
+  if (schemaVersion === 3 && Object.hasOwn(value, 'boundary')) {
+    nonEmptyString(value.boundary, `${path}.boundary`, issues);
+  }
+  if (schemaVersion === 3) {
+    if (!Array.isArray(value.relations)) {
+      issue(issues, `${path}.relations`, 'invalid-type', 'Expected an array.');
+    } else {
+      const relationIds = new Set<string>();
+      value.relations.forEach((relation, index) => {
+        const relationPath = `${path}.relations[${index}]`;
+        if (!isRecord(relation)) {
+          issue(
+            issues,
+            relationPath,
+            'invalid-type',
+            'Expected an Argument relation.',
+          );
+          return;
+        }
+        fields(
+          relation,
+          ['id', 'kind', 'targetArgumentId', 'targetPart', 'reliedOnRevision'],
+          [],
+          relationPath,
+          issues,
+        );
+        nonEmptyString(relation.id, `${relationPath}.id`, issues);
+        if (relation.kind !== 'attack' && relation.kind !== 'support') {
+          issue(
+            issues,
+            `${relationPath}.kind`,
+            'invalid-value',
+            'Argument relation kind must be attack or support.',
+          );
+        }
+        if (
+          nonEmptyString(
+            relation.targetArgumentId,
+            `${relationPath}.targetArgumentId`,
+            issues,
+          ) &&
+          relation.targetArgumentId === value.id
+        ) {
+          issue(
+            issues,
+            `${relationPath}.targetArgumentId`,
+            'self-reference',
+            'An Argument relation must target another Argument.',
+          );
+        }
+        validateArgumentTargetPart(
+          relation.targetPart,
+          `${relationPath}.targetPart`,
+          issues,
+        );
+        positiveRevision(
+          relation.reliedOnRevision,
+          `${relationPath}.reliedOnRevision`,
+          issues,
+        );
+        if (typeof relation.id === 'string') {
+          if (relationIds.has(relation.id)) {
+            issue(
+              issues,
+              `${relationPath}.id`,
+              'duplicate-id',
+              'Relation IDs must be unique within an Argument.',
+            );
+          }
+          relationIds.add(relation.id);
+        }
+      });
+    }
+  }
   validateRetrieval(value.retrieval, `${path}.retrieval`, issues);
   if (Object.hasOwn(value, 'supersedesArgumentId')) {
     if (
@@ -632,6 +794,32 @@ function validateAxiom(
   }
 }
 
+function validateArgumentTargetPart(
+  value: unknown,
+  path: string,
+  issues: ArgumentLibraryValidationIssue[],
+): void {
+  if (!isRecord(value)) {
+    issue(issues, path, 'invalid-type', 'Expected an Argument target part.');
+  } else if (
+    value.kind === 'argument' ||
+    value.kind === 'reasoning' ||
+    value.kind === 'conclusion'
+  ) {
+    fields(value, ['kind'], [], path, issues);
+  } else if (value.kind === 'premise') {
+    fields(value, ['kind', 'premiseId'], [], path, issues);
+    nonEmptyString(value.premiseId, `${path}.premiseId`, issues);
+  } else {
+    issue(
+      issues,
+      `${path}.kind`,
+      'invalid-value',
+      'Unsupported Argument target part.',
+    );
+  }
+}
+
 function validateTarget(
   value: unknown,
   path: string,
@@ -669,30 +857,7 @@ function validateTarget(
   } else if (value.kind === 'argument' && allowArgumentTarget) {
     fields(value, ['kind', 'argumentId', 'part'], [], path, issues);
     nonEmptyString(value.argumentId, `${path}.argumentId`, issues);
-    if (!isRecord(value.part)) {
-      issue(
-        issues,
-        `${path}.part`,
-        'invalid-type',
-        'Expected an Argument target part.',
-      );
-    } else if (
-      value.part.kind === 'argument' ||
-      value.part.kind === 'reasoning' ||
-      value.part.kind === 'conclusion'
-    ) {
-      fields(value.part, ['kind'], [], `${path}.part`, issues);
-    } else if (value.part.kind === 'premise') {
-      fields(value.part, ['kind', 'premiseId'], [], `${path}.part`, issues);
-      nonEmptyString(value.part.premiseId, `${path}.part.premiseId`, issues);
-    } else {
-      issue(
-        issues,
-        `${path}.part.kind`,
-        'invalid-value',
-        'Unsupported Argument target part.',
-      );
-    }
+    validateArgumentTargetPart(value.part, `${path}.part`, issues);
   } else {
     issue(issues, `${path}.kind`, 'invalid-value', 'Unsupported target kind.');
   }
@@ -955,6 +1120,15 @@ function validateIntegrity(
   if (Array.isArray(library.arguments)) {
     library.arguments.forEach((entry, index) => {
       if (!isRecord(entry)) return;
+      const localExampleIds = new Set(
+        Array.isArray(entry.examples)
+          ? entry.examples.flatMap((example) =>
+              isRecord(example) && typeof example.id === 'string'
+                ? [example.id]
+                : [],
+            )
+          : [],
+      );
       if (Array.isArray(entry.premises)) {
         entry.premises.forEach((premise, premiseIndex) => {
           if (!isRecord(premise)) return;
@@ -965,7 +1139,10 @@ function validateIntegrity(
             referencedId = premise.axiomId;
             referencedIds = axiomIds;
             referencedKind = 'Axiom';
-          } else if (premise.kind === 'argument-conclusion') {
+          } else if (
+            premise.kind === 'argument-conclusion' ||
+            premise.kind === 'argument-premise'
+          ) {
             referencedId = premise.argumentId;
             referencedIds = argumentIds;
             referencedKind = 'Argument';
@@ -980,6 +1157,94 @@ function validateIntegrity(
               `$.arguments[${index}].premises[${premiseIndex}]`,
               'missing-reference',
               `Unknown ${referencedKind} "${referencedId}".`,
+            );
+          }
+          if (Array.isArray(premise.exampleIds)) {
+            premise.exampleIds.forEach((exampleId, exampleIndex) => {
+              if (
+                typeof exampleId === 'string' &&
+                !localExampleIds.has(exampleId)
+              ) {
+                issue(
+                  issues,
+                  `$.arguments[${index}].premises[${premiseIndex}].exampleIds[${exampleIndex}]`,
+                  'missing-reference',
+                  `Unknown local Example "${exampleId}".`,
+                );
+              }
+            });
+          }
+          if (
+            premise.kind === 'argument-premise' &&
+            typeof premise.argumentId === 'string' &&
+            typeof premise.premiseId === 'string'
+          ) {
+            const targetArgument = argumentsById.get(premise.argumentId);
+            if (
+              targetArgument !== undefined &&
+              (!Array.isArray(targetArgument.premises) ||
+                !targetArgument.premises.some(
+                  (targetPremise) =>
+                    isRecord(targetPremise) &&
+                    targetPremise.id === premise.premiseId,
+                ))
+            ) {
+              issue(
+                issues,
+                `$.arguments[${index}].premises[${premiseIndex}].premiseId`,
+                'missing-reference',
+                `Unknown source premise "${premise.premiseId}".`,
+              );
+            }
+          }
+        });
+      }
+      if (Array.isArray(entry.relations)) {
+        entry.relations.forEach((relation, relationIndex) => {
+          if (
+            !isRecord(relation) ||
+            typeof relation.targetArgumentId !== 'string'
+          ) {
+            return;
+          }
+          const relationPath = `$.arguments[${index}].relations[${relationIndex}]`;
+          const targetArgument = argumentsById.get(relation.targetArgumentId);
+          if (targetArgument === undefined) {
+            issue(
+              issues,
+              `${relationPath}.targetArgumentId`,
+              'missing-reference',
+              `Unknown target Argument "${relation.targetArgumentId}".`,
+            );
+            return;
+          }
+          const targetPart = relation.targetPart;
+          if (!isRecord(targetPart)) return;
+          if (
+            targetPart.kind === 'premise' &&
+            typeof targetPart.premiseId === 'string' &&
+            (!Array.isArray(targetArgument.premises) ||
+              !targetArgument.premises.some(
+                (premise) =>
+                  isRecord(premise) && premise.id === targetPart.premiseId,
+              ))
+          ) {
+            issue(
+              issues,
+              `${relationPath}.targetPart.premiseId`,
+              'missing-reference',
+              `Unknown target premise "${targetPart.premiseId}".`,
+            );
+          }
+          if (
+            targetPart.kind === 'reasoning' &&
+            typeof targetArgument.reasoning !== 'string'
+          ) {
+            issue(
+              issues,
+              `${relationPath}.targetPart`,
+              'missing-reference',
+              'The target Argument has no reasoning section.',
             );
           }
         });
@@ -1110,7 +1375,7 @@ function validateIntegrity(
                 : `$.arguments[${recordIndex}]`,
               'dependency-cycle',
               edgeKind === 'premise'
-                ? 'Argument conclusion premises must not form a dependency cycle.'
+                ? 'Argument premise dependencies must not form a dependency cycle.'
                 : 'Argument supersession links must not form a cycle.',
             );
             continue;
@@ -1127,7 +1392,8 @@ function validateIntegrity(
     Array.isArray(record.premises)
       ? record.premises.flatMap((premise) =>
           isRecord(premise) &&
-          premise.kind === 'argument-conclusion' &&
+          (premise.kind === 'argument-conclusion' ||
+            premise.kind === 'argument-premise') &&
           typeof premise.argumentId === 'string'
             ? [premise.argumentId]
             : [],
@@ -1141,8 +1407,9 @@ function validateIntegrity(
   );
 }
 
-export function validateArgumentLibrary(
+function validateArgumentLibraryVersion(
   value: unknown,
+  expectedVersion: 2 | 3,
 ): ArgumentLibraryValidationResult {
   const issues: ArgumentLibraryValidationIssue[] = [];
   if (!isRecord(value)) {
@@ -1175,6 +1442,7 @@ export function validateArgumentLibrary(
     issues,
   );
   if (
+    expectedVersion === ARGUMENT_LIBRARY_SCHEMA_VERSION &&
     typeof value.schemaVersion === 'number' &&
     value.schemaVersion > ARGUMENT_LIBRARY_SCHEMA_VERSION
   ) {
@@ -1184,12 +1452,12 @@ export function validateArgumentLibrary(
       'future-schema',
       'Argument Library uses a newer schema version.',
     );
-  } else if (value.schemaVersion !== ARGUMENT_LIBRARY_SCHEMA_VERSION) {
+  } else if (value.schemaVersion !== expectedVersion) {
     issue(
       issues,
       '$.schemaVersion',
       'invalid-value',
-      'Unsupported Argument Library schema version.',
+      `Expected Argument Library schema version ${expectedVersion}.`,
     );
   }
   nonEmptyString(value.libraryId, '$.libraryId', issues);
@@ -1214,7 +1482,7 @@ export function validateArgumentLibrary(
   const sourceIds = new Set<string>();
   if (Array.isArray(value.topics))
     value.topics.forEach((entry, index) =>
-      validateTopic(entry, `$.topics[${index}]`, issues),
+      validateTopic(entry, `$.topics[${index}]`, issues, expectedVersion),
     );
   if (Array.isArray(value.axioms))
     value.axioms.forEach((entry, index) =>
@@ -1222,7 +1490,13 @@ export function validateArgumentLibrary(
     );
   if (Array.isArray(value.arguments))
     value.arguments.forEach((entry, index) =>
-      validateArgument(entry, `$.arguments[${index}]`, issues, sourceIds),
+      validateArgument(
+        entry,
+        `$.arguments[${index}]`,
+        issues,
+        sourceIds,
+        expectedVersion,
+      ),
     );
   if (Array.isArray(value.counterArguments))
     value.counterArguments.forEach((entry, index) =>
@@ -1239,6 +1513,37 @@ export function validateArgumentLibrary(
     : { valid: false, issues };
 }
 
+export function validateArgumentLibrary(
+  value: unknown,
+): ArgumentLibraryValidationResult {
+  return validateArgumentLibraryVersion(value, 3);
+}
+
+export type ArgumentLibraryV2ValidationResult =
+  | {
+      readonly valid: true;
+      readonly value: PlainRecord;
+      readonly issues: readonly [];
+    }
+  | {
+      readonly valid: false;
+      readonly issues: readonly ArgumentLibraryValidationIssue[];
+    };
+
+/** Strictly validates the schema-v2 shape before deterministic migration. */
+export function validateArgumentLibraryV2(
+  value: unknown,
+): ArgumentLibraryV2ValidationResult {
+  const validation = validateArgumentLibraryVersion(value, 2);
+  return validation.valid
+    ? {
+        valid: true,
+        value: value as PlainRecord,
+        issues: [],
+      }
+    : validation;
+}
+
 export type ArgumentLibraryV1ValidationResult =
   | {
       readonly valid: true;
@@ -1250,7 +1555,7 @@ export type ArgumentLibraryV1ValidationResult =
       readonly issues: readonly ArgumentLibraryValidationIssue[];
     };
 
-/** Strictly validates the legacy shape before a deterministic v1-to-v2 migration. */
+/** Strictly validates the legacy shape before deterministic v1 migration. */
 export function validateArgumentLibraryV1(
   value: unknown,
 ): ArgumentLibraryV1ValidationResult {

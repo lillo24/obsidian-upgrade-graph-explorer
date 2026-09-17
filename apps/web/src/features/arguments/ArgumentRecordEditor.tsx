@@ -1,6 +1,9 @@
 import type {
+  ArgumentExample,
   ArgumentLibrary,
   ArgumentPremise,
+  ArgumentRelation,
+  ArgumentTargetPart,
   HumanReviewState,
 } from '@icarus-graph-explorer/argument-workspace';
 
@@ -181,13 +184,267 @@ function SourceReferenceEditor({
   );
 }
 
+function ExamplesEditor({
+  examples,
+  premises,
+  onChange,
+  onCreateId,
+}: {
+  readonly examples: readonly ArgumentExample[];
+  readonly premises: readonly ArgumentPremise[];
+  readonly onChange: (examples: readonly ArgumentExample[]) => void;
+  readonly onCreateId: () => string;
+}) {
+  const referencedIds = new Set(
+    premises.flatMap(({ exampleIds }) => exampleIds ?? []),
+  );
+  const move = (index: number, direction: -1 | 1) => {
+    const destination = index + direction;
+    if (destination < 0 || destination >= examples.length) return;
+    const reordered = [...examples];
+    const [example] = reordered.splice(index, 1);
+    reordered.splice(destination, 0, example!);
+    onChange(reordered);
+  };
+  return (
+    <fieldset className="arguments-editor__fieldset">
+      <legend>Examples</legend>
+      {examples.length === 0 ? (
+        <p className="arguments-empty">No concrete Examples recorded.</p>
+      ) : (
+        <ol className="arguments-premise-editor">
+          {examples.map((example, index) => {
+            const referenced = referencedIds.has(example.id);
+            return (
+              <li key={example.id}>
+                <div className="arguments-premise-editor__controls">
+                  <code>{example.id}</code>
+                  <button
+                    disabled={index === 0}
+                    onClick={() => move(index, -1)}
+                    type="button"
+                  >
+                    Move up
+                  </button>
+                  <button
+                    disabled={index === examples.length - 1}
+                    onClick={() => move(index, 1)}
+                    type="button"
+                  >
+                    Move down
+                  </button>
+                  <button
+                    disabled={referenced}
+                    onClick={() =>
+                      onChange(examples.filter(({ id }) => id !== example.id))
+                    }
+                    title={
+                      referenced
+                        ? 'Remove Example links from premises first.'
+                        : undefined
+                    }
+                    type="button"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <label>
+                  Example text
+                  <textarea
+                    aria-required="true"
+                    onChange={(event) =>
+                      onChange(
+                        examples.map((current) =>
+                          current.id === example.id
+                            ? { ...current, text: event.currentTarget.value }
+                            : current,
+                        ),
+                      )
+                    }
+                    rows={3}
+                    value={example.text}
+                  />
+                </label>
+                {referenced ? (
+                  <small>Referenced by one or more premises.</small>
+                ) : null}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      <button
+        onClick={() => onChange([...examples, { id: onCreateId(), text: '' }])}
+        type="button"
+      >
+        Add Example
+      </button>
+    </fieldset>
+  );
+}
+
+function relationTargetPartValue(part: ArgumentTargetPart): string {
+  return part.kind === 'premise' ? `premise\0${part.premiseId}` : part.kind;
+}
+
+function parseRelationTargetPart(value: string): ArgumentTargetPart {
+  const [kind, premiseId] = value.split('\0');
+  return kind === 'premise'
+    ? { kind, premiseId: premiseId! }
+    : {
+        kind: kind as 'argument' | 'reasoning' | 'conclusion',
+      };
+}
+
+function RelationsEditor({
+  library,
+  ownerId,
+  relations,
+  onChange,
+  onCreateId,
+}: {
+  readonly library: ArgumentLibrary;
+  readonly ownerId: string;
+  readonly relations: readonly ArgumentRelation[];
+  readonly onChange: (relations: readonly ArgumentRelation[]) => void;
+  readonly onCreateId: () => string;
+}) {
+  const targets = library.arguments.filter(({ id }) => id !== ownerId);
+  const replace = (index: number, relation: ArgumentRelation) =>
+    onChange(
+      relations.map((current, currentIndex) =>
+        currentIndex === index ? relation : current,
+      ),
+    );
+  return (
+    <fieldset className="arguments-editor__fieldset">
+      <legend>Argument relations</legend>
+      {relations.length === 0 ? (
+        <p className="arguments-empty">No attack or support relation.</p>
+      ) : (
+        <ol className="arguments-premise-editor">
+          {relations.map((relation, index) => {
+            const target = library.arguments.find(
+              ({ id }) => id === relation.targetArgumentId,
+            )!;
+            return (
+              <li key={relation.id}>
+                <div className="arguments-premise-editor__controls">
+                  <code>{relation.id}</code>
+                  <button
+                    onClick={() =>
+                      onChange(relations.filter(({ id }) => id !== relation.id))
+                    }
+                    type="button"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <label>
+                  Relation
+                  <select
+                    onChange={(event) =>
+                      replace(index, {
+                        ...relation,
+                        kind: event.currentTarget.value as 'attack' | 'support',
+                      })
+                    }
+                    value={relation.kind}
+                  >
+                    <option value="attack">Attacks</option>
+                    <option value="support">Supports</option>
+                  </select>
+                </label>
+                <label>
+                  Target Argument
+                  <select
+                    onChange={(event) => {
+                      const nextTarget = library.arguments.find(
+                        ({ id }) => id === event.currentTarget.value,
+                      )!;
+                      replace(index, {
+                        ...relation,
+                        targetArgumentId: nextTarget.id,
+                        targetPart: { kind: 'argument' },
+                        reliedOnRevision: nextTarget.revision,
+                      });
+                    }}
+                    value={relation.targetArgumentId}
+                  >
+                    {targets.map((argument) => (
+                      <option key={argument.id} value={argument.id}>
+                        {argument.title} — revision {argument.revision}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Target part
+                  <select
+                    onChange={(event) =>
+                      replace(index, {
+                        ...relation,
+                        targetPart: parseRelationTargetPart(
+                          event.currentTarget.value,
+                        ),
+                      })
+                    }
+                    value={relationTargetPartValue(relation.targetPart)}
+                  >
+                    <option value="argument">Whole Argument</option>
+                    {target.premises.map((premise, premiseIndex) => (
+                      <option key={premise.id} value={`premise\0${premise.id}`}>
+                        Premise {premiseIndex + 1} — {premise.id}
+                      </option>
+                    ))}
+                    {target.reasoning === undefined ? null : (
+                      <option value="reasoning">Reasoning</option>
+                    )}
+                    <option value="conclusion">Conclusion</option>
+                  </select>
+                </label>
+                <small>
+                  Relied-on revision: {relation.reliedOnRevision}. Target
+                  changes mark this relation stale without retargeting it.
+                </small>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      <button
+        disabled={targets.length === 0}
+        onClick={() => {
+          const target = targets[0];
+          if (target === undefined) return;
+          onChange([
+            ...relations,
+            {
+              id: onCreateId(),
+              kind: 'attack',
+              targetArgumentId: target.id,
+              targetPart: { kind: 'argument' },
+              reliedOnRevision: target.revision,
+            },
+          ]);
+        }}
+        type="button"
+      >
+        Add relation
+      </button>
+    </fieldset>
+  );
+}
+
 function PremiseEditor({
+  examples,
   library,
   premises,
   ownerId,
   onChange,
   onCreateId,
 }: {
+  readonly examples: readonly ArgumentExample[];
   readonly library: ArgumentLibrary;
   readonly premises: readonly ArgumentPremise[];
   readonly ownerId: string;
@@ -248,6 +505,7 @@ function PremiseEditor({
                   onChange={(event) => {
                     const kind = event.currentTarget.value;
                     if (kind === premise.kind) return;
+                    const exampleIds = premise.exampleIds;
                     if (kind === 'axiom') {
                       const axiom = library.axioms[0];
                       if (axiom !== undefined) {
@@ -256,6 +514,7 @@ function PremiseEditor({
                           kind,
                           axiomId: axiom.id,
                           reliedOnRevision: axiom.revision,
+                          ...(exampleIds === undefined ? {} : { exampleIds }),
                         });
                       }
                     } else if (kind === 'argument-conclusion') {
@@ -268,6 +527,26 @@ function PremiseEditor({
                           kind,
                           argumentId: argument.id,
                           reliedOnRevision: argument.revision,
+                          ...(exampleIds === undefined ? {} : { exampleIds }),
+                        });
+                      }
+                    } else if (kind === 'argument-premise') {
+                      const argument = library.arguments.find(
+                        ({ id, premises: candidatePremises }) =>
+                          id !== ownerId && candidatePremises.length > 0,
+                      );
+                      const referencedPremise = argument?.premises[0];
+                      if (
+                        argument !== undefined &&
+                        referencedPremise !== undefined
+                      ) {
+                        replace(index, {
+                          id: premise.id,
+                          kind,
+                          argumentId: argument.id,
+                          premiseId: referencedPremise.id,
+                          reliedOnRevision: argument.revision,
+                          ...(exampleIds === undefined ? {} : { exampleIds }),
                         });
                       }
                     } else {
@@ -275,6 +554,7 @@ function PremiseEditor({
                         id: premise.id,
                         kind: 'text',
                         text: '',
+                        ...(exampleIds === undefined ? {} : { exampleIds }),
                       });
                     }
                   }}
@@ -291,6 +571,15 @@ function PremiseEditor({
                     value="argument-conclusion"
                   >
                     Prior Argument conclusion
+                  </option>
+                  <option
+                    disabled={library.arguments.every(
+                      ({ id, premises: candidatePremises }) =>
+                        id === ownerId || candidatePremises.length === 0,
+                    )}
+                    value="argument-premise"
+                  >
+                    Prior Argument premise
                   </option>
                 </select>
               </label>
@@ -332,7 +621,7 @@ function PremiseEditor({
                     ))}
                   </select>
                 </label>
-              ) : (
+              ) : premise.kind === 'argument-conclusion' ? (
                 <label>
                   Referenced Argument conclusion
                   <select
@@ -357,6 +646,85 @@ function PremiseEditor({
                       ))}
                   </select>
                 </label>
+              ) : (
+                <>
+                  <label>
+                    Source Argument
+                    <select
+                      onChange={(event) => {
+                        const argument = library.arguments.find(
+                          ({ id }) => id === event.currentTarget.value,
+                        )!;
+                        replace(index, {
+                          ...premise,
+                          argumentId: argument.id,
+                          premiseId: argument.premises[0]!.id,
+                          reliedOnRevision: argument.revision,
+                        });
+                      }}
+                      value={premise.argumentId}
+                    >
+                      {library.arguments
+                        .filter(
+                          ({ id, premises: candidatePremises }) =>
+                            id !== ownerId && candidatePremises.length > 0,
+                        )
+                        .map((argument) => (
+                          <option key={argument.id} value={argument.id}>
+                            {argument.title} — revision {argument.revision}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <label>
+                    Source premise
+                    <select
+                      onChange={(event) =>
+                        replace(index, {
+                          ...premise,
+                          premiseId: event.currentTarget.value,
+                        })
+                      }
+                      value={premise.premiseId}
+                    >
+                      {library.arguments
+                        .find(({ id }) => id === premise.argumentId)!
+                        .premises.map((candidate, candidateIndex) => (
+                          <option key={candidate.id} value={candidate.id}>
+                            Premise {candidateIndex + 1} — {candidate.id}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                </>
+              )}
+              {examples.length === 0 ? null : (
+                <fieldset className="arguments-editor__checks">
+                  <legend>Grounded in local Examples</legend>
+                  {examples.map((example) => (
+                    <label key={example.id}>
+                      <input
+                        checked={
+                          premise.exampleIds?.includes(example.id) ?? false
+                        }
+                        onChange={(event) => {
+                          const selected = premise.exampleIds ?? [];
+                          const exampleIds = event.currentTarget.checked
+                            ? [...selected, example.id]
+                            : selected.filter((id) => id !== example.id);
+                          replace(index, {
+                            ...premise,
+                            exampleIds,
+                          });
+                        }}
+                        type="checkbox"
+                      />
+                      <span>
+                        <code>{example.id}</code> — {example.text}
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
               )}
               {premise.kind === 'text' ? null : (
                 <small>
@@ -390,7 +758,9 @@ export function ArgumentRecordEditor({
   errors,
   library,
   onChange,
+  onCreateExampleId,
   onCreatePremiseId,
+  onCreateRelationId,
   onRetrievalTextChange,
   onSourceChange,
   retrievalText,
@@ -400,7 +770,9 @@ export function ArgumentRecordEditor({
   readonly errors: readonly string[];
   readonly library: ArgumentLibrary;
   readonly onChange: (draft: ArgumentRecordDraft) => void;
+  readonly onCreateExampleId: () => string;
   readonly onCreatePremiseId: () => string;
+  readonly onCreateRelationId: () => string;
   readonly onRetrievalTextChange: (value: RetrievalEditorText) => void;
   readonly onSourceChange: (source: string) => void;
   readonly retrievalText: RetrievalEditorText;
@@ -557,7 +929,14 @@ export function ArgumentRecordEditor({
 
       {draft.kind === 'argument' ? (
         <>
+          <ExamplesEditor
+            examples={draft.examples}
+            onChange={(examples) => onChange({ ...draft, examples })}
+            onCreateId={onCreateExampleId}
+            premises={draft.premises}
+          />
           <PremiseEditor
+            examples={draft.examples}
             library={library}
             onChange={(premises) => onChange({ ...draft, premises })}
             onCreateId={onCreatePremiseId}
@@ -585,6 +964,23 @@ export function ArgumentRecordEditor({
               value={draft.conclusion}
             />
           </label>
+          <label>
+            Boundary / Invariance
+            <textarea
+              onChange={(event) =>
+                onChange({ ...draft, boundary: event.currentTarget.value })
+              }
+              rows={4}
+              value={draft.boundary ?? ''}
+            />
+          </label>
+          <RelationsEditor
+            library={library}
+            onChange={(relations) => onChange({ ...draft, relations })}
+            onCreateId={onCreateRelationId}
+            ownerId={draft.id}
+            relations={draft.relations}
+          />
           <label>
             Supersedes Argument
             <select

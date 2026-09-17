@@ -18,6 +18,7 @@ import {
   previewArgumentLibraryImport,
   reassessCounterArgumentResponse,
   reassessArgumentPremises,
+  reassessArgumentRelations,
   sameSnapshot,
   setRecordArchived,
   setRecordReviewState,
@@ -26,6 +27,7 @@ import {
   type Argument,
   type ArgumentAxiom,
   type ArgumentCounterArgument,
+  type ArgumentExample,
   type ArgumentImportPreview,
   type ArgumentLibrary,
   type ArgumentLibraryCommitResult,
@@ -33,6 +35,7 @@ import {
   type ArgumentLibraryStore,
   type ArgumentRecordKind,
   type ArgumentPremise,
+  type ArgumentRelation,
   type ArgumentRuntime,
   type ArgumentTopic,
   type CounterArgumentOutcome,
@@ -118,9 +121,12 @@ export interface CounterArgumentRecordDraft extends DraftBase {
 export interface ArgumentRecordEditorDraft extends DraftBase {
   readonly kind: 'argument';
   readonly title: string;
+  readonly examples: readonly ArgumentExample[];
   readonly premises: readonly ArgumentPremise[];
   readonly reasoning?: string | undefined;
   readonly conclusion: string;
+  readonly boundary?: string | undefined;
+  readonly relations: readonly ArgumentRelation[];
   readonly retrieval: RetrievalMetadata;
   readonly sourceReferences: readonly TheorySourceReference[];
   readonly supersedesArgumentId?: string | undefined;
@@ -138,7 +144,7 @@ export interface ArgumentImportPlan {
   readonly mode: 'merge' | 'replace';
   readonly preview: ArgumentImportPreview;
   readonly base: SnapshotDescriptor;
-  readonly migratedFromSchemaVersion?: 1;
+  readonly migratedFromSchemaVersion?: 1 | 2;
 }
 
 export type ArgumentWorkspaceActionResult =
@@ -314,6 +320,7 @@ function saveDraft(
     );
   } else if (draft.kind === 'argument') {
     const reasoning = optional(draft.reasoning);
+    const boundary = optional(draft.boundary);
     const supersedesArgumentId = optional(draft.supersedesArgumentId);
     next =
       draft.mode === 'create'
@@ -322,9 +329,12 @@ function saveDraft(
             {
               id: draft.id,
               title: draft.title,
+              examples: draft.examples,
               premises: draft.premises,
               ...(reasoning === undefined ? {} : { reasoning }),
               conclusion: draft.conclusion,
+              ...(boundary === undefined ? {} : { boundary }),
+              relations: draft.relations,
               retrieval: draft.retrieval,
               sourceReferences: draft.sourceReferences,
               ...(supersedesArgumentId === undefined
@@ -339,9 +349,12 @@ function saveDraft(
             draft.id,
             {
               title: draft.title,
+              examples: draft.examples,
               premises: draft.premises,
               reasoning: reasoning ?? null,
               conclusion: draft.conclusion,
+              boundary: boundary ?? null,
+              relations: draft.relations,
               retrieval: draft.retrieval,
               sourceReferences: draft.sourceReferences,
               supersedesArgumentId: supersedesArgumentId ?? null,
@@ -666,7 +679,7 @@ export class ArgumentWorkspaceSession {
       parsed.value,
       parsed.migratedFromSchemaVersion === undefined
         ? undefined
-        : 'Migrated schema v1 to v2 and saved',
+        : `Migrated schema v${parsed.migratedFromSchemaVersion} to v3 and saved`,
     );
   }
 
@@ -733,6 +746,15 @@ export class ArgumentWorkspaceSession {
   ): Promise<ArgumentWorkspaceActionResult> {
     return this.#commit(expected, (library) =>
       reassessArgumentPremises(library, id, this.runtime),
+    );
+  }
+
+  reassessArgumentRelations(
+    expected: SnapshotDescriptor,
+    id: string,
+  ): Promise<ArgumentWorkspaceActionResult> {
+    return this.#commit(expected, (library) =>
+      reassessArgumentRelations(library, id, this.runtime),
     );
   }
 

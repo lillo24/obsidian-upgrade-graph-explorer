@@ -6,6 +6,7 @@ import {
   editCounterArgument,
   createCounterArgument,
   createArgument,
+  editArgument,
   setTopicMembership,
 } from './library';
 import {
@@ -231,6 +232,126 @@ describe('snapshot-bound knowledge reader', () => {
     });
   });
 
+  it('resolves reused premises and direct relations without traversing an unlimited debate network', () => {
+    const runtime = deterministicRuntime('relation-bundle');
+    let library = createNeutralArgumentLibrary();
+    library = createArgument(
+      library,
+      {
+        id: 'AR-SOURCE',
+        title: 'Source Argument',
+        examples: [{ id: 'E-SOURCE', text: 'A concrete neutral case.' }],
+        premises: [
+          {
+            id: 'P-SOURCE',
+            kind: 'text',
+            text: 'The case supports a reusable premise.',
+            exampleIds: ['E-SOURCE'],
+          },
+        ],
+        reasoning: 'Source reasoning.',
+        conclusion: 'Source conclusion.',
+      },
+      runtime,
+    );
+    library = createArgument(
+      library,
+      {
+        id: 'AR-CONSUMER',
+        title: 'Consumer Argument',
+        premises: [
+          {
+            id: 'P-REUSE',
+            kind: 'argument-premise',
+            argumentId: 'AR-SOURCE',
+            premiseId: 'P-SOURCE',
+            reliedOnRevision: 1,
+          },
+        ],
+        conclusion: 'Consumer conclusion.',
+        boundary: 'Independent of neutral display choices.',
+        relations: [
+          {
+            id: 'REL-SUPPORT',
+            kind: 'support',
+            targetArgumentId: 'AR-SOURCE',
+            targetPart: { kind: 'premise', premiseId: 'P-SOURCE' },
+            reliedOnRevision: 1,
+          },
+        ],
+      },
+      runtime,
+    );
+    library = editArgument(
+      library,
+      'AR-NEUTRAL',
+      {
+        relations: [
+          {
+            id: 'REL-UNRELATED',
+            kind: 'attack',
+            targetArgumentId: 'AR-CONSUMER',
+            targetPart: { kind: 'argument' },
+            reliedOnRevision: 1,
+          },
+        ],
+      },
+      runtime,
+    );
+    const reader = createKnowledgeReader(
+      captureArgumentLibrarySnapshot(library),
+    );
+    expect(
+      reader.searchIndex({ query: 'concrete neutral case' }),
+    ).toMatchObject({
+      status: 'ok',
+      value: {
+        candidates: expect.arrayContaining([
+          expect.objectContaining({ id: 'AR-SOURCE' }),
+        ]),
+      },
+    });
+    expect(
+      reader.searchIndex({ query: 'neutral display choices' }),
+    ).toMatchObject({
+      status: 'ok',
+      value: {
+        candidates: expect.arrayContaining([
+          expect.objectContaining({ id: 'AR-CONSUMER' }),
+        ]),
+      },
+    });
+    const result = reader.readArgumentBundle({
+      kind: 'argument',
+      id: 'AR-CONSUMER',
+    });
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    expect(result.value.arguments.map(({ id }) => id)).toEqual([
+      'AR-CONSUMER',
+      'AR-SOURCE',
+    ]);
+    expect(result.value.arguments[0]).toMatchObject({
+      boundary: 'Independent of neutral display choices.',
+      resolvedPremises: [
+        {
+          premiseId: 'P-REUSE',
+          referencedRecord: { id: 'AR-SOURCE' },
+          referencedPremise: { id: 'P-SOURCE', kind: 'text' },
+        },
+      ],
+      resolvedRelations: [
+        {
+          relationId: 'REL-SUPPORT',
+          kind: 'support',
+          stale: false,
+          targetArgument: { id: 'AR-SOURCE' },
+          targetPart: { kind: 'premise', premiseId: 'P-SOURCE' },
+        },
+      ],
+    });
+  });
+
   it('keeps target traversal cycle-safe and reports depth/record limits explicitly', () => {
     const runtime = deterministicRuntime('cycle');
     let library = createNeutralArgumentLibrary();
@@ -352,7 +473,7 @@ describe('snapshot-bound knowledge reader', () => {
     if (result.status !== 'ok') return;
     expect(() => JSON.stringify(result.value.receipt)).not.toThrow();
     expect(result.value.receipt).toMatchObject({
-      contractVersion: 2,
+      contractVersion: 3,
       operation: 'read-argument-bundle',
       snapshot: reader.snapshot,
       returnedRecords: expect.arrayContaining([

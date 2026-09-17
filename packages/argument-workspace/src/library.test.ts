@@ -13,6 +13,8 @@ import {
   editTopic,
   promoteArgumentToCurrent,
   reassessArgumentPremises,
+  reassessArgumentRelations,
+  removeArgumentExample,
   reassessCounterArgumentResponse,
   recordTheorySourceVersion,
   responseStaleness,
@@ -333,6 +335,7 @@ describe('Argument Library domain operations', () => {
     expect(argumentStaleness(library, stale)).toEqual({
       stale: true,
       premiseIds: ['P-FOLLOWUP'],
+      relationIds: [],
     });
     expect(stale.conclusion).toBe(original.conclusion);
 
@@ -343,6 +346,7 @@ describe('Argument Library domain operations', () => {
     expect(argumentStaleness(library, reassessed)).toEqual({
       stale: false,
       premiseIds: [],
+      relationIds: [],
     });
     expect(reassessed).toMatchObject({
       conclusion: original.conclusion,
@@ -439,7 +443,13 @@ describe('Argument Library domain operations', () => {
       {
         id: 'AR-CYCLE',
         title: 'Cycle candidate',
-        premises: [],
+        premises: [
+          {
+            id: 'P-CYCLE-SOURCE',
+            kind: 'text',
+            text: 'A premise that will participate in a rejected cycle.',
+          },
+        ],
         conclusion: 'A cycle candidate conclusion.',
       },
       runtime,
@@ -451,16 +461,18 @@ describe('Argument Library domain operations', () => {
       .find(({ id }) => id === 'AR-NEUTRAL')!
       .premises.push({
         id: 'P-CYCLE-A',
-        kind: 'argument-conclusion',
+        kind: 'argument-premise',
         argumentId: 'AR-CYCLE',
+        premiseId: 'P-CYCLE-SOURCE',
         reliedOnRevision: 1,
       });
     cyclic.arguments
       .find(({ id }) => id === 'AR-CYCLE')!
       .premises.push({
         id: 'P-CYCLE-B',
-        kind: 'argument-conclusion',
+        kind: 'argument-premise',
         argumentId: 'AR-NEUTRAL',
+        premiseId: 'P-NEUTRAL-TEXT',
         reliedOnRevision: 1,
       });
     const validation = validateArgumentLibrary(cyclic);
@@ -529,5 +541,293 @@ describe('Argument Library domain operations', () => {
       'AX-NEUTRAL',
       'AX-TWO',
     ]);
+  });
+
+  it('represents Examples, premise reuse, relations, supersession, and Current independently', () => {
+    const runtime = deterministicRuntime('relations');
+    let library = createNeutralArgumentLibrary();
+    library = createArgument(
+      library,
+      {
+        id: 'AR-BASE',
+        title: 'Base comparison',
+        examples: [
+          { id: 'E-ONE', text: 'The first sample produces output A.' },
+          { id: 'E-TWO', text: 'The second sample also produces output A.' },
+        ],
+        premises: [
+          {
+            id: 'P-ONE',
+            kind: 'text',
+            text: 'The first sample has property one.',
+            exampleIds: ['E-ONE'],
+          },
+          {
+            id: 'P-COMPARE',
+            kind: 'text',
+            text: 'Both samples share an output.',
+            exampleIds: ['E-ONE', 'E-TWO'],
+          },
+        ],
+        reasoning: 'Shared outputs can arise from distinct inputs.',
+        conclusion: 'Output alone does not identify the input.',
+        reviewState: 'accepted',
+      },
+      runtime,
+    );
+    const baseRevision = library.arguments.find(
+      ({ id }) => id === 'AR-BASE',
+    )!.revision;
+    library = createArgument(
+      library,
+      {
+        id: 'AR-REVISION',
+        title: 'Revised comparison',
+        premises: [
+          {
+            id: 'P-REUSED',
+            kind: 'argument-premise',
+            argumentId: 'AR-BASE',
+            premiseId: 'P-ONE',
+            reliedOnRevision: baseRevision,
+          },
+          {
+            id: 'P-NEW',
+            kind: 'text',
+            text: 'A shared representation can preserve distinct relations.',
+          },
+        ],
+        reasoning: 'The shared output is a representation, not an identity.',
+        conclusion: 'The representation can express more than one relation.',
+        boundary:
+          'The result does not depend on the display format of the output.',
+        relations: [
+          {
+            id: 'REL-ATTACK',
+            kind: 'attack',
+            targetArgumentId: 'AR-BASE',
+            targetPart: { kind: 'reasoning' },
+            reliedOnRevision: baseRevision,
+          },
+        ],
+        supersedesArgumentId: 'AR-BASE',
+        reviewState: 'accepted',
+      },
+      runtime,
+    );
+    library = setTopicMembership(
+      library,
+      'T-NEUTRAL',
+      'argument',
+      'AR-BASE',
+      true,
+      runtime,
+    );
+    library = setTopicMembership(
+      library,
+      'T-NEUTRAL',
+      'argument',
+      'AR-REVISION',
+      true,
+      runtime,
+    );
+    library = promoteArgumentToCurrent(
+      library,
+      'T-NEUTRAL',
+      'AR-BASE',
+      runtime,
+    );
+    expect(library.topics[0]!.currentArgumentId).toBe('AR-BASE');
+    library = promoteArgumentToCurrent(
+      library,
+      'T-NEUTRAL',
+      'AR-REVISION',
+      runtime,
+    );
+    expect(library.arguments.some(({ id }) => id === 'AR-BASE')).toBe(true);
+    expect(library.topics[0]!.currentArgumentId).toBe('AR-REVISION');
+    expect(validateArgumentLibrary(library).valid).toBe(true);
+
+    library = editArgument(
+      library,
+      'AR-BASE',
+      { reasoning: 'The base reasoning was explicitly revised.' },
+      runtime,
+    );
+    const revised = library.arguments.find(({ id }) => id === 'AR-REVISION')!;
+    expect(argumentStaleness(library, revised)).toEqual({
+      stale: true,
+      premiseIds: ['P-REUSED'],
+      relationIds: ['REL-ATTACK'],
+    });
+    library = reassessArgumentPremises(library, 'AR-REVISION', runtime);
+    expect(
+      argumentStaleness(
+        library,
+        library.arguments.find(({ id }) => id === 'AR-REVISION')!,
+      ).relationIds,
+    ).toEqual(['REL-ATTACK']);
+    library = reassessArgumentRelations(library, 'AR-REVISION', runtime);
+    expect(
+      argumentStaleness(
+        library,
+        library.arguments.find(({ id }) => id === 'AR-REVISION')!,
+      ),
+    ).toEqual({ stale: false, premiseIds: [], relationIds: [] });
+  });
+
+  it('validates local Example and external premise references while allowing relation cycles', () => {
+    const runtime = deterministicRuntime('integrity-v3');
+    let library = createNeutralArgumentLibrary();
+    library = createArgument(
+      library,
+      {
+        id: 'AR-OTHER',
+        title: 'Other reasoning',
+        premises: [{ id: 'P-OTHER', kind: 'text', text: 'Other premise.' }],
+        conclusion: 'Other conclusion.',
+        relations: [
+          {
+            id: 'REL-TO-NEUTRAL',
+            kind: 'support',
+            targetArgumentId: 'AR-NEUTRAL',
+            targetPart: { kind: 'argument' },
+            reliedOnRevision: library.arguments[0]!.revision,
+          },
+        ],
+      },
+      runtime,
+    );
+    library = editArgument(
+      library,
+      'AR-NEUTRAL',
+      {
+        relations: [
+          {
+            id: 'REL-TO-OTHER',
+            kind: 'attack',
+            targetArgumentId: 'AR-OTHER',
+            targetPart: { kind: 'conclusion' },
+            reliedOnRevision: library.arguments.find(
+              ({ id }) => id === 'AR-OTHER',
+            )!.revision,
+          },
+        ],
+      },
+      runtime,
+    );
+    expect(validateArgumentLibrary(library).valid).toBe(true);
+
+    const danglingExample = clonePlainData(library) as unknown as {
+      arguments: { premises: Record<string, unknown>[] }[];
+    };
+    danglingExample.arguments[0]!.premises[0] = {
+      ...danglingExample.arguments[0]!.premises[0]!,
+      exampleIds: ['E-MISSING'],
+    };
+    const exampleValidation = validateArgumentLibrary(danglingExample);
+    expect(exampleValidation.valid).toBe(false);
+    if (!exampleValidation.valid) {
+      expect(exampleValidation.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'missing-reference' }),
+        ]),
+      );
+    }
+
+    const missingPremise = clonePlainData(library) as unknown as {
+      arguments: { premises: Record<string, unknown>[] }[];
+    };
+    missingPremise.arguments[0]!.premises.push({
+      id: 'P-BROKEN',
+      kind: 'argument-premise',
+      argumentId: 'AR-OTHER',
+      premiseId: 'P-MISSING',
+      reliedOnRevision: 1,
+    });
+    const premiseValidation = validateArgumentLibrary(missingPremise);
+    expect(premiseValidation.valid).toBe(false);
+    if (!premiseValidation.valid) {
+      expect(premiseValidation.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: expect.stringContaining('premiseId'),
+            code: 'missing-reference',
+          }),
+        ]),
+      );
+    }
+
+    const missingRelationPart = clonePlainData(library) as unknown as {
+      arguments: {
+        id: string;
+        relations: { targetPart: Record<string, unknown> }[];
+      }[];
+    };
+    missingRelationPart.arguments.find(
+      ({ id }) => id === 'AR-NEUTRAL',
+    )!.relations[0]!.targetPart = {
+      kind: 'premise',
+      premiseId: 'P-MISSING',
+    };
+    const relationValidation = validateArgumentLibrary(missingRelationPart);
+    expect(relationValidation.valid).toBe(false);
+    if (!relationValidation.valid) {
+      expect(relationValidation.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: expect.stringContaining('targetPart.premiseId'),
+            code: 'missing-reference',
+          }),
+        ]),
+      );
+    }
+
+    const selfReference = clonePlainData(library) as unknown as {
+      arguments: { id: string; premises: Record<string, unknown>[] }[];
+    };
+    selfReference.arguments
+      .find(({ id }) => id === 'AR-OTHER')!
+      .premises.push({
+        id: 'P-SELF',
+        kind: 'argument-premise',
+        argumentId: 'AR-OTHER',
+        premiseId: 'P-OTHER',
+        reliedOnRevision: 1,
+      });
+    const selfValidation = validateArgumentLibrary(selfReference);
+    expect(selfValidation.valid).toBe(false);
+    if (!selfValidation.valid) {
+      expect(selfValidation.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'self-reference' }),
+        ]),
+      );
+    }
+  });
+
+  it('rejects deleting an Example while a premise still references it', () => {
+    const runtime = deterministicRuntime('example-delete');
+    const library = createArgument(
+      createNeutralArgumentLibrary(),
+      {
+        id: 'AR-EXAMPLE',
+        title: 'Example ownership',
+        examples: [{ id: 'E-OWNED', text: 'A concrete case.' }],
+        premises: [
+          {
+            id: 'P-GROUNDED',
+            kind: 'text',
+            text: 'A claim grounded in the case.',
+            exampleIds: ['E-OWNED'],
+          },
+        ],
+        conclusion: 'The provenance remains explicit.',
+      },
+      runtime,
+    );
+    expect(() =>
+      removeArgumentExample(library, 'AR-EXAMPLE', 'E-OWNED', runtime),
+    ).toThrow(/referenced by a premise/i);
   });
 });

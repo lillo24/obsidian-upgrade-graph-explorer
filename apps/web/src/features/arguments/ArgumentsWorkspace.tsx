@@ -217,9 +217,12 @@ function editDraft(
         id: argument.id,
         expected: descriptor,
         title: argument.title,
+        examples: argument.examples,
         premises: argument.premises,
         reasoning: argument.reasoning,
         conclusion: argument.conclusion,
+        boundary: argument.boundary,
+        relations: argument.relations,
         retrieval: argument.retrieval,
         sourceReferences: argument.sourceReferences,
         supersedesArgumentId: argument.supersedesArgumentId,
@@ -309,8 +312,10 @@ function newDraft(
       record: {
         ...base,
         kind,
+        examples: [],
         premises: [],
         conclusion: '',
+        relations: [],
         sourceReferences: [],
       },
     };
@@ -427,7 +432,7 @@ function WorkspaceOnboarding({
     source: string;
     fileName: string;
     library: ArgumentLibrary;
-    migratedFromSchemaVersion?: 1;
+    migratedFromSchemaVersion?: 1 | 2;
   }>();
   const [error, setError] = useState<string>();
   async function select(event: ChangeEvent<HTMLInputElement>) {
@@ -491,9 +496,9 @@ function WorkspaceOnboarding({
           </p>
           {preview.migratedFromSchemaVersion === undefined ? null : (
             <p className="arguments-disclosure">
-              Schema v1 will be migrated deterministically to v2. Existing
-              records remain unchanged; no Arguments or Current pointer are
-              invented.
+              Schema v{preview.migratedFromSchemaVersion} will be migrated
+              deterministically to v3. Existing records remain intact; no
+              Examples, relations, Arguments, or Current pointer are inferred.
             </p>
           )}
           <button
@@ -1405,6 +1410,28 @@ const ArgumentsWorkspaceContent = forwardRef<
     );
   }
 
+  async function reassessArgumentRelations() {
+    if (state.phase !== 'ready' || currentSelection?.kind !== 'argument') {
+      return;
+    }
+    if (
+      !window.confirm(
+        'Confirm that you inspected the current relation targets and want to advance their relied-on revisions.',
+      )
+    ) {
+      return;
+    }
+    const result = await session.reassessArgumentRelations(
+      state.snapshot.descriptor,
+      currentSelection.id,
+    );
+    setNotice(
+      result.status === 'ok'
+        ? 'Relation reassessment saved; attack/support and supersession remain independent.'
+        : result.message,
+    );
+  }
+
   async function promoteArgument(topicId: string) {
     if (state.phase !== 'ready' || currentSelection?.kind !== 'argument') {
       return;
@@ -1818,6 +1845,7 @@ const ArgumentsWorkspaceContent = forwardRef<
                     onNavigate={navigate}
                     onPromote={(topicId) => void promoteArgument(topicId)}
                     onReassess={() => void reassessArgument()}
+                    onReassessRelations={() => void reassessArgumentRelations()}
                     sourceSection={
                       <TheorySourceReferences
                         currentLibrary={state.snapshot.descriptor}
@@ -1907,7 +1935,11 @@ const ArgumentsWorkspaceContent = forwardRef<
                         : { ...current, dirty: true, errors: [], record },
                     )
                   }
+                  onCreateExampleId={() => session.runtime.createId('example')}
                   onCreatePremiseId={() => session.runtime.createId('premise')}
+                  onCreateRelationId={() =>
+                    session.runtime.createId('relation')
+                  }
                   onRetrievalTextChange={(retrievalText) =>
                     setEditor((current) =>
                       current === undefined
@@ -1993,8 +2025,10 @@ const ArgumentsWorkspaceContent = forwardRef<
                   {importPreview.merge.migratedFromSchemaVersion ===
                   undefined ? null : (
                     <p className="arguments-disclosure">
-                      Incoming schema v1 was migrated to v2 without inventing
-                      Arguments or Current pointers.
+                      Incoming schema v
+                      {importPreview.merge.migratedFromSchemaVersion} was
+                      migrated to v3 without inferring Examples, relations,
+                      Arguments, or Current pointers.
                     </p>
                   )}
                   <p>Status: {importPreview.merge.preview.status}</p>

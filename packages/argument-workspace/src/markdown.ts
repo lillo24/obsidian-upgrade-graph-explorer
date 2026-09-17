@@ -195,17 +195,34 @@ export function exportArgumentLibraryMarkdown(
         '',
         `# ${argument.title}`,
         '',
+        '## Examples',
+        '',
+        ...(argument.examples.length === 0
+          ? ['_None._']
+          : argument.examples.map(
+              (example, index) =>
+                `${index + 1}. **${example.id}** — ${example.text}`,
+            )),
+        '',
         '## Premises',
         '',
         ...(argument.premises.length === 0
           ? ['_None._']
           : argument.premises.map((premise, index) => {
-              const prefix = `${index + 1}. **${premise.id}** — `;
+              const exampleLinks =
+                premise.exampleIds === undefined ||
+                premise.exampleIds.length === 0
+                  ? ''
+                  : ` [Examples: ${premise.exampleIds.join(', ')}]`;
+              const prefix = `${index + 1}. **${premise.id}**${exampleLinks} — `;
               if (premise.kind === 'text') return `${prefix}${premise.text}`;
               if (premise.kind === 'axiom') {
                 return `${prefix}[[axioms/${axiomFiles.get(premise.axiomId)!}|${axiomTitles.get(premise.axiomId)!}]] (${premise.axiomId}, relied on revision ${premise.reliedOnRevision})`;
               }
-              return `${prefix}[[arguments/${argumentFiles.get(premise.argumentId)!}|${argumentTitles.get(premise.argumentId)!}]] conclusion (${premise.argumentId}, relied on revision ${premise.reliedOnRevision})`;
+              if (premise.kind === 'argument-conclusion') {
+                return `${prefix}[[arguments/${argumentFiles.get(premise.argumentId)!}|${argumentTitles.get(premise.argumentId)!}]] conclusion (${premise.argumentId}, relied on revision ${premise.reliedOnRevision})`;
+              }
+              return `${prefix}[[arguments/${argumentFiles.get(premise.argumentId)!}|${argumentTitles.get(premise.argumentId)!}]] premise ${premise.premiseId} (${premise.argumentId}, relied on revision ${premise.reliedOnRevision})`;
             })),
         ...(argument.reasoning === undefined
           ? []
@@ -214,6 +231,21 @@ export function exportArgumentLibraryMarkdown(
         '## Conclusion',
         '',
         argument.conclusion,
+        ...(argument.boundary === undefined
+          ? []
+          : ['', '## Boundary / Invariance', '', argument.boundary]),
+        '',
+        '## Argument relations',
+        '',
+        ...(argument.relations.length === 0
+          ? ['_None._']
+          : argument.relations.map((relation) => {
+              const part =
+                relation.targetPart.kind === 'premise'
+                  ? `premise ${relation.targetPart.premiseId}`
+                  : relation.targetPart.kind;
+              return `- **${relation.id}** — ${relation.kind} [[arguments/${argumentFiles.get(relation.targetArgumentId)!}|${argumentTitles.get(relation.targetArgumentId)!}]].${part} (${relation.targetArgumentId}, relied on revision ${relation.reliedOnRevision})`;
+            })),
         ...(argument.supersedesArgumentId === undefined
           ? []
           : [

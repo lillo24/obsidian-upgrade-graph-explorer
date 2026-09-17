@@ -157,7 +157,8 @@ export function buildDescriptiveIndex(
     const referenceIds = argument.premises.flatMap((premise) =>
       premise.kind === 'axiom'
         ? [premise.axiomId]
-        : premise.kind === 'argument-conclusion'
+        : premise.kind === 'argument-conclusion' ||
+            premise.kind === 'argument-premise'
           ? [premise.argumentId]
           : [],
     );
@@ -165,7 +166,8 @@ export function buildDescriptiveIndex(
       const title =
         premise.kind === 'axiom'
           ? axiomTitles.get(premise.axiomId)
-          : premise.kind === 'argument-conclusion'
+          : premise.kind === 'argument-conclusion' ||
+              premise.kind === 'argument-premise'
             ? argumentTitles.get(premise.argumentId)
             : undefined;
       return title === undefined ? [] : [title];
@@ -179,11 +181,23 @@ export function buildDescriptiveIndex(
       archived: argument.archived,
       fields: fields([
         ['title', argument.title, 12],
+        ['examples', argument.examples.map(({ text }) => text).join(' '), 7],
         ['premises', textPremises.join(' '), 8],
         ['reasoning', argument.reasoning, 8],
         ['conclusion', argument.conclusion, 10],
+        ['boundary', argument.boundary, 6],
         ['referencedIds', referenceIds.join(' '), 2],
         ['referencedTitles', referenceTitles.join(' '), 4],
+        [
+          'relationTargets',
+          argument.relations
+            .flatMap((relation) => [
+              relation.targetArgumentId,
+              argumentTitles.get(relation.targetArgumentId) ?? '',
+            ])
+            .join(' '),
+          4,
+        ],
         ['aliases', argument.retrieval.aliases.join(' '), 8],
         ['keywords', argument.retrieval.keywords.join(' '), 6],
         ['phrases', argument.retrieval.phrases.join(' '), 9],

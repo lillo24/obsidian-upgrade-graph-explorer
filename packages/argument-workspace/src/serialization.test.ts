@@ -6,7 +6,11 @@ import {
   sameSnapshot,
   sha256,
 } from './canonical';
-import { createEmptyArgumentLibrary, createTopic } from './library';
+import {
+  createArgument,
+  createEmptyArgumentLibrary,
+  createTopic,
+} from './library';
 import {
   exportArgumentLibraryMarkdown,
   safeMarkdownFileName,
@@ -109,7 +113,7 @@ describe('Argument Library interchange', () => {
     });
     expect(
       parseArgumentLibraryJson(
-        JSON.stringify({ ...createNeutralArgumentLibrary(), schemaVersion: 3 }),
+        JSON.stringify({ ...createNeutralArgumentLibrary(), schemaVersion: 4 }),
       ),
     ).toMatchObject({ status: 'future-schema' });
   });
@@ -122,7 +126,7 @@ describe('Argument Library interchange', () => {
       status: 'valid',
       migratedFromSchemaVersion: 1,
       value: {
-        schemaVersion: 2,
+        schemaVersion: 3,
         libraryId: 'library-v1-fixture',
         libraryRevision: 7,
         arguments: [],
@@ -135,6 +139,43 @@ describe('Argument Library interchange', () => {
     expect(first.value.counterArguments).toEqual(legacyV1.counterArguments);
     expect(first.value.topics[0]).not.toHaveProperty('currentArgumentId');
     expect(JSON.stringify(first.value)).not.toContain('reasoning');
+  });
+
+  it('migrates v2 deterministically and preserves existing records and premises', () => {
+    const current = clonePlainData(createNeutralArgumentLibrary());
+    const withoutV3Fields = (argument: unknown): Record<string, unknown> => {
+      const legacyArgument = clonePlainData(argument) as Record<
+        string,
+        unknown
+      >;
+      delete legacyArgument.examples;
+      delete legacyArgument.relations;
+      delete legacyArgument.boundary;
+      return legacyArgument;
+    };
+    const legacyArguments = current.arguments.map(withoutV3Fields);
+    const legacyV2 = {
+      ...current,
+      schemaVersion: 2,
+      arguments: legacyArguments,
+    };
+    const source = JSON.stringify(legacyV2);
+    const first = parseArgumentLibraryJson(source);
+    const second = parseArgumentLibraryJson(source);
+    expect(first).toMatchObject({
+      status: 'valid',
+      migratedFromSchemaVersion: 2,
+      value: {
+        schemaVersion: 3,
+        arguments: [{ examples: [], relations: [] }],
+      },
+    });
+    expect(second).toEqual(first);
+    if (first.status !== 'valid') return;
+    expect(first.value.arguments.map(withoutV3Fields)).toEqual(legacyArguments);
+    expect(first.value.topics).toEqual(legacyV2.topics);
+    expect(first.value.axioms).toEqual(legacyV2.axioms);
+    expect(first.value.counterArguments).toEqual(legacyV2.counterArguments);
   });
 
   it('treats identical import as idempotent and same-lineage altered content as conflict', () => {
@@ -210,10 +251,77 @@ describe('Argument Library interchange', () => {
       path.startsWith('arguments/'),
     )!;
     expect(argument.text).toContain('## Premises');
+    expect(argument.text).toContain('## Examples');
     expect(argument.text).toContain('## Reasoning');
     expect(argument.text).toContain('## Conclusion');
+    expect(argument.text).toContain('## Argument relations');
     expect(safeMarkdownFileName('CON', 'id:unsafe')).toBe(
       'record--id-unsafe.md',
     );
+  });
+
+  it('exports v3 Argument structure without flattening reusable identities', () => {
+    const runtime = deterministicRuntime('markdown-v3');
+    let library = createArgument(
+      createEmptyArgumentLibrary(runtime, 'markdown-v3-library'),
+      {
+        id: 'AR-MD-SOURCE',
+        title: 'Source case',
+        examples: [{ id: 'E-MD', text: 'A concrete exported Example.' }],
+        premises: [
+          {
+            id: 'P-MD',
+            kind: 'text',
+            text: 'A reusable exported premise.',
+            exampleIds: ['E-MD'],
+          },
+        ],
+        reasoning: 'Source reasoning.',
+        conclusion: 'Source conclusion.',
+      },
+      runtime,
+    );
+    library = createArgument(
+      library,
+      {
+        id: 'AR-MD-NEXT',
+        title: 'Reusing case',
+        premises: [
+          {
+            id: 'P-MD-REUSE',
+            kind: 'argument-premise',
+            argumentId: 'AR-MD-SOURCE',
+            premiseId: 'P-MD',
+            reliedOnRevision: 1,
+          },
+        ],
+        conclusion: 'Reused conclusion.',
+        boundary: 'Invariant under a neutral presentation change.',
+        relations: [
+          {
+            id: 'REL-MD',
+            kind: 'attack',
+            targetArgumentId: 'AR-MD-SOURCE',
+            targetPart: { kind: 'reasoning' },
+            reliedOnRevision: 1,
+          },
+        ],
+        supersedesArgumentId: 'AR-MD-SOURCE',
+      },
+      runtime,
+    );
+    const exported = exportArgumentLibraryMarkdown(library);
+    const source = exported.files.find(({ path }) =>
+      path.includes('AR-MD-SOURCE'),
+    )!.text;
+    const next = exported.files.find(({ path }) =>
+      path.includes('AR-MD-NEXT'),
+    )!.text;
+    expect(source).toContain('**E-MD** — A concrete exported Example.');
+    expect(source).toContain('[Examples: E-MD]');
+    expect(next).toContain('premise P-MD');
+    expect(next).toContain('## Boundary / Invariance');
+    expect(next).toContain('**REL-MD** — attack');
+    expect(next).toContain('## Supersedes');
   });
 });

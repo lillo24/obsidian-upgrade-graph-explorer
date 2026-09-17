@@ -1,4 +1,6 @@
 import {
+  addArgumentExample,
+  addArgumentRelation,
   attachAnsweringAxiom,
   createAxiom,
   createArgument,
@@ -7,12 +9,18 @@ import {
   detachAnsweringAxiom,
   editAxiom,
   editArgument,
+  editArgumentExample,
+  editArgumentRelation,
   editCounterArgument,
   editTopic,
   reassessCounterArgumentResponse,
   reassessArgumentPremises,
+  reassessArgumentRelations,
+  moveArgumentExample,
   promoteArgumentToCurrent,
   recordTheorySourceVersion,
+  removeArgumentExample,
+  removeArgumentRelation,
   setRecordArchived,
   setRecordReviewState,
   setTopicMembership,
@@ -26,6 +34,8 @@ import { ArgumentLibraryRepository } from './storage';
 import type {
   ArgumentLibrary,
   ArgumentLibraryCommitResult,
+  ArgumentExample,
+  ArgumentRelation,
   ArgumentRecordKind,
   ArgumentRuntime,
   CreateAxiomInput,
@@ -120,6 +130,100 @@ export class ArgumentLibraryAuthoringService {
   ): Promise<ArgumentLibraryCommitResult> {
     return this.commit(expected, (library) =>
       reassessArgumentPremises(library, argumentId, this.runtime),
+    );
+  }
+
+  reassessArgumentRelations(
+    expected: SnapshotDescriptor,
+    argumentId: string,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      reassessArgumentRelations(library, argumentId, this.runtime),
+    );
+  }
+
+  addArgumentExample(
+    expected: SnapshotDescriptor,
+    argumentId: string,
+    example: ArgumentExample,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      addArgumentExample(library, argumentId, example, this.runtime),
+    );
+  }
+
+  editArgumentExample(
+    expected: SnapshotDescriptor,
+    argumentId: string,
+    exampleId: string,
+    text: string,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      editArgumentExample(library, argumentId, exampleId, text, this.runtime),
+    );
+  }
+
+  moveArgumentExample(
+    expected: SnapshotDescriptor,
+    argumentId: string,
+    exampleId: string,
+    destinationIndex: number,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      moveArgumentExample(
+        library,
+        argumentId,
+        exampleId,
+        destinationIndex,
+        this.runtime,
+      ),
+    );
+  }
+
+  removeArgumentExample(
+    expected: SnapshotDescriptor,
+    argumentId: string,
+    exampleId: string,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      removeArgumentExample(library, argumentId, exampleId, this.runtime),
+    );
+  }
+
+  addArgumentRelation(
+    expected: SnapshotDescriptor,
+    argumentId: string,
+    relation: ArgumentRelation,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      addArgumentRelation(library, argumentId, relation, this.runtime),
+    );
+  }
+
+  editArgumentRelation(
+    expected: SnapshotDescriptor,
+    argumentId: string,
+    relationId: string,
+    relation: ArgumentRelation,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      editArgumentRelation(
+        library,
+        argumentId,
+        relationId,
+        relation,
+        this.runtime,
+      ),
+    );
+  }
+
+  removeArgumentRelation(
+    expected: SnapshotDescriptor,
+    argumentId: string,
+    relationId: string,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      removeArgumentRelation(library, argumentId, relationId, this.runtime),
     );
   }
 

@@ -190,13 +190,15 @@ narrow bridge and scheduler keep all provider tests independent of a native
 runtime.
 
 `packages/argument-workspace` is an independent source-neutral domain and
-application boundary for one local Argument Library. Its schema-v2
+application boundary for one local Argument Library. Its schema-v3
 Topic/Axiom/Argument/Counter-Argument data is not added to the canonical
-Markdown graph. Arguments own ordered authored or revision-pinned premises,
-optional reasoning, conclusions, and supersession links; Topics expose an
-explicit Current pointer without truth semantics. The package owns strict
-validation and v1 migration, stable record/library revisions, portable source
-locators, Argument/response staleness and explicit reassessment, deterministic
+Markdown graph. Arguments own scoped Examples, ordered authored or
+revision-pinned Axiom/conclusion/prior-premise dependencies, optional reasoning,
+conclusions, Boundary/Invariance prose, explicit attack/support relations, and
+separate supersession links; Topics expose an explicit Current pointer without
+truth semantics. The package owns strict validation and v1/v2 migration, stable
+record/library revisions, portable source locators, premise/relation/response
+staleness and explicit reassessment, deterministic
 descriptive indexing, JSON/Markdown interchange, serialized expected-snapshot
 authoring commits, and immutable snapshot-bound read/bundle/source-dispatch
 contracts. Authoring and consumer facades are separate. The consumer has no
@@ -204,8 +206,8 @@ store access, agent role, review stage, graph/view state, or model dependency.
 
 `apps/web/src/persistence/argument-library.ts` adapts that store contract to one
 stable profile-level localStorage key. `packages/argument-workspace-tauri`
-adapts it to dedicated private app-local schema-v2 JSON using validated
-temporary-sibling replacement and preserves a migrated schema-v1 file.
+adapts it to dedicated private app-local schema-v3 JSON using validated
+temporary-sibling replacement and preserves migrated schema-v1/v2 files.
 Neither adapter uses the graph view registry, selected-vault Markdown, or
 workspace identity catalog. Live theory-source acquisition remains a later host
 adapter behind the Argument Workspace's narrow registered-reference reader; it
