@@ -1,7 +1,8 @@
 # GRAPHVIS-OBSIDIAN1 implementation report
 
 Status: **implemented and validated; ready for native user QA.** The integration
-PR is intentionally unmerged until the requested subjective appearance review.
+[PR #110](https://github.com/lillo24/obsidian-upgrade-graph-explorer/pull/110)
+is intentionally unmerged until the requested subjective appearance review.
 
 ## Obsidian evidence
 
@@ -115,4 +116,3 @@ Side-by-side acceptance checklist:
 4. Confirm muted edges, ordinary nodes, focused/root accents, diagnostics, and
    Visual Group colors remain distinguishable.
 5. Exercise Move and Arrange Folders and inspect labels near every canvas edge.
-
