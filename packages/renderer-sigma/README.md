@@ -156,7 +156,10 @@ radius-bounded 3.75 px. One 220 ms cubic ease-out progress drives label offset,
 incident-edge color interpolation, and the width multiplier from 1 to 1.3 on
 enter, leave, and direct node switches. Animation frames refresh only the
 transition nodes and their incident edges; reduced-motion mode snaps and no
-hover path mutates graph/camera state.
+hover path mutates graph/camera state. Once a File crosses the movement
+threshold, its direct-connection emphasis is pinned until that drag releases or
+cancels, even if the physical pointer has left the node; afterward presentation
+resumes from the actual pointer hover target.
 These presentation values do not enter layout requests, fingerprints, position
 caches, camera policy, or persistence. The source audit is recorded in
 `docs/OBSIDIAN_GRAPH_VISUAL_REFERENCE.md`.

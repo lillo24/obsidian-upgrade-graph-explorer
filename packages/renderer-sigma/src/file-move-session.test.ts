@@ -207,6 +207,50 @@ describe('temporary File move renderer sessions', () => {
     ['All', globalHarness, 'entity:doc-a'],
     ['Focus', localHarness, 'entity:root'],
   ] as const)(
+    'keeps the dragged File connections highlighted in %s until release',
+    (_mode, createHarness, nodeKey) => {
+      const { renderer } = createHarness();
+      renderer.refresh();
+      const node = renderer.graph.getNodeAttributes(nodeKey) as {
+        x: number;
+        y: number;
+      };
+      const incidentEdge = renderer.graph.edges(nodeKey)[0]!;
+      const ordinarySize = Number(
+        renderer.displayEdges.get(incidentEdge)?.size,
+      );
+
+      renderer.handlers.get('enterNode')!({ node: nodeKey });
+      const highlightedSize = Number(
+        renderer.displayEdges.get(incidentEdge)?.size,
+      );
+      expect(highlightedSize).toBeGreaterThan(ordinarySize);
+
+      renderer.handlers.get('downNode')!({
+        node: nodeKey,
+        event: node,
+        preventSigmaDefault: vi.fn(),
+      });
+      renderer.handlers.get('moveBody')!({
+        event: { x: node.x + 3, y: node.y },
+        preventSigmaDefault: vi.fn(),
+      });
+      renderer.handlers.get('leaveNode')!({});
+
+      expect(renderer.displayEdges.get(incidentEdge)?.size).toBe(
+        highlightedSize,
+      );
+
+      renderer.handlers.get('upStage')!({});
+
+      expect(renderer.displayEdges.get(incidentEdge)?.size).toBe(ordinarySize);
+    },
+  );
+
+  it.each([
+    ['All', globalHarness, 'entity:doc-a'],
+    ['Focus', localHarness, 'entity:root'],
+  ] as const)(
     'clears the drag-selected File with one later %s background click',
     (_mode, createHarness, nodeKey) => {
       const { onNodeSelected, renderer } = createHarness();

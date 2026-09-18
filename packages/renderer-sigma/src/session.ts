@@ -213,6 +213,7 @@ export class GlobalRendererSession {
   private readonly hoverTransition: NetworkHoverTransitionController;
   private neighborhoods: ReadonlyMap<string, ReadonlySet<string>>;
   private hoveredNode: string | undefined;
+  private fileMoveHighlightedNode: string | undefined;
   private selectedNode: string | undefined;
   private semanticAnchorNodeKey: string | undefined;
   private settings;
@@ -730,15 +731,16 @@ export class GlobalRendererSession {
       attributes.entityId === null
         ? undefined
         : this.presentationOverrides?.get(attributes.entityId)?.sizeScale;
-    const hovered = key === this.hoveredNode;
+    const highlightedNode = this.highlightedNode();
+    const hovered = key === highlightedNode;
     const visualGroup =
       attributes.entityId === null
         ? undefined
         : this.visualGroupStyles?.get(attributes.entityId);
     const relatedToHover =
-      this.hoveredNode === undefined ||
+      highlightedNode === undefined ||
       hovered ||
-      this.neighborhoods.get(this.hoveredNode)?.has(key) === true;
+      this.neighborhoods.get(highlightedNode)?.has(key) === true;
     const arrangementFolderKey = this.activeArrangementFolderKey();
     const scopeState = this.arrangementContext?.scopeStateByNodeKey?.get(key);
     const automaticSize = automaticGlobalNodeSize(
@@ -1005,6 +1007,19 @@ export class GlobalRendererSession {
     );
   }
 
+  private highlightedNode(): string | undefined {
+    return this.fileMoveHighlightedNode ?? this.hoveredNode;
+  }
+
+  private setFileMoveHighlightedNode(key: string | undefined): void {
+    const previous = this.highlightedNode();
+    this.fileMoveHighlightedNode = key;
+    const next = this.highlightedNode();
+    if (previous === next) return;
+    this.hoverTransition.setHovered(previous, next);
+    this.refreshHoverStyles(previous, next);
+  }
+
   private updateTemporaryFileMoveCursor(): void {
     const eligibleHover =
       this.hoveredNode !== undefined &&
@@ -1055,6 +1070,7 @@ export class GlobalRendererSession {
     const coordinator = this.fileMoveCoordinator;
     if (coordinator === undefined) return false;
     const dragged = coordinator.release();
+    this.setFileMoveHighlightedNode(undefined);
     if (dragged) {
       this.nodeClicks?.cancel();
       this.suppressFileMoveDoubleClick = true;
@@ -1068,6 +1084,7 @@ export class GlobalRendererSession {
     reason: Exclude<TemporaryNodeConstraintEndReason, 'released'>,
   ): boolean {
     const cancelled = this.fileMoveCoordinator?.cancel(reason) ?? false;
+    this.setFileMoveHighlightedNode(undefined);
     this.fileMovePointerOwner?.reset();
     this.keyboardFileMoveViewportPoint = undefined;
     this.updateTemporaryFileMoveCursor();
@@ -1148,12 +1165,13 @@ export class GlobalRendererSession {
     this.nodeClicks = nodeClicks;
     this.renderer.on('enterNode', ({ node }) => {
       const started = performance.now();
-      const previous = this.hoveredNode;
+      const previous = this.highlightedNode();
       this.hoveredNode = node;
-      this.hoverTransition.setHovered(previous, node);
+      const next = this.highlightedNode();
+      this.hoverTransition.setHovered(previous, next);
       this.options.onNodeHovered?.(node);
       this.options.instrumentation?.count('global-hover-applications');
-      this.refreshHoverStyles(previous, node);
+      this.refreshHoverStyles(previous, next);
       this.updateTemporaryFileMoveCursor();
       this.options.instrumentation?.record(
         'global-hover',
@@ -1161,15 +1179,16 @@ export class GlobalRendererSession {
       );
     });
     this.renderer.on('leaveNode', () => {
-      const previous = this.hoveredNode;
+      const previous = this.highlightedNode();
       this.hoveredNode = undefined;
-      this.hoverTransition.setHovered(previous, undefined);
+      const next = this.highlightedNode();
+      this.hoverTransition.setHovered(previous, next);
       const arrangementActive = this.arrangementContext?.active === true;
       if (arrangementActive) this.arrangementHoveredFolder = undefined;
       this.options.onNodeHovered?.(undefined);
       this.options.instrumentation?.count('global-hover-applications');
       if (arrangementActive) this.refreshArrangementStyles();
-      else this.refreshHoverStyles(previous);
+      else this.refreshHoverStyles(previous, next);
       this.updateTemporaryFileMoveCursor();
     });
     this.renderer.on('clickNode', ({ node }) => {
@@ -1315,6 +1334,7 @@ export class GlobalRendererSession {
   ): void {
     this.detachFileMoveLifecycle();
     this.fileMoveCoordinator?.cancel(cancellationReason);
+    this.setFileMoveHighlightedNode(undefined);
     this.fileMoveCoordinator = undefined;
     this.fileMoveContext = undefined;
     this.keyboardFileMoveViewportPoint = undefined;
@@ -1331,6 +1351,7 @@ export class GlobalRendererSession {
         count: (operation) => this.options.instrumentation?.count(operation),
         onDragStart: (nodeKey) => {
           this.fileMovePointerOwner?.claim();
+          this.setFileMoveHighlightedNode(nodeKey);
           this.updateTemporaryFileMoveCursor();
           this.nodeClicks?.cancel();
           this.selectNode(nodeKey);
@@ -1841,11 +1862,12 @@ export class GlobalRendererSession {
     if (key !== undefined && !this.graph.hasNode(key)) {
       throw new Error(`Cannot hover missing Global node ${key}.`);
     }
-    const previous = this.hoveredNode;
+    const previous = this.highlightedNode();
     this.hoveredNode = key;
-    this.hoverTransition.setHovered(previous, key);
+    const next = this.highlightedNode();
+    this.hoverTransition.setHovered(previous, next);
     return this.measureNextRender('hover-reducer', () =>
-      this.refreshHoverStyles(previous, key),
+      this.refreshHoverStyles(previous, next),
     );
   }
 

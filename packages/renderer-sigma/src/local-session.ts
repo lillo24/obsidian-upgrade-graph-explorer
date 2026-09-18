@@ -152,6 +152,7 @@ export class LocalRendererSession {
   };
   private neighborhoods: ReadonlyMap<string, ReadonlySet<string>>;
   private hoveredNode: string | undefined;
+  private fileMoveHighlightedNode: string | undefined;
   private selectedNode: string | undefined;
   private pendingViewportAnchorNodeKey: string | undefined;
   private visualLod: LocalVisualLod;
@@ -427,7 +428,8 @@ export class LocalRendererSession {
       attributes.entityId === null
         ? undefined
         : this.presentationOverrides?.get(attributes.entityId)?.sizeScale;
-    const hovered = key === this.hoveredNode;
+    const highlightedNode = this.highlightedNode();
+    const hovered = key === highlightedNode;
     const visualGroup =
       attributes.entityId === null
         ? undefined
@@ -435,9 +437,9 @@ export class LocalRendererSession {
     const resolved = resolveLocalNodeStyle(attributes, {
       hovered,
       relatedToHover:
-        this.hoveredNode === undefined ||
+        highlightedNode === undefined ||
         hovered ||
-        this.neighborhoods.get(this.hoveredNode)?.has(key) === true,
+        this.neighborhoods.get(highlightedNode)?.has(key) === true,
       selected: key === this.selectedNode,
       lod: this.visualLod,
       ...(visualGroup === undefined ? {} : { visualGroup }),
@@ -475,6 +477,19 @@ export class LocalRendererSession {
       attributes.entityId !== null &&
       attributes.sourcePath !== null
     );
+  }
+
+  private highlightedNode(): string | undefined {
+    return this.fileMoveHighlightedNode ?? this.hoveredNode;
+  }
+
+  private setFileMoveHighlightedNode(key: string | undefined): void {
+    const previous = this.highlightedNode();
+    this.fileMoveHighlightedNode = key;
+    const next = this.highlightedNode();
+    if (previous === next) return;
+    this.hoverTransition.setHovered(previous, next);
+    this.refreshHoverStyles(previous, next);
   }
 
   private updateTemporaryFileMoveCursor(): void {
@@ -538,6 +553,7 @@ export class LocalRendererSession {
     const coordinator = this.fileMoveCoordinator;
     if (coordinator === undefined) return false;
     const dragged = coordinator.release();
+    this.setFileMoveHighlightedNode(undefined);
     if (dragged) {
       this.nodeClicks?.cancel();
       this.suppressFileMoveDoubleClick = true;
@@ -551,6 +567,7 @@ export class LocalRendererSession {
     reason: Exclude<TemporaryNodeConstraintEndReason, 'released'>,
   ): boolean {
     const cancelled = this.fileMoveCoordinator?.cancel(reason) ?? false;
+    this.setFileMoveHighlightedNode(undefined);
     this.fileMovePointerOwner?.reset();
     this.keyboardFileMoveViewportPoint = undefined;
     this.updateTemporaryFileMoveCursor();
@@ -631,11 +648,12 @@ export class LocalRendererSession {
     this.nodeClicks = nodeClicks;
     this.renderer.on('enterNode', ({ node }) => {
       const started = performance.now();
-      const previous = this.hoveredNode;
+      const previous = this.highlightedNode();
       this.hoveredNode = node;
-      this.hoverTransition.setHovered(previous, node);
+      const next = this.highlightedNode();
+      this.hoverTransition.setHovered(previous, next);
       this.options.instrumentation?.count('local-hover-applications');
-      this.refreshHoverStyles(previous, node);
+      this.refreshHoverStyles(previous, next);
       this.updateTemporaryFileMoveCursor();
       this.options.instrumentation?.record(
         'local-hover',
@@ -643,11 +661,12 @@ export class LocalRendererSession {
       );
     });
     this.renderer.on('leaveNode', () => {
-      const previous = this.hoveredNode;
+      const previous = this.highlightedNode();
       this.hoveredNode = undefined;
-      this.hoverTransition.setHovered(previous, undefined);
+      const next = this.highlightedNode();
+      this.hoverTransition.setHovered(previous, next);
       this.options.instrumentation?.count('local-hover-applications');
-      this.refreshHoverStyles(previous);
+      this.refreshHoverStyles(previous, next);
       this.updateTemporaryFileMoveCursor();
     });
     this.renderer.on('clickNode', ({ node }) => {
@@ -727,6 +746,7 @@ export class LocalRendererSession {
   ): void {
     this.detachFileMoveLifecycle();
     this.fileMoveCoordinator?.cancel(cancellationReason);
+    this.setFileMoveHighlightedNode(undefined);
     this.fileMoveCoordinator = undefined;
     this.fileMoveContext = context;
     this.keyboardFileMoveViewportPoint = undefined;
@@ -739,6 +759,7 @@ export class LocalRendererSession {
         count: (operation) => this.options.instrumentation?.count(operation),
         onDragStart: (nodeKey) => {
           this.fileMovePointerOwner?.claim();
+          this.setFileMoveHighlightedNode(nodeKey);
           this.updateTemporaryFileMoveCursor();
           this.nodeClicks?.cancel();
           this.selectNode(nodeKey);
