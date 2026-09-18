@@ -67,7 +67,7 @@ it('serves initialize, tools/list, and tools/call over clean stdio', async () =>
     });
     expect(guide.structuredContent).toMatchObject({
       status: 'ok',
-      version: 'argument-compiler-ai-usage-v1',
+      version: 'argument-compiler-ai-usage-v2',
       format: 'markdown',
       guide: expect.stringContaining(
         'search result -> plausible prior record -> compiler_read_bundle',

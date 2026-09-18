@@ -5,17 +5,17 @@
   max-height: none;
   padding: 0;
   overflow: hidden;
-  border: 2px solid #587786;
+  border: 2px solid var(--color-border-strong);
   border-radius: 0.95rem;
-  color: #172631;
-  background: #eef3f5;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-workspace);
   box-shadow:
-    inset 0 0 0 1px rgb(255 255 255 / 80%),
-    0 1.5rem 5rem rgb(10 25 32 / 38%);
+    inset 0 0 0 1px var(--color-inset-highlight),
+    0 1.5rem 5rem var(--color-shadow-strong);
 }
 
 .arguments-dialog::backdrop {
-  background: rgb(10 25 32 / 55%);
+  background: var(--color-surface-backdrop);
 }
 
 .arguments-dialog--embedded {
@@ -47,8 +47,8 @@
   gap: 1rem;
   align-items: center;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #b8c7ce;
-  background: #ffffff;
+  border-bottom: 1px solid var(--color-border-default);
+  background: var(--color-surface-toolbar);
 }
 
 .arguments-dialog__header .eyebrow {
@@ -60,7 +60,7 @@
 }
 
 .arguments-dialog__status {
-  color: #45616e;
+  color: var(--color-text-muted);
   font-size: 0.75rem;
   font-weight: 750;
 }
@@ -84,10 +84,10 @@
 .arguments-dialog select,
 .arguments-dialog input,
 .arguments-dialog textarea {
-  border: 1px solid #91a6b0;
+  border: 1px solid var(--color-border-default);
   border-radius: 0.45rem;
-  color: #172631;
-  background: #ffffff;
+  color: var(--color-control-foreground);
+  background: var(--color-control-background);
 }
 
 .arguments-dialog button,
@@ -101,8 +101,8 @@
 
 .arguments-dialog button:hover,
 .arguments-dialog .button-like:hover {
-  border-color: #245d71;
-  background: #eaf3f6;
+  border-color: var(--color-border-focus);
+  background: var(--color-control-hover);
 }
 
 .arguments-dialog button:disabled {
@@ -138,8 +138,8 @@
   padding: 0.85rem;
   overflow: auto;
   overscroll-behavior: contain;
-  border-right: 1px solid #c5d1d6;
-  background: #f8fafb;
+  border-right: 1px solid var(--color-border-default);
+  background: var(--color-surface-sidebar);
 }
 
 .arguments-create-actions {
@@ -153,7 +153,7 @@
 .arguments-topics {
   margin: 1rem 0;
   padding-bottom: 0.8rem;
-  border-bottom: 1px solid #d6dfe3;
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .arguments-topics h2 {
@@ -185,14 +185,14 @@
 }
 
 .arguments-topics button[aria-current='page'] {
-  border-color: #276b81;
-  background: #dceef3;
+  border-color: var(--color-control-selected-border);
+  background: var(--color-control-selected-background);
 }
 
 .arguments-search {
   display: grid;
   gap: 0.3rem;
-  color: #344f5d;
+  color: var(--color-text-secondary);
   font-size: 0.75rem;
   font-weight: 780;
 }
@@ -208,7 +208,7 @@
   gap: 0.4rem;
   align-items: center;
   margin: 0.6rem 0;
-  color: #4c636e;
+  color: var(--color-control-foreground);
   font-size: 0.72rem;
 }
 
@@ -221,7 +221,7 @@
 .arguments-record-links small,
 .arguments-source-list small {
   display: block;
-  color: #637985;
+  color: var(--color-text-link);
   font-size: 0.67rem;
   overflow-wrap: anywhere;
 }
@@ -238,7 +238,7 @@
   padding: 1rem clamp(1rem, 2.2vw, 2.25rem) 3rem;
   overflow: auto;
   overscroll-behavior: contain;
-  background: #ffffff;
+  background: var(--color-surface-panel);
 }
 
 .arguments-source-binding {
@@ -249,9 +249,9 @@
   justify-content: space-between;
   margin: 0 auto 1rem;
   padding: 0.7rem 0.8rem;
-  border: 1px solid #b8cbd3;
+  border: 1px solid var(--color-border-default);
   border-radius: 0.6rem;
-  background: #f3f8fa;
+  background: var(--color-surface-subtle);
 }
 
 .arguments-source-binding > div {
@@ -260,7 +260,7 @@
 }
 
 .arguments-source-binding small {
-  color: #58707b;
+  color: var(--color-text-muted);
 }
 
 .arguments-main__toolbar {
@@ -270,8 +270,8 @@
   justify-content: flex-end;
   margin: -1rem calc(clamp(1rem, 2.2vw, 2.25rem) * -1) 1.25rem;
   padding: 0.65rem clamp(1rem, 2.2vw, 2.25rem);
-  border-bottom: 1px solid #d6e0e4;
-  background: rgb(255 255 255 / 96%);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-overlay);
 }
 
 .arguments-main__toolbar button:first-child {
@@ -288,7 +288,7 @@
 .arguments-record-header {
   margin-bottom: 1.25rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid #d8e1e5;
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .arguments-record-header h2 {
@@ -306,46 +306,46 @@
 .arguments-badge {
   display: inline-flex;
   padding: 0.2rem 0.45rem;
-  border: 1px solid #a8bbc4;
+  border: 1px solid var(--color-border-default);
   border-radius: 999px;
-  color: #3d5865;
-  background: #f4f8f9;
+  color: var(--color-text-muted);
+  background: var(--color-surface-subtle);
   font-size: 0.67rem;
   font-weight: 780;
 }
 
 .arguments-badge--review-accepted,
 .arguments-badge--fresh {
-  border-color: #76a393;
-  color: #205747;
-  background: #eef8f4;
+  border-color: var(--color-status-success-border);
+  color: var(--color-status-success-foreground);
+  background: var(--color-status-success-background);
 }
 
 .arguments-badge--review-rejected,
 .arguments-badge--stale {
-  border-color: #cb8b7e;
-  color: #7b302c;
-  background: #fff3f1;
+  border-color: var(--color-status-error-border);
+  color: var(--color-status-error-foreground);
+  background: var(--color-status-error-background);
 }
 
 .arguments-badge--outcome {
-  border-color: #8ba4c0;
-  color: #294d6d;
-  background: #f1f6fb;
+  border-color: var(--color-status-info-border);
+  color: var(--color-text-muted);
+  background: var(--color-status-info-background);
 }
 
 .arguments-reading-section {
   margin: 1.25rem 0;
   padding: 1rem;
-  border: 1px solid #d7e0e4;
+  border: 1px solid var(--color-border-subtle);
   border-radius: 0.7rem;
-  background: #fbfcfd;
+  background: var(--color-surface-subtle);
 }
 
 .arguments-reading-section h3,
 .arguments-exchange h3 {
   margin: 0 0 0.65rem;
-  color: #294a5a;
+  color: var(--color-text-primary);
   font-size: 0.88rem;
 }
 
@@ -376,7 +376,7 @@
   min-height: 0;
   padding: 0;
   border: 0;
-  color: #175b75;
+  color: var(--color-text-link);
   background: transparent;
   text-align: left;
 }
@@ -395,8 +395,8 @@
 
 .arguments-exchange > li {
   padding: 1rem;
-  border-left: 3px solid #87a8b6;
-  background: #f8fafb;
+  border-left: 3px solid var(--color-status-info-border);
+  background: var(--color-surface-subtle);
 }
 
 .arguments-exchange h4 {
@@ -405,7 +405,7 @@
 
 .arguments-structured-target,
 .arguments-disclosure {
-  color: #5b717c;
+  color: var(--color-control-foreground);
   font-size: 0.75rem;
 }
 
@@ -414,18 +414,18 @@
 .arguments-operation-error {
   margin-top: 0.9rem;
   padding: 0.8rem;
-  border: 1px solid #d3b26d;
+  border: 1px solid var(--color-status-error-border);
   border-radius: 0.55rem;
-  background: #fff9ea;
+  background: var(--color-status-error-background);
 }
 
 .arguments-source-list li {
   display: grid;
   gap: 0.35rem;
   padding: 0.75rem;
-  border: 1px solid #d8e1e5;
+  border: 1px solid var(--color-border-subtle);
   border-radius: 0.5rem;
-  background: #ffffff;
+  background: var(--color-surface-panel);
 }
 
 .arguments-source-list code,
@@ -441,7 +441,7 @@
   gap: 0.65rem;
   margin-top: 0.4rem;
   padding-top: 0.75rem;
-  border-top: 1px solid #d8e1e5;
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .arguments-source-preview dl {
@@ -471,9 +471,9 @@
   margin: 0;
   padding: 0.8rem;
   overflow: auto;
-  border: 1px solid #c8d5da;
+  border: 1px solid var(--color-border-subtle);
   border-radius: 0.45rem;
-  background: #f7fafb;
+  background: var(--color-surface-subtle);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 0.75rem;
   line-height: 1.5;
@@ -484,7 +484,7 @@
 .arguments-metadata,
 .arguments-snapshot-metadata {
   margin-top: 1rem;
-  color: #455e6a;
+  color: var(--color-text-muted);
   font-size: 0.75rem;
 }
 
@@ -516,7 +516,7 @@
 .arguments-editor__advanced label {
   display: grid;
   gap: 0.35rem;
-  color: #344f5d;
+  color: var(--color-text-muted);
   font-size: 0.78rem;
   font-weight: 760;
 }
@@ -539,13 +539,13 @@
   gap: 0.65rem;
   margin: 0;
   padding: 0.85rem;
-  border: 1px solid #d3dee2;
+  border: 1px solid var(--color-border-subtle);
   border-radius: 0.6rem;
 }
 
 .arguments-editor__fieldset legend {
   padding: 0 0.3rem;
-  color: #294a5a;
+  color: var(--color-text-muted);
   font-size: 0.78rem;
   font-weight: 800;
 }
@@ -561,7 +561,7 @@
   display: grid;
   gap: 0.65rem;
   padding: 0.75rem;
-  border: 1px solid #d7e0e4;
+  border: 1px solid var(--color-border-subtle);
   border-radius: 0.5rem;
 }
 
@@ -619,7 +619,7 @@
 
 .arguments-editor__advanced {
   padding: 0.8rem;
-  border: 1px solid #c9d6db;
+  border: 1px solid var(--color-border-subtle);
   border-radius: 0.6rem;
 }
 
@@ -631,14 +631,14 @@
 
 .arguments-form-errors,
 .arguments-error {
-  color: #7a2933;
+  color: var(--color-status-error-foreground);
 }
 
 .arguments-form-errors {
   padding: 0.75rem 0.9rem;
-  border: 1px solid #c9848d;
+  border: 1px solid var(--color-status-error-border);
   border-radius: 0.55rem;
-  background: #fff4f5;
+  background: var(--color-status-error-background);
 }
 
 .arguments-dirty {
@@ -647,10 +647,10 @@
   width: max-content;
   margin: 1rem 0 0 auto;
   padding: 0.35rem 0.6rem;
-  border: 1px solid #ca9d45;
+  border: 1px solid var(--color-status-warning-border);
   border-radius: 999px;
-  color: #664711;
-  background: #fff4cf;
+  color: var(--color-status-warning-foreground);
+  background: var(--color-status-warning-background);
   font-size: 0.72rem;
   font-weight: 800;
 }
@@ -670,7 +670,7 @@
 
 .arguments-empty,
 .arguments-empty-workspace {
-  color: #667c86;
+  color: var(--color-text-muted);
   font-style: italic;
 }
 
@@ -684,11 +684,11 @@
   align-items: center;
   max-width: min(32rem, calc(100% - 2rem));
   padding: 0.65rem 0.8rem;
-  border: 1px solid #668997;
+  border: 1px solid var(--color-status-info-border);
   border-radius: 0.55rem;
-  color: #173b49;
-  background: #f3fbfd;
-  box-shadow: 0 0.8rem 2rem rgb(10 25 32 / 20%);
+  color: var(--color-status-info-foreground);
+  background: var(--color-status-info-background);
+  box-shadow: 0 0.8rem 2rem var(--color-shadow-elevated);
   font-size: 0.75rem;
 }
 
@@ -704,7 +704,7 @@
   padding: 1rem;
   place-items: center;
   inset: 0;
-  background: rgb(18 37 46 / 62%);
+  background: var(--color-surface-scrim);
 }
 
 .arguments-subdialog > div {
@@ -712,10 +712,10 @@
   max-height: min(78dvh, 50rem);
   padding: 1.2rem;
   overflow: auto;
-  border: 1px solid #6e8995;
+  border: 1px solid var(--color-border-default);
   border-radius: 0.75rem;
-  background: #ffffff;
-  box-shadow: 0 1rem 3rem rgb(10 25 32 / 32%);
+  background: var(--color-surface-elevated);
+  box-shadow: 0 1rem 3rem var(--color-shadow-strong);
 }
 
 .arguments-subdialog h2,
@@ -726,7 +726,7 @@
 .arguments-subdialog > div > div + div {
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid #d8e1e5;
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .arguments-subdialog textarea {
@@ -764,14 +764,14 @@
 }
 
 .arguments-mailbox__layout nav button[aria-current='page'] {
-  border-color: #245d71;
-  background: #eaf3f6;
+  border-color: var(--color-control-selected-border);
+  background: var(--color-control-selected-background);
 }
 
 .arguments-mailbox__layout nav button span,
 .arguments-mailbox__layout nav button small {
   overflow: hidden;
-  color: #45616e;
+  color: var(--color-control-foreground);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -780,9 +780,9 @@
 .arguments-mailbox__decision,
 .arguments-proposal-resolution {
   padding: 0.9rem;
-  border: 1px solid #d8e1e5;
+  border: 1px solid var(--color-status-info-border);
   border-radius: 0.55rem;
-  background: #fbfdfe;
+  background: var(--color-status-info-background);
 }
 
 .arguments-mailbox__detail > h3:not(:first-child) {
@@ -791,14 +791,14 @@
 
 .arguments-proposal-resolution {
   margin-bottom: 1rem;
-  border-color: #668997;
-  background: #f3fbfd;
+  border-color: var(--color-status-info-border);
+  background: var(--color-status-info-background);
 }
 
 .arguments-context-sources {
   margin: 0.75rem 0;
   padding: 0.65rem 0.75rem;
-  border: 1px solid #d8e1e5;
+  border: 1px solid var(--color-border-subtle);
   border-radius: 0.5rem;
 }
 
@@ -826,7 +826,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.45rem;
-  border-bottom: 1px solid #e0e7ea;
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 @media (max-width: 800px) {
@@ -877,7 +877,7 @@
   .arguments-sidebar {
     max-height: 38dvh;
     border-right: 0;
-    border-bottom: 1px solid #c5d1d6;
+    border-bottom: 1px solid var(--color-border-default);
   }
 
   .arguments-main {
@@ -900,86 +900,5 @@
 
   .arguments-mailbox__layout {
     grid-template-columns: 1fr;
-  }
-}
-
-:root[data-theme='dark'] {
-  .arguments-dialog {
-    color: #e7eef1;
-    background: #17242b;
-    border-color: #7694a2;
-  }
-
-  .arguments-dialog__header,
-  .arguments-main,
-  .arguments-subdialog > div,
-  .arguments-source-list li,
-  .arguments-source-binding {
-    color: #e7eef1;
-    background: #1b2a32;
-  }
-
-  .arguments-mailbox__detail,
-  .arguments-mailbox__decision,
-  .arguments-proposal-resolution {
-    color: #e7eef1;
-    background: #22333c;
-  }
-
-  .arguments-sidebar,
-  .arguments-reading-section,
-  .arguments-exchange > li,
-  .arguments-source-preview__text {
-    color: #dce7eb;
-    background: #22333c;
-  }
-
-  .arguments-dialog button,
-  .arguments-dialog .button-like,
-  .arguments-dialog select,
-  .arguments-dialog input,
-  .arguments-dialog textarea {
-    color: #edf4f6;
-    background: #16242b;
-    border-color: #67818d;
-  }
-
-  .arguments-dialog button:hover,
-  .arguments-dialog .button-like:hover {
-    color: #f4f8fa;
-    background: #294653;
-  }
-
-  .arguments-topics button[aria-current='page'] {
-    color: #102b36;
-    background: #b9dce7;
-  }
-
-  .arguments-dialog .eyebrow,
-  .arguments-dialog__status,
-  .arguments-topics h2,
-  .arguments-search,
-  .arguments-archive-toggle,
-  .arguments-search-results small,
-  .arguments-record-links small,
-  .arguments-source-list small,
-  .arguments-source-binding small,
-  .arguments-reading-section h3,
-  .arguments-exchange h3,
-  .arguments-editor > label,
-  .arguments-editor__fieldset > label,
-  .arguments-editor__advanced label,
-  .arguments-editor__fieldset legend,
-  .arguments-disclosure,
-  .arguments-structured-target,
-  .arguments-metadata,
-  .arguments-snapshot-metadata,
-  .arguments-empty,
-  .arguments-empty-workspace {
-    color: #b9cbd3;
-  }
-
-  .arguments-main__toolbar {
-    background: rgb(27 42 50 / 96%);
   }
 }

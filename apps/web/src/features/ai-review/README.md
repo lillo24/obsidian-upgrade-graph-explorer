@@ -33,6 +33,10 @@ synthetic-qa-fixture.ts  Explicit development-only scripted result fixture.
 review.css               Responsive history, reading, and bounded overflow.
 ```
 
+`review.css` consumes the application semantic tokens for every DOM surface,
+control, focus state, and status. The shared root theme remains authoritative
+while Review is open; the feature owns no media-query or `data-theme` palette.
+
 New setups default to 1 first-parent commit. Changing N invalidates the old
 preparation; refresh opens a fresh bounded native session. Captures contain
 committed pinned-HEAD content only, keep changed/context/deleted roles, and are

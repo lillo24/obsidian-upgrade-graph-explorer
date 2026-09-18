@@ -15,6 +15,10 @@ import { GlobalGraphCanvas } from './GlobalGraphCanvas';
 import { GlobalLayoutCache } from './layout-cache';
 import { createGlobalLayoutRequest, globalLayoutFingerprint } from './layout';
 import { mapProjectionToGlobalTopology } from './mapping';
+import {
+  OBSIDIAN_DARK_NETWORK_THEME,
+  OBSIDIAN_LIGHT_NETWORK_THEME,
+} from './network-theme';
 import { SigmaTestRenderer } from './sigma-test-renderer';
 import { globalTestProjection } from './test-fixture';
 import type { GlobalRendererInstrumentation } from './types';
@@ -72,6 +76,7 @@ it('previews cached All density without ForceAtlas2 or spatial Pull work', async
   };
   const onDensityQaDiagnosticsChange = vi.fn();
   let densityFramingStrength = 100;
+  let theme: 'dark' | 'light' = 'dark';
   const harness = new CanvasTestHarness(() =>
     GlobalGraphCanvas({
       densityFramingStrength,
@@ -89,6 +94,7 @@ it('previews cached All density without ForceAtlas2 or spatial Pull work', async
       projection,
       selection: null,
       settings,
+      theme,
       trackpadZoomMode: 'pinch-zoom',
     }),
   );
@@ -109,6 +115,44 @@ it('previews cached All density without ForceAtlas2 or spatial Pull work', async
     edgeCount: input.edges.length,
     isolatedNodeCount: 0,
   });
+
+  const renderer = SigmaTestRenderer.instances[0]!;
+  const coordinates = renderer.graph.nodes().map((key) => ({
+    key,
+    x: renderer.graph.getNodeAttribute(key, 'x'),
+    y: renderer.graph.getNodeAttribute(key, 'y'),
+  }));
+  const camera = renderer.camera.getState();
+  theme = 'light';
+  harness.invalidate();
+  await harness.flush();
+  expect(SigmaTestRenderer.instances).toHaveLength(1);
+  expect(renderer.settings).toMatchObject({
+    defaultEdgeColor: OBSIDIAN_LIGHT_NETWORK_THEME.edge,
+    defaultNodeColor: OBSIDIAN_LIGHT_NETWORK_THEME.node,
+    labelColor: { color: OBSIDIAN_LIGHT_NETWORK_THEME.label },
+  });
+  expect(renderer.camera.getState()).toEqual(camera);
+  expect(
+    renderer.graph.nodes().map((key) => ({
+      key,
+      x: renderer.graph.getNodeAttribute(key, 'x'),
+      y: renderer.graph.getNodeAttribute(key, 'y'),
+    })),
+  ).toEqual(coordinates);
+  expect(layout).not.toHaveBeenCalled();
+  expect(spatialLayout).not.toHaveBeenCalled();
+
+  theme = 'dark';
+  harness.invalidate();
+  await harness.flush();
+  expect(SigmaTestRenderer.instances).toHaveLength(1);
+  expect(renderer.settings).toMatchObject({
+    defaultEdgeColor: OBSIDIAN_DARK_NETWORK_THEME.edge,
+    defaultNodeColor: OBSIDIAN_DARK_NETWORK_THEME.node,
+    labelColor: { color: OBSIDIAN_DARK_NETWORK_THEME.label },
+  });
+  expect(renderer.camera.getState()).toEqual(camera);
 
   densityFramingStrength = 0;
   harness.invalidate();

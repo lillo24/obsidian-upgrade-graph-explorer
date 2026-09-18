@@ -14,7 +14,10 @@ import * as localLayout from './local-layout';
 import { LocalLayoutCache } from './local-layout-cache';
 import { LocalGraphCanvas } from './LocalGraphCanvas';
 import { localTestProjection } from './local-test-fixture';
-import { OBSIDIAN_DARK_NETWORK_THEME } from './network-theme';
+import {
+  OBSIDIAN_DARK_NETWORK_THEME,
+  OBSIDIAN_LIGHT_NETWORK_THEME,
+} from './network-theme';
 import {
   DEFAULT_GLOBAL_LAYOUT_SETTINGS,
   resolveNetworkSettings,
@@ -71,6 +74,7 @@ it('keeps shared visual controls render-only and relayouts only for Reference Pu
   let networkSettings: ResolvedNetworkSettings = resolveNetworkSettings(
     DEFAULT_GLOBAL_LAYOUT_SETTINGS,
   );
+  let theme: 'dark' | 'light' = 'dark';
   const requests: Omit<LocalLayoutRequest, 'requestId'>[] = [];
   const layout = vi.fn(
     async (request: Omit<LocalLayoutRequest, 'requestId'>) => {
@@ -117,6 +121,7 @@ it('keeps shared visual controls render-only and relayouts only for Reference Pu
       projection,
       rootEntityId: 'root',
       selection: null,
+      theme,
       trackpadZoomMode: 'pinch-zoom',
       visualGroupStyles,
     }),
@@ -160,6 +165,44 @@ it('keeps shared visual controls render-only and relayouts only for Reference Pu
     x: renderer.graph.getNodeAttribute(key, 'x') as number,
     y: renderer.graph.getNodeAttribute(key, 'y') as number,
   }));
+  const cameraBefore = renderer.camera.getState();
+  const requestCallsBeforeTheme = createRequest.mock.calls.length;
+  const fingerprintCallsBeforeTheme = createFingerprint.mock.calls.length;
+  const cacheWritesBeforeTheme = cacheSet.mock.calls.length;
+
+  theme = 'light';
+  harness.invalidate();
+  await harness.flush();
+  expect(SigmaTestRenderer.instances).toHaveLength(1);
+  expect(layout).toHaveBeenCalledTimes(1);
+  expect(createRequest).toHaveBeenCalledTimes(requestCallsBeforeTheme);
+  expect(createFingerprint).toHaveBeenCalledTimes(fingerprintCallsBeforeTheme);
+  expect(cacheSet).toHaveBeenCalledTimes(cacheWritesBeforeTheme);
+  expect(renderer.camera.getState()).toEqual(cameraBefore);
+  expect(renderer.settings).toMatchObject({
+    defaultEdgeColor: OBSIDIAN_LIGHT_NETWORK_THEME.edge,
+    defaultNodeColor: OBSIDIAN_LIGHT_NETWORK_THEME.node,
+    labelColor: { color: OBSIDIAN_LIGHT_NETWORK_THEME.label },
+  });
+  expect(
+    renderer.graph.nodes().map((key) => ({
+      key,
+      x: renderer.graph.getNodeAttribute(key, 'x') as number,
+      y: renderer.graph.getNodeAttribute(key, 'y') as number,
+    })),
+  ).toEqual(positionsBefore);
+
+  theme = 'dark';
+  harness.invalidate();
+  await harness.flush();
+  expect(SigmaTestRenderer.instances).toHaveLength(1);
+  expect(layout).toHaveBeenCalledTimes(1);
+  expect(renderer.camera.getState()).toEqual(cameraBefore);
+  expect(renderer.settings).toMatchObject({
+    defaultEdgeColor: OBSIDIAN_DARK_NETWORK_THEME.edge,
+    defaultNodeColor: OBSIDIAN_DARK_NETWORK_THEME.node,
+    labelColor: { color: OBSIDIAN_DARK_NETWORK_THEME.label },
+  });
 
   networkSettings = {
     ...networkSettings,

@@ -1,6 +1,6 @@
 # Icarus Argument Compiler AI cross-check protocol
 
-Protocol version: `argument-compiler-ai-usage-v1`
+Protocol version: `argument-compiler-ai-usage-v2`
 
 Use this protocol when substantive candidate ideas already exist and the
 Compiler cross-check is beginning. The Compiler is not the generator of the
@@ -8,6 +8,11 @@ initial critique: reason independently first, and do not reshape a candidate
 merely because the Argument Library exists. The first pass does not need a
 formal Premises / Reasoning / Conclusion schema. Use concrete examples when
 they arise naturally; do not force them.
+
+The Compiler Mailbox is the proposal-submission layer of this system. When
+`compiler_submit_proposal` is available, that tool is the action used to send a
+candidate to the Mailbox. The Mailbox is not an Argument Library record and
+should not be searched for with `compiler_search_index`.
 
 ## 1. Build focused lexical searches
 
@@ -123,22 +128,33 @@ future/current tool list exposes an authorized source-reading capability, use
 it selectively only when meaning, scope, or a stored dependency cannot be
 resolved from the bundle.
 
-## 6. Present and optionally submit survivors
+## 6. Present and submit survivors
 
 Do not clutter the final answer with every retrieval step. Omit candidates
 defeated by existing reasoning. Present surviving or genuinely new arguments
 clearly, briefly explain a relevant prior relationship when it matters, and
 preserve uncertainty when the library did not settle the issue.
 
-If the current MCP tool list includes a real Mailbox or proposal-submission
-capability, submit a surviving genuinely new or revised argument after
-presenting it to the user. Use the actual tool schema and include useful review
-provenance: the proposal and target, concrete examples when useful, relevant
-record IDs and revisions, why the old response did not settle it, the likely
-relation, and unresolved scope or boundary.
+For this Compiler, `compiler_submit_proposal` is the action that sends a
+candidate to the human-reviewed Compiler Mailbox.
 
-Submission is only a proposal. It must not accept the idea, make it Current,
-mutate canonical theory automatically, or silently replace an existing
-Argument. If no submission capability is present, do not invent or claim a
-submission; present the survivor to the user and state that submission is
-unavailable.
+If a meaningful new or revised candidate survives the cross-check:
+
+1. Present the surviving candidate to the user in chat.
+2. Call `compiler_submit_proposal` to send it to the Compiler Mailbox.
+3. Follow the tool's actual schema and include useful review provenance: the
+   candidate, its target when known, concrete examples when useful, relevant
+   consulted record IDs and revisions, why the prior reasoning did not settle
+   it, and unresolved scope or boundary.
+
+Do not search the Argument Library for a record called "Mailbox". The Mailbox
+is a proposal-submission workflow, not canonical Argument Library knowledge.
+
+A successful `compiler_submit_proposal` call means only that a pending,
+non-canonical proposal was stored for human review. It does not accept the
+idea, make it Current, mutate canonical theory, or replace an existing
+Argument.
+
+If `compiler_submit_proposal` is not present in the current tool list, do not
+invent or claim a submission. Present the survivor to the user and state that
+the Mailbox submission action is unavailable.

@@ -10,10 +10,15 @@ import { resolveNetworkHoverEdgeWidthMultiplier } from './network-hover';
 import { applyNetworkNodeSizeScale } from './node-size';
 import {
   interpolateNetworkEdgeColor,
-  OBSIDIAN_DARK_NETWORK_THEME,
+  type NetworkTheme,
+  networkThemeFor,
 } from './network-theme';
 
 export const GLOBAL_ALWAYS_LABELED_NODE_LIMIT = 12;
+const KNOWN_NETWORK_THEMES = [
+  networkThemeFor('light'),
+  networkThemeFor('dark'),
+] as const;
 
 export function shouldAlwaysShowGlobalLabels(nodeCount: number): boolean {
   return nodeCount > 0 && nodeCount <= GLOBAL_ALWAYS_LABELED_NODE_LIMIT;
@@ -29,6 +34,7 @@ export function resolveGlobalVisualLod(cameraRatio: number): GlobalVisualLod {
 }
 
 export interface GlobalNodeStyleContext {
+  readonly theme?: NetworkTheme;
   readonly arrangementActive?: boolean;
   readonly arrangementMember?: boolean;
   readonly scopeState?: FolderScopeVisualizationState;
@@ -46,6 +52,7 @@ export interface GlobalNodeStyleContext {
 }
 
 export interface GlobalEdgeStyleContext {
+  readonly theme?: NetworkTheme;
   readonly arrangementRelation?:
     'internal' | 'boundary' | 'child-owned' | 'unrelated';
   readonly hoverProgress: number;
@@ -54,11 +61,63 @@ export interface GlobalEdgeStyleContext {
   readonly automaticSize?: number;
 }
 
+function globalNodeThemeColor(
+  attributes: GlobalNodeAttributes,
+  theme: NetworkTheme,
+): string {
+  if (attributes.nodeKind === 'document') {
+    return KNOWN_NETWORK_THEMES.some(
+      (palette) => attributes.color === palette.node,
+    )
+      ? theme.node
+      : attributes.color;
+  }
+  const knownDiagnosticColor = KNOWN_NETWORK_THEMES.some((palette) =>
+    [
+      palette.node,
+      palette.unresolvedNode,
+      palette.diagnosticAmbiguous,
+      palette.diagnosticInvalid,
+    ].includes(attributes.color),
+  );
+  if (!knownDiagnosticColor) return attributes.color;
+  return attributes.status === 'unresolved'
+    ? theme.unresolvedNode
+    : attributes.status === 'ambiguous'
+      ? theme.diagnosticAmbiguous
+      : attributes.status === 'invalid'
+        ? theme.diagnosticInvalid
+        : theme.node;
+}
+
+function globalEdgeThemeColor(
+  attributes: GlobalEdgeAttributes,
+  theme: NetworkTheme,
+): string {
+  const knownSemanticColor = KNOWN_NETWORK_THEMES.some((palette) =>
+    [
+      palette.edge,
+      palette.attachmentNode,
+      palette.diagnosticAmbiguous,
+      palette.diagnosticInvalid,
+    ].includes(attributes.color),
+  );
+  if (!knownSemanticColor) return attributes.color;
+  return attributes.status === 'unresolved'
+    ? theme.attachmentNode
+    : attributes.status === 'ambiguous'
+      ? theme.diagnosticAmbiguous
+      : attributes.status === 'invalid'
+        ? theme.diagnosticInvalid
+        : theme.edge;
+}
+
 /** Built-in layer; future GROUP1 may contribute before this final interaction pass. */
 export function resolveGlobalNodeStyle(
   attributes: GlobalNodeAttributes,
   context: GlobalNodeStyleContext,
 ) {
+  const theme = context.theme ?? networkThemeFor('dark');
   // Global visual settings and per-File scale are presentation only.
   const automaticSize = context.automaticSize ?? attributes.size;
   const size =
@@ -77,8 +136,8 @@ export function resolveGlobalNodeStyle(
     emphasized || arrangementMember || context.alwaysShowLabel === true;
   const baseColor =
     attributes.nodeKind === 'document' && attributes.entityId !== null
-      ? (context.visualGroup?.accent ?? attributes.color)
-      : attributes.color;
+      ? (context.visualGroup?.accent ?? globalNodeThemeColor(attributes, theme))
+      : globalNodeThemeColor(attributes, theme);
   const visibleByScale =
     context.lod === 'near' ||
     (context.lod === 'regional'
@@ -86,22 +145,22 @@ export function resolveGlobalNodeStyle(
       : size >= context.settings.labelThreshold);
   const color = arrangementFocused
     ? context.selected
-      ? OBSIDIAN_DARK_NETWORK_THEME.focusedNode
+      ? theme.focusedNode
       : context.hovered
-        ? OBSIDIAN_DARK_NETWORK_THEME.highlight
+        ? theme.highlight
         : arrangementMember
           ? baseColor
           : context.scopeState === undefined
-            ? OBSIDIAN_DARK_NETWORK_THEME.dimmedNode
+            ? theme.dimmedNode
             : context.scopeState === 'shadowed-by-child'
-              ? OBSIDIAN_DARK_NETWORK_THEME.scopeShadowed
+              ? theme.scopeShadowed
               : context.scopeState === 'excluded-candidate'
-                ? OBSIDIAN_DARK_NETWORK_THEME.scopeExcluded
-                : OBSIDIAN_DARK_NETWORK_THEME.scopeInactive
+                ? theme.scopeExcluded
+                : theme.scopeInactive
     : context.selected
-      ? OBSIDIAN_DARK_NETWORK_THEME.focusedNode
+      ? theme.focusedNode
       : context.hovered
-        ? OBSIDIAN_DARK_NETWORK_THEME.highlight
+        ? theme.highlight
         : baseColor;
   return {
     ...attributes,
@@ -123,21 +182,23 @@ export function resolveGlobalEdgeStyle(
   attributes: GlobalEdgeAttributes,
   context: GlobalEdgeStyleContext,
 ) {
+  const theme = context.theme ?? networkThemeFor('dark');
   const arrangementRelation = context.arrangementRelation;
   const arrangementActive = arrangementRelation !== undefined;
   const weakFarEdge = context.lod === 'far' && attributes.referenceCount === 1;
   const hoverProgress = arrangementActive ? 0 : context.hoverProgress;
+  const baseColor = globalEdgeThemeColor(attributes, theme);
   return {
     ...attributes,
     color: arrangementActive
       ? arrangementRelation === 'internal'
-        ? attributes.color
+        ? baseColor
         : arrangementRelation === 'boundary'
-          ? OBSIDIAN_DARK_NETWORK_THEME.hierarchyEdge
+          ? theme.hierarchyEdge
           : arrangementRelation === 'child-owned'
-            ? OBSIDIAN_DARK_NETWORK_THEME.scopeShadowed
-            : OBSIDIAN_DARK_NETWORK_THEME.dimmedEdge
-      : interpolateNetworkEdgeColor(attributes.color, hoverProgress),
+            ? theme.scopeShadowed
+            : theme.dimmedEdge
+      : interpolateNetworkEdgeColor(baseColor, hoverProgress, theme),
     hidden: !arrangementActive && weakFarEdge && hoverProgress <= 0,
     size:
       (context.automaticSize ?? attributes.size) *

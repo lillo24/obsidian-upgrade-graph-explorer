@@ -9,10 +9,14 @@ theme.
 - `theme-provider.tsx`, `theme-context.ts`, and `ThemeApplication.tsx` expose
   the runtime snapshot and setter to React without giving components direct
   access to storage, the DOM, or media queries.
-- `tokens.css` defines application-wide semantic color roles for light and dark
-  resolved themes.
+- `tokens.css` defines application-wide semantic surface, text, border, focus,
+  control, shadow, and status roles for both resolved themes. DOM feature CSS
+  consumes these roles rather than owning theme selectors.
 - `runtime.test.ts` verifies resolution, OS-change behavior, root application,
-  and write-failure behavior.
+  and write-failure behavior. `theme-css-contract.test.ts` audits component CSS
+  ownership, intentional literal-color exceptions, and key WCAG contrast pairs.
+  `production-theme-audit.test.ts` scans app and renderer production sources for
+  color drift and enforces the single OS/root-theme ownership boundary.
 - `test-controller.ts` is the fixed light test seam for component tests that do
   not mount the browser runtime.
 

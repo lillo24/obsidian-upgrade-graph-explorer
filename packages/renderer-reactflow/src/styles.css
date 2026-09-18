@@ -9,10 +9,10 @@
   background:
     radial-gradient(
       circle at 50% 0%,
-      rgb(255 255 255 / 90%),
+      var(--hierarchy-canvas-glow),
       transparent 38rem
     ),
-    #edf2f3;
+    var(--hierarchy-canvas-background);
 }
 
 .graph-canvas .react-flow__renderer {
@@ -40,7 +40,7 @@
 }
 
 .graph-canvas .react-flow__node:focus-visible {
-  outline: 3px solid #c78310;
+  outline: 3px solid var(--hierarchy-focus-outline);
   outline-offset: 4px;
 }
 
@@ -74,43 +74,43 @@
 }
 
 .focus-schematic-folder-strip {
-  fill: rgb(73 126 149 / 5%);
-  stroke: rgb(55 109 132 / 38%);
+  fill: var(--hierarchy-folder-fill);
+  stroke: var(--hierarchy-folder-stroke);
   stroke-width: 1.5;
   stroke-dasharray: 7 6;
 }
 
 .focus-schematic-folder-strip--root {
-  fill: rgb(36 94 116 / 9%);
-  stroke: rgb(36 94 116 / 58%);
+  fill: var(--hierarchy-folder-root-fill);
+  stroke: var(--hierarchy-folder-root-stroke);
 }
 
 .focus-schematic-folder-parent-strip {
-  fill: rgb(73 126 149 / 3%);
-  stroke: rgb(55 109 132 / 30%);
+  fill: var(--hierarchy-folder-parent-fill);
+  stroke: var(--hierarchy-folder-parent-stroke);
   stroke-width: 1.25;
   stroke-dasharray: 3 8;
 }
 
 .focus-schematic-folder-parent-strip__label {
-  fill: rgb(33 79 97 / 72%);
+  fill: var(--hierarchy-folder-text);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
 
 .focus-schematic-folder-strip--nested {
-  fill: rgb(73 126 149 / 6%);
-  stroke: rgb(55 109 132 / 45%);
+  fill: var(--hierarchy-folder-nested-fill);
+  stroke: var(--hierarchy-folder-nested-stroke);
 }
 
 .focus-schematic-folder-strip__guide {
-  stroke: rgb(55 109 132 / 18%);
+  stroke: var(--hierarchy-folder-guide-stroke);
   stroke-width: 1;
 }
 
 .focus-schematic-folder-strip__label {
-  fill: rgb(33 79 97 / 82%);
+  fill: var(--hierarchy-folder-text);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -124,26 +124,26 @@
 }
 
 .focus-schematic-folder-guide {
-  fill: var(--folder-guide-fill, rgb(73 126 149 / 4%));
-  stroke: var(--folder-guide-stroke, rgb(55 109 132 / 42%));
+  fill: var(--folder-guide-fill, var(--hierarchy-folder-fill));
+  stroke: var(--folder-guide-stroke, var(--hierarchy-folder-stroke));
   stroke-width: 1.5;
   stroke-dasharray: 5 7;
   stroke-linejoin: round;
 }
 
 .focus-schematic-folder-guides [data-folder-depth-style='1'] {
-  --folder-guide-fill: rgb(73 126 149 / 5%);
-  --folder-guide-stroke: rgb(55 109 132 / 48%);
+  --folder-guide-fill: var(--hierarchy-folder-fill);
+  --folder-guide-stroke: var(--hierarchy-folder-stroke);
 }
 
 .focus-schematic-folder-guides [data-folder-depth-style='2'] {
-  --folder-guide-fill: rgb(91 117 155 / 6%);
-  --folder-guide-stroke: rgb(68 92 130 / 55%);
+  --folder-guide-fill: var(--hierarchy-folder-depth-two-fill);
+  --folder-guide-stroke: var(--hierarchy-folder-depth-two-stroke);
 }
 
 .focus-schematic-folder-guides [data-folder-depth-style='3+'] {
-  --folder-guide-fill: rgb(112 102 151 / 7%);
-  --folder-guide-stroke: rgb(83 70 128 / 62%);
+  --folder-guide-fill: var(--hierarchy-folder-depth-three-fill);
+  --folder-guide-stroke: var(--hierarchy-folder-depth-three-stroke);
 }
 
 .focus-schematic-folder-guide--capsule {
@@ -151,29 +151,29 @@
 }
 
 .focus-schematic-folder-guide--root {
-  fill: rgb(36 94 116 / 7%);
-  stroke: rgb(36 94 116 / 56%);
+  fill: var(--hierarchy-folder-current-parent-fill);
+  stroke: var(--hierarchy-folder-root-stroke);
 }
 
 .focus-schematic-folder-guide--active {
-  fill: rgb(73 126 149 / 10%);
-  stroke: rgb(36 94 116 / 88%);
+  fill: var(--hierarchy-folder-active-fill);
+  stroke: var(--hierarchy-folder-active-stroke);
   stroke-width: 2.5;
 }
 
 .focus-schematic-folder-guide--parent {
-  fill: rgb(73 126 149 / 7%);
-  stroke: rgb(36 94 116 / 66%);
+  fill: var(--hierarchy-folder-current-parent-fill);
+  stroke: var(--hierarchy-folder-current-parent-stroke);
   stroke-width: 2;
 }
 
 .focus-schematic-folder-guide--sibling {
-  stroke: rgb(78 123 143 / 70%);
+  stroke: var(--hierarchy-folder-sibling-stroke);
   stroke-dasharray: 2 5;
 }
 
 .focus-schematic-folder-guide__label {
-  fill: rgb(33 79 97 / 84%);
+  fill: var(--hierarchy-folder-text);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -193,7 +193,7 @@
   padding: 0.12rem 0.18rem;
   border: 0;
   border-radius: 0;
-  color: #214f61;
+  color: var(--hierarchy-folder-text);
   background: transparent;
   box-shadow: none;
   font: inherit;
@@ -206,12 +206,12 @@
 
 .focus-schematic-folder-guide-controls[data-folder-depth-style='2']
   .focus-schematic-folder-guide-controls__chip {
-  color: #445c7d;
+  color: var(--hierarchy-folder-depth-two-text);
 }
 
 .focus-schematic-folder-guide-controls[data-folder-depth-style='3+']
   .focus-schematic-folder-guide-controls__chip {
-  color: #55477c;
+  color: var(--hierarchy-folder-depth-three-text);
 }
 
 .focus-schematic-folder-guide-controls__name {
@@ -221,7 +221,7 @@
 .focus-schematic-folder-guide-controls__parent {
   display: block;
   margin-top: 0.1rem;
-  color: #60737d;
+  color: var(--hierarchy-folder-muted-text);
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -229,15 +229,15 @@
 }
 
 .focus-schematic-folder-guide-controls__chip:hover {
-  color: #173c4a;
+  color: var(--hierarchy-folder-text);
   text-decoration: underline;
-  text-decoration-color: rgb(36 94 116 / 45%);
+  text-decoration-color: var(--hierarchy-folder-nested-stroke);
   text-underline-offset: 3px;
 }
 
 .focus-schematic-folder-guide-controls__chip:focus-visible {
   border-radius: 2px;
-  outline: 2px solid rgb(36 94 116 / 68%);
+  outline: 2px solid var(--hierarchy-highlight);
   outline-offset: 3px;
   text-decoration: none;
 }
@@ -250,11 +250,11 @@
   width: 15rem;
   gap: 0.35rem;
   padding: 0.65rem;
-  border: 1px solid #8eb0be;
+  border: 1px solid var(--hierarchy-context-border);
   border-radius: 0.7rem;
-  color: #173743;
-  background: rgb(255 255 255 / 98%);
-  box-shadow: 0 0.65rem 1.5rem rgb(31 58 72 / 20%);
+  color: var(--hierarchy-context-text);
+  background: var(--hierarchy-context-surface);
+  box-shadow: 0 0.65rem 1.5rem var(--hierarchy-context-shadow);
   pointer-events: none;
   font-size: 12px;
   line-height: 1.3;
@@ -269,11 +269,11 @@
   flex-direction: column;
   padding: 0.62rem 0.72rem;
   overflow: hidden;
-  border: 1px solid #95aab5;
+  border: 1px solid var(--hierarchy-node-border);
   border-radius: 0.75rem;
-  color: #142631;
-  background: #ffffff;
-  box-shadow: 0 0.55rem 1.4rem rgb(31 58 72 / 12%);
+  color: var(--hierarchy-node-text);
+  background: var(--hierarchy-node-surface);
+  box-shadow: 0 0.55rem 1.4rem var(--hierarchy-node-shadow);
 }
 
 .entity-card-frame {
@@ -284,31 +284,39 @@
 }
 
 .entity-card--document {
-  border: 2px solid #789ca9;
-  border-top: 5px solid #245e74;
+  border: 2px solid var(--hierarchy-document-border);
+  border-top: 5px solid var(--hierarchy-document-accent);
   border-radius: 1rem;
-  background: linear-gradient(145deg, #ffffff 20%, #e7f4f6);
-  box-shadow: 0 0.7rem 1.55rem rgb(28 72 88 / 16%);
+  background: linear-gradient(
+    145deg,
+    var(--hierarchy-node-surface) 20%,
+    var(--hierarchy-document-surface-end)
+  );
+  box-shadow: 0 0.7rem 1.55rem var(--hierarchy-document-shadow);
 }
 
 .entity-card--section {
   padding: 0.58rem 0.78rem;
-  border: 2px solid #8b82ae;
+  border: 2px solid var(--hierarchy-section-border);
   border-left-width: 5px;
   border-radius: 1.6rem;
-  background: linear-gradient(145deg, #ffffff 15%, #eeeafa);
-  box-shadow: 0 0.45rem 1rem rgb(75 65 117 / 13%);
+  background: linear-gradient(
+    145deg,
+    var(--hierarchy-node-surface) 15%,
+    var(--hierarchy-section-surface-end)
+  );
+  box-shadow: 0 0.45rem 1rem var(--hierarchy-section-shadow);
 }
 
 .entity-card--block {
   border-style: dashed;
-  border-top: 4px solid #89713f;
-  background: #fffcf2;
+  border-top: 4px solid var(--hierarchy-block-accent);
+  background: var(--hierarchy-block-surface);
 }
 
 .entity-card--context {
-  color: #536873;
-  background: #f0f3f4;
+  color: var(--hierarchy-node-context-text);
+  background: var(--hierarchy-node-context-surface);
   box-shadow: none;
 }
 
@@ -336,7 +344,11 @@
 
 .graph-canvas[data-visual-variant='compact-schematic'] {
   background:
-    linear-gradient(rgb(255 255 255 / 42%), rgb(255 255 255 / 42%)), #e9eff1;
+    linear-gradient(
+      var(--hierarchy-canvas-compact-overlay),
+      var(--hierarchy-canvas-compact-overlay)
+    ),
+    var(--hierarchy-canvas-compact-background);
 }
 
 .graph-canvas .react-flow__node.graph-node--compact-schematic {
@@ -349,31 +361,31 @@
   padding: 0.34rem 0.48rem;
   border-width: 1px;
   border-radius: 0.28rem;
-  background: #fbfdfd;
-  box-shadow: 0 0.22rem 0.55rem rgb(22 46 58 / 12%);
+  background: var(--hierarchy-compact-surface);
+  box-shadow: 0 0.22rem 0.55rem var(--hierarchy-compact-shadow);
 }
 
 .entity-card--compact-schematic.entity-card--document {
-  border: 1px solid #4f7584;
-  border-left: 4px solid #245e74;
-  background: #eef7f8;
+  border: 1px solid var(--hierarchy-compact-document-border);
+  border-left: 4px solid var(--hierarchy-document-accent);
+  background: var(--hierarchy-compact-document-surface);
 }
 
 .entity-card--compact-schematic.entity-card--section {
-  border: 1px solid #756b9b;
-  border-left: 3px solid #756b9b;
-  background: #f3f1fa;
+  border: 1px solid var(--hierarchy-section-accent);
+  border-left: 3px solid var(--hierarchy-section-accent);
+  background: var(--hierarchy-compact-section-surface);
 }
 
 .entity-card--compact-schematic.entity-card--block {
-  border: 1px dashed #85703f;
-  background: #fffdf5;
+  border: 1px dashed var(--hierarchy-block-border);
+  background: var(--hierarchy-compact-block-surface);
 }
 
 .entity-card--local-root {
-  outline: 3px double #245e74;
+  outline: 3px double var(--hierarchy-document-accent);
   outline-offset: 3px;
-  box-shadow: 0 0.38rem 0.9rem rgb(28 78 97 / 24%);
+  box-shadow: 0 0.38rem 0.9rem var(--hierarchy-root-shadow);
 }
 
 .entity-card--compact-schematic .entity-title,
@@ -405,24 +417,24 @@
   height: 1.05rem;
   flex: 0 0 1.05rem;
   place-items: center;
-  color: #2c5363;
+  color: var(--hierarchy-marker-document);
   font-size: 0.78rem;
   font-weight: 900;
   line-height: 1;
 }
 
 .compact-hierarchy-marker--section {
-  color: #695d91;
+  color: var(--hierarchy-marker-section);
   font-size: 1rem;
 }
 
 .compact-hierarchy-marker--block {
-  color: #80672f;
+  color: var(--hierarchy-marker-block);
   font-size: 0.62rem;
 }
 
 .compact-hierarchy-marker--diagnostic {
-  color: #9a5d24;
+  color: var(--hierarchy-marker-diagnostic);
   font-size: 1rem;
 }
 
@@ -481,7 +493,7 @@
   display: block;
   margin-top: 0.2rem;
   overflow: hidden;
-  color: #607682;
+  color: var(--hierarchy-node-muted);
   font-size: 0.65rem;
   line-height: 1.3;
   text-overflow: ellipsis;
@@ -502,7 +514,7 @@
 }
 
 .internal-reference-badge {
-  color: #21604b;
+  color: var(--hierarchy-internal-reference);
   font-size: 0.62rem;
   font-weight: 800;
 }
@@ -518,7 +530,7 @@
   padding: 0.2rem;
   border: 1px solid transparent;
   border-radius: 0.45rem;
-  color: #183b4b;
+  color: var(--hierarchy-control-text);
   background: transparent;
   font-size: 0.72rem;
   font-weight: 850;
@@ -528,8 +540,8 @@
 }
 
 .entity-disclosure:hover {
-  border-color: #9db1ba;
-  background: rgb(231 242 244 / 78%);
+  border-color: var(--hierarchy-disclosure-hover-border);
+  background: var(--hierarchy-disclosure-hover-surface);
 }
 
 .entity-disclosure:disabled {
@@ -538,26 +550,26 @@
 }
 
 .entity-disclosure:focus-visible {
-  outline: 3px solid #c78310;
+  outline: 3px solid var(--hierarchy-focus-outline);
   outline-offset: 2px;
 }
 
 .graph-canvas[data-focus-appearance='outline']
   .graph-node--focus-distance-0
   .entity-card {
-  border-color: #194f68;
-  outline: 3px double #286e8d;
+  border-color: var(--hierarchy-root-outline);
+  outline: 3px double var(--hierarchy-highlight);
   outline-offset: 4px;
-  box-shadow: 0 0.8rem 1.8rem rgb(24 76 98 / 22%);
+  box-shadow: 0 0.8rem 1.8rem var(--hierarchy-root-shadow);
 }
 
 .graph-canvas[data-focus-appearance='inverted']
   .graph-node--focus-distance-0
   .entity-card {
-  border-color: #071d28;
-  color: #f7fbfc;
-  background: #173d4d;
-  box-shadow: 0 0.85rem 1.9rem rgb(7 29 40 / 30%);
+  border-color: var(--hierarchy-root-inverted-border);
+  color: var(--hierarchy-root-inverted-text);
+  background: var(--hierarchy-root-inverted-surface);
+  box-shadow: 0 0.85rem 1.9rem var(--hierarchy-selected-shadow);
 }
 
 .graph-canvas[data-focus-appearance='inverted']
@@ -569,14 +581,14 @@
 .graph-canvas[data-focus-appearance='inverted']
   .graph-node--focus-distance-0
   .entity-disclosure {
-  color: #e8f5f7;
+  color: var(--hierarchy-root-inverted-text);
 }
 
 .graph-canvas[data-focus-appearance='inverted']
   .graph-node--focus-distance-0
   .entity-disclosure:hover {
-  border-color: #9fc5d2;
-  background: rgb(255 255 255 / 12%);
+  border-color: var(--hierarchy-root-inverted-hover-border);
+  background: var(--hierarchy-root-inverted-hover);
 }
 
 .graph-canvas[data-focus-appearance='minimal']
@@ -587,8 +599,8 @@
   left: 0.3rem;
   width: 0.65rem;
   height: 0.65rem;
-  border-top: 3px solid #286e8d;
-  border-left: 3px solid #286e8d;
+  border-top: 3px solid var(--hierarchy-highlight);
+  border-left: 3px solid var(--hierarchy-highlight);
   content: '';
 }
 
@@ -597,17 +609,17 @@
   .entity-title {
   padding-left: 0.65rem;
   text-decoration: underline;
-  text-decoration-color: #286e8d;
+  text-decoration-color: var(--hierarchy-highlight);
   text-decoration-thickness: 2px;
   text-underline-offset: 0.2rem;
 }
 
 .graph-canvas .react-flow__node.selected .entity-card,
 .graph-canvas .react-flow__node.selected .diagnostic-card {
-  border-color: #101723;
+  border-color: var(--hierarchy-selected-border);
   box-shadow:
-    0 0 0 3px rgb(247 211 106 / 90%),
-    0 1rem 2rem rgb(16 23 35 / 18%);
+    0 0 0 3px var(--hierarchy-selected-ring),
+    0 1rem 2rem var(--hierarchy-selected-shadow);
 }
 
 .file-direct-connection-ring {
@@ -645,7 +657,7 @@
 }
 
 .file-direct-connection-ring__visible {
-  stroke: rgba(68, 92, 103, 0.62);
+  stroke: var(--hierarchy-direct-ring);
   stroke-width: 1px;
 }
 
@@ -658,36 +670,39 @@
 .file-direct-connection-ring:focus-visible
   .file-direct-connection-ring__visible,
 .react-flow__node.is-highlighted .file-direct-connection-ring__visible {
-  stroke: #245e74;
+  stroke: var(--hierarchy-document-accent);
   stroke-width: 2px;
 }
 
 .diagnostic-card {
   border-width: 2px;
-  box-shadow: 0 0.5rem 1.3rem rgb(74 51 22 / 13%);
+  box-shadow: 0 0.5rem 1.3rem var(--hierarchy-diagnostic-shadow);
 }
 
 .diagnostic-card--unresolved {
-  border-color: #a97a19;
+  border-color: var(--hierarchy-unresolved-border);
   border-style: dashed;
-  background: #fff8df;
+  color: var(--hierarchy-unresolved-text);
+  background: var(--hierarchy-unresolved-surface);
 }
 
 .diagnostic-card--ambiguous {
-  border-color: #b35d25;
+  border-color: var(--hierarchy-ambiguous-border);
   border-style: double;
   border-width: 4px;
-  background: #fff0e2;
+  color: var(--hierarchy-ambiguous-text);
+  background: var(--hierarchy-ambiguous-surface);
 }
 
 .diagnostic-card--invalid {
-  border-color: #a63845;
+  border-color: var(--hierarchy-invalid-border);
+  color: var(--hierarchy-invalid-text);
   background: repeating-linear-gradient(
     135deg,
-    #fff0f1,
-    #fff0f1 8px,
-    #fbe4e6 8px,
-    #fbe4e6 16px
+    var(--hierarchy-invalid-surface),
+    var(--hierarchy-invalid-surface) 8px,
+    var(--hierarchy-invalid-stripe) 8px,
+    var(--hierarchy-invalid-stripe) 16px
   );
 }
 
@@ -719,17 +734,17 @@
 
 .graph-edge-path {
   fill: none;
-  stroke: #63808e;
+  stroke: var(--hierarchy-reference-edge);
   stroke-width: 1.8;
 }
 
 .graph-edge-path--hierarchy {
-  stroke: #a7b4ba;
+  stroke: var(--hierarchy-hierarchy-edge);
   stroke-width: 1.2;
 }
 
 .graph-edge-path--compact-schematic.graph-edge-path--hierarchy {
-  stroke: #71838b;
+  stroke: var(--hierarchy-compact-hierarchy-edge);
   stroke-width: 2.2;
 }
 
@@ -739,34 +754,35 @@
 }
 
 .graph-edge-path--resolved {
-  stroke: #2b765f;
+  stroke: var(--hierarchy-resolved-edge);
   stroke-width: 2.3;
 }
 
 .graph-edge-path--unresolved {
-  stroke: #a97a19;
+  stroke: var(--hierarchy-unresolved-border);
   stroke-dasharray: 8 5;
 }
 
 .graph-edge-path--ambiguous {
-  stroke: #b35d25;
+  stroke: var(--hierarchy-ambiguous-border);
   stroke-dasharray: 2 4;
   stroke-width: 3;
 }
 
 .graph-edge-path--invalid {
-  stroke: #a63845;
+  stroke: var(--hierarchy-invalid-border);
   stroke-dasharray: 10 3 2 3;
   stroke-width: 3;
 }
 
 .react-flow__edge.graph-edge--focus-fallback .graph-edge-path {
-  stroke: #7b6f8f;
+  stroke: var(--hierarchy-fallback-edge);
   stroke-dasharray: 6 5;
   stroke-width: 1.8;
 }
 
 .react-flow__edge.graph-edge--secondary .graph-edge-path {
+  stroke: var(--hierarchy-secondary-edge);
   opacity: 0.46;
   stroke-width: 1.35;
 }
@@ -786,11 +802,11 @@
   align-items: center;
   justify-content: center;
   padding: 0.15rem 0.38rem;
-  border: 1px solid #718792;
+  border: 1px solid var(--hierarchy-edge-label-border);
   border-radius: 999px;
-  color: #18303d;
-  background: #ffffff;
-  box-shadow: 0 0.2rem 0.5rem rgb(16 23 35 / 12%);
+  color: var(--hierarchy-node-text);
+  background: var(--hierarchy-node-surface);
+  box-shadow: 0 0.2rem 0.5rem var(--hierarchy-node-shadow);
   font-size: 0.66rem;
   font-weight: 900;
   pointer-events: none;
@@ -798,44 +814,44 @@
 
 .graph-edge-label--unresolved {
   border-style: dashed;
-  color: #765310;
-  background: #fff8df;
+  color: var(--hierarchy-unresolved-text);
+  background: var(--hierarchy-unresolved-surface);
 }
 
 .graph-edge-label--ambiguous {
   border-style: double;
-  color: #8b451d;
-  background: #fff0e2;
+  color: var(--hierarchy-ambiguous-text);
+  background: var(--hierarchy-ambiguous-surface);
 }
 
 .graph-edge-label--invalid {
-  color: #8a2f38;
-  background: #fff0f1;
+  color: var(--hierarchy-invalid-text);
+  background: var(--hierarchy-invalid-surface);
 }
 
 .graph-canvas .react-flow__controls {
   overflow: hidden;
-  border: 1px solid #a8b8c0;
+  border: 1px solid var(--hierarchy-control-border);
   border-radius: 0.6rem;
-  box-shadow: 0 0.55rem 1.2rem rgb(16 23 35 / 14%);
+  box-shadow: 0 0.55rem 1.2rem var(--hierarchy-control-shadow);
 }
 
 .graph-canvas .react-flow__controls-button {
   width: 2.3rem;
   height: 2.3rem;
-  border-bottom-color: #d4dde1;
-  color: #183b4b;
-  background: #ffffff;
+  border-bottom-color: var(--hierarchy-control-divider);
+  color: var(--hierarchy-control-text);
+  background: var(--hierarchy-control-surface);
 }
 
 .graph-canvas .react-flow__controls-button:hover {
-  background: #e8f1f3;
+  background: var(--hierarchy-control-hover);
 }
 
 .graph-canvas .react-flow__controls-button:focus-visible {
   position: relative;
   z-index: 1;
-  outline: 3px solid #c78310;
+  outline: 3px solid var(--hierarchy-focus-outline);
   outline-offset: -3px;
 }
 
@@ -862,10 +878,10 @@
   width: min(90%, 44rem);
   margin: 0;
   padding: 0.65rem 0.8rem;
-  border: 1px solid #b4781b;
+  border: 1px solid var(--hierarchy-warning-border);
   border-radius: 0.55rem;
-  color: #553a0d;
-  background: #fff4d2;
+  color: var(--hierarchy-warning-text);
+  background: var(--hierarchy-warning-surface);
   font-size: 0.76rem;
   transform: translateX(-50%);
 }
@@ -877,11 +893,11 @@
   right: 0.75rem;
   margin: 0;
   padding: 0.45rem 0.65rem;
-  border: 1px solid #8ca7b2;
+  border: 1px solid var(--hierarchy-status-border);
   border-radius: 999px;
-  color: #294b5a;
-  background: rgb(255 255 255 / 92%);
-  box-shadow: 0 0.35rem 0.8rem rgb(16 35 45 / 12%);
+  color: var(--hierarchy-status-text);
+  background: var(--hierarchy-status-surface);
+  box-shadow: 0 0.35rem 0.8rem var(--hierarchy-status-shadow);
   font-size: 0.72rem;
   font-weight: 800;
 }
@@ -900,11 +916,11 @@
   height: 2.3rem;
   place-items: center;
   padding: 0.45rem;
-  border: 1px solid #a8b8c0;
+  border: 1px solid var(--hierarchy-control-border);
   border-radius: 0.6rem;
-  color: #183b4b;
-  background: #ffffff;
-  box-shadow: 0 0.55rem 1.2rem rgb(16 35 45 / 14%);
+  color: var(--hierarchy-control-text);
+  background: var(--hierarchy-control-surface);
+  box-shadow: 0 0.55rem 1.2rem var(--hierarchy-control-shadow);
   cursor: pointer;
 }
 
@@ -914,12 +930,13 @@
   place-content: center;
   gap: 0.35rem;
   padding: 2rem;
-  color: #536873;
+  color: var(--hierarchy-node-context-text);
+  background: var(--hierarchy-canvas-background);
   text-align: center;
 }
 
 .graph-empty strong {
-  color: #18303d;
+  color: var(--hierarchy-node-text);
   font-size: 1.1rem;
 }
 
@@ -938,21 +955,21 @@
   width: 100%;
   height: 100%;
   box-sizing: border-box;
-  border: 1px solid rgba(73, 103, 116, 0.28);
+  border: 1px solid var(--hierarchy-module-border);
   border-radius: 14px;
-  background: rgba(244, 248, 249, 0.54);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+  background: var(--hierarchy-module-surface);
+  box-shadow: inset 0 0 0 1px var(--hierarchy-module-inset);
 }
 
 .focus-module-boundary--root {
-  border-color: rgba(28, 82, 103, 0.58);
-  background: rgba(226, 239, 243, 0.64);
-  box-shadow: inset 0 0 0 1px rgba(28, 82, 103, 0.12);
+  border-color: var(--hierarchy-module-root-border);
+  background: var(--hierarchy-module-root-surface);
+  box-shadow: inset 0 0 0 1px var(--hierarchy-module-root-inset);
 }
 
 .react-flow__node.is-highlighted .focus-module-boundary {
-  border-color: rgba(36, 94, 116, 0.82);
-  background: rgba(232, 243, 246, 0.72);
+  border-color: var(--hierarchy-module-highlight-border);
+  background: var(--hierarchy-module-highlight-surface);
 }
 
 .focus-module-boundary--empty,
@@ -968,10 +985,10 @@
   height: 100%;
   place-items: center;
   box-sizing: border-box;
-  border: 1px dashed #879ca5;
+  border: 1px dashed var(--hierarchy-bridge-border);
   border-radius: 10px;
-  color: #526b77;
-  background: rgba(247, 250, 251, 0.92);
+  color: var(--hierarchy-bridge-text);
+  background: var(--hierarchy-bridge-surface);
   font-size: 1.05rem;
   font-weight: 800;
 }

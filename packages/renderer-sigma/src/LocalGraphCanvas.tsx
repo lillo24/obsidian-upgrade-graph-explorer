@@ -43,7 +43,7 @@ import {
 } from './local-mapping';
 import { LocalRendererSession } from './local-session';
 import { NetworkViewportControls } from './NetworkViewportControls';
-import { NETWORK_GRAPH_THEME_ID } from './network-theme';
+import { networkThemeFor } from './network-theme';
 import type {
   LocalCenterRequest,
   LocalDensityQaDiagnostics,
@@ -170,6 +170,7 @@ export function LocalGraphCanvas({
 }: LocalGraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<LocalRendererSession | undefined>(undefined);
+  const initialThemeRef = useRef(theme);
   const [cache] = useState(() => layoutCache ?? new LocalLayoutCache());
   const handledCenterRequest = useRef(0);
   const handledFitRequest = useRef(0);
@@ -452,6 +453,7 @@ export function LocalGraphCanvas({
     const mounted = mountLocalRendererSession(
       () =>
         new LocalRendererSession(container, initial.input, {
+          theme: initialThemeRef.current,
           rootNodeKey: initial.input.rootNodeKey,
           densityFramingStrength: initial.densityFramingStrength,
           networkSettings: initial.networkSettings,
@@ -530,6 +532,10 @@ export function LocalGraphCanvas({
         sessionRef.current = undefined;
     };
   }, [initial, instrumentation]);
+
+  useEffect(() => {
+    sessionRef.current?.setTheme?.(theme);
+  }, [theme]);
 
   useEffect(() => {
     const session = sessionRef.current;
@@ -815,7 +821,7 @@ export function LocalGraphCanvas({
     <div
       className="local-graph-canvas"
       data-initial-presentation={initialPresentationReady ? 'ready' : 'pending'}
-      data-network-theme={NETWORK_GRAPH_THEME_ID}
+      data-network-theme={networkThemeFor(theme).id}
       data-theme={theme}
     >
       <div className="local-graph-canvas__surface" ref={containerRef} />
