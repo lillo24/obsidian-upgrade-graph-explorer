@@ -1,8 +1,10 @@
 # GRAPHVIS-OBSIDIAN1 implementation report
 
-Status: **GRAPHVIS-OBSIDIAN1 merged; GRAPHVIS2 implemented and ready for native
-user QA.** The original integration landed in
-[PR #110](https://github.com/lillo24/obsidian-upgrade-graph-explorer/pull/110).
+Status: **GRAPHVIS-OBSIDIAN1 merged; GRAPHVIS2 native visual QA approved.** The
+original integration landed in
+[PR #110](https://github.com/lillo24/obsidian-upgrade-graph-explorer/pull/110),
+and the GRAPHVIS2 refinement is tracked in
+[PR #113](https://github.com/lillo24/obsidian-upgrade-graph-explorer/pull/113).
 
 ## Obsidian evidence
 
@@ -112,6 +114,13 @@ activation with Sigma's default double-click zoom prevented. A real drag still
 captures the pointer, continues across overlays, releases once, and suppresses
 its trailing click.
 
+User QA exposed one remaining release-arbitration edge case: when the native
+pointer owner had already consumed the synthetic release click, the
+coordinator's fallback suppression flag could remain armed and consume the next
+intentional background click. That fallback now expires after the release turn.
+The immediate trailing click remains suppressed, while one later background
+click clears the drag-selected File in both All and Focus.
+
 ## Regression proof
 
 This change alters renderer constants, reducers, canvas drawers, and graph-local
@@ -142,8 +151,8 @@ its coordinate-sensitive cases passed.
 ## Validation
 
 - `pnpm install --frozen-lockfile` passed.
-- Renderer-focused tests passed: **62 files / 495 tests**.
-- Web tests passed: **95 files / 728 tests**.
+- Renderer-focused tests passed: **62 files / 499 tests**.
+- Web tests passed: **96 files / 735 tests**.
 - `pnpm benchmark:global-renderer -- --profile small` passed; example mapping
   median was 0.208 ms, graph build median was 0.107 ms, and visual label
   threshold median was 0.039 ms. Its visual operation contract recorded zero
@@ -153,8 +162,8 @@ its coordinate-sensitive cases passed.
   was 0.419 ms, topology mapping median was 0.019 ms, and graph build median was
   0.039 ms. Its operation oracle recorded zero local/global projection, layout,
   and workspace transactions during the layout toggle.
-- `pnpm check` passed formatting, lint, all workspace typechecks, **270 files /
-  2,259 tests**, and the production web build.
+- `pnpm check` passed formatting, lint, all workspace typechecks, **272 files /
+  2,279 tests**, and the production web build.
 - `pnpm desktop:check` passed, including **16 Rust tests**.
 - `pnpm desktop:build` produced a fresh optimized Windows executable.
 - `git diff --check` passed.
@@ -169,6 +178,8 @@ visible. In All and Focus, the selected/hovered node and only its incident edges
 gained emphasis with no dimming overlay; unrelated neutral and semantic-colored
 edges kept their ordinary styling. The harness recorded no graph rebuild while
 app and harness consoles remained free of warnings and errors.
+Post-QA browser smoke testing additionally dragged `Source.md`, confirmed its
+selected ring, and cleared that selection with one background click.
 
 Automated tests cover transition endpoints and midpoints, enter/leave, direct
 A-to-B switches, semantic-color interpolation, width growth, the 220 ms cubic
@@ -179,10 +190,9 @@ Drawer tests retain exact-reference and Unicode truncation using measured width,
 three-argument `fillText` calls with no `maxWidth` compression, fade composition,
 and invariant x/font/text values across hover frames.
 
-The available computer-use surface was browser-only, so the optimized native
-window could not be inspected programmatically. Native desktop appearance is
-therefore the explicit remaining user-acceptance item, not a claimed automated
-pass.
+The user approved the native label and hover appearance. The post-QA background
+deselection correction was then verified through the production browser path
+and the same All/Focus session handlers used by the desktop build.
 
 ## Native handoff
 
@@ -192,16 +202,10 @@ Fresh executable:
 C:\Users\leona\Documents\GitHub\icarus-graph-explorer-graphvis2\apps\desktop\src-tauri\target\release\icarus-graph-explorer-desktop.exe
 ```
 
-Size: **13,548,544 bytes**
+Size: **13,552,640 bytes**
 
-SHA-256: `FE78DB2D1D82BA09AF90E962D6EC0E17206FE5638FC816115E6B3CDE2D64814F`
+SHA-256: `DD56225F0EAB8444DB6DDAD8CAE9975E059CAB3A7EB5E3B88C7F176AF5B014F8`
 
-Side-by-side acceptance checklist:
-
-1. Are small-node labels now restrained enough?
-2. Are large-node labels still readable without dominating?
-3. Does the connector plus label hover transition feel smooth and elegant rather
-   than snappy?
-5. Hover nodes in All and Focus; confirm only direct lines brighten, unrelated
-   content does not darken, and the label eases down only slightly.
-6. Repeat with reduced motion and confirm the label snaps without interpolation.
+Native acceptance result: the user approved the small/large label balance and
+the coordinated connector-plus-label hover transition. This refreshed binary
+also contains the one-background-click deselection correction.

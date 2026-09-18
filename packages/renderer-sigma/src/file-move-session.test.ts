@@ -203,6 +203,40 @@ describe('temporary File move renderer sessions', () => {
     expect(onNodeActivated).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['All', globalHarness, 'entity:doc-a'],
+    ['Focus', localHarness, 'entity:root'],
+  ] as const)(
+    'clears the drag-selected File with one later %s background click',
+    (_mode, createHarness, nodeKey) => {
+      const { onNodeSelected, renderer } = createHarness();
+      const node = renderer.graph.getNodeAttributes(nodeKey) as {
+        x: number;
+        y: number;
+      };
+      renderer.handlers.get('downNode')!({
+        node: nodeKey,
+        event: node,
+        preventSigmaDefault: vi.fn(),
+      });
+      renderer.handlers.get('moveBody')!({
+        event: { x: node.x + 3, y: node.y },
+        preventSigmaDefault: vi.fn(),
+      });
+      renderer.handlers.get('upStage')!({});
+      expect(onNodeSelected).toHaveBeenCalledTimes(1);
+      expect(onNodeSelected.mock.calls[0]?.[0]).toBe(nodeKey);
+
+      // No Sigma click followed the release because the native owner already
+      // consumed it. The next user click must therefore remain meaningful.
+      vi.advanceTimersByTime(0);
+      renderer.handlers.get('clickStage')!({});
+
+      expect(onNodeSelected).toHaveBeenCalledTimes(2);
+      expect(onNodeSelected).toHaveBeenLastCalledWith(undefined, undefined);
+    },
+  );
+
   it('retains ordinary single/double-click meaning below threshold', () => {
     const {
       onNodeActivated,
