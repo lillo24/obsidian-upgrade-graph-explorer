@@ -9,10 +9,17 @@ Graph Explorer UI ─┐
 MCP server ──────┘
 ```
 
-The server is read-only. It reloads and validates `library-v4.json` for every
-tool call, creates a retained `KnowledgeReader` for that call, and never creates
-a second database. No save, create, update, delete, import, source-version, or
-vault-edit capability is registered.
+The server reloads and validates `library-v5.json` for every tool call and never
+creates a second database. Five tools provide the bundled usage guide or
+retained read-only `KnowledgeReader` snapshots. One tightly scoped append-only
+tool can submit a bounded non-canonical Proposal to the same file. No canonical
+create, update, delete, import, resolution, source-version, or vault-edit
+capability is registered.
+
+The intended AI workflow is: reason independently, cross-check the Compiler,
+test the candidate against the prior recorded response, and submit it to the
+Mailbox only if it still appears novel or unresolved. Submission does not make
+the candidate theory; a human owns every canonical resolution.
 
 ## Library location
 
@@ -23,10 +30,15 @@ for MCP host configuration.
 Without that variable, the server mirrors Tauri's app-local-data convention for
 the `com.icarus.graph-explorer` application identifier:
 
-- Windows: `%LOCALAPPDATA%\com.icarus.graph-explorer\argument-workspace\library-v4.json`
-- macOS: `~/Library/Application Support/com.icarus.graph-explorer/argument-workspace/library-v4.json`
+- Windows: `%LOCALAPPDATA%\com.icarus.graph-explorer\argument-workspace\library-v5.json`
+- macOS: `~/Library/Application Support/com.icarus.graph-explorer/argument-workspace/library-v5.json`
 - Linux: `$XDG_DATA_HOME` (or `~/.local/share`) followed by
-  `com.icarus.graph-explorer/argument-workspace/library-v4.json`
+  `com.icarus.graph-explorer/argument-workspace/library-v5.json`
+
+When the derived v5 path is absent, reads may recover a valid adjacent
+`library-v4.json` through the core's deterministic in-memory migration. An
+explicit `ICARUS_ARGUMENT_LIBRARY_PATH` is authoritative and has no implicit
+fallback.
 
 If a safe default cannot be derived, the server returns a setup error asking
 for `ICARUS_ARGUMENT_LIBRARY_PATH`. Neither status nor errors disclose the
@@ -35,7 +47,7 @@ resolved absolute path. Reads are capped at 64 MiB and tool responses at 1 MiB.
 For the current Windows desktop library:
 
 ```powershell
-$env:ICARUS_ARGUMENT_LIBRARY_PATH = Join-Path $env:LOCALAPPDATA 'com.icarus.graph-explorer\argument-workspace\library-v4.json'
+$env:ICARUS_ARGUMENT_LIBRARY_PATH = Join-Path $env:LOCALAPPDATA 'com.icarus.graph-explorer\argument-workspace\library-v5.json'
 ```
 
 ## Tools
@@ -50,8 +62,20 @@ $env:ICARUS_ARGUMENT_LIBRARY_PATH = Join-Path $env:LOCALAPPDATA 'com.icarus.grap
   plus the same bounded paging/archive options.
 - `compiler_read_bundle`: bounded structured context selected by `id`, optional
   `kind`, `maxRecords`, and `maxDepth`.
+- `compiler_submit_proposal`: appends one pending non-canonical Proposal after
+  validating payload bounds, exact consultation descriptor and record
+  revisions, optional exact Argument-part target, Topic, and suggested Axiom
+  IDs. Referenced Topics, targets, and suggested Axioms must also appear in the
+  consultation records. `clientSubmissionId` and exact payload retries are
+  idempotent.
 
-Every tool is annotated read-only. Index and bundle results preserve the
+The five guide/reader tools are annotated read-only. Proposal submission is annotated
+non-destructive and idempotent, but not read-only. It is intended only after an
+AI has done its own reasoning and cross-check against the compiler snapshot;
+submission is not a correctness verdict. The returned ID remains outside
+framework knowledge until a human accepts or rejects it in the Mailbox.
+
+Index and bundle results preserve the
 Argument Workspace result, snapshot, provenance, completeness, omissions, and
 consultation receipt rather than flattening them into a new summary schema.
 Search before guessing IDs; when an objection exists, read its bundle before
@@ -71,14 +95,23 @@ A minimal client/project instruction can therefore remain small:
 > After independent candidate reasoning, call `compiler_usage_guide` when
 > beginning the Icarus Argument Compiler cross-check.
 
-The current server has no Mailbox/proposal-submission tool. The guide is
-future-compatible: it permits submission only when the connected tool list
-actually exposes that capability, and otherwise requires the AI to present the
-surviving proposal without claiming it was submitted.
+The current server exposes `compiler_submit_proposal`, so the guide's optional
+submission step is available. Clients must still discover the actual tool list;
+if a deployed older server lacks the tool, they must present the surviving
+proposal without claiming it was submitted.
 
 Bundles preserve registered theory-source references, but MCP1 intentionally
 does not expose `compiler_read_source`. The standalone process has no authorized
 vault/source binding and never follows record paths into the filesystem.
+
+Submission accepts candidate title, examples, premise hints, optional
+reasoning, conclusion, optional boundary, why it is novel/unresolved, optional
+Topic/target/suggested Axioms, and the consultation descriptor/records. Text,
+list lengths, and the whole JSON payload are bounded. A stale consultation or
+target fails without writing. The server performs one expected-snapshot atomic
+replacement; concurrent changes return a conflict rather than silently
+retargeting. It never exposes a tool that resolves Proposals or mutates
+canonical arrays.
 
 ## Build, test, and run
 
@@ -104,7 +137,7 @@ pnpm dlx @modelcontextprotocol/inspector@2.6.0 node packages/argument-mcp-server
 
 In the Inspector, connect and use the Tools tab to call status, list/search, and
 bundle reads. For a synthetic fixture, point `ICARUS_ARGUMENT_LIBRARY_PATH` at a
-temporary schema-v4 JSON file before starting Inspector. Never commit or paste
+temporary schema-v5 JSON file before starting Inspector. Never commit or paste
 the private real library into tests or logs.
 
 For a headless connection check, the same Inspector package also has a CLI

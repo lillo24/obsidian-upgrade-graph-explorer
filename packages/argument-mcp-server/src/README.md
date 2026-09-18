@@ -1,13 +1,16 @@
 # Source map
 
-This folder owns the local read-only MCP adapter for the Argument Library.
+This folder owns the local MCP adapter for canonical Argument Library reads and
+non-canonical Proposal submission.
 
 - `loader.ts` derives the app-local path, reads strict UTF-8 bytes with a size
-  bound, validates schema-v4 data (or deterministic v1/v2/v3 imports) through
-  Argument Workspace, and creates a new
-  retained `KnowledgeReader` for each call.
-- `server.ts` registers the five read-only MCP tools and adapts domain results
-  to bounded MCP text and structured content.
+  bound, validates schema-v5 data (or deterministic v1/v2/v3/v4 imports) through
+  Argument Workspace, creates a retained `KnowledgeReader` for each read call,
+  and exposes expected-snapshot atomic persistence to the Proposal-only
+  service.
+- `server.ts` registers five read-only Compiler/guide tools plus the bounded,
+  append-only, idempotent `compiler_submit_proposal` tool. It does not expose
+  canonical authoring or Proposal resolution.
 - `usage-guide.ts` imports the canonical Compiler cross-check guide as bundled
   text so the deployed server has no documentation-file runtime dependency.
 - `raw-imports.d.ts` declares that build-time raw Markdown import for

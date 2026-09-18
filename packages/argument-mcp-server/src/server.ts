@@ -3,7 +3,16 @@ import type { CallToolResult } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
 
 import {
+  ARGUMENT_PROPOSAL_MAX_ID_LENGTH,
+  ARGUMENT_PROPOSAL_MAX_LIST_ITEMS,
+  ARGUMENT_PROPOSAL_MAX_TEXT_LENGTH,
+  ARGUMENT_PROPOSAL_MAX_TITLE_LENGTH,
+  ArgumentLibraryRepository,
+  ArgumentProposalSubmissionService,
+  CONTENT_FINGERPRINT_ALGORITHM,
   KNOWLEDGE_READER_CONTRACT_VERSION,
+  type ArgumentRuntime,
+  type CreateArgumentProposalInput,
   type ListIndexRequest,
   type ReadArgumentBundleResult,
   type ReadArgumentBundleRequest,
@@ -11,6 +20,7 @@ import {
   type SnapshotBoundResult,
   type IndexPage,
 } from '@icarus-graph-explorer/argument-workspace';
+import { randomUUID } from 'node:crypto';
 
 import {
   ArgumentLibraryLoader,
@@ -29,6 +39,13 @@ export const MAX_TOOL_RESULT_BYTES = 1024 * 1024;
 
 const READ_ONLY_ANNOTATIONS = {
   readOnlyHint: true,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false,
+} as const;
+
+const APPEND_ONLY_ANNOTATIONS = {
+  readOnlyHint: false,
   destructiveHint: false,
   idempotentHint: true,
   openWorldHint: false,
@@ -73,6 +90,83 @@ const readBundleInput = z
   })
   .strict();
 
+const targetPartInput = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('argument') }).strict(),
+  z
+    .object({
+      kind: z.literal('premise'),
+      premiseId: z.string().trim().min(1).max(ARGUMENT_PROPOSAL_MAX_ID_LENGTH),
+    })
+    .strict(),
+  z.object({ kind: z.literal('reasoning') }).strict(),
+  z.object({ kind: z.literal('conclusion') }).strict(),
+]);
+
+const proposalText = z
+  .string()
+  .trim()
+  .min(1)
+  .max(ARGUMENT_PROPOSAL_MAX_TEXT_LENGTH);
+const proposalId = z
+  .string()
+  .trim()
+  .min(1)
+  .max(ARGUMENT_PROPOSAL_MAX_ID_LENGTH);
+const submitProposalInput = z
+  .object({
+    clientSubmissionId: proposalId.optional(),
+    title: z.string().trim().min(1).max(ARGUMENT_PROPOSAL_MAX_TITLE_LENGTH),
+    topicId: proposalId.optional(),
+    target: z
+      .object({
+        argumentId: proposalId,
+        part: targetPartInput,
+        reliedOnRevision: z.number().int().min(1),
+      })
+      .strict()
+      .optional(),
+    examples: z.array(proposalText).max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS),
+    premiseHints: z.array(proposalText).max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS),
+    suggestedAxiomIds: z
+      .array(proposalId)
+      .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+      .optional(),
+    reasoning: proposalText.optional(),
+    conclusion: proposalText,
+    boundary: proposalText.optional(),
+    whyNovelOrUnresolved: proposalText,
+    consultation: z
+      .object({
+        libraryId: proposalId,
+        libraryRevision: z.number().int().min(1),
+        contentFingerprint: z
+          .object({
+            algorithm: z.literal(CONTENT_FINGERPRINT_ALGORITHM),
+            value: z.string().regex(/^[a-f0-9]{64}$/u),
+          })
+          .strict(),
+        records: z
+          .array(
+            z
+              .object({
+                kind: z.enum([
+                  'topic',
+                  'axiom',
+                  'argument',
+                  'counter-argument',
+                ]),
+                id: proposalId,
+                revision: z.number().int().min(1),
+              })
+              .strict(),
+          )
+          .min(1)
+          .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS),
+      })
+      .strict(),
+  })
+  .strict();
+
 type JsonObject = Record<string, unknown>;
 
 function domainListRequest(
@@ -101,6 +195,29 @@ function domainBundleRequest(
     ...(input.kind === undefined ? {} : { kind: input.kind }),
     ...(input.maxRecords === undefined ? {} : { maxRecords: input.maxRecords }),
     ...(input.maxDepth === undefined ? {} : { maxDepth: input.maxDepth }),
+  };
+}
+
+function domainProposalInput(
+  input: z.infer<typeof submitProposalInput>,
+): CreateArgumentProposalInput {
+  return {
+    ...(input.clientSubmissionId === undefined
+      ? {}
+      : { clientSubmissionId: input.clientSubmissionId }),
+    title: input.title,
+    ...(input.topicId === undefined ? {} : { topicId: input.topicId }),
+    ...(input.target === undefined ? {} : { target: input.target }),
+    examples: input.examples,
+    premiseHints: input.premiseHints,
+    ...(input.suggestedAxiomIds === undefined
+      ? {}
+      : { suggestedAxiomIds: input.suggestedAxiomIds }),
+    ...(input.reasoning === undefined ? {} : { reasoning: input.reasoning }),
+    conclusion: input.conclusion,
+    ...(input.boundary === undefined ? {} : { boundary: input.boundary }),
+    whyNovelOrUnresolved: input.whyNovelOrUnresolved,
+    consultation: input.consultation,
   };
 }
 
@@ -176,17 +293,22 @@ function usageGuideResult(): CallToolResult {
 
 export interface CreateArgumentMcpServerOptions extends ArgumentLibraryLoaderOptions {
   readonly loader?: ArgumentLibraryLoader;
+  readonly proposalRuntime?: ArgumentRuntime;
 }
 
 export function createArgumentMcpServer(
   options: CreateArgumentMcpServerOptions = {},
 ): McpServer {
   const loader = options.loader ?? new ArgumentLibraryLoader(options);
+  const proposalRuntime = options.proposalRuntime ?? {
+    createId: (kind) => `${kind}-${randomUUID()}`,
+    now: () => new Date().toISOString(),
+  };
   const server = new McpServer(
     { name: ARGUMENT_MCP_SERVER_NAME, version: ARGUMENT_MCP_SERVER_VERSION },
     {
       instructions:
-        'After independent candidate reasoning, call compiler_usage_guide when beginning a Compiler cross-check. Search before guessing record IDs. Stored records are challengeable framework knowledge, not external proof.',
+        'After independent candidate reasoning, call compiler_usage_guide when beginning a Compiler cross-check. Search before guessing IDs and fight the prior response. Submit only a surviving unresolved candidate; Mailbox submission is non-canonical and awaits human resolution.',
     },
   );
 
@@ -232,6 +354,10 @@ export function createArgumentMcpServer(
           axioms: loaded.library.axioms.length,
           arguments: loaded.library.arguments.length,
           counterArguments: loaded.library.counterArguments.length,
+          proposals: loaded.library.proposals.length,
+          pendingProposals: loaded.library.proposals.filter(
+            ({ status }) => status === 'pending',
+          ).length,
         },
         knowledgeReaderContractVersion: KNOWLEDGE_READER_CONTRACT_VERSION,
       });
@@ -288,6 +414,63 @@ export function createArgumentMcpServer(
         : readerResult(
             loaded.reader.readArgumentBundle(domainBundleRequest(input)),
           );
+    },
+  );
+
+  server.registerTool(
+    'compiler_submit_proposal',
+    {
+      title: 'Submit proposal to human Mailbox',
+      description:
+        'Append one pending, non-canonical proposal after independent reasoning and a Compiler cross-check. Mailbox submission does not establish that the proposal is correct. A human must accept or reject it and is solely responsible for any canonical Argument, Counter-Argument, Axiom dependency, supersession, or Current promotion.',
+      inputSchema: submitProposalInput,
+      annotations: APPEND_ONLY_ANNOTATIONS,
+    },
+    async (input) => {
+      const proposalRepository = new ArgumentLibraryRepository(loader.store());
+      const proposalService = new ArgumentProposalSubmissionService(
+        proposalRepository,
+        proposalRuntime,
+      );
+      const opened = await proposalRepository.open();
+      if (opened.status !== 'ready') {
+        const error = {
+          status: 'error',
+          error: {
+            code: 'proposal-submission-unavailable',
+            message:
+              opened.status === 'missing'
+                ? 'The Argument Library is missing.'
+                : opened.message,
+          },
+        };
+        return {
+          ...serializedResult(error),
+          isError: true,
+        };
+      }
+      const result = await proposalService.submitProposal(
+        opened.snapshot.descriptor,
+        domainProposalInput(input),
+      );
+      if (result.status !== 'committed') {
+        const error = {
+          status: 'error',
+          error: {
+            code: result.status,
+            message: result.message,
+            ...(result.actual === undefined ? {} : { actual: result.actual }),
+          },
+        };
+        return { ...serializedResult(error), isError: true };
+      }
+      return serializedResult({
+        status: 'ok',
+        proposalId: result.proposal.id,
+        proposalStatus: result.proposal.status,
+        duplicate: result.duplicate,
+        snapshot: result.snapshot.descriptor,
+      });
     },
   );
 

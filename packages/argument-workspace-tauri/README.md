@@ -8,16 +8,17 @@ This package owns the desktop storage adapter for the source-neutral
   saves, and temporary-sibling replacement.
 - `src/index.test.ts` verifies the adapter without a native runtime.
 
-Schema-v4 data lives at `argument-workspace/library-v4.json` under
+Schema-v5 data lives at `argument-workspace/library-v5.json` under
 application-local data. It is independent of the selected vault, graph view
-state, and workspace identity catalog. When v4 is absent, load prefers a valid
-`library-v3.json`, then `library-v2.json`, and then `library-v1.json`, performs
-the core deterministic migration, writes v4 through a temporary sibling, and keeps the old file as a
+state, and workspace identity catalog. When v5 is absent, load prefers a valid
+`library-v4.json`, then `library-v3.json`, `library-v2.json`, and
+`library-v1.json`, performs the core deterministic migration, writes v5 through
+a temporary sibling, and keeps the old file as a
 recoverable copy. Migration failure leaves the source untouched. Loads
 preserve corrupt/future bytes for explicit recovery. Saves validate and
 serialize before writing, compare the current on-disk descriptor with the
 caller's expectation, write a unique temporary sibling, then rename it over the
-confirmed v4 file. A failure removes the temporary file where possible and
+confirmed v5 file. A failure removes the temporary file where possible and
 never adopts or overwrites corrupt input.
 
 The adapter does not scan or resolve a vault. Later source integration should
