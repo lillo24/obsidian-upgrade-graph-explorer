@@ -100,6 +100,36 @@ The accent values resolve from the default `258 / 88% / 66%` accent HSL and
 the dark-theme `--color-accent-1` transform. Unrelated graph elements fade
 toward 0.2 alpha while a node is highlighted.
 
+## Default-light graph palette
+
+The transparent Pixi stage exposes `--background-primary`, which resolves to
+`--color-base-00`, **`#ffffff`**, under Obsidian 1.11.5's default light theme.
+The same graph-role rules used above resolve through the light base scale:
+
+| Graph role                    | Variable chain                                                 | Resolved value             |
+| ----------------------------- | -------------------------------------------------------------- | -------------------------- |
+| Background                    | `--background-primary` → `--color-base-00`                     | `#ffffff`                  |
+| Label text                    | `--graph-text` → `--text-normal` → `--color-base-100`          | `#222222`                  |
+| Ordinary node                 | `--graph-node` → `--text-muted` → `--color-base-70`            | `#5c5c5c`                  |
+| Edge                          | `--graph-line` → `--color-base-35`                             | `#d4d4d4`                  |
+| Focused node/ring             | `--graph-node-focused` → `--text-accent` → `--color-accent`    | `#8a5cf5`                  |
+| Hover/highlight fill and line | `--interactive-accent` → `--color-accent-1`                    | `#9873f7`                  |
+| Unresolved node               | `--graph-node-unresolved` → `--text-faint` → `--color-base-50` | `#ababab` at `0.5` opacity |
+| Tag node                      | `--graph-node-tag` → `--color-green`                           | `#08b94e`                  |
+| Attachment node               | `--graph-node-attachment` → `--color-yellow`                   | `#e0ac00`                  |
+
+The two accent hex values are the final sRGB results of the default
+`258 / 88% / 66%` HSL and the light-theme `--color-accent-1` transform
+(`257 / 88.88% / 70.95%`). These are evidence-backed Obsidian values rather
+than inverted dark colors.
+
+Icarus-only light adaptations use `#ababab` for hierarchy edges, the native
+light orange/red values `#ec7500` and `#e93147` for ambiguous/invalid
+diagnostics, and `#52658a`, `#bdbdbd`, and `#e0e0e0` for shadowed, excluded,
+and inactive Arrange scope states. Focus sections/blocks use Obsidian's light
+purple `#7852ee` and base-60 `#707070`. These roles have no exact Obsidian
+Graph counterpart and are deliberately recorded as adaptations.
+
 ## Icarus compatibility decisions
 
 - Icarus retains its existing Sigma label threshold, semantic LOD, and forced
@@ -136,7 +166,7 @@ toward 0.2 alpha while a node is highlighted.
 - Icarus Visual Group accents remain renderer inputs. Selected, hovered, and
   Focus-root states remain authoritative interaction layers, as in Obsidian.
 - Icarus unresolved/ambiguous/invalid and hierarchy/reference distinctions use
-  dark-safe variants around the Obsidian base palette. These states have no
+  palette-specific variants around the Obsidian bases. These states have no
   exact one-to-one Obsidian representation.
 - Exact Obsidian Pixi word wrapping is not available in Sigma's one-line canvas
   label API. Icarus keeps a centered single line, measures the current-font
@@ -146,8 +176,9 @@ toward 0.2 alpha while a node is highlighted.
 - Outside Arrange Folders, Icarus deliberately does not reproduce Obsidian's
   unrelated-graph fade. Hover retains every unrelated node/edge's ordinary
   style and brightens only directly incident edges. Neutral incident lines use
-  the recovered `#8a5cf5` interactive accent; explicit semantic hues are
-  lightened without being replaced.
+  the palette's recovered interactive accent. Explicit semantic hues are
+  lightened on dark and darkened on light, preserving hue while moving toward
+  contrast rather than blindly toward white.
 - Icarus adapts Obsidian's label displacement to at most 3 screen pixels or 35%
   of rendered radius, whichever is smaller, over 120 ms with cubic ease-out.
   Leave reverses smoothly. Reduced-motion mode snaps to the final hover state.

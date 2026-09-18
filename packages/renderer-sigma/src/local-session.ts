@@ -3,6 +3,7 @@ import type { WheelCoords } from 'sigma/types';
 import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-groups';
 import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
 import type { SpatialPoint } from '@icarus-graph-explorer/spatial-overrides';
+import type { ResolvedTheme } from '@icarus-graph-explorer/theme';
 import {
   changedFileSizeNodeKeys,
   indexFileNodeKeys,
@@ -64,8 +65,9 @@ import {
 import { NetworkHoverTransitionController } from './network-hover';
 import { createNetworkLabelDrawers } from './network-label';
 import {
+  type NetworkTheme,
   NETWORK_LABEL_FONT_FAMILY,
-  OBSIDIAN_DARK_NETWORK_THEME,
+  networkThemeFor,
 } from './network-theme';
 import type {
   LocalCenterRequest,
@@ -84,6 +86,8 @@ import type {
 import type { ResolvedNetworkSettings } from './types';
 
 export interface LocalRendererSessionOptions {
+  /** App-resolved presentation theme; never inferred inside the renderer. */
+  readonly theme?: ResolvedTheme;
   readonly rootNodeKey: string;
   readonly trackpadZoomMode: LocalTrackpadZoomMode;
   readonly densityFramingStrength?: number;
@@ -153,6 +157,7 @@ export class LocalRendererSession {
   private visualLod: LocalVisualLod;
   private visualGroupStyles: VisualGroupPresentationMap | undefined;
   private presentationOverrides: EntityPresentationOverrideMap | undefined;
+  private networkTheme: NetworkTheme;
   private networkVisualSettings: LocalNetworkVisualSettings;
   private fileNodeKeys: ReturnType<typeof indexFileNodeKeys>;
   private sizeStyleRefreshPending: Set<string> | undefined;
@@ -274,6 +279,7 @@ export class LocalRendererSession {
   ) {
     this.container = container;
     this.options = options;
+    this.networkTheme = networkThemeFor(options.theme ?? 'dark');
     this.rootNodeKey = options.rootNodeKey;
     this.densityInput = input;
     this.densityFramingStrength =
@@ -318,7 +324,7 @@ export class LocalRendererSession {
       hideEdgesOnMove: this.graph.size > 4_000,
       hideLabelsOnMove: false,
       labelDensity: 0.12,
-      labelColor: { color: OBSIDIAN_DARK_NETWORK_THEME.label },
+      labelColor: { color: this.networkTheme.label },
       labelFont: NETWORK_LABEL_FONT_FAMILY,
       labelGridCellSize: 100,
       labelRenderedSizeThreshold:
@@ -329,8 +335,8 @@ export class LocalRendererSession {
       stagePadding: 24,
       defaultDrawNodeHover: labelDrawers.drawHover,
       defaultDrawNodeLabel: labelDrawers.drawLabel,
-      defaultEdgeColor: OBSIDIAN_DARK_NETWORK_THEME.edge,
-      defaultNodeColor: OBSIDIAN_DARK_NETWORK_THEME.node,
+      defaultEdgeColor: this.networkTheme.edge,
+      defaultNodeColor: this.networkTheme.node,
       nodeReducer: (key, attributes) => this.reduceNode(key, attributes),
       edgeReducer: (key, attributes) => this.reduceEdge(key, attributes),
     });
@@ -437,6 +443,7 @@ export class LocalRendererSession {
       ...(visualGroup === undefined ? {} : { visualGroup }),
       ...(sizeScale === undefined ? {} : { sizeScale }),
       baseNodeSizeScale: this.networkVisualSettings.nodeSizeScale,
+      theme: this.networkTheme,
     });
     return {
       ...resolved,
@@ -456,6 +463,7 @@ export class LocalRendererSession {
       hoverProgress,
       lod: this.visualLod,
       linkThicknessScale: this.networkVisualSettings.linkThicknessScale,
+      theme: this.networkTheme,
     });
   }
 
@@ -791,6 +799,18 @@ export class LocalRendererSession {
     this.sizeStyleRefreshPending ??= new Set();
     for (const key of keys) this.sizeStyleRefreshPending.add(key);
     if (this.topologyRefreshPending === undefined) this.refreshPendingStyles();
+  }
+
+  /** Repaints cached Sigma presentation without touching graph or camera state. */
+  setTheme(theme: ResolvedTheme): void {
+    const next = networkThemeFor(theme);
+    if (next.id === this.networkTheme.id) return;
+    this.networkTheme = next;
+    this.renderer.setSetting('labelColor', { color: next.label });
+    this.renderer.setSetting('defaultEdgeColor', next.edge);
+    this.renderer.setSetting('defaultNodeColor', next.node);
+    this.options.instrumentation?.count('local-style-updates');
+    this.renderer.refresh({ skipIndexation: true, schedule: true });
   }
 
   updateNetworkSettings(settings: ResolvedNetworkSettings): void {

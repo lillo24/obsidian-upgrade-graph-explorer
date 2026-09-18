@@ -11,10 +11,12 @@ clustering. Neither owns canonical entities, KG6 projection policy, search,
 inspection, source acquisition, Tauri, React Flow, Dagre, analytics, or saved
 coordinates.
 
-THEMESYS1 adds an explicit app-resolved `light | dark` prop to both canvases.
-The renderer never reads browser storage, media queries, root attributes, or
-computed styles as theme authority. Its existing Obsidian-dark palette remains
-unchanged until THEMESYS2 maps this seam to dual renderer palettes.
+THEMESYS1 adds an explicit app-resolved `light | dark` prop to both canvases;
+THEMESYS2 maps it through the shared `NetworkTheme` contract and
+`networkThemeFor()`. The renderer never reads browser storage, media queries,
+root attributes, or computed styles as theme authority. The approved dark
+palette remains visually equivalent, while the light palette follows the
+resolved Obsidian 1.11.5 default-light Graph variable chain.
 
 ```text
 documents-only KG6 projection
@@ -31,6 +33,24 @@ bounded Local KG6 projection
   → local-layout.ts    separate hierarchy/reference ForceAtlas2 protocol
   → Local Worker → latest result → bounded memory-only position cache
 ```
+
+## Network theme contract
+
+`NetworkTheme` owns every WebGL palette role used by both sessions, including
+neutral and hierarchy edges, labels, document/section/block nodes, focus and
+hover accents, diagnostics, and Arrange scope states. `networkThemeFor('light' |
+'dark')` returns the corresponding immutable palette. Canvas HTML uses the
+same palette ID as `data-network-theme="obsidian-light|obsidian-dark"` for
+viewport and Arrange controls; CSS never resolves OS color preference.
+
+`GlobalRendererSession.setTheme()` and `LocalRendererSession.setTheme()` update
+Sigma's label/default color settings and run one full reducer refresh with
+`skipIndexation: true`. Reducers resolve semantic colors from the current
+palette rather than treating topology's compatibility color attributes as
+authority. This path does not reconcile Graphology, submit ForceAtlas2 or
+PHYSICS1 work, apply spatial influence, change coordinates or camera state,
+invalidate a cache, or persist state. The React canvases keep the same session
+mounted for dark → light → dark changes.
 
 ## File map
 
@@ -58,7 +78,7 @@ src/
   style.ts                 Far/Regional/Near LOD and GROUP1A base-accent layer.
   network-label.ts         Shared All/Focus label sizing, truncation, placement, and canvas drawing.
   network-hover.ts         Shared renderer-local label/incident-edge hover transition progress.
-  network-theme.ts         Evidence-backed Obsidian dark graph palette and shared font tokens.
+  network-theme.ts         Evidence-backed dual Obsidian palettes, selector API, hover-color policy, and shared font tokens.
   raw-viewport-frame.ts    Raw graph-space center/scale diagnostics and bounded repair primitive.
   network-camera-intent.ts One-shot initial framing versus camera-neutral position-adoption policy.
   network-position-frame.ts Validates the stable presented-position normalization extent.

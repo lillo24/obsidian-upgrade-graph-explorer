@@ -90,7 +90,9 @@ export class SigmaTestRenderer {
   });
   readonly scheduleRender = vi.fn();
   readonly scheduleHighlightedNodesRender = vi.fn();
-  readonly setSetting = vi.fn();
+  readonly setSetting = vi.fn((key: string, value: unknown) => {
+    Object.assign(this.settings, { [key]: value });
+  });
   readonly kill = vi.fn();
   constructor(
     readonly graph: MultiDirectedGraph,

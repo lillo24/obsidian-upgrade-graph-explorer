@@ -22,20 +22,24 @@ import type {
   ResolvedGlobalVisualSettings,
 } from './types';
 import { stableUnit } from './deterministic';
-import { OBSIDIAN_DARK_NETWORK_THEME } from './network-theme';
+import { networkThemeFor } from './network-theme';
+
+// Topology keeps legacy colors for serialized/test compatibility. Session
+// reducers always resolve the current explicit Network theme at draw time.
+const TOPOLOGY_COLOR_DEFAULTS = networkThemeFor('dark');
 
 const DIAGNOSTIC_NODE_COLORS = {
-  resolved: OBSIDIAN_DARK_NETWORK_THEME.node,
-  unresolved: OBSIDIAN_DARK_NETWORK_THEME.unresolvedNode,
-  ambiguous: OBSIDIAN_DARK_NETWORK_THEME.diagnosticAmbiguous,
-  invalid: OBSIDIAN_DARK_NETWORK_THEME.diagnosticInvalid,
+  resolved: TOPOLOGY_COLOR_DEFAULTS.node,
+  unresolved: TOPOLOGY_COLOR_DEFAULTS.unresolvedNode,
+  ambiguous: TOPOLOGY_COLOR_DEFAULTS.diagnosticAmbiguous,
+  invalid: TOPOLOGY_COLOR_DEFAULTS.diagnosticInvalid,
 } as const satisfies Record<GlobalReferenceStatus, string>;
 
 const REFERENCE_EDGE_COLORS = {
-  resolved: OBSIDIAN_DARK_NETWORK_THEME.edge,
-  unresolved: OBSIDIAN_DARK_NETWORK_THEME.attachmentNode,
-  ambiguous: OBSIDIAN_DARK_NETWORK_THEME.diagnosticAmbiguous,
-  invalid: OBSIDIAN_DARK_NETWORK_THEME.diagnosticInvalid,
+  resolved: TOPOLOGY_COLOR_DEFAULTS.edge,
+  unresolved: TOPOLOGY_COLOR_DEFAULTS.attachmentNode,
+  ambiguous: TOPOLOGY_COLOR_DEFAULTS.diagnosticAmbiguous,
+  invalid: TOPOLOGY_COLOR_DEFAULTS.diagnosticInvalid,
 } as const satisfies Record<GlobalReferenceStatus, string>;
 
 /** Deterministic warm seed only; never persisted as knowledge or view truth. */
@@ -133,7 +137,7 @@ function nodeAttributes(
       nodeSize,
       referenceDegreeSizeInfluence,
     }),
-    color: OBSIDIAN_DARK_NETWORK_THEME.node,
+    color: TOPOLOGY_COLOR_DEFAULTS.node,
     label: entityLabel(node),
     nodeKind: 'document',
     entityId: node.entityId,

@@ -5,7 +5,7 @@ import type {
 } from '@icarus-graph-explorer/view-projection';
 
 import { stableUnit } from './deterministic';
-import { OBSIDIAN_DARK_NETWORK_THEME } from './network-theme';
+import { networkThemeFor } from './network-theme';
 import type {
   LocalEdgeAttributes,
   LocalInputNode,
@@ -14,11 +14,13 @@ import type {
   LocalRendererInput,
 } from './local-types';
 
+// Topology colors remain stable; reducers select the live explicit theme.
+const TOPOLOGY_COLOR_DEFAULTS = networkThemeFor('dark');
 const NODE_COLORS = {
-  document: OBSIDIAN_DARK_NETWORK_THEME.node,
-  section: '#a882ff',
-  block: '#999999',
-  diagnostic: OBSIDIAN_DARK_NETWORK_THEME.diagnosticInvalid,
+  document: TOPOLOGY_COLOR_DEFAULTS.node,
+  section: TOPOLOGY_COLOR_DEFAULTS.sectionNode,
+  block: TOPOLOGY_COLOR_DEFAULTS.blockNode,
+  diagnostic: TOPOLOGY_COLOR_DEFAULTS.diagnosticInvalid,
 } as const satisfies Record<LocalNodeKind, string>;
 
 function entityLabel(node: ProjectedEntityNode): string {
@@ -56,10 +58,10 @@ function mappedNode(node: ProjectedNode, rootEntityId: string): LocalInputNode {
     color:
       node.kind === 'reference-target'
         ? node.status === 'unresolved'
-          ? OBSIDIAN_DARK_NETWORK_THEME.unresolvedNode
+          ? TOPOLOGY_COLOR_DEFAULTS.unresolvedNode
           : node.status === 'ambiguous'
-            ? OBSIDIAN_DARK_NETWORK_THEME.diagnosticAmbiguous
-            : OBSIDIAN_DARK_NETWORK_THEME.diagnosticInvalid
+            ? TOPOLOGY_COLOR_DEFAULTS.diagnosticAmbiguous
+            : TOPOLOGY_COLOR_DEFAULTS.diagnosticInvalid
         : NODE_COLORS[kind],
     label: node.kind === 'entity' ? entityLabel(node) : node.rawTarget,
     nodeKind: kind,
@@ -91,8 +93,8 @@ function mappedEdge(
         : 0.65 + Math.min(1.6, Math.log2(referenceCount + 1) * 0.35),
     color:
       edge.kind === 'hierarchy'
-        ? OBSIDIAN_DARK_NETWORK_THEME.hierarchyEdge
-        : OBSIDIAN_DARK_NETWORK_THEME.edge,
+        ? TOPOLOGY_COLOR_DEFAULTS.hierarchyEdge
+        : TOPOLOGY_COLOR_DEFAULTS.edge,
   };
   return {
     key: edge.id,

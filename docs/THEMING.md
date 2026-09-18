@@ -49,14 +49,27 @@ their planned migrations.
 Every production renderer receives `ResolvedTheme` through a typed `theme`
 prop. Renderers may use that ID to select a palette, but they must never resolve
 theme from `localStorage`, `matchMedia`, `document.dataset`, or computed CSS.
-The current hard-coded graph palettes remain intentionally unchanged in this
-foundation step.
+
+All Network and Focus Network map that resolved ID through
+`networkThemeFor(theme)`. Their imperative sessions keep the selected
+`NetworkTheme` in memory and update Sigma's label/default colors plus the node
+and edge reducers in place. The matching `data-network-theme` marker themes
+only the canvas-owned HTML controls and Arrange Folders surfaces. Renderer CSS
+does not use `prefers-color-scheme`.
+
+A Network theme change is presentation-only: the mounted session, Graphology
+instance, positions, normalization extent, camera, layout services, PHYSICS1,
+spatial influence, caches, and persistence remain untouched. One Sigma refresh
+reruns the color reducers with indexation skipped. Label sizing, opacity,
+truncation, and hover-motion functions are shared unchanged between palettes.
 
 ## Migration sequence
 
 1. THEMESYS1 establishes ownership, persistence, startup behavior, semantic
    tokens, Settings, and renderer seams.
-2. THEMESYS2 migrates ordinary application chrome and shared controls.
-3. THEMESYS3 migrates workspace and feature surfaces from hard-coded palettes.
-4. THEMESYS4 maps renderer palettes to the explicit resolved theme and performs
-   final contrast and cross-platform QA.
+2. THEMESYS2 maps All/Focus Network palettes and graph-local controls to the
+   explicit resolved theme.
+3. Later migrations move ordinary application chrome, shared controls,
+   workspace surfaces, and feature-specific palettes onto semantic tokens.
+4. Final contrast and cross-platform QA closes any remaining hard-coded color
+   boundaries.

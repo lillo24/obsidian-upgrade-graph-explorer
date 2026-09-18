@@ -7,7 +7,7 @@ import {
   NetworkHoverTransitionController,
   resolveNetworkHoverLabelOffset,
 } from './network-hover';
-import { OBSIDIAN_DARK_NETWORK_THEME } from './network-theme';
+import { networkThemeFor } from './network-theme';
 
 const OBSIDIAN_BASE_FONT_PX = 14;
 const OBSIDIAN_FONT_RADIUS_FACTOR = 0.25;
@@ -253,7 +253,7 @@ type NetworkLabelSettings = Pick<
 >;
 
 function labelColor(settings: NetworkLabelSettings): string {
-  return settings.labelColor.color ?? OBSIDIAN_DARK_NETWORK_THEME.label;
+  return settings.labelColor.color ?? networkThemeFor('dark').label;
 }
 
 /** Width-based ellipsis over Unicode code points; glyphs are never condensed. */
