@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -62,20 +63,42 @@ afterEach(async () => {
 });
 
 describe('Argument Library MCP tools', () => {
-  it('registers exactly four read-only tools and no write capability', async () => {
+  it('registers exactly five read-only tools and no write capability', async () => {
     const { path } = await temporaryLibrary();
     const session = await connect(
       createArgumentMcpServer({ libraryPath: path }),
     );
     try {
       const listed = await session.client.listTools();
+      const instructions = session.client.getInstructions();
 
+      expect(instructions).toContain(
+        'call compiler_usage_guide when beginning a Compiler cross-check',
+      );
+      expect(instructions?.length).toBeLessThan(300);
       expect(listed.tools.map(({ name }) => name)).toEqual([
+        'compiler_usage_guide',
         'compiler_status',
         'compiler_list_index',
         'compiler_search_index',
         'compiler_read_bundle',
       ]);
+      expect(
+        listed.tools.find(({ name }) => name === 'compiler_usage_guide'),
+      ).toMatchObject({
+        description: expect.stringContaining(
+          'after independent candidate reasoning is complete',
+        ),
+        outputSchema: {
+          type: 'object',
+          required: expect.arrayContaining([
+            'status',
+            'version',
+            'format',
+            'guide',
+          ]),
+        },
+      });
       expect(listed.tools).toSatisfy((tools: typeof listed.tools) =>
         tools.every(
           ({ annotations }) =>
@@ -86,6 +109,60 @@ describe('Argument Library MCP tools', () => {
       expect(JSON.stringify(listed.tools)).not.toMatch(
         /save|create|update|delete|import|read_source/u,
       );
+    } finally {
+      await session.close();
+    }
+  });
+
+  it('returns the canonical usage protocol without loading or mutating a library', async () => {
+    const { path } = await temporaryLibrary();
+    expect(existsSync(path)).toBe(false);
+    const session = await connect(
+      createArgumentMcpServer({ libraryPath: path }),
+    );
+    try {
+      const result = await session.client.callTool({
+        name: 'compiler_usage_guide',
+        arguments: {},
+      });
+      const response = structured(result) as {
+        status: string;
+        version: string;
+        format: string;
+        guide: string;
+      };
+
+      expect(result.isError).not.toBe(true);
+      expect(response).toMatchObject({
+        status: 'ok',
+        version: 'argument-compiler-ai-usage-v1',
+        format: 'markdown',
+      });
+      expect(
+        Buffer.byteLength(JSON.stringify(response), 'utf8'),
+      ).toBeLessThanOrEqual(MAX_TOOL_RESULT_BYTES);
+      const normalizedGuide = response.guide.replace(/\s+/gu, ' ');
+      expect(normalizedGuide).toContain(
+        'substantive candidate ideas already exist',
+      );
+      expect(normalizedGuide).toContain(
+        'multiple focused lexical formulations',
+      );
+      expect(normalizedGuide).toContain(
+        'search result -> plausible prior record -> compiler_read_bundle',
+      );
+      expect(normalizedGuide).toContain(
+        'not authority and not external empirical proof',
+      );
+      expect(normalizedGuide).toContain('Prior response still applies');
+      expect(normalizedGuide).toContain(
+        'submit a surviving genuinely new or revised argument',
+      );
+      expect(normalizedGuide).toContain(
+        'If no submission capability is present, do not invent or claim a',
+      );
+      expect(result.content).toEqual([{ type: 'text', text: response.guide }]);
+      expect(existsSync(path)).toBe(false);
     } finally {
       await session.close();
     }

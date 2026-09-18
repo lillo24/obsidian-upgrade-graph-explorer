@@ -6,11 +6,15 @@ This folder owns the local read-only MCP adapter for the Argument Library.
   bound, validates schema-v4 data (or deterministic v1/v2/v3 imports) through
   Argument Workspace, and creates a new
   retained `KnowledgeReader` for each call.
-- `server.ts` registers the four read-only MCP tools and adapts domain results
+- `server.ts` registers the five read-only MCP tools and adapts domain results
   to bounded MCP text and structured content.
+- `usage-guide.ts` imports the canonical Compiler cross-check guide as bundled
+  text so the deployed server has no documentation-file runtime dependency.
+- `raw-imports.d.ts` declares that build-time raw Markdown import for
+  TypeScript.
 - `cli.ts` is the stdio-only process entry point; stdout remains reserved for
   MCP protocol messages.
 - `test-fixture.ts` builds synthetic public test data through Argument
   Workspace's public authoring API.
 - `loader.test.ts`, `server.test.ts`, and `stdio.test.ts` cover file handling,
-  tool/domain parity, and a spawned stdio session.
+  tool/domain parity, guide invariants, and a spawned bundled stdio session.

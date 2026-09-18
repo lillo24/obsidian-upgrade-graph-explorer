@@ -40,6 +40,8 @@ $env:ICARUS_ARGUMENT_LIBRARY_PATH = Join-Path $env:LOCALAPPDATA 'com.icarus.grap
 
 ## Tools
 
+- `compiler_usage_guide`: the post-generation retrieval and cross-check
+  protocol for an AI using the Compiler.
 - `compiler_status`: availability, portable snapshot descriptor, reader
   contract version, and record counts.
 - `compiler_list_index`: bounded index paging with `limit`, `cursor`, and
@@ -55,6 +57,24 @@ consultation receipt rather than flattening them into a new summary schema.
 Search before guessing IDs; when an objection exists, read its bundle before
 repeating it. Stored records are framework knowledge and may be challenged;
 retrieval is not external proof.
+
+Detailed AI usage guidance has one canonical source in
+[`docs/ARGUMENT_COMPILER_AI_USAGE.md`](../../docs/ARGUMENT_COMPILER_AI_USAGE.md).
+The build embeds that Markdown in `dist/server.js`, and
+`compiler_usage_guide` returns it without reading the runtime filesystem or
+loading the Argument Library. Its protocol is intended only after independent
+candidate reasoning exists: the Compiler is a cross-check and accumulated
+reasoning context, not external proof or a generator for the first pass.
+
+A minimal client/project instruction can therefore remain small:
+
+> After independent candidate reasoning, call `compiler_usage_guide` when
+> beginning the Icarus Argument Compiler cross-check.
+
+The current server has no Mailbox/proposal-submission tool. The guide is
+future-compatible: it permits submission only when the connected tool list
+actually exposes that capability, and otherwise requires the AI to present the
+surviving proposal without claiming it was submitted.
 
 Bundles preserve registered theory-source references, but MCP1 intentionally
 does not expose `compiler_read_source`. The standalone process has no authorized
@@ -96,4 +116,7 @@ pnpm dlx @modelcontextprotocol/inspector@2.6.0 --cli node packages/argument-mcp-
 ```
 
 OpenAI Secure MCP Tunnel and ChatGPT MCP configuration are deliberately deferred
-to the next step; this package exposes only a local stdio process.
+to the next step; this package exposes only a local stdio process. After
+upgrading or restarting this server, refresh/reconnect the client so it
+rediscovers `compiler_usage_guide`; tool descriptions improve discoverability
+but cannot guarantee that a model will invoke or obey the guide.
