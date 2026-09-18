@@ -49,9 +49,10 @@ requests open/close transitions.
 - `arguments.css` owns the responsive 94vw by 93dvh two-pane surface.
 
 Full-library imports are explicitly selected at runtime and limited to 5 MiB
-before parsing. Insert JSON uses the same size ceiling but a distinct pasted,
-strictly validated additive format; its preview is non-mutating and confirmation
-persists the prepared candidate once against the previewed snapshot. Dirty
+before parsing. Insert JSON uses the same size ceiling but a distinct,
+strictly validated additive format; users may select a local `.json` file or
+paste and edit the document manually before its non-mutating preview.
+Confirmation persists the prepared candidate once against the previewed snapshot. Dirty
 editor drafts retain the existing Save/Discard/Stay guard. The format and
 neutral example are documented in
 [`docs/ARGUMENT_WORKSPACE_INSERT_JSON.md`](../../../../../docs/ARGUMENT_WORKSPACE_INSERT_JSON.md).

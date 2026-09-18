@@ -9,9 +9,11 @@ Argument Workspace has two deliberately separate JSON workflows:
   Current without supplying library metadata.
 
 Insert JSON is useful for payloads drafted by an external assistant, but the
-payload is not trusted or written automatically. A user must paste it, inspect
-the non-mutating preview, and confirm the snapshot-bound transaction. This does
-not add a write tool to AI Review or the Compiler interface.
+payload is not trusted or written automatically. A user may select a local
+`.json` file (up to 5 MiB) or paste the document manually, inspect the
+non-mutating preview, and confirm the snapshot-bound transaction. A selected
+file is loaded into the same editable text area as pasted JSON. This does not
+add a write tool to AI Review or the Compiler interface.
 
 ## Format
 

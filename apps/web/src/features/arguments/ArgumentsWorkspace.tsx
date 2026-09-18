@@ -102,6 +102,7 @@ interface ImportPreviewState {
 
 interface InsertJsonState {
   readonly source: string;
+  readonly fileName?: string;
   readonly plan?: ArgumentWorkspaceInsertPlan;
   readonly errors?: readonly string[];
 }
@@ -473,6 +474,7 @@ function InsertJsonDialog({
   state,
   onCancel,
   onChange,
+  onChooseFile,
   onConfirm,
   onPreview,
   onUseTemplate,
@@ -481,6 +483,7 @@ function InsertJsonDialog({
   readonly state: InsertJsonState;
   readonly onCancel: () => void;
   readonly onChange: (source: string) => void;
+  readonly onChooseFile: (event: ChangeEvent<HTMLInputElement>) => void;
   readonly onConfirm: (plan: ArgumentWorkspaceInsertPlan) => void;
   readonly onPreview: () => void;
   readonly onUseTemplate: () => void;
@@ -499,8 +502,24 @@ function InsertJsonDialog({
           Add records and links to the current library. Preview is strict and
           non-mutating; nothing is saved until confirmation.
         </p>
+        <div className="arguments-actions">
+          <label className="button-like">
+            Select JSON file
+            <input
+              accept="application/json,.json"
+              disabled={busy}
+              onChange={onChooseFile}
+              type="file"
+            />
+          </label>
+          {state.fileName === undefined ? null : (
+            <span>
+              Loaded <code>{state.fileName}</code>
+            </span>
+          )}
+        </div>
         <label>
-          Insert JSON document
+          Insert JSON document (or paste manually)
           <textarea
             onChange={(event) => onChange(event.currentTarget.value)}
             placeholder='{"format":"argument-workspace-insert-v1", ...}'
@@ -1285,14 +1304,62 @@ const ArgumentsWorkspaceContent = forwardRef<
   function previewInsert() {
     if (insertJson === undefined) return;
     const result = session.previewInsert(insertJson.source);
+    const selectedFile =
+      insertJson.fileName === undefined
+        ? {}
+        : { fileName: insertJson.fileName };
     setInsertJson(
       result.status === 'ok'
-        ? { source: insertJson.source, plan: result.plan }
+        ? { source: insertJson.source, ...selectedFile, plan: result.plan }
         : {
             source: insertJson.source,
+            ...selectedFile,
             errors: result.issues ?? [result.message],
           },
     );
+  }
+
+  async function chooseInsertJson(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (file === undefined) return;
+    if (file.size > ARGUMENT_LIBRARY_IMPORT_LIMIT_BYTES) {
+      setInsertJson((current) =>
+        current === undefined
+          ? current
+          : {
+              source: current.source,
+              ...(current.fileName === undefined
+                ? {}
+                : { fileName: current.fileName }),
+              errors: [
+                `Insert JSON file "${file.name}" exceeds the 5 MiB limit.`,
+              ],
+            },
+      );
+      return;
+    }
+    try {
+      const source = await file.text();
+      setInsertJson((current) =>
+        current === undefined ? current : { source, fileName: file.name },
+      );
+    } catch (error) {
+      const detail = error instanceof Error ? `: ${error.message}` : '';
+      setInsertJson((current) =>
+        current === undefined
+          ? current
+          : {
+              source: current.source,
+              ...(current.fileName === undefined
+                ? {}
+                : { fileName: current.fileName }),
+              errors: [
+                `Could not read Insert JSON file "${file.name}"${detail}`,
+              ],
+            },
+      );
+    }
   }
 
   function commitInsert(plan: ArgumentWorkspaceInsertPlan) {
@@ -2345,6 +2412,7 @@ const ArgumentsWorkspaceContent = forwardRef<
             busy={state.busy}
             onCancel={() => setInsertJson(undefined)}
             onChange={(source) => setInsertJson({ source })}
+            onChooseFile={(event) => void chooseInsertJson(event)}
             onConfirm={commitInsert}
             onPreview={previewInsert}
             onUseTemplate={() =>

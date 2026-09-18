@@ -475,6 +475,68 @@ describe('standalone Arguments workspace', () => {
     expect(container.textContent).toContain('Inserted UI Topic');
   });
 
+  it('loads an Insert JSON file into the editable source before preview and confirmation', async () => {
+    await mount();
+    await click('Insert JSON');
+
+    const source = JSON.stringify({
+      format: 'argument-workspace-insert-v1',
+      topics: [
+        {
+          id: 'TOP-INSERT-FILE',
+          title: 'Bread drinking symbolic matching',
+          summary: 'Loaded from a selected JSON file.',
+        },
+      ],
+    });
+    const picker = [
+      ...container.querySelectorAll<HTMLInputElement>('input[type="file"]'),
+    ].find((control) =>
+      control.closest('label')?.textContent?.includes('Select JSON file'),
+    );
+    if (picker === undefined)
+      throw new Error('Missing Insert JSON file picker.');
+    expect(picker.accept).toContain('.json');
+
+    const file = new File(
+      [source],
+      'bread_drinking_symbolic_matching_insert.json',
+      {
+        type: 'application/json',
+      },
+    );
+    Object.defineProperty(file, 'text', {
+      configurable: true,
+      value: async () => source,
+    });
+    Object.defineProperty(picker, 'files', {
+      configurable: true,
+      value: [file],
+    });
+    await act(async () => {
+      picker.dispatchEvent(new Event('change', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(textarea('Insert JSON document').value).toBe(source);
+    expect(container.textContent).toContain(
+      'bread_drinking_symbolic_matching_insert.json',
+    );
+    await click('Preview insert');
+    expect(store.writes).toBe(0);
+    expect(container.textContent).toContain('Validated preview');
+    expect(container.textContent).toContain('TOP-INSERT-FILE');
+
+    await click('Confirm insert');
+    await vi.waitFor(() => expect(store.writes).toBe(1));
+    expect(store.snapshot.library.topics).toContainEqual(
+      expect.objectContaining({
+        id: 'TOP-INSERT-FILE',
+        title: 'Bread drinking symbolic matching',
+      }),
+    );
+  });
+
   it('shows Current reasoning and promotes an accepted member explicitly', async () => {
     vi.stubGlobal(
       'confirm',
