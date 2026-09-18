@@ -63,11 +63,8 @@ import {
   reduceGlobalFolderArrangementGesture,
   type GlobalFolderArrangementGestureState,
 } from './arrangement';
-import {
-  createNetworkLabelDrawers,
-  NetworkLabelHoverController,
-  scheduleNetworkLabelHoverFrame,
-} from './network-label';
+import { NetworkHoverTransitionController } from './network-hover';
+import { createNetworkLabelDrawers } from './network-label';
 import {
   NETWORK_LABEL_FONT_FAMILY,
   OBSIDIAN_DARK_NETWORK_THEME,
@@ -209,7 +206,7 @@ export class GlobalRendererSession {
     GlobalNodeAttributes,
     Parameters<typeof resolveGlobalEdgeStyle>[0]
   >;
-  private readonly labelHover: NetworkLabelHoverController;
+  private readonly hoverTransition: NetworkHoverTransitionController;
   private neighborhoods: ReadonlyMap<string, ReadonlySet<string>>;
   private hoveredNode: string | undefined;
   private selectedNode: string | undefined;
@@ -405,9 +402,8 @@ export class GlobalRendererSession {
     this.neighborhoods = createGlobalNeighborhoodIndex(input);
     const mountStart = performance.now();
     container.setAttribute('aria-hidden', 'true');
-    this.labelHover = new NetworkLabelHoverController({
-      onFrame: () => scheduleNetworkLabelHoverFrame(this.renderer),
-      onSettled: (nodeKeys) => this.refreshNodeStyles(...nodeKeys),
+    this.hoverTransition = new NetworkHoverTransitionController({
+      onFrame: (nodeKeys) => this.refreshHoverStyles(...nodeKeys),
       reducedMotion: () =>
         window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ===
         true,
@@ -415,7 +411,7 @@ export class GlobalRendererSession {
     const labelDrawers = createNetworkLabelDrawers<
       GlobalNodeAttributes,
       Parameters<typeof resolveGlobalEdgeStyle>[0]
-    >(this.labelHover);
+    >(this.hoverTransition);
     this.renderer = new Sigma<
       GlobalNodeAttributes,
       Parameters<typeof resolveGlobalEdgeStyle>[0]
@@ -765,7 +761,7 @@ export class GlobalRendererSession {
     });
     return {
       ...resolved,
-      highlighted: resolved.highlighted || this.labelHover.hasOverlay(key),
+      highlighted: resolved.highlighted || this.hoverTransition.hasOverlay(key),
     };
   }
 
@@ -773,11 +769,10 @@ export class GlobalRendererSession {
     key: string,
     attributes: Parameters<typeof resolveGlobalEdgeStyle>[0],
   ) {
-    const hoverActive = this.hoveredNode !== undefined;
-    const relatedToHover =
-      !hoverActive ||
-      this.graph.source(key) === this.hoveredNode ||
-      this.graph.target(key) === this.hoveredNode;
+    const hoverProgress = Math.max(
+      this.hoverTransition.progress(this.graph.source(key)),
+      this.hoverTransition.progress(this.graph.target(key)),
+    );
     const arrangementFolderKey = this.activeArrangementFolderKey();
     const sourceState = this.arrangementContext?.scopeStateByNodeKey?.get(
       this.graph.source(key),
@@ -804,8 +799,7 @@ export class GlobalRendererSession {
         this.settings,
       ),
       ...(arrangementRelation === undefined ? {} : { arrangementRelation }),
-      relatedToHover,
-      hoverActive,
+      hoverProgress,
       lod: this.visualLod,
     });
   }
@@ -1148,7 +1142,7 @@ export class GlobalRendererSession {
       const started = performance.now();
       const previous = this.hoveredNode;
       this.hoveredNode = node;
-      this.labelHover.setHovered(previous, node);
+      this.hoverTransition.setHovered(previous, node);
       this.options.onNodeHovered?.(node);
       this.options.instrumentation?.count('global-hover-applications');
       this.refreshHoverStyles(previous, node);
@@ -1161,7 +1155,7 @@ export class GlobalRendererSession {
     this.renderer.on('leaveNode', () => {
       const previous = this.hoveredNode;
       this.hoveredNode = undefined;
-      this.labelHover.setHovered(previous, undefined);
+      this.hoverTransition.setHovered(previous, undefined);
       const arrangementActive = this.arrangementContext?.active === true;
       if (arrangementActive) this.arrangementHoveredFolder = undefined;
       this.options.onNodeHovered?.(undefined);
@@ -1829,7 +1823,7 @@ export class GlobalRendererSession {
     }
     const previous = this.hoveredNode;
     this.hoveredNode = key;
-    this.labelHover.setHovered(previous, key);
+    this.hoverTransition.setHovered(previous, key);
     return this.measureNextRender('hover-reducer', () =>
       this.refreshHoverStyles(previous, key),
     );
@@ -1944,8 +1938,10 @@ export class GlobalRendererSession {
       return;
     }
     const edges = new Set<string>();
-    for (const node of nodes) {
-      this.graph.forEachEdge(node, (edge) => edges.add(edge));
+    if (this.arrangementContext?.active !== true) {
+      for (const node of nodes) {
+        this.graph.forEachEdge(node, (edge) => edges.add(edge));
+      }
     }
     this.renderer.refresh({
       partialGraph: { nodes, edges: [...edges] },
@@ -2453,7 +2449,7 @@ export class GlobalRendererSession {
     this.fileMoveCoordinator = undefined;
     this.fileMoveContext = undefined;
     this.nodeClicks?.cancel();
-    this.labelHover?.dispose();
+    this.hoverTransition?.dispose();
     this.renderer.getMouseCaptor().off('wheel', this.precisionWheelHandler);
     this.renderer.getMouseCaptor().off('mousemovebody', this.mouseDragHandler);
     this.renderer.getTouchCaptor().off('touchmove', this.touchMoveHandler);

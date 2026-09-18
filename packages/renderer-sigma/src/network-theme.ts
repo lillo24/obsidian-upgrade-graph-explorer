@@ -48,3 +48,33 @@ export function resolveIncidentEdgeColor(color: string): string {
     .map((channel) => channel.toString(16).padStart(2, '0'))
     .join('')}`;
 }
+
+function parseHexColor(
+  color: string,
+): readonly [number, number, number] | null {
+  const match = /^#([0-9a-f]{6})$/i.exec(color);
+  if (match === null) return null;
+  const value = Number.parseInt(match[1]!, 16);
+  return [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff];
+}
+
+/** Interpolate the six-digit hex colors used by production Network edges. */
+export function interpolateNetworkEdgeColor(
+  baseColor: string,
+  progress: number,
+): string {
+  const amount = Math.min(1, Math.max(0, progress));
+  if (amount === 0) return baseColor;
+  const targetColor = resolveIncidentEdgeColor(baseColor);
+  if (amount === 1) return targetColor;
+  const base = parseHexColor(baseColor);
+  const target = parseHexColor(targetColor);
+  if (base === null || target === null) return baseColor;
+  return `#${base
+    .map((channel, index) =>
+      Math.round(channel + (target[index]! - channel) * amount)
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`;
+}

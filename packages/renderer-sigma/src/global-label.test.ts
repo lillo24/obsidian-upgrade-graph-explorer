@@ -4,16 +4,22 @@ import {
   createNetworkLabelDrawers,
   drawNetworkNodeHover,
   drawNetworkNodeLabel,
-  NetworkLabelHoverController,
   NETWORK_LABEL_FULL_OPACITY_RATIO,
   NETWORK_LABEL_REFERENCE_TEXT,
   placeNetworkLabel,
-  resolveNetworkLabelHoverOffset,
-  resolveNetworkLabelHoverProgress,
+  resolveNetworkLabelDiameterRatio,
   resolveNetworkLabelOpacity,
   resolveNetworkLabelScale,
+  SELECTED_NETWORK_LABEL_SIZE_CANDIDATE,
   truncateNetworkLabel,
 } from './network-label';
+import {
+  NetworkHoverTransitionController,
+  NETWORK_HOVER_DURATION_MS,
+  resolveNetworkHoverEdgeWidthMultiplier,
+  resolveNetworkHoverLabelOffset,
+  resolveNetworkHoverProgress,
+} from './network-hover';
 
 const BASE = {
   nodeX: 120,
@@ -28,8 +34,8 @@ describe('shared All/Focus Network label placement', () => {
   it('centers an interior label below the node', () => {
     const placement = placeNetworkLabel(BASE);
     expect(placement.textX).toBe(BASE.nodeX);
-    expect(placement.textY).toBe(BASE.nodeY + BASE.nodeSize + 5);
-    expect(placement.fontSize).toBe(16);
+    expect(placement.textY).toBe(BASE.nodeY + BASE.nodeSize + 4.5);
+    expect(placement.fontSize).toBeCloseTo(10.56);
   });
 
   it.each([
@@ -56,10 +62,90 @@ describe('shared All/Focus Network label placement', () => {
   it('scales font and gap with Sigma rendered/logical node scale', () => {
     expect(
       resolveNetworkLabelScale({ renderedNodeSize: 4, logicalNodeSize: 8 }),
-    ).toMatchObject({ fontSize: 8, gap: 2.5, renderScale: 0.5 });
+    ).toMatchObject({ gap: 2.25, renderScale: 0.5 });
+    expect(
+      resolveNetworkLabelScale({ renderedNodeSize: 4, logicalNodeSize: 8 })
+        .fontSize,
+    ).toBeCloseTo(5.28);
     expect(
       resolveNetworkLabelScale({ renderedNodeSize: 16, logicalNodeSize: 8 }),
-    ).toMatchObject({ fontSize: 32, gap: 10, renderScale: 2 });
+    ).toMatchObject({ gap: 9, renderScale: 2 });
+    expect(
+      resolveNetworkLabelScale({ renderedNodeSize: 16, logicalNodeSize: 8 })
+        .fontSize,
+    ).toBeCloseTo(21.12);
+  });
+
+  it('uses the selected middle curve after a deterministic three-candidate bakeoff', () => {
+    expect(SELECTED_NETWORK_LABEL_SIZE_CANDIDATE).toBe('middle');
+    const smallRadius = 3.1;
+    const largeRadius = 8.4;
+    expect(
+      resolveNetworkLabelDiameterRatio(smallRadius, 'conservative'),
+    ).toBeCloseTo(0.5465);
+    expect(resolveNetworkLabelDiameterRatio(smallRadius, 'middle')).toBeCloseTo(
+      0.5865,
+    );
+    expect(resolveNetworkLabelDiameterRatio(smallRadius, 'larger')).toBeCloseTo(
+      0.6265,
+    );
+    expect(
+      resolveNetworkLabelDiameterRatio(largeRadius, 'conservative'),
+    ).toBeCloseTo(0.626);
+    expect(resolveNetworkLabelDiameterRatio(largeRadius, 'middle')).toBeCloseTo(
+      0.666,
+    );
+    expect(resolveNetworkLabelDiameterRatio(largeRadius, 'larger')).toBeCloseTo(
+      0.706,
+    );
+  });
+
+  it('keeps representative node fonts monotonic with a size-sensitive ratio ceiling', () => {
+    const radii = [3.1, 3.8, 4.7, 6.4, 8.4, 10.5, 15];
+    const scales = radii.map((logicalNodeSize) =>
+      resolveNetworkLabelScale({
+        renderedNodeSize: logicalNodeSize,
+        logicalNodeSize,
+      }),
+    );
+    for (let index = 1; index < scales.length; index += 1) {
+      expect(scales[index]!.fontSize).toBeGreaterThan(
+        scales[index - 1]!.fontSize,
+      );
+    }
+    expect(scales[0]!.fontSize / (radii[0]! * 2)).toBeLessThan(
+      scales[4]!.fontSize / (radii[4]! * 2),
+    );
+    for (const [index, scale] of scales.entries()) {
+      const ratio = resolveNetworkLabelDiameterRatio(radii[index]!);
+      expect(scale.fontSize).toBeLessThanOrEqual(radii[index]! * 2 * ratio);
+      expect(scale.fontSize).toBeLessThan(radii[index]! * 2);
+    }
+  });
+
+  it('keeps font monotonic across zoom while leaving opacity independent', () => {
+    const logicalNodeSize = 6.4;
+    const renderedSizes = [3.2, 6.4, 12.8];
+    const fonts = renderedSizes.map(
+      (renderedNodeSize) =>
+        resolveNetworkLabelScale({ renderedNodeSize, logicalNodeSize })
+          .fontSize,
+    );
+    expect(fonts[1]).toBeGreaterThan(fonts[0]!);
+    expect(fonts[2]).toBeGreaterThan(fonts[1]!);
+    expect(
+      resolveNetworkLabelOpacity({
+        renderedNodeSize: 4 * 2 ** 0.25,
+        labelRenderedSizeThreshold: 4,
+      }),
+    ).toBeCloseTo(0.5);
+    expect(
+      resolveNetworkLabelOpacity({
+        renderedNodeSize: 1,
+        labelRenderedSizeThreshold: 4,
+        forceLabel: true,
+      }),
+    ).toBe(1);
   });
 
   it('keeps edge labels below while clamping their horizontal center', () => {
@@ -67,8 +153,8 @@ describe('shared All/Focus Network label placement', () => {
     const right = placeNetworkLabel({ ...BASE, nodeX: 318 });
     expect(left.textX - left.maxTextWidth / 2).toBeGreaterThanOrEqual(4);
     expect(right.textX + right.maxTextWidth / 2).toBeLessThanOrEqual(316);
-    expect(left.textY).toBe(BASE.nodeY + BASE.nodeSize + 5);
-    expect(right.textY).toBe(BASE.nodeY + BASE.nodeSize + 5);
+    expect(left.textY).toBe(BASE.nodeY + BASE.nodeSize + 4.5);
+    expect(right.textY).toBe(BASE.nodeY + BASE.nodeSize + 4.5);
   });
 
   it('preserves the below-node invariant near the bottom edge', () => {
@@ -191,26 +277,29 @@ describe('shared All/Focus Network label truncation', () => {
 describe('renderer-local hover label motion', () => {
   it('uses bounded monotonic ease-out and reduced-motion snapping', () => {
     const at = (elapsedMs: number) =>
-      resolveNetworkLabelHoverProgress({
+      resolveNetworkHoverProgress({
         elapsedMs,
         from: 0,
         to: 1,
       });
     expect(at(0)).toBe(0);
-    expect(at(30)).toBeGreaterThan(0);
-    expect(at(60)).toBeGreaterThan(at(30));
-    expect(at(120)).toBe(1);
+    expect(at(55)).toBeGreaterThan(0);
+    expect(at(110)).toBeGreaterThan(at(55));
+    expect(at(NETWORK_HOVER_DURATION_MS)).toBe(1);
     expect(at(1_000)).toBe(1);
     expect(
-      resolveNetworkLabelHoverProgress({
+      resolveNetworkHoverProgress({
         elapsedMs: 0,
         from: 0,
         to: 1,
         reducedMotion: true,
       }),
     ).toBe(1);
-    expect(resolveNetworkLabelHoverOffset(8, 1)).toBe(2.8);
-    expect(resolveNetworkLabelHoverOffset(100, 1)).toBe(3);
+    expect(resolveNetworkHoverLabelOffset(3.1, 1)).toBeCloseTo(1.705);
+    expect(resolveNetworkHoverLabelOffset(8, 1)).toBe(3.75);
+    expect(resolveNetworkHoverEdgeWidthMultiplier(0)).toBe(1);
+    expect(resolveNetworkHoverEdgeWidthMultiplier(0.5)).toBe(1.15);
+    expect(resolveNetworkHoverEdgeWidthMultiplier(1)).toBe(1.3);
   });
 
   it('animates entry and return, then releases the transient overlay', () => {
@@ -218,11 +307,9 @@ describe('renderer-local hover label motion', () => {
     let handle = 0;
     const frames: (() => void)[] = [];
     const onFrame = vi.fn();
-    const onSettled = vi.fn();
-    const hover = new NetworkLabelHoverController({
+    const hover = new NetworkHoverTransitionController({
       now: () => now,
       onFrame,
-      onSettled,
       requestFrame: (callback) => {
         frames.push(callback);
         return ++handle;
@@ -232,34 +319,69 @@ describe('renderer-local hover label motion', () => {
     hover.setHovered(undefined, 'node');
     expect(hover.ownsLabelLayer('node')).toBe(true);
     expect(hover.progress('node')).toBe(0);
-    now = 60;
+    now = 110;
     expect(hover.progress('node')).toBeGreaterThan(0.5);
     frames.shift()?.();
-    now = 120;
+    now = 220;
     frames.shift()?.();
     expect(hover.progress('node')).toBe(1);
+    expect(frames).toHaveLength(0);
 
     hover.setHovered('node', undefined);
-    now = 180;
+    now = 330;
     expect(hover.progress('node')).toBeLessThan(0.5);
     frames.shift()?.();
-    now = 240;
+    now = 440;
     frames.shift()?.();
     expect(hover.ownsLabelLayer('node')).toBe(false);
     expect(onFrame).toHaveBeenCalled();
-    expect(onSettled).toHaveBeenCalledWith(['node']);
+    expect(onFrame).toHaveBeenLastCalledWith(['node']);
+    expect(frames).toHaveLength(0);
+  });
+
+  it('preserves continuous progress when switching directly from A to B', () => {
+    let now = 0;
+    const hover = new NetworkHoverTransitionController({
+      now: () => now,
+      onFrame: () => undefined,
+      requestFrame: () => 1,
+    });
+    hover.setHovered(undefined, 'a');
+    now = 110;
+    const aMidpoint = hover.progress('a');
+    hover.setHovered('a', 'b');
+    expect(hover.progress('a')).toBeCloseTo(aMidpoint);
+    expect(hover.progress('b')).toBe(0);
+    now = 165;
+    expect(hover.progress('a')).toBeLessThan(aMidpoint);
+    expect(hover.progress('b')).toBeGreaterThan(0);
+  });
+
+  it('snaps enter and leave without scheduling frames for reduced motion', () => {
+    const requestFrame = vi.fn(() => 1);
+    const hover = new NetworkHoverTransitionController({
+      onFrame: () => undefined,
+      reducedMotion: () => true,
+      requestFrame,
+    });
+    hover.setHovered(undefined, 'node');
+    expect(hover.progress('node')).toBe(1);
+    expect(requestFrame).not.toHaveBeenCalled();
+    hover.setHovered('node', undefined);
+    expect(hover.progress('node')).toBe(0);
+    expect(hover.ownsLabelLayer('node')).toBe(false);
+    expect(requestFrame).not.toHaveBeenCalled();
   });
 
   it('changes only label y while preserving text, x, and font', () => {
     let now = 0;
-    const hover = new NetworkLabelHoverController({
+    const hover = new NetworkHoverTransitionController({
       now: () => now,
       onFrame: () => undefined,
-      onSettled: () => undefined,
       requestFrame: () => 1,
     });
     hover.setHovered(undefined, 'node');
-    now = 120;
+    now = NETWORK_HOVER_DURATION_MS;
     const drawers = createNetworkLabelDrawers(hover);
     const ordinary = drawingContext();
     const animated = drawingContext();

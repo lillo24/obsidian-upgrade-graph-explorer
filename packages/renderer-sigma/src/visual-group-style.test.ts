@@ -208,8 +208,7 @@ describe('cross-Sigma Visual Group style contract', () => {
     };
     expect(
       resolveLocalEdgeStyle(edge, {
-        relatedToHover: true,
-        hoverActive: false,
+        hoverProgress: 0,
         lod: 'near-local',
       }),
     ).toEqual({ ...edge, hidden: false, size: 1, zIndex: 0 });

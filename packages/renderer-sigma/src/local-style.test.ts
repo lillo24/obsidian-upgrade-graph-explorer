@@ -23,8 +23,7 @@ describe('Focus reference visibility', () => {
       const lod = resolveLocalVisualLod(ratio);
       const style = resolveLocalEdgeStyle(reference, {
         lod,
-        relatedToHover: true,
-        hoverActive: false,
+        hoverProgress: 0,
       });
       expect(style.hidden).toBe(false);
       expect(style.size).toBeCloseTo(
@@ -37,13 +36,11 @@ describe('Focus reference visibility', () => {
   it('retains far hover emphasis without hiding unrelated references', () => {
     const related = resolveLocalEdgeStyle(reference, {
       lod: 'far-local',
-      relatedToHover: true,
-      hoverActive: true,
+      hoverProgress: 1,
     });
     const unrelated = resolveLocalEdgeStyle(reference, {
       lod: 'far-local',
-      relatedToHover: false,
-      hoverActive: true,
+      hoverProgress: 0,
     });
     expect(related).toMatchObject({
       hidden: false,
@@ -98,8 +95,7 @@ describe('Focus reference visibility', () => {
     const hierarchy = { ...reference, edgeKind: 'hierarchy' } as const;
     const styled = resolveLocalEdgeStyle(hierarchy, {
       lod: 'far-local',
-      relatedToHover: true,
-      hoverActive: true,
+      hoverProgress: 1,
     });
     expect(styled).toMatchObject({
       hidden: false,

@@ -1,8 +1,10 @@
 # GRAPHVIS-OBSIDIAN1 implementation report
 
-Status: **implemented and validated; ready for native user QA.** The integration
-[PR #110](https://github.com/lillo24/obsidian-upgrade-graph-explorer/pull/110)
-is intentionally unmerged until the requested subjective appearance review.
+Status: **GRAPHVIS-OBSIDIAN1 merged; GRAPHVIS2 native visual QA approved.** The
+original integration landed in
+[PR #110](https://github.com/lillo24/obsidian-upgrade-graph-explorer/pull/110),
+and the GRAPHVIS2 refinement is tracked in
+[PR #113](https://github.com/lillo24/obsidian-upgrade-graph-explorer/pull/113).
 
 ## Obsidian evidence
 
@@ -38,9 +40,11 @@ its default scale 1–2 fade maps to a rendered-size window of 1–`sqrt(2)`.
 - `network-label.ts` owns one All/Focus canvas drawer and placement policy. It
   centers qualifying labels below rendered nodes. Sigma 3.0.3 supplies the
   camera-scaled radius while reducer data retains the logical presentation
-  radius, so the renderer applies
-  `min((14 + logicalRadius / 4) * renderedRadius / logicalRadius,
-  renderedDiameter)` and scales the five-unit gap by the same ratio.
+  radius. GRAPHVIS2 keeps that scale relationship while applying the selected
+  middle presentation curve:
+  `min((14 + logicalRadius / 4) * renderScale * 0.9,
+  renderedDiameter * clamp(0.54 + logicalRadius * 0.015, 0.56, 0.69))`.
+  The 4.5-unit logical gap scales by the same `renderScale`.
 - The drawer measures the current-font width of
   `Creativity - Initiative - Curiosity.md`, binary-searches the longest Unicode
   code-point prefix that fits with `…`, and calls three-argument `fillText` at
@@ -54,11 +58,14 @@ its default scale 1–2 fade maps to a rendered-size window of 1–`sqrt(2)`.
 - Existing forced-label states—including selected, hovered, Focus root,
   arrangement members, and always-labelled small graphs—bypass zoom fading and
   stay fully opaque. Hover retains the same x/font/truncated text and moves y by
-  at most 3 screen pixels or 35% of rendered radius over a 120 ms cubic
+  at most 3.75 screen pixels or 55% of rendered radius over a 220 ms cubic
   ease-out. Reduced motion snaps to the hovered position.
 - `GlobalRendererSession` and `LocalRendererSession` install that same label and
   hover drawer. Existing label thresholds, semantic LOD, forced labels, and
   `hideLabelsOnMove: false` remain unchanged.
+- `network-hover.ts` owns one renderer-local transition progress shared by label
+  offset and edge presentation. Enter, leave, and direct A-to-B switches retain
+  their sampled progress; the frame loop sleeps when no transition is moving.
 - `network-theme.ts` owns the evidence-backed dark Graph tokens and shared system
   font. All and Focus canvases identify the `obsidian-dark` theme explicitly.
 - Node/edge reducers use the Obsidian base language while preserving Icarus
@@ -67,11 +74,32 @@ its default scale 1–2 fade maps to a rendered-size window of 1–`sqrt(2)`.
 - Outside Arrange Folders, unrelated nodes and edges retain their exact
   ordinary style during hover. Only directly incident edges brighten; neutral
   graph/hierarchy lines use `#8a5cf5`, while explicit semantic hex colors are
-  lightened 28% toward white and retain their hue. Incident width increases by
-  30%; the existing far-LOD direct-edge reveal remains intact.
+  lightened 28% toward white and retain their hue. GRAPHVIS2 interpolates from
+  each base color to that target and from ordinary width to 1.3× using the same
+  transition progress; the existing far-LOD direct-edge reveal remains intact.
 - Dark styling is confined to the Network graph surface, its empty/status states,
   viewport controls, and arrangement indicators. The application shell,
   sidebars, Inspector, and Hierarchy views are outside this change.
+
+## GRAPHVIS2 visual refinement
+
+The deterministic bakeoff compared three continuous font-to-diameter ceilings:
+conservative A (about 55% small / 63% root), middle B (about 59% small / 67%
+root), and larger C (about 63% small / 71% root). Production Focus and the
+309-node All harness selected B: A made small labels marginal, while C stayed
+too close to the text-heavy merged baseline. At representative logical radii,
+the selected curve yields about 59% for Blocks, 60% for diagnostics, 61% for
+Sections, 64% for ordinary Files, 67% for the Focus root, and 69% for a
+high-degree File. The Obsidian-derived term becomes the limiter for the largest
+possible hubs, so they receive a modest global reduction instead of an
+aggressive cap.
+
+Hover timing compared 2.5, 3.5, and 4.5 px ordinary-scale targets. The selected
+3.75 px maximum with a 55%-of-radius bound gives ordinary Files roughly 3.5 px
+of motion while keeping small nodes restrained. A single 220 ms cubic ease-out
+now drives label y, incident-edge color, and incident-edge width in both
+directions. No Obsidian-style opaque overlay was added, and Arrange Folders
+keeps its stronger existing edge-style ownership.
 
 ## Click and Move arbitration
 
@@ -86,6 +114,13 @@ activation with Sigma's default double-click zoom prevented. A real drag still
 captures the pointer, continues across overlays, releases once, and suppresses
 its trailing click.
 
+User QA exposed one remaining release-arbitration edge case: when the native
+pointer owner had already consumed the synthetic release click, the
+coordinator's fallback suppression flag could remain armed and consume the next
+intentional background click. That fallback now expires after the release turn.
+The immediate trailing click remains suppressed, while one later background
+click clears the drag-selected File in both All and Focus.
+
 ## Regression proof
 
 This change alters renderer constants, reducers, canvas drawers, and graph-local
@@ -95,9 +130,11 @@ continuous physics, spatial influence, camera, cache, or persistence input.
 Existing position/camera tests remained green. The Global renderer visual
 operation contract reported **0 projection, 0 topology, 0 layout, and 0
 coordinate writes**. Hover entry refreshes only the previous/current nodes and
-their incident edges; animation frames use Sigma 3.0.3's hover-canvas scheduler.
-A focused session regression proves Graphology x/y and camera state are
-unchanged. The Local renderer
+their incident edges. Every transition frame uses the same partial-refresh path
+for just those nodes and edges; unrelated reducer values remain byte-for-byte
+equivalent, and the frame loop stops after settlement. A focused session
+regression proves Graphology x/y and camera state are unchanged, including zero
+camera `setState` calls. The Local renderer
 benchmark's layout-toggle oracle reported **0 unintended global layouts**, and
 its coordinate-sensitive cases passed.
 
@@ -114,72 +151,61 @@ its coordinate-sensitive cases passed.
 ## Validation
 
 - `pnpm install --frozen-lockfile` passed.
-- Renderer-focused tests passed: **62 files / 489 tests**.
-- Web tests passed: **95 files / 726 tests**.
-- `pnpm benchmark:file-move` passed. Median reducer latency was 0.170 ms
-  without placement and 0.103 ms with placement; the large-placement index
-  conversion median was 4.460 ms, and 10,000 raw pointer samples were reduced
-  to three commands in 9.547 ms.
+- Renderer-focused tests passed: **62 files / 499 tests**.
+- Web tests passed: **96 files / 735 tests**.
 - `pnpm benchmark:global-renderer -- --profile small` passed; example mapping
-  median was 0.283 ms, graph build median was 0.107 ms, and visual label
-  threshold median was 0.038 ms. Its visual operation contract recorded zero
+  median was 0.208 ms, graph build median was 0.107 ms, and visual label
+  threshold median was 0.039 ms. Its visual operation contract recorded zero
   projection, topology mapping, graph reconciliation, layout, and coordinate
   writes, with exactly one Sigma visual refresh.
-- `pnpm benchmark:local-renderer -- --profile small` passed; its operation
-  oracle recorded zero local/global projection, layout, and workspace
-  transactions.
-- `pnpm check` passed formatting, lint, all workspace typechecks, **269 files /
-  2,244 tests**, and the production web build.
+- `pnpm benchmark:local-renderer -- --profile small` passed; projection median
+  was 0.419 ms, topology mapping median was 0.019 ms, and graph build median was
+  0.039 ms. Its operation oracle recorded zero local/global projection, layout,
+  and workspace transactions during the layout toggle.
+- `pnpm check` passed formatting, lint, all workspace typechecks, **272 files /
+  2,279 tests**, and the production web build.
 - `pnpm desktop:check` passed, including **16 Rust tests**.
 - `pnpm desktop:build` produced a fresh optimized Windows executable.
 - `git diff --check` passed.
 
-Production-browser visual QA exercised a persisted Focus Network and the built
-production `GlobalRendererSession` harness with 309 nodes and 1,200 edges. A
-single click selected without moving, a canonical double-click activated once
-without a drag, sub-threshold jitter did not move the node, and a deliberate
-drag entered `Settling...`, continued across the top controls, and released
-without activating the covered control. In All and Focus, the selected/hovered
-node and only its incident edges gained purple emphasis while unrelated neutral
-and semantic-colored edges kept their ordinary styling. At fitted, zoomed-in,
-and zoomed-out scales, label font size and gap followed the rendered node radius,
-the node-diameter cap held, and ordinary labels faded/cut off while forced labels
-remained readable. No graph rebuild, layout request, graph-coordinate mutation,
-or camera reframe was observed during the hover-only checks. Automated drawer
-tests additionally cover exact-reference and Unicode truncation using measured
-width, three-argument `fillText` calls with no `maxWidth` compression, fade
-composition, 120 ms cubic hover easing, reduced-motion snapping, and invariant
-text/position/font values across the hover frames.
+Production-browser visual QA exercised a persisted Focus Network (8 nodes / 7
+edges), the persisted All Network (11 nodes / 7 edges), and the built production
+`GlobalRendererSession` harness with 309 nodes and 1,200 edges. At fitted,
+zoomed-in, close, zoomed-out, and near-fade scales, label size and gap followed
+the rendered radius; the selected middle curve kept small labels restrained and
+larger labels readable while ordinary labels faded and forced labels stayed
+visible. In All and Focus, the selected/hovered node and only its incident edges
+gained emphasis with no dimming overlay; unrelated neutral and semantic-colored
+edges kept their ordinary styling. The harness recorded no graph rebuild while
+app and harness consoles remained free of warnings and errors.
+Post-QA browser smoke testing additionally dragged `Source.md`, confirmed its
+selected ring, and cleared that selection with one background click.
 
-The available computer-use surface was browser-only, so the optimized native
-window could not be inspected programmatically. Native desktop appearance is
-therefore the explicit remaining user-acceptance item, not a claimed automated
-pass.
+Automated tests cover transition endpoints and midpoints, enter/leave, direct
+A-to-B switches, semantic-color interpolation, width growth, the 220 ms cubic
+ease, reduced-motion snapping, and loop settlement. Integration assertions
+prove partial refreshes contain only the active nodes and their incident edges;
+unrelated reducer values, Graphology x/y, and camera state remain unchanged.
+Drawer tests retain exact-reference and Unicode truncation using measured width,
+three-argument `fillText` calls with no `maxWidth` compression, fade composition,
+and invariant x/font/text values across hover frames.
+
+The user approved the native label and hover appearance. The post-QA background
+deselection correction was then verified through the production browser path
+and the same All/Focus session handlers used by the desktop build.
 
 ## Native handoff
 
 Fresh executable:
 
 ```text
-C:\Users\leona\Documents\GitHub\icarus-graph-explorer-graphvis-obsidian1\apps\desktop\src-tauri\target\release\icarus-graph-explorer-desktop.exe
+C:\Users\leona\Documents\GitHub\icarus-graph-explorer-graphvis2\apps\desktop\src-tauri\target\release\icarus-graph-explorer-desktop.exe
 ```
 
-Size: **13,547,008 bytes**
+Size: **13,552,640 bytes**
 
-SHA-256: `704E42D4C6F2800A1F90C4F880D637621599C8854ACD7072E275A4F97F70B092`
+SHA-256: `DD56225F0EAB8444DB6DDAD8CAE9975E059CAB3A7EB5E3B88C7F176AF5B014F8`
 
-Side-by-side acceptance checklist:
-
-1. Single-click and rapid double-click a movable File; confirm selection and one
-   activation with no movement or grabbing cursor.
-2. Add tiny pointer jitter below 3 px, then deliberately cross the threshold;
-   confirm `pointer` changes to `grabbing` only for the real drag and overlay
-   crossing/release remain smooth.
-3. At far, normal, and close zoom, confirm label font and gap scale with nodes,
-   the 1B fade remains smooth, and text never exceeds node diameter.
-4. Compare `Creativity - Initiative - Curiosity.md` with
-   `Hippocampus as a reward predictor + Cerebellum.md`; confirm the latter uses
-   a clean ellipsis with no horizontal squeezing.
-5. Hover nodes in All and Focus; confirm only direct lines brighten, unrelated
-   content does not darken, and the label eases down only slightly.
-6. Repeat with reduced motion and confirm the label snaps without interpolation.
+Native acceptance result: the user approved the small/large label balance and
+the coordinated connector-plus-label hover transition. This refreshed binary
+also contains the one-background-click deselection correction.

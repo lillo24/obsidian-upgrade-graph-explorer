@@ -3,20 +3,58 @@ import type {
   NodeLabelDrawingFunction,
 } from 'sigma/rendering';
 
+import {
+  NetworkHoverTransitionController,
+  resolveNetworkHoverLabelOffset,
+} from './network-hover';
 import { OBSIDIAN_DARK_NETWORK_THEME } from './network-theme';
 
 const OBSIDIAN_BASE_FONT_PX = 14;
 const OBSIDIAN_FONT_RADIUS_FACTOR = 0.25;
-const OBSIDIAN_NODE_LABEL_GAP_PX = 5;
+const OBSIDIAN_NODE_LABEL_GAP_PX = 4.5;
 const VIEWPORT_PADDING_PX = 4;
 const HOVER_RING_GAP_PX = 2;
-const NETWORK_LABEL_HOVER_MAX_OFFSET_PX = 3;
-const NETWORK_LABEL_HOVER_RADIUS_FACTOR = 0.35;
 const NETWORK_LABEL_ELLIPSIS = '…';
 
 export const NETWORK_LABEL_REFERENCE_TEXT =
   'Creativity - Initiative - Curiosity.md';
-export const NETWORK_LABEL_HOVER_DURATION_MS = 120;
+
+export type NetworkLabelSizeCandidate = 'conservative' | 'middle' | 'larger';
+
+export const SELECTED_NETWORK_LABEL_SIZE_CANDIDATE = 'middle' as const;
+
+const NETWORK_LABEL_SIZE_CANDIDATES = {
+  conservative: {
+    fontScale: 0.88,
+    minimumDiameterRatio: 0.52,
+    ratioBase: 0.5,
+    ratioPerRadius: 0.015,
+    maximumDiameterRatio: 0.64,
+  },
+  middle: {
+    fontScale: 0.9,
+    minimumDiameterRatio: 0.56,
+    ratioBase: 0.54,
+    ratioPerRadius: 0.015,
+    maximumDiameterRatio: 0.69,
+  },
+  larger: {
+    fontScale: 0.92,
+    minimumDiameterRatio: 0.6,
+    ratioBase: 0.58,
+    ratioPerRadius: 0.015,
+    maximumDiameterRatio: 0.74,
+  },
+} as const satisfies Record<
+  NetworkLabelSizeCandidate,
+  {
+    readonly fontScale: number;
+    readonly minimumDiameterRatio: number;
+    readonly ratioBase: number;
+    readonly ratioPerRadius: number;
+    readonly maximumDiameterRatio: number;
+  }
+>;
 
 /**
  * Obsidian fades text from renderer scale 1 to 2 while its rendered node radius
@@ -61,6 +99,7 @@ export function resolveNetworkLabelOpacity({
 export interface NetworkLabelScaleInput {
   readonly renderedNodeSize: number;
   readonly logicalNodeSize: number;
+  readonly sizeCandidate?: NetworkLabelSizeCandidate;
 }
 
 export interface NetworkLabelScale {
@@ -69,14 +108,29 @@ export interface NetworkLabelScale {
   readonly renderScale: number;
 }
 
+export function resolveNetworkLabelDiameterRatio(
+  logicalNodeSize: number,
+  sizeCandidate: NetworkLabelSizeCandidate = SELECTED_NETWORK_LABEL_SIZE_CANDIDATE,
+): number {
+  const safeLogicalRadius = Math.max(0, logicalNodeSize);
+  const candidate = NETWORK_LABEL_SIZE_CANDIDATES[sizeCandidate];
+  return clamp(
+    candidate.ratioBase + safeLogicalRadius * candidate.ratioPerRadius,
+    candidate.minimumDiameterRatio,
+    candidate.maximumDiameterRatio,
+  );
+}
+
 /**
  * Sigma 3.0.3 passes a camera-scaled radius to label drawers while retaining
- * reducer data on the draw payload. Scaling Obsidian's logical font and gap by
- * rendered/logical radius keeps label and node proportions coherent.
+ * reducer data on the draw payload. The selected Icarus presentation curve
+ * keeps Obsidian's logical font basis while applying a continuous,
+ * size-sensitive ceiling below the rendered node diameter.
  */
 export function resolveNetworkLabelScale({
   renderedNodeSize,
   logicalNodeSize,
+  sizeCandidate = SELECTED_NETWORK_LABEL_SIZE_CANDIDATE,
 }: NetworkLabelScaleInput): NetworkLabelScale {
   const safeRenderedRadius = Math.max(0, renderedNodeSize);
   const safeLogicalRadius =
@@ -85,51 +139,22 @@ export function resolveNetworkLabelScale({
       : safeRenderedRadius;
   const renderScale =
     safeLogicalRadius > 0 ? safeRenderedRadius / safeLogicalRadius : 0;
+  const candidate = NETWORK_LABEL_SIZE_CANDIDATES[sizeCandidate];
+  const diameterRatio = resolveNetworkLabelDiameterRatio(
+    safeLogicalRadius,
+    sizeCandidate,
+  );
   return {
     fontSize: Math.min(
       (OBSIDIAN_BASE_FONT_PX +
         safeLogicalRadius * OBSIDIAN_FONT_RADIUS_FACTOR) *
-        renderScale,
-      safeRenderedRadius * 2,
+        renderScale *
+        candidate.fontScale,
+      safeRenderedRadius * 2 * diameterRatio,
     ),
     gap: OBSIDIAN_NODE_LABEL_GAP_PX * renderScale,
     renderScale,
   };
-}
-
-export interface NetworkLabelHoverProgressInput {
-  readonly elapsedMs: number;
-  readonly durationMs?: number;
-  readonly from: number;
-  readonly reducedMotion?: boolean;
-  readonly to: number;
-}
-
-/** Short cubic ease-out used for the Icarus adaptation of Obsidian's smoothing. */
-export function resolveNetworkLabelHoverProgress({
-  elapsedMs,
-  durationMs = NETWORK_LABEL_HOVER_DURATION_MS,
-  from,
-  reducedMotion = false,
-  to,
-}: NetworkLabelHoverProgressInput): number {
-  if (reducedMotion || durationMs <= 0) return clamp(to, 0, 1);
-  const time = clamp(elapsedMs / durationMs, 0, 1);
-  const eased = 1 - (1 - time) ** 3;
-  return clamp(from + (to - from) * eased, 0, 1);
-}
-
-export function resolveNetworkLabelHoverOffset(
-  renderedNodeSize: number,
-  progress: number,
-): number {
-  const radius = Math.max(0, renderedNodeSize);
-  return (
-    Math.min(
-      NETWORK_LABEL_HOVER_MAX_OFFSET_PX,
-      radius * NETWORK_LABEL_HOVER_RADIUS_FACTOR,
-    ) * clamp(progress, 0, 1)
-  );
 }
 
 export interface NetworkLabelPlacementInput {
@@ -201,7 +226,7 @@ export function placeNetworkLabel({
       nodeY +
       safeRadius +
       scale.gap +
-      resolveNetworkLabelHoverOffset(safeRadius, hoverProgress),
+      resolveNetworkHoverLabelOffset(safeRadius, hoverProgress),
   };
 }
 
@@ -357,162 +382,6 @@ export function drawNetworkNodeHover(
   drawNetworkNodeHoverPresentation(context, data, settings, 0, true);
 }
 
-type HoverTransition = {
-  readonly from: number;
-  readonly startedAt: number;
-  readonly to: number;
-};
-
-export interface NetworkLabelHoverControllerOptions {
-  readonly cancelFrame?: (handle: number) => void;
-  readonly durationMs?: number;
-  readonly now?: () => number;
-  readonly onFrame: () => void;
-  readonly onSettled: (nodeKeys: readonly string[]) => void;
-  readonly reducedMotion?: () => boolean;
-  readonly requestFrame?: (callback: () => void) => number;
-}
-
-/** Renderer-local transient hover state; it never touches graph coordinates. */
-export class NetworkLabelHoverController {
-  private readonly transitions = new Map<string, HoverTransition>();
-  private readonly durationMs: number;
-  private readonly now: () => number;
-  private readonly requestFrame: (callback: () => void) => number;
-  private readonly cancelFrame: (handle: number) => void;
-  private frameHandle: number | undefined;
-
-  constructor(private readonly options: NetworkLabelHoverControllerOptions) {
-    this.durationMs = options.durationMs ?? NETWORK_LABEL_HOVER_DURATION_MS;
-    this.now = options.now ?? (() => performance.now());
-    this.requestFrame =
-      options.requestFrame ??
-      ((callback) =>
-        typeof requestAnimationFrame === 'function'
-          ? requestAnimationFrame(callback)
-          : window.setTimeout(callback, 16));
-    this.cancelFrame =
-      options.cancelFrame ??
-      ((handle) => {
-        if (typeof cancelAnimationFrame === 'function') {
-          cancelAnimationFrame(handle);
-        } else {
-          window.clearTimeout(handle);
-        }
-      });
-  }
-
-  setHovered(
-    previousNodeKey: string | undefined,
-    nextNodeKey: string | undefined,
-  ): readonly string[] {
-    if (previousNodeKey === nextNodeKey) return [];
-    const now = this.now();
-    const reducedMotion = this.options.reducedMotion?.() === true;
-    const affected = new Set<string>();
-    if (previousNodeKey !== undefined) {
-      affected.add(previousNodeKey);
-      this.start(previousNodeKey, 0, now, reducedMotion);
-    }
-    if (nextNodeKey !== undefined) {
-      affected.add(nextNodeKey);
-      this.start(nextNodeKey, 1, now, reducedMotion);
-    }
-    this.ensureFrame();
-    return [...affected];
-  }
-
-  progress(nodeKey: string): number {
-    const transition = this.transitions.get(nodeKey);
-    if (transition === undefined) return 0;
-    return this.sample(transition, this.now());
-  }
-
-  ownsLabelLayer(nodeKey: string): boolean {
-    return this.transitions.has(nodeKey);
-  }
-
-  isHovered(nodeKey: string): boolean {
-    return this.transitions.get(nodeKey)?.to === 1;
-  }
-
-  hasOverlay(nodeKey: string): boolean {
-    return this.transitions.has(nodeKey);
-  }
-
-  dispose(): void {
-    if (this.frameHandle !== undefined) this.cancelFrame(this.frameHandle);
-    this.frameHandle = undefined;
-    this.transitions.clear();
-  }
-
-  private start(
-    nodeKey: string,
-    to: number,
-    now: number,
-    reducedMotion: boolean,
-  ): void {
-    const existing = this.transitions.get(nodeKey);
-    const from = existing === undefined ? 0 : this.sample(existing, now);
-    if (reducedMotion) {
-      if (to === 0) this.transitions.delete(nodeKey);
-      else this.transitions.set(nodeKey, { from: 1, startedAt: now, to: 1 });
-      return;
-    }
-    if (from === to) {
-      if (to === 0) this.transitions.delete(nodeKey);
-      else this.transitions.set(nodeKey, { from: to, startedAt: now, to });
-      return;
-    }
-    this.transitions.set(nodeKey, { from, startedAt: now, to });
-  }
-
-  private sample(transition: HoverTransition, now: number): number {
-    return resolveNetworkLabelHoverProgress({
-      elapsedMs: now - transition.startedAt,
-      durationMs: this.durationMs,
-      from: transition.from,
-      to: transition.to,
-    });
-  }
-
-  private ensureFrame(): void {
-    if (this.frameHandle !== undefined || !this.hasAnimatingTransition())
-      return;
-    this.frameHandle = this.requestFrame(this.tick);
-  }
-
-  private hasAnimatingTransition(): boolean {
-    for (const transition of this.transitions.values()) {
-      if (transition.from !== transition.to) return true;
-    }
-    return false;
-  }
-
-  private readonly tick = (): void => {
-    this.frameHandle = undefined;
-    const now = this.now();
-    const settled: string[] = [];
-    let renderHoverFrame = false;
-    for (const [nodeKey, transition] of this.transitions) {
-      if (now - transition.startedAt < this.durationMs) {
-        renderHoverFrame = true;
-        continue;
-      }
-      if (transition.to === 0) {
-        this.transitions.delete(nodeKey);
-        settled.push(nodeKey);
-      } else {
-        this.transitions.set(nodeKey, { from: 1, startedAt: now, to: 1 });
-        renderHoverFrame = true;
-      }
-    }
-    if (renderHoverFrame) this.options.onFrame();
-    if (settled.length > 0) this.options.onSettled(settled);
-    this.ensureFrame();
-  };
-}
-
 // Mirrors graphology-types' Attributes constraint without adding a new direct
 // package dependency solely for this renderer-generic factory.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -523,7 +392,7 @@ export function createNetworkLabelDrawers<
   E extends GraphAttributes,
   G extends GraphAttributes = GraphAttributes,
 >(
-  hover: NetworkLabelHoverController,
+  hover: NetworkHoverTransitionController,
 ): {
   readonly drawLabel: NodeLabelDrawingFunction<N, E, G>;
   readonly drawHover: NodeHoverDrawingFunction<N, E, G>;
@@ -548,25 +417,4 @@ export function createNetworkLabelDrawers<
       );
     },
   };
-}
-
-export interface NetworkLabelHoverRenderer {
-  readonly scheduleRender: () => unknown;
-}
-
-/**
- * Sigma 3.0.3 owns a hover-canvas-only scheduler but declares it private.
- * Prefer that verified runtime seam; retain a full-render fallback for a future
- * Sigma version so hover motion remains correct rather than failing silently.
- */
-export function scheduleNetworkLabelHoverFrame(
-  renderer: NetworkLabelHoverRenderer,
-): void {
-  const highlightedOnly = (
-    renderer as NetworkLabelHoverRenderer & {
-      readonly scheduleHighlightedNodesRender?: () => void;
-    }
-  ).scheduleHighlightedNodesRender;
-  if (typeof highlightedOnly === 'function') highlightedOnly.call(renderer);
-  else renderer.scheduleRender();
 }
