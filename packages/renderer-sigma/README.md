@@ -51,7 +51,8 @@ src/
   layout-cache.ts          Four-entry memory-only LRU of automatic derived positions.
   lifecycle.ts             WebGL construction result and idempotent session lease.
   style.ts                 Far/Regional/Near LOD and GROUP1A base-accent layer.
-  network-label.ts         Shared All/Focus below-node label and hover drawing after adaptive culling.
+  network-label.ts         Shared All/Focus label sizing, truncation, placement, and canvas drawing.
+  network-hover.ts         Shared renderer-local label/incident-edge hover transition progress.
   network-theme.ts         Evidence-backed Obsidian dark graph palette and shared font tokens.
   raw-viewport-frame.ts    Raw graph-space center/scale diagnostics and bounded repair primitive.
   network-camera-intent.ts One-shot initial framing versus camera-neutral position-adoption policy.
@@ -112,20 +113,25 @@ All and Focus share one renderer-only Network presentation policy. Qualifying
 labels are centered below their rendered nodes using the Obsidian 1.11.5
 `14 + radius / 4` formula. Sigma 3.0.3 supplies the camera-scaled rendered
 radius, while the reducer carries the final logical presentation radius; their
-ratio scales both font and five-unit gap, with font still capped to the rendered
-diameter because Icarus supports smaller nodes than Obsidian. Labels wider than
-the current-font width of `Creativity - Initiative - Curiosity.md` (or the
-remaining viewport) are ellipsized and drawn at natural glyph width. The
-Network surfaces and Sigma defaults use the resolved Obsidian default-dark
-graph palette. Ordinary labels adapt
+ratio scales both font and the 4.5-unit gap. The Obsidian-derived font receives
+a 0.9 presentation factor and a continuous logical-radius ceiling that rises
+from 56% to at most 69% of rendered diameter, keeping small labels more
+subordinate while retaining readable large labels. Labels wider than the
+current-font width of `Creativity - Initiative - Curiosity.md` (or the remaining
+viewport) are ellipsized and drawn at natural glyph width. The Network surfaces
+and Sigma defaults use the resolved Obsidian default-dark graph palette.
+Ordinary labels adapt
 Obsidian's zoom fade to Sigma's rendered-radius threshold: opacity rises from 0
 at the current hard-cull boundary to 1 at `sqrt(2)` times that boundary, while
 forced labels remain fully opaque. Semantic diagnostics, hierarchy/reference
 distinctions, and explicit Visual Group accents remain Icarus-owned layers.
 Hover keeps unrelated nodes and edges at their ordinary styles, brightens only
 direct incident edges, and moves only the hovered/just-left label downward by a
-bounded 3 px over a 120 ms renderer-local ease-out. Reduced-motion mode snaps;
-hover frames use Sigma's highlight canvas and never mutate graph/camera state.
+radius-bounded 3.75 px. One 220 ms cubic ease-out progress drives label offset,
+incident-edge color interpolation, and the width multiplier from 1 to 1.3 on
+enter, leave, and direct node switches. Animation frames refresh only the
+transition nodes and their incident edges; reduced-motion mode snaps and no
+hover path mutates graph/camera state.
 These presentation values do not enter layout requests, fingerprints, position
 caches, camera policy, or persistence. The source audit is recorded in
 `docs/OBSIDIAN_GRAPH_VISUAL_REFERENCE.md`.

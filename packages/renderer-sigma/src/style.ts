@@ -6,10 +6,11 @@ import type {
 } from './types';
 import type { VisualGroupNodePresentation } from '@icarus-graph-explorer/visual-groups';
 import type { FolderScopeVisualizationState } from '@icarus-graph-explorer/spatial-overrides';
+import { resolveNetworkHoverEdgeWidthMultiplier } from './network-hover';
 import { applyNetworkNodeSizeScale } from './node-size';
 import {
+  interpolateNetworkEdgeColor,
   OBSIDIAN_DARK_NETWORK_THEME,
-  resolveIncidentEdgeColor,
 } from './network-theme';
 
 export const GLOBAL_ALWAYS_LABELED_NODE_LIMIT = 12;
@@ -47,8 +48,7 @@ export interface GlobalNodeStyleContext {
 export interface GlobalEdgeStyleContext {
   readonly arrangementRelation?:
     'internal' | 'boundary' | 'child-owned' | 'unrelated';
-  readonly relatedToHover: boolean;
-  readonly hoverActive: boolean;
+  readonly hoverProgress: number;
   readonly lod: GlobalVisualLod;
   /** Current automatic display width; layout edge weight remains independent. */
   readonly automaticSize?: number;
@@ -126,6 +126,7 @@ export function resolveGlobalEdgeStyle(
   const arrangementRelation = context.arrangementRelation;
   const arrangementActive = arrangementRelation !== undefined;
   const weakFarEdge = context.lod === 'far' && attributes.referenceCount === 1;
+  const hoverProgress = arrangementActive ? 0 : context.hoverProgress;
   return {
     ...attributes,
     color: arrangementActive
@@ -136,13 +137,8 @@ export function resolveGlobalEdgeStyle(
           : arrangementRelation === 'child-owned'
             ? OBSIDIAN_DARK_NETWORK_THEME.scopeShadowed
             : OBSIDIAN_DARK_NETWORK_THEME.dimmedEdge
-      : context.hoverActive && context.relatedToHover
-        ? resolveIncidentEdgeColor(attributes.color)
-        : attributes.color,
-    hidden:
-      !arrangementActive &&
-      weakFarEdge &&
-      !(context.hoverActive && context.relatedToHover),
+      : interpolateNetworkEdgeColor(attributes.color, hoverProgress),
+    hidden: !arrangementActive && weakFarEdge && hoverProgress <= 0,
     size:
       (context.automaticSize ?? attributes.size) *
       (arrangementActive
@@ -157,12 +153,12 @@ export function resolveGlobalEdgeStyle(
             ? 0.55
             : context.lod === 'regional'
               ? 0.78
-              : 1) * (context.hoverActive && context.relatedToHover ? 1.3 : 1)),
+              : 1) * resolveNetworkHoverEdgeWidthMultiplier(hoverProgress)),
     zIndex:
       arrangementRelation === 'internal' ||
       arrangementRelation === 'boundary' ||
       arrangementRelation === 'child-owned' ||
-      (context.hoverActive && context.relatedToHover)
+      hoverProgress > 0
         ? 1
         : 0,
   };
