@@ -55,8 +55,8 @@ roles.
 Hard-coded production colors remain only where color itself is canonical data:
 the Document/Section/Block badges. The development-only PHYSICS1 Lab retains a
 fixed diagnostic node/edge palette. User-selected Visual Group accents,
-semantic renderer data colors, Network palettes, and Hierarchy renderer
-internals remain outside the DOM-token layer.
+semantic renderer data colors, and renderer palette definitions remain outside
+the DOM-token layer.
 
 ## Renderer boundary
 
@@ -77,6 +77,38 @@ spatial influence, caches, and persistence remain untouched. One Sigma refresh
 reruns the color reducers with indexation skipped. Label sizing, opacity,
 truncation, and hover-motion functions are shared unchanged between palettes.
 
+All Hierarchy and Focus Hierarchy map the same resolved ID through
+`hierarchyThemeFor(theme)`. `hierarchy-theme.ts` owns the renderer-specific
+canvas, File/Heading/Block/diagnostic card, edge, folder-guide, module, control,
+context, status, selection, and focus roles. `GraphCanvas` applies the matching
+CSS custom-property map to its existing root and forwards the ID to React Flow's
+public `colorMode` seam. The stylesheet consumes only those roles; it has no
+hard-coded palette or OS-theme query.
+
+A Hierarchy theme change is also presentation-only. `theme` is absent from
+projection mapping, prepared-graph identity, Dagre input, Local Structured
+fingerprints/cache keys, coordinates, transition anchors, viewport state,
+selection, navigation, and persistence. A mounted switch updates the existing
+canvas element and CSS variables without a layout request or viewport reset.
+
+## Enforcement and literal-color audit
+
+`production-theme-audit.test.ts` scans production sources under `apps/web/src`,
+`packages/renderer-sigma/src`, and `packages/renderer-reactflow/src`. New color
+literals must live in one of the declared app/renderer theme boundaries or be
+added as a reviewed exact exception. It also enforces that only the app runtime
+owns `prefers-color-scheme` and only `tokens.css` owns the root theme selector.
+
+The current non-boundary exceptions are six canonical entity-kind badge colors
+in `App.css` and fifteen colors in the isolated PHYSICS1 development lab in
+`index.css`. Visual Group palette values are persisted data accents. Renderer
+theme files are semantic palette definitions. Tests and fixtures are excluded;
+there are no remaining unclassified production surface/text literals, fixed
+brand colors, or third-party defaults copied into product source.
+
+New application UI uses app semantic tokens. New renderer visuals extend their
+renderer adapter instead of importing app CSS or resolving System locally.
+
 ## Migration sequence
 
 1. THEMESYS1 establishes ownership, persistence, startup behavior, semantic
@@ -85,5 +117,5 @@ truncation, and hover-motion functions are shared unchanged between palettes.
    explicit resolved theme.
 3. THEMESYS3 moves ordinary application chrome, shared controls, workspace
    surfaces, Arguments, and AI Review onto semantic tokens.
-4. THEMESYS4 migrates the separate Hierarchy renderer palette; final
-   cross-platform QA closes any remaining renderer-specific boundaries.
+4. THEMESYS4 migrates the Hierarchy renderer palette and adds the final
+   cross-app audit guard. The sequence is complete.

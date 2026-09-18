@@ -9,10 +9,11 @@ navigation, anchored disclosure, and accessible canvas controls. It does not ins
 references, roll endpoints, aggregate links, apply focus/filter policy, read
 reports, access files, or persist view state.
 
-THEMESYS1 adds an explicit app-resolved `light | dark` prop. React Flow receives
-that ID through its public color-mode seam; this package does not read browser
-storage, media queries, root attributes, or computed styles as theme authority.
-Full structural-surface palette migration remains a later theme phase.
+The explicit app-resolved `light | dark` prop is the only theme input. React
+Flow receives that ID through its public color-mode seam, while
+`hierarchyThemeFor()` resolves the package's renderer-specific semantic palette
+and CSS-variable map. This package does not read browser storage, media queries,
+root attributes, or computed styles as theme authority.
 
 ```text
 ViewProjection + renderer interaction state
@@ -34,6 +35,7 @@ src/
   local-structured-layout.ts  Exact fingerprint/cache, immediate seed, and root normalization.
   local-structured.ts    DOM-free Local Structured benchmark/test exports.
   visual-group-presentation.tsx  EntityId style context and zero-work operation contract.
+  hierarchy-theme.ts      Light/Dark Hierarchy semantic palettes and CSS-variable adapter.
   highlight.ts           Exact and modular aggregate hover emphasis.
   hover-context.tsx      Nested direct-File ring hover override.
   focus-interaction.ts   Graph-scoped Enter-to-Focus activation policy.
@@ -82,6 +84,21 @@ edge, and every Classic hover remain exact. A direct-File ring appears only for
 a structured modular File with a displayed reference directly incident to the
 File node. Its pointer/keyboard override is transient and renderer-local; the
 ring changes neither measured card dimensions nor selection/Inspector state.
+
+## Hierarchy theme contract
+
+The adapter owns canvas/grid, File/Heading/Block/diagnostic cards, text, borders,
+selection/highlight, reference/hierarchy/secondary edges, folder guides,
+root/focus states, viewport controls, context/status surfaces, modules, bridges,
+and focus outlines. Visual Group accents remain user/data colors layered over
+the card grammar and are not replaced by theme values.
+
+Changing `theme` updates semantic CSS variables and React Flow color mode on the
+same mounted canvas. It is intentionally absent from mapping options, prepared
+graphs, Dagre requests, Local Structured fingerprints and caches, coordinates,
+viewport/navigation state, and persistence. `hierarchy-seed-adoption.test.tsx`
+proves a live switch keeps the same root element, worker-request count,
+coordinates, viewport transform, and selection callbacks.
 
 ## Contract and layout
 

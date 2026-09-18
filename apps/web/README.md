@@ -218,7 +218,9 @@ without remounting or changing view state.
 The literal-color audit deliberately permits only canonical entity-kind data
 badges in `App.css` and the development-only PHYSICS1 Lab visualization in
 `index.css`. User Visual Group accents and renderer-owned semantic palettes are
-separate data/presentation contracts, not application chrome tokens.
+separate data/presentation contracts, not application chrome tokens. The
+production theme audit test scans the app plus both renderer source trees so a
+new surface/text literal or feature-level OS theme owner fails validation.
 
 The normal product shell is the graph workspace: it reaches all viewport edges
 without a permanent app header, centered page wrapper, or outer card framing.
