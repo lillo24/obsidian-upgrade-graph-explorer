@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   attachAnsweringAxiom,
+  createArgument,
   createAxiom,
   createCounterArgument,
   createEmptyArgumentLibrary,
   createKnowledgeReaderFromLibrary,
   createTopic,
+  editAxiom,
   type ArgumentRuntime,
 } from '@icarus-graph-explorer/argument-workspace';
 
@@ -94,6 +96,80 @@ describe('argument-library context formatting', () => {
     expect(JSON.parse(formatted.structured)).toMatchObject({
       completeness: { status: 'complete', theorySources: 'not-read' },
       receipt: { completeness: 'complete' },
+    });
+  });
+
+  it('formats inherited dependency paths for compiler-readable context', () => {
+    let serial = 0;
+    const runtime: ArgumentRuntime = {
+      createId: (kind) => `${kind}-${++serial}`,
+      now: () => `2026-01-02T00:00:${String(serial++).padStart(2, '0')}.000Z`,
+    };
+    let library = createEmptyArgumentLibrary(runtime, 'context-stale');
+    library = createAxiom(
+      library,
+      { id: 'AX-ROOT', title: 'Root', statement: 'Root support.' },
+      runtime,
+    );
+    library = createArgument(
+      library,
+      {
+        id: 'A1',
+        title: 'First',
+        premises: [
+          {
+            id: 'A1-P1',
+            kind: 'axiom',
+            axiomId: 'AX-ROOT',
+            reliedOnRevision: 1,
+          },
+        ],
+        conclusion: 'First conclusion.',
+      },
+      runtime,
+    );
+    library = createArgument(
+      library,
+      {
+        id: 'A2',
+        title: 'Second',
+        premises: [
+          {
+            id: 'A2-P1',
+            kind: 'argument-conclusion',
+            argumentId: 'A1',
+            reliedOnRevision: 1,
+          },
+        ],
+        conclusion: 'Second conclusion.',
+      },
+      runtime,
+    );
+    library = editAxiom(
+      library,
+      'AX-ROOT',
+      { statement: 'Revised root support.' },
+      runtime,
+    );
+    const result = createKnowledgeReaderFromLibrary(library).readArgumentBundle(
+      { id: 'A2', kind: 'argument' },
+    );
+    if (result.status !== 'ok') throw new Error('Stale bundle failed.');
+
+    const formatted = formatArgumentBundle(result.value);
+    expect(formatted.text).toContain(
+      'A2-P1: direct=no; inherited=yes; inherited [A2.A2-P1 -> A1.conclusion; A1.A1-P1 -> AX-ROOT] root: axiom AX-ROOT revision 1 -> 2',
+    );
+    expect(JSON.parse(formatted.structured)).toMatchObject({
+      arguments: expect.arrayContaining([
+        expect.objectContaining({
+          id: 'A2',
+          stalePremiseIds: ['A2-P1'],
+          premiseStaleness: [
+            expect.objectContaining({ direct: false, inherited: true }),
+          ],
+        }),
+      ]),
     });
   });
 });

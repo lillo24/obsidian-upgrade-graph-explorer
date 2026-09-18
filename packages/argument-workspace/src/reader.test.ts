@@ -352,6 +352,101 @@ describe('snapshot-bound knowledge reader', () => {
     });
   });
 
+  it('reports transitive premise staleness and its root path in bundles', () => {
+    const runtime = deterministicRuntime('transitive-bundle');
+    let library = createNeutralArgumentLibrary();
+    library = createArgument(
+      library,
+      {
+        id: 'AR-SECOND',
+        title: 'Second inference',
+        premises: [
+          {
+            id: 'P-SECOND',
+            kind: 'argument-conclusion',
+            argumentId: 'AR-NEUTRAL',
+            reliedOnRevision: 1,
+          },
+        ],
+        conclusion: 'A second conclusion.',
+      },
+      runtime,
+    );
+    library = createArgument(
+      library,
+      {
+        id: 'AR-THIRD',
+        title: 'Third inference',
+        premises: [
+          {
+            id: 'P-THIRD',
+            kind: 'argument-conclusion',
+            argumentId: 'AR-SECOND',
+            reliedOnRevision: 1,
+          },
+        ],
+        conclusion: 'A third conclusion.',
+      },
+      runtime,
+    );
+    library = editAxiom(
+      library,
+      'AX-NEUTRAL',
+      { statement: 'The root Axiom was revised.' },
+      runtime,
+    );
+
+    const result = createKnowledgeReader(
+      captureArgumentLibrarySnapshot(library),
+    ).readArgumentBundle({ kind: 'argument', id: 'AR-THIRD' });
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    const third = result.value.arguments.find(({ id }) => id === 'AR-THIRD')!;
+    expect(third).toMatchObject({
+      argumentStale: true,
+      stalePremiseIds: ['P-THIRD'],
+      staleRelationIds: [],
+      premiseStaleness: [
+        {
+          premiseId: 'P-THIRD',
+          stale: true,
+          direct: false,
+          inherited: true,
+          causes: [
+            {
+              kind: 'inherited',
+              root: {
+                kind: 'revision-mismatch',
+                recordKind: 'axiom',
+                recordId: 'AX-NEUTRAL',
+                reliedOnRevision: 1,
+                currentRevision: 2,
+              },
+              path: [
+                expect.objectContaining({
+                  argumentId: 'AR-THIRD',
+                  premiseId: 'P-THIRD',
+                }),
+                expect.objectContaining({
+                  argumentId: 'AR-SECOND',
+                  premiseId: 'P-SECOND',
+                }),
+                expect.objectContaining({
+                  argumentId: 'AR-NEUTRAL',
+                  premiseId: 'P-NEUTRAL-AXIOM',
+                  axiomId: 'AX-NEUTRAL',
+                }),
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(result.value.completeness.warnings).toContain(
+      'AR-THIRD inherits stale inference support: P-THIRD.',
+    );
+  });
+
   it('keeps target traversal cycle-safe and reports depth/record limits explicitly', () => {
     const runtime = deterministicRuntime('cycle');
     let library = createNeutralArgumentLibrary();
@@ -473,7 +568,7 @@ describe('snapshot-bound knowledge reader', () => {
     if (result.status !== 'ok') return;
     expect(() => JSON.stringify(result.value.receipt)).not.toThrow();
     expect(result.value.receipt).toMatchObject({
-      contractVersion: 3,
+      contractVersion: 4,
       operation: 'read-argument-bundle',
       snapshot: reader.snapshot,
       returnedRecords: expect.arrayContaining([

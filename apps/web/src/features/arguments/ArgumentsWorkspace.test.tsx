@@ -19,6 +19,7 @@ import {
   createCounterArgument,
   createEmptyArgumentLibrary,
   createTopic,
+  editAxiom,
   promoteArgumentToCurrent,
   sameSnapshot,
   setTopicMembership,
@@ -387,6 +388,35 @@ describe('standalone Arguments workspace', () => {
     expect(
       store.snapshot.library.arguments.find(({ id }) => id === 'AR-UI-NEXT'),
     ).toMatchObject({ supersedesArgumentId: 'AR-UI' });
+  });
+
+  it('explains inherited premise staleness when pinned revisions still match', async () => {
+    const changed = editAxiom(
+      fixture(),
+      'AX-UI',
+      { statement: 'The compatible-units support was revised.' },
+      runtime(),
+    );
+    store.snapshot = captureArgumentLibrarySnapshot(changed);
+    await mount();
+    await click('Replacement reasoning');
+
+    const text = container.textContent ?? '';
+    expect(text).toContain(
+      'Pinned revision metadata — relied on revision 1; current revision 1.',
+    );
+    expect(text).toContain(
+      'Inherited stale — the referenced inference has unresolved upstream premise support.',
+    );
+    expect(text).toContain(
+      'AR-UI-NEXT.P-UI-REUSED → AR-UI.P-UI; AR-UI.P-UI → AX-UI',
+    );
+    expect(text).toContain(
+      'Resolve and reassess upstream inference dependencies before reassessing this Argument.',
+    );
+    expect(button('Reassess against current premise versions').disabled).toBe(
+      true,
+    );
   });
 
   it('edits Examples, Boundary/Invariance, provenance, premise reuse, and relations in one Argument editor', async () => {

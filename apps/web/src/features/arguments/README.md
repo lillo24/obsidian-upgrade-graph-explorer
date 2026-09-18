@@ -9,8 +9,9 @@ requests open/close transitions.
   narrow leave guard and embedded panel to the shared workspace modal while
   retaining a standalone wrapper for tests.
 - `ArgumentRecordView.tsx` presents Topic, Axiom, Argument, Counter-Argument,
-  Current/staleness/source status, and metadata reading views. The injected
-  source section remains an application concern.
+  Current/source status, direct versus inherited premise staleness with compact
+  cause paths, separate relation staleness, and metadata reading views. The
+  injected source section remains an application concern.
 - `TheorySourceReferences.tsx` presents registered locators, safe plain-text
   source previews, full-file version/freshness disclosure, and explicit source
   baseline controls.
@@ -50,8 +51,10 @@ Schema-v1/v2 imports surface a migration notice and use the core deterministic
 migration; no Argument, Example/provenance, relation, or Current pointer is
 inferred. Pending-review Arguments
 and Counter-Arguments are available through the Proposals-only filter. Current
-promotion and premise/relation reassessment require explicit confirmation and remain
-expected-snapshot commits.
+promotion and premise/relation reassessment require explicit confirmation and
+remain expected-snapshot commits. Inherited premise staleness disables local
+reassessment until upstream inference dependencies have been reassessed; reads
+never advance pinned revisions.
 Source capture is limited to 24 registered references, 16 Markdown files, one
 million UTF-16 characters per file, four million captured characters total,
 and four concurrent reads. Packets request at most 64,000 characters per

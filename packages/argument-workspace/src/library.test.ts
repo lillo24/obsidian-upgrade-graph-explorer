@@ -332,7 +332,7 @@ describe('Argument Library domain operations', () => {
       runtime,
     );
     const stale = library.arguments.find(({ id }) => id === 'AR-FOLLOWUP')!;
-    expect(argumentStaleness(library, stale)).toEqual({
+    expect(argumentStaleness(library, stale)).toMatchObject({
       stale: true,
       premiseIds: ['P-FOLLOWUP'],
       relationIds: [],
@@ -343,7 +343,7 @@ describe('Argument Library domain operations', () => {
     const reassessed = library.arguments.find(
       ({ id }) => id === 'AR-FOLLOWUP',
     )!;
-    expect(argumentStaleness(library, reassessed)).toEqual({
+    expect(argumentStaleness(library, reassessed)).toMatchObject({
       stale: false,
       premiseIds: [],
       relationIds: [],
@@ -655,7 +655,7 @@ describe('Argument Library domain operations', () => {
       runtime,
     );
     const revised = library.arguments.find(({ id }) => id === 'AR-REVISION')!;
-    expect(argumentStaleness(library, revised)).toEqual({
+    expect(argumentStaleness(library, revised)).toMatchObject({
       stale: true,
       premiseIds: ['P-REUSED'],
       relationIds: ['REL-ATTACK'],
@@ -673,7 +673,7 @@ describe('Argument Library domain operations', () => {
         library,
         library.arguments.find(({ id }) => id === 'AR-REVISION')!,
       ),
-    ).toEqual({ stale: false, premiseIds: [], relationIds: [] });
+    ).toMatchObject({ stale: false, premiseIds: [], relationIds: [] });
   });
 
   it('validates local Example and external premise references while allowing relation cycles', () => {
