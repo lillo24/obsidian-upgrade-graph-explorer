@@ -350,6 +350,25 @@ export class ArgumentLibraryAuthoringService {
     );
   }
 
+  /** Persists one previously previewed additive candidate as a single commit. */
+  commitInsert(
+    expected: SnapshotDescriptor,
+    candidate: ArgumentLibrary,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (current) => {
+      if (
+        candidate.libraryId !== current.libraryId ||
+        candidate.schemaVersion !== current.schemaVersion ||
+        candidate.libraryRevision !== current.libraryRevision + 1
+      ) {
+        throw new Error(
+          'Prepared Insert JSON candidate does not extend the expected library snapshot.',
+        );
+      }
+      return candidate;
+    });
+  }
+
   mergeImport(
     expected: SnapshotDescriptor,
     incoming: ArgumentLibrary,

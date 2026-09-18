@@ -141,6 +141,7 @@ export function App({
   );
   const liveUnsubscribeRef = useRef<(() => void) | undefined>(undefined);
   const sourceRequestGeneration = useRef(0);
+  const vaultOpenAbortRef = useRef<AbortController | undefined>(undefined);
   const argumentSourceSessionSequence = useRef(0);
   const [defaultArgumentSourceAccess] = useState(
     () => new ArgumentSourceAccessSession(),
@@ -254,6 +255,8 @@ export function App({
   useEffect(
     () => () => {
       sourceRequestGeneration.current += 1;
+      vaultOpenAbortRef.current?.abort();
+      vaultOpenAbortRef.current = undefined;
       vaultDiscoveryProgressStore.dispose();
       liveUnsubscribeRef.current?.();
       const controller = liveControllerRef.current;
@@ -278,6 +281,14 @@ export function App({
     setVaultOpenProgress(undefined);
     setVaultOpeningStartedAt(performance.now());
     setLoadError(undefined);
+  }
+
+  function stopVaultOpening(): void {
+    if (!vaultOpening) return;
+    sourceRequestGeneration.current += 1;
+    vaultOpenAbortRef.current?.abort();
+    vaultOpenAbortRef.current = undefined;
+    clearVaultOpening();
   }
 
   function progressListener(
@@ -482,6 +493,8 @@ export function App({
       return;
     const requestGeneration = sourceRequestGeneration.current + 1;
     sourceRequestGeneration.current = requestGeneration;
+    const abortController = new AbortController();
+    vaultOpenAbortRef.current = abortController;
     setVaultSelectionPending(true);
     setLoadError(undefined);
     let desktopVault: typeof import('./desktop-vault') | undefined;
@@ -509,6 +522,7 @@ export function App({
         undefined,
         progressListener(requestGeneration),
         discoveryProgressListener(requestGeneration),
+        abortController.signal,
       );
       if (
         !isCurrentVaultOpenRequest(
@@ -551,6 +565,9 @@ export function App({
           requestGeneration,
         )
       ) {
+        if (vaultOpenAbortRef.current === abortController) {
+          vaultOpenAbortRef.current = undefined;
+        }
         clearVaultOpening();
       }
     }
@@ -575,6 +592,8 @@ export function App({
     if (!confirmed) return;
     const requestGeneration = sourceRequestGeneration.current + 1;
     sourceRequestGeneration.current = requestGeneration;
+    const abortController = new AbortController();
+    vaultOpenAbortRef.current = abortController;
     beginVaultOpening();
     try {
       const { openLiveDesktopVault } = await import('./desktop-live-vault');
@@ -588,6 +607,7 @@ export function App({
         undefined,
         progressListener(requestGeneration),
         discoveryProgressListener(requestGeneration),
+        abortController.signal,
       );
       if (
         !isCurrentVaultOpenRequest(
@@ -618,6 +638,9 @@ export function App({
           requestGeneration,
         )
       ) {
+        if (vaultOpenAbortRef.current === abortController) {
+          vaultOpenAbortRef.current = undefined;
+        }
         clearVaultOpening();
       }
     }
@@ -630,6 +653,8 @@ export function App({
     event.currentTarget.value = '';
     if (file === undefined) return;
     sourceRequestGeneration.current += 1;
+    vaultOpenAbortRef.current?.abort();
+    vaultOpenAbortRef.current = undefined;
     clearVaultOpening();
     try {
       const parsed: unknown = JSON.parse(await file.text());
@@ -665,6 +690,8 @@ export function App({
 
   function restoreSample(): void {
     sourceRequestGeneration.current += 1;
+    vaultOpenAbortRef.current?.abort();
+    vaultOpenAbortRef.current = undefined;
     clearVaultOpening();
     stopActiveLiveController();
     performanceSession?.begin('I1-initial-view-preparation');
@@ -831,6 +858,26 @@ export function App({
         {sourceNotice === undefined ? null : (
           <div className="workspace-notice-stack">
             <WorkspaceNotice
+              {...(vaultOpening
+                ? {
+                    action: (
+                      <button
+                        aria-label="Stop vault loading"
+                        onClick={stopVaultOpening}
+                        type="button"
+                      >
+                        <svg
+                          aria-hidden="true"
+                          focusable="false"
+                          viewBox="0 0 16 16"
+                        >
+                          <path d="m4 4 8 8m0-8-8 8" />
+                        </svg>
+                        <span>Stop Load</span>
+                      </button>
+                    ),
+                  }
+                : {})}
               tone={sourceNotice.tone}
               {...(vaultOpening
                 ? { discoveryProgressStore: vaultDiscoveryProgressStore }

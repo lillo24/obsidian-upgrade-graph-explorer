@@ -136,6 +136,9 @@ canonical truth, or own a platform storage implementation.
   for Modular preview. If a live mode change removes the focused control, focus
   returns to the Sandbox tab. Hidden values remain owned by the existing
   preference/session state and are never reset on unmount.
+  A capture-phase outside-pointer listener closes Settings even when the graph
+  canvas consumes the same pointer event; interactions inside the trigger or
+  popover remain open.
   The shared Network controls still edit one validated serializable preference;
   global focus-root and gesture preference storage remains in `../preferences/`.
   Separate All and Focus density sliders are page-lifetime live A/B camera
@@ -164,7 +167,8 @@ canonical truth, or own a platform storage implementation.
   only the notice timing subtree rather than `App` or `GraphExplorer`. That
   subtree also subscribes directly to the coalesced native-discovery progress
   store, shows aggregate counters, and discloses a workspace-relative target
-  only when one native operation crosses its slow threshold.
+  only when one native operation crosses its slow threshold. An optional action
+  slot gives the initial vault-open notice an always-reachable Stop Load button.
 - `EntitySearch.tsx` performs bounded deferred search over the full canonical
   inspection index, independently from visible graph filters.
   `entity-search-disclosure.ts` keeps its query and result disclosure separate:

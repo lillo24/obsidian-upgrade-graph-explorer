@@ -11,6 +11,7 @@ export const VAULT_DISCOVERY_SLOW_OPERATION_WARNING_MS = 3_000;
 export const VAULT_DISCOVERY_OPERATION_TIMEOUT_MS = 60_000;
 
 export interface VaultDiscoveryTracker {
+  throwIfAborted(): void;
   setRecursionDepth(depth: number): void;
   examineEntry(): void;
   recordDirectoryRead(): void;
@@ -96,6 +97,9 @@ export function createVaultDiscoveryTracker(
   }
 
   return {
+    throwIfAborted() {
+      options.signal?.throwIfAborted();
+    },
     setRecursionDepth(depth) {
       if (currentRecursionDepth === depth) return;
       currentRecursionDepth = depth;
@@ -120,6 +124,7 @@ export function createVaultDiscoveryTracker(
       publish();
     },
     async operation(operation, workspacePath, task) {
+      options.signal?.throwIfAborted();
       const startedAt = performance.now();
       current = { operation, workspacePath, startedAt };
       publish();
@@ -138,8 +143,14 @@ export function createVaultDiscoveryTracker(
           operationTimeoutMs,
         );
       });
+      let abort: (() => void) | undefined;
+      const aborted = new Promise<never>((_resolve, reject) => {
+        if (options.signal === undefined) return;
+        abort = () => reject(options.signal?.reason);
+        options.signal.addEventListener('abort', abort, { once: true });
+      });
       try {
-        const result = await Promise.race([task(), timeout]);
+        const result = await Promise.race([task(), timeout, aborted]);
         const durationMs = Number((performance.now() - startedAt).toFixed(3));
         lastCompletedOperation = { operation, workspacePath, durationMs };
         current = undefined;
@@ -147,6 +158,9 @@ export function createVaultDiscoveryTracker(
         return result;
       } finally {
         if (watchdog !== undefined) clearTimeout(watchdog);
+        if (abort !== undefined) {
+          options.signal?.removeEventListener('abort', abort);
+        }
       }
     },
   };

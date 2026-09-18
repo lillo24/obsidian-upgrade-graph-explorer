@@ -5,7 +5,8 @@ of graph projection and rendering; the graph shell only hosts its launcher and
 requests open/close transitions.
 
 - `ArgumentsWorkspace.tsx` owns onboarding, drafts, navigation, search, source
-  binding/previews, imports, and confirmed-snapshot exports. It exposes a
+  binding/previews, separate additive Insert JSON and full-library Import JSON
+  dialogs, and confirmed-snapshot exports. It exposes a
   narrow leave guard and embedded panel to the shared workspace modal while
   retaining a standalone wrapper for tests.
 - `ArgumentRecordView.tsx` presents Topic, Axiom, Argument, Counter-Argument,
@@ -23,8 +24,8 @@ requests open/close transitions.
 - `retrieval-editor.ts` retains raw retrieval textarea text during editing and
   normalizes it into the existing arrays only at Save.
 - `session.ts` owns the single repository/authoring session, serialized reload
-  and mutations, immutable reader replacement, atomic multi-operation Save,
-  and the expected-snapshot source-baseline transaction.
+  and mutations, immutable reader replacement, atomic multi-operation Save and
+  Insert JSON commits, and the expected-snapshot source-baseline transaction.
 - `platform-store.ts` selects the browser profile store or desktop app-local
   store once on first access. It never falls back across platforms.
 - `argument-overlay.ts` remains the focus/escape implementation used by the
@@ -46,7 +47,13 @@ requests open/close transitions.
   directory layout beneath a directory explicitly selected by the user.
 - `arguments.css` owns the responsive 94vw by 93dvh two-pane surface.
 
-Imports are explicitly selected at runtime and limited to 5 MiB before parsing.
+Full-library imports are explicitly selected at runtime and limited to 5 MiB
+before parsing. Insert JSON uses the same size ceiling but a distinct pasted,
+strictly validated additive format; its preview is non-mutating and confirmation
+persists the prepared candidate once against the previewed snapshot. Dirty
+editor drafts retain the existing Save/Discard/Stay guard. The format and
+neutral example are documented in
+[`docs/ARGUMENT_WORKSPACE_INSERT_JSON.md`](../../../../../docs/ARGUMENT_WORKSPACE_INSERT_JSON.md).
 Schema-v1/v2 imports surface a migration notice and use the core deterministic
 migration; no Argument, Example/provenance, relation, or Current pointer is
 inferred. Pending-review Arguments
