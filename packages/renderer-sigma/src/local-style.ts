@@ -4,10 +4,11 @@ import type {
   LocalVisualLod,
 } from './local-types';
 import type { VisualGroupNodePresentation } from '@icarus-graph-explorer/visual-groups';
+import { resolveNetworkHoverEdgeWidthMultiplier } from './network-hover';
 import { applyNetworkNodeSizeScale } from './node-size';
 import {
+  interpolateNetworkEdgeColor,
   OBSIDIAN_DARK_NETWORK_THEME,
-  resolveIncidentEdgeColor,
 } from './network-theme';
 
 export function resolveLocalVisualLod(cameraRatio: number): LocalVisualLod {
@@ -73,26 +74,19 @@ export function resolveLocalNodeStyle(
 export function resolveLocalEdgeStyle(
   attributes: LocalEdgeAttributes,
   context: {
-    readonly relatedToHover: boolean;
-    readonly hoverActive: boolean;
+    readonly hoverProgress: number;
     readonly lod: LocalVisualLod;
     /** Shared Network Link thickness relative to the established Focus default. */
     readonly linkThicknessScale?: number;
   },
 ) {
   const hierarchy = attributes.edgeKind === 'hierarchy';
+  const baseColor = hierarchy
+    ? OBSIDIAN_DARK_NETWORK_THEME.hierarchyEdge
+    : attributes.color;
   return {
     ...attributes,
-    color:
-      context.hoverActive && context.relatedToHover
-        ? resolveIncidentEdgeColor(
-            hierarchy
-              ? OBSIDIAN_DARK_NETWORK_THEME.hierarchyEdge
-              : attributes.color,
-          )
-        : hierarchy
-          ? OBSIDIAN_DARK_NETWORK_THEME.hierarchyEdge
-          : attributes.color,
+    color: interpolateNetworkEdgeColor(baseColor, context.hoverProgress),
     // Focus is already a bounded projection: far LOD simplifies styling, never
     // removes its reference relationships. All Network has a separate policy.
     hidden: false,
@@ -106,7 +100,7 @@ export function resolveLocalEdgeStyle(
         : context.lod === 'normal-local'
           ? 0.84
           : 1) *
-      (context.hoverActive && context.relatedToHover ? 1.3 : 1),
-    zIndex: context.hoverActive && context.relatedToHover ? 1 : 0,
+      resolveNetworkHoverEdgeWidthMultiplier(context.hoverProgress),
+    zIndex: context.hoverProgress > 0 ? 1 : 0,
   };
 }

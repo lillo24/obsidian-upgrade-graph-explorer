@@ -149,8 +149,7 @@ describe('Global visual interactions', () => {
     ).toBe('');
     expect(
       resolveGlobalEdgeStyle(edge, {
-        hoverActive: false,
-        relatedToHover: true,
+        hoverProgress: 0,
         lod: 'far',
       }).hidden,
     ).toBe(true);
@@ -409,18 +408,15 @@ describe('Global visual interactions', () => {
       settings,
     });
     const baseEdge = resolveGlobalEdgeStyle(edge, {
-      hoverActive: false,
-      relatedToHover: true,
+      hoverProgress: 0,
       lod: 'near',
     });
     const incidentEdge = resolveGlobalEdgeStyle(edge, {
-      hoverActive: true,
-      relatedToHover: true,
+      hoverProgress: 1,
       lod: 'near',
     });
     const unrelatedEdge = resolveGlobalEdgeStyle(edge, {
-      hoverActive: true,
-      relatedToHover: false,
+      hoverProgress: 0,
       lod: 'near',
     });
 
@@ -479,20 +475,17 @@ describe('Global visual interactions', () => {
   it('keeps internal and incident edges visible while fading unrelated edges', () => {
     const internal = resolveGlobalEdgeStyle(edge, {
       arrangementRelation: 'internal',
-      hoverActive: false,
-      relatedToHover: true,
+      hoverProgress: 1,
       lod: 'far',
     });
     const incident = resolveGlobalEdgeStyle(edge, {
       arrangementRelation: 'boundary',
-      hoverActive: false,
-      relatedToHover: true,
+      hoverProgress: 1,
       lod: 'far',
     });
     const unrelated = resolveGlobalEdgeStyle(edge, {
       arrangementRelation: 'unrelated',
-      hoverActive: false,
-      relatedToHover: true,
+      hoverProgress: 1,
       lod: 'far',
     });
     expect(internal.hidden).toBe(false);

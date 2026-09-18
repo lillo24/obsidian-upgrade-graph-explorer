@@ -346,6 +346,8 @@ export class TemporaryFileMoveCoordinator {
     Extract<FileMoveGestureEffect, { readonly kind: 'update' }> | undefined;
   private frameHandle: number | undefined;
   private suppressReleasedClick = false;
+  private releasedClickSuppressionTimer:
+    ReturnType<typeof setTimeout> | undefined;
   private readonly scheduler: FileMoveFrameScheduler;
 
   constructor(private readonly options: TemporaryFileMoveCoordinatorOptions) {
@@ -457,11 +459,12 @@ export class TemporaryFileMoveCoordinator {
 
   consumeReleasedDragClick(): boolean {
     const value = this.suppressReleasedClick;
-    this.suppressReleasedClick = false;
+    this.clearReleasedClickSuppression();
     return value;
   }
 
   dispose(): void {
+    this.clearReleasedClickSuppression();
     this.cancel('disposed');
   }
 
@@ -501,13 +504,35 @@ export class TemporaryFileMoveCoordinator {
     }
     if (effect.reason === 'released') {
       this.flushUpdate();
-      this.suppressReleasedClick = true;
+      this.armReleasedClickSuppression();
       this.options.count?.('file-move-releases');
     } else {
       this.dropUpdate();
       this.options.count?.('file-move-cancels');
     }
     this.options.context.port.end(effect);
+  }
+
+  /**
+   * Sigma's event fallback may still report the click produced by this release.
+   * The native pointer owner normally consumes it first, so expire the fallback
+   * after the release turn rather than stealing a later intentional stage click.
+   */
+  private armReleasedClickSuppression(): void {
+    this.clearReleasedClickSuppression();
+    this.suppressReleasedClick = true;
+    this.releasedClickSuppressionTimer = setTimeout(() => {
+      this.suppressReleasedClick = false;
+      this.releasedClickSuppressionTimer = undefined;
+    }, 0);
+  }
+
+  private clearReleasedClickSuppression(): void {
+    if (this.releasedClickSuppressionTimer !== undefined) {
+      clearTimeout(this.releasedClickSuppressionTimer);
+    }
+    this.releasedClickSuppressionTimer = undefined;
+    this.suppressReleasedClick = false;
   }
 
   private flushUpdate(): void {

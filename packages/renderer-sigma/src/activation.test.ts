@@ -102,6 +102,19 @@ describe.each(['global', 'local'] as const)('%s node activation', (mode) => {
     expect(singleClick).toHaveBeenCalledExactlyOnceWith('document');
   });
 
+  it('clears an ordinary single-click selection on the first background click', () => {
+    const { handlers, selected } = interactionHarness(mode);
+    const event = { node: 'document', preventSigmaDefault: vi.fn() };
+
+    handlers.get('clickNode')?.(event);
+    handlers.get('clickStage')?.(event);
+
+    expect(selected.mock.calls).toEqual([
+      ['document', documentNode],
+      [undefined, undefined],
+    ]);
+  });
+
   it('activates a canonical document exactly once and suppresses Sigma zoom', () => {
     const { activated, handlers, singleClick } = interactionHarness(mode);
     const preventSigmaDefault = vi.fn();

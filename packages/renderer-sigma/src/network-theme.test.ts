@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  interpolateNetworkEdgeColor,
   NETWORK_GRAPH_THEME_ID,
   OBSIDIAN_DARK_NETWORK_THEME,
   resolveIncidentEdgeColor,
@@ -28,5 +29,22 @@ describe('Obsidian dark Network theme', () => {
     expect(resolveIncidentEdgeColor('#3f3f3f')).toBe('#8a5cf5');
     expect(resolveIncidentEdgeColor('#666666')).toBe('#8a5cf5');
     expect(resolveIncidentEdgeColor('#123456')).toBe('#546d85');
+  });
+
+  it('interpolates incident edge colors continuously to their semantic target', () => {
+    expect(interpolateNetworkEdgeColor('#3f3f3f', 0)).toBe('#3f3f3f');
+    expect(interpolateNetworkEdgeColor('#3f3f3f', 0.5)).toBe('#654e9a');
+    expect(interpolateNetworkEdgeColor('#3f3f3f', 1)).toBe('#8a5cf5');
+    expect(interpolateNetworkEdgeColor('#123456', 0.5)).toBe('#33516e');
+    expect(interpolateNetworkEdgeColor('#123456', 1)).toBe('#546d85');
+    const neutralSteps = [0, 0.25, 0.5, 0.75, 1].map((progress) =>
+      Number.parseInt(
+        interpolateNetworkEdgeColor('#3f3f3f', progress).slice(1),
+        16,
+      ),
+    );
+    for (let index = 1; index < neutralSteps.length; index += 1) {
+      expect(neutralSteps[index]).toBeGreaterThan(neutralSteps[index - 1]!);
+    }
   });
 });
