@@ -8,7 +8,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "build": "esbuild src/cli.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/server.js",
+    "build": "esbuild src/cli.ts --bundle --platform=node --format=esm --target=node22 --loader:.md=text --outfile=dist/server.js",
     "start": "node dist/server.js",
     "test": "vitest run --root ../.. packages/argument-mcp-server/src",
     "typecheck": "tsc --noEmit"
