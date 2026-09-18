@@ -110,6 +110,9 @@ importers:
       '@icarus-graph-explorer/spatial-overrides':
         specifier: workspace:*
         version: link:../../packages/spatial-overrides
+      '@icarus-graph-explorer/theme':
+        specifier: workspace:*
+        version: link:../../packages/theme
       '@icarus-graph-explorer/view-projection':
         specifier: workspace:*
         version: link:../../packages/view-projection
@@ -365,6 +368,9 @@ importers:
       '@icarus-graph-explorer/performance':
         specifier: workspace:*
         version: link:../performance
+      '@icarus-graph-explorer/theme':
+        specifier: workspace:*
+        version: link:../theme
       '@icarus-graph-explorer/view-projection':
         specifier: workspace:*
         version: link:../view-projection
@@ -396,6 +402,9 @@ importers:
       '@icarus-graph-explorer/spatial-overrides':
         specifier: workspace:*
         version: link:../spatial-overrides
+      '@icarus-graph-explorer/theme':
+        specifier: workspace:*
+        version: link:../theme
       '@icarus-graph-explorer/view-projection':
         specifier: workspace:*
         version: link:../view-projection
@@ -510,6 +519,8 @@ importers:
       '@icarus-graph-explorer/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/theme: {}
 
   packages/vault-discovery-policy:
     dependencies:

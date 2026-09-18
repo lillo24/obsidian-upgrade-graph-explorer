@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server';
+import type { ComponentProps } from 'react';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -17,12 +18,12 @@ import {
 } from '@icarus-graph-explorer/view-projection';
 import { DEFAULT_GLOBAL_LAYOUT_SETTINGS } from '@icarus-graph-explorer/renderer-sigma/settings';
 
-import { App } from './App';
+import { App as AppComponent } from './App';
 import { DeveloperSettingsSection } from './components/DeveloperSettingsSection';
 import { DiagnosticEvidenceContent } from './components/DiagnosticEvidenceContent';
 import { DiagnosticEvidenceDialog } from './components/DiagnosticEvidenceDialog';
 import { retainGraphSelection } from './components/controlled-selection';
-import { GraphExplorer } from './components/GraphExplorer';
+import { GraphExplorer as GraphExplorerComponent } from './components/GraphExplorer';
 import { GraphSettings } from './components/GraphSettings';
 import { SourceSettingsSection } from './components/SourceSettingsSection';
 import { WorkspaceNotice } from './components/WorkspaceNotice';
@@ -34,6 +35,7 @@ import {
   matchingHierarchyDocumentIds,
 } from './report-view';
 import sampleReport from './sample-report.json';
+import { TEST_THEME_CONTROLLER } from './theme/test-controller';
 
 const validation = validateObsidianDiagnosticReport(sampleReport);
 if (!validation.valid) throw new Error('The web sample report must be valid.');
@@ -46,6 +48,16 @@ const storage = {
   removeItem: () => undefined,
   setItem: () => undefined,
 };
+
+function App(props: Omit<ComponentProps<typeof AppComponent>, 'theme'> = {}) {
+  return <AppComponent {...props} theme={TEST_THEME_CONTROLLER} />;
+}
+
+function GraphExplorer(
+  props: Omit<ComponentProps<typeof GraphExplorerComponent>, 'theme'>,
+) {
+  return <GraphExplorerComponent {...props} theme={TEST_THEME_CONTROLLER} />;
+}
 describe('graph-first explorer shell', () => {
   it('retains controlled selection identity when a renderer echoes it', () => {
     const current = { kind: 'node', id: 'entity:source' } as const;
@@ -336,8 +348,10 @@ describe('graph-first explorer shell', () => {
         onGlobalLayoutSettingsChange={() => undefined}
         onOpenChange={() => undefined}
         onResetSandbox={() => undefined}
+        onThemePreferenceChange={() => undefined}
         onTrackpadZoomModeChange={() => undefined}
         open
+        themePreference="system"
         trackpadZoomMode="pinch-zoom"
         warning="Preference is session-only."
       >

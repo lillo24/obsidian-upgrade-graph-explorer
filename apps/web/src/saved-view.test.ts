@@ -204,6 +204,9 @@ describe('Named Saved View semantic composition', () => {
       'savedQueries',
       'panels',
       'coordinates',
+      'theme',
+      'themePreference',
+      'resolvedTheme',
     ]) {
       expect(serialized).not.toContain(excluded);
     }

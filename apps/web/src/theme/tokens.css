@@ -1,0 +1,72 @@
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --color-surface-app: #eef2f4;
+  --color-surface-chrome: #f7fafb;
+  --color-surface-panel: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-surface-input: #ffffff;
+  --color-surface-hover: #e9f3f5;
+  --color-surface-selected: #dceff0;
+  --color-surface-overlay: rgb(255 255 255 / 96%);
+  --color-text-primary: #172631;
+  --color-text-secondary: #395966;
+  --color-text-muted: #647983;
+  --color-text-inverse: #ffffff;
+  --color-border-subtle: #e0e7ea;
+  --color-border-default: #9eb0bc;
+  --color-border-strong: #6e929e;
+  --color-border-focus: #1c5267;
+  --color-accent-primary: #1c5267;
+  --color-accent-hover: #164454;
+  --color-accent-soft: #dceff0;
+  --color-status-info-foreground: #175f70;
+  --color-status-info-background: #f4fbfc;
+  --color-status-info-border: #9ccbd3;
+  --color-status-success-foreground: #276347;
+  --color-status-success-background: #edf8f1;
+  --color-status-success-border: #9bc8aa;
+  --color-status-warning-foreground: #654714;
+  --color-status-warning-background: #fff8df;
+  --color-status-warning-border: #ddc476;
+  --color-status-error-foreground: #7b2731;
+  --color-status-error-background: #fff1f2;
+  --color-status-error-border: #c9858d;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-surface-app: #10171c;
+  --color-surface-chrome: #17242b;
+  --color-surface-panel: #1b2a32;
+  --color-surface-elevated: #22333c;
+  --color-surface-input: #16242b;
+  --color-surface-hover: #294653;
+  --color-surface-selected: #315766;
+  --color-surface-overlay: rgb(27 42 50 / 96%);
+  --color-text-primary: #e7eef1;
+  --color-text-secondary: #dce7eb;
+  --color-text-muted: #b9cbd3;
+  --color-text-inverse: #102b36;
+  --color-border-subtle: #3b515c;
+  --color-border-default: #67818d;
+  --color-border-strong: #7694a2;
+  --color-border-focus: #8ed5df;
+  --color-accent-primary: #7bb5c9;
+  --color-accent-hover: #9bcbd9;
+  --color-accent-soft: #294653;
+  --color-status-info-foreground: #c6edf3;
+  --color-status-info-background: #17343c;
+  --color-status-info-border: #4f8490;
+  --color-status-success-foreground: #c9efda;
+  --color-status-success-background: #18392b;
+  --color-status-success-border: #4d8667;
+  --color-status-warning-foreground: #ffe5ad;
+  --color-status-warning-background: #3c301b;
+  --color-status-warning-border: #8d7240;
+  --color-status-error-foreground: #ffd9dc;
+  --color-status-error-background: #43262a;
+  --color-status-error-border: #9c5d65;
+}

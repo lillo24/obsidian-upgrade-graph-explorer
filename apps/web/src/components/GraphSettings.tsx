@@ -18,6 +18,7 @@ import type {
   GlobalDensityQaDiagnostics,
   LocalDensityQaDiagnostics,
 } from '@icarus-graph-explorer/renderer-sigma/types';
+import type { ThemePreference } from '@icarus-graph-explorer/theme';
 
 import type {
   FocusHierarchyImplementation,
@@ -77,8 +78,10 @@ interface GraphSettingsProps {
   ) => void;
   readonly onOpenChange: (open: boolean) => void;
   readonly onTrackpadZoomModeChange: (mode: TrackpadZoomMode) => void;
+  readonly onThemePreferenceChange: (preference: ThemePreference) => void;
   readonly onResetSandbox: () => void;
   readonly trackpadZoomMode: TrackpadZoomMode;
+  readonly themePreference: ThemePreference;
   readonly warning?: string;
 }
 
@@ -188,9 +191,11 @@ export const GraphSettings = memo(function GraphSettings({
   onGlobalLayoutSettingsChange,
   onOpenChange,
   onTrackpadZoomModeChange,
+  onThemePreferenceChange,
   onResetSandbox,
   open,
   trackpadZoomMode,
+  themePreference,
   warning,
 }: GraphSettingsProps) {
   const [activeTab, setActiveTab] = useState<GraphSettingsTab>('preferences');
@@ -360,6 +365,31 @@ export const GraphSettings = memo(function GraphSettings({
               id="graph-settings-preferences-panel"
               role="tabpanel"
             >
+              <section
+                aria-labelledby="appearance-settings-heading"
+                className="graph-settings__section"
+              >
+                <h3 id="appearance-settings-heading">Appearance</h3>
+                <label
+                  className="theme-preference-control"
+                  htmlFor="theme-preference"
+                >
+                  <span>Theme</span>
+                  <select
+                    id="theme-preference"
+                    onChange={(event) =>
+                      onThemePreferenceChange(
+                        event.currentTarget.value as ThemePreference,
+                      )
+                    }
+                    value={themePreference}
+                  >
+                    <option value="system">System</option>
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                  </select>
+                </label>
+              </section>
               <section
                 aria-labelledby="graph-interaction-settings-heading"
                 className="graph-settings__section"

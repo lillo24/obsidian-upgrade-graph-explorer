@@ -29,6 +29,7 @@
     "@icarus-graph-explorer/review-workspace-tauri": "workspace:*",
     "@icarus-graph-explorer/spatial-overrides": "workspace:*",
     "@icarus-graph-explorer/source-provider-tauri": "workspace:*",
+    "@icarus-graph-explorer/theme": "workspace:*",
     "@icarus-graph-explorer/view-state": "workspace:*",
     "@icarus-graph-explorer/view-projection": "workspace:*",
     "@icarus-graph-explorer/visual-groups": "workspace:*",

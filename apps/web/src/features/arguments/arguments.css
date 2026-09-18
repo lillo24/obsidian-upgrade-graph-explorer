@@ -842,7 +842,7 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
+:root[data-theme='dark'] {
   .arguments-dialog {
     color: #e7eef1;
     background: #17242b;

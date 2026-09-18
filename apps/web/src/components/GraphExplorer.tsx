@@ -203,6 +203,7 @@ import {
   INACTIVE_FOLDER_ARRANGEMENT_MODE,
 } from '../spatial-overrides/arrangement';
 import { createFolderScopeTree } from '../spatial-overrides/folder-scope-model';
+import type { ThemeController } from '../theme/runtime';
 import {
   NETWORK_EDITING_OFF,
   reduceNetworkEditing,
@@ -403,6 +404,7 @@ export function GraphExplorer({
   settingsContent,
   snapshot,
   storage,
+  theme,
 }: {
   readonly applicationOverlayOpen?: boolean;
   readonly identityStability?: DiagnosticIdentityStability;
@@ -423,6 +425,8 @@ export function GraphExplorer({
   readonly settingsContent?: ReactNode;
   readonly snapshot: KnowledgeSnapshot;
   readonly storage?: StorageLike | null;
+  /** App-owned theme state; renderers receive only its resolved theme ID. */
+  readonly theme: ThemeController;
 }) {
   const projectionWorkspace = useMemo(() => {
     const create = () => createProjectionWorkspace(snapshot);
@@ -4688,6 +4692,11 @@ export function GraphExplorer({
     selectionExists(networkProjection, selection)
       ? selection
       : null;
+  const settingsWarning = [preferenceWarning, theme.warning]
+    .filter(
+      (warning): warning is string => warning !== null && warning !== undefined,
+    )
+    .join(' ');
 
   return (
     <section
@@ -4772,9 +4781,11 @@ export function GraphExplorer({
             onResetSandbox={resetSandbox}
             open={activeOverlay === 'settings'}
             trackpadZoomMode={trackpadZoomMode}
-            {...(preferenceWarning === undefined
+            themePreference={theme.preference}
+            onThemePreferenceChange={theme.setPreference}
+            {...(settingsWarning.length === 0
               ? {}
-              : { warning: preferenceWarning })}
+              : { warning: settingsWarning })}
           >
             {settingsContent}
           </GraphSettings>
@@ -5076,9 +5087,11 @@ export function GraphExplorer({
                   onResetSandbox={resetSandbox}
                   open={activeOverlay === 'settings'}
                   trackpadZoomMode={trackpadZoomMode}
-                  {...(preferenceWarning === undefined
+                  themePreference={theme.preference}
+                  onThemePreferenceChange={theme.setPreference}
+                  {...(settingsWarning.length === 0
                     ? {}
-                    : { warning: preferenceWarning })}
+                    : { warning: settingsWarning })}
                 >
                   {settingsContent}
                 </GraphSettings>
@@ -5259,6 +5272,7 @@ export function GraphExplorer({
                 spatialRules={spatialOverrides.rules}
                 spatialSourceKey={workspaceId}
                 trackpadZoomMode={trackpadZoomMode}
+                theme={theme.resolvedTheme}
                 temporaryConstraintActive={networkEditingState.phase === 'off'}
                 temporaryConstraintRetryKey={temporaryFileMoveRetryKey}
                 visualGroupStyles={visualGroupPresentation.styles}
@@ -5381,6 +5395,7 @@ export function GraphExplorer({
                 temporaryConstraintActive={networkEditingState.phase === 'off'}
                 temporaryConstraintRetryKey={temporaryFileMoveRetryKey}
                 trackpadZoomMode={trackpadZoomMode}
+                theme={theme.resolvedTheme}
                 presentationOverrides={nodePresentation.overrides}
                 visualGroupStyles={visualGroupPresentation.styles}
               />
@@ -5435,6 +5450,7 @@ export function GraphExplorer({
                 rootEntityId={localRootEntityId}
                 selection={activeSelection}
                 trackpadZoomMode={trackpadZoomMode}
+                theme={theme.resolvedTheme}
                 visualGroupStyles={visualGroupPresentation.styles}
               />
             ) : LocalStructuredGraphView !== undefined ? (
@@ -5469,6 +5485,7 @@ export function GraphExplorer({
                 rootEntityId={localRootEntityId}
                 selection={activeSelection}
                 trackpadZoomMode={trackpadZoomMode}
+                theme={theme.resolvedTheme}
                 visualGroupStyles={visualGroupPresentation.styles}
                 visualVariant={hierarchyVisualVariantForScope(activeScope)}
               />
@@ -5496,6 +5513,7 @@ export function GraphExplorer({
               projection={result.projection}
               selection={activeSelection}
               trackpadZoomMode={trackpadZoomMode}
+              theme={theme.resolvedTheme}
               visualGroupStyles={visualGroupPresentation.styles}
               visualVariant={hierarchyVisualVariantForScope(activeScope)}
             />

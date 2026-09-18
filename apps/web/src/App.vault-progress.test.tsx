@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { act } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import {
   afterEach,
@@ -60,12 +60,17 @@ vi.mock('./components/GraphExplorer', () => ({
   },
 }));
 
-import { App } from './App';
+import { App as AppComponent } from './App';
 import type {
   DesktopVaultOpenProgressListener,
   OpenedDesktopVault,
 } from './desktop-vault';
 import sampleReportJson from './sample-report.json';
+import { TEST_THEME_CONTROLLER } from './theme/test-controller';
+
+function App(props: Omit<ComponentProps<typeof AppComponent>, 'theme'>) {
+  return <AppComponent {...props} theme={TEST_THEME_CONTROLLER} />;
+}
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }

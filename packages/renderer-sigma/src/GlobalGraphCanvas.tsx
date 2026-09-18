@@ -1,4 +1,5 @@
 import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
+import type { ResolvedTheme } from '@icarus-graph-explorer/theme';
 import {
   classifyFolderSpatialDraftScope,
   createFolderSpatialRuleDraft,
@@ -168,6 +169,8 @@ export interface GlobalFolderScopeTreeNode {
 }
 
 export interface GlobalGraphCanvasProps {
+  /** App-resolved presentation theme; never read from browser state here. */
+  readonly theme?: ResolvedTheme;
   /** Identifies a startup Fit that must yield to newer manual camera input. */
   readonly automaticFitRequestKey?: number;
   readonly folderArrangement?: GlobalFolderArrangementProps;
@@ -490,6 +493,7 @@ export function GlobalGraphCanvas({
   startupTrace,
   temporaryConstraintActive = false,
   temporaryConstraintRetryKey = 0,
+  theme = 'dark',
   trackpadZoomMode,
   visualGroupStyles,
   presentationOverrides,
@@ -2892,6 +2896,7 @@ export function GlobalGraphCanvas({
       data-arrangement-phase={arrangementGesturePhase}
       data-initial-presentation={initialPresentationReady ? 'ready' : 'pending'}
       data-network-theme={NETWORK_GRAPH_THEME_ID}
+      data-theme={theme}
     >
       <div
         aria-hidden="true"

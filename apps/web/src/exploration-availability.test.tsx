@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server';
+import type { ComponentProps } from 'react';
 import { describe, expect, it } from 'vitest';
 import {
   createProjectionWorkspace,
@@ -22,13 +23,20 @@ import {
   goForwardInGraphHistory,
   returnToAllInGraphHistory,
 } from './navigation-history';
-import { GraphExplorer } from './components/GraphExplorer';
+import { GraphExplorer as GraphExplorerComponent } from './components/GraphExplorer';
 import { ExplorationControls } from './components/ExplorationControls';
 import { hydrateGraphView } from './persistence/session';
 import { workspaceViewStorageKey } from './persistence/storage';
 import { GRAPH_PREFERENCES_STORAGE_KEY } from './preferences/graph-preferences';
 import { planLocalEntityNavigation } from './local-view';
 import sampleReport from './sample-report.json';
+import { TEST_THEME_CONTROLLER } from './theme/test-controller';
+
+function GraphExplorer(
+  props: Omit<ComponentProps<typeof GraphExplorerComponent>, 'theme'>,
+) {
+  return <GraphExplorerComponent {...props} theme={TEST_THEME_CONTROLLER} />;
+}
 
 const report = validateObsidianDiagnosticReport(sampleReport);
 if (!report.valid) throw new Error('Invalid Synthetic Sample.');

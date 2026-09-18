@@ -9,6 +9,11 @@ navigation, anchored disclosure, and accessible canvas controls. It does not ins
 references, roll endpoints, aggregate links, apply focus/filter policy, read
 reports, access files, or persist view state.
 
+THEMESYS1 adds an explicit app-resolved `light | dark` prop. React Flow receives
+that ID through its public color-mode seam; this package does not read browser
+storage, media queries, root attributes, or computed styles as theme authority.
+Full structural-surface palette migration remains a later theme phase.
+
 ```text
 ViewProjection + renderer interaction state
   → one-to-one React Flow mapping
