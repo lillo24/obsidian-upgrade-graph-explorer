@@ -291,7 +291,7 @@ describe('Argument Library MCP tools', () => {
       expect(result.isError).not.toBe(true);
       expect(response).toMatchObject({
         status: 'ok',
-        version: 'argument-compiler-ai-usage-v1',
+        version: 'argument-compiler-ai-usage-v2',
         format: 'markdown',
       });
       expect(
@@ -311,11 +311,13 @@ describe('Argument Library MCP tools', () => {
         'not authority and not external empirical proof',
       );
       expect(normalizedGuide).toContain('Prior response still applies');
+      expect(normalizedGuide).toContain('Compiler Mailbox');
+      expect(normalizedGuide).toContain('compiler_submit_proposal');
       expect(normalizedGuide).toContain(
-        'submit a surviving genuinely new or revised argument',
+        'The Mailbox is not an Argument Library record',
       );
       expect(normalizedGuide).toContain(
-        'If no submission capability is present, do not invent or claim a',
+        'If `compiler_submit_proposal` is not present in the current tool list',
       );
       expect(result.content).toEqual([{ type: 'text', text: response.guide }]);
       expect(existsSync(path)).toBe(false);
