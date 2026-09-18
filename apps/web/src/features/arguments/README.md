@@ -48,7 +48,9 @@ requests open/close transitions.
   every envelope field except `packetFingerprint` itself.
 - `markdown-directory-export.ts` preserves the core export's safe relative
   directory layout beneath a directory explicitly selected by the user.
-- `arguments.css` owns the responsive 94vw by 93dvh two-pane surface.
+- `arguments.css` owns the responsive 94vw by 93dvh two-pane surface. Its
+  surface, control, focus, and status colors inherit the application semantic
+  tokens; it owns no separate OS or root-theme override.
 
 Full-library imports are explicitly selected at runtime and limited to 5 MiB
 before parsing. Insert JSON uses the same size ceiling but a distinct,
