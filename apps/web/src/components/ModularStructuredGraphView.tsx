@@ -26,6 +26,7 @@ import {
   type FocusSchematicEndpointOrderPolicy,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performance';
+import type { ResolvedTheme } from '@icarus-graph-explorer/theme';
 import {
   GraphCanvas,
   GraphContextMenu,
@@ -70,6 +71,7 @@ import type { SemanticLocalStructuredViewport } from './LocalStructuredGraphView
 import { useWorkerServiceDisposal } from './use-worker-service-disposal';
 
 export interface ModularStructuredGraphViewProps {
+  readonly theme: ResolvedTheme;
   readonly centerRequest?: GraphCenterRequest;
   readonly fitRequestKey: number;
   readonly focusAppearance: FocusAppearance;

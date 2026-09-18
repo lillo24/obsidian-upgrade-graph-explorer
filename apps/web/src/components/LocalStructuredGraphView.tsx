@@ -1,6 +1,7 @@
 import { Component, useCallback, useMemo, type ReactNode } from 'react';
 
 import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performance';
+import type { ResolvedTheme } from '@icarus-graph-explorer/theme';
 import {
   GraphCanvas,
   LocalStructuredLayoutCache,
@@ -25,6 +26,7 @@ export interface SemanticLocalStructuredViewport {
 }
 
 export interface LocalStructuredGraphViewProps {
+  readonly theme: ResolvedTheme;
   readonly centerRequest?: GraphCenterRequest;
   readonly fitRequestKey: number;
   readonly focusAppearance: FocusAppearance;

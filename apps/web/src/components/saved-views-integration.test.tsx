@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import {
   afterEach,
@@ -43,10 +43,17 @@ import {
 import { workspaceViewStorageKey } from '../persistence/storage';
 import { spatialOverrideStorageKey } from '../persistence/spatial-overrides';
 import sampleReport from '../sample-report.json';
+import { TEST_THEME_CONTROLLER } from '../theme/test-controller';
 import type { GlobalGraphViewProps } from './GlobalGraphView';
-import { GraphExplorer } from './GraphExplorer';
+import { GraphExplorer as GraphExplorerComponent } from './GraphExplorer';
 import type { LocalGraphViewProps } from './LocalGraphView';
 import type { LocalStructuredGraphViewProps } from './LocalStructuredGraphView';
+
+function GraphExplorer(
+  props: Omit<ComponentProps<typeof GraphExplorerComponent>, 'theme'>,
+) {
+  return <GraphExplorerComponent {...props} theme={TEST_THEME_CONTROLLER} />;
+}
 
 const captured = vi.hoisted(() => ({
   global: undefined as GlobalGraphViewProps | undefined,

@@ -6,6 +6,7 @@ import type {
   DagreLayoutOutput,
 } from '@icarus-graph-explorer/dagre-layout';
 import type { PerformanceInstrumentation } from '@icarus-graph-explorer/performance';
+import type { ResolvedTheme } from '@icarus-graph-explorer/theme';
 import type {
   DiagnosticReferenceStatus,
   ProjectionEdgeId,
@@ -202,6 +203,8 @@ export interface GraphLayoutService {
 }
 
 export interface GraphCanvasProps {
+  /** App-resolved presentation theme; never read from browser state here. */
+  readonly theme?: ResolvedTheme;
   readonly projection: ViewProjection;
   /** Omitted only when a validated prepared graph is supplied by a lazy renderer. */
   readonly layoutService?: GraphLayoutService;

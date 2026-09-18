@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRuntimePerformanceRecorder } from '@icarus-graph-explorer/performance';
@@ -17,10 +17,17 @@ import type { GlobalGraphViewProps } from './GlobalGraphView';
 import type { LocalGraphViewProps } from './LocalGraphView';
 import type { LocalStructuredGraphViewProps } from './LocalStructuredGraphView';
 import type { ModularStructuredGraphViewProps } from './ModularStructuredGraphView';
-import { GraphExplorer } from './GraphExplorer';
+import { GraphExplorer as GraphExplorerComponent } from './GraphExplorer';
 import { GRAPH_PREFERENCES_STORAGE_KEY } from '../preferences/graph-preferences';
 import { workspaceViewStorageKey } from '../persistence/storage';
 import sampleReport from '../sample-report.json';
+import { TEST_THEME_CONTROLLER } from '../theme/test-controller';
+
+function GraphExplorer(
+  props: Omit<ComponentProps<typeof GraphExplorerComponent>, 'theme'>,
+) {
+  return <GraphExplorerComponent {...props} theme={TEST_THEME_CONTROLLER} />;
+}
 
 const captured = vi.hoisted(() => ({
   global: undefined as GlobalGraphViewProps | undefined,
@@ -236,6 +243,7 @@ describe('GraphExplorer experimental availability integration', () => {
             : captured.hierarchy;
 
       expect(props?.fitRequestKey).toBe(1);
+      expect(props?.theme).toBe('light');
       expect(props?.centerRequest).toBeUndefined();
       expect(
         values.get(workspaceViewStorageKey(snapshot.workspace.id)),

@@ -155,6 +155,7 @@ function GraphCanvasInner({
   projection,
   rootEntityId,
   selection,
+  theme = 'light',
   trackpadZoomMode,
   visualVariant = 'extended',
 }: GraphCanvasProps) {
@@ -1069,7 +1070,7 @@ function GraphCanvasInner({
 
   if (projection.nodes.length === 0) {
     return (
-      <div className="graph-empty" role="status">
+      <div className="graph-empty" data-theme={theme} role="status">
         <strong>No nodes match this view.</strong>
         <span>Exit focus or adjust the graph controls to restore context.</span>
       </div>
@@ -1081,6 +1082,7 @@ function GraphCanvasInner({
       <div
         className="graph-layout-pending graph-empty"
         data-focus-appearance={focusAppearance}
+        data-theme={theme}
         data-trackpad-zoom-mode={trackpadZoomMode}
         data-visual-variant={visualVariant}
       >
@@ -1112,6 +1114,7 @@ function GraphCanvasInner({
       aria-label="Projected knowledge graph"
       aria-busy={layoutPending}
       data-focus-appearance={focusAppearance}
+      data-theme={theme}
       data-trackpad-zoom-mode={trackpadZoomMode}
       data-visual-variant={visualVariant}
       onKeyDownCapture={activateFocusedNode}
@@ -1137,7 +1140,7 @@ function GraphCanvasInner({
         >
           <ReactFlow<GraphFlowNode, GraphFlowEdge>
             aria-label="Interactive projected knowledge graph"
-            colorMode="light"
+            colorMode={theme}
             deleteKeyCode={null}
             edgeTypes={GRAPH_EDGE_TYPES}
             edges={edges}

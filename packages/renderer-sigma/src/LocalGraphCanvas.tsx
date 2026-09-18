@@ -1,4 +1,5 @@
 import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
+import type { ResolvedTheme } from '@icarus-graph-explorer/theme';
 import {
   useCallback,
   useEffect,
@@ -59,6 +60,8 @@ import type { ResolvedNetworkSettings } from './types';
 import { shouldApplyGlobalViewportRequest } from './viewport-request';
 
 export interface LocalGraphCanvasProps {
+  /** App-resolved presentation theme; never read from browser state here. */
+  readonly theme?: ResolvedTheme;
   /** Identifies a startup Fit that must yield to newer manual camera input. */
   readonly automaticFitRequestKey?: number;
   readonly centerRequest?: LocalCenterRequest;
@@ -160,6 +163,7 @@ export function LocalGraphCanvas({
   selection,
   temporaryConstraintActive = false,
   temporaryConstraintRetryKey = 0,
+  theme = 'dark',
   trackpadZoomMode,
   visualGroupStyles,
   presentationOverrides,
@@ -812,6 +816,7 @@ export function LocalGraphCanvas({
       className="local-graph-canvas"
       data-initial-presentation={initialPresentationReady ? 'ready' : 'pending'}
       data-network-theme={NETWORK_GRAPH_THEME_ID}
+      data-theme={theme}
     >
       <div className="local-graph-canvas__surface" ref={containerRef} />
       <NetworkViewportControls

@@ -94,23 +94,21 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .workspace-dialog,
-  .workspace-dialog__chrome {
-    color: #e7eef1;
-    background: #1b2a32;
-    border-color: #7694a2;
-  }
+:root[data-theme='dark'] .workspace-dialog,
+:root[data-theme='dark'] .workspace-dialog__chrome {
+  color: #e7eef1;
+  background: #1b2a32;
+  border-color: #7694a2;
+}
 
-  .workspace-dialog__tabs button,
-  .workspace-dialog__close {
-    color: #edf4f6;
-    background: #16242b;
-    border-color: #67818d;
-  }
+:root[data-theme='dark'] .workspace-dialog__tabs button,
+:root[data-theme='dark'] .workspace-dialog__close {
+  color: #edf4f6;
+  background: #16242b;
+  border-color: #67818d;
+}
 
-  .workspace-dialog__tabs button:hover,
-  .workspace-dialog__close:hover {
-    background: #294653;
-  }
+:root[data-theme='dark'] .workspace-dialog__tabs button:hover,
+:root[data-theme='dark'] .workspace-dialog__close:hover {
+  background: #294653;
 }

@@ -38,6 +38,9 @@ canonical truth, or own a platform storage implementation.
   and Fit requests are consumed once, preventing remount or Back/Forward from
   replaying stale camera work; newer Center and Fit intents supersede older ones.
   Graphology, worker positions, and transition points are never persisted.
+  THEMESYS1 also receives the app-owned theme controller and passes only its
+  resolved `light | dark` ID through every renderer boundary. Components and
+  renderers do not read storage, root attributes, or media queries.
   SPATIAL1 also owns the independent workspace spatial-override session and
   passes its resolved map only to All Network. SPATIAL2B expands the web-owned
   Arrange lifecycle and write-before-adopt callbacks to complete Pull/Place
@@ -124,7 +127,9 @@ canonical truth, or own a platform storage implementation.
 - `GraphSettings.tsx` presents the viewport-bounded shared normal/maximized
   Settings popover. Its transient keyboard-accessible tabs separate ordinary
   Preferences, the graph-presentation Sandbox, and App-owned Source & Diagnostics
-  controls while keeping all panels mounted. `graph-settings-tabs.ts` owns the
+  controls while keeping all panels mounted. The native Theme select in
+  Preferences edits the separate application appearance owner immediately; it
+  is not part of Graph Preferences or a Saved View. `graph-settings-tabs.ts` owns the
   wrapping three-tab keyboard transition. `GraphExplorer` supplies the canonical
   semantic Scope/Layout, and Sandbox removes controls that cannot affect that
   active view: Focus Root appears only in Focus + Hierarchy because Focus Network
