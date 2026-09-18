@@ -24,6 +24,9 @@ has no UI, renderer, vault, platform, agent, or model dependency.
 - `serialization.ts` owns lossless schema-v3 JSON parsing/export, deterministic
   schema-v1/v2 migration, non-mutating historical validation, import preview,
   collision checks, and merge preparation.
+- `insert.ts` owns strict `argument-workspace-insert-v1` parsing, whole-payload
+  reference and promotion resolution, revision-pin normalization, non-mutating
+  preview, and construction of one snapshot-bound additive candidate.
 - `search.ts` builds one deterministic descriptive index per snapshot and owns
   snapshot/query-bound pagination cursors.
 - `bundle.ts` assembles the bounded argumentative closure for Topic, Axiom,
@@ -157,6 +160,13 @@ the descriptor. Historical JSON may be validated and opened in an isolated
 reader without mutating the editable store. Import preview distinguishes exact
 idempotence, merge/replace readiness, and same-ID/different-content conflicts.
 Merges keep the local lineage and advance its revision.
+
+Insert JSON is a separate additive authoring format rather than a partial
+library snapshot. Its preview assigns canonical timestamps/revisions, resolves
+omitted reference pins against the final in-memory candidate, validates all
+same-payload and existing-record references together, and returns that complete
+candidate for one expected-snapshot repository commit. See
+[`docs/ARGUMENT_WORKSPACE_INSERT_JSON.md`](../../docs/ARGUMENT_WORKSPACE_INSERT_JSON.md).
 
 Markdown export returns `{path, text}[]`. It writes one file per reusable record
 under `topics/`, `axioms/`, `arguments/`, or `counter-arguments/`; Topic,
