@@ -15,6 +15,7 @@ import {
 } from '@icarus-graph-explorer/spatial-overrides';
 import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-groups';
 import type { EntityPresentationOverrideMap } from '@icarus-graph-explorer/presentation-overrides';
+import type { ResolvedTheme } from '@icarus-graph-explorer/theme';
 import {
   changedFileSizeNodeKeys,
   indexFileNodeKeys,
@@ -66,8 +67,9 @@ import {
 import { NetworkHoverTransitionController } from './network-hover';
 import { createNetworkLabelDrawers } from './network-label';
 import {
+  type NetworkTheme,
   NETWORK_LABEL_FONT_FAMILY,
-  OBSIDIAN_DARK_NETWORK_THEME,
+  networkThemeFor,
 } from './network-theme';
 import { createGlobalLayoutRequestFromAutomaticPositions } from './layout';
 import { automaticGlobalEdgeSize, automaticGlobalNodeSize } from './mapping';
@@ -116,6 +118,8 @@ import type {
 } from './types';
 
 export interface GlobalRendererSessionOptions {
+  /** App-resolved presentation theme; never inferred inside the renderer. */
+  readonly theme?: ResolvedTheme;
   readonly settings: GlobalLayoutSettings;
   readonly trackpadZoomMode: GlobalTrackpadZoomMode;
   /** Transient Sandbox policy; excluded from layout input and identity. */
@@ -239,6 +243,7 @@ export class GlobalRendererSession {
   private visualLod: GlobalVisualLod;
   private visualGroupStyles: VisualGroupPresentationMap | undefined;
   private presentationOverrides: EntityPresentationOverrideMap | undefined;
+  private networkTheme: NetworkTheme;
   private fileNodeKeys: ReturnType<typeof indexFileNodeKeys>;
   private referenceDegrees: ReadonlyMap<string, number>;
   private sizeStyleRefreshPending: Set<string> | undefined;
@@ -381,6 +386,7 @@ export class GlobalRendererSession {
   ) {
     this.container = container;
     this.options = options;
+    this.networkTheme = networkThemeFor(options.theme ?? 'dark');
     this.settings = resolveGlobalLayoutSettings(options.settings);
     this.visualSettings = resolveGlobalVisualSettings(options.settings);
     this.trackpadZoomMode = options.trackpadZoomMode;
@@ -422,7 +428,7 @@ export class GlobalRendererSession {
       hideEdgesOnMove: this.graph.size > 20_000,
       hideLabelsOnMove: false,
       labelDensity: 0.08,
-      labelColor: { color: OBSIDIAN_DARK_NETWORK_THEME.label },
+      labelColor: { color: this.networkTheme.label },
       labelFont: NETWORK_LABEL_FONT_FAMILY,
       labelGridCellSize: 120,
       labelRenderedSizeThreshold: this.settings.labelThreshold,
@@ -433,8 +439,8 @@ export class GlobalRendererSession {
       stagePadding: 24,
       defaultDrawNodeHover: labelDrawers.drawHover,
       defaultDrawNodeLabel: labelDrawers.drawLabel,
-      defaultEdgeColor: OBSIDIAN_DARK_NETWORK_THEME.edge,
-      defaultNodeColor: OBSIDIAN_DARK_NETWORK_THEME.node,
+      defaultEdgeColor: this.networkTheme.edge,
+      defaultNodeColor: this.networkTheme.node,
       nodeReducer: (key, attributes) => this.reduceNode(key, attributes),
       edgeReducer: (key, attributes) => this.reduceEdge(key, attributes),
     });
@@ -755,6 +761,7 @@ export class GlobalRendererSession {
       selected: key === this.selectedNode,
       lod: this.visualLod,
       settings: this.settings,
+      theme: this.networkTheme,
       automaticSize,
       ...(visualGroup === undefined ? {} : { visualGroup }),
       ...(sizeScale === undefined ? {} : { sizeScale }),
@@ -801,6 +808,7 @@ export class GlobalRendererSession {
       ...(arrangementRelation === undefined ? {} : { arrangementRelation }),
       hoverProgress,
       lod: this.visualLod,
+      theme: this.networkTheme,
     });
   }
 
@@ -1792,6 +1800,18 @@ export class GlobalRendererSession {
     return this.measureNextRender('labels-setting', () => {
       this.renderer.setSetting('renderLabels', enabled);
     });
+  }
+
+  /** Repaints cached Sigma presentation without touching graph or camera state. */
+  setTheme(theme: ResolvedTheme): void {
+    const next = networkThemeFor(theme);
+    if (next.id === this.networkTheme.id) return;
+    this.networkTheme = next;
+    this.renderer.setSetting('labelColor', { color: next.label });
+    this.renderer.setSetting('defaultEdgeColor', next.edge);
+    this.renderer.setSetting('defaultNodeColor', next.node);
+    this.options.instrumentation?.count('global-style-updates');
+    this.renderer.refresh({ skipIndexation: true, schedule: true });
   }
 
   setEdgeEvents(enabled: boolean): Promise<GlobalRendererMeasurement> {

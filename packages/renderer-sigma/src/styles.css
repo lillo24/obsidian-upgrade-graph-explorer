@@ -1,10 +1,5 @@
 .global-graph-canvas,
 .local-graph-canvas {
-  --network-graph-background: #1e1e1e;
-  --network-graph-control-background: #262626;
-  --network-graph-control-border: #3f3f3f;
-  --network-graph-control-hover: #363636;
-  --network-graph-text: #dadada;
   position: relative;
   width: 100%;
   height: 100%;
@@ -13,9 +8,68 @@
   background: var(--network-graph-background);
 }
 
+.global-graph-canvas[data-network-theme='obsidian-light'],
+.local-graph-canvas[data-network-theme='obsidian-light'] {
+  --network-graph-background: #ffffff;
+  --network-graph-control-background: #f6f6f6;
+  --network-graph-control-border: #d4d4d4;
+  --network-graph-control-hover: #e3e3e3;
+  --network-graph-text: #222222;
+  --network-graph-muted-text: #5c5c5c;
+  --network-graph-focus: #8a5cf5;
+  --network-graph-shadow: rgb(0 0 0 / 16%);
+  --network-arrange-spotlight: rgb(138 92 245 / 10%);
+  --network-arrange-dragging: rgb(152 115 247 / 10%);
+  --network-arrange-target-background: rgb(255 255 255 / 86%);
+  --network-arrange-target-shadow: rgb(138 92 245 / 18%);
+  --network-arrange-place: #a65f00;
+  --network-arrange-place-shadow: rgb(166 95 0 / 14%);
+  --network-arrange-surface: rgb(255 255 255 / 96%);
+  --network-arrange-border: rgb(36 106 124 / 28%);
+  --network-arrange-text: #243f46;
+  --network-arrange-muted: #52676c;
+  --network-arrange-subtle: #62767b;
+  --network-arrange-selected-border: #28788d;
+  --network-arrange-selected-background: #e5f5f8;
+  --network-arrange-selected-text: #164b58;
+  --network-arrange-scope-background: #f4f8f8;
+  --network-arrange-confirm-background: #fff4e5;
+  --network-status-background: rgb(246 246 246 / 94%);
+  --network-error-border: #b34853;
+  --network-error-background: #fff5f5;
+  --network-error-text: #7e2731;
+}
+
 .global-graph-canvas[data-network-theme='obsidian-dark'],
 .local-graph-canvas[data-network-theme='obsidian-dark'] {
-  background: var(--network-graph-background);
+  --network-graph-background: #1e1e1e;
+  --network-graph-control-background: #262626;
+  --network-graph-control-border: #3f3f3f;
+  --network-graph-control-hover: #363636;
+  --network-graph-text: #dadada;
+  --network-graph-muted-text: #b3b3b3;
+  --network-graph-focus: #a68af9;
+  --network-graph-shadow: rgb(0 0 0 / 36%);
+  --network-arrange-spotlight: rgb(166 138 249 / 10%);
+  --network-arrange-dragging: rgb(138 92 245 / 8%);
+  --network-arrange-target-background: rgb(30 30 30 / 82%);
+  --network-arrange-target-shadow: rgb(138 92 245 / 18%);
+  --network-arrange-place: #e9973f;
+  --network-arrange-place-shadow: rgb(233 151 63 / 18%);
+  --network-arrange-surface: rgb(38 38 38 / 96%);
+  --network-arrange-border: rgb(166 138 249 / 30%);
+  --network-arrange-text: #dadada;
+  --network-arrange-muted: #b3b3b3;
+  --network-arrange-subtle: #999999;
+  --network-arrange-selected-border: #a68af9;
+  --network-arrange-selected-background: rgb(138 92 245 / 18%);
+  --network-arrange-selected-text: #dadada;
+  --network-arrange-scope-background: #242424;
+  --network-arrange-confirm-background: #362b21;
+  --network-status-background: rgb(38 38 38 / 92%);
+  --network-error-border: #fb464c;
+  --network-error-background: #3b2021;
+  --network-error-text: #ffd4d6;
 }
 
 .global-graph-canvas__surface {
@@ -57,14 +111,14 @@
   background: radial-gradient(
     circle 8.5rem at var(--arrange-x) var(--arrange-y),
     transparent 0 50%,
-    rgb(166 138 249 / 10%) 100%
+    var(--network-arrange-spotlight) 100%
   );
   pointer-events: none;
   transition: background-color 120ms ease;
 }
 
 .global-graph-canvas__arrangement-spotlight--dragging {
-  background-color: rgb(138 92 245 / 8%);
+  background-color: var(--network-arrange-dragging);
 }
 
 .global-graph-canvas__target-marker {
@@ -76,10 +130,10 @@
   left: var(--arrange-target-x);
   width: 1.1rem;
   height: 1.1rem;
-  border: 2px solid #a68af9;
+  border: 2px solid var(--network-graph-focus);
   border-radius: 50%;
-  background: rgb(30 30 30 / 82%);
-  box-shadow: 0 0 0 0.35rem rgb(138 92 245 / 18%);
+  background: var(--network-arrange-target-background);
+  box-shadow: 0 0 0 0.35rem var(--network-arrange-target-shadow);
   cursor: grab;
   pointer-events: auto;
   touch-action: none;
@@ -88,7 +142,7 @@
 }
 
 .global-graph-canvas__target-marker:focus-visible {
-  outline: 3px solid rgb(166 138 249 / 48%);
+  outline: 3px solid var(--network-graph-focus);
   outline-offset: 0.42rem;
 }
 
@@ -104,8 +158,8 @@
 
 .global-graph-canvas__target-marker--place {
   border-radius: 0.18rem;
-  border-color: #a6671d;
-  box-shadow: 0 0 0 0.35rem rgb(166 103 29 / 14%);
+  border-color: var(--network-arrange-place);
+  box-shadow: 0 0 0 0.35rem var(--network-arrange-place-shadow);
 }
 
 .global-graph-empty {
@@ -117,13 +171,13 @@
   align-content: center;
   gap: 0.35rem;
   padding: 1rem;
-  color: #b3b3b3;
+  color: var(--network-graph-muted-text);
   text-align: center;
   pointer-events: none;
 }
 
 .global-graph-empty strong {
-  color: #dadada;
+  color: var(--network-graph-text);
   font-size: 1rem;
 }
 
@@ -153,7 +207,7 @@
   border: 1px solid var(--network-graph-control-border);
   border-radius: 0.6rem;
   background: var(--network-graph-control-background);
-  box-shadow: 0 0.55rem 1.2rem rgb(0 0 0 / 36%);
+  box-shadow: 0 0.55rem 1.2rem var(--network-graph-shadow);
 }
 
 .network-viewport-controls button {
@@ -182,7 +236,7 @@
 .network-viewport-controls button:focus-visible {
   position: relative;
   z-index: 1;
-  outline: 3px solid #a68af9;
+  outline: 3px solid var(--network-graph-focus);
   outline-offset: -3px;
 }
 
@@ -209,16 +263,16 @@
   display: flex;
   gap: 0.35rem;
   padding: 0.35rem;
-  border: 1px solid rgb(36 63 70 / 18%);
+  border: 1px solid var(--network-arrange-border);
   border-radius: 0.6rem;
-  background: rgb(255 255 255 / 92%);
-  box-shadow: 0 0.2rem 0.8rem rgb(23 42 47 / 12%);
+  background: var(--network-arrange-surface);
+  box-shadow: 0 0.2rem 0.8rem var(--network-graph-shadow);
 }
 
 .global-graph-canvas__arrangement-tools button[aria-pressed='true'] {
-  border-color: #28788d;
-  background: #e5f5f8;
-  color: #164b58;
+  border-color: var(--network-arrange-selected-border);
+  background: var(--network-arrange-selected-background);
+  color: var(--network-arrange-selected-text);
 }
 
 .global-graph-canvas__arrangement-panel {
@@ -230,15 +284,15 @@
   max-height: calc(100% - 1.5rem);
   overflow: auto;
   padding: 0.85rem;
-  border: 1px solid rgb(36 106 124 / 28%);
+  border: 1px solid var(--network-arrange-border);
   border-radius: 0.8rem;
-  background: rgb(255 255 255 / 96%);
-  box-shadow: 0 0.45rem 1.5rem rgb(23 42 47 / 16%);
-  color: #243f46;
+  background: var(--network-arrange-surface);
+  box-shadow: 0 0.45rem 1.5rem var(--network-graph-shadow);
+  color: var(--network-arrange-text);
 }
 
 .global-graph-canvas__arrangement-panel:focus-visible {
-  outline: 3px solid rgb(40 120 141 / 32%);
+  outline: 3px solid var(--network-graph-focus);
   outline-offset: 2px;
 }
 
@@ -260,7 +314,7 @@
 .global-graph-canvas__arrangement-position,
 .global-graph-canvas__arrangement-persistence {
   margin: 0.18rem 0 0;
-  color: #52676c;
+  color: var(--network-arrange-muted);
   font-size: 0.78rem;
   line-height: 1.35;
 }
@@ -271,14 +325,14 @@
 }
 
 .global-graph-canvas__arrangement-folder span {
-  color: #52676c;
+  color: var(--network-arrange-muted);
   font-size: 0.72rem;
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 
 .global-graph-canvas__arrangement-folder em {
-  color: #8b5517;
+  color: var(--network-arrange-place);
   font-size: 0.72rem;
   font-style: normal;
 }
@@ -289,13 +343,13 @@
   gap: 0.35rem 0.65rem;
   margin: 0.65rem 0 0;
   padding: 0.5rem;
-  border: 1px solid rgb(36 63 70 / 14%);
+  border: 1px solid var(--network-arrange-border);
   border-radius: 0.55rem;
 }
 
 .global-graph-canvas__rule-options legend {
   padding: 0 0.25rem;
-  color: #52676c;
+  color: var(--network-arrange-muted);
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -325,7 +379,7 @@
 .global-graph-canvas__scope-editor small,
 .global-graph-canvas__scope-row small,
 .global-graph-canvas__scope-summary {
-  color: #62767b;
+  color: var(--network-arrange-subtle);
   font-size: 0.72rem;
 }
 
@@ -338,19 +392,19 @@
   gap: 0.45rem;
   padding: 0.55rem;
   border-radius: 0.55rem;
-  background: #f4f8f8;
+  background: var(--network-arrange-scope-background);
 }
 
 .global-graph-canvas__scope-tree {
   max-height: 12rem;
   overflow: auto;
-  border-block: 1px solid rgb(36 63 70 / 10%);
+  border-block: 1px solid var(--network-arrange-border);
   padding-block: 0.25rem;
 }
 
 .global-graph-canvas__scope-tree > p {
   margin: 0.4rem;
-  color: #62767b;
+  color: var(--network-arrange-subtle);
   font-size: 0.76rem;
 }
 
@@ -379,7 +433,7 @@
 
 @keyframes spatial-scope-pulse {
   from {
-    background: rgb(40 120 141 / 20%);
+    background: var(--network-arrange-selected-background);
   }
 
   to {
@@ -437,14 +491,14 @@
 .global-graph-canvas__arrangement-persistence {
   margin: 0.7rem 0;
   padding-top: 0.55rem;
-  border-top: 1px solid rgb(36 63 70 / 12%);
+  border-top: 1px solid var(--network-arrange-border);
 }
 
 .global-graph-canvas__arrangement-confirm {
   flex-wrap: wrap;
   padding: 0.45rem;
   border-radius: 0.45rem;
-  background: #fff4e5;
+  background: var(--network-arrange-confirm-background);
   font-size: 0.78rem;
 }
 
@@ -463,8 +517,8 @@
   padding: 0.35rem 0.65rem;
   border: 1px solid var(--network-graph-control-border);
   border-radius: 999px;
-  background: rgb(38 38 38 / 92%);
-  box-shadow: 0 0.15rem 0.6rem rgb(0 0 0 / 24%);
+  background: var(--network-status-background);
+  box-shadow: 0 0.15rem 0.6rem var(--network-graph-shadow);
   color: var(--network-graph-text);
   font-size: 0.78rem;
   line-height: 1.25;
@@ -483,8 +537,8 @@
   padding: 0.35rem 0.65rem;
   border: 1px solid var(--network-graph-control-border);
   border-radius: 999px;
-  background: rgb(38 38 38 / 92%);
-  box-shadow: 0 0.15rem 0.6rem rgb(0 0 0 / 24%);
+  background: var(--network-status-background);
+  box-shadow: 0 0.15rem 0.6rem var(--network-graph-shadow);
   color: var(--network-graph-text);
   font-size: 0.78rem;
   line-height: 1.25;
@@ -501,10 +555,10 @@
   max-width: min(32rem, calc(100% - 8rem));
   margin: 0;
   padding: 0.65rem 0.8rem;
-  border: 1px solid #b34853;
+  border: 1px solid var(--network-error-border);
   border-radius: 0.5rem;
-  background: #fff5f5;
-  color: #7e2731;
+  background: var(--network-error-background);
+  color: var(--network-error-text);
 }
 
 .global-graph-canvas__arrangement-error {
@@ -515,11 +569,11 @@
   max-width: min(28rem, calc(100% - 1.5rem));
   margin: 0;
   padding: 0.55rem 0.75rem;
-  border: 1px solid #b84735;
+  border: 1px solid var(--network-error-border);
   border-radius: 0.55rem;
-  background: rgb(255 245 242 / 97%);
-  color: #7a2d22;
-  box-shadow: 0 0.25rem 0.9rem rgb(85 32 25 / 14%);
+  background: var(--network-error-background);
+  color: var(--network-error-text);
+  box-shadow: 0 0.25rem 0.9rem var(--network-graph-shadow);
   font-size: 0.78rem;
 }
 
@@ -550,10 +604,10 @@
   max-width: min(32rem, calc(100% - 8rem));
   margin: 0;
   padding: 0.65rem 0.8rem;
-  border: 1px solid #b34853;
+  border: 1px solid var(--network-error-border);
   border-radius: 0.5rem;
-  background: #fff5f5;
-  color: #7e2731;
+  background: var(--network-error-background);
+  color: var(--network-error-text);
 }
 
 @media (prefers-reduced-motion: reduce) {

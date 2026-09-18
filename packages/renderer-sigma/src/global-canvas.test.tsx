@@ -49,7 +49,7 @@ describe('GlobalGraphCanvas empty state', () => {
     expect(markup).not.toContain('All Network canvas controls');
   });
 
-  it('marks Focus Network with the same dark graph theme', () => {
+  it('marks both Network scopes with the app-resolved graph theme', () => {
     const markup = renderToStaticMarkup(
       <LocalGraphCanvas
         layoutRequestKey={0}
@@ -60,12 +60,14 @@ describe('GlobalGraphCanvas empty state', () => {
         projection={localTestProjection()}
         rootEntityId="root"
         selection={null}
+        theme="light"
         trackpadZoomMode="pinch-zoom"
       />,
     );
 
     expect(markup).toContain('local-graph-canvas__surface');
-    expect(markup).toContain('data-network-theme="obsidian-dark"');
+    expect(markup).toContain('data-network-theme="obsidian-light"');
+    expect(markup).toContain('data-theme="light"');
   });
 
   it('keeps exact in-memory cache restoration out of the user-facing status', () => {

@@ -52,7 +52,7 @@ import {
 } from './layout';
 import { GlobalGraphEmptyState } from './GlobalGraphEmptyState';
 import { NetworkViewportControls } from './NetworkViewportControls';
-import { NETWORK_GRAPH_THEME_ID } from './network-theme';
+import { networkThemeFor } from './network-theme';
 import { mountGlobalRendererSession } from './lifecycle';
 import {
   mapProjectionToGlobal,
@@ -503,6 +503,7 @@ export function GlobalGraphCanvas({
   const spotlightRef = useRef<HTMLDivElement>(null);
   const targetMarkerRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<GlobalRendererSession | undefined>(undefined);
+  const initialThemeRef = useRef(theme);
   const [cache] = useState(() => layoutCache ?? new GlobalLayoutCache());
   const [dynamicCache] = useState(
     () => spatialInfluenceCache ?? new GlobalSpatialInfluenceCache(),
@@ -1362,6 +1363,7 @@ export function GlobalGraphCanvas({
     const mounted = mountGlobalRendererSession(
       () =>
         new GlobalRendererSession(container, initial.input, {
+          theme: initialThemeRef.current,
           settings: initial.settings,
           trackpadZoomMode: initial.trackpadZoomMode,
           ...(initial.densityFramingStrength === undefined
@@ -1548,6 +1550,10 @@ export function GlobalGraphCanvas({
     folderArrangement?.active === true && arrangementAvailable
       ? `${fingerprint}:${layoutRequestKey}:${spatialSourceKey ?? 'no-source'}:${folderArrangement.activeFolderKey ?? 'no-folder'}`
       : undefined;
+
+  useEffect(() => {
+    sessionRef.current?.setTheme?.(theme);
+  }, [theme]);
 
   useEffect(() => {
     const previous = pullPreviewOwnerKeyRef.current;
@@ -2895,7 +2901,7 @@ export function GlobalGraphCanvas({
       className={`global-graph-canvas${folderArrangement?.active === true ? ' global-graph-canvas--arranging' : ''}`}
       data-arrangement-phase={arrangementGesturePhase}
       data-initial-presentation={initialPresentationReady ? 'ready' : 'pending'}
-      data-network-theme={NETWORK_GRAPH_THEME_ID}
+      data-network-theme={networkThemeFor(theme).id}
       data-theme={theme}
     >
       <div

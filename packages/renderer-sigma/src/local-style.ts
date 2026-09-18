@@ -8,8 +8,14 @@ import { resolveNetworkHoverEdgeWidthMultiplier } from './network-hover';
 import { applyNetworkNodeSizeScale } from './node-size';
 import {
   interpolateNetworkEdgeColor,
-  OBSIDIAN_DARK_NETWORK_THEME,
+  type NetworkTheme,
+  networkThemeFor,
 } from './network-theme';
+
+const KNOWN_NETWORK_THEMES = [
+  networkThemeFor('light'),
+  networkThemeFor('dark'),
+] as const;
 
 export function resolveLocalVisualLod(cameraRatio: number): LocalVisualLod {
   if (!Number.isFinite(cameraRatio) || cameraRatio <= 0) {
@@ -18,6 +24,31 @@ export function resolveLocalVisualLod(cameraRatio: number): LocalVisualLod {
   if (cameraRatio > 1.25) return 'far-local';
   if (cameraRatio > 0.42) return 'normal-local';
   return 'near-local';
+}
+
+function localNodeThemeColor(
+  attributes: LocalNodeAttributes,
+  theme: NetworkTheme,
+): string {
+  const colorForKind = (palette: NetworkTheme) =>
+    attributes.nodeKind === 'document'
+      ? palette.node
+      : attributes.nodeKind === 'section'
+        ? palette.sectionNode
+        : attributes.nodeKind === 'block'
+          ? palette.blockNode
+          : attributes.status === 'unresolved'
+            ? palette.unresolvedNode
+            : attributes.status === 'ambiguous'
+              ? palette.diagnosticAmbiguous
+              : attributes.status === 'invalid'
+                ? palette.diagnosticInvalid
+                : palette.node;
+  return KNOWN_NETWORK_THEMES.some(
+    (palette) => attributes.color === colorForKind(palette),
+  )
+    ? colorForKind(theme)
+    : attributes.color;
 }
 
 export function resolveLocalNodeStyle(
@@ -31,13 +62,16 @@ export function resolveLocalNodeStyle(
     readonly sizeScale?: number;
     /** Shared Network Base node size relative to the established Focus default. */
     readonly baseNodeSizeScale?: number;
+    readonly theme?: NetworkTheme;
   },
 ) {
+  const theme = context.theme ?? networkThemeFor('dark');
   const emphasized = context.selected || context.hovered;
+  const themeColor = localNodeThemeColor(attributes, theme);
   const baseColor =
     attributes.nodeKind !== 'diagnostic' && attributes.entityId !== null
-      ? (context.visualGroup?.accent ?? attributes.color)
-      : attributes.color;
+      ? (context.visualGroup?.accent ?? themeColor)
+      : themeColor;
   const labelVisible =
     emphasized ||
     attributes.root ||
@@ -58,11 +92,11 @@ export function resolveLocalNodeStyle(
     size,
     networkLabelLogicalSize: size,
     color: context.selected
-      ? OBSIDIAN_DARK_NETWORK_THEME.focusedNode
+      ? theme.focusedNode
       : context.hovered
-        ? OBSIDIAN_DARK_NETWORK_THEME.highlight
+        ? theme.highlight
         : attributes.root
-          ? OBSIDIAN_DARK_NETWORK_THEME.focusedNode
+          ? theme.focusedNode
           : baseColor,
     forceLabel: emphasized || attributes.root,
     highlighted: emphasized,
@@ -78,15 +112,20 @@ export function resolveLocalEdgeStyle(
     readonly lod: LocalVisualLod;
     /** Shared Network Link thickness relative to the established Focus default. */
     readonly linkThicknessScale?: number;
+    readonly theme?: NetworkTheme;
   },
 ) {
+  const theme = context.theme ?? networkThemeFor('dark');
   const hierarchy = attributes.edgeKind === 'hierarchy';
+  const expectedColors = KNOWN_NETWORK_THEMES.map((palette) => palette.edge);
   const baseColor = hierarchy
-    ? OBSIDIAN_DARK_NETWORK_THEME.hierarchyEdge
-    : attributes.color;
+    ? theme.hierarchyEdge
+    : expectedColors.includes(attributes.color)
+      ? theme.edge
+      : attributes.color;
   return {
     ...attributes,
-    color: interpolateNetworkEdgeColor(baseColor, context.hoverProgress),
+    color: interpolateNetworkEdgeColor(baseColor, context.hoverProgress, theme),
     // Focus is already a bounded projection: far LOD simplifies styling, never
     // removes its reference relationships. All Network has a separate policy.
     hidden: false,
