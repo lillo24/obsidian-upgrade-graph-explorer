@@ -410,10 +410,10 @@ The exact FIX4 prompt is archived at
 Its SHA-256 is
 `522CDB10D878622C1EEDC5DA852F32E524BF3C25D5D804C55367EDBC600147E0`.
 
-The complete repository gate passes 278 test files / 2,361 tests plus
+The complete repository gate passes 280 test files / 2,374 tests plus
 formatting, lint, all workspace typechecks, and the production web build.
 Desktop formatting/check, 16 Rust tests, and the optimized release build pass.
 The QA executable is
 `output/hier4b-spacing-fix4-immediate-folder-unity-native-candidate.exe`;
 its SHA-256 is
-`F04E47B123E16B8BD2A54E6DFA82BD5D359AAA8DBB5D363C4B6865427BA20305`.
+`81848929DD3BADF070C62CEAEF5DB423FC33CD4CBC288C9E7BA6286D3D21B9F8`.
