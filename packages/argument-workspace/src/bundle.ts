@@ -1,4 +1,5 @@
 import { clonePlainData } from './canonical';
+import { createContextResolver, resolveArgumentBackground } from './contexts';
 import { createArgumentStalenessEvaluator, responseStaleness } from './library';
 import type {
   ArgumentBundle,
@@ -41,6 +42,8 @@ function recordKinds(
 ): readonly ArgumentRecordKind[] {
   const kinds: ArgumentRecordKind[] = [];
   if (library.topics.some((record) => record.id === id)) kinds.push('topic');
+  if (library.contexts.some((record) => record.id === id))
+    kinds.push('context');
   if (library.axioms.some((record) => record.id === id)) kinds.push('axiom');
   if (library.arguments.some((record) => record.id === id)) {
     kinds.push('argument');
@@ -68,6 +71,10 @@ export function assembleArgumentBundle(
   const maxRecords = request.maxRecords ?? 100;
   const maxDepth = request.maxDepth ?? 8;
   const topics = new Map(library.topics.map((record) => [record.id, record]));
+  const contexts = new Map(
+    library.contexts.map((record) => [record.id, record]),
+  );
+  const resolveContext = createContextResolver(library);
   const axioms = new Map(library.axioms.map((record) => [record.id, record]));
   const argumentsById = new Map(
     library.arguments.map((record) => [record.id, record]),
@@ -77,6 +84,7 @@ export function assembleArgumentBundle(
     library.counterArguments.map((record) => [record.id, record]),
   );
   const topicIds = new Set<string>();
+  const contextIds = new Set<string>();
   const axiomIds = new Set<string>();
   const argumentIds = new Set<string>();
   const counterIds = new Set<string>();
@@ -102,6 +110,21 @@ export function assembleArgumentBundle(
   const visitingArguments = new Set<string>();
   const visitingCounters = new Set<string>();
 
+  const addContext = (id: string, depth: number): void => {
+    const context = contexts.get(id);
+    if (context === undefined) return;
+    contextIds.add(id);
+    context.axiomIds.forEach((axiomId) => axiomIds.add(axiomId));
+    if (context.parentContextId === undefined) return;
+    if (depth >= maxDepth) {
+      omissions.add(
+        `Context parent chain beyond depth ${maxDepth} from ${id}.`,
+      );
+      return;
+    }
+    addContext(context.parentContextId, depth + 1);
+  };
+
   const addArgument = (
     id: string,
     depth: number,
@@ -117,6 +140,7 @@ export function assembleArgumentBundle(
       return;
     }
     visitingArguments.add(id);
+    argument.contextIds.forEach((contextId) => addContext(contextId, depth));
     for (const premise of argument.premises) {
       if (premise.kind === 'axiom') {
         axiomIds.add(premise.axiomId);
@@ -221,6 +245,8 @@ export function assembleArgumentBundle(
       addArgument(topic.currentArgumentId, 0, false);
       addDirectArgumentCounters(topic.currentArgumentId);
     }
+  } else if (kind === 'context') {
+    addContext(request.id, 0);
   } else if (kind === 'axiom') {
     axiomIds.add(request.id);
     addMembershipTopics('axiom', request.id);
@@ -246,6 +272,10 @@ export function assembleArgumentBundle(
     ...[...topicIds].map((id) => ({
       kind: 'topic' as const,
       record: topics.get(id)!,
+    })),
+    ...[...contextIds].map((id) => ({
+      kind: 'context' as const,
+      record: contexts.get(id)!,
     })),
     ...[...axiomIds].map((id) => ({
       kind: 'axiom' as const,
@@ -287,6 +317,17 @@ export function assembleArgumentBundle(
 
   const bundleTopics = [...topicIds]
     .map((id) => topics.get(id)!)
+    .sort((left, right) => left.id.localeCompare(right.id));
+  const bundleContexts = [...contextIds]
+    .map((id) => {
+      const resolved = resolveContext(id);
+      return {
+        ...resolved.context,
+        parentContextIds: resolved.parentContextIds,
+        inheritedAxiomIds: resolved.inheritedAxiomIds,
+        effectiveAxiomIds: resolved.effectiveAxiomIds,
+      };
+    })
     .sort((left, right) => left.id.localeCompare(right.id));
   const bundleAxioms = [...axiomIds]
     .map((id) => {
@@ -386,6 +427,28 @@ export function assembleArgumentBundle(
           targetPart: relation.targetPart,
         };
       });
+      const background = resolveArgumentBackground(
+        library,
+        argument.contextIds,
+      );
+      const resolvedContexts = background.contexts.map((resolved) => ({
+        contextId: resolved.context.id,
+        parentContextIds: resolved.parentContextIds,
+        directAxiomIds: resolved.context.axiomIds,
+        effectiveAxiomIds: resolved.effectiveAxiomIds,
+      }));
+      const backgroundAxioms = background.axioms.map(
+        ({ axiomId, viaContextIds }) => {
+          const axiom = axioms.get(axiomId)!;
+          return {
+            axiomId,
+            revision: axiom.revision,
+            title: axiom.title,
+            archived: axiom.archived,
+            viaContextIds,
+          };
+        },
+      );
       return {
         ...argument,
         argumentStale: stale.stale,
@@ -397,6 +460,8 @@ export function assembleArgumentBundle(
         supersededByArgumentIds,
         targetingCounterArgumentIds,
         incomingRelationIds,
+        resolvedContexts,
+        backgroundAxioms,
         resolvedPremises,
         resolvedRelations,
       };
@@ -415,6 +480,7 @@ export function assembleArgumentBundle(
     .sort((left, right) => left.id.localeCompare(right.id));
   for (const record of [
     ...bundleTopics,
+    ...bundleContexts,
     ...bundleAxioms,
     ...bundleArguments,
     ...bundleCounters,
@@ -463,6 +529,7 @@ export function assembleArgumentBundle(
     value: clonePlainData({
       selector: { kind, id: request.id },
       topics: bundleTopics,
+      contexts: bundleContexts,
       axioms: bundleAxioms,
       arguments: bundleArguments,
       counterArguments: bundleCounters,

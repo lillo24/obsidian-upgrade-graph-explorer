@@ -9,20 +9,23 @@ Argument Workspace has two deliberately separate JSON workflows:
   Current without supplying library metadata.
 
 Insert JSON is useful for payloads drafted by an external assistant, but the
-payload is not trusted or written automatically. A user must paste it, inspect
-the non-mutating preview, and confirm the snapshot-bound transaction. This does
-not add a write tool to AI Review or the Compiler interface.
+payload is not trusted or written automatically. A user may select a local
+`.json` file (up to 5 MiB) or paste the document manually, inspect the
+non-mutating preview, and confirm the snapshot-bound transaction. A selected
+file is loaded into the same editable text area as pasted JSON. This does not
+add a write tool to AI Review or the Compiler interface.
 
 ## Format
 
 The root `format` is required and must be
-`argument-workspace-insert-v1`. The six arrays are optional and default to
+`argument-workspace-insert-v1`. The seven arrays are optional and default to
 empty, but the document must contain at least one record or operation.
 
 ```json
 {
   "format": "argument-workspace-insert-v1",
   "topics": [],
+  "contexts": [],
   "axioms": [],
   "arguments": [],
   "counterArguments": [],
@@ -31,12 +34,15 @@ empty, but the document must contain at least one record or operation.
 }
 ```
 
-Record fields follow the existing Topic, Axiom, Argument, and Counter-Argument
+Record fields follow the existing Topic, Context, Axiom, Argument, and Counter-Argument
 create inputs. The payload does not accept `libraryId`, schema/library revision,
 fingerprints, timestamps, record revisions, or archive state; the authoring
 transaction assigns those canonical fields. Every new record must have an
 explicit stable ID. Argument Examples, Premises, and relations also require
-explicit IDs so same-payload references are deterministic.
+explicit IDs so same-payload references are deterministic. Contexts may name
+one `parentContextId` and ordered direct `axiomIds`; Arguments may attach them
+through `contextIds`. These references may target existing records or records
+created in the same payload.
 
 `memberships` supports the existing `axiom`, `argument`, and
 `counter-argument` kinds. V1 is additive: omit `present` or set it to `true`.
@@ -58,8 +64,9 @@ revision or validation fails; it is never silently replaced.
 
 References may point to an existing record or to another record created by the
 same payload. The complete candidate is validated together, so JSON array order
-does not control dependency resolution. Inference-premise and supersession
-cycles fail. Attack/support cycles remain valid debate structure.
+does not control dependency resolution. Inference-premise, supersession, and
+Context-inheritance cycles fail. Context inheritance remains separate from the
+inference graph, and attack/support cycles remain valid debate structure.
 
 Preview rejects unknown fields, duplicate or colliding IDs, missing Examples or
 record references, malformed target parts, invalid promotions, invalid source

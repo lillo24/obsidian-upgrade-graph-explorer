@@ -16,6 +16,7 @@ import {
   validateArgumentLibrary,
   validateArgumentLibraryV1,
   validateArgumentLibraryV2,
+  validateArgumentLibraryV3,
 } from './validation';
 
 export function serializeArgumentLibrary(library: ArgumentLibrary): string {
@@ -65,6 +66,22 @@ export function parseArgumentLibraryJson(
       ...migration,
       preservedSource: source,
     };
+  }
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value as { readonly schemaVersion?: unknown }).schemaVersion === 3
+  ) {
+    const migration = migrateArgumentLibraryV3(value);
+    if (migration.status === 'valid') {
+      return {
+        status: 'valid',
+        value: migration.value,
+        migratedFromSchemaVersion: 3,
+      };
+    }
+    return { ...migration, preservedSource: source };
   }
   if (
     typeof value === 'object' &&
@@ -172,6 +189,33 @@ export function migrateArgumentLibraryV2(
       }),
     ),
   };
+  return migrateArgumentLibraryV3(candidate);
+}
+
+/** Deterministically adds Context storage and empty Argument bindings. */
+export function migrateArgumentLibraryV3(
+  value: unknown,
+): ArgumentLibraryMigrationResult {
+  const legacyValidation = validateArgumentLibraryV3(value);
+  if (!legacyValidation.valid) {
+    const first = legacyValidation.issues[0];
+    return {
+      status: 'invalid-library',
+      message: `Argument Library v3 is invalid${
+        first === undefined ? '.' : ` at ${first.path}: ${first.message}`
+      }`,
+      issues: legacyValidation.issues,
+    };
+  }
+  const legacy = clonePlainData(legacyValidation.value);
+  const candidate = {
+    ...legacy,
+    schemaVersion: 4,
+    contexts: [],
+    arguments: (legacy.arguments as readonly Record<string, unknown>[]).map(
+      (argument) => ({ ...argument, contextIds: [] }),
+    ),
+  };
   const migratedValidation = validateArgumentLibrary(candidate);
   if (!migratedValidation.valid) {
     const first = migratedValidation.issues[0];
@@ -215,6 +259,7 @@ function recordsByKind(library: ArgumentLibrary): readonly {
 }[] {
   return [
     { kind: 'topic', values: library.topics },
+    { kind: 'context', values: library.contexts },
     { kind: 'axiom', values: library.axioms },
     { kind: 'argument', values: library.arguments },
     { kind: 'counter-argument', values: library.counterArguments },
@@ -380,6 +425,7 @@ export function mergeArgumentLibraries(
     libraryRevision: current.libraryRevision + 1,
     updatedAt: now,
     topics: merge(current.topics, incoming.topics),
+    contexts: merge(current.contexts, incoming.contexts),
     axioms: merge(current.axioms, incoming.axioms),
     arguments: merge(current.arguments, incoming.arguments),
     counterArguments: merge(

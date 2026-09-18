@@ -24,7 +24,7 @@ it('serves initialize, tools/list, and tools/call over clean stdio', async () =>
   const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
   const temporary = await mkdtemp(join(tmpdir(), 'icarus-argument-mcp-stdio-'));
   const serverPath = join(temporary, 'server.mjs');
-  const libraryPath = join(temporary, 'library-v3.json');
+  const libraryPath = join(temporary, 'library-v4.json');
   const { library } = createSyntheticLibrary();
   await writeFile(libraryPath, serializeArgumentLibrary(library), 'utf8');
   await build({
@@ -33,6 +33,7 @@ it('serves initialize, tools/list, and tools/call over clean stdio', async () =>
     platform: 'node',
     format: 'esm',
     target: 'node22',
+    loader: { '.md': 'text' },
     outfile: serverPath,
     logLevel: 'silent',
   });
@@ -56,7 +57,22 @@ it('serves initialize, tools/list, and tools/call over clean stdio', async () =>
   try {
     await client.connect(transport);
     const tools = await client.listTools();
+    expect(tools.tools.map(({ name }) => name)).toContain(
+      'compiler_usage_guide',
+    );
     expect(tools.tools.map(({ name }) => name)).toContain('compiler_status');
+    const guide = await client.callTool({
+      name: 'compiler_usage_guide',
+      arguments: {},
+    });
+    expect(guide.structuredContent).toMatchObject({
+      status: 'ok',
+      version: 'argument-compiler-ai-usage-v1',
+      format: 'markdown',
+      guide: expect.stringContaining(
+        'search result -> plausible prior record -> compiler_read_bundle',
+      ),
+    });
     const status = await client.callTool({
       name: 'compiler_status',
       arguments: {},

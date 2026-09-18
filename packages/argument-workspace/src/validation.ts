@@ -395,7 +395,7 @@ function validateTopic(
   value: unknown,
   path: string,
   issues: ArgumentLibraryValidationIssue[],
-  schemaVersion: 1 | 2 | 3 = 3,
+  schemaVersion: 1 | 2 | 3 | 4 = 4,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected a Topic.');
@@ -439,7 +439,7 @@ function validateArgumentPremise(
   path: string,
   ownerId: unknown,
   issues: ArgumentLibraryValidationIssue[],
-  schemaVersion: 2 | 3 = 3,
+  schemaVersion: 2 | 3 | 4 = 4,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected an Argument premise.');
@@ -449,13 +449,13 @@ function validateArgumentPremise(
     fields(
       value,
       ['id', 'kind', 'text'],
-      schemaVersion === 3 ? ['exampleIds'] : [],
+      schemaVersion >= 3 ? ['exampleIds'] : [],
       path,
       issues,
     );
     nonEmptyString(value.id, `${path}.id`, issues);
     nonEmptyString(value.text, `${path}.text`, issues);
-    if (schemaVersion === 3 && Object.hasOwn(value, 'exampleIds')) {
+    if (schemaVersion >= 3 && Object.hasOwn(value, 'exampleIds')) {
       stringArray(value.exampleIds, `${path}.exampleIds`, issues);
     }
     return;
@@ -464,7 +464,7 @@ function validateArgumentPremise(
     fields(
       value,
       ['id', 'kind', 'axiomId', 'reliedOnRevision'],
-      schemaVersion === 3 ? ['exampleIds'] : [],
+      schemaVersion >= 3 ? ['exampleIds'] : [],
       path,
       issues,
     );
@@ -475,7 +475,7 @@ function validateArgumentPremise(
       `${path}.reliedOnRevision`,
       issues,
     );
-    if (schemaVersion === 3 && Object.hasOwn(value, 'exampleIds')) {
+    if (schemaVersion >= 3 && Object.hasOwn(value, 'exampleIds')) {
       stringArray(value.exampleIds, `${path}.exampleIds`, issues);
     }
     return;
@@ -484,7 +484,7 @@ function validateArgumentPremise(
     fields(
       value,
       ['id', 'kind', 'argumentId', 'reliedOnRevision'],
-      schemaVersion === 3 ? ['exampleIds'] : [],
+      schemaVersion >= 3 ? ['exampleIds'] : [],
       path,
       issues,
     );
@@ -505,12 +505,12 @@ function validateArgumentPremise(
       `${path}.reliedOnRevision`,
       issues,
     );
-    if (schemaVersion === 3 && Object.hasOwn(value, 'exampleIds')) {
+    if (schemaVersion >= 3 && Object.hasOwn(value, 'exampleIds')) {
       stringArray(value.exampleIds, `${path}.exampleIds`, issues);
     }
     return;
   }
-  if (value.kind === 'argument-premise' && schemaVersion === 3) {
+  if (value.kind === 'argument-premise' && schemaVersion >= 3) {
     fields(
       value,
       ['id', 'kind', 'argumentId', 'premiseId', 'reliedOnRevision'],
@@ -549,7 +549,7 @@ function validateArgument(
   path: string,
   issues: ArgumentLibraryValidationIssue[],
   sourceIds: Set<string>,
-  schemaVersion: 2 | 3 = 3,
+  schemaVersion: 2 | 3 | 4 = 4,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected an Argument.');
@@ -560,16 +560,17 @@ function validateArgument(
     [
       ...METADATA_FIELDS,
       'title',
-      ...(schemaVersion === 3 ? ['examples'] : []),
+      ...(schemaVersion >= 3 ? ['examples'] : []),
       'premises',
       'conclusion',
-      ...(schemaVersion === 3 ? ['relations'] : []),
+      ...(schemaVersion >= 3 ? ['relations'] : []),
+      ...(schemaVersion >= 4 ? ['contextIds'] : []),
       'retrieval',
       'sourceReferences',
     ],
     [
       'reasoning',
-      ...(schemaVersion === 3 ? ['boundary'] : []),
+      ...(schemaVersion >= 3 ? ['boundary'] : []),
       'supersedesArgumentId',
     ],
     path,
@@ -577,7 +578,7 @@ function validateArgument(
   );
   validateMetadata(value, path, issues);
   nonEmptyString(value.title, `${path}.title`, issues);
-  if (schemaVersion === 3) {
+  if (schemaVersion >= 3) {
     if (!Array.isArray(value.examples)) {
       issue(issues, `${path}.examples`, 'invalid-type', 'Expected an array.');
     } else {
@@ -635,10 +636,10 @@ function validateArgument(
     nonEmptyString(value.reasoning, `${path}.reasoning`, issues);
   }
   nonEmptyString(value.conclusion, `${path}.conclusion`, issues);
-  if (schemaVersion === 3 && Object.hasOwn(value, 'boundary')) {
+  if (schemaVersion >= 3 && Object.hasOwn(value, 'boundary')) {
     nonEmptyString(value.boundary, `${path}.boundary`, issues);
   }
-  if (schemaVersion === 3) {
+  if (schemaVersion >= 3) {
     if (!Array.isArray(value.relations)) {
       issue(issues, `${path}.relations`, 'invalid-type', 'Expected an array.');
     } else {
@@ -708,6 +709,9 @@ function validateArgument(
         }
       });
     }
+  }
+  if (schemaVersion >= 4) {
+    stringArray(value.contextIds, `${path}.contextIds`, issues);
   }
   validateRetrieval(value.retrieval, `${path}.retrieval`, issues);
   if (Object.hasOwn(value, 'supersedesArgumentId')) {
@@ -790,6 +794,43 @@ function validateAxiom(
         issues,
         sourceIds,
       ),
+    );
+  }
+}
+
+function validateContext(
+  value: unknown,
+  path: string,
+  issues: ArgumentLibraryValidationIssue[],
+): void {
+  if (!isRecord(value)) {
+    issue(issues, path, 'invalid-type', 'Expected a Context.');
+    return;
+  }
+  fields(
+    value,
+    [...METADATA_FIELDS, 'title', 'retrieval', 'axiomIds'],
+    ['description', 'parentContextId'],
+    path,
+    issues,
+  );
+  validateMetadata(value, path, issues);
+  nonEmptyString(value.title, `${path}.title`, issues);
+  if (Object.hasOwn(value, 'description')) {
+    nonEmptyString(value.description, `${path}.description`, issues);
+  }
+  validateRetrieval(value.retrieval, `${path}.retrieval`, issues);
+  stringArray(value.axiomIds, `${path}.axiomIds`, issues);
+  if (
+    Object.hasOwn(value, 'parentContextId') &&
+    nonEmptyString(value.parentContextId, `${path}.parentContextId`, issues) &&
+    value.parentContextId === value.id
+  ) {
+    issue(
+      issues,
+      `${path}.parentContextId`,
+      'self-reference',
+      'A Context cannot inherit from itself.',
     );
   }
 }
@@ -1034,6 +1075,7 @@ function collectIds(
 function validateIntegrity(
   library: PlainRecord,
   topicIds: ReadonlySet<string>,
+  contextIds: ReadonlySet<string>,
   axiomIds: ReadonlySet<string>,
   argumentIds: ReadonlySet<string>,
   counterIds: ReadonlySet<string>,
@@ -1041,6 +1083,15 @@ function validateIntegrity(
 ): void {
   const argumentsById = new Map<string, PlainRecord>();
   const argumentIndexById = new Map<string, number>();
+  const contextsById = new Map<string, PlainRecord>();
+  const contextIndexById = new Map<string, number>();
+  if (Array.isArray(library.contexts)) {
+    library.contexts.forEach((entry, index) => {
+      if (!isRecord(entry) || typeof entry.id !== 'string') return;
+      contextsById.set(entry.id, entry);
+      contextIndexById.set(entry.id, index);
+    });
+  }
   if (Array.isArray(library.arguments)) {
     library.arguments.forEach((entry, index) => {
       if (!isRecord(entry) || typeof entry.id !== 'string') return;
@@ -1114,6 +1165,34 @@ function validateIntegrity(
             'The current Argument cannot be archived.',
           );
         }
+      }
+    });
+  }
+  if (Array.isArray(library.contexts)) {
+    library.contexts.forEach((entry, index) => {
+      if (!isRecord(entry)) return;
+      if (Array.isArray(entry.axiomIds)) {
+        entry.axiomIds.forEach((id, memberIndex) => {
+          if (typeof id === 'string' && !axiomIds.has(id)) {
+            issue(
+              issues,
+              `$.contexts[${index}].axiomIds[${memberIndex}]`,
+              'missing-reference',
+              `Unknown Axiom "${id}".`,
+            );
+          }
+        });
+      }
+      if (
+        typeof entry.parentContextId === 'string' &&
+        !contextIds.has(entry.parentContextId)
+      ) {
+        issue(
+          issues,
+          `$.contexts[${index}].parentContextId`,
+          'missing-reference',
+          `Unknown parent Context "${entry.parentContextId}".`,
+        );
       }
     });
   }
@@ -1245,6 +1324,18 @@ function validateIntegrity(
               `${relationPath}.targetPart`,
               'missing-reference',
               'The target Argument has no reasoning section.',
+            );
+          }
+        });
+      }
+      if (Array.isArray(entry.contextIds)) {
+        entry.contextIds.forEach((id, contextIndex) => {
+          if (typeof id === 'string' && !contextIds.has(id)) {
+            issue(
+              issues,
+              `$.arguments[${index}].contextIds[${contextIndex}]`,
+              'missing-reference',
+              `Unknown Context "${id}".`,
             );
           }
         });
@@ -1405,11 +1496,37 @@ function validateIntegrity(
       ? [record.supersedesArgumentId]
       : [],
   );
+
+  const contextState = new Map<string, 'visiting' | 'visited'>();
+  const visitContext = (id: string): void => {
+    const current = contextState.get(id);
+    if (current === 'visited' || current === 'visiting') return;
+    contextState.set(id, 'visiting');
+    const record = contextsById.get(id);
+    const parentId = record?.parentContextId;
+    if (typeof parentId === 'string' && contextsById.has(parentId)) {
+      if (contextState.get(parentId) === 'visiting') {
+        const recordIndex = contextIndexById.get(id);
+        issue(
+          issues,
+          recordIndex === undefined
+            ? '$.contexts'
+            : `$.contexts[${recordIndex}].parentContextId`,
+          'dependency-cycle',
+          'Context parent links must not form an inheritance cycle.',
+        );
+      } else {
+        visitContext(parentId);
+      }
+    }
+    contextState.set(id, 'visited');
+  };
+  for (const id of contextsById.keys()) visitContext(id);
 }
 
 function validateArgumentLibraryVersion(
   value: unknown,
-  expectedVersion: 2 | 3,
+  expectedVersion: 2 | 3 | 4,
 ): ArgumentLibraryValidationResult {
   const issues: ArgumentLibraryValidationIssue[] = [];
   if (!isRecord(value)) {
@@ -1433,6 +1550,7 @@ function validateArgumentLibraryVersion(
       'createdAt',
       'updatedAt',
       'topics',
+      ...(expectedVersion >= 4 ? ['contexts'] : []),
       'axioms',
       'arguments',
       'counterArguments',
@@ -1466,6 +1584,10 @@ function validateArgumentLibraryVersion(
   timestamp(value.updatedAt, '$.updatedAt', issues);
   const globalIds = new Set<string>();
   const topicIds = collectIds(value.topics, '$.topics', issues, globalIds);
+  const contextIds =
+    expectedVersion >= 4
+      ? collectIds(value.contexts, '$.contexts', issues, globalIds)
+      : new Set<string>();
   const axiomIds = collectIds(value.axioms, '$.axioms', issues, globalIds);
   const argumentIds = collectIds(
     value.arguments,
@@ -1483,6 +1605,10 @@ function validateArgumentLibraryVersion(
   if (Array.isArray(value.topics))
     value.topics.forEach((entry, index) =>
       validateTopic(entry, `$.topics[${index}]`, issues, expectedVersion),
+    );
+  if (expectedVersion >= 4 && Array.isArray(value.contexts))
+    value.contexts.forEach((entry, index) =>
+      validateContext(entry, `$.contexts[${index}]`, issues),
     );
   if (Array.isArray(value.axioms))
     value.axioms.forEach((entry, index) =>
@@ -1507,7 +1633,15 @@ function validateArgumentLibraryVersion(
         sourceIds,
       ),
     );
-  validateIntegrity(value, topicIds, axiomIds, argumentIds, counterIds, issues);
+  validateIntegrity(
+    value,
+    topicIds,
+    contextIds,
+    axiomIds,
+    argumentIds,
+    counterIds,
+    issues,
+  );
   return issues.length === 0
     ? { valid: true, value: value as unknown as ArgumentLibrary, issues: [] }
     : { valid: false, issues };
@@ -1516,7 +1650,28 @@ function validateArgumentLibraryVersion(
 export function validateArgumentLibrary(
   value: unknown,
 ): ArgumentLibraryValidationResult {
-  return validateArgumentLibraryVersion(value, 3);
+  return validateArgumentLibraryVersion(value, 4);
+}
+
+export type ArgumentLibraryV3ValidationResult =
+  | {
+      readonly valid: true;
+      readonly value: PlainRecord;
+      readonly issues: readonly [];
+    }
+  | {
+      readonly valid: false;
+      readonly issues: readonly ArgumentLibraryValidationIssue[];
+    };
+
+/** Strictly validates the schema-v3 shape before deterministic migration. */
+export function validateArgumentLibraryV3(
+  value: unknown,
+): ArgumentLibraryV3ValidationResult {
+  const validation = validateArgumentLibraryVersion(value, 3);
+  return validation.valid
+    ? { valid: true, value: value as PlainRecord, issues: [] }
+    : validation;
 }
 
 export type ArgumentLibraryV2ValidationResult =
@@ -1634,6 +1789,7 @@ export function validateArgumentLibraryV1(
   validateIntegrity(
     value,
     topicIds,
+    new Set<string>(),
     axiomIds,
     new Set<string>(),
     counterIds,

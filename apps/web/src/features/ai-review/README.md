@@ -8,6 +8,11 @@ current confirmed Argument Library snapshot through REVIEW1's read-only
 compiler protocol. It does not own graph state, argument records, native paths,
 or provider transport.
 
+Context/Axiom Group records pass through that retained read-only adapter as
+background. Their effective Axioms remain explicitly separate from Argument
+premises, never become inference dependencies, and cannot be mutated by an AI
+Review tool call.
+
 ```text
 controller.ts            Source lifecycle, setup, capture, prompt previews,
                          history/imports, and optional injected engine runs.

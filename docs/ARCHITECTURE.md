@@ -190,13 +190,15 @@ narrow bridge and scheduler keep all provider tests independent of a native
 runtime.
 
 `packages/argument-workspace` is an independent source-neutral domain and
-application boundary for one local Argument Library. Its schema-v3
-Topic/Axiom/Argument/Counter-Argument data is not added to the canonical
-Markdown graph. Arguments own scoped Examples, ordered authored or
+application boundary for one local Argument Library. Its schema-v4
+Topic/Context/Axiom/Argument/Counter-Argument data is not added to the canonical
+Markdown graph. Contexts are named, ordered Axiom groups with zero or one
+parent; their inherited effective Axioms are interpretive background and never
+implicit inference dependencies. Arguments own scoped Examples, ordered authored or
 revision-pinned Axiom/conclusion/prior-premise dependencies, optional reasoning,
 conclusions, Boundary/Invariance prose, explicit attack/support relations, and
 separate supersession links; Topics expose an explicit Current pointer without
-truth semantics. The package owns strict validation and v1/v2 migration, stable
+truth semantics. The package owns strict validation and v1/v2/v3 migration, stable
 record/library revisions, portable source locators, premise/relation/response
 staleness and explicit reassessment, deterministic
 descriptive indexing, JSON/Markdown interchange, serialized expected-snapshot
@@ -206,8 +208,8 @@ store access, agent role, review stage, graph/view state, or model dependency.
 
 `apps/web/src/persistence/argument-library.ts` adapts that store contract to one
 stable profile-level localStorage key. `packages/argument-workspace-tauri`
-adapts it to dedicated private app-local schema-v3 JSON using validated
-temporary-sibling replacement and preserves migrated schema-v1/v2 files.
+adapts it to dedicated private app-local schema-v4 JSON using validated
+temporary-sibling replacement and preserves migrated schema-v1/v2/v3 files.
 Neither adapter uses the graph view registry, selected-vault Markdown, or
 workspace identity catalog. Live theory-source acquisition remains a later host
 adapter behind the Argument Workspace's narrow registered-reference reader; it

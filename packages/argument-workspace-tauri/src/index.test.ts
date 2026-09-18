@@ -59,10 +59,50 @@ const runtime = {
 };
 
 describe('Tauri Argument Library storage', () => {
+  it('prefers and preserves a recoverable v3 file while creating v4', async () => {
+    const bridge = new MemoryBridge();
+    const legacyPath = '/app-local/argument-workspace/library-v3.json';
+    const currentPath = '/app-local/argument-workspace/library-v4.json';
+    const legacy = JSON.stringify({
+      schemaVersion: 3,
+      libraryId: 'legacy-v3-library',
+      libraryRevision: 3,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      topics: [],
+      axioms: [],
+      arguments: [],
+      counterArguments: [],
+    });
+    bridge.files.set(legacyPath, legacy);
+    bridge.files.set(
+      '/app-local/argument-workspace/library-v2.json',
+      JSON.stringify({ schemaVersion: 2 }),
+    );
+    const store = createTauriArgumentLibraryStore({
+      bridge,
+      temporaryToken: () => 'v3-migration',
+    });
+
+    expect(await store.load()).toMatchObject({
+      status: 'loaded',
+      snapshot: {
+        library: { schemaVersion: 4, libraryId: 'legacy-v3-library' },
+      },
+    });
+    expect(bridge.files.get(legacyPath)).toBe(legacy);
+    expect(
+      parseArgumentLibraryJson(bridge.files.get(currentPath)!),
+    ).toMatchObject({
+      status: 'valid',
+      value: { schemaVersion: 4, libraryId: 'legacy-v3-library' },
+    });
+  });
+
   it('migrates a legacy file atomically and keeps the v1 source recoverable', async () => {
     const bridge = new MemoryBridge();
     const legacyPath = '/app-local/argument-workspace/library-v1.json';
-    const currentPath = '/app-local/argument-workspace/library-v3.json';
+    const currentPath = '/app-local/argument-workspace/library-v4.json';
     const legacy = JSON.stringify({
       schemaVersion: 1,
       libraryId: 'legacy-library',
@@ -83,21 +123,21 @@ describe('Tauri Argument Library storage', () => {
 
     expect(loaded).toMatchObject({
       status: 'loaded',
-      snapshot: { library: { schemaVersion: 3, arguments: [] } },
+      snapshot: { library: { schemaVersion: 4, arguments: [], contexts: [] } },
     });
     expect(bridge.files.get(legacyPath)).toBe(legacy);
     const current = bridge.files.get(currentPath);
     expect(current).toBeTypeOf('string');
     expect(parseArgumentLibraryJson(current!)).toMatchObject({
       status: 'valid',
-      value: { schemaVersion: 3, libraryId: 'legacy-library' },
+      value: { schemaVersion: 4, libraryId: 'legacy-library' },
     });
   });
 
-  it('prefers and preserves a recoverable v2 file while creating v3', async () => {
+  it('prefers and preserves a recoverable v2 file while creating v4', async () => {
     const bridge = new MemoryBridge();
     const legacyPath = '/app-local/argument-workspace/library-v2.json';
-    const currentPath = '/app-local/argument-workspace/library-v3.json';
+    const currentPath = '/app-local/argument-workspace/library-v4.json';
     const legacy = JSON.stringify({
       schemaVersion: 2,
       libraryId: 'legacy-v2-library',
@@ -117,14 +157,14 @@ describe('Tauri Argument Library storage', () => {
 
     expect(await store.load()).toMatchObject({
       status: 'loaded',
-      snapshot: { library: { schemaVersion: 3 } },
+      snapshot: { library: { schemaVersion: 4 } },
     });
     expect(bridge.files.get(legacyPath)).toBe(legacy);
     expect(
       parseArgumentLibraryJson(bridge.files.get(currentPath)!),
     ).toMatchObject({
       status: 'valid',
-      value: { schemaVersion: 3, libraryId: 'legacy-v2-library' },
+      value: { schemaVersion: 4, libraryId: 'legacy-v2-library' },
     });
   });
 
@@ -138,7 +178,7 @@ describe('Tauri Argument Library storage', () => {
     const saved = await store.save(first, 'missing');
     expect(saved.status).toBe('saved');
     expect([...bridge.files.keys()]).toEqual([
-      '/app-local/argument-workspace/library-v3.json',
+      '/app-local/argument-workspace/library-v4.json',
     ]);
     if (saved.status !== 'saved') return;
     const second = createTopic(

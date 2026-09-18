@@ -4,6 +4,7 @@ import {
   type Argument,
   type ArgumentAxiom,
   type ArgumentCounterArgument,
+  type ArgumentContext,
   type ArgumentLibrary,
   type ArgumentLibrarySnapshot,
   type ArgumentLibraryValidationIssue,
@@ -14,6 +15,7 @@ import {
   type CreateArgumentInput,
   type CreateAxiomInput,
   type CreateCounterArgumentInput,
+  type CreateContextInput,
   type CreateTopicInput,
   type SnapshotDescriptor,
   type TopicMembershipKind,
@@ -51,6 +53,13 @@ export interface ArgumentWorkspaceInsertTopic extends Omit<
 
 export interface ArgumentWorkspaceInsertAxiom extends Omit<
   CreateAxiomInput,
+  'id'
+> {
+  readonly id: string;
+}
+
+export interface ArgumentWorkspaceInsertContext extends Omit<
+  CreateContextInput,
   'id'
 > {
   readonly id: string;
@@ -94,6 +103,7 @@ export interface ArgumentWorkspaceInsertPromotion {
 export interface ArgumentWorkspaceInsertDocument {
   readonly format: typeof ARGUMENT_WORKSPACE_INSERT_FORMAT;
   readonly topics?: readonly ArgumentWorkspaceInsertTopic[];
+  readonly contexts?: readonly ArgumentWorkspaceInsertContext[];
   readonly axioms?: readonly ArgumentWorkspaceInsertAxiom[];
   readonly arguments?: readonly ArgumentWorkspaceInsertArgument[];
   readonly counterArguments?: readonly ArgumentWorkspaceInsertCounterArgument[];
@@ -110,7 +120,8 @@ export interface ArgumentWorkspaceInsertResolvedPin {
 }
 
 export interface ArgumentWorkspaceInsertRecordPreview {
-  readonly kind: 'topic' | 'axiom' | 'argument' | 'counter-argument';
+  readonly kind:
+    'topic' | 'context' | 'axiom' | 'argument' | 'counter-argument';
   readonly id: string;
   readonly title: string;
 }
@@ -119,6 +130,7 @@ export interface ArgumentWorkspaceInsertPreview {
   readonly format: typeof ARGUMENT_WORKSPACE_INSERT_FORMAT;
   readonly counts: {
     readonly topics: number;
+    readonly contexts: number;
     readonly axioms: number;
     readonly arguments: number;
     readonly counterArguments: number;
@@ -137,7 +149,8 @@ export interface ArgumentWorkspaceInsertPreview {
     readonly relation: ArgumentRelation;
   }[];
   readonly referencedExistingRecords: readonly {
-    readonly kind: 'topic' | 'axiom' | 'argument' | 'counter-argument';
+    readonly kind:
+      'topic' | 'context' | 'axiom' | 'argument' | 'counter-argument';
     readonly id: string;
   }[];
   readonly resolvedPins: readonly ArgumentWorkspaceInsertResolvedPin[];
@@ -161,6 +174,7 @@ export type ArgumentWorkspaceInsertParseResult =
 const ROOT_FIELDS = [
   'format',
   'topics',
+  'contexts',
   'axioms',
   'arguments',
   'counterArguments',
@@ -185,6 +199,15 @@ const AXIOM_FIELDS = [
   'sourceReferences',
   'reviewState',
 ] as const;
+const CONTEXT_FIELDS = [
+  'id',
+  'title',
+  'description',
+  'retrieval',
+  'axiomIds',
+  'parentContextId',
+  'reviewState',
+] as const;
 const ARGUMENT_FIELDS = [
   'id',
   'title',
@@ -194,6 +217,7 @@ const ARGUMENT_FIELDS = [
   'conclusion',
   'boundary',
   'relations',
+  'contextIds',
   'retrieval',
   'sourceReferences',
   'supersedesArgumentId',
@@ -344,11 +368,20 @@ function buildAxiom(input: PlainRecord, now: string): PlainRecord {
   };
 }
 
+function buildContext(input: PlainRecord, now: string): PlainRecord {
+  return {
+    ...newMetadata(input, now),
+    retrieval: normalizeRetrieval(input.retrieval),
+    axiomIds: input.axiomIds ?? [],
+  };
+}
+
 function buildArgument(input: PlainRecord, now: string): PlainRecord {
   return {
     ...newMetadata(input, now),
     examples: input.examples ?? [],
     relations: input.relations ?? [],
+    contextIds: input.contextIds ?? [],
     retrieval: normalizeRetrieval(input.retrieval),
     sourceReferences: input.sourceReferences ?? [],
   };
@@ -551,6 +584,12 @@ export function previewArgumentWorkspaceInsert(
     TOPIC_FIELDS,
     issues,
   );
+  const contexts = recordArray(
+    arrayField(parsed, 'contexts', issues),
+    '$.contexts',
+    CONTEXT_FIELDS,
+    issues,
+  );
   const axioms = recordArray(
     arrayField(parsed, 'axioms', issues),
     '$.axioms',
@@ -583,6 +622,7 @@ export function previewArgumentWorkspaceInsert(
   );
   if (
     topics.length +
+      contexts.length +
       axioms.length +
       argumentsInput.length +
       counterArguments.length +
@@ -601,6 +641,7 @@ export function previewArgumentWorkspaceInsert(
   const existingKeys = new Set<string>();
   for (const [kind, records] of [
     ['topic', snapshot.library.topics],
+    ['context', snapshot.library.contexts],
     ['axiom', snapshot.library.axioms],
     ['argument', snapshot.library.arguments],
     ['counter-argument', snapshot.library.counterArguments],
@@ -610,6 +651,7 @@ export function previewArgumentWorkspaceInsert(
   const allExistingIds = new Set(
     [
       ...snapshot.library.topics,
+      ...snapshot.library.contexts,
       ...snapshot.library.axioms,
       ...snapshot.library.arguments,
       ...snapshot.library.counterArguments,
@@ -618,6 +660,7 @@ export function previewArgumentWorkspaceInsert(
   const payloadIds = new Set<string>();
   for (const [path, records] of [
     ['$.topics', topics],
+    ['$.contexts', contexts],
     ['$.axioms', axioms],
     ['$.arguments', argumentsInput],
     ['$.counterArguments', counterArguments],
@@ -704,6 +747,7 @@ export function previewArgumentWorkspaceInsert(
   const now = runtimeTimestamp(runtime, issues);
   if (now === undefined) return invalid(issues);
   const newTopics = topics.map((input) => buildTopic(input, now));
+  const newContexts = contexts.map((input) => buildContext(input, now));
   const newAxioms = axioms.map((input) => buildAxiom(input, now));
   const newArguments = argumentsInput.map((input) => buildArgument(input, now));
   const newCounterArguments = counterArguments.map((input) =>
@@ -712,6 +756,10 @@ export function previewArgumentWorkspaceInsert(
   const topicRecords = [
     ...snapshot.library.topics.map((record) => ({ ...record })),
     ...newTopics,
+  ];
+  const contextRecords = [
+    ...snapshot.library.contexts.map((record) => ({ ...record })),
+    ...newContexts,
   ];
   const axiomRecords = [
     ...snapshot.library.axioms.map((record) => ({ ...record })),
@@ -936,6 +984,7 @@ export function previewArgumentWorkspaceInsert(
     libraryRevision: snapshot.library.libraryRevision + 1,
     updatedAt: now,
     topics: sortRecords(topicRecords as unknown as ArgumentTopic[]),
+    contexts: sortRecords(contextRecords as unknown as ArgumentContext[]),
     axioms: sortRecords(axiomRecords as unknown as ArgumentAxiom[]),
     arguments: sortRecords(argumentRecords as unknown as Argument[]),
     counterArguments: sortRecords(
@@ -993,6 +1042,34 @@ export function previewArgumentWorkspaceInsert(
       'argument',
       argument.supersedesArgumentId,
     );
+    if (Array.isArray(argument.contextIds)) {
+      argument.contextIds.forEach((contextId) =>
+        addExistingReference(
+          existingReferences,
+          existingKeys,
+          'context',
+          contextId,
+        ),
+      );
+    }
+  });
+  newContexts.forEach((context) => {
+    addExistingReference(
+      existingReferences,
+      existingKeys,
+      'context',
+      context.parentContextId,
+    );
+    if (Array.isArray(context.axiomIds)) {
+      context.axiomIds.forEach((axiomId) =>
+        addExistingReference(
+          existingReferences,
+          existingKeys,
+          'axiom',
+          axiomId,
+        ),
+      );
+    }
   });
   newCounterArguments.forEach((counter) => {
     if (!isRecord(counter.target)) return;
@@ -1032,6 +1109,11 @@ export function previewArgumentWorkspaceInsert(
       id: String(record.id),
       title: String(record.title),
     })),
+    ...newContexts.map((record) => ({
+      kind: 'context' as const,
+      id: String(record.id),
+      title: String(record.title),
+    })),
     ...newAxioms.map((record) => ({
       kind: 'axiom' as const,
       id: String(record.id),
@@ -1062,6 +1144,7 @@ export function previewArgumentWorkspaceInsert(
         format: ARGUMENT_WORKSPACE_INSERT_FORMAT,
         counts: {
           topics: newTopics.length,
+          contexts: newContexts.length,
           axioms: newAxioms.length,
           arguments: newArguments.length,
           counterArguments: newCounterArguments.length,
@@ -1112,6 +1195,7 @@ export const ARGUMENT_WORKSPACE_INSERT_TEMPLATE = JSON.stringify(
         reviewState: 'accepted',
       },
     ],
+    contexts: [],
     arguments: [
       {
         id: 'ARG-DEMO',

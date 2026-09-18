@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -5,6 +6,8 @@ import { join } from 'node:path';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import type { McpServer } from '@modelcontextprotocol/server';
 import {
+  createArgument,
+  createContext,
   createKnowledgeReaderFromLibrary,
   serializeArgumentLibrary,
   setRecordArchived,
@@ -23,7 +26,7 @@ async function temporaryLibrary(): Promise<{
 }> {
   const directory = await mkdtemp(join(tmpdir(), 'icarus-argument-mcp-'));
   temporaryDirectories.push(directory);
-  return { directory, path: join(directory, 'library-v3.json') };
+  return { directory, path: join(directory, 'library-v4.json') };
 }
 
 async function connect(server: McpServer): Promise<{
@@ -60,20 +63,42 @@ afterEach(async () => {
 });
 
 describe('Argument Library MCP tools', () => {
-  it('registers exactly four read-only tools and no write capability', async () => {
+  it('registers exactly five read-only tools and no write capability', async () => {
     const { path } = await temporaryLibrary();
     const session = await connect(
       createArgumentMcpServer({ libraryPath: path }),
     );
     try {
       const listed = await session.client.listTools();
+      const instructions = session.client.getInstructions();
 
+      expect(instructions).toContain(
+        'call compiler_usage_guide when beginning a Compiler cross-check',
+      );
+      expect(instructions?.length).toBeLessThan(300);
       expect(listed.tools.map(({ name }) => name)).toEqual([
+        'compiler_usage_guide',
         'compiler_status',
         'compiler_list_index',
         'compiler_search_index',
         'compiler_read_bundle',
       ]);
+      expect(
+        listed.tools.find(({ name }) => name === 'compiler_usage_guide'),
+      ).toMatchObject({
+        description: expect.stringContaining(
+          'after independent candidate reasoning is complete',
+        ),
+        outputSchema: {
+          type: 'object',
+          required: expect.arrayContaining([
+            'status',
+            'version',
+            'format',
+            'guide',
+          ]),
+        },
+      });
       expect(listed.tools).toSatisfy((tools: typeof listed.tools) =>
         tools.every(
           ({ annotations }) =>
@@ -84,6 +109,60 @@ describe('Argument Library MCP tools', () => {
       expect(JSON.stringify(listed.tools)).not.toMatch(
         /save|create|update|delete|import|read_source/u,
       );
+    } finally {
+      await session.close();
+    }
+  });
+
+  it('returns the canonical usage protocol without loading or mutating a library', async () => {
+    const { path } = await temporaryLibrary();
+    expect(existsSync(path)).toBe(false);
+    const session = await connect(
+      createArgumentMcpServer({ libraryPath: path }),
+    );
+    try {
+      const result = await session.client.callTool({
+        name: 'compiler_usage_guide',
+        arguments: {},
+      });
+      const response = structured(result) as {
+        status: string;
+        version: string;
+        format: string;
+        guide: string;
+      };
+
+      expect(result.isError).not.toBe(true);
+      expect(response).toMatchObject({
+        status: 'ok',
+        version: 'argument-compiler-ai-usage-v1',
+        format: 'markdown',
+      });
+      expect(
+        Buffer.byteLength(JSON.stringify(response), 'utf8'),
+      ).toBeLessThanOrEqual(MAX_TOOL_RESULT_BYTES);
+      const normalizedGuide = response.guide.replace(/\s+/gu, ' ');
+      expect(normalizedGuide).toContain(
+        'substantive candidate ideas already exist',
+      );
+      expect(normalizedGuide).toContain(
+        'multiple focused lexical formulations',
+      );
+      expect(normalizedGuide).toContain(
+        'search result -> plausible prior record -> compiler_read_bundle',
+      );
+      expect(normalizedGuide).toContain(
+        'not authority and not external empirical proof',
+      );
+      expect(normalizedGuide).toContain('Prior response still applies');
+      expect(normalizedGuide).toContain(
+        'submit a surviving genuinely new or revised argument',
+      );
+      expect(normalizedGuide).toContain(
+        'If no submission capability is present, do not invent or claim a',
+      );
+      expect(result.content).toEqual([{ type: 'text', text: response.guide }]);
+      expect(existsSync(path)).toBe(false);
     } finally {
       await session.close();
     }
@@ -107,6 +186,7 @@ describe('Argument Library MCP tools', () => {
         libraryId: 'library-mcp-test',
         recordCounts: {
           topics: 1,
+          contexts: 0,
           axioms: 1,
           arguments: 1,
           counterArguments: 1,
@@ -173,6 +253,106 @@ describe('Argument Library MCP tools', () => {
         },
       });
       expect(JSON.stringify(result)).not.toContain(path);
+    } finally {
+      await session.close();
+    }
+  });
+
+  it('lists, searches, and reads Context background without adding write tools', async () => {
+    const { path } = await temporaryLibrary();
+    const fixture = createSyntheticLibrary();
+    let library = createContext(
+      fixture.library,
+      {
+        id: 'CTX-MEASUREMENT',
+        title: 'Measurement framework',
+        description: 'Background assumptions for compatible comparisons.',
+        axiomIds: ['AX-UNITS'],
+        retrieval: { keywords: ['framework-context'] },
+        reviewState: 'accepted',
+      },
+      fixture.runtime,
+    );
+    library = createArgument(
+      library,
+      {
+        id: 'AR-CONTEXT-ONLY',
+        title: 'Context-only interpretation',
+        premises: [],
+        conclusion: 'The Context remains background rather than a premise.',
+        contextIds: ['CTX-MEASUREMENT'],
+        reviewState: 'accepted',
+      },
+      fixture.runtime,
+    );
+    await writeFile(path, serializeArgumentLibrary(library), 'utf8');
+    const session = await connect(
+      createArgumentMcpServer({ libraryPath: path }),
+    );
+    try {
+      const status = await session.client.callTool({
+        name: 'compiler_status',
+        arguments: {},
+      });
+      expect(structured(status)).toMatchObject({
+        recordCounts: { contexts: 1 },
+      });
+
+      const search = await session.client.callTool({
+        name: 'compiler_search_index',
+        arguments: { query: 'framework-context' },
+      });
+      expect(structured(search)).toMatchObject({
+        status: 'ok',
+        value: {
+          candidates: [
+            expect.objectContaining({
+              kind: 'context',
+              id: 'CTX-MEASUREMENT',
+            }),
+          ],
+        },
+      });
+
+      const context = await session.client.callTool({
+        name: 'compiler_read_bundle',
+        arguments: { kind: 'context', id: 'CTX-MEASUREMENT' },
+      });
+      expect(structured(context)).toMatchObject({
+        status: 'ok',
+        value: {
+          contexts: [
+            expect.objectContaining({
+              id: 'CTX-MEASUREMENT',
+              effectiveAxiomIds: ['AX-UNITS'],
+            }),
+          ],
+          axioms: [expect.objectContaining({ id: 'AX-UNITS' })],
+          arguments: [],
+        },
+      });
+
+      const argument = await session.client.callTool({
+        name: 'compiler_read_bundle',
+        arguments: { kind: 'argument', id: 'AR-CONTEXT-ONLY' },
+      });
+      expect(structured(argument)).toMatchObject({
+        status: 'ok',
+        value: {
+          arguments: [
+            expect.objectContaining({
+              contextIds: ['CTX-MEASUREMENT'],
+              resolvedPremises: [],
+              backgroundAxioms: [
+                expect.objectContaining({
+                  axiomId: 'AX-UNITS',
+                  viaContextIds: ['CTX-MEASUREMENT'],
+                }),
+              ],
+            }),
+          ],
+        },
+      });
     } finally {
       await session.close();
     }
@@ -250,7 +430,7 @@ describe('Argument Library MCP tools', () => {
 
       for (const [source, code] of [
         ['{broken', 'invalid-json'],
-        [JSON.stringify({ schemaVersion: 4 }), 'future-schema'],
+        [JSON.stringify({ schemaVersion: 5 }), 'future-schema'],
       ] as const) {
         await writeFile(path, source, 'utf8');
         const failed = await session.client.callTool({

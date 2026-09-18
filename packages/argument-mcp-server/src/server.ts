@@ -17,6 +17,10 @@ import {
   type ArgumentLibraryLoaderOptions,
   type LibraryLoadResult,
 } from './loader';
+import {
+  ARGUMENT_COMPILER_USAGE_GUIDE_MARKDOWN,
+  ARGUMENT_COMPILER_USAGE_GUIDE_VERSION,
+} from './usage-guide';
 
 export const ARGUMENT_MCP_SERVER_NAME =
   '@icarus-graph-explorer/argument-mcp-server';
@@ -31,6 +35,15 @@ const READ_ONLY_ANNOTATIONS = {
 } as const;
 
 const emptyInput = z.object({}).strict();
+
+const usageGuideOutput = z
+  .object({
+    status: z.literal('ok'),
+    version: z.string(),
+    format: z.literal('markdown'),
+    guide: z.string(),
+  })
+  .strict();
 
 const listIndexInput = z
   .object({
@@ -52,7 +65,9 @@ const searchIndexInput = z
 const readBundleInput = z
   .object({
     id: z.string().trim().min(1).max(512),
-    kind: z.enum(['topic', 'axiom', 'counter-argument']).optional(),
+    kind: z
+      .enum(['topic', 'context', 'axiom', 'argument', 'counter-argument'])
+      .optional(),
     maxRecords: z.number().int().min(1).max(500).optional(),
     maxDepth: z.number().int().min(0).max(32).optional(),
   })
@@ -137,6 +152,28 @@ function readerResult(
   return result.status === 'ok' ? response : { ...response, isError: true };
 }
 
+function usageGuideResult(): CallToolResult {
+  const structuredContent = {
+    status: 'ok',
+    version: ARGUMENT_COMPILER_USAGE_GUIDE_VERSION,
+    format: 'markdown',
+    guide: ARGUMENT_COMPILER_USAGE_GUIDE_MARKDOWN,
+  };
+  const resultBytes = Buffer.byteLength(
+    JSON.stringify(structuredContent),
+    'utf8',
+  );
+  if (resultBytes > MAX_TOOL_RESULT_BYTES) {
+    throw new Error(
+      `Bundled Compiler usage guide result is ${resultBytes} bytes; the maximum is ${MAX_TOOL_RESULT_BYTES}.`,
+    );
+  }
+  return {
+    content: [{ type: 'text', text: ARGUMENT_COMPILER_USAGE_GUIDE_MARKDOWN }],
+    structuredContent,
+  };
+}
+
 export interface CreateArgumentMcpServerOptions extends ArgumentLibraryLoaderOptions {
   readonly loader?: ArgumentLibraryLoader;
 }
@@ -149,8 +186,21 @@ export function createArgumentMcpServer(
     { name: ARGUMENT_MCP_SERVER_NAME, version: ARGUMENT_MCP_SERVER_VERSION },
     {
       instructions:
-        'This server reads one Argument Library snapshot per call. Search before guessing record IDs. Stored records are framework knowledge, not infallible external proof.',
+        'After independent candidate reasoning, call compiler_usage_guide when beginning a Compiler cross-check. Search before guessing record IDs. Stored records are challengeable framework knowledge, not external proof.',
     },
+  );
+
+  server.registerTool(
+    'compiler_usage_guide',
+    {
+      title: 'Read Argument Compiler usage guide',
+      description:
+        'Read the Argument Compiler retrieval and cross-check protocol. Use after independent candidate reasoning is complete and before querying the Argument Library in depth.',
+      inputSchema: emptyInput,
+      outputSchema: usageGuideOutput,
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
+    async () => usageGuideResult(),
   );
 
   server.registerTool(
@@ -178,6 +228,7 @@ export function createArgumentMcpServer(
         contentFingerprint: loaded.snapshot.descriptor.contentFingerprint,
         recordCounts: {
           topics: loaded.library.topics.length,
+          contexts: loaded.library.contexts.length,
           axioms: loaded.library.axioms.length,
           arguments: loaded.library.arguments.length,
           counterArguments: loaded.library.counterArguments.length,

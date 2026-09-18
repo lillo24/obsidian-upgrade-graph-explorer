@@ -6,12 +6,14 @@ import {
   createAxiom,
   createArgument,
   createCounterArgument,
+  createContext,
   createKnowledgeReader,
   createTopic,
   detachAnsweringAxiom,
   editAxiom,
   editArgument,
   editCounterArgument,
+  editContext,
   editTopic,
   parseArgumentLibraryJson,
   previewArgumentWorkspaceInsert,
@@ -28,6 +30,7 @@ import {
   type Argument,
   type ArgumentAxiom,
   type ArgumentCounterArgument,
+  type ArgumentContext,
   type ArgumentExample,
   type ArgumentImportPreview,
   type ArgumentLibrary,
@@ -105,6 +108,15 @@ export interface AxiomRecordDraft extends DraftBase {
   readonly sourceReferences: readonly TheorySourceReference[];
 }
 
+export interface ContextRecordDraft extends DraftBase {
+  readonly kind: 'context';
+  readonly title: string;
+  readonly description?: string | undefined;
+  readonly retrieval: RetrievalMetadata;
+  readonly axiomIds: readonly string[];
+  readonly parentContextId?: string | undefined;
+}
+
 export interface CounterArgumentRecordDraft extends DraftBase {
   readonly kind: 'counter-argument';
   readonly title: string;
@@ -129,6 +141,7 @@ export interface ArgumentRecordEditorDraft extends DraftBase {
   readonly conclusion: string;
   readonly boundary?: string | undefined;
   readonly relations: readonly ArgumentRelation[];
+  readonly contextIds: readonly string[];
   readonly retrieval: RetrievalMetadata;
   readonly sourceReferences: readonly TheorySourceReference[];
   readonly supersedesArgumentId?: string | undefined;
@@ -136,6 +149,7 @@ export interface ArgumentRecordEditorDraft extends DraftBase {
 
 export type ArgumentRecordDraft =
   | TopicRecordDraft
+  | ContextRecordDraft
   | AxiomRecordDraft
   | ArgumentRecordEditorDraft
   | CounterArgumentRecordDraft;
@@ -146,7 +160,7 @@ export interface ArgumentImportPlan {
   readonly mode: 'merge' | 'replace';
   readonly preview: ArgumentImportPreview;
   readonly base: SnapshotDescriptor;
-  readonly migratedFromSchemaVersion?: 1 | 2;
+  readonly migratedFromSchemaVersion?: 1 | 2 | 3;
 }
 
 export type ArgumentWorkspaceActionResult =
@@ -276,6 +290,36 @@ function saveDraft(
             runtime,
           );
     next = syncTopicRecordMemberships(next, draft, runtime);
+  } else if (draft.kind === 'context') {
+    const description = optional(draft.description);
+    const parentContextId = optional(draft.parentContextId);
+    next =
+      draft.mode === 'create'
+        ? createContext(
+            next,
+            {
+              id: draft.id,
+              title: draft.title,
+              ...(description === undefined ? {} : { description }),
+              retrieval: draft.retrieval,
+              axiomIds: draft.axiomIds,
+              ...(parentContextId === undefined ? {} : { parentContextId }),
+              reviewState: draft.reviewState,
+            },
+            runtime,
+          )
+        : editContext(
+            next,
+            draft.id,
+            {
+              title: draft.title,
+              description: description ?? null,
+              retrieval: draft.retrieval,
+              axiomIds: draft.axiomIds,
+              parentContextId: parentContextId ?? null,
+            },
+            runtime,
+          );
   } else if (draft.kind === 'axiom') {
     const explanation = optional(draft.explanation);
     const scope = optional(draft.scope);
@@ -337,6 +381,7 @@ function saveDraft(
               conclusion: draft.conclusion,
               ...(boundary === undefined ? {} : { boundary }),
               relations: draft.relations,
+              contextIds: draft.contextIds,
               retrieval: draft.retrieval,
               sourceReferences: draft.sourceReferences,
               ...(supersedesArgumentId === undefined
@@ -357,6 +402,7 @@ function saveDraft(
               conclusion: draft.conclusion,
               boundary: boundary ?? null,
               relations: draft.relations,
+              contextIds: draft.contextIds,
               retrieval: draft.retrieval,
               sourceReferences: draft.sourceReferences,
               supersedesArgumentId: supersedesArgumentId ?? null,
@@ -473,6 +519,11 @@ export function findRecord(
 ): ArgumentTopic;
 export function findRecord(
   library: ArgumentLibrary,
+  kind: 'context',
+  id: string,
+): ArgumentContext;
+export function findRecord(
+  library: ArgumentLibrary,
   kind: 'axiom',
   id: string,
 ): ArgumentAxiom;
@@ -490,20 +541,32 @@ export function findRecord(
   library: ArgumentLibrary,
   kind: ArgumentRecordKind,
   id: string,
-): ArgumentTopic | ArgumentAxiom | Argument | ArgumentCounterArgument;
+):
+  | ArgumentTopic
+  | ArgumentContext
+  | ArgumentAxiom
+  | Argument
+  | ArgumentCounterArgument;
 export function findRecord(
   library: ArgumentLibrary,
   kind: ArgumentRecordKind,
   id: string,
-): ArgumentTopic | ArgumentAxiom | Argument | ArgumentCounterArgument {
+):
+  | ArgumentTopic
+  | ArgumentContext
+  | ArgumentAxiom
+  | Argument
+  | ArgumentCounterArgument {
   const record =
     kind === 'topic'
       ? library.topics.find((candidate) => candidate.id === id)
-      : kind === 'axiom'
-        ? library.axioms.find((candidate) => candidate.id === id)
-        : kind === 'argument'
-          ? library.arguments.find((candidate) => candidate.id === id)
-          : library.counterArguments.find((candidate) => candidate.id === id);
+      : kind === 'context'
+        ? library.contexts.find((candidate) => candidate.id === id)
+        : kind === 'axiom'
+          ? library.axioms.find((candidate) => candidate.id === id)
+          : kind === 'argument'
+            ? library.arguments.find((candidate) => candidate.id === id)
+            : library.counterArguments.find((candidate) => candidate.id === id);
   if (record === undefined) throw new Error(`${kind} "${id}" does not exist.`);
   return record;
 }
@@ -681,7 +744,7 @@ export class ArgumentWorkspaceSession {
       parsed.value,
       parsed.migratedFromSchemaVersion === undefined
         ? undefined
-        : `Migrated schema v${parsed.migratedFromSchemaVersion} to v3 and saved`,
+        : `Migrated schema v${parsed.migratedFromSchemaVersion} to v4 and saved`,
     );
   }
 

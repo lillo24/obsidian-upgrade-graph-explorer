@@ -1,4 +1,5 @@
 import { describeArgumentLibrary } from './canonical';
+import { createContextResolver, resolveArgumentBackground } from './contexts';
 import type {
   ArgumentLibrary,
   ArgumentMarkdownExport,
@@ -75,6 +76,12 @@ export function exportArgumentLibraryMarkdown(
       safeMarkdownFileName(record.title, record.id),
     ]),
   );
+  const contextFiles = new Map(
+    library.contexts.map((record) => [
+      record.id,
+      safeMarkdownFileName(record.title, record.id),
+    ]),
+  );
   const argumentFiles = new Map(
     library.arguments.map((record) => [
       record.id,
@@ -93,6 +100,10 @@ export function exportArgumentLibraryMarkdown(
   const argumentTitles = new Map(
     library.arguments.map(({ id, title }) => [id, title]),
   );
+  const contextTitles = new Map(
+    library.contexts.map(({ id, title }) => [id, title]),
+  );
+  const resolveContext = createContextResolver(library);
   const counterTitles = new Map(
     library.counterArguments.map(({ id, title }) => [id, title]),
   );
@@ -148,6 +159,61 @@ export function exportArgumentLibraryMarkdown(
             )),
       ].join('\n')}\n`,
     })),
+    ...library.contexts.map((context) => {
+      const resolved = resolveContext(context.id);
+      return {
+        path: `contexts/${contextFiles.get(context.id)!}`,
+        text: `${[
+          frontmatter({
+            type: 'argument-context',
+            id: context.id,
+            revision: context.revision,
+            reviewState: context.reviewState,
+            archived: context.archived,
+          }),
+          '',
+          `# ${context.title}`,
+          ...(context.description === undefined
+            ? []
+            : ['', '## Description', '', context.description]),
+          '',
+          '## Parent Context',
+          '',
+          ...(context.parentContextId === undefined
+            ? ['_None._']
+            : [
+                `[[contexts/${contextFiles.get(context.parentContextId)!}|${contextTitles.get(context.parentContextId)!}]] (${context.parentContextId})`,
+              ]),
+          '',
+          '## Direct Axioms',
+          '',
+          ...(context.axiomIds.length === 0
+            ? ['_None._']
+            : context.axiomIds.map(
+                (id) =>
+                  `- [[axioms/${axiomFiles.get(id)!}|${axiomTitles.get(id)!}]] (${id})`,
+              )),
+          '',
+          '## Inherited Axioms',
+          '',
+          ...(resolved.inheritedAxiomIds.length === 0
+            ? ['_None._']
+            : resolved.inheritedAxiomIds.map(
+                (id) =>
+                  `- [[axioms/${axiomFiles.get(id)!}|${axiomTitles.get(id)!}]] (${id})`,
+              )),
+          '',
+          '## Effective Axioms',
+          '',
+          ...(resolved.effectiveAxiomIds.length === 0
+            ? ['_None._']
+            : resolved.effectiveAxiomIds.map(
+                (id) =>
+                  `- [[axioms/${axiomFiles.get(id)!}|${axiomTitles.get(id)!}]] (${id})`,
+              )),
+        ].join('\n')}\n`,
+      };
+    }),
     ...library.axioms.map((axiom) => ({
       path: `axioms/${axiomFiles.get(axiom.id)!}`,
       text: `${[
@@ -182,89 +248,113 @@ export function exportArgumentLibraryMarkdown(
             )),
       ].join('\n')}\n`,
     })),
-    ...library.arguments.map((argument) => ({
-      path: `arguments/${argumentFiles.get(argument.id)!}`,
-      text: `${[
-        frontmatter({
-          type: 'argument',
-          id: argument.id,
-          revision: argument.revision,
-          reviewState: argument.reviewState,
-          archived: argument.archived,
-        }),
-        '',
-        `# ${argument.title}`,
-        '',
-        '## Examples',
-        '',
-        ...(argument.examples.length === 0
-          ? ['_None._']
-          : argument.examples.map(
-              (example, index) =>
-                `${index + 1}. **${example.id}** — ${example.text}`,
-            )),
-        '',
-        '## Premises',
-        '',
-        ...(argument.premises.length === 0
-          ? ['_None._']
-          : argument.premises.map((premise, index) => {
-              const exampleLinks =
-                premise.exampleIds === undefined ||
-                premise.exampleIds.length === 0
-                  ? ''
-                  : ` [Examples: ${premise.exampleIds.join(', ')}]`;
-              const prefix = `${index + 1}. **${premise.id}**${exampleLinks} — `;
-              if (premise.kind === 'text') return `${prefix}${premise.text}`;
-              if (premise.kind === 'axiom') {
-                return `${prefix}[[axioms/${axiomFiles.get(premise.axiomId)!}|${axiomTitles.get(premise.axiomId)!}]] (${premise.axiomId}, relied on revision ${premise.reliedOnRevision})`;
-              }
-              if (premise.kind === 'argument-conclusion') {
-                return `${prefix}[[arguments/${argumentFiles.get(premise.argumentId)!}|${argumentTitles.get(premise.argumentId)!}]] conclusion (${premise.argumentId}, relied on revision ${premise.reliedOnRevision})`;
-              }
-              return `${prefix}[[arguments/${argumentFiles.get(premise.argumentId)!}|${argumentTitles.get(premise.argumentId)!}]] premise ${premise.premiseId} (${premise.argumentId}, relied on revision ${premise.reliedOnRevision})`;
-            })),
-        ...(argument.reasoning === undefined
-          ? []
-          : ['', '## Reasoning', '', argument.reasoning]),
-        '',
-        '## Conclusion',
-        '',
-        argument.conclusion,
-        ...(argument.boundary === undefined
-          ? []
-          : ['', '## Boundary / Invariance', '', argument.boundary]),
-        '',
-        '## Argument relations',
-        '',
-        ...(argument.relations.length === 0
-          ? ['_None._']
-          : argument.relations.map((relation) => {
-              const part =
-                relation.targetPart.kind === 'premise'
-                  ? `premise ${relation.targetPart.premiseId}`
-                  : relation.targetPart.kind;
-              return `- **${relation.id}** — ${relation.kind} [[arguments/${argumentFiles.get(relation.targetArgumentId)!}|${argumentTitles.get(relation.targetArgumentId)!}]].${part} (${relation.targetArgumentId}, relied on revision ${relation.reliedOnRevision})`;
-            })),
-        ...(argument.supersedesArgumentId === undefined
-          ? []
-          : [
-              '',
-              '## Supersedes',
-              '',
-              `[[arguments/${argumentFiles.get(argument.supersedesArgumentId)!}|${argumentTitles.get(argument.supersedesArgumentId)!}]] (${argument.supersedesArgumentId})`,
-            ]),
-        '',
-        '## Theory sources',
-        '',
-        ...(argument.sourceReferences.length === 0
-          ? ['_None._']
-          : argument.sourceReferences.map(
-              (reference) =>
-                `- ${formatTheorySourceLocator(reference)} — ${reference.role} (${reference.id})`,
-            )),
-      ].join('\n')}\n`,
-    })),
+    ...library.arguments.map((argument) => {
+      const background = resolveArgumentBackground(
+        library,
+        argument.contextIds,
+      );
+      return {
+        path: `arguments/${argumentFiles.get(argument.id)!}`,
+        text: `${[
+          frontmatter({
+            type: 'argument',
+            id: argument.id,
+            revision: argument.revision,
+            reviewState: argument.reviewState,
+            archived: argument.archived,
+          }),
+          '',
+          `# ${argument.title}`,
+          '',
+          '## Contexts (background, not premises)',
+          '',
+          ...(argument.contextIds.length === 0
+            ? ['_None._']
+            : argument.contextIds.map(
+                (id) =>
+                  `- [[contexts/${contextFiles.get(id)!}|${contextTitles.get(id)!}]] (${id})`,
+              )),
+          '',
+          '### Effective background Axioms',
+          '',
+          ...(background.axioms.length === 0
+            ? ['_None._']
+            : background.axioms.map(
+                ({ axiomId, viaContextIds }) =>
+                  `- [[axioms/${axiomFiles.get(axiomId)!}|${axiomTitles.get(axiomId)!}]] (${axiomId}; via ${viaContextIds.join(', ')})`,
+              )),
+          '',
+          '## Examples',
+          '',
+          ...(argument.examples.length === 0
+            ? ['_None._']
+            : argument.examples.map(
+                (example, index) =>
+                  `${index + 1}. **${example.id}** — ${example.text}`,
+              )),
+          '',
+          '## Premises',
+          '',
+          ...(argument.premises.length === 0
+            ? ['_None._']
+            : argument.premises.map((premise, index) => {
+                const exampleLinks =
+                  premise.exampleIds === undefined ||
+                  premise.exampleIds.length === 0
+                    ? ''
+                    : ` [Examples: ${premise.exampleIds.join(', ')}]`;
+                const prefix = `${index + 1}. **${premise.id}**${exampleLinks} — `;
+                if (premise.kind === 'text') return `${prefix}${premise.text}`;
+                if (premise.kind === 'axiom') {
+                  return `${prefix}[[axioms/${axiomFiles.get(premise.axiomId)!}|${axiomTitles.get(premise.axiomId)!}]] (${premise.axiomId}, relied on revision ${premise.reliedOnRevision})`;
+                }
+                if (premise.kind === 'argument-conclusion') {
+                  return `${prefix}[[arguments/${argumentFiles.get(premise.argumentId)!}|${argumentTitles.get(premise.argumentId)!}]] conclusion (${premise.argumentId}, relied on revision ${premise.reliedOnRevision})`;
+                }
+                return `${prefix}[[arguments/${argumentFiles.get(premise.argumentId)!}|${argumentTitles.get(premise.argumentId)!}]] premise ${premise.premiseId} (${premise.argumentId}, relied on revision ${premise.reliedOnRevision})`;
+              })),
+          ...(argument.reasoning === undefined
+            ? []
+            : ['', '## Reasoning', '', argument.reasoning]),
+          '',
+          '## Conclusion',
+          '',
+          argument.conclusion,
+          ...(argument.boundary === undefined
+            ? []
+            : ['', '## Boundary / Invariance', '', argument.boundary]),
+          '',
+          '## Argument relations',
+          '',
+          ...(argument.relations.length === 0
+            ? ['_None._']
+            : argument.relations.map((relation) => {
+                const part =
+                  relation.targetPart.kind === 'premise'
+                    ? `premise ${relation.targetPart.premiseId}`
+                    : relation.targetPart.kind;
+                return `- **${relation.id}** — ${relation.kind} [[arguments/${argumentFiles.get(relation.targetArgumentId)!}|${argumentTitles.get(relation.targetArgumentId)!}]].${part} (${relation.targetArgumentId}, relied on revision ${relation.reliedOnRevision})`;
+              })),
+          ...(argument.supersedesArgumentId === undefined
+            ? []
+            : [
+                '',
+                '## Supersedes',
+                '',
+                `[[arguments/${argumentFiles.get(argument.supersedesArgumentId)!}|${argumentTitles.get(argument.supersedesArgumentId)!}]] (${argument.supersedesArgumentId})`,
+              ]),
+          '',
+          '## Theory sources',
+          '',
+          ...(argument.sourceReferences.length === 0
+            ? ['_None._']
+            : argument.sourceReferences.map(
+                (reference) =>
+                  `- ${formatTheorySourceLocator(reference)} — ${reference.role} (${reference.id})`,
+              )),
+        ].join('\n')}\n`,
+      };
+    }),
     ...library.counterArguments.map((counter) => {
       const target =
         counter.target === undefined

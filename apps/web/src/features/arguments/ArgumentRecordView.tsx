@@ -1,9 +1,12 @@
 import {
   argumentStaleness,
+  createContextResolver,
+  resolveArgumentBackground,
   responseStaleness,
   type Argument,
   type ArgumentAxiom,
   type ArgumentCounterArgument,
+  type ArgumentContext,
   type ArgumentDependencyPathStep,
   type ArgumentLibrary,
   type ArgumentPremiseStalenessCause,
@@ -46,7 +49,11 @@ function Metadata({
   library,
 }: {
   readonly record:
-    ArgumentTopic | ArgumentAxiom | Argument | ArgumentCounterArgument;
+    | ArgumentTopic
+    | ArgumentContext
+    | ArgumentAxiom
+    | Argument
+    | ArgumentCounterArgument;
   readonly library: ArgumentLibrary;
 }) {
   return (
@@ -223,6 +230,117 @@ export function ArgumentTopicView({
   );
 }
 
+function ContextAxiomLinks({
+  axiomIds,
+  library,
+  onNavigate,
+}: {
+  readonly axiomIds: readonly string[];
+  readonly library: ArgumentLibrary;
+  readonly onNavigate: (selection: ArgumentSelection) => void;
+}) {
+  return axiomIds.length === 0 ? (
+    <p className="arguments-empty">None.</p>
+  ) : (
+    <ol className="arguments-record-links">
+      {axiomIds.map((axiomId) => {
+        const axiom = library.axioms.find(({ id }) => id === axiomId)!;
+        return (
+          <li key={axiomId}>
+            <button
+              onClick={() => onNavigate({ kind: 'axiom', id: axiomId })}
+              type="button"
+            >
+              {axiom.title}
+              {axiom.archived ? ' — archived' : ''}
+            </button>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+export function ArgumentContextView({
+  context,
+  library,
+  onNavigate,
+}: {
+  readonly context: ArgumentContext;
+  readonly library: ArgumentLibrary;
+  readonly onNavigate: (selection: ArgumentSelection) => void;
+}) {
+  const resolved = createContextResolver(library)(context.id);
+  return (
+    <article className="arguments-record">
+      <RecordHeader
+        archived={context.archived}
+        eyebrow="Context / Axiom Group"
+        reviewState={context.reviewState}
+        title={context.title}
+      />
+      {context.description === undefined ? null : (
+        <MarkdownText>{context.description}</MarkdownText>
+      )}
+      <div className="arguments-callout">
+        Contexts provide background only. Their Axioms are not inference
+        premises and do not affect dependency staleness.
+      </div>
+      <section className="arguments-reading-section">
+        <h3>Parent chain</h3>
+        {resolved.parentContextIds.length === 0 ? (
+          <p className="arguments-empty">No parent Context.</p>
+        ) : (
+          <ol className="arguments-record-links">
+            {resolved.parentContextIds.map((contextId) => {
+              const parent = library.contexts.find(
+                ({ id }) => id === contextId,
+              )!;
+              return (
+                <li key={contextId}>
+                  <button
+                    onClick={() =>
+                      onNavigate({ kind: 'context', id: contextId })
+                    }
+                    type="button"
+                  >
+                    {parent.title}
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </section>
+      <section className="arguments-reading-section">
+        <h3>Direct Axioms</h3>
+        <ContextAxiomLinks
+          axiomIds={context.axiomIds}
+          library={library}
+          onNavigate={onNavigate}
+        />
+      </section>
+      <section className="arguments-reading-section">
+        <h3>Inherited Axioms</h3>
+        <ContextAxiomLinks
+          axiomIds={resolved.inheritedAxiomIds}
+          library={library}
+          onNavigate={onNavigate}
+        />
+      </section>
+      <section className="arguments-reading-section">
+        <h3>Effective Axioms</h3>
+        <ContextAxiomLinks
+          axiomIds={resolved.effectiveAxiomIds}
+          library={library}
+          onNavigate={onNavigate}
+        />
+      </section>
+      <Metadata library={library} record={context} />
+    </article>
+  );
+}
+
 export function ArgumentView({
   argument,
   library,
@@ -257,6 +375,7 @@ export function ArgumentView({
     ({ target }) =>
       target?.kind === 'argument' && target.argumentId === argument.id,
   );
+  const background = resolveArgumentBackground(library, argument.contextIds);
   return (
     <article className="arguments-record">
       <RecordHeader
@@ -278,6 +397,55 @@ export function ArgumentView({
           </span>
         )}
       </div>
+      <section className="arguments-reading-section arguments-current">
+        <h3>Contexts — background, not premises</h3>
+        {background.contexts.length === 0 ? (
+          <p className="arguments-empty">No Context attached.</p>
+        ) : (
+          <>
+            <ul className="arguments-record-links">
+              {background.contexts.map(({ context }) => (
+                <li key={context.id}>
+                  <button
+                    onClick={() =>
+                      onNavigate({ kind: 'context', id: context.id })
+                    }
+                    type="button"
+                  >
+                    {context.title}
+                    {context.archived ? ' — archived' : ''}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <h4>Effective background Axioms</h4>
+            {background.axioms.length === 0 ? (
+              <p className="arguments-empty">None.</p>
+            ) : (
+              <ul className="arguments-record-links">
+                {background.axioms.map(({ axiomId, viaContextIds }) => {
+                  const axiom = library.axioms.find(
+                    ({ id }) => id === axiomId,
+                  )!;
+                  return (
+                    <li key={axiomId}>
+                      <button
+                        onClick={() =>
+                          onNavigate({ kind: 'axiom', id: axiomId })
+                        }
+                        type="button"
+                      >
+                        {axiom.title}
+                      </button>
+                      <small>Background via {viaContextIds.join(', ')}.</small>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </>
+        )}
+      </section>
       <section className="arguments-reading-section">
         <h3>Examples</h3>
         {argument.examples.length === 0 ? (

@@ -4,6 +4,7 @@ import {
   type Argument,
   type ArgumentAxiom,
   type ArgumentCounterArgument,
+  type ArgumentContext,
   type ArgumentDependencyPathStep,
   type ArgumentDependencyRootCause,
   type ArgumentExample,
@@ -19,10 +20,12 @@ import {
   type CreateAxiomInput,
   type CreateArgumentInput,
   type CreateCounterArgumentInput,
+  type CreateContextInput,
   type CreateTopicInput,
   type EditAxiomInput,
   type EditArgumentInput,
   type EditCounterArgumentInput,
+  type EditContextInput,
   type EditTopicInput,
   type HumanReviewState,
   type RecordTheorySourceVersionInput,
@@ -38,6 +41,12 @@ function sortedUnique(
   return [...new Set(values ?? [])].sort((left, right) =>
     left.localeCompare(right),
   );
+}
+
+function orderedUnique(
+  values: readonly string[] | undefined,
+): readonly string[] {
+  return [...new Set(values ?? [])];
 }
 
 function retrieval(
@@ -73,6 +82,7 @@ function nextId(
   requiredText(id, `${kind} ID`);
   const exists = [
     ...library.topics,
+    ...library.contexts,
     ...library.axioms,
     ...library.arguments,
     ...library.counterArguments,
@@ -84,9 +94,11 @@ function nextId(
 function adopt(
   previous: ArgumentLibrary,
   runtime: ArgumentRuntime,
-  patch: Pick<
-    ArgumentLibrary,
-    'topics' | 'axioms' | 'arguments' | 'counterArguments'
+  patch: Partial<
+    Pick<
+      ArgumentLibrary,
+      'topics' | 'contexts' | 'axioms' | 'arguments' | 'counterArguments'
+    >
   >,
 ): ArgumentLibrary {
   const updatedAt = runtimeTimestamp(runtime);
@@ -94,18 +106,21 @@ function adopt(
     ...previous,
     libraryRevision: previous.libraryRevision + 1,
     updatedAt,
-    topics: [...patch.topics].sort((left, right) =>
+    topics: [...(patch.topics ?? previous.topics)].sort((left, right) =>
       left.id.localeCompare(right.id),
     ),
-    axioms: [...patch.axioms].sort((left, right) =>
+    contexts: [...(patch.contexts ?? previous.contexts)].sort((left, right) =>
       left.id.localeCompare(right.id),
     ),
-    arguments: [...patch.arguments].sort((left, right) =>
+    axioms: [...(patch.axioms ?? previous.axioms)].sort((left, right) =>
       left.id.localeCompare(right.id),
     ),
-    counterArguments: [...patch.counterArguments].sort((left, right) =>
-      left.id.localeCompare(right.id),
+    arguments: [...(patch.arguments ?? previous.arguments)].sort(
+      (left, right) => left.id.localeCompare(right.id),
     ),
+    counterArguments: [
+      ...(patch.counterArguments ?? previous.counterArguments),
+    ].sort((left, right) => left.id.localeCompare(right.id)),
   });
   return assertValidArgumentLibrary(next);
 }
@@ -150,6 +165,7 @@ export function createEmptyArgumentLibrary(
     createdAt: now,
     updatedAt: now,
     topics: [],
+    contexts: [],
     axioms: [],
     arguments: [],
     counterArguments: [],
@@ -334,6 +350,141 @@ export function editAxiom(
   });
 }
 
+export function createContext(
+  library: ArgumentLibrary,
+  input: CreateContextInput,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  const now = runtimeTimestamp(runtime);
+  const context: ArgumentContext = {
+    id: nextId(library, 'context', input.id, runtime),
+    revision: 1,
+    reviewState: input.reviewState ?? 'draft',
+    archived: false,
+    createdAt: now,
+    updatedAt: now,
+    title: requiredText(input.title, 'Context title'),
+    ...(input.description === undefined
+      ? {}
+      : {
+          description: requiredText(input.description, 'Context description'),
+        }),
+    retrieval: retrieval(input.retrieval),
+    axiomIds: orderedUnique(input.axiomIds),
+    ...(input.parentContextId === undefined
+      ? {}
+      : {
+          parentContextId: requiredText(
+            input.parentContextId,
+            'Parent Context ID',
+          ),
+        }),
+  };
+  return adopt(library, runtime, {
+    contexts: [...library.contexts, context],
+  });
+}
+
+export function editContext(
+  library: ArgumentLibrary,
+  contextId: string,
+  input: EditContextInput,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  const previous = library.contexts.find(({ id }) => id === contextId);
+  if (previous === undefined) {
+    throw new Error(`Context "${contextId}" does not exist.`);
+  }
+  const description = optionalField(
+    previous.description,
+    input.description,
+    'Context description',
+  );
+  const parentContextId = optionalField(
+    previous.parentContextId,
+    input.parentContextId,
+    'Parent Context ID',
+  );
+  const next = recordUpdate(
+    previous,
+    {
+      ...previous,
+      title:
+        input.title === undefined
+          ? previous.title
+          : requiredText(input.title, 'Context title'),
+      ...(description === undefined
+        ? { description: undefined }
+        : { description }),
+      retrieval:
+        input.retrieval === undefined
+          ? previous.retrieval
+          : retrieval(input.retrieval),
+      axiomIds:
+        input.axiomIds === undefined
+          ? previous.axiomIds
+          : orderedUnique(input.axiomIds),
+      ...(parentContextId === undefined
+        ? { parentContextId: undefined }
+        : { parentContextId }),
+    },
+    runtime,
+  );
+  if (next === previous) return library;
+  return adopt(library, runtime, {
+    contexts: library.contexts.map((record) =>
+      record.id === contextId ? next : record,
+    ),
+  });
+}
+
+export function setContextAxiomMembership(
+  library: ArgumentLibrary,
+  contextId: string,
+  axiomId: string,
+  member: boolean,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  const context = library.contexts.find(({ id }) => id === contextId);
+  if (context === undefined)
+    throw new Error(`Context "${contextId}" does not exist.`);
+  if (!library.axioms.some(({ id }) => id === axiomId)) {
+    throw new Error(`Axiom "${axiomId}" does not exist.`);
+  }
+  const axiomIds = member
+    ? orderedUnique([...context.axiomIds, axiomId])
+    : context.axiomIds.filter((id) => id !== axiomId);
+  return editContext(library, contextId, { axiomIds }, runtime);
+}
+
+export function moveContextAxiom(
+  library: ArgumentLibrary,
+  contextId: string,
+  axiomId: string,
+  toIndex: number,
+  runtime: ArgumentRuntime,
+): ArgumentLibrary {
+  const context = library.contexts.find(({ id }) => id === contextId);
+  if (context === undefined)
+    throw new Error(`Context "${contextId}" does not exist.`);
+  const fromIndex = context.axiomIds.indexOf(axiomId);
+  if (fromIndex < 0)
+    throw new Error(
+      `Axiom "${axiomId}" is not a direct member of Context "${contextId}".`,
+    );
+  if (
+    !Number.isSafeInteger(toIndex) ||
+    toIndex < 0 ||
+    toIndex >= context.axiomIds.length
+  ) {
+    throw new Error('Context Axiom destination index is out of range.');
+  }
+  const axiomIds = [...context.axiomIds];
+  axiomIds.splice(fromIndex, 1);
+  axiomIds.splice(toIndex, 0, axiomId);
+  return editContext(library, contextId, { axiomIds }, runtime);
+}
+
 function updateArgument(
   library: ArgumentLibrary,
   argumentId: string,
@@ -380,6 +531,7 @@ export function createArgument(
       ? {}
       : { boundary: requiredText(input.boundary, 'Boundary / Invariance') }),
     relations: clonePlainData(input.relations ?? []),
+    contextIds: orderedUnique(input.contextIds),
     retrieval: retrieval(input.retrieval),
     sourceReferences: clonePlainData(input.sourceReferences ?? []),
     ...(input.supersedesArgumentId === undefined
@@ -445,6 +597,10 @@ export function editArgument(
         input.relations === undefined
           ? previous.relations
           : clonePlainData(input.relations),
+      contextIds:
+        input.contextIds === undefined
+          ? previous.contextIds
+          : orderedUnique(input.contextIds),
       retrieval:
         input.retrieval === undefined
           ? previous.retrieval
@@ -1345,11 +1501,13 @@ export function setRecordArchived(
   const collectionName =
     kind === 'topic'
       ? 'topics'
-      : kind === 'axiom'
-        ? 'axioms'
-        : kind === 'argument'
-          ? 'arguments'
-          : 'counterArguments';
+      : kind === 'context'
+        ? 'contexts'
+        : kind === 'axiom'
+          ? 'axioms'
+          : kind === 'argument'
+            ? 'arguments'
+            : 'counterArguments';
   const collection = library[collectionName];
   const previous = collection.find(({ id }) => id === recordId);
   if (previous === undefined)
@@ -1363,6 +1521,12 @@ export function setRecordArchived(
             record.id === recordId ? (next as ArgumentTopic) : record,
           )
         : library.topics,
+    contexts:
+      kind === 'context'
+        ? library.contexts.map((record) =>
+            record.id === recordId ? (next as ArgumentContext) : record,
+          )
+        : library.contexts,
     axioms:
       kind === 'axiom'
         ? library.axioms.map((record) =>
@@ -1394,11 +1558,13 @@ export function setRecordReviewState(
   const collectionName =
     kind === 'topic'
       ? 'topics'
-      : kind === 'axiom'
-        ? 'axioms'
-        : kind === 'argument'
-          ? 'arguments'
-          : 'counterArguments';
+      : kind === 'context'
+        ? 'contexts'
+        : kind === 'axiom'
+          ? 'axioms'
+          : kind === 'argument'
+            ? 'arguments'
+            : 'counterArguments';
   const collection = library[collectionName];
   const previous = collection.find(({ id }) => id === recordId);
   if (previous === undefined)
@@ -1412,6 +1578,12 @@ export function setRecordReviewState(
             record.id === recordId ? (next as ArgumentTopic) : record,
           )
         : library.topics,
+    contexts:
+      kind === 'context'
+        ? library.contexts.map((record) =>
+            record.id === recordId ? (next as ArgumentContext) : record,
+          )
+        : library.contexts,
     axioms:
       kind === 'axiom'
         ? library.axioms.map((record) =>
