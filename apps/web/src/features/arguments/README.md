@@ -6,7 +6,8 @@ requests open/close transitions.
 
 - `ArgumentsWorkspace.tsx` owns onboarding, drafts, navigation, search, source
   binding/previews, separate additive Insert JSON and full-library Import JSON
-  dialogs, and confirmed-snapshot exports. It exposes a
+  dialogs, the Proposal Mailbox and human resolution UI, and confirmed-snapshot
+  exports. It exposes a
   narrow leave guard and embedded panel to the shared workspace modal while
   retaining a standalone wrapper for tests.
 - `ArgumentRecordView.tsx` presents Topic, Context/Axiom Group, Axiom, Argument, Counter-Argument,
@@ -26,7 +27,8 @@ requests open/close transitions.
   normalizes it into the existing arrays only at Save.
 - `session.ts` owns the single repository/authoring session, serialized reload
   and mutations, immutable reader replacement, atomic multi-operation Save and
-  Insert JSON commits, and the expected-snapshot source-baseline transaction.
+  Insert JSON commits, atomic Proposal resolutions, and the expected-snapshot
+  source-baseline transaction.
 - `platform-store.ts` selects the browser profile store or desktop app-local
   store once on first access. It never falls back across platforms.
 - `argument-overlay.ts` remains the focus/escape implementation used by the
@@ -56,12 +58,26 @@ Confirmation persists the prepared candidate once against the previewed snapshot
 editor drafts retain the existing Save/Discard/Stay guard. The format and
 neutral example are documented in
 [`docs/ARGUMENT_WORKSPACE_INSERT_JSON.md`](../../../../../docs/ARGUMENT_WORKSPACE_INSERT_JSON.md).
-Schema-v1/v2/v3 imports surface a migration notice and use the core deterministic
+Schema-v1/v2/v3/v4 imports surface a migration notice and use the core deterministic
 migration; no Argument, Example/provenance, relation, or Current pointer is
 inferred. V3 migration adds empty Context storage and empty Argument Context
-bindings only. Context background remains visibly separate from inference
-premises and never participates in premise staleness. Pending-review Arguments
-and Counter-Arguments are available through the Proposals-only filter. Current
+bindings only; v4 migration adds only an empty Proposal Mailbox. Context
+background remains visibly separate from inference premises and never
+participates in premise staleness.
+
+The Mailbox header count and pending/history tabs expose non-canonical AI
+Proposals separately from the canonical record browser. Details show candidate
+content, exact target/revision, staleness, suggested Axioms, and consultation
+provenance. Suggestions never auto-select canonical dependencies. Accept opens
+the ordinary Argument editor with attack, supersession, and Current promotion
+as distinct controls; Reject opens the Counter-Argument editor and requires a
+human response plus resolved outcome. Save performs one expected-snapshot
+transaction, while Cancel and dirty-draft guards preserve the pending Proposal.
+Opening the Mailbox reloads first so writes made through the local MCP process
+become visible.
+
+Canonical pending-review Arguments and Counter-Arguments remain available
+through the Proposals-only filter; they are distinct from the Mailbox. Current
 promotion and premise/relation reassessment require explicit confirmation and
 remain expected-snapshot commits. Inherited premise staleness disables local
 reassessment until upstream inference dependencies have been reassessed; reads

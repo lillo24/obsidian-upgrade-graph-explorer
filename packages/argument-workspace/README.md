@@ -7,9 +7,9 @@ has no UI, renderer, vault, platform, agent, or model dependency.
 
 ## Folder map
 
-- `types.ts` defines Topic, Context, Axiom, Argument, Counter-Argument, source locator,
+- `types.ts` defines Topic, Context, Axiom, Argument, Counter-Argument, Proposal, source locator,
   persistence, snapshot, bundle, source-read, and receipt contracts.
-- `validation.ts` strictly validates schema-v4 libraries and legacy-v1/v2/v3 migration
+- `validation.ts` strictly validates schema-v5 libraries and legacy-v1/v2/v3/v4 migration
   input, portable relative locators, global record/source-reference identities,
   and relationship/dependency integrity.
 - `canonical.ts` owns canonical JSON, browser/worker/Node-neutral SHA-256,
@@ -21,11 +21,14 @@ has no UI, renderer, vault, platform, agent, or model dependency.
 - `contexts.ts` resolves the single-parent Context chain, deterministic
   effective-Axiom union, and per-Argument background provenance without
   entering the inference dependency graph.
+- `proposals.ts` validates and appends non-canonical AI proposals and owns the
+  atomic human accept/reject transformations into canonical history.
 - `storage.ts` serializes expected-snapshot commits and adopts data only after a
   store confirms persistence.
-- `authoring.ts` exposes the mutation-only service over that repository.
-- `serialization.ts` owns lossless schema-v4 JSON parsing/export, deterministic
-  schema-v1/v2/v3 migration, non-mutating historical validation, import preview,
+- `authoring.ts` exposes the mutation-only human service and the narrower
+  proposal-submission-only service over that repository.
+- `serialization.ts` owns lossless schema-v5 JSON parsing/export, deterministic
+  schema-v1/v2/v3/v4 migration, non-mutating historical validation, import preview,
   collision checks, and merge preparation.
 - `insert.ts` owns strict `argument-workspace-insert-v1` parsing, whole-payload
   reference and promotion resolution, revision-pin normalization, non-mutating
@@ -43,8 +46,9 @@ has no UI, renderer, vault, platform, agent, or model dependency.
 
 ## Schema and revisions
 
-Schema v4 stores one library identity/revision and arrays of Topics, Contexts,
-Axioms, Arguments, and Counter-Arguments. Every record has a stable ID, independent
+Schema v5 stores one library identity/revision; canonical arrays of Topics,
+Contexts, Axioms, Arguments, and Counter-Arguments; and a separate `proposals`
+Mailbox. Every canonical record has a stable ID, independent
 record revision, human review state, archive state, and timestamps. Topic
 membership is by ID. An Argument has scoped stable-ID Examples; ordered
 stable-ID authored-text, Axiom-reference, prior-Argument-conclusion, or
@@ -73,6 +77,23 @@ whole Argument/premise/reasoning/conclusion, and store their response in the
 same record. A response has a multi-valued outcome, application explanation,
 boundary/reopening text, and answering Axiom IDs plus the Axiom revisions used
 for that assessment.
+
+Mailbox Proposals are append-only AI suggestions, not framework knowledge and
+not a sixth canonical record kind. A pending Proposal stores its own immutable
+candidate prose, exact optional Argument/part/revision target, suggested Axiom
+IDs, why it may be novel or unresolved, and the exact library descriptor plus
+record revisions consulted. Submission requires that consultation snapshot and
+all target/reference revisions still match. Exact retries are idempotent;
+payloads and lists are bounded. Proposals are excluded from canonical search,
+bundles, Markdown export, Topic membership, Current, and all canonical create or
+edit APIs.
+
+Only a human resolution can change Proposal status. Acceptance atomically
+creates an accepted canonical Argument and records the resulting ID; rejection
+atomically creates an accepted canonical Counter-Argument/Audit with a
+non-`unanswered` response outcome and records that ID. Attack, supersession,
+Topic membership, and Current promotion remain separate explicit choices.
+Cancelling or failing either transaction leaves the Proposal pending.
 
 Attack/support and supersession are independent: neither creates, implies, or
 promotes the other. Relation cycles are allowed as debate structure and are
@@ -139,7 +160,7 @@ returned explicitly without adopting the candidate. Desktop storage lives in
 with validated temporary-sibling replacement. Neither adapter stores data in a
 vault, graph view state, or workspace identity catalog.
 
-Valid schema-v1, schema-v2, and schema-v3 JSON are accepted only through strict
+Valid schema-v1, schema-v2, schema-v3, and schema-v4 JSON are accepted only through strict
 deterministic migrations:
 record content/revisions/timestamps remain unchanged, each Topic receives an
 empty `argumentIds`, the library receives an empty `arguments`, and no Current
@@ -149,22 +170,28 @@ state, membership, Current pointer, and supersession link remain unchanged.
 No Example provenance or Counter-Argument conversion is inferred. V3 receives
 an empty `contexts` collection and each Argument receives empty `contextIds`;
 no grouping or attachment is inferred. Browser data stays under its established
-profile key and is rewritten as v4 only after a successful save. Desktop load
-prefers `library-v4.json`, then migrates a valid `library-v3.json`,
+profile key and is rewritten as v5 only after a successful save. V4 receives
+only an empty `proposals` array; no candidate content or decision is inferred.
+Desktop load prefers `library-v5.json`, then migrates a valid `library-v4.json`,
+`library-v3.json`,
 `library-v2.json`, or `library-v1.json` atomically while retaining the source
 file as a recoverable copy.
 
 ## Authoring and interchange
 
-`ArgumentLibraryAuthoringService` supports all five record kinds, Topic
+`ArgumentLibraryAuthoringService` supports all five canonical record kinds, Topic
 membership, explicit Current promotion, Example and relation mutations,
 Context parent/direct-Axiom authoring and Argument Context attachment,
 Argument premise/relation reassessment,
 answering-Axiom attach/detach, response updates/reassessment, source-version
 baseline recording, archive/restore, human review/reopen, and validated merge
-imports. All calls take an expected snapshot descriptor and return an explicit
-commit/conflict/failure. `pending-review` Arguments and Counter-Arguments are
-proposal records; acceptance never promotes automatically.
+imports, and human Proposal resolution. All calls take an expected snapshot
+descriptor and return an explicit commit/conflict/failure.
+`ArgumentProposalSubmissionService` exposes only bounded Proposal submission;
+it cannot create or modify canonical records. Canonical `pending-review`
+Arguments and Counter-Arguments remain ordinary human-authored records and are
+distinct from Mailbox Proposals. Acceptance never promotes automatically unless
+the human resolution explicitly requests promotion.
 
 Canonical authoring stores the proposition being evaluated directly (for
 example, `X is Y`). Revisability is represented structurally by human review,
@@ -215,7 +242,8 @@ targets, and Context title/description/retrieval metadata. Context member-Axiom
 prose is deliberately not flattened into the Context index. It
 preserves authored text and useful numeric
 and operator tokens. Search candidates report score and matched fields, never a
-new verdict.
+new verdict. Proposal prose is deliberately absent from the reader index and
+bundle closure.
 
 Bundle closure is deliberately bounded. A Topic includes its direct Axioms and
 Counter-Arguments plus only its Current Argument and that Argument's premise

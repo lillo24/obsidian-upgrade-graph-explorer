@@ -86,6 +86,7 @@ function nextId(
     ...library.axioms,
     ...library.arguments,
     ...library.counterArguments,
+    ...library.proposals,
   ].some((record) => record.id === id);
   if (exists) throw new Error(`Argument record ID "${id}" already exists.`);
   return id;
@@ -97,7 +98,12 @@ function adopt(
   patch: Partial<
     Pick<
       ArgumentLibrary,
-      'topics' | 'contexts' | 'axioms' | 'arguments' | 'counterArguments'
+      | 'topics'
+      | 'contexts'
+      | 'axioms'
+      | 'arguments'
+      | 'counterArguments'
+      | 'proposals'
     >
   >,
 ): ArgumentLibrary {
@@ -121,6 +127,9 @@ function adopt(
     counterArguments: [
       ...(patch.counterArguments ?? previous.counterArguments),
     ].sort((left, right) => left.id.localeCompare(right.id)),
+    proposals: [...(patch.proposals ?? previous.proposals)].sort(
+      (left, right) => left.id.localeCompare(right.id),
+    ),
   });
   return assertValidArgumentLibrary(next);
 }
@@ -169,6 +178,7 @@ export function createEmptyArgumentLibrary(
     axioms: [],
     arguments: [],
     counterArguments: [],
+    proposals: [],
   });
 }
 

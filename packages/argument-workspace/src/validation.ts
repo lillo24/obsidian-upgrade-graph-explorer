@@ -22,6 +22,7 @@ const OUTCOMES = new Set([
   'refuted',
   'inapplicable-under-stated-scope',
 ]);
+const PROPOSAL_STATUSES = new Set(['pending', 'accepted', 'rejected']);
 const SOURCE_ROLES = new Set(['target', 'basis', 'support']);
 const FINGERPRINT_SCOPES = new Set(['file', 'heading', 'block', 'span']);
 
@@ -134,6 +135,22 @@ function stringArray(
     } else {
       seen.add(entry);
     }
+  });
+  return valid;
+}
+
+function textArray(
+  value: unknown,
+  path: string,
+  issues: ArgumentLibraryValidationIssue[],
+): value is readonly string[] {
+  if (!Array.isArray(value)) {
+    issue(issues, path, 'invalid-type', 'Expected an array.');
+    return false;
+  }
+  let valid = true;
+  value.forEach((entry, index) => {
+    if (!nonEmptyString(entry, `${path}[${index}]`, issues)) valid = false;
   });
   return valid;
 }
@@ -395,7 +412,7 @@ function validateTopic(
   value: unknown,
   path: string,
   issues: ArgumentLibraryValidationIssue[],
-  schemaVersion: 1 | 2 | 3 | 4 = 4,
+  schemaVersion: 1 | 2 | 3 | 4 | 5 = 5,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected a Topic.');
@@ -439,7 +456,7 @@ function validateArgumentPremise(
   path: string,
   ownerId: unknown,
   issues: ArgumentLibraryValidationIssue[],
-  schemaVersion: 2 | 3 | 4 = 4,
+  schemaVersion: 2 | 3 | 4 | 5 = 5,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected an Argument premise.');
@@ -549,7 +566,7 @@ function validateArgument(
   path: string,
   issues: ArgumentLibraryValidationIssue[],
   sourceIds: Set<string>,
-  schemaVersion: 2 | 3 | 4 = 4,
+  schemaVersion: 2 | 3 | 4 | 5 = 5,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected an Argument.');
@@ -1045,6 +1062,267 @@ function validateCounterArgument(
   validateResponse(value.response, `${path}.response`, issues);
 }
 
+function validateProposalConsultation(
+  value: unknown,
+  path: string,
+  issues: ArgumentLibraryValidationIssue[],
+): void {
+  if (!isRecord(value)) {
+    issue(issues, path, 'invalid-type', 'Expected proposal consultation.');
+    return;
+  }
+  fields(
+    value,
+    ['libraryId', 'libraryRevision', 'records'],
+    ['contentFingerprint'],
+    path,
+    issues,
+  );
+  nonEmptyString(value.libraryId, `${path}.libraryId`, issues);
+  positiveRevision(value.libraryRevision, `${path}.libraryRevision`, issues);
+  if (Object.hasOwn(value, 'contentFingerprint')) {
+    validateFingerprint(
+      value.contentFingerprint,
+      `${path}.contentFingerprint`,
+      issues,
+    );
+  }
+  if (!Array.isArray(value.records)) {
+    issue(issues, `${path}.records`, 'invalid-type', 'Expected an array.');
+    return;
+  }
+  if (value.records.length === 0) {
+    issue(
+      issues,
+      `${path}.records`,
+      'invalid-value',
+      'Proposal consultation must retain at least one record identity.',
+    );
+  }
+  const seen = new Set<string>();
+  value.records.forEach((record, index) => {
+    const recordPath = `${path}.records[${index}]`;
+    if (!isRecord(record)) {
+      issue(
+        issues,
+        recordPath,
+        'invalid-type',
+        'Expected a consulted record identity.',
+      );
+      return;
+    }
+    fields(record, ['kind', 'id'], ['revision'], recordPath, issues);
+    if (
+      record.kind !== 'topic' &&
+      record.kind !== 'axiom' &&
+      record.kind !== 'argument' &&
+      record.kind !== 'counter-argument'
+    ) {
+      issue(
+        issues,
+        `${recordPath}.kind`,
+        'invalid-value',
+        'Unsupported consulted record kind.',
+      );
+    }
+    if (nonEmptyString(record.id, `${recordPath}.id`, issues)) {
+      const key = `${String(record.kind)}\0${record.id}`;
+      if (seen.has(key)) {
+        issue(
+          issues,
+          `${recordPath}.id`,
+          'duplicate-id',
+          'Duplicate consulted record identity.',
+        );
+      }
+      seen.add(key);
+    }
+    if (Object.hasOwn(record, 'revision')) {
+      positiveRevision(record.revision, `${recordPath}.revision`, issues);
+    }
+  });
+}
+
+function validateProposal(
+  value: unknown,
+  path: string,
+  issues: ArgumentLibraryValidationIssue[],
+): void {
+  if (!isRecord(value)) {
+    issue(issues, path, 'invalid-type', 'Expected a Mailbox proposal.');
+    return;
+  }
+  fields(
+    value,
+    [
+      'id',
+      'revision',
+      'createdAt',
+      'updatedAt',
+      'status',
+      'title',
+      'examples',
+      'premiseHints',
+      'suggestedAxiomIds',
+      'conclusion',
+      'whyNovelOrUnresolved',
+      'consultation',
+      'submissionFingerprint',
+    ],
+    [
+      'topicId',
+      'target',
+      'reasoning',
+      'boundary',
+      'clientSubmissionId',
+      'decision',
+    ],
+    path,
+    issues,
+  );
+  nonEmptyString(value.id, `${path}.id`, issues);
+  positiveRevision(value.revision, `${path}.revision`, issues);
+  timestamp(value.createdAt, `${path}.createdAt`, issues);
+  timestamp(value.updatedAt, `${path}.updatedAt`, issues);
+  if (!PROPOSAL_STATUSES.has(value.status as string)) {
+    issue(
+      issues,
+      `${path}.status`,
+      'invalid-value',
+      'Unsupported proposal status.',
+    );
+  }
+  nonEmptyString(value.title, `${path}.title`, issues);
+  if (Object.hasOwn(value, 'topicId')) {
+    nonEmptyString(value.topicId, `${path}.topicId`, issues);
+  }
+  if (Object.hasOwn(value, 'target')) {
+    const targetPath = `${path}.target`;
+    if (!isRecord(value.target)) {
+      issue(issues, targetPath, 'invalid-type', 'Expected a proposal target.');
+    } else {
+      fields(
+        value.target,
+        ['argumentId', 'part', 'reliedOnRevision'],
+        [],
+        targetPath,
+        issues,
+      );
+      nonEmptyString(
+        value.target.argumentId,
+        `${targetPath}.argumentId`,
+        issues,
+      );
+      validateArgumentTargetPart(
+        value.target.part,
+        `${targetPath}.part`,
+        issues,
+      );
+      positiveRevision(
+        value.target.reliedOnRevision,
+        `${targetPath}.reliedOnRevision`,
+        issues,
+      );
+    }
+  }
+  textArray(value.examples, `${path}.examples`, issues);
+  textArray(value.premiseHints, `${path}.premiseHints`, issues);
+  stringArray(value.suggestedAxiomIds, `${path}.suggestedAxiomIds`, issues);
+  for (const field of [
+    'reasoning',
+    'boundary',
+    'clientSubmissionId',
+  ] as const) {
+    if (Object.hasOwn(value, field)) {
+      nonEmptyString(value[field], `${path}.${field}`, issues);
+    }
+  }
+  nonEmptyString(value.conclusion, `${path}.conclusion`, issues);
+  nonEmptyString(
+    value.whyNovelOrUnresolved,
+    `${path}.whyNovelOrUnresolved`,
+    issues,
+  );
+  validateProposalConsultation(
+    value.consultation,
+    `${path}.consultation`,
+    issues,
+  );
+  validateFingerprint(
+    value.submissionFingerprint,
+    `${path}.submissionFingerprint`,
+    issues,
+  );
+
+  const hasDecision = Object.hasOwn(value, 'decision');
+  if (value.status === 'pending' && hasDecision) {
+    issue(
+      issues,
+      `${path}.decision`,
+      'invalid-value',
+      'Pending proposals must not have a decision.',
+    );
+  } else if (value.status !== 'pending' && !hasDecision) {
+    issue(
+      issues,
+      `${path}.decision`,
+      'invalid-type',
+      'Resolved proposals require a decision.',
+    );
+  }
+  if (!hasDecision) return;
+  if (!isRecord(value.decision)) {
+    issue(
+      issues,
+      `${path}.decision`,
+      'invalid-type',
+      'Expected a proposal decision.',
+    );
+    return;
+  }
+  fields(
+    value.decision,
+    ['decidedAt'],
+    ['note', 'resultingArgumentId', 'resultingCounterArgumentId'],
+    `${path}.decision`,
+    issues,
+  );
+  timestamp(value.decision.decidedAt, `${path}.decision.decidedAt`, issues);
+  if (Object.hasOwn(value.decision, 'note')) {
+    nonEmptyString(value.decision.note, `${path}.decision.note`, issues);
+  }
+  const argumentResult = Object.hasOwn(value.decision, 'resultingArgumentId');
+  const counterResult = Object.hasOwn(
+    value.decision,
+    'resultingCounterArgumentId',
+  );
+  if (argumentResult) {
+    nonEmptyString(
+      value.decision.resultingArgumentId,
+      `${path}.decision.resultingArgumentId`,
+      issues,
+    );
+  }
+  if (counterResult) {
+    nonEmptyString(
+      value.decision.resultingCounterArgumentId,
+      `${path}.decision.resultingCounterArgumentId`,
+      issues,
+    );
+  }
+  if (
+    (value.status === 'accepted' && (!argumentResult || counterResult)) ||
+    (value.status === 'rejected' && (!counterResult || argumentResult))
+  ) {
+    issue(
+      issues,
+      `${path}.decision`,
+      'invalid-value',
+      'Accepted proposals must link one Argument; rejected proposals must link one Counter-Argument.',
+    );
+  }
+}
+
 function collectIds(
   value: unknown,
   path: string,
@@ -1443,6 +1721,89 @@ function validateIntegrity(
     }
   });
 
+  if (Array.isArray(library.proposals)) {
+    library.proposals.forEach((entry, index) => {
+      if (!isRecord(entry)) return;
+      if (typeof entry.topicId === 'string' && !topicIds.has(entry.topicId)) {
+        issue(
+          issues,
+          `$.proposals[${index}].topicId`,
+          'missing-reference',
+          `Unknown Topic "${entry.topicId}".`,
+        );
+      }
+      if (
+        isRecord(entry.target) &&
+        typeof entry.target.argumentId === 'string' &&
+        !argumentIds.has(entry.target.argumentId)
+      ) {
+        issue(
+          issues,
+          `$.proposals[${index}].target.argumentId`,
+          'missing-reference',
+          `Unknown target Argument "${entry.target.argumentId}".`,
+        );
+      }
+      if (Array.isArray(entry.suggestedAxiomIds)) {
+        entry.suggestedAxiomIds.forEach((axiomId, axiomIndex) => {
+          if (typeof axiomId === 'string' && !axiomIds.has(axiomId)) {
+            issue(
+              issues,
+              `$.proposals[${index}].suggestedAxiomIds[${axiomIndex}]`,
+              'missing-reference',
+              `Unknown suggested Axiom "${axiomId}".`,
+            );
+          }
+        });
+      }
+      if (
+        isRecord(entry.consultation) &&
+        Array.isArray(entry.consultation.records)
+      ) {
+        entry.consultation.records.forEach((identity, identityIndex) => {
+          if (!isRecord(identity) || typeof identity.id !== 'string') return;
+          const exists =
+            (identity.kind === 'topic' && topicIds.has(identity.id)) ||
+            (identity.kind === 'axiom' && axiomIds.has(identity.id)) ||
+            (identity.kind === 'argument' && argumentIds.has(identity.id)) ||
+            (identity.kind === 'counter-argument' &&
+              counterIds.has(identity.id));
+          if (!exists) {
+            issue(
+              issues,
+              `$.proposals[${index}].consultation.records[${identityIndex}].id`,
+              'missing-reference',
+              `Unknown consulted ${String(identity.kind)} "${identity.id}".`,
+            );
+          }
+        });
+      }
+      if (!isRecord(entry.decision)) return;
+      if (
+        typeof entry.decision.resultingArgumentId === 'string' &&
+        !argumentIds.has(entry.decision.resultingArgumentId)
+      ) {
+        issue(
+          issues,
+          `$.proposals[${index}].decision.resultingArgumentId`,
+          'missing-reference',
+          `Unknown resulting Argument "${entry.decision.resultingArgumentId}".`,
+        );
+      }
+      if (
+        typeof entry.decision.resultingCounterArgumentId === 'string' &&
+        !counterIds.has(entry.decision.resultingCounterArgumentId)
+      ) {
+        issue(
+          issues,
+          `$.proposals[${index}].decision.resultingCounterArgumentId`,
+          'missing-reference',
+          `Unknown resulting Counter-Argument "${entry.decision.resultingCounterArgumentId}".`,
+        );
+      }
+    });
+  }
+
   const visitGraph = (
     edgeKind: 'premise' | 'supersession',
     edgesFor: (record: PlainRecord) => readonly string[],
@@ -1526,7 +1887,7 @@ function validateIntegrity(
 
 function validateArgumentLibraryVersion(
   value: unknown,
-  expectedVersion: 2 | 3 | 4,
+  expectedVersion: 2 | 3 | 4 | 5,
 ): ArgumentLibraryValidationResult {
   const issues: ArgumentLibraryValidationIssue[] = [];
   if (!isRecord(value)) {
@@ -1554,6 +1915,7 @@ function validateArgumentLibraryVersion(
       'axioms',
       'arguments',
       'counterArguments',
+      ...(expectedVersion >= 5 ? ['proposals'] : []),
     ],
     [],
     '$',
@@ -1601,6 +1963,9 @@ function validateArgumentLibraryVersion(
     issues,
     globalIds,
   );
+  if (expectedVersion >= 5) {
+    collectIds(value.proposals, '$.proposals', issues, globalIds);
+  }
   const sourceIds = new Set<string>();
   if (Array.isArray(value.topics))
     value.topics.forEach((entry, index) =>
@@ -1633,6 +1998,11 @@ function validateArgumentLibraryVersion(
         sourceIds,
       ),
     );
+  if (expectedVersion >= 5 && Array.isArray(value.proposals)) {
+    value.proposals.forEach((entry, index) =>
+      validateProposal(entry, `$.proposals[${index}]`, issues),
+    );
+  }
   validateIntegrity(
     value,
     topicIds,
@@ -1650,7 +2020,28 @@ function validateArgumentLibraryVersion(
 export function validateArgumentLibrary(
   value: unknown,
 ): ArgumentLibraryValidationResult {
-  return validateArgumentLibraryVersion(value, 4);
+  return validateArgumentLibraryVersion(value, 5);
+}
+
+export type ArgumentLibraryV4ValidationResult =
+  | {
+      readonly valid: true;
+      readonly value: PlainRecord;
+      readonly issues: readonly [];
+    }
+  | {
+      readonly valid: false;
+      readonly issues: readonly ArgumentLibraryValidationIssue[];
+    };
+
+/** Strictly validates the schema-v4 shape before deterministic migration. */
+export function validateArgumentLibraryV4(
+  value: unknown,
+): ArgumentLibraryV4ValidationResult {
+  const validation = validateArgumentLibraryVersion(value, 4);
+  return validation.valid
+    ? { valid: true, value: value as PlainRecord, issues: [] }
+    : validation;
 }
 
 export type ArgumentLibraryV3ValidationResult =
