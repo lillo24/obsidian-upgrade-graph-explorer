@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import type { McpServer } from '@modelcontextprotocol/server';
 import {
+  createArgument,
+  createContext,
   createKnowledgeReaderFromLibrary,
   serializeArgumentLibrary,
   setRecordArchived,
@@ -23,7 +25,7 @@ async function temporaryLibrary(): Promise<{
 }> {
   const directory = await mkdtemp(join(tmpdir(), 'icarus-argument-mcp-'));
   temporaryDirectories.push(directory);
-  return { directory, path: join(directory, 'library-v3.json') };
+  return { directory, path: join(directory, 'library-v4.json') };
 }
 
 async function connect(server: McpServer): Promise<{
@@ -107,6 +109,7 @@ describe('Argument Library MCP tools', () => {
         libraryId: 'library-mcp-test',
         recordCounts: {
           topics: 1,
+          contexts: 0,
           axioms: 1,
           arguments: 1,
           counterArguments: 1,
@@ -173,6 +176,106 @@ describe('Argument Library MCP tools', () => {
         },
       });
       expect(JSON.stringify(result)).not.toContain(path);
+    } finally {
+      await session.close();
+    }
+  });
+
+  it('lists, searches, and reads Context background without adding write tools', async () => {
+    const { path } = await temporaryLibrary();
+    const fixture = createSyntheticLibrary();
+    let library = createContext(
+      fixture.library,
+      {
+        id: 'CTX-MEASUREMENT',
+        title: 'Measurement framework',
+        description: 'Background assumptions for compatible comparisons.',
+        axiomIds: ['AX-UNITS'],
+        retrieval: { keywords: ['framework-context'] },
+        reviewState: 'accepted',
+      },
+      fixture.runtime,
+    );
+    library = createArgument(
+      library,
+      {
+        id: 'AR-CONTEXT-ONLY',
+        title: 'Context-only interpretation',
+        premises: [],
+        conclusion: 'The Context remains background rather than a premise.',
+        contextIds: ['CTX-MEASUREMENT'],
+        reviewState: 'accepted',
+      },
+      fixture.runtime,
+    );
+    await writeFile(path, serializeArgumentLibrary(library), 'utf8');
+    const session = await connect(
+      createArgumentMcpServer({ libraryPath: path }),
+    );
+    try {
+      const status = await session.client.callTool({
+        name: 'compiler_status',
+        arguments: {},
+      });
+      expect(structured(status)).toMatchObject({
+        recordCounts: { contexts: 1 },
+      });
+
+      const search = await session.client.callTool({
+        name: 'compiler_search_index',
+        arguments: { query: 'framework-context' },
+      });
+      expect(structured(search)).toMatchObject({
+        status: 'ok',
+        value: {
+          candidates: [
+            expect.objectContaining({
+              kind: 'context',
+              id: 'CTX-MEASUREMENT',
+            }),
+          ],
+        },
+      });
+
+      const context = await session.client.callTool({
+        name: 'compiler_read_bundle',
+        arguments: { kind: 'context', id: 'CTX-MEASUREMENT' },
+      });
+      expect(structured(context)).toMatchObject({
+        status: 'ok',
+        value: {
+          contexts: [
+            expect.objectContaining({
+              id: 'CTX-MEASUREMENT',
+              effectiveAxiomIds: ['AX-UNITS'],
+            }),
+          ],
+          axioms: [expect.objectContaining({ id: 'AX-UNITS' })],
+          arguments: [],
+        },
+      });
+
+      const argument = await session.client.callTool({
+        name: 'compiler_read_bundle',
+        arguments: { kind: 'argument', id: 'AR-CONTEXT-ONLY' },
+      });
+      expect(structured(argument)).toMatchObject({
+        status: 'ok',
+        value: {
+          arguments: [
+            expect.objectContaining({
+              contextIds: ['CTX-MEASUREMENT'],
+              resolvedPremises: [],
+              backgroundAxioms: [
+                expect.objectContaining({
+                  axiomId: 'AX-UNITS',
+                  viaContextIds: ['CTX-MEASUREMENT'],
+                }),
+              ],
+            }),
+          ],
+        },
+      });
     } finally {
       await session.close();
     }
@@ -250,7 +353,7 @@ describe('Argument Library MCP tools', () => {
 
       for (const [source, code] of [
         ['{broken', 'invalid-json'],
-        [JSON.stringify({ schemaVersion: 4 }), 'future-schema'],
+        [JSON.stringify({ schemaVersion: 5 }), 'future-schema'],
       ] as const) {
         await writeFile(path, source, 'utf8');
         const failed = await session.client.callTool({

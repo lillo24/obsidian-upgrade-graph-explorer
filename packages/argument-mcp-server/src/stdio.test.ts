@@ -24,7 +24,7 @@ it('serves initialize, tools/list, and tools/call over clean stdio', async () =>
   const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
   const temporary = await mkdtemp(join(tmpdir(), 'icarus-argument-mcp-stdio-'));
   const serverPath = join(temporary, 'server.mjs');
-  const libraryPath = join(temporary, 'library-v3.json');
+  const libraryPath = join(temporary, 'library-v4.json');
   const { library } = createSyntheticLibrary();
   await writeFile(libraryPath, serializeArgumentLibrary(library), 'utf8');
   await build({

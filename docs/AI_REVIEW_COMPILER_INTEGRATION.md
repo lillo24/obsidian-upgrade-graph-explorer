@@ -2,7 +2,7 @@
 
 ## Status and ownership
 
-`packages/ai-review` is a headless orchestration package. It owns immutable review inputs, stage execution/history, run-local evidence, result validation, and exports. It does not own the compiler's Topics, Axioms, Arguments, Counter-Arguments, responses, statuses, indexes, or durable storage.
+`packages/ai-review` is a headless orchestration package. It owns immutable review inputs, stage execution/history, run-local evidence, result validation, and exports. It does not own the compiler's Topics, Contexts, Axioms, Arguments, Counter-Arguments, responses, statuses, indexes, or durable storage.
 
 `packages/argument-workspace` owns those records and exposes an immutable,
 retained `KnowledgeReader`. The application composition adapter in
@@ -90,7 +90,7 @@ contracts require a small application-owned translation:
 - Review's `workspaceId` is an authorization/source-capture context. It is not
   the Argument Library's `libraryId`, and an adapter must not derive or replace
   one identity with the other.
-- Review's `snapshotId` starts with `argument-library-snapshot-v3:` and appends
+- Review's `snapshotId` starts with `argument-library-snapshot-v4:` and appends
   the canonical core descriptor JSON encoded as lowercase hexadecimal UTF-16
   code units. It therefore losslessly contains `libraryId`, schema version,
   library revision, fingerprint algorithm, and SHA-256 content fingerprint.
@@ -138,6 +138,12 @@ contracts require a small application-owned translation:
   full-file version metadata only. Ordinary reads/refreshes/exports are
   read-only; no source body, verdict, review state, reassessment, or theory file
   is changed.
+- Contexts are returned as read-only `context` records. Context bundles expose
+  parent chains and direct/inherited/effective Axioms; Argument bundles keep
+  attached Contexts and effective background Axioms explicitly separate from
+  `resolvedPremises`. Context membership is background availability, does not
+  pin a Context revision, and is never mapped into Review as an inference
+  dependency or staleness cause.
 - Argument Examples, premise provenance/reuse, attack/support relations,
   supersession, Boundary/Invariance, and Current remain canonical library data
   behind the existing authoring boundary. Review may read them through the

@@ -52,7 +52,9 @@ const searchIndexInput = z
 const readBundleInput = z
   .object({
     id: z.string().trim().min(1).max(512),
-    kind: z.enum(['topic', 'axiom', 'counter-argument']).optional(),
+    kind: z
+      .enum(['topic', 'context', 'axiom', 'argument', 'counter-argument'])
+      .optional(),
     maxRecords: z.number().int().min(1).max(500).optional(),
     maxDepth: z.number().int().min(0).max(32).optional(),
   })
@@ -178,6 +180,7 @@ export function createArgumentMcpServer(
         contentFingerprint: loaded.snapshot.descriptor.contentFingerprint,
         recordCounts: {
           topics: loaded.library.topics.length,
+          contexts: loaded.library.contexts.length,
           axioms: loaded.library.axioms.length,
           arguments: loaded.library.arguments.length,
           counterArguments: loaded.library.counterArguments.length,

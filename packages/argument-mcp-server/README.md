@@ -9,7 +9,7 @@ Graph Explorer UI ─┐
 MCP server ──────┘
 ```
 
-The server is read-only. It reloads and validates `library-v3.json` for every
+The server is read-only. It reloads and validates `library-v4.json` for every
 tool call, creates a retained `KnowledgeReader` for that call, and never creates
 a second database. No save, create, update, delete, import, source-version, or
 vault-edit capability is registered.
@@ -23,10 +23,10 @@ for MCP host configuration.
 Without that variable, the server mirrors Tauri's app-local-data convention for
 the `com.icarus.graph-explorer` application identifier:
 
-- Windows: `%LOCALAPPDATA%\com.icarus.graph-explorer\argument-workspace\library-v3.json`
-- macOS: `~/Library/Application Support/com.icarus.graph-explorer/argument-workspace/library-v3.json`
+- Windows: `%LOCALAPPDATA%\com.icarus.graph-explorer\argument-workspace\library-v4.json`
+- macOS: `~/Library/Application Support/com.icarus.graph-explorer/argument-workspace/library-v4.json`
 - Linux: `$XDG_DATA_HOME` (or `~/.local/share`) followed by
-  `com.icarus.graph-explorer/argument-workspace/library-v3.json`
+  `com.icarus.graph-explorer/argument-workspace/library-v4.json`
 
 If a safe default cannot be derived, the server returns a setup error asking
 for `ICARUS_ARGUMENT_LIBRARY_PATH`. Neither status nor errors disclose the
@@ -35,7 +35,7 @@ resolved absolute path. Reads are capped at 64 MiB and tool responses at 1 MiB.
 For the current Windows desktop library:
 
 ```powershell
-$env:ICARUS_ARGUMENT_LIBRARY_PATH = Join-Path $env:LOCALAPPDATA 'com.icarus.graph-explorer\argument-workspace\library-v3.json'
+$env:ICARUS_ARGUMENT_LIBRARY_PATH = Join-Path $env:LOCALAPPDATA 'com.icarus.graph-explorer\argument-workspace\library-v4.json'
 ```
 
 ## Tools
@@ -84,7 +84,7 @@ pnpm dlx @modelcontextprotocol/inspector@2.6.0 node packages/argument-mcp-server
 
 In the Inspector, connect and use the Tools tab to call status, list/search, and
 bundle reads. For a synthetic fixture, point `ICARUS_ARGUMENT_LIBRARY_PATH` at a
-temporary schema-v3 JSON file before starting Inspector. Never commit or paste
+temporary schema-v4 JSON file before starting Inspector. Never commit or paste
 the private real library into tests or logs.
 
 For a headless connection check, the same Inspector package also has a CLI

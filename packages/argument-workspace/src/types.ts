@@ -1,10 +1,10 @@
-export const ARGUMENT_LIBRARY_SCHEMA_VERSION = 3 as const;
-export const KNOWLEDGE_READER_CONTRACT_VERSION = 4 as const;
+export const ARGUMENT_LIBRARY_SCHEMA_VERSION = 4 as const;
+export const KNOWLEDGE_READER_CONTRACT_VERSION = 5 as const;
 export const CONTENT_FINGERPRINT_ALGORITHM =
   'sha256-canonical-json-v1' as const;
 
 export type ArgumentRecordKind =
-  'topic' | 'axiom' | 'argument' | 'counter-argument';
+  'topic' | 'context' | 'axiom' | 'argument' | 'counter-argument';
 export type HumanReviewState =
   'draft' | 'pending-review' | 'accepted' | 'reopened' | 'rejected';
 export type CounterArgumentOutcome =
@@ -202,6 +202,19 @@ export interface ArgumentAxiom extends ArgumentRecordMetadata {
   readonly sourceReferences: readonly TheorySourceReference[];
 }
 
+/**
+ * Human-curated background that can be attached to Arguments without becoming
+ * an inference premise. Parent Contexts contribute only their effective axioms;
+ * descriptive metadata is never inherited.
+ */
+export interface ArgumentContext extends ArgumentRecordMetadata {
+  readonly title: string;
+  readonly description?: string;
+  readonly retrieval: RetrievalMetadata;
+  readonly axiomIds: readonly string[];
+  readonly parentContextId?: string;
+}
+
 export type ArgumentTargetPart =
   | { readonly kind: 'argument' }
   | { readonly kind: 'premise'; readonly premiseId: string }
@@ -226,6 +239,7 @@ export interface Argument extends ArgumentRecordMetadata {
   readonly conclusion: string;
   readonly boundary?: string;
   readonly relations: readonly ArgumentRelation[];
+  readonly contextIds: readonly string[];
   readonly retrieval: RetrievalMetadata;
   readonly sourceReferences: readonly TheorySourceReference[];
   readonly supersedesArgumentId?: string;
@@ -274,6 +288,7 @@ export interface ArgumentLibrary {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly topics: readonly ArgumentTopic[];
+  readonly contexts: readonly ArgumentContext[];
   readonly axioms: readonly ArgumentAxiom[];
   readonly arguments: readonly Argument[];
   readonly counterArguments: readonly ArgumentCounterArgument[];
@@ -355,6 +370,24 @@ export interface CreateAxiomInput {
   readonly reviewState?: HumanReviewState;
 }
 
+export interface CreateContextInput {
+  readonly id?: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly retrieval?: Partial<RetrievalMetadata>;
+  readonly axiomIds?: readonly string[];
+  readonly parentContextId?: string;
+  readonly reviewState?: HumanReviewState;
+}
+
+export interface EditContextInput {
+  readonly title?: string;
+  readonly description?: string | null;
+  readonly retrieval?: RetrievalMetadata;
+  readonly axiomIds?: readonly string[];
+  readonly parentContextId?: string | null;
+}
+
 export interface EditAxiomInput {
   readonly title?: string;
   readonly statement?: string;
@@ -374,6 +407,7 @@ export interface CreateArgumentInput {
   readonly conclusion: string;
   readonly boundary?: string;
   readonly relations?: readonly ArgumentRelation[];
+  readonly contextIds?: readonly string[];
   readonly retrieval?: Partial<RetrievalMetadata>;
   readonly sourceReferences?: readonly TheorySourceReference[];
   readonly supersedesArgumentId?: string;
@@ -388,6 +422,7 @@ export interface EditArgumentInput {
   readonly conclusion?: string;
   readonly boundary?: string | null;
   readonly relations?: readonly ArgumentRelation[];
+  readonly contextIds?: readonly string[];
   readonly retrieval?: RetrievalMetadata;
   readonly sourceReferences?: readonly TheorySourceReference[];
   readonly supersedesArgumentId?: string | null;
@@ -504,6 +539,11 @@ export interface ArgumentBundle {
     readonly id: string;
   };
   readonly topics: readonly ArgumentTopic[];
+  readonly contexts: readonly (ArgumentContext & {
+    readonly parentContextIds: readonly string[];
+    readonly inheritedAxiomIds: readonly string[];
+    readonly effectiveAxiomIds: readonly string[];
+  })[];
   readonly axioms: readonly (ArgumentAxiom & {
     readonly linkedCounterArgumentIds: readonly string[];
   })[];
@@ -517,6 +557,20 @@ export interface ArgumentBundle {
     readonly supersededByArgumentIds: readonly string[];
     readonly targetingCounterArgumentIds: readonly string[];
     readonly incomingRelationIds: readonly string[];
+    /** Resolved background only; these records are not premises. */
+    readonly resolvedContexts: readonly {
+      readonly contextId: string;
+      readonly parentContextIds: readonly string[];
+      readonly directAxiomIds: readonly string[];
+      readonly effectiveAxiomIds: readonly string[];
+    }[];
+    readonly backgroundAxioms: readonly {
+      readonly axiomId: string;
+      readonly revision: number;
+      readonly title: string;
+      readonly archived: boolean;
+      readonly viaContextIds: readonly string[];
+    }[];
     readonly resolvedPremises: readonly {
       readonly premiseId: string;
       readonly kind: ArgumentPremise['kind'];
@@ -711,7 +765,7 @@ export type ArgumentLibraryJsonParseResult =
   | {
       readonly status: 'valid';
       readonly value: ArgumentLibrary;
-      readonly migratedFromSchemaVersion?: 1 | 2;
+      readonly migratedFromSchemaVersion?: 1 | 2 | 3;
     }
   | {
       readonly status: 'invalid-json' | 'future-schema' | 'invalid-library';

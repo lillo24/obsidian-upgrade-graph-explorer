@@ -9,7 +9,7 @@ requests open/close transitions.
   dialogs, and confirmed-snapshot exports. It exposes a
   narrow leave guard and embedded panel to the shared workspace modal while
   retaining a standalone wrapper for tests.
-- `ArgumentRecordView.tsx` presents Topic, Axiom, Argument, Counter-Argument,
+- `ArgumentRecordView.tsx` presents Topic, Context/Axiom Group, Axiom, Argument, Counter-Argument,
   Current/source status, direct versus inherited premise staleness with compact
   cause paths, separate relation staleness, and metadata reading views. The
   injected source section remains an application concern.
@@ -19,7 +19,8 @@ requests open/close transitions.
 - `ArgumentRecordEditor.tsx` owns schema-shaped authoring controls, including
   scoped stable-ID Examples, ordered stable-ID premises and Example provenance,
   prior-premise reuse, attack/support relations, Boundary/Invariance,
-  reusable memberships, part-level response targets, and the advanced lossless
+  ordered Context Axiom membership, single-parent Context inheritance,
+  Argument background attachment, reusable memberships, part-level response targets, and the advanced lossless
   source-reference JSON field.
 - `retrieval-editor.ts` retains raw retrieval textarea text during editing and
   normalizes it into the existing arrays only at Save.
@@ -54,9 +55,11 @@ persists the prepared candidate once against the previewed snapshot. Dirty
 editor drafts retain the existing Save/Discard/Stay guard. The format and
 neutral example are documented in
 [`docs/ARGUMENT_WORKSPACE_INSERT_JSON.md`](../../../../../docs/ARGUMENT_WORKSPACE_INSERT_JSON.md).
-Schema-v1/v2 imports surface a migration notice and use the core deterministic
+Schema-v1/v2/v3 imports surface a migration notice and use the core deterministic
 migration; no Argument, Example/provenance, relation, or Current pointer is
-inferred. Pending-review Arguments
+inferred. V3 migration adds empty Context storage and empty Argument Context
+bindings only. Context background remains visibly separate from inference
+premises and never participates in premise staleness. Pending-review Arguments
 and Counter-Arguments are available through the Proposals-only filter. Current
 promotion and premise/relation reassessment require explicit confirmation and
 remain expected-snapshot commits. Inherited premise staleness disables local

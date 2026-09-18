@@ -32,7 +32,7 @@ describe('ArgumentLibraryLoader', () => {
   it('uses the configured path before platform defaults', () => {
     const result = resolveArgumentLibraryPath({
       env: {
-        [ARGUMENT_LIBRARY_PATH_ENV]: 'fixtures/library-v3.json',
+        [ARGUMENT_LIBRARY_PATH_ENV]: 'fixtures/library-v4.json',
         LOCALAPPDATA: 'C:\\ignored',
       },
       platform: 'win32',
@@ -41,7 +41,7 @@ describe('ArgumentLibraryLoader', () => {
 
     expect(result).toEqual({
       status: 'resolved',
-      path: resolve('C:\\workspace', 'fixtures/library-v3.json'),
+      path: resolve('C:\\workspace', 'fixtures/library-v4.json'),
     });
   });
 
@@ -69,7 +69,7 @@ describe('ArgumentLibraryLoader', () => {
         'Application Support',
         'com.icarus.graph-explorer',
         'argument-workspace',
-        'library-v3.json',
+        'library-v4.json',
       ),
     });
     expect(
@@ -84,14 +84,14 @@ describe('ArgumentLibraryLoader', () => {
         '/data',
         'com.icarus.graph-explorer',
         'argument-workspace',
-        'library-v3.json',
+        'library-v4.json',
       ),
     });
   });
 
-  it('loads strict UTF-8 schema-v3 data through the domain reader', async () => {
+  it('loads strict UTF-8 schema-v4 data through the domain reader', async () => {
     const directory = await temporaryDirectory();
-    const path = join(directory, 'library-v3.json');
+    const path = join(directory, 'library-v4.json');
     const { library } = createSyntheticLibrary();
     await writeFile(path, serializeArgumentLibrary(library), 'utf8');
 
@@ -136,14 +136,14 @@ describe('ArgumentLibraryLoader', () => {
     {
       name: 'future schema',
       prepare: async (path: string) =>
-        writeFile(path, JSON.stringify({ schemaVersion: 4 }), 'utf8'),
+        writeFile(path, JSON.stringify({ schemaVersion: 5 }), 'utf8'),
       expected: 'future-schema',
     },
   ])(
     'classifies $name without returning file contents',
     async ({ prepare, expected }) => {
       const directory = await temporaryDirectory();
-      const path = join(directory, 'library-v3.json');
+      const path = join(directory, 'library-v4.json');
       await prepare(path);
 
       const loaded = await new ArgumentLibraryLoader({
@@ -158,7 +158,7 @@ describe('ArgumentLibraryLoader', () => {
 
   it('rejects files over the configured read bound', async () => {
     const directory = await temporaryDirectory();
-    const path = join(directory, 'library-v3.json');
+    const path = join(directory, 'library-v4.json');
     await writeFile(path, '{}', 'utf8');
 
     await expect(

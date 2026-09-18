@@ -200,6 +200,7 @@ function validateBundleInput(
   if (
     value.kind !== undefined &&
     value.kind !== 'topic' &&
+    value.kind !== 'context' &&
     value.kind !== 'axiom' &&
     value.kind !== 'argument' &&
     value.kind !== 'counter-argument'

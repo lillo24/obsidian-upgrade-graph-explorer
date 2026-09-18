@@ -38,6 +38,7 @@ import { ArgumentRecordEditor } from './ArgumentRecordEditor';
 import {
   ArgumentAxiomView,
   ArgumentCounterArgumentView,
+  ArgumentContextView,
   ArgumentTopicView,
   ArgumentView,
   type ArgumentSelection,
@@ -142,6 +143,9 @@ function firstSelection(
   const topic =
     library.topics.find(({ archived }) => !archived) ?? library.topics[0];
   if (topic !== undefined) return { kind: 'topic', id: topic.id };
+  const context =
+    library.contexts.find(({ archived }) => !archived) ?? library.contexts[0];
+  if (context !== undefined) return { kind: 'context', id: context.id };
   const axiom =
     library.axioms.find(({ archived }) => !archived) ?? library.axioms[0];
   if (axiom !== undefined) return { kind: 'axiom', id: axiom.id };
@@ -188,6 +192,28 @@ function editDraft(
       },
     };
   }
+  if (selection.kind === 'context') {
+    const context = findRecord(library, 'context', selection.id);
+    return {
+      dirty: false,
+      errors: [],
+      retrievalText: retrievalEditorText(context.retrieval),
+      source: '[]',
+      record: {
+        kind: 'context',
+        mode: 'edit',
+        id: context.id,
+        expected: descriptor,
+        title: context.title,
+        description: context.description,
+        retrieval: context.retrieval,
+        axiomIds: context.axiomIds,
+        parentContextId: context.parentContextId,
+        reviewState: context.reviewState,
+        topicIds: [],
+      },
+    };
+  }
   if (selection.kind === 'axiom') {
     const axiom = findRecord(library, 'axiom', selection.id);
     return {
@@ -231,6 +257,7 @@ function editDraft(
         conclusion: argument.conclusion,
         boundary: argument.boundary,
         relations: argument.relations,
+        contextIds: argument.contextIds,
         retrieval: argument.retrieval,
         sourceReferences: argument.sourceReferences,
         supersedesArgumentId: argument.supersedesArgumentId,
@@ -311,6 +338,21 @@ function newDraft(
       record: { ...base, kind, statement: '', sourceReferences: [] },
     };
   }
+  if (kind === 'context') {
+    return {
+      dirty: true,
+      errors: [],
+      retrievalText: emptyRetrievalText,
+      source: '[]',
+      record: {
+        ...base,
+        kind,
+        description: undefined,
+        axiomIds: [],
+        parentContextId: undefined,
+      },
+    };
+  }
   if (kind === 'argument') {
     return {
       dirty: true,
@@ -324,6 +366,7 @@ function newDraft(
         premises: [],
         conclusion: '',
         relations: [],
+        contextIds: [],
         sourceReferences: [],
       },
     };
@@ -379,7 +422,7 @@ function parseSources(
     ...editor.record,
     retrieval: normalizeRetrievalEditorText(editor.retrievalText),
   } as ArgumentRecordDraft;
-  if (record.kind === 'topic') {
+  if (record.kind === 'topic' || record.kind === 'context') {
     return errors.length === 0
       ? { valid: true, record }
       : { valid: false, errors };
@@ -422,7 +465,7 @@ async function copyText(text: string): Promise<void> {
 }
 
 function counts(library: ArgumentLibrary): string {
-  return `${library.topics.length} Topic${library.topics.length === 1 ? '' : 's'}, ${library.axioms.length} Axiom${library.axioms.length === 1 ? '' : 's'}, ${library.arguments.length} Argument${library.arguments.length === 1 ? '' : 's'}, ${library.counterArguments.length} Counter-Argument${library.counterArguments.length === 1 ? '' : 's'}`;
+  return `${library.topics.length} Topic${library.topics.length === 1 ? '' : 's'}, ${library.contexts.length} Context${library.contexts.length === 1 ? '' : 's'}, ${library.axioms.length} Axiom${library.axioms.length === 1 ? '' : 's'}, ${library.arguments.length} Argument${library.arguments.length === 1 ? '' : 's'}, ${library.counterArguments.length} Counter-Argument${library.counterArguments.length === 1 ? '' : 's'}`;
 }
 
 function InsertJsonDialog({
@@ -631,7 +674,7 @@ function WorkspaceOnboarding({
     source: string;
     fileName: string;
     library: ArgumentLibrary;
-    migratedFromSchemaVersion?: 1 | 2;
+    migratedFromSchemaVersion?: 1 | 2 | 3;
   }>();
   const [error, setError] = useState<string>();
   async function select(event: ChangeEvent<HTMLInputElement>) {
@@ -1859,6 +1902,9 @@ const ArgumentsWorkspaceContent = forwardRef<
                 <button onClick={() => beginCreate('axiom')} type="button">
                   New Axiom
                 </button>
+                <button onClick={() => beginCreate('context')} type="button">
+                  New Context
+                </button>
                 <button onClick={() => beginCreate('argument')} type="button">
                   New Argument
                 </button>
@@ -1894,6 +1940,37 @@ const ArgumentsWorkspaceContent = forwardRef<
                             type="button"
                           >
                             {topic.title}
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </nav>
+              <nav aria-label="Contexts" className="arguments-topics">
+                <h2>Contexts</h2>
+                {state.snapshot.library.contexts.filter(
+                  (context) => !context.archived,
+                ).length === 0 ? (
+                  <p className="arguments-empty">No active Contexts.</p>
+                ) : (
+                  <ul>
+                    {state.snapshot.library.contexts
+                      .filter((context) => !context.archived)
+                      .map((context) => (
+                        <li key={context.id}>
+                          <button
+                            aria-current={
+                              currentSelection?.kind === 'context' &&
+                              currentSelection.id === context.id
+                                ? 'page'
+                                : undefined
+                            }
+                            onClick={() =>
+                              navigate({ kind: 'context', id: context.id })
+                            }
+                            type="button"
+                          >
+                            {context.title}
                           </button>
                         </li>
                       ))}
@@ -2027,8 +2104,8 @@ const ArgumentsWorkspaceContent = forwardRef<
                   <section className="arguments-empty-workspace">
                     <h2>Empty library</h2>
                     <p>
-                      Create a Topic, Axiom, Argument, or Counter-Argument to
-                      begin.
+                      Create a Topic, Context, Axiom, Argument, or
+                      Counter-Argument to begin.
                     </p>
                   </section>
                 ) : currentSelection?.kind === 'topic' ? (
@@ -2040,6 +2117,16 @@ const ArgumentsWorkspaceContent = forwardRef<
                       'topic',
                       currentSelection.id,
                     )}
+                  />
+                ) : currentSelection?.kind === 'context' ? (
+                  <ArgumentContextView
+                    context={findRecord(
+                      state.snapshot.library,
+                      'context',
+                      currentSelection.id,
+                    )}
+                    library={state.snapshot.library}
+                    onNavigate={navigate}
                   />
                 ) : currentSelection?.kind === 'axiom' ? (
                   <ArgumentAxiomView
@@ -2401,9 +2488,9 @@ const ArgumentsWorkspaceContent = forwardRef<
               <p className="arguments-disclosure">
                 If folder selection is unavailable, preserve each shown{' '}
                 <code>topics/</code>, <code>axioms/</code>,{' '}
-                <code>arguments/</code>, or <code>counter-arguments/</code> path
-                when arranging individual downloads so reusable links remain
-                valid.
+                <code>contexts/</code>, <code>arguments/</code>, or{' '}
+                <code>counter-arguments/</code> path when arranging individual
+                downloads so reusable links remain valid.
               </p>
               <button onClick={() => setMarkdownFiles(undefined)} type="button">
                 Close export

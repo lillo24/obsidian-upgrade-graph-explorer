@@ -113,7 +113,7 @@ describe('Argument Library interchange', () => {
     });
     expect(
       parseArgumentLibraryJson(
-        JSON.stringify({ ...createNeutralArgumentLibrary(), schemaVersion: 4 }),
+        JSON.stringify({ ...createNeutralArgumentLibrary(), schemaVersion: 5 }),
       ),
     ).toMatchObject({ status: 'future-schema' });
   });
@@ -126,10 +126,11 @@ describe('Argument Library interchange', () => {
       status: 'valid',
       migratedFromSchemaVersion: 1,
       value: {
-        schemaVersion: 3,
+        schemaVersion: 4,
         libraryId: 'library-v1-fixture',
         libraryRevision: 7,
         arguments: [],
+        contexts: [],
         topics: [{ id: 'T-V1', argumentIds: [] }],
       },
     });
@@ -151,11 +152,14 @@ describe('Argument Library interchange', () => {
       delete legacyArgument.examples;
       delete legacyArgument.relations;
       delete legacyArgument.boundary;
+      delete legacyArgument.contextIds;
       return legacyArgument;
     };
     const legacyArguments = current.arguments.map(withoutV3Fields);
+    const currentWithoutContexts = { ...current } as Record<string, unknown>;
+    delete currentWithoutContexts.contexts;
     const legacyV2 = {
-      ...current,
+      ...currentWithoutContexts,
       schemaVersion: 2,
       arguments: legacyArguments,
     };
@@ -166,16 +170,17 @@ describe('Argument Library interchange', () => {
       status: 'valid',
       migratedFromSchemaVersion: 2,
       value: {
-        schemaVersion: 3,
-        arguments: [{ examples: [], relations: [] }],
+        schemaVersion: 4,
+        contexts: [],
+        arguments: [{ examples: [], relations: [], contextIds: [] }],
       },
     });
     expect(second).toEqual(first);
     if (first.status !== 'valid') return;
     expect(first.value.arguments.map(withoutV3Fields)).toEqual(legacyArguments);
-    expect(first.value.topics).toEqual(legacyV2.topics);
-    expect(first.value.axioms).toEqual(legacyV2.axioms);
-    expect(first.value.counterArguments).toEqual(legacyV2.counterArguments);
+    expect(first.value.topics).toEqual(current.topics);
+    expect(first.value.axioms).toEqual(current.axioms);
+    expect(first.value.counterArguments).toEqual(current.counterArguments);
   });
 
   it('treats identical import as idempotent and same-lineage altered content as conflict', () => {

@@ -1,10 +1,11 @@
-import type {
-  ArgumentExample,
-  ArgumentLibrary,
-  ArgumentPremise,
-  ArgumentRelation,
-  ArgumentTargetPart,
-  HumanReviewState,
+import {
+  resolveArgumentBackground,
+  type ArgumentExample,
+  type ArgumentLibrary,
+  type ArgumentPremise,
+  type ArgumentRelation,
+  type ArgumentTargetPart,
+  type HumanReviewState,
 } from '@icarus-graph-explorer/argument-workspace';
 
 import type { RetrievalEditorText } from './retrieval-editor';
@@ -107,6 +108,65 @@ function CheckboxList({
         ))
       )}
     </fieldset>
+  );
+}
+
+function OrderedContextAxiomEditor({
+  axioms,
+  selected,
+  onChange,
+}: {
+  readonly axioms: ArgumentLibrary['axioms'];
+  readonly selected: readonly string[];
+  readonly onChange: (values: readonly string[]) => void;
+}) {
+  const options = axioms.map((axiom) => ({
+    id: axiom.id,
+    label: axiom.title,
+    archived: axiom.archived,
+  }));
+  const titles = new Map(axioms.map((axiom) => [axiom.id, axiom.title]));
+  const move = (index: number, direction: -1 | 1) => {
+    const destination = index + direction;
+    if (destination < 0 || destination >= selected.length) return;
+    const values = [...selected];
+    const [item] = values.splice(index, 1);
+    values.splice(destination, 0, item!);
+    onChange(values);
+  };
+  return (
+    <>
+      <CheckboxList
+        empty="Create an Axiom before adding background."
+        legend="Direct background Axioms"
+        onChange={onChange}
+        options={options}
+        selected={selected}
+      />
+      {selected.length < 2 ? null : (
+        <ol className="arguments-editor__ordered-list">
+          {selected.map((axiomId, index) => (
+            <li key={axiomId}>
+              <span>{titles.get(axiomId) ?? axiomId}</span>
+              <button
+                disabled={index === 0}
+                onClick={() => move(index, -1)}
+                type="button"
+              >
+                Up
+              </button>
+              <button
+                disabled={index === selected.length - 1}
+                onClick={() => move(index, 1)}
+                type="button"
+              >
+                Down
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+    </>
   );
 }
 
@@ -788,6 +848,16 @@ export function ArgumentRecordEditor({
     label: record.title,
     archived: record.archived,
   }));
+  const selectedContextIds = new Set(
+    draft.kind === 'argument' ? draft.contextIds : [],
+  );
+  const contexts = library.contexts
+    .filter((record) => !record.archived || selectedContextIds.has(record.id))
+    .map((record) => ({
+      id: record.id,
+      label: record.title,
+      archived: record.archived,
+    }));
   const counters = library.counterArguments.map((record) => ({
     id: record.id,
     label: record.title,
@@ -927,8 +997,84 @@ export function ArgumentRecordEditor({
         </>
       ) : null}
 
+      {draft.kind === 'context' ? (
+        <>
+          <label>
+            Description
+            <textarea
+              onChange={(event) =>
+                onChange({ ...draft, description: event.currentTarget.value })
+              }
+              rows={6}
+              value={draft.description ?? ''}
+            />
+          </label>
+          <label>
+            Parent Context
+            <select
+              onChange={(event) =>
+                onChange({
+                  ...draft,
+                  parentContextId:
+                    event.currentTarget.value === ''
+                      ? undefined
+                      : event.currentTarget.value,
+                })
+              }
+              value={draft.parentContextId ?? ''}
+            >
+              <option value="">No parent Context</option>
+              {library.contexts
+                .filter(
+                  ({ id, archived }) =>
+                    id !== draft.id &&
+                    (!archived || id === draft.parentContextId),
+                )
+                .map((context) => (
+                  <option key={context.id} value={context.id}>
+                    {context.title}
+                    {context.archived ? ' — archived' : ''}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <OrderedContextAxiomEditor
+            axioms={library.axioms}
+            onChange={(axiomIds) => onChange({ ...draft, axiomIds })}
+            selected={draft.axiomIds}
+          />
+          <p className="arguments-disclosure">
+            Parent Axioms are inherited as background. Context metadata is not
+            inherited, and background never becomes an inference premise.
+          </p>
+        </>
+      ) : null}
+
       {draft.kind === 'argument' ? (
         <>
+          <CheckboxList
+            empty="Create a Context before attaching background."
+            legend="Contexts (background, not premises)"
+            onChange={(contextIds) => onChange({ ...draft, contextIds })}
+            options={contexts}
+            selected={draft.contextIds}
+          />
+          {draft.contextIds.length === 0 ? null : (
+            <details className="arguments-disclosure">
+              <summary>Effective background Axioms</summary>
+              <p>
+                {resolveArgumentBackground(library, draft.contextIds)
+                  .axioms.map(({ axiomId, viaContextIds }) => {
+                    const axiom = library.axioms.find(
+                      ({ id }) => id === axiomId,
+                    );
+                    return `${axiom?.title ?? axiomId} (via ${viaContextIds.join(', ')})`;
+                  })
+                  .join('; ') || 'none'}
+                . These are available context, not premise dependencies.
+              </p>
+            </details>
+          )}
           <ExamplesEditor
             examples={draft.examples}
             onChange={(examples) => onChange({ ...draft, examples })}

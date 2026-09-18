@@ -17,6 +17,7 @@ import {
   createAxiom,
   createArgument,
   createCounterArgument,
+  createContext,
   createEmptyArgumentLibrary,
   createTopic,
   editAxiom,
@@ -73,6 +74,17 @@ function fixture(): ArgumentLibrary {
     },
     clock,
   );
+  library = createContext(
+    library,
+    {
+      id: 'CTX-UI',
+      title: 'Neutral background',
+      description: 'Background for interpreting the comparison.',
+      axiomIds: ['AX-UI'],
+      reviewState: 'accepted',
+    },
+    clock,
+  );
   library = createCounterArgument(
     createArgument(
       createArgument(
@@ -98,6 +110,7 @@ function fixture(): ArgumentLibrary {
           reasoning: 'Comparable units are required before comparison.',
           conclusion: 'Convert units before concluding a contradiction.',
           boundary: 'The conclusion does not depend on display formatting.',
+          contextIds: ['CTX-UI'],
           reviewState: 'accepted',
         },
         clock,
@@ -479,6 +492,11 @@ describe('standalone Arguments workspace', () => {
     expect(container.textContent).toContain(
       'The conclusion does not depend on display formatting.',
     );
+    expect(container.textContent).toContain(
+      'Contexts — background, not premises',
+    );
+    expect(container.textContent).toContain('Effective background Axioms');
+    expect(container.textContent).toContain('Neutral background');
 
     await click('Back');
     await click('Replacement reasoning');
@@ -496,6 +514,29 @@ describe('standalone Arguments workspace', () => {
     expect(
       store.snapshot.library.arguments.find(({ id }) => id === 'AR-UI-NEXT'),
     ).toMatchObject({ supersedesArgumentId: 'AR-UI' });
+  });
+
+  it('exposes Context authoring fields and the separate Argument background selector', async () => {
+    await mount();
+    await click('New Context');
+    expect(textarea('Description')).toBeInstanceOf(HTMLTextAreaElement);
+    expect(container.textContent).toContain('Parent Context');
+    expect(container.textContent).toContain('Direct background Axioms');
+    expect(container.textContent).toContain(
+      'background never becomes an inference premise',
+    );
+
+    await click('Cancel');
+    await click('Discard');
+    await click('Compatibility reasoning');
+    await click('Edit');
+    expect(container.textContent).toContain(
+      'Contexts (background, not premises)',
+    );
+    expect(container.textContent).toContain('Effective background Axioms');
+    expect(container.textContent).toContain(
+      'available context, not premise dependencies',
+    );
   });
 
   it('explains inherited premise staleness when pinned revisions still match', async () => {

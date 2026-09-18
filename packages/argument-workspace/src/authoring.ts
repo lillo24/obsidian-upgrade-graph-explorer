@@ -5,6 +5,7 @@ import {
   createAxiom,
   createArgument,
   createCounterArgument,
+  createContext,
   createTopic,
   detachAnsweringAxiom,
   editAxiom,
@@ -12,17 +13,20 @@ import {
   editArgumentExample,
   editArgumentRelation,
   editCounterArgument,
+  editContext,
   editTopic,
   reassessCounterArgumentResponse,
   reassessArgumentPremises,
   reassessArgumentRelations,
   moveArgumentExample,
+  moveContextAxiom,
   promoteArgumentToCurrent,
   recordTheorySourceVersion,
   removeArgumentExample,
   removeArgumentRelation,
   setRecordArchived,
   setRecordReviewState,
+  setContextAxiomMembership,
   setTopicMembership,
   updateCounterArgumentResponse,
 } from './library';
@@ -41,10 +45,12 @@ import type {
   CreateAxiomInput,
   CreateArgumentInput,
   CreateCounterArgumentInput,
+  CreateContextInput,
   CreateTopicInput,
   EditAxiomInput,
   EditArgumentInput,
   EditCounterArgumentInput,
+  EditContextInput,
   EditTopicInput,
   HumanReviewState,
   RecordTheorySourceVersionInput,
@@ -102,6 +108,59 @@ export class ArgumentLibraryAuthoringService {
   ): Promise<ArgumentLibraryCommitResult> {
     return this.commit(expected, (library) =>
       editAxiom(library, axiomId, input, this.runtime),
+    );
+  }
+
+  createContext(
+    expected: SnapshotDescriptor,
+    input: CreateContextInput,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      createContext(library, input, this.runtime),
+    );
+  }
+
+  editContext(
+    expected: SnapshotDescriptor,
+    contextId: string,
+    input: EditContextInput,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      editContext(library, contextId, input, this.runtime),
+    );
+  }
+
+  setContextAxiomMembership(
+    expected: SnapshotDescriptor,
+    contextId: string,
+    axiomId: string,
+    member: boolean,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      setContextAxiomMembership(
+        library,
+        contextId,
+        axiomId,
+        member,
+        this.runtime,
+      ),
+    );
+  }
+
+  moveContextAxiom(
+    expected: SnapshotDescriptor,
+    contextId: string,
+    axiomId: string,
+    destinationIndex: number,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      moveContextAxiom(
+        library,
+        contextId,
+        axiomId,
+        destinationIndex,
+        this.runtime,
+      ),
     );
   }
 
