@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { act } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,7 +8,22 @@ import { DEFAULT_GLOBAL_LAYOUT_SETTINGS } from '@icarus-graph-explorer/renderer-
 
 import type { ExplorationLayout, ExplorationScope } from '../exploration-model';
 
-import { GraphSettings } from './GraphSettings';
+import { GraphSettings as GraphSettingsComponent } from './GraphSettings';
+
+function GraphSettings(
+  props: Omit<
+    ComponentProps<typeof GraphSettingsComponent>,
+    'onThemePreferenceChange' | 'themePreference'
+  >,
+) {
+  return (
+    <GraphSettingsComponent
+      {...props}
+      onThemePreferenceChange={() => undefined}
+      themePreference="system"
+    />
+  );
+}
 
 describe('Modular Focus Hierarchy Sandbox controls', () => {
   let container: HTMLDivElement;

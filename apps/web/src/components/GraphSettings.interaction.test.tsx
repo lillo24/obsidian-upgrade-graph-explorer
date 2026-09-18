@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DEFAULT_GLOBAL_LAYOUT_SETTINGS } from '@icarus-graph-explorer/renderer-sigma/settings';
+import type { ThemePreference } from '@icarus-graph-explorer/theme';
 
 import { GraphSettings } from './GraphSettings';
 
@@ -14,6 +15,8 @@ import { GraphSettings } from './GraphSettings';
 
 function SettingsHarness() {
   const [open, setOpen] = useState(true);
+  const [themePreference, setThemePreference] =
+    useState<ThemePreference>('system');
   return (
     <>
       <GraphSettings
@@ -29,8 +32,10 @@ function SettingsHarness() {
         onGlobalLayoutSettingsChange={() => undefined}
         onOpenChange={setOpen}
         onResetSandbox={() => undefined}
+        onThemePreferenceChange={setThemePreference}
         onTrackpadZoomModeChange={() => undefined}
         open={open}
+        themePreference={themePreference}
         trackpadZoomMode="scroll-zoom"
       />
       <button
@@ -82,5 +87,19 @@ describe('Graph Settings interactions', () => {
     expect(
       container.querySelector('[aria-label="Open Settings"]'),
     ).not.toBeNull();
+  });
+
+  it('applies a keyboard-accessible Theme selection immediately', async () => {
+    const select = container.querySelector('#theme-preference');
+    if (!(select instanceof HTMLSelectElement)) {
+      throw new Error('Missing Theme selector.');
+    }
+
+    await act(() => {
+      select.value = 'dark';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(select.value).toBe('dark');
   });
 });

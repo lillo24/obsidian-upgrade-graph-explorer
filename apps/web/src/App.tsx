@@ -77,6 +77,7 @@ import {
   isLiveVaultProgressPhase,
 } from './vault-open-progress';
 import { createVaultDiscoveryProgressStore } from './vault-discovery-progress-store';
+import type { ThemeController } from './theme/runtime';
 
 const sampleValidation = validateObsidianDiagnosticReport(sampleReportJson);
 if (!sampleValidation.valid) {
@@ -104,6 +105,8 @@ function liveSourceStatus(snapshot: DesktopLiveVaultSnapshot): string {
 }
 
 export interface AppProps {
+  /** The application-wide appearance owner supplied by ThemeProvider. */
+  readonly theme: ThemeController;
   /** Tests may inject the native provider; ordinary browser mode detects lazily. */
   readonly desktopSourceProvider?: TauriSourceProvider;
   /** Standalone/integration hosts may inject a disposable profile store. */
@@ -122,7 +125,8 @@ export function App({
   desktopSourceProvider,
   reviewController: injectedReviewController,
   reviewHistoryStore,
-}: AppProps = {}) {
+  theme,
+}: AppProps) {
   const [report, setReport] = useState<ObsidianDiagnosticReport>(SAMPLE_REPORT);
   const [reportName, setReportName] = useState('Synthetic Sample');
   const [sourceSessionKey, setSourceSessionKey] = useState(0);
@@ -854,6 +858,7 @@ export function App({
             </>
           }
           snapshot={report.snapshot}
+          theme={theme}
         />
         {sourceNotice === undefined ? null : (
           <div className="workspace-notice-stack">

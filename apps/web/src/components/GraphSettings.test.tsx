@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server';
+import type { ComponentProps } from 'react';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -9,9 +10,24 @@ import {
 
 import {
   GlobalCustomLayoutControls,
-  GraphSettings,
+  GraphSettings as GraphSettingsComponent,
   NetworkSharedControls,
 } from './GraphSettings';
+
+function GraphSettings(
+  props: Omit<
+    ComponentProps<typeof GraphSettingsComponent>,
+    'onThemePreferenceChange' | 'themePreference'
+  >,
+) {
+  return (
+    <GraphSettingsComponent
+      {...props}
+      onThemePreferenceChange={() => undefined}
+      themePreference="system"
+    />
+  );
+}
 
 describe('Graph Settings presentation', () => {
   it('separates Preferences, Sandbox, and Source into accessible transient tabs', () => {
@@ -75,6 +91,12 @@ describe('Graph Settings presentation', () => {
       'hidden="" id="graph-settings-source-panel" role="tabpanel"',
     );
     expect(markup).toContain('>Preferences</button>');
+    expect(markup).toContain('id="theme-preference"');
+    expect(markup).toContain(
+      '<option value="system" selected="">System</option>',
+    );
+    expect(markup).toContain('<option value="light">Light</option>');
+    expect(markup).toContain('<option value="dark">Dark</option>');
     expect(markup).toContain('>Sandbox</button>');
     expect(markup).toContain('>Interaction<');
     expect(markup).not.toContain('>Focus Root appearance<');

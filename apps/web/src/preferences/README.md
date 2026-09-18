@@ -4,6 +4,13 @@ This folder owns global, user-level graph appearance and interaction preferences
 from workspace view persistence because these settings apply to every vault and
 must not be serialized into KG9 workspace state.
 
+Application color theme is deliberately a separate appearance boundary:
+`appearance-preferences.ts` owns the strict version-1
+`icarus.graph-explorer.appearance.v1` record and defaults to System. It is not a
+Graph Preference and therefore never enters Current View or Named Saved Views.
+Its tests cover exact validation, corruption, unavailable storage, and
+session-only write failures.
+
 - `graph-preferences.ts` owns the defensive `localStorage` boundary for
   `icarus.graph-explorer.preferences.v1`.
 - `graph-preferences.test.ts` verifies defaults, validation, exact serialization,

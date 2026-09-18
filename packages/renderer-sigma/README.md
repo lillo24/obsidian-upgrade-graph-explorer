@@ -11,6 +11,11 @@ clustering. Neither owns canonical entities, KG6 projection policy, search,
 inspection, source acquisition, Tauri, React Flow, Dagre, analytics, or saved
 coordinates.
 
+THEMESYS1 adds an explicit app-resolved `light | dark` prop to both canvases.
+The renderer never reads browser storage, media queries, root attributes, or
+computed styles as theme authority. Its existing Obsidian-dark palette remains
+unchanged until THEMESYS2 maps this seam to dual renderer palettes.
+
 ```text
 documents-only KG6 projection
   → mapping.ts       stable renderer keys + workspace-relative folder metadata

@@ -1,7 +1,9 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { App } from './App';
+import { createBrowserThemeRuntime } from './theme/runtime';
+import { ThemeApplication } from './theme/ThemeApplication';
+import { ThemeProvider } from './theme/theme-provider';
 import './index.css';
 
 const root = document.querySelector('#root');
@@ -11,6 +13,8 @@ if (!root) {
 }
 
 const applicationRoot = createRoot(root);
+const themeRuntime = createBrowserThemeRuntime();
+
 if (
   import.meta.env.DEV &&
   new URLSearchParams(window.location.search).has('physics1-lab')
@@ -24,8 +28,10 @@ if (
   });
 } else {
   applicationRoot.render(
-    <StrictMode>
-      <App />
-    </StrictMode>,
+    <ThemeProvider runtime={themeRuntime}>
+      <StrictMode>
+        <ThemeApplication />
+      </StrictMode>
+    </ThemeProvider>,
   );
 }

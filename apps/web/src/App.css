@@ -37,6 +37,11 @@
   min-height: 0;
 }
 
+.app-shell {
+  color: var(--color-text-primary);
+  background: var(--color-surface-app);
+}
+
 .workspace-main {
   position: relative;
   overflow: hidden;
@@ -804,6 +809,34 @@ h2 {
 
 .graph-settings__section + .graph-settings__section {
   border-top: 1px solid #dce4e8;
+}
+
+.theme-preference-control {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.theme-preference-control select {
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.65rem;
+  color: var(--color-text-primary);
+  background: var(--color-surface-input);
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.5rem;
+}
+
+.theme-preference-control select:hover {
+  background: var(--color-surface-hover);
+}
+
+.theme-preference-control select:focus-visible {
+  border-color: var(--color-border-focus);
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
 }
 
 .graph-settings__sandbox-note {

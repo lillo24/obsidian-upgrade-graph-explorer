@@ -47,6 +47,7 @@
     "@icarus-graph-explorer/focus-schematic": "workspace:*",
     "@icarus-graph-explorer/focus-schematic-layout": "workspace:*",
     "@icarus-graph-explorer/performance": "workspace:*",
+    "@icarus-graph-explorer/theme": "workspace:*",
     "@icarus-graph-explorer/view-projection": "workspace:*",
     "@icarus-graph-explorer/visual-groups": "workspace:*",
     "@xyflow/react": "12.11.5"
