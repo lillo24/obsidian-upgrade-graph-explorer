@@ -8,6 +8,7 @@ import {
 } from '@icarus-graph-explorer/focus-schematic';
 import {
   buildEndpointFixture,
+  applyFocusSchematicSoftRadialSpread,
   compareFocusSchematicSoftInternalVariants,
   computeFocusSchematicComputedLayoutAttempt,
   computeFocusSchematicSoftClusterLayoutAttempt,
@@ -24,6 +25,7 @@ import {
   SOFT_CLUSTER_STABILITY_PAIRS,
   type EndpointFixtureSpec,
   type FocusSchematicEndpointPlan,
+  type FocusSchematicComputedLayout,
   type FocusSchematicSoftFolderDisplayIntent,
   type FocusSchematicSoftHierarchyForcePolicy,
   type FocusSchematicSoftClusterStrength,
@@ -42,6 +44,84 @@ function inputFor(spec: EndpointFixtureSpec, bands: boolean) {
   });
 }
 
+function displayedMetrics(layout: FocusSchematicComputedLayout) {
+  const modules = layout.candidate.modules;
+  const centerByModuleId = new Map(
+    modules.map((module) => [
+      module.moduleId,
+      {
+        x: module.x + module.width / 2,
+        y: module.y + module.height / 2,
+      },
+    ]),
+  );
+  const pairKeys = new Set<string>();
+  for (const connection of layout.endpointPlan.connections) {
+    if (
+      connection.role === 'secondary' ||
+      connection.sourceModuleId === connection.targetModuleId
+    )
+      continue;
+    pairKeys.add(
+      [connection.sourceModuleId, connection.targetModuleId].sort().join('\0'),
+    );
+  }
+  const topologyDistances = [...pairKeys].map((key) => {
+    const [leftId, rightId] = key.split('\0');
+    const left = centerByModuleId.get(leftId!)!;
+    const right = centerByModuleId.get(rightId!)!;
+    return Math.hypot(right.x - left.x, right.y - left.y);
+  });
+  const attachmentByKey = new Map(
+    layout.attachments.map((attachment) => [
+      `${attachment.connectionId}:${attachment.endpoint}`,
+      attachment,
+    ]),
+  );
+  const endpointSpans = layout.endpointPlan.connections.flatMap(
+    (connection) => {
+      if (connection.role === 'secondary') return [];
+      const source = attachmentByKey.get(`${connection.id}:source`);
+      const target = attachmentByKey.get(`${connection.id}:target`);
+      return source === undefined || target === undefined
+        ? []
+        : [Math.hypot(target.x - source.x, target.y - source.y)];
+    },
+  );
+  const left = Math.min(...modules.map((module) => module.x));
+  const right = Math.max(...modules.map((module) => module.x + module.width));
+  const top = Math.min(...modules.map((module) => module.y));
+  const bottom = Math.max(...modules.map((module) => module.y + module.height));
+  let minimumModuleGap: number | null = null;
+  for (let a = 0; a < modules.length; a += 1)
+    for (let b = a + 1; b < modules.length; b += 1) {
+      const first = modules[a]!;
+      const second = modules[b]!;
+      const gap = Math.max(
+        second.x - (first.x + first.width),
+        first.x - (second.x + second.width),
+        second.y - (first.y + first.height),
+        first.y - (second.y + second.height),
+      );
+      minimumModuleGap =
+        minimumModuleGap === null ? gap : Math.min(minimumModuleGap, gap);
+    }
+  const mean = (values: readonly number[]) =>
+    values.length === 0
+      ? null
+      : values.reduce((sum, value) => sum + value, 0) / values.length;
+  return {
+    boundsWidth: right - left,
+    boundsHeight: bottom - top,
+    boundsArea: (right - left) * (bottom - top),
+    connectedPairDistanceMean: mean(topologyDistances),
+    exactPrimaryEndpointSpanMean: mean(endpointSpans),
+    exactEndpointCrossingCount: layout.quality.exactEndpointCrossingCount,
+    overlapCount: layout.quality.moduleOverlapPairs.length,
+    minimumModuleGap,
+  };
+}
+
 function soft(
   spec: EndpointFixtureSpec,
   strength: FocusSchematicSoftClusterStrength,
@@ -54,6 +134,7 @@ function soft(
     FocusSchematicSoftClusterOptions,
     'strength' | 'displayIntent' | 'hierarchyForcePolicy'
   > = {},
+  radialSpacing: number = 0,
 ) {
   const input = inputFor(spec, false);
   const first = computeFocusSchematicSoftClusterLayoutAttempt(input, {
@@ -72,6 +153,11 @@ function soft(
     throw new Error(`${spec.id}/${strength}: ${first.reason}`);
   if (second.status !== 'success')
     throw new Error(`${spec.id}/${strength} repeat: ${second.reason}`);
+  const displayed = applyFocusSchematicSoftRadialSpread(
+    input,
+    first.result,
+    radialSpacing,
+  );
   const root = input.model.modules.find(
     ({ id }) => id === input.model.rootModuleId,
   )!;
@@ -96,8 +182,14 @@ function soft(
       secondaryGeometryInfluence: first.evidence.secondaryGeometryInfluence,
       boundedSchedule:
         JSON.stringify(first.evidence.fixedIterationSchedule) === '[36,18]',
+      radialSpreadSafety:
+        first.evidence.groupPacking.radialSpreadSafetyViolationCount === 0,
     },
     metrics: first.evidence.metrics,
+    preGroupMetrics: first.evidence.preGroupMetrics,
+    groupPacking: first.evidence.groupPacking,
+    radialSpacing,
+    displayedMetrics: displayedMetrics(displayed),
     runtime: first.evidence.runtime,
     compass: first.evidence.compass,
     internalMetrics: first.result.internalLayoutEvidence.metrics,
@@ -800,32 +892,37 @@ function summarizeSpacingRows(rows: readonly SoftRow[]) {
   return {
     rowCount: rows.length,
     hardGatesPass: rows.every(
-      ({ deterministic, rootFileCentered, hardGates }) =>
+      ({ deterministic, rootFileCentered, hardGates, displayedMetrics }) =>
         deterministic &&
         rootFileCentered &&
         hardGates.overlapFree &&
+        displayedMetrics.overlapCount === 0 &&
         hardGates.nodeContainment &&
         hardGates.secondaryGeometryInfluence === 0 &&
-        hardGates.boundedSchedule,
+        hardGates.boundedSchedule &&
+        hardGates.radialSpreadSafety,
     ),
-    minimumModuleGap: metric((row) => row.metrics.minimumModuleGap, 'minimum'),
-    boundsWidth: metric((row) => row.metrics.boundsWidth),
-    boundsHeight: metric((row) => row.metrics.boundsHeight),
-    boundsArea: metric((row) => row.metrics.boundsArea),
+    minimumModuleGap: metric(
+      (row) => row.displayedMetrics.minimumModuleGap,
+      'minimum',
+    ),
+    boundsWidth: metric((row) => row.displayedMetrics.boundsWidth),
+    boundsHeight: metric((row) => row.displayedMetrics.boundsHeight),
+    boundsArea: metric((row) => row.displayedMetrics.boundsArea),
     connectedPairDistanceMean: metric(
-      (row) => row.metrics.connectedPairDistanceMean,
+      (row) => row.displayedMetrics.connectedPairDistanceMean,
     ),
     connectedPairDistanceP95: metric(
       (row) => row.metrics.connectedPairDistanceP95,
     ),
     exactPrimaryEndpointSpanMean: metric(
-      (row) => row.metrics.exactPrimaryEndpointSpanMean,
+      (row) => row.displayedMetrics.exactPrimaryEndpointSpanMean,
     ),
     exactPrimaryEndpointSpanP95: metric(
       (row) => row.metrics.exactPrimaryEndpointSpanP95,
     ),
     exactEndpointCrossingCount: metric(
-      (row) => row.metrics.exactEndpointCrossingCount,
+      (row) => row.displayedMetrics.exactEndpointCrossingCount,
     ),
     hopMeanAbsoluteRadiusError: metric(
       (row) => row.metrics.hopMeanAbsoluteRadiusError,
@@ -860,14 +957,14 @@ const spacingRows = spacingSamples.flatMap((spacing) =>
   SOFT_CLUSTER_FIXTURES.map((spec) => ({
     spacing,
     radialScale: focusSchematicSoftRadialSpreadScale(spacing),
-    ...soft(spec, 50, emptyDisplayIntent, 'normalized-decay'),
+    ...soft(spec, 50, emptyDisplayIntent, 'normalized-decay', {}, spacing),
   })),
 );
 const adaptiveSpacingRows = [0, 50, 100].flatMap((spacing) =>
   SOFT_ADAPTIVE_COMPASS_FIXTURES.map((spec) => ({
     spacing,
     radialScale: focusSchematicSoftRadialSpreadScale(spacing),
-    ...soft(spec, 50, emptyDisplayIntent, 'normalized-decay'),
+    ...soft(spec, 50, emptyDisplayIntent, 'normalized-decay', {}, spacing),
   })),
 );
 const spacingAnchorSummaries = spacingSamples.map((spacing) => ({
@@ -894,6 +991,8 @@ const strengthSpacingRows = [0, 50, 100].flatMap((strength) =>
       strength,
       emptyDisplayIntent,
       'normalized-decay',
+      {},
+      spacing,
     ),
   })),
 );
@@ -901,6 +1000,86 @@ const strengthSpacingRows = [0, 50, 100].flatMap((strength) =>
 const fixtureRows = SOFT_CLUSTER_FIXTURES.flatMap((spec) =>
   strengths.map((strength) => soft(spec, strength)),
 );
+const groupPackingTradeoffRows = fixtureRows.map((row) => {
+  const difference = (
+    after: number | null,
+    before: number | null,
+  ): number | null =>
+    after === null || before === null ? null : after - before;
+  return {
+    fixtureId: row.fixtureId,
+    strength: row.strength,
+    boundsAreaChange: difference(
+      row.metrics.boundsArea,
+      row.preGroupMetrics.boundsArea,
+    ),
+    connectedPairDistanceMeanChange: difference(
+      row.metrics.connectedPairDistanceMean,
+      row.preGroupMetrics.connectedPairDistanceMean,
+    ),
+    exactPrimaryEndpointSpanMeanChange: difference(
+      row.metrics.exactPrimaryEndpointSpanMean,
+      row.preGroupMetrics.exactPrimaryEndpointSpanMean,
+    ),
+    hopMeanAbsoluteRadiusErrorChange: difference(
+      row.metrics.hopMeanAbsoluteRadiusError,
+      row.preGroupMetrics.hopMeanAbsoluteRadiusError,
+    ),
+    exactEndpointCrossingCountChange: difference(
+      row.metrics.exactEndpointCrossingCount,
+      row.preGroupMetrics.exactEndpointCrossingCount,
+    ),
+    groupPackingMs: row.groupPacking.groupPackingMs,
+    groupPacking: row.groupPacking,
+  };
+});
+
+function summarizeTradeoff(
+  read: (row: (typeof groupPackingTradeoffRows)[number]) => number | null,
+) {
+  const values = groupPackingTradeoffRows.flatMap((row) => {
+    const value = read(row);
+    return value === null ? [] : [{ row, value }];
+  });
+  const ordered = [...values].sort((left, right) => left.value - right.value);
+  const worst = [...values].sort(
+    (left, right) => Math.abs(right.value) - Math.abs(left.value),
+  )[0];
+  return {
+    mean: average(values.map(({ value }) => value)),
+    p95:
+      ordered[Math.max(0, Math.ceil(ordered.length * 0.95) - 1)]?.value ?? null,
+    maximum: ordered.at(-1)?.value ?? null,
+    worstAbsolute:
+      worst === undefined
+        ? null
+        : {
+            fixtureId: worst.row.fixtureId,
+            strength: worst.row.strength,
+            change: worst.value,
+          },
+  };
+}
+
+const groupPackingTradeoffSummary = {
+  boundsAreaChange: summarizeTradeoff((row) => row.boundsAreaChange),
+  connectedPairDistanceMeanChange: summarizeTradeoff(
+    (row) => row.connectedPairDistanceMeanChange,
+  ),
+  exactPrimaryEndpointSpanMeanChange: summarizeTradeoff(
+    (row) => row.exactPrimaryEndpointSpanMeanChange,
+  ),
+  hopMeanAbsoluteRadiusErrorChange: summarizeTradeoff(
+    (row) => row.hopMeanAbsoluteRadiusErrorChange,
+  ),
+  exactEndpointCrossingCountChange: summarizeTradeoff(
+    (row) => row.exactEndpointCrossingCountChange,
+  ),
+  groupPackingMs: summarizeTradeoff((row) => row.groupPackingMs),
+};
+const sc14GroupPacking = fixtureRows.find(
+  ({ fixtureId, strength }) => fixtureId === 'SC14' && strength === 50,
+)!;
 const compassDemandBakeoffRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.flatMap(
   (spec) => [
     {
@@ -961,10 +1140,12 @@ const hardGatesPass =
       hardGates.overlapFree &&
       hardGates.nodeContainment &&
       hardGates.secondaryGeometryInfluence === 0 &&
-      hardGates.boundedSchedule,
+      hardGates.boundedSchedule &&
+      hardGates.radialSpreadSafety,
   ) &&
   stressRows.every(
-    ({ deterministic, hardGates }) => deterministic && hardGates.overlapFree,
+    ({ deterministic, hardGates }) =>
+      deterministic && hardGates.overlapFree && hardGates.radialSpreadSafety,
   ) &&
   hierarchyForceRows.every(
     ({ deterministic, hardGates, maximumPerFileFolderWeight }) =>
@@ -1033,6 +1214,24 @@ const report = {
   secondaryMutation: secondaryInvariant,
   inputPermutation: permutationInvariant,
   fixtureRows,
+  groupPackingBakeoff: {
+    representation: 'exact-rigid-member-rectangles',
+    continuousScaleDomain: [1, 2.4],
+    rows: groupPackingTradeoffRows,
+    summary: groupPackingTradeoffSummary,
+    sc14: {
+      preGroupMetrics: sc14GroupPacking.preGroupMetrics,
+      finalMetrics: sc14GroupPacking.metrics,
+      groupPacking: sc14GroupPacking.groupPacking,
+      spacing: spacingRows
+        .filter(({ fixtureId }) => fixtureId === 'SC14')
+        .map(({ spacing, radialScale, displayedMetrics }) => ({
+          spacing,
+          radialScale,
+          displayedMetrics,
+        })),
+    },
+  },
   directionalReferenceRows: referenceRows,
   stabilityRows: stability,
   stressRows,

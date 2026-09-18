@@ -1460,10 +1460,10 @@ records per-module cardinal counts, demand matches and hard-guard overrides,
 pass-to-pass region and bounds changes, and pass-two crossing/span deltas. A
 separate perturbation diagnostic compares Adaptive and Vertical internal
 rectangles with final File-center displacement and recognizes legitimate
-second-pass region changes. Soft algorithm version 8 covers root-neutral scope,
-normalized decay, and the fixed structural policy; worker protocol 10 and Soft
-evidence schema 5 isolate those changes while the Directional algorithm version
-remains 4.
+second-pass region changes. Soft algorithm version 9 covers root-neutral scope,
+normalized decay, the fixed structural policy, and compound immediate-folder
+packing; worker protocol 11 and Soft evidence schema 6 isolate those changes
+while the Directional algorithm version remains 4.
 
 The renderer derives a typed visible-structure marker for each unfiltered module
 after layout. Modules with only a currently visible File paint a transparent
@@ -1492,18 +1492,27 @@ and two internal-layout rounds make the result stateless and reproducible.
 Authored arrows preserve direction while macro coordinates carry no incoming/
 outgoing meaning.
 
+After those rounds, Soft derives exact rigid compound bodies from each File's
+immediate displayed parent after manual intent and before automatic singleton
+compression. A bounded deterministic nearest-ring search translates whole
+bodies around the anchored Focus-containing body. An affine interval oracle
+checks every cross-body module rectangle with the 16 px clearance over the full
+continuous 1.0x-2.4x radial range. Root-level Files remain structural singleton
+bodies; the same result is also checked against their optional aggregate. No
+member is internally moved and no collision solver runs after radial spacing.
+
 The 24-entry exact cache includes macro family plus normalized strength,
 scope/decay, and canonical sparse display intent only for Soft Clusters.
 Direct-only canonicalizes decay. The 0–100 spacing preference is excluded: the
 web applies a continuous 1.0×–2.4× root-relative translation to complete
-non-root modules after structural cache adoption, then refreshes cardinal
+immediate-folder bodies after structural cache adoption, then refreshes cardinal
 attachments and geometry-derived validation quality. Spread therefore does not
 rerun Adaptive Compass, ordering, force, collision, or the worker. Strict
 renderer rejection keeps the validated adopted graph visible and surfaces an
 explicit presentation warning. Changing stored Soft state cannot miss or
 perturb a Directional layout. Structural policy changes use the existing terminating
 latest-result-wins worker lifecycle. The worker response carries aggregate Soft
-solver, Compass, and collision evidence while computed geometry carries only a
+solver, Compass, group-packing, and collision evidence while computed geometry carries only a
 deterministic policy identity. The real projection continues to own disclosure,
 reroot, filters, hidden modules, and watcher updates; the renderer continues to
 own exact hover, Secondary edge presentation, and the camera. No Classic/
@@ -1524,9 +1533,9 @@ HIER4B-FIX3 adds empty-guide area targeting, composed File/current-folder menus,
 short accessible labels, and displayed-depth styling to FIX2 while retaining
 FIX1's cardinal File ports. POLISH1 then hides empty painted module boundaries
 and makes folder labels visually passive without changing geometry or menu
-behavior. HIER4B-SPACING-FIX2 now awaits native QA for corrected radial
-adoption, pre-compression Direct groups and singleton guides, and top-edge label
-anchoring in PR #106. Unified folder-region
+behavior. HIER4B-SPACING-FIX3B now awaits native QA for structurally safe rigid
+group spacing and the optional renderer-only `Workspace root` group in PR #106.
+Unified folder-region
 policy and MODULAR-CONTEXT1 remain separate later work;
 HIER5 follows HIER4B, and HIER3C follows HIER5.
 

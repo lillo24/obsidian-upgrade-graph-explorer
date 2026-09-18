@@ -109,6 +109,17 @@ geometry-derived quality without changing dimensions, internal offsets,
 Adaptive Compass, folder force, or packing. It is excluded from the worker
 request and structural cache key.
 
+HIER4B-SPACING-FIX3B adds one deterministic structural packing stage after the
+Soft solver and before radial spacing. Each immediate named folder is an exact
+rigid compound of its final module rectangles; root-level Files remain atomic
+structural bodies. The Focus-containing body is fixed. A bounded nearest-ring
+search translates whole bodies until an affine interval oracle proves that no
+cross-group module pair can violate the 16 px clearance anywhere over the
+continuous 1.0x-2.4x spread range. The optional Workspace-root group remains a
+renderer-only preference: structural packing also validates the aggregate root
+body, so toggling it does not enter worker input or cache identity. No collision
+or repacking pass runs after radial spacing.
+
 Nested Soft force uses normalized `1 / base ** index` membership with selectable
 base 3 (default) or 4. Direct-only selects each File's immediate displayed
 parent after manual promotion/flattening and before automatic singleton
@@ -179,6 +190,9 @@ the bakeoff evidence if changed.
   Clusters; Directional Bands remains the default.
 - `src/soft-cluster-spacing.ts` owns the fixed structural policy, bounded 0–100
   radial-spread normalization, and continuous 1.0×–2.4× scale mapping.
+- `src/soft-group-packing.ts` owns immediate-folder compound bodies, the exact
+  continuous affine overlap oracle, deterministic structural body packing, and
+  group-packing evidence.
 - `src/soft-radial-spread.ts` translates complete non-root module geometry
   around the fixed root after structural computation, then refreshes cardinal
   attachments and strict geometry-derived quality.
@@ -195,11 +209,11 @@ the bakeoff evidence if changed.
   placeholder policy.
 - `src/selected.ts` maps the accepted A1 computed result to the compatible
   selected candidate/attempt API.
-- `src/worker-protocol.ts` owns the version-10 exact-shape production messages,
+- `src/worker-protocol.ts` owns the version-11 exact-shape production messages,
   macro/strength/scope/decay/display-intent policy normalization, cardinal and
-  Soft Compass evidence, and originating-input result validation. Version 10
-  and Soft evidence schema 5 carry structural scope/decay while radial spread
-  stays outside worker input.
+  Soft Compass evidence, and originating-input result validation. Version 11
+  and Soft evidence schema 6 carry structural compound-group evidence and
+  pre/final quality metrics while radial spread stays outside worker input.
 - `src/worker-runtime.ts` validates requests, computes A1, records phase
   timings, and returns either a complete validated result or an explicit
   failure.

@@ -571,6 +571,7 @@ export function GraphExplorer({
     modularFocusSoftAncestorDecayBase,
     modularFocusSoftFolderStrength,
     modularFocusSoftSpacing,
+    modularFocusIncludeWorkspaceRootGroup,
     modularFolderStripsVisible,
     modularConnectionStyle,
     trackpadZoomMode,
@@ -3614,6 +3615,14 @@ export function GraphExplorer({
     },
     [updateGraphPreferences],
   );
+  const changeModularFocusIncludeWorkspaceRootGroup = useCallback(
+    (include: boolean) => {
+      updateGraphPreferences({
+        modularFocusIncludeWorkspaceRootGroup: include,
+      });
+    },
+    [updateGraphPreferences],
+  );
   const changeModularFolderStripsVisible = useCallback(
     (visible: GraphPreferences['modularFolderStripsVisible']) => {
       updateGraphPreferences({ modularFolderStripsVisible: visible });
@@ -4769,6 +4778,9 @@ export function GraphExplorer({
             }
             modularFocusSoftFolderStrength={modularFocusSoftFolderStrength}
             modularFocusSoftSpacing={modularFocusSoftSpacing}
+            modularFocusIncludeWorkspaceRootGroup={
+              modularFocusIncludeWorkspaceRootGroup
+            }
             modularFolderStripsVisible={modularFolderStripsVisible}
             modularConnectionStyle={modularConnectionStyle}
             showExperimentalAllHierarchy={showExperimentalAllHierarchy}
@@ -4802,6 +4814,9 @@ export function GraphExplorer({
               changeModularFocusSoftFolderStrength
             }
             onModularFocusSoftSpacingChange={changeModularFocusSoftSpacing}
+            onModularFocusIncludeWorkspaceRootGroupChange={
+              changeModularFocusIncludeWorkspaceRootGroup
+            }
             onModularFolderStripsVisibleChange={
               changeModularFolderStripsVisible
             }
@@ -5081,6 +5096,9 @@ export function GraphExplorer({
                     modularFocusSoftFolderStrength
                   }
                   modularFocusSoftSpacing={modularFocusSoftSpacing}
+                  modularFocusIncludeWorkspaceRootGroup={
+                    modularFocusIncludeWorkspaceRootGroup
+                  }
                   modularFolderStripsVisible={modularFolderStripsVisible}
                   modularConnectionStyle={modularConnectionStyle}
                   showExperimentalAllHierarchy={showExperimentalAllHierarchy}
@@ -5119,6 +5137,9 @@ export function GraphExplorer({
                   }
                   onModularFocusSoftSpacingChange={
                     changeModularFocusSoftSpacing
+                  }
+                  onModularFocusIncludeWorkspaceRootGroupChange={
+                    changeModularFocusIncludeWorkspaceRootGroup
                   }
                   onModularFolderStripsVisibleChange={
                     changeModularFolderStripsVisible
@@ -5455,6 +5476,9 @@ export function GraphExplorer({
                 softAncestorDecayBase={modularFocusSoftAncestorDecayBase}
                 softFolderStrength={modularFocusSoftFolderStrength}
                 softSpacing={modularFocusSoftSpacing}
+                includeWorkspaceRootGroup={
+                  modularFocusIncludeWorkspaceRootGroup
+                }
                 softFolderDisplayIntent={softFolderDisplay.displayIntent}
                 softFolderDisplayPersistenceError={
                   softFolderDisplay.session.error

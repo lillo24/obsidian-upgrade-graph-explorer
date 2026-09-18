@@ -1,6 +1,6 @@
 # HIER4B Soft Folder Clusters
 
-Status: **HIER4B-SPACING-FIX2 CANDIDATE — native radial adoption, true immediate-parent Direct folders, and top-edge labels await native graphical QA in PR #106.**
+Status: **HIER4B-SPACING-FIX3B CANDIDATE — structural folder-group packing and rigid radial spacing await native graphical QA in PR #106.**
 
 HIER4B evaluates a second macro-layout family for Modular Focus Hierarchy.
 Directional Folder Bands remains the Modular Preview default, and Classic Focus
@@ -109,29 +109,51 @@ pass-one/pass-two region and bounds churn, and before/after pass-two crossings
 and span. The macro perturbation diagnostic distinguishes visible region,
 internal rectangle, and module-bound changes from a true geometric no-op. When
 Adaptive and Vertical input rectangles are identical across both bounded passes,
-the downstream Soft candidate is byte-identical. Soft cache algorithm version 8
-covers the root-neutral scope and decay semantics. Worker protocol version 10
-and Soft evidence schema 5 carry the structural scope, decay, and fixed-spacing
-policy without invalidating the Directional algorithm version.
+the downstream Soft candidate is byte-identical. Soft cache algorithm version 9
+covers the structural compound-group pass in addition to root-neutral scope and
+decay semantics. Worker protocol version 11 and Soft evidence schema 6 carry
+the structural scope, decay, group-packing evidence, and fixed-spacing policy
+without invalidating the Directional algorithm version.
 
-## Soft spacing
+## Structural group packing and Soft spacing
 
-HIER4B-SPACING-FIX2 retains one fixed structural policy: 600 hop spacing, 88
+HIER4B-SPACING-FIX3B retains one fixed structural policy: 600 hop spacing, 88
 module gap, 180 topology distance, 72 packing step, 104 radial jitter, 30/60
 internal node/rank separation, and 34/30 module padding. The `[36, 18]`
 schedule, Adaptive Compass, endpoint ordering, folder relaxation, collision
 packing, and root-neutral force are decided once by that structural result.
 
+After the existing solver finishes, one structural pass derives disjoint bodies
+from the immediate displayed parent captured after manual intent and before
+automatic singleton compression. Every named folder is an exact rigid list of
+its member module rectangles. Files stored directly at workspace root are
+individual structural bodies. A body containing Focus is anchored; all other
+bodies may translate as a whole without changing any member-relative vector.
+A deterministic nearest-ring search chooses the first safe translation. Its
+exact affine interval oracle checks every cross-body rectangle pair, including
+the 16 px clearance, over the entire continuous spread domain from 1.0x to
+2.4x. A structural attempt fails if any violation remains. This pass does not
+rerun Adaptive Compass, reorder members, or collapse a topology-split folder.
+
 The Sandbox `Soft spacing` value from 0 to 100 is now a post-layout radial
 spread. Its linear scale is `1 + 1.4 × value/100`: 0 is 1.0× base radius, 50 is
-1.7×, and 100 is 2.4×. Every non-root module and all its File/Heading/Block/
-Diagnostic rectangles receive the same translation from the fixed root center.
+1.7×, and 100 is 2.4×. Every member of one immediate-folder body receives the
+same translation from the fixed root center. A Focus-containing body stays
+fixed in full; root-level Files move as singleton bodies by default.
 Endpoint attachments and geometry-derived endpoint/folder quality are then
 recomputed from those final rectangles so strict renderer validation remains
-truthful; no structural search or relaxation reruns. The root, module
+truthful; no structural search, packing, collision pass, or relaxation reruns.
+The root, module
 dimensions, internal offsets, angular direction, branch assignments, force
 groups, and structural evidence remain unchanged. Folder guides derive from
 the transformed rectangles.
+
+`Include workspace root group` is a persisted Sandbox presentation preference
+and defaults Off. Off shows no `.` guide and keeps root-level Files as separate
+radial bodies. On groups those Files for the radial transform and renders the
+label `Workspace root`. Structural packing always uses the Off singleton
+partition and additionally proves the On aggregate partition safe, so this
+toggle causes no projection, model, worker, structural layout, or cache work.
 
 Radial spread is absent from worker requests and structural cache identity, so
 changing it causes zero projection/model/worker/solver work and reuses one
@@ -274,7 +296,7 @@ graphical question.
 
 ## Later work
 
-`HIER4B-SPACING` now has a FIX2 native candidate and Sandbox tuning control;
+`HIER4B-SPACING` now has a FIX3B native candidate and Sandbox tuning control;
 native graphical approval is pending. Folder-strength continuity on dense
 graphs remains a separate future evaluation and is unchanged by FIX2.
 `HIER4B-UNIFIED-REGIONS` will separately

@@ -38,6 +38,8 @@ interface FolderGuideBuildResult {
 export interface FocusSchematicFolderClusterGuideOptions {
   /** Render each displayed folder from its direct Files without child regions. */
   readonly directFoldersOnly?: boolean;
+  /** Expose the structural workspace root as one visible folder. */
+  readonly includeWorkspaceRootGroup?: boolean;
 }
 
 export interface FocusSchematicFolderClusterGuide {
@@ -84,11 +86,11 @@ const folderKeyDepth = (folderKey: string): number =>
   folderKey === '.' ? 0 : folderKey.split('/').length;
 
 function shortFolderLabel(folderKey: string): string {
-  return folderKey === '.' ? 'Root folder' : folderKey.split('/').at(-1)!;
+  return folderKey === '.' ? 'Workspace root' : folderKey.split('/').at(-1)!;
 }
 
 function accessibleFolderLabel(folderKey: string): string {
-  return folderKey === '.' ? 'Root folder' : `${folderKey}/`;
+  return folderKey === '.' ? 'Workspace root' : `${folderKey}/`;
 }
 
 function rectangleSize(
@@ -483,6 +485,7 @@ export function focusSchematicFolderClusterGuides(
   options: FocusSchematicFolderClusterGuideOptions = {},
 ): readonly FocusSchematicFolderClusterGuide[] {
   const directFoldersOnly = options.directFoldersOnly === true;
+  const includeWorkspaceRootGroup = options.includeWorkspaceRootGroup === true;
   const rectangleByModuleId = new Map<string, GuideUnit>();
   for (const node of nodes) {
     if (node.type !== 'module') continue;
@@ -497,9 +500,9 @@ export function focusSchematicFolderClusterGuides(
       ...size,
     });
   }
-  const displayedFolders = directFoldersOnly
-    ? tree.preCompressionFolders
-    : tree.folders;
+  const displayedFolders = (
+    directFoldersOnly ? tree.preCompressionFolders : tree.folders
+  ).filter(({ folderKey }) => folderKey !== '.' || includeWorkspaceRootGroup);
   const byKey = new Map(
     displayedFolders.map((folder) => [folder.folderKey, folder]),
   );

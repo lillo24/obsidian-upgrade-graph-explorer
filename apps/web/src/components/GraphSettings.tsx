@@ -61,6 +61,10 @@ interface GraphSettingsProps {
   readonly onModularFocusSoftAncestorDecayBaseChange?: (base: 3 | 4) => void;
   readonly modularFocusSoftSpacing?: number;
   readonly onModularFocusSoftSpacingChange?: (spacing: number) => void;
+  readonly modularFocusIncludeWorkspaceRootGroup?: boolean;
+  readonly onModularFocusIncludeWorkspaceRootGroupChange?: (
+    include: boolean,
+  ) => void;
   readonly modularFolderStripsVisible?: GraphPreferences['modularFolderStripsVisible'];
   readonly onModularFolderStripsVisibleChange?: (visible: boolean) => void;
   readonly modularConnectionStyle?: GraphPreferences['modularConnectionStyle'];
@@ -185,6 +189,8 @@ export const GraphSettings = memo(function GraphSettings({
   onModularFocusSoftAncestorDecayBaseChange,
   modularFocusSoftSpacing = 50,
   onModularFocusSoftSpacingChange,
+  modularFocusIncludeWorkspaceRootGroup = false,
+  onModularFocusIncludeWorkspaceRootGroupChange,
   modularFolderStripsVisible = true,
   onModularFolderStripsVisibleChange,
   modularConnectionStyle = 'direct',
@@ -916,9 +922,27 @@ export const GraphSettings = memo(function GraphSettings({
                                 <span>Strong spread</span>
                               </small>
                               <small>
-                                Spread File modules outward from the Focus
-                                without changing layout decisions.
+                                Move immediate-folder groups outward from the
+                                Focus without changing their internal spacing.
                               </small>
+                            </label>
+                            <label>
+                              <input
+                                aria-label="Include workspace root group"
+                                checked={modularFocusIncludeWorkspaceRootGroup}
+                                onChange={(event) =>
+                                  onModularFocusIncludeWorkspaceRootGroupChange?.(
+                                    event.currentTarget.checked,
+                                  )
+                                }
+                                type="checkbox"
+                              />
+                              <span>
+                                <strong>Include workspace root group</strong>
+                                <small>
+                                  Group Files stored directly at the vault root.
+                                </small>
+                              </span>
                             </label>
                           </>
                         ) : null}

@@ -7,10 +7,17 @@ import type {
   FocusSchematicLayoutInput,
 } from './types';
 import { focusSchematicSoftRadialSpreadScale } from './soft-cluster-spacing';
+import { buildFocusSchematicSoftFolderDisplayTree } from './soft-folder-display';
+import { createFocusSchematicSoftCompoundBodies } from './soft-group-packing';
 
 interface Translation {
   readonly x: number;
   readonly y: number;
+}
+
+export interface FocusSchematicSoftRadialSpreadOptions {
+  /** Renderer-only grouping of Files stored directly at workspace root. */
+  readonly includeWorkspaceRootGroup?: boolean;
 }
 
 const center = (rectangle: {
@@ -24,14 +31,15 @@ const center = (rectangle: {
 });
 
 /**
- * Applies the Sandbox spacing value after structural Soft layout. Complete
- * non-root modules translate uniformly, so internal geometry and every solver
- * decision remain byte-identical to the cached base result.
+ * Applies the Sandbox spacing value after structural Soft layout. Every
+ * immediate-folder body translates rigidly; structural packing already proves
+ * that this affine transform is safe over the full supported scale interval.
  */
 export function applyFocusSchematicSoftRadialSpread(
   input: FocusSchematicLayoutInput,
   computed: FocusSchematicComputedLayout,
   spacing: unknown,
+  options: FocusSchematicSoftRadialSpreadOptions = {},
 ): FocusSchematicComputedLayout {
   const scale = focusSchematicSoftRadialSpreadScale(spacing);
   if (scale === 1) return computed;
@@ -47,17 +55,32 @@ export function applyFocusSchematicSoftRadialSpread(
         ?.documentProjectionNodeId,
   );
   const rootCenter = center(rootFile ?? root);
+  const policy = computed.internalLayoutEvidence.softClusterPolicyEvidence;
+  if (policy?.layoutFamily !== 'soft-folder-clusters')
+    throw new Error(
+      'Soft radial spread requires Soft Folder Cluster policy evidence.',
+    );
+  const tree = buildFocusSchematicSoftFolderDisplayTree({
+    visibleFiles: input.model.modules
+      .filter(({ presentation }) => presentation !== 'filtered')
+      .map(({ id, folderKey }) => ({ fileId: id, exactFolderKey: folderKey })),
+    intent: policy.displayIntent,
+  });
   const translations = new Map<string, Translation>();
-  for (const module of computed.candidate.modules) {
-    if (module.moduleId === computed.candidate.rootModuleId) {
-      translations.set(module.moduleId, { x: 0, y: 0 });
-      continue;
-    }
-    const moduleCenter = center(module);
-    translations.set(module.moduleId, {
-      x: (moduleCenter.x - rootCenter.x) * (scale - 1),
-      y: (moduleCenter.y - rootCenter.y) * (scale - 1),
-    });
+  for (const body of createFocusSchematicSoftCompoundBodies(
+    input,
+    computed.candidate,
+    tree,
+    options,
+  )) {
+    const delta = body.anchored
+      ? { x: 0, y: 0 }
+      : {
+          x: (body.center.x - rootCenter.x) * (scale - 1),
+          y: (body.center.y - rootCenter.y) * (scale - 1),
+        };
+    for (const moduleId of body.memberModuleIds)
+      translations.set(moduleId, delta);
   }
   const translate = <Rectangle extends { readonly moduleId: string }>(
     rectangle: Rectangle,

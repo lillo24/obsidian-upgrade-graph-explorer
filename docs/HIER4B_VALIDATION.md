@@ -1,6 +1,6 @@
 # HIER4B validation
 
-Status: **MERGED HIER4B IMPLEMENTATION — PATCH1 Adaptive Compass compatibility implemented and awaiting graphical approval.**
+Status: **HIER4B-SPACING-FIX3B CANDIDATE — structural group packing in PR #106 awaits native graphical approval.**
 
 HIER4B evidence remains synthetic and development-only. Directional Folder
 Bands is the unchanged reference and default. Soft Folder Clusters is merged on
@@ -305,3 +305,64 @@ The exact HIER4B-SPACING-FIX2 prompt is archived at
 `history-implementations/HIER4B_SPACING_FIX2_spread_adoption_direct_parent_labels_codex_prompt.md`.
 Its SHA-256 is
 `75B852EA005DB43973247D439B53B8D8B8148CAFACFBEA884E3FCC3304C1D0F5`.
+
+## HIER4B-SPACING-FIX3B candidate
+
+FIX3 demonstrated that applying rigid centroid spread directly to the prior
+SC14 structural result was unsafe: the exact fixture produced 11 cross-folder
+overlaps over the sampled slider range, including Target5 with Target7 at 25.
+FIX3B adds one structural immediate-folder body pass before radial spacing.
+Named folders use their exact member rectangle list as a rigid compound;
+workspace-root Files are structural singletons; and the Focus-containing body
+is fixed. The nearest safe whole-body translation is selected by stable body
+order, 72 px rings, and 48 deterministic angular samples. No member moves
+inside its body.
+
+The authoritative oracle solves horizontal and vertical affine overlap
+intervals for every cross-body rectangle pair, including the 16 px clearance,
+and rejects any intersection over scale `[1.0, 2.4]`. It validates both the
+default root-singleton partition and the optional Workspace-root aggregate.
+The radial postprocess remains a pure group-centroid translation and runs no
+collision resolver or discrete packing. SC14 is overlap-free at every integer
+slider value and at the exact continuous gate; 71/72/73 changes only the smooth
+translation. SC23 retains its topology-split member vectors exactly.
+
+The generated bakeoff passes all hard gates. At strength 50, SC14 moves two of
+four bodies, with mean translation 72 px, P95/max 144 px, zero safety
+violations, and zero exact endpoint crossings before and after packing. Its
+bounds area changes from 1,542,357 to 1,763,192 square pixels; connected-pair
+mean changes from 702.58 to 762.94; and exact primary endpoint span mean changes
+from 522.19 to 596.84. Across 135 fixture/strength rows, mean packing overhead
+is about 0.24 ms. The largest absolute bounds change is SC21 strength 0:
+4,834,890 to 11,222,802 square pixels (2.32x), paired with 22 fewer exact
+crossings. The worst mean connected-pair increase is 206.86 px and the worst
+hop-radius error increase is 141.52 px, both explicitly retained for founder
+graphical review rather than hidden by thresholds.
+
+`Include workspace root group` defaults Off. Off emits no `.` guide or product
+folder label. On uses `Workspace root` and changes only renderer guide/radial
+grouping; it is excluded from projection, model, worker request, structural
+layout, and cache identity. Saved View application preserves the current
+preference because it is not a view-profile field.
+
+Soft structural algorithm/cache version 9 invalidates prior Soft geometry.
+Worker protocol 11 and Soft evidence schema 6 add exact group-packing and
+pre/final structural-quality evidence. Directional algorithm version 4 and its
+reference hashes are unchanged.
+
+Focused validation passes 160 layout tests, 127 renderer tests, 172 web
+component tests, and 91 preference/cache tests. The updated benchmark decision
+is `REQUIRES_GRAPHICAL_REVIEW` with `hardGatesPass: true`.
+
+The complete repository gate passes 276 test files / 2,325 tests plus
+formatting, lint, all workspace typechecks, and the production web build.
+Desktop formatting/check, 16 Rust tests, and the optimized release build pass.
+The QA executable is
+`output/hier4b-spacing-fix3b-structural-group-packing-native-candidate.exe`;
+its SHA-256 is
+`D026AE6BE49571F463E6F060A19BAA84C8B9D78D670D9973DC17CA006A3CEE27`.
+
+The exact FIX3B prompt is archived at
+`history-implementations/HIER4B_SPACING_FIX3B_structural_folder_group_packing_codex_prompt.md`.
+Its SHA-256 is
+`52EB3A287AAD67912FB2AB997B5569523F35D581FAF38D3A9B2BCF102041741E`.

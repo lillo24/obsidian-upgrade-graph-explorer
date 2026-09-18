@@ -39,6 +39,8 @@ export function resetGraphSandbox(
         DEFAULT_GRAPH_PREFERENCES.modularFocusSoftAncestorDecayBase,
       modularFocusSoftSpacing:
         DEFAULT_GRAPH_PREFERENCES.modularFocusSoftSpacing,
+      modularFocusIncludeWorkspaceRootGroup:
+        DEFAULT_GRAPH_PREFERENCES.modularFocusIncludeWorkspaceRootGroup,
       modularFolderStripsVisible:
         DEFAULT_GRAPH_PREFERENCES.modularFolderStripsVisible,
       modularConnectionStyle: DEFAULT_GRAPH_PREFERENCES.modularConnectionStyle,

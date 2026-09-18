@@ -147,8 +147,18 @@ describe('nested Soft folder guides', () => {
     expect(
       focusSchematicFolderClusterGuides(root, [node('root-file', 0, 0)], {
         directFoldersOnly: true,
+      }),
+    ).toEqual([]);
+    expect(
+      focusSchematicFolderClusterGuides(root, [node('root-file', 0, 0)], {
+        directFoldersOnly: true,
+        includeWorkspaceRootGroup: true,
       })[0],
-    ).toMatchObject({ folderKey: '.', root: true });
+    ).toMatchObject({
+      folderKey: '.',
+      root: true,
+      label: 'Workspace root',
+    });
   });
 
   it('renders Direct-only guides from direct Files without ancestor wrappers or tree mutation', () => {
@@ -586,6 +596,7 @@ describe('nested Soft folder guides', () => {
     const guides = focusSchematicFolderClusterGuides(
       tree([{ fileId: 'root', exactFolderKey: '.' }]),
       [node('root', 0, 0)],
+      { includeWorkspaceRootGroup: true },
     );
     const guide = guides[0]!;
     expect(guide.shape).toBe('singleton');

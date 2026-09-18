@@ -59,7 +59,7 @@ function fileActions(
           ? 'Move up'
           : `Move up to ${
               currentFolder.displayParentFolderKey === '.'
-                ? 'Root folder'
+                ? 'Workspace root'
                 : `${currentFolder.displayParentFolderKey}/`
             }`,
       ...(currentFolder?.displayParentFolderKey == null
@@ -105,7 +105,7 @@ function folderActions(
           ? 'Flatten into parent'
           : `Flatten into ${
               folder.displayParentFolderKey === '.'
-                ? 'Root folder'
+                ? 'Workspace root'
                 : `${folder.displayParentFolderKey}/`
             }`,
       ...(folder?.displayParentFolderKey == null

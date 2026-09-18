@@ -84,6 +84,7 @@ export interface ModularStructuredGraphViewProps {
   readonly softAncestorDecayBase: 3 | 4;
   readonly softFolderStrength: number;
   readonly softSpacing: number;
+  readonly includeWorkspaceRootGroup: boolean;
   readonly softFolderDisplayIntent: FocusSchematicProductLayoutPolicies['softFolderDisplayIntent'];
   readonly softFolderDisplayPersistenceStatus: string;
   readonly softFolderDisplayPersistenceError: string | undefined;
@@ -306,6 +307,7 @@ export default function ModularStructuredGraphView(
     rootEntityId,
     softFolderStrength,
     softSpacing,
+    includeWorkspaceRootGroup,
     softFolderDisplayIntent,
     softFolderDisplayPersistenceStatus,
     softFolderDisplayPersistenceError,
@@ -663,6 +665,7 @@ export default function ModularStructuredGraphView(
           visualVariant: 'extended',
           macroLayout,
           softSpacing: effectiveSoftSpacing,
+          includeWorkspaceRootGroup,
         },
         adopted.graph,
       );
@@ -678,6 +681,7 @@ export default function ModularStructuredGraphView(
     layoutKey,
     lifecycle.adopted,
     effectiveSoftSpacing,
+    includeWorkspaceRootGroup,
     macroLayout,
     model,
     projection,
@@ -692,9 +696,14 @@ export default function ModularStructuredGraphView(
       focusSchematicFolderClusterGuides(
         softFolderDisplayTree,
         displayedGraph.nodes,
-        { directFoldersOnly },
+        { directFoldersOnly, includeWorkspaceRootGroup },
       ),
-    [directFoldersOnly, displayedGraph.nodes, softFolderDisplayTree],
+    [
+      directFoldersOnly,
+      displayedGraph.nodes,
+      includeWorkspaceRootGroup,
+      softFolderDisplayTree,
+    ],
   );
   const activeSoftFolderContext =
     softFolderContext === null ||
@@ -702,15 +711,16 @@ export default function ModularStructuredGraphView(
       ? !softFolderDisplayTree.files.some(
           ({ fileId }) => fileId === softFolderContext.fileId,
         )
-      : !softFolderDisplayTree.folders.some(
+      : (!softFolderDisplayTree.folders.some(
           ({ folderKey }) => folderKey === softFolderContext.folderKey,
         ) &&
-        !(
-          directFoldersOnly &&
-          softFolderDisplayTree.preCompressionFolders.some(
-            ({ folderKey }) => folderKey === softFolderContext.folderKey,
-          )
-        ))
+          !(
+            directFoldersOnly &&
+            softFolderDisplayTree.preCompressionFolders.some(
+              ({ folderKey }) => folderKey === softFolderContext.folderKey,
+            )
+          )) ||
+        (softFolderContext.folderKey === '.' && !includeWorkspaceRootGroup))
       ? null
       : softFolderContext;
   const closeSoftFolderContext = useCallback(
@@ -895,7 +905,7 @@ export default function ModularStructuredGraphView(
                   }`
                 : `Folder display for ${
                     activeSoftFolderContext.folderKey === '.'
-                      ? 'Root folder'
+                      ? 'Workspace root'
                       : `${activeSoftFolderContext.folderKey}/`
                   }`
             }

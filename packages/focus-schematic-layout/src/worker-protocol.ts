@@ -19,7 +19,7 @@ import type {
   FocusSchematicSoftClusterEvidence,
 } from './types';
 
-export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 10 as const;
+export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 11 as const;
 
 export interface FocusSchematicLayoutWorkerRequest {
   readonly protocolVersion: typeof FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION;
@@ -144,13 +144,15 @@ function validateSoftClusterEvidence(
       'secondaryGeometryInfluence',
       'fixedIterationSchedule',
       'compass',
+      'groupPacking',
+      'preGroupMetrics',
       'metrics',
       'runtime',
     ],
     'Soft Cluster evidence',
   );
   if (
-    evidence.schemaVersion !== 5 ||
+    evidence.schemaVersion !== 6 ||
     evidence.developmentOnly !== true ||
     evidence.layoutFamily !== 'soft-folder-clusters' ||
     evidence.strength !==
@@ -239,6 +241,74 @@ function validateSoftClusterEvidence(
     throw new FocusSchematicLayoutProtocolError(
       'Soft Compass demand matches exceed demanded branches.',
     );
+  const groupPacking = record(
+    evidence.groupPacking,
+    'Soft compound group packing evidence',
+  );
+  exactKeys(
+    groupPacking,
+    [
+      'compoundGroupCount',
+      'anchoredGroupCount',
+      'groupPackingIterationCount',
+      'groupPackingCollisionCheckCount',
+      'groupPackingCorrectionCount',
+      'groupPackingMs',
+      'groupTranslationMean',
+      'groupTranslationP95',
+      'groupTranslationMax',
+      'groupEnvelopeAreaMean',
+      'groupEnvelopeAreaP95',
+      'radialSpreadSafetyViolationCount',
+    ],
+    'Soft compound group packing evidence',
+  );
+  for (const [key, metric] of Object.entries(groupPacking))
+    finiteNonNegative(metric, `Soft compound group packing evidence.${key}`);
+  if (
+    Number(groupPacking.anchoredGroupCount) !== 1 ||
+    Number(groupPacking.radialSpreadSafetyViolationCount) !== 0
+  )
+    throw new FocusSchematicLayoutProtocolError(
+      'Soft compound group packing evidence is invalid.',
+    );
+  const preGroupMetrics = record(
+    evidence.preGroupMetrics,
+    'Soft pre-group metrics',
+  );
+  const finalMetrics = record(evidence.metrics, 'Soft final metrics');
+  const metricKeys = [
+    'repeatedFolderCount',
+    'repeatedFolderModuleCount',
+    'repeatedFolderRmsRadiusMean',
+    'repeatedFolderRmsRadiusMedian',
+    'repeatedFolderRmsRadiusP95',
+    'childFolderCoherenceMean',
+    'parentFolderCoherenceMean',
+    'connectedPairCount',
+    'connectedPairDistanceMean',
+    'connectedPairDistanceP95',
+    'exactPrimaryEndpointSpanMean',
+    'exactPrimaryEndpointSpanP95',
+    'exactEndpointCrossingCount',
+    'hopMeanAbsoluteRadiusError',
+    'hopRadiusCorrelation',
+    'boundsWidth',
+    'boundsHeight',
+    'boundsArea',
+    'overlapCount',
+    'minimumModuleGap',
+  ] as const;
+  for (const [label, value] of [
+    ['Soft pre-group metrics', preGroupMetrics],
+    ['Soft final metrics', finalMetrics],
+  ] as const) {
+    exactKeys(value, metricKeys, label);
+    for (const key of metricKeys) {
+      const metric = value[key];
+      if (metric !== null) finiteNumber(metric, `${label}.${key}`);
+    }
+  }
   const resolvedSpacing = record(
     evidence.structuralSpacing,
     'Soft Cluster structural spacing',

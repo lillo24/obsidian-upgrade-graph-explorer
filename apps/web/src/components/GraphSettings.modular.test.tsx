@@ -52,6 +52,8 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
     softAncestorDecayBase: 3 | 4 = 3,
     onDirectFoldersOnlyChange = vi.fn(),
     onSoftAncestorDecayBaseChange = vi.fn(),
+    includeWorkspaceRootGroup = false,
+    onIncludeWorkspaceRootGroupChange = vi.fn(),
   ) {
     act(() => {
       root.render(
@@ -70,6 +72,7 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
           modularFocusDirectFoldersOnly={directFoldersOnly}
           modularFocusSoftAncestorDecayBase={softAncestorDecayBase}
           modularFocusSoftSpacing={softSpacing}
+          modularFocusIncludeWorkspaceRootGroup={includeWorkspaceRootGroup}
           modularFolderStripsVisible={folderStrips}
           modularConnectionStyle={connectionStyle}
           onAllNetworkDensityFramingStrengthChange={() => undefined}
@@ -86,6 +89,9 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
             onSoftAncestorDecayBaseChange
           }
           onModularFocusSoftSpacingChange={onSoftSpacingChange}
+          onModularFocusIncludeWorkspaceRootGroupChange={
+            onIncludeWorkspaceRootGroupChange
+          }
           onModularFolderStripsVisibleChange={onFolderStripsChange}
           onModularConnectionStyleChange={onConnectionStyleChange}
           onOpenChange={() => undefined}
@@ -110,6 +116,7 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
       onMacroLayoutChange,
       onSoftFolderStrengthChange,
       onSoftSpacingChange,
+      onIncludeWorkspaceRootGroupChange,
       onFolderStripsChange,
       onConnectionStyleChange,
     };
@@ -389,6 +396,7 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
     const onSoftSpacingChange = vi.fn();
     const onDirectFoldersOnlyChange = vi.fn();
     const onSoftAncestorDecayBaseChange = vi.fn();
+    const onIncludeWorkspaceRootGroupChange = vi.fn();
     const onFolderStripsChange = vi.fn();
     const onConnectionStyleChange = vi.fn();
     renderSettings(
@@ -411,6 +419,8 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
       3,
       onDirectFoldersOnlyChange,
       onSoftAncestorDecayBaseChange,
+      false,
+      onIncludeWorkspaceRootGroupChange,
     );
 
     const byValue = (value: string) =>
@@ -463,11 +473,15 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
     const direct = container.querySelector<HTMLInputElement>(
       'input[aria-label="Direct folders only"]',
     )!;
+    const workspaceRoot = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Include workspace root group"]',
+    )!;
     const decayFour = container.querySelector<HTMLInputElement>(
       'input[name="modular-focus-soft-ancestor-decay"][value="4"]',
     )!;
     act(() => direct.click());
     act(() => decayFour.click());
+    act(() => workspaceRoot.click());
     expect(onInternalLayoutChange).toHaveBeenCalledWith('adaptive-compass');
     expect(onHeadingOrderChange).toHaveBeenCalledWith('crossing-optimized');
     expect(onMacroLayoutChange).toHaveBeenCalledWith('directional-bands');
@@ -475,6 +489,7 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
     expect(onSoftSpacingChange).toHaveBeenCalledWith(75);
     expect(onDirectFoldersOnlyChange).toHaveBeenCalledWith(true);
     expect(onSoftAncestorDecayBaseChange).toHaveBeenCalledWith(4);
+    expect(onIncludeWorkspaceRootGroupChange).toHaveBeenCalledWith(true);
     expect(onConnectionStyleChange).toHaveBeenCalledWith('direct');
     expect(onFolderStripsChange).toHaveBeenCalledWith(true);
   });
@@ -513,7 +528,7 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
     ).toBe(true);
     expect(container.querySelector('[aria-label="Ancestor pull"]')).toBeNull();
     expect(container.textContent).toContain(
-      'Spread File modules outward from the Focus',
+      'Move immediate-folder groups outward from the Focus',
     );
   });
 });

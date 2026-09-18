@@ -185,7 +185,7 @@ describe('HIER4B Soft Folder Clusters', () => {
     expect(
       first.attempt.result.internalLayoutEvidence.softClusterPolicyEvidence,
     ).toMatchObject({
-      schemaVersion: 5,
+      schemaVersion: 6,
       structuralSpacing: first.attempt.evidence.structuralSpacing,
       folderScopeMode: 'nested',
       ancestorDecayBase: 3,
@@ -502,7 +502,7 @@ describe('HIER4B Soft Folder Clusters', () => {
       createHash('sha256')
         .update(JSON.stringify(attempt.result.candidate))
         .digest('hex'),
-    ).toBe('5fe9c8a80ce5b8127829bf3c679105f757501d9d921c5bda127d5a06145ff15c');
+    ).toBe('c28b7b6b89381a20192a5d64f5e1a1dbe57a0bca7619a1da8d20062265065e47');
   });
 
   it('keeps representative Directional layouts byte-identical', () => {
@@ -797,7 +797,7 @@ describe('HIER4B Soft Folder Clusters', () => {
         internalLayoutVariant: 'vertical-spine',
       },
     ).attempt;
-    expect(adaptive.configId).toContain('HIER4Bv8');
+    expect(adaptive.configId).toContain('HIER4Bv9');
     expect(repeated.configId).toBe(adaptive.configId);
     expect(repeated.result.candidate).toEqual(adaptive.result.candidate);
     expect(vertical.configId).not.toBe(adaptive.configId);

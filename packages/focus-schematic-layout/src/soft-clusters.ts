@@ -30,6 +30,7 @@ import {
   EMPTY_FOCUS_SCHEMATIC_SOFT_FOLDER_DISPLAY_INTENT,
   focusSchematicSoftFolderScopeMemberships,
 } from './soft-folder-display';
+import { packFocusSchematicSoftFolderGroups } from './soft-group-packing';
 import type {
   FocusSchematicComputedLayout,
   FocusSchematicEndpointPlan,
@@ -49,7 +50,7 @@ import type {
 export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE = [
   36, 18,
 ] as const;
-export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 8 as const;
+export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 9 as const;
 
 const STRATEGY_ID = 'HIER4B-soft-folder-clusters' as const;
 const EPSILON = 1e-6;
@@ -1010,6 +1011,39 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       spacing,
     );
     candidate = anchorRootFile(input, placeAtCenters(candidate, positions));
+    const preGroupAttachments = createFocusSchematicEndpointAttachments(
+      base.endpointPlan,
+      candidate,
+      'soft-cardinal-files',
+    );
+    const preGroupQuality = evaluateFocusSchematicEndpointLayoutQuality(
+      input,
+      base.modulePlan,
+      base.endpointPlan,
+      base.internalLanePlan,
+      candidate,
+      preGroupAttachments,
+      'soft-cardinal-files',
+    );
+    const preGroupMetrics = metrics(
+      input,
+      candidate,
+      base.endpointPlan,
+      preGroupAttachments,
+      preGroupQuality,
+      pairs,
+      hops,
+      tree,
+      hierarchyForcePolicy,
+      ancestorDecayBase,
+      spacing,
+    );
+    const groupPacking = packFocusSchematicSoftFolderGroups(
+      input,
+      candidate,
+      tree,
+    );
+    candidate = groupPacking.candidate;
     const attachments = createFocusSchematicEndpointAttachments(
       base.endpointPlan,
       candidate,
@@ -1088,7 +1122,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       0,
     );
     const evidence: FocusSchematicSoftClusterEvidence = {
-      schemaVersion: 5,
+      schemaVersion: 6,
       developmentOnly: true,
       layoutFamily: 'soft-folder-clusters',
       strength,
@@ -1172,6 +1206,8 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
           secondInternalCandidate,
         ),
       },
+      groupPacking: groupPacking.evidence,
+      preGroupMetrics,
       metrics: metrics(
         input,
         candidate,
@@ -1207,7 +1243,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       internalLayoutEvidence: {
         ...internalLayoutEvidence,
         softClusterPolicyEvidence: {
-          schemaVersion: 5,
+          schemaVersion: 6,
           layoutFamily: 'soft-folder-clusters',
           strength,
           structuralSpacing: spacing,

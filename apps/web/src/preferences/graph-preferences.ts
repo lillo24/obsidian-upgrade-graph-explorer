@@ -50,6 +50,8 @@ export interface GraphPreferences {
   readonly modularFocusSoftAncestorDecayBase: 3 | 4;
   /** Sandbox-only radial post-layout spread, normalized to [0, 100]. */
   readonly modularFocusSoftSpacing: number;
+  /** Presentation-only grouping for Files stored directly at workspace root. */
+  readonly modularFocusIncludeWorkspaceRootGroup: boolean;
   /** Historical storage key for both macro-specific Folder guide overlays. */
   readonly modularFolderStripsVisible: boolean;
   /** Modular Preview edge drawing only; omitted from the Classic renderer. */
@@ -89,6 +91,7 @@ export const DEFAULT_GRAPH_PREFERENCES: GraphPreferences = {
   modularFocusDirectFoldersOnly: false,
   modularFocusSoftAncestorDecayBase: 3,
   modularFocusSoftSpacing: DEFAULT_FOCUS_SCHEMATIC_SOFT_SPACING,
+  modularFocusIncludeWorkspaceRootGroup: false,
   modularFolderStripsVisible: true,
   modularConnectionStyle: 'direct',
   showExperimentalAllHierarchy: false,
@@ -298,6 +301,7 @@ export function loadGraphPreferences(
         readonly modularFocusDirectFoldersOnly?: unknown;
         readonly modularFocusSoftAncestorDecayBase?: unknown;
         readonly modularFocusSoftSpacing?: unknown;
+        readonly modularFocusIncludeWorkspaceRootGroup?: unknown;
         readonly modularFolderStripsVisible?: unknown;
         readonly modularConnectionStyle?: unknown;
         readonly showExperimentalAllHierarchy?: unknown;
@@ -358,6 +362,8 @@ export function loadGraphPreferences(
           modularFocusSoftSpacing: normalizeModularFocusSoftSpacing(
             stored.modularFocusSoftSpacing,
           ),
+          modularFocusIncludeWorkspaceRootGroup:
+            stored.modularFocusIncludeWorkspaceRootGroup === true,
           modularFolderStripsVisible:
             typeof stored.modularFolderStripsVisible === 'boolean'
               ? stored.modularFolderStripsVisible
@@ -415,6 +421,8 @@ export function serializeGraphPreferences(
     modularFocusSoftSpacing: normalizeModularFocusSoftSpacing(
       preferences.modularFocusSoftSpacing,
     ),
+    modularFocusIncludeWorkspaceRootGroup:
+      preferences.modularFocusIncludeWorkspaceRootGroup,
     modularFolderStripsVisible: hierarchy.modularFolderStripsVisible,
     modularConnectionStyle: hierarchy.modularConnectionStyle,
     showExperimentalAllHierarchy: preferences.showExperimentalAllHierarchy,

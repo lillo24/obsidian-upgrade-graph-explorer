@@ -73,6 +73,7 @@ describe('graph preferences', () => {
       modularFocusDirectFoldersOnly: false,
       modularFocusSoftAncestorDecayBase: 3,
       modularFocusSoftSpacing: 50,
+      modularFocusIncludeWorkspaceRootGroup: false,
       modularFolderStripsVisible: true,
       modularConnectionStyle: 'direct',
       showExperimentalAllHierarchy: false,
@@ -92,6 +93,7 @@ describe('graph preferences', () => {
         modularFocusDirectFoldersOnly: true,
         modularFocusSoftAncestorDecayBase: 4,
         modularFocusSoftSpacing: 63,
+        modularFocusIncludeWorkspaceRootGroup: true,
         modularFolderStripsVisible: false,
         modularConnectionStyle: 'electronic',
         showExperimentalAllHierarchy: false,
@@ -99,7 +101,7 @@ describe('graph preferences', () => {
       }),
     ).toEqual({ ok: true });
     expect(storage.value).toBe(
-      '{"focusAppearance":"minimal","focusHierarchyImplementation":"modular-preview","globalLayoutSettings":{"folderClustering":true,"spacingPreset":"normal"},"localLayoutMode":"free","modularFocusInternalLayout":"vertical-spine","modularFocusHeadingOrder":"document-order","modularFocusMacroLayout":"soft-folder-clusters","modularFocusSoftFolderStrength":75,"modularFocusDirectFoldersOnly":true,"modularFocusSoftAncestorDecayBase":4,"modularFocusSoftSpacing":63,"modularFolderStripsVisible":false,"modularConnectionStyle":"electronic","showExperimentalAllHierarchy":false,"trackpadZoomMode":"scroll-zoom"}',
+      '{"focusAppearance":"minimal","focusHierarchyImplementation":"modular-preview","globalLayoutSettings":{"folderClustering":true,"spacingPreset":"normal"},"localLayoutMode":"free","modularFocusInternalLayout":"vertical-spine","modularFocusHeadingOrder":"document-order","modularFocusMacroLayout":"soft-folder-clusters","modularFocusSoftFolderStrength":75,"modularFocusDirectFoldersOnly":true,"modularFocusSoftAncestorDecayBase":4,"modularFocusSoftSpacing":63,"modularFocusIncludeWorkspaceRootGroup":true,"modularFolderStripsVisible":false,"modularConnectionStyle":"electronic","showExperimentalAllHierarchy":false,"trackpadZoomMode":"scroll-zoom"}',
     );
   });
 
@@ -140,6 +142,7 @@ describe('graph preferences', () => {
       modularFocusDirectFoldersOnly: false,
       modularFocusSoftAncestorDecayBase: 3,
       modularFocusSoftSpacing: 50,
+      modularFocusIncludeWorkspaceRootGroup: false,
       modularFolderStripsVisible: true,
       modularConnectionStyle: 'direct',
       showExperimentalAllHierarchy: false,
@@ -163,6 +166,7 @@ describe('graph preferences', () => {
       modularFocusDirectFoldersOnly: false,
       modularFocusSoftAncestorDecayBase: 3,
       modularFocusSoftSpacing: 50,
+      modularFocusIncludeWorkspaceRootGroup: false,
       modularFolderStripsVisible: true,
       modularConnectionStyle: 'direct',
       showExperimentalAllHierarchy: false,
@@ -319,6 +323,7 @@ describe('graph preferences', () => {
         modularFocusDirectFoldersOnly: false,
         modularFocusSoftAncestorDecayBase: 3,
         modularFocusSoftSpacing: 50,
+        modularFocusIncludeWorkspaceRootGroup: false,
         modularFolderStripsVisible: true,
         modularConnectionStyle: 'direct',
         showExperimentalAllHierarchy: false,
@@ -502,6 +507,23 @@ describe('Modular Focus Hierarchy production layout policies', () => {
   });
 
   it.each([
+    [undefined, false],
+    [null, false],
+    [false, false],
+    [true, true],
+    [1, false],
+    ['true', false],
+  ])('normalizes workspace-root grouping %j to %j', (value, expected) => {
+    const storage = memoryStorage(
+      JSON.stringify({ modularFocusIncludeWorkspaceRootGroup: value }),
+    );
+    expect(
+      loadGraphPreferences(storage).preferences
+        .modularFocusIncludeWorkspaceRootGroup,
+    ).toBe(expected);
+  });
+
+  it.each([
     [undefined, 3],
     [3, 3],
     [4, 4],
@@ -606,6 +628,7 @@ describe('Focus Hierarchy Saved View profile boundary', () => {
       modularFocusDirectFoldersOnly: true,
       modularFocusSoftAncestorDecayBase: 4 as const,
       modularFocusSoftSpacing: 81,
+      modularFocusIncludeWorkspaceRootGroup: false,
       modularFolderStripsVisible: false,
       modularConnectionStyle: 'electronic' as const,
     };
@@ -619,6 +642,7 @@ describe('Focus Hierarchy Saved View profile boundary', () => {
       showExperimentalAllHierarchy: true,
       trackpadZoomMode: 'pinch-zoom' as const,
       modularFocusSoftSpacing: 19,
+      modularFocusIncludeWorkspaceRootGroup: true,
     };
 
     const profile = captureFocusHierarchySettings(savedPreferences);
@@ -630,9 +654,11 @@ describe('Focus Hierarchy Saved View profile boundary', () => {
     expect(applied.showExperimentalAllHierarchy).toBe(true);
     expect(applied.trackpadZoomMode).toBe('pinch-zoom');
     expect(applied.modularFocusSoftSpacing).toBe(19);
+    expect(applied.modularFocusIncludeWorkspaceRootGroup).toBe(true);
     expect(applied.modularFocusDirectFoldersOnly).toBe(true);
     expect(applied.modularFocusSoftAncestorDecayBase).toBe(4);
     expect(profile).not.toHaveProperty('modularFocusSoftSpacing');
+    expect(profile).not.toHaveProperty('modularFocusIncludeWorkspaceRootGroup');
   });
 
   it('accepts legacy Saved Views without scope controls and restores defaults', () => {

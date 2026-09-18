@@ -14,6 +14,7 @@ import type {
   ViewProjection,
 } from '@icarus-graph-explorer/view-projection';
 import type { FocusSchematicSoftClusterSpacingPolicy } from './soft-cluster-spacing';
+import type { FocusSchematicSoftGroupPackingEvidence } from './soft-group-packing';
 
 export const FOCUS_SCHEMATIC_LAYOUT_PLAN_SCHEMA_VERSION = 1 as const;
 export const FOCUS_SCHEMATIC_ENDPOINT_PLAN_SCHEMA_VERSION = 1 as const;
@@ -421,7 +422,7 @@ export type FocusSchematicSoftFolderScopeMode = 'nested' | 'nearest-only';
 export type FocusSchematicSoftAncestorDecayBase = 3 | 4;
 
 export interface FocusSchematicSoftClusterPolicyEvidence {
-  readonly schemaVersion: 5;
+  readonly schemaVersion: 6;
   readonly layoutFamily: 'soft-folder-clusters';
   readonly strength: FocusSchematicSoftClusterStrength;
   readonly structuralSpacing: FocusSchematicSoftClusterSpacingPolicy;
@@ -512,7 +513,7 @@ export interface FocusSchematicSoftClusterRuntimeEvidence {
 }
 
 export interface FocusSchematicSoftClusterEvidence {
-  readonly schemaVersion: 5;
+  readonly schemaVersion: 6;
   readonly developmentOnly: true;
   readonly layoutFamily: 'soft-folder-clusters';
   readonly strength: FocusSchematicSoftClusterStrength;
@@ -533,6 +534,9 @@ export interface FocusSchematicSoftClusterEvidence {
   readonly secondaryGeometryInfluence: 0;
   readonly fixedIterationSchedule: readonly [36, 18];
   readonly compass: FocusSchematicSoftCompassEvidence;
+  readonly groupPacking: FocusSchematicSoftGroupPackingEvidence;
+  /** Geometry quality immediately before structural compound-group packing. */
+  readonly preGroupMetrics: FocusSchematicSoftClusterMetrics;
   readonly metrics: FocusSchematicSoftClusterMetrics;
   readonly runtime: FocusSchematicSoftClusterRuntimeEvidence;
 }

@@ -16,6 +16,7 @@ export interface PrepareFocusSchematicDisplayedGraphInput extends Omit<
   readonly computedLayout: FocusSchematicComputedLayout;
   readonly macroLayout: FocusSchematicProductMacroLayout;
   readonly softSpacing: number;
+  readonly includeWorkspaceRootGroup: boolean;
 }
 
 export interface FocusSchematicPresentationResult {
@@ -30,13 +31,19 @@ const errorMessage = (error: unknown): string =>
 export function prepareFocusSchematicDisplayedGraph(
   input: PrepareFocusSchematicDisplayedGraphInput,
 ): RendererGraph {
-  const { macroLayout, softSpacing, ...rendererInput } = input;
+  const {
+    macroLayout,
+    softSpacing,
+    includeWorkspaceRootGroup,
+    ...rendererInput
+  } = input;
   const displayedComputed =
     macroLayout === 'soft-folder-clusters'
       ? applyFocusSchematicSoftRadialSpread(
           input.layoutInput,
           input.computedLayout,
           softSpacing,
+          { includeWorkspaceRootGroup },
         )
       : input.computedLayout;
   return prepareFocusSchematicRendererGraph({

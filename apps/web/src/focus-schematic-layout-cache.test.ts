@@ -38,10 +38,10 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     const key = exactFocusSchematicLayoutCacheKey(input);
     expect(key).toContain('modular-focus-hierarchy');
     expect(key).toContain('"algorithmVersion":4');
-    expect(key).toContain('"protocolVersion":10');
-    expect(key.replace('"protocolVersion":10', '"protocolVersion":9')).not.toBe(
-      key,
-    );
+    expect(key).toContain('"protocolVersion":11');
+    expect(
+      key.replace('"protocolVersion":11', '"protocolVersion":10'),
+    ).not.toBe(key);
     expect(exactFocusSchematicLayoutCacheKey(input, 1)).not.toBe(key);
     expect(key).toContain('nodeDimensions');
     expect(key).toContain('settings');
@@ -185,7 +185,7 @@ describe('page-lifetime Focus Schematic layout cache', () => {
       }) as const;
     expect(
       exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)),
-    ).toContain('"algorithmVersion":8');
+    ).toContain('"algorithmVersion":9');
     expect(
       exactFocusSchematicLayoutCacheKey(
         directionalInput,

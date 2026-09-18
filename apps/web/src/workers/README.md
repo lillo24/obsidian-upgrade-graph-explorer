@@ -75,7 +75,7 @@ is created only after Local Free is mounted; Structure startup and ordinary
 Global use do not load it.
 
 The Focus Schematic worker is a fifth independent protocol and loads only after
-Focus + Hierarchy + Modular Preview mounts. Its version-10 request carries the
+Focus + Hierarchy + Modular Preview mounts. Its version-11 request carries the
 plain HIER1 model, Local projection, exact renderer dimensions, and frozen A1
 settings plus macro layout, normalized Soft strength, nested/direct scope,
 canonical ancestor decay, sparse Soft display intent, internal layout,
@@ -83,7 +83,8 @@ Heading-order, and experimental Directional hierarchy policies. Radial Soft
 spacing is a main-thread post-transform and is absent from this contract. The
 worker dispatches unchanged Directional Bands or the
 experimental Soft Folder Clusters solver. Both sides validate exact message
-shape, cardinal File attachment policy, and Soft runtime evidence; success is revalidated
+shape, cardinal File attachment policy, structural compound-group evidence,
+and Soft runtime evidence; success is revalidated
 against the originating input. A new request terminates obsolete compute,
 generation/request guards reject stale messages, and unmount or presentation
 change disposes the worker. Startup, clone, transport, runtime, malformed, and
@@ -93,6 +94,10 @@ Directional requests have separate exact cache/configuration identities; Soft
 requests normalize the hierarchy policy back to Flat semantics. Direct-only
 requests canonicalize the inactive decay choice, while Nested 1/3 and 1/4 keep
 distinct structural identities.
+The Soft structural algorithm version is 9. It packs immediate-folder compound
+bodies once and proves continuous 1.0x-2.4x radial safety. Soft spacing and the
+optional renderer-only Workspace-root grouping remain absent from the request
+and cache identity, so changing either reuses the adopted structural result.
 
 The continuous Network physics worker is dormant scaffolding for PHYSICS1. An
 `initialize` call stores clone-safe Focus or All seed data in the client but

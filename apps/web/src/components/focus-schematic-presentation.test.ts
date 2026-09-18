@@ -42,6 +42,7 @@ describe('Modular Focus Schematic presentation', () => {
       rootEntityId: fixture.model.rootModuleId,
       secondaryRelationshipsVisible: false,
       macroLayout: 'soft-folder-clusters' as const,
+      includeWorkspaceRootGroup: false,
     };
     const graphs = [0, 50, 100].map((softSpacing) =>
       prepareFocusSchematicDisplayedGraph({ ...base, softSpacing }),
@@ -90,6 +91,7 @@ describe('Modular Focus Schematic presentation', () => {
       secondaryRelationshipsVisible: false,
       macroLayout: 'soft-folder-clusters' as const,
       softSpacing: 0,
+      includeWorkspaceRootGroup: false,
     };
     const adopted = prepareFocusSchematicDisplayedGraph(validInput);
     const result = resolveFocusSchematicPresentation(
