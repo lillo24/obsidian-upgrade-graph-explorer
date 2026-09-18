@@ -15,6 +15,7 @@ import {
 } from 'react';
 
 import {
+  ARGUMENT_WORKSPACE_INSERT_TEMPLATE,
   canonicalJson,
   createKnowledgeReader,
   exportArgumentLibraryMarkdown,
@@ -25,6 +26,7 @@ import {
   type ArgumentLibrary,
   type ArgumentLibraryStore,
   type ArgumentRecordKind,
+  type ArgumentWorkspaceInsertPlan,
   type HumanReviewState,
   type IndexCandidate,
   type KnowledgeReader,
@@ -95,6 +97,12 @@ interface ImportPreviewState {
   readonly merge?: ArgumentImportPlan;
   readonly replace?: ArgumentImportPlan;
   readonly error?: string;
+}
+
+interface InsertJsonState {
+  readonly source: string;
+  readonly plan?: ArgumentWorkspaceInsertPlan;
+  readonly errors?: readonly string[];
 }
 
 interface ContextPreviewState {
@@ -415,6 +423,197 @@ async function copyText(text: string): Promise<void> {
 
 function counts(library: ArgumentLibrary): string {
   return `${library.topics.length} Topic${library.topics.length === 1 ? '' : 's'}, ${library.axioms.length} Axiom${library.axioms.length === 1 ? '' : 's'}, ${library.arguments.length} Argument${library.arguments.length === 1 ? '' : 's'}, ${library.counterArguments.length} Counter-Argument${library.counterArguments.length === 1 ? '' : 's'}`;
+}
+
+function InsertJsonDialog({
+  busy,
+  state,
+  onCancel,
+  onChange,
+  onConfirm,
+  onPreview,
+  onUseTemplate,
+}: {
+  readonly busy: boolean;
+  readonly state: InsertJsonState;
+  readonly onCancel: () => void;
+  readonly onChange: (source: string) => void;
+  readonly onConfirm: (plan: ArgumentWorkspaceInsertPlan) => void;
+  readonly onPreview: () => void;
+  readonly onUseTemplate: () => void;
+}) {
+  const plan = state.plan;
+  const preview = plan?.preview;
+  return (
+    <section
+      aria-labelledby="arguments-insert-title"
+      className="arguments-subdialog"
+      role="dialog"
+    >
+      <div>
+        <h2 id="arguments-insert-title">Insert JSON</h2>
+        <p>
+          Add records and links to the current library. Preview is strict and
+          non-mutating; nothing is saved until confirmation.
+        </p>
+        <label>
+          Insert JSON document
+          <textarea
+            onChange={(event) => onChange(event.currentTarget.value)}
+            placeholder='{"format":"argument-workspace-insert-v1", ...}'
+            spellCheck={false}
+            value={state.source}
+          />
+        </label>
+        <div className="arguments-actions">
+          <button disabled={busy} onClick={onPreview} type="button">
+            Preview insert
+          </button>
+          <button disabled={busy} onClick={onUseTemplate} type="button">
+            Use template
+          </button>
+        </div>
+        {state.errors === undefined ? null : (
+          <div className="arguments-error" role="alert">
+            <h3>Validation errors</h3>
+            <ul>
+              {state.errors.map((error, index) => (
+                <li key={`${index}:${error}`}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {preview === undefined ? null : (
+          <div className="arguments-insert-preview">
+            <h3>Validated preview</h3>
+            <p>
+              Format <code>{preview.format}</code>. Create{' '}
+              {preview.counts.topics} Topic, {preview.counts.axioms} Axiom,{' '}
+              {preview.counts.arguments} Argument, and{' '}
+              {preview.counts.counterArguments} Counter-Argument records.
+            </p>
+            {preview.records.length === 0 ? null : (
+              <>
+                <h3>Records</h3>
+                <ul>
+                  {preview.records.map((record) => (
+                    <li key={`${record.kind}:${record.id}`}>
+                      {record.kind} <code>{record.id}</code> — {record.title}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {preview.memberships.length === 0 ? null : (
+              <>
+                <h3>Topic memberships</h3>
+                <ul>
+                  {preview.memberships.map((membership) => (
+                    <li
+                      key={`${membership.topicId}:${membership.kind}:${membership.recordId}`}
+                    >
+                      <code>{membership.topicId}</code> ← {membership.kind}{' '}
+                      <code>{membership.recordId}</code>
+                      {membership.alreadyPresent ? ' (already present)' : ''}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {preview.currentPromotions.length === 0 ? null : (
+              <>
+                <h3>Current promotions</h3>
+                <ul>
+                  {preview.currentPromotions.map((promotion) => (
+                    <li key={promotion.topicId}>
+                      <code>{promotion.argumentId}</code> for{' '}
+                      <code>{promotion.topicId}</code>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {preview.supersessions.length === 0 ? null : (
+              <>
+                <h3>Supersession</h3>
+                <ul>
+                  {preview.supersessions.map((link) => (
+                    <li key={link.argumentId}>
+                      <code>{link.argumentId}</code> supersedes{' '}
+                      <code>{link.supersedesArgumentId}</code>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {preview.relations.length === 0 ? null : (
+              <>
+                <h3>Attack / support relations</h3>
+                <ul>
+                  {preview.relations.map(({ argumentId, relation }) => (
+                    <li key={`${argumentId}:${relation.id}`}>
+                      <code>{argumentId}</code> {relation.kind}s{' '}
+                      <code>{relation.targetArgumentId}</code> (
+                      {relation.targetPart.kind})
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {preview.referencedExistingRecords.length === 0 ? null : (
+              <>
+                <h3>Existing records referenced</h3>
+                <ul>
+                  {preview.referencedExistingRecords.map((record) => (
+                    <li key={`${record.kind}:${record.id}`}>
+                      {record.kind} <code>{record.id}</code>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {preview.resolvedPins.length === 0 ? null : (
+              <>
+                <h3>Revision pins</h3>
+                <ul>
+                  {preview.resolvedPins.map((pin) => (
+                    <li key={pin.path}>
+                      {pin.suppliedExplicitly ? 'Validated' : 'Resolved'}{' '}
+                      <code>{pin.targetId}</code> at revision {pin.revision}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {preview.warnings.length === 0 ? null : (
+              <>
+                <h3>Warnings</h3>
+                <ul>
+                  {preview.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        )}
+        <div className="arguments-actions">
+          <button
+            disabled={busy || plan === undefined}
+            onClick={() => {
+              if (plan !== undefined) onConfirm(plan);
+            }}
+            type="button"
+          >
+            Confirm insert
+          </button>
+          <button onClick={onCancel} type="button">
+            Cancel insert
+          </button>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function WorkspaceOnboarding({
@@ -770,6 +969,7 @@ const ArgumentsWorkspaceContent = forwardRef<
   const [confirmation, setConfirmation] = useState<string>();
   const pendingTransition = useRef<(() => void) | undefined>(undefined);
   const [notice, setNotice] = useState<string>();
+  const [insertJson, setInsertJson] = useState<InsertJsonState>();
   const [importPreview, setImportPreview] = useState<ImportPreviewState>();
   const [markdownFiles, setMarkdownFiles] =
     useState<ReturnType<typeof exportArgumentLibraryMarkdown>>();
@@ -818,6 +1018,10 @@ const ArgumentsWorkspaceContent = forwardRef<
       setContextExport(undefined);
       return true;
     }
+    if (insertJson !== undefined) {
+      setInsertJson(undefined);
+      return true;
+    }
     if (markdownFiles !== undefined) {
       setMarkdownFiles(undefined);
       return true;
@@ -828,7 +1032,14 @@ const ArgumentsWorkspaceContent = forwardRef<
     }
     requestClose();
     return true;
-  }, [confirmation, contextExport, importPreview, markdownFiles, requestClose]);
+  }, [
+    confirmation,
+    contextExport,
+    importPreview,
+    insertJson,
+    markdownFiles,
+    requestClose,
+  ]);
 
   useEffect(() => {
     escapeAction.current = handleEscape;
@@ -1024,6 +1235,37 @@ const ArgumentsWorkspaceContent = forwardRef<
               : 'Import saved',
           );
         } else setNotice(result.message);
+      });
+    });
+  }
+
+  function previewInsert() {
+    if (insertJson === undefined) return;
+    const result = session.previewInsert(insertJson.source);
+    setInsertJson(
+      result.status === 'ok'
+        ? { source: insertJson.source, plan: result.plan }
+        : {
+            source: insertJson.source,
+            errors: result.issues ?? [result.message],
+          },
+    );
+  }
+
+  function commitInsert(plan: ArgumentWorkspaceInsertPlan) {
+    requestTransition('Insert over unsaved changes?', () => {
+      void session.commitInsert(plan).then((result) => {
+        if (result.status === 'ok') {
+          const firstRecord = plan.preview.records[0];
+          setInsertJson(undefined);
+          setHistory([]);
+          if (firstRecord !== undefined) {
+            setSelection({ kind: firstRecord.kind, id: firstRecord.id });
+          }
+          setNotice('Inserted JSON');
+        } else {
+          setNotice(result.message);
+        }
       });
     });
   }
@@ -1506,8 +1748,15 @@ const ArgumentsWorkspaceContent = forwardRef<
           <div className="arguments-dialog__actions">
             {state.phase !== 'ready' ? null : (
               <>
+                <button
+                  disabled={state.busy}
+                  onClick={() => setInsertJson({ source: '' })}
+                  type="button"
+                >
+                  Insert JSON
+                </button>
                 <label className="button-like">
-                  Import JSON
+                  Import Library JSON
                   <input
                     accept="application/json,.json"
                     disabled={state.busy}
@@ -2002,6 +2251,20 @@ const ArgumentsWorkspaceContent = forwardRef<
               ×
             </button>
           </div>
+        )}
+
+        {insertJson === undefined ? null : (
+          <InsertJsonDialog
+            busy={state.busy}
+            onCancel={() => setInsertJson(undefined)}
+            onChange={(source) => setInsertJson({ source })}
+            onConfirm={commitInsert}
+            onPreview={previewInsert}
+            onUseTemplate={() =>
+              setInsertJson({ source: ARGUMENT_WORKSPACE_INSERT_TEMPLATE })
+            }
+            state={insertJson}
+          />
         )}
 
         {importPreview === undefined ? null : (

@@ -354,6 +354,114 @@ describe('standalone Arguments workspace', () => {
     expect(preview.value).toContain('Consultation receipt');
   });
 
+  it('previews Insert JSON and protects a dirty draft before one atomic confirmation', async () => {
+    await mount();
+    await click('Numeric mismatch');
+    await click('Edit');
+    const observation = [
+      ...container.querySelectorAll<HTMLTextAreaElement>('textarea'),
+    ].find((control) =>
+      control.parentElement?.textContent?.includes(
+        'Observation / example / argument',
+      ),
+    )!;
+    await act(() => setValue(observation, 'Unsaved local draft.'));
+
+    await click('Insert JSON');
+    const source = textarea('Insert JSON document');
+    await act(() =>
+      setValue(
+        source,
+        JSON.stringify({
+          format: 'argument-workspace-insert-v1',
+          topics: [
+            {
+              id: 'TOP-INSERT-UI',
+              title: 'Inserted UI Topic',
+              summary: 'A synthetic UI insertion.',
+            },
+          ],
+          arguments: [
+            {
+              id: 'ARG-INSERT-UI-A1',
+              title: 'Inserted original',
+              premises: [
+                { id: 'P-INSERT-UI', kind: 'text', text: 'Premise one.' },
+              ],
+              reasoning: 'Original reasoning.',
+              conclusion: 'Original conclusion.',
+              reviewState: 'accepted',
+            },
+            {
+              id: 'ARG-INSERT-UI-A2',
+              title: 'Inserted refinement',
+              premises: [
+                {
+                  id: 'P-INSERT-REUSE',
+                  kind: 'argument-premise',
+                  argumentId: 'ARG-INSERT-UI-A1',
+                  premiseId: 'P-INSERT-UI',
+                },
+              ],
+              conclusion: 'Refined conclusion.',
+              relations: [
+                {
+                  id: 'REL-INSERT-UI',
+                  kind: 'attack',
+                  targetArgumentId: 'ARG-INSERT-UI-A1',
+                  targetPart: { kind: 'reasoning' },
+                },
+              ],
+              supersedesArgumentId: 'ARG-INSERT-UI-A1',
+              reviewState: 'accepted',
+            },
+          ],
+          memberships: [
+            {
+              topicId: 'TOP-INSERT-UI',
+              kind: 'argument',
+              recordId: 'ARG-INSERT-UI-A1',
+            },
+            {
+              topicId: 'TOP-INSERT-UI',
+              kind: 'argument',
+              recordId: 'ARG-INSERT-UI-A2',
+            },
+          ],
+          currentPromotions: [
+            {
+              topicId: 'TOP-INSERT-UI',
+              argumentId: 'ARG-INSERT-UI-A2',
+            },
+          ],
+        }),
+      ),
+    );
+    await click('Preview insert');
+
+    expect(store.writes).toBe(0);
+    expect(container.textContent).toContain('Validated preview');
+    expect(container.textContent).toContain(
+      'Resolved ARG-INSERT-UI-A1 at revision 1',
+    );
+    expect(container.textContent).toContain('Attack / support relations');
+
+    await click('Confirm insert');
+    expect(container.textContent).toContain('Insert over unsaved changes?');
+    expect(store.writes).toBe(0);
+    await click('Discard');
+
+    expect(store.writes).toBe(1);
+    expect(store.snapshot.library.topics).toContainEqual(
+      expect.objectContaining({
+        id: 'TOP-INSERT-UI',
+        currentArgumentId: 'ARG-INSERT-UI-A2',
+        argumentIds: ['ARG-INSERT-UI-A1', 'ARG-INSERT-UI-A2'],
+      }),
+    );
+    expect(container.textContent).toContain('Inserted UI Topic');
+  });
+
   it('shows Current reasoning and promotes an accepted member explicitly', async () => {
     vi.stubGlobal(
       'confirm',

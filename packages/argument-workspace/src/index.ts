@@ -3,6 +3,7 @@ export * from './validation';
 export * from './canonical';
 export * from './library';
 export * from './serialization';
+export * from './insert';
 export * from './storage';
 export * from './authoring';
 export * from './search';

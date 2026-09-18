@@ -147,7 +147,100 @@ function draft(
   };
 }
 
+function insertSource(overrides: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    format: 'argument-workspace-insert-v1',
+    arguments: [
+      {
+        id: 'ARG-INSERTED',
+        title: 'Inserted explanation',
+        premises: [
+          { id: 'P-INSERTED', kind: 'text', text: 'A neutral premise.' },
+        ],
+        conclusion: 'A neutral inserted conclusion.',
+        reviewState: 'accepted',
+      },
+    ],
+    memberships: [
+      { topicId: 'T-ONE', kind: 'argument', recordId: 'ARG-INSERTED' },
+    ],
+    currentPromotions: [{ topicId: 'T-ONE', argumentId: 'ARG-INSERTED' }],
+    ...overrides,
+  });
+}
+
 describe('Argument Workspace application session', () => {
+  it('previews without writing and commits the complete Insert JSON candidate once', async () => {
+    const host = harness(neutralLibrary());
+    await host.session.open();
+
+    const preview = host.session.previewInsert(insertSource());
+
+    expect(preview.status).toBe('ok');
+    expect(host.writes()).toBe(0);
+    if (preview.status !== 'ok') return;
+    const committed = await host.session.commitInsert(preview.plan);
+    expect(committed.status).toBe('ok');
+    expect(host.writes()).toBe(1);
+    const state = host.session.state();
+    if (state.phase !== 'ready') throw new Error('Session not ready.');
+    expect(state.snapshot.library.topics[0]).toMatchObject({
+      argumentIds: ['ARG-INSERTED'],
+      currentArgumentId: 'ARG-INSERTED',
+    });
+    const search = state.reader.searchIndex({ query: 'Inserted explanation' });
+    expect(search.status).toBe('ok');
+    if (search.status === 'ok') {
+      expect(search.value.candidates).toContainEqual(
+        expect.objectContaining({ id: 'ARG-INSERTED' }),
+      );
+    }
+  });
+
+  it('keeps invalid, colliding, and late-failing inserts entirely out of storage', async () => {
+    const host = harness(neutralLibrary());
+    await host.session.open();
+
+    const invalid = host.session.previewInsert('{not json');
+    const collision = host.session.previewInsert(
+      insertSource({
+        arguments: [
+          {
+            id: 'AX-ONE',
+            title: 'Collision',
+            premises: [],
+            conclusion: 'Should not be inserted.',
+          },
+        ],
+      }),
+    );
+    const lateFailure = host.session.previewInsert(
+      insertSource({
+        currentPromotions: [{ topicId: 'T-ONE', argumentId: 'ARG-MISSING' }],
+      }),
+    );
+
+    expect(invalid.status).toBe('invalid');
+    expect(collision.status).toBe('invalid');
+    expect(lateFailure.status).toBe('invalid');
+    expect(host.writes()).toBe(0);
+  });
+
+  it('rejects a stale Insert JSON preview without a second write', async () => {
+    const host = harness(neutralLibrary());
+    await host.session.open();
+    const preview = host.session.previewInsert(insertSource());
+    expect(preview.status).toBe('ok');
+    expect((await host.session.save(draft(host.session))).status).toBe('ok');
+
+    if (preview.status !== 'ok') return;
+    expect(await host.session.commitInsert(preview.plan)).toMatchObject({
+      status: 'conflict',
+      message: expect.stringMatching(/changed after the insert preview/i),
+    });
+    expect(host.writes()).toBe(1);
+  });
+
   it('keeps one Save atomic across record, response, answer, and Topic membership', async () => {
     const host = harness(neutralLibrary());
     await Promise.all([host.session.open(), host.session.open()]);

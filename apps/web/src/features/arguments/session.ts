@@ -14,6 +14,7 @@ import {
   editCounterArgument,
   editTopic,
   parseArgumentLibraryJson,
+  previewArgumentWorkspaceInsert,
   promoteArgumentToCurrent,
   previewArgumentLibraryImport,
   reassessCounterArgumentResponse,
@@ -38,6 +39,7 @@ import {
   type ArgumentRelation,
   type ArgumentRuntime,
   type ArgumentTopic,
+  type ArgumentWorkspaceInsertPlan,
   type CounterArgumentOutcome,
   type CounterArgumentTarget,
   type HumanReviewState,
@@ -773,6 +775,65 @@ export class ArgumentWorkspaceSession {
     input: RecordTheorySourceVersionInput,
   ): Promise<ArgumentWorkspaceActionResult> {
     return this.#adopt(this.#authoring.recordSourceVersion(expected, input));
+  }
+
+  previewInsert(source: string):
+    | { readonly status: 'ok'; readonly plan: ArgumentWorkspaceInsertPlan }
+    | {
+        readonly status: 'invalid';
+        readonly message: string;
+        readonly issues?: readonly string[];
+      } {
+    if (
+      new TextEncoder().encode(source).byteLength >
+      ARGUMENT_LIBRARY_IMPORT_LIMIT_BYTES
+    ) {
+      return {
+        status: 'invalid',
+        message: 'Insert JSON exceeds the 5 MiB limit.',
+      };
+    }
+    const state = this.#state;
+    if (state.phase !== 'ready') {
+      return {
+        status: 'invalid',
+        message: 'Load or initialize the Argument Library first.',
+      };
+    }
+    const result = previewArgumentWorkspaceInsert(
+      state.snapshot,
+      source,
+      this.runtime,
+    );
+    return result.status === 'valid'
+      ? { status: 'ok', plan: result.plan }
+      : {
+          status: 'invalid',
+          message: result.message,
+          issues: result.issues.map(
+            (issue) => `${issue.path}: ${issue.message}`,
+          ),
+        };
+  }
+
+  commitInsert(
+    plan: ArgumentWorkspaceInsertPlan,
+  ): Promise<ArgumentWorkspaceActionResult> {
+    const state = this.#state;
+    if (
+      state.phase !== 'ready' ||
+      !sameSnapshot(state.snapshot.descriptor, plan.base)
+    ) {
+      return Promise.resolve({
+        status: 'conflict',
+        message:
+          'The library changed after the insert preview. Preview the JSON again before inserting.',
+        ...(state.phase === 'ready'
+          ? { actual: state.snapshot.descriptor }
+          : {}),
+      });
+    }
+    return this.#adopt(this.#authoring.commitInsert(plan.base, plan.candidate));
   }
 
   previewImport(
