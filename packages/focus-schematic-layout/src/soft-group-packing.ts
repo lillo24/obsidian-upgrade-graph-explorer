@@ -13,6 +13,7 @@ import type {
   FocusSchematicSoftFolderDisplayTree,
 } from './types';
 import { FOCUS_SCHEMATIC_LAYOUT_CLEARANCE } from './settings';
+import { FOCUS_SCHEMATIC_SOFT_FOLDER_GUIDE_PADDING } from './soft-folder-guide-geometry';
 
 const EPSILON = 1e-9;
 const PACKING_STEP = 72;
@@ -285,8 +286,8 @@ export function countFocusSchematicSoftRadialSpreadSafetyViolations(
       rightIndex < bodies.length;
       rightIndex += 1
     )
-      for (const left of bodies[leftIndex]!.rectangles)
-        for (const right of bodies[rightIndex]!.rectangles) {
+      for (const left of collisionRectangles(bodies[leftIndex]!))
+        for (const right of collisionRectangles(bodies[rightIndex]!)) {
           if (stats !== undefined) stats.collisionChecks += 1;
           if (
             radialSpreadOverlapInterval(
@@ -299,6 +300,21 @@ export function countFocusSchematicSoftRadialSpreadSafetyViolations(
             violations += 1;
         }
   return violations;
+}
+
+function collisionRectangles(
+  value: FocusSchematicSoftCompoundBody,
+): readonly FocusSchematicRectangle[] {
+  if (value.kind !== 'named-folder') return value.rectangles;
+  const padding = FOCUS_SCHEMATIC_SOFT_FOLDER_GUIDE_PADDING;
+  return [
+    {
+      x: value.envelope.x - padding,
+      y: value.envelope.y - padding,
+      width: value.envelope.width + padding * 2,
+      height: value.envelope.height + padding * 2,
+    },
+  ];
 }
 
 function translateBody(
@@ -325,8 +341,8 @@ function bodyIsSafe(
   stats: PackingStats,
 ): boolean {
   return obstacles.every((obstacle) => {
-    for (const own of candidate.rectangles)
-      for (const other of obstacle.rectangles) {
+    for (const own of collisionRectangles(candidate))
+      for (const other of collisionRectangles(obstacle)) {
         stats.collisionChecks += 1;
         if (
           radialSpreadOverlapInterval(candidate, own, obstacle, other) !== null

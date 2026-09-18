@@ -476,7 +476,9 @@ export function buildFocusSchematicSoftFolderDisplayTree({
     const candidates = [...folders.values()]
       .filter(
         ({ folderKey, directFileIds, childFolderKeys }) =>
-          folderKey !== '.' && directFileIds.size + childFolderKeys.size === 1,
+          folderKey !== '.' &&
+          directFileIds.size === 0 &&
+          childFolderKeys.size === 1,
       )
       .sort(
         (left, right) =>

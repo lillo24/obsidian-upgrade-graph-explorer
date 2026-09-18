@@ -1,6 +1,6 @@
 # HIER4B validation
 
-Status: **HIER4B-SPACING-FIX3B CANDIDATE — structural group packing in PR #106 awaits native graphical approval.**
+Status: **HIER4B-SPACING-FIX4 CANDIDATE — mandatory immediate-folder unity in PR #106 awaits native graphical approval.**
 
 HIER4B evidence remains synthetic and development-only. Directional Folder
 Bands is the unchanged reference and default. Soft Folder Clusters is merged on
@@ -53,20 +53,21 @@ the earlier branches; radial spread remains outside this identity.
 
 `soft-folder-display.test.ts` covers N1–N17: nested parent/child folders,
 single-File and repeated promotion, exact restore, one-layer and sibling
-flattening, layer restore, one-child-unit compression, deep chains, meaningful
+flattening, layer restore, ancestor-only pass-through compression, deep chains, meaningful
 two-unit folders, visibility changes, disclosure invariance, manual/automatic
 provenance, workspace isolation, and stale intent. Directional isolation is
 covered by the worker/runtime oracle as N18.
 
-The selected compression rule suppresses a non-root folder only when it has
-exactly one direct displayed child unit after manual intent. Empty visible
-layers are pruned. The transformation repeats to a meaningful branching level
-and stores no automatic result.
+The selected compression rule suppresses a non-root folder only when it has no
+direct visible Files and exactly one child folder after manual intent. Empty
+visible layers are pruned. The transformation repeats through ancestor-only
+pass-through chains and stores no automatic result. Any folder with a direct
+visible File remains, including a named singleton.
 
 ## Guide and interaction cases
 
 Renderer tests prove bottom-up parent containment, direct File plus child-guide
-enclosure, short hierarchy labels, disconnected islands, bounded fixed padding,
+enclosure, short hierarchy labels, ancestor islands, bounded fixed padding,
 determinism, parent/sibling emphasis, compressed ancestry text, pointer-inert
 hulls, and removal of the old toolbar. HT1–HT10 cover actual rounded-region
 hits, parent/child and depth-3+ priority, parent-only space, disconnected
@@ -91,12 +92,13 @@ focus-visible styling, and both Shift+F10 and ContextMenu-key entry. The existin
 HT, MC, FM, and L suites continue to cover empty guide-area targeting, deepest
 nested hits, label right-click, focus restoration, and split-region labels.
 
-FIX4 adds LR1–LR10 renderer cases for one-child-folder suppression, the reported
-`Integrating the ideas/Cure Framework` split, two far same-folder singleton
+The earlier guide FIX4 adds LR1–LR10 renderer cases for one-child-folder suppression, the reported
+`Integrating the ideas/Cure Framework` split, invalid far same-folder singleton
 islands, File-plus-child and two-child useful parents, recursive local chains,
 mixed visible/suppressed islands, pass-through parent geometry, surviving-child
-hit testing, and cold determinism. Every named rendered region records at least
-two direct visual units. Suppressed regions never enter the returned guide list,
+hit testing, and cold determinism. Any immediate named folder with a direct File
+renders, including singletons; one-unit suppression applies only to ancestor
+wrappers without direct Files. Suppressed regions never enter the returned guide list,
 so renderer labels, hover/context controls, and area hit testing cannot select
 them. The existing root-direct-File policy remains covered separately.
 
@@ -112,11 +114,11 @@ H2 — normalized equal ancestor shares
 
 HFA1–HFA7 cover a parent direct File plus nested child, sibling nested folders,
 depth three, promoted File, flattened parent with surviving grandchild,
-disconnected islands, and topology opposing nesting. Hard gates require no
+formerly disconnected immediate groups, and topology opposing nesting. Hard gates require no
 overlap, deterministic output, exact crossing evidence, bounded fixed schedule,
 and maximum total folder weight per File no greater than one. H1 keeps child
 coherence stronger while still supplying parent coherence. Strength 0 creates
-no folder force.
+no attraction force, while mandatory immediate-folder cohesion remains active.
 
 The current benchmark passed:
 
@@ -230,7 +232,7 @@ Flow positions, valid edge handles, and one structural compute. Existing
 identity.
 
 Direct scope now captures every File's parent after manual promotion and folder
-flattening but before automatic singleton compression. D1–D7 cover a deep
+flattening but before automatic ancestor pass-through compression. D1–D7 cover a deep
 singleton chain, distinct parent/child immediate folders, a named singleton
 guide, promotion, flattening, genuine root membership, and root-neutral force.
 Nested memberships and the final compressed display tree remain unchanged.
@@ -325,7 +327,8 @@ default root-singleton partition and the optional Workspace-root aggregate.
 The radial postprocess remains a pure group-centroid translation and runs no
 collision resolver or discrete packing. SC14 is overlap-free at every integer
 slider value and at the exact continuous gate; 71/72/73 changes only the smooth
-translation. SC23 retains its topology-split member vectors exactly.
+translation. Before FIX4, SC23 retained its topology-split member vectors
+exactly; FIX4 intentionally supersedes that behavior.
 
 The generated bakeoff passes all hard gates. At strength 50, SC14 moves two of
 four bodies, with mean translation 72 px, P95/max 144 px, zero safety
@@ -346,7 +349,7 @@ layout, and cache identity. Saved View application preserves the current
 preference because it is not a view-profile field.
 
 Soft structural algorithm/cache version 9 invalidates prior Soft geometry.
-Worker protocol 11 and Soft evidence schema 6 add exact group-packing and
+The FIX3B candidate used worker protocol 11 and Soft evidence schema 6 for exact group-packing and
 pre/final structural-quality evidence. Directional algorithm version 4 and its
 reference hashes are unchanged.
 
@@ -366,3 +369,51 @@ The exact FIX3B prompt is archived at
 `history-implementations/HIER4B_SPACING_FIX3B_structural_folder_group_packing_codex_prompt.md`.
 Its SHA-256 is
 `52EB3A287AAD67912FB2AB997B5569523F35D581FAF38D3A9B2BCF102041741E`.
+
+## HIER4B-SPACING-FIX4 candidate
+
+FIX4 changes the Soft priority order: immediate named-folder identity and unity
+now outrank topology splitting, while ancestor folders remain soft. After the
+fixed `[36, 18]` relaxation, a deterministic whole-module pass compacts each
+post-manual/pre-compression immediate group around its existing centroid. A
+Focus-containing group keeps the Focus module fixed. Module dimensions and all
+File/Heading/Block offsets remain unchanged. FIX3B then packs those coherent
+groups and proves continuous radial safety before the renderer-only spread.
+
+Layout and renderer share the exact 216 px guide-connectivity, 24 px hull
+padding, and blocker-swallowing oracle. Named-folder envelopes become padded
+structural obstacles, so an unrelated File cannot sit inside a direct-folder
+hull. The final structural hard gate is zero immediate-folder split violations.
+The renderer rejects a structurally split immediate folder rather than drawing
+duplicate same-name regions. Nested mode always renders an immediate folder
+that owns a direct File, including a singleton; workspace-root Files remain
+ungrouped when the existing option is Off.
+
+SC5 and SC23 now assert unity rather than topology-approved splitting. The
+benchmark passes 135 fixture/strength rows, 15 hub stress rows, 21 hierarchy
+policy rows, 35 hierarchy-strength rows, 28 scope/decay rows, 32 Compass rows,
+and 40 Compass-strength rows with `hardGatesPass: true`. Across fixture rows,
+the cohesion stage reduces mean bounds area by about 410,250 square pixels and
+mean connected-pair distance by about 32 px. Its worst hop-radius cost is SC5
+at strength 0 (+456.25 px); SC5 adds one crossing, while SC23 adds none. The
+largest final/pre-cohesion bounds ratio is 1.44x for SC21 at strength 100, so
+the bounded packing shows no pathological canvas explosion.
+
+Soft structural algorithm/cache version 10 invalidates prior Soft geometry.
+Worker protocol 12 and Soft evidence schema 7 add cohesion movement/radius/
+pair-distance metrics plus pre/post-cohesion topology quality. Directional
+algorithm version 4, Adaptive Compass assignment/search, the root-neutral force
+rule, and secondary zero-influence behavior are unchanged.
+
+The exact FIX4 prompt is archived at
+`history-implementations/HIER4B_SPACING_FIX4_immediate_folder_unity_codex_prompt.md`.
+Its SHA-256 is
+`522CDB10D878622C1EEDC5DA852F32E524BF3C25D5D804C55367EDBC600147E0`.
+
+The complete repository gate passes 278 test files / 2,361 tests plus
+formatting, lint, all workspace typechecks, and the production web build.
+Desktop formatting/check, 16 Rust tests, and the optimized release build pass.
+The QA executable is
+`output/hier4b-spacing-fix4-immediate-folder-unity-native-candidate.exe`;
+its SHA-256 is
+`F04E47B123E16B8BD2A54E6DFA82BD5D359AAA8DBB5D363C4B6865427BA20305`.

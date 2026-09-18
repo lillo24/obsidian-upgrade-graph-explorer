@@ -120,6 +120,14 @@ renderer-only preference: structural packing also validates the aggregate root
 body, so toggling it does not enter worker input or cache identity. No collision
 or repacking pass runs after radial spacing.
 
+HIER4B-SPACING-FIX4 inserts mandatory immediate-folder cohesion before that
+compound pack. It groups by the post-manual/pre-compression direct parent,
+compacts whole modules around their prior centroid, pins Focus when present,
+and shares the renderer's island oracle. Named singleton folders remain in the
+display tree. Automatic compression removes only ancestor-only pass-through
+folders. Folder strength zero disables extra attraction but still runs this
+cohesion stage.
+
 Nested Soft force uses normalized `1 / base ** index` membership with selectable
 base 3 (default) or 4. Direct-only selects each File's immediate displayed
 parent after manual promotion/flattening and before automatic singleton
@@ -193,12 +201,16 @@ the bakeoff evidence if changed.
 - `src/soft-group-packing.ts` owns immediate-folder compound bodies, the exact
   continuous affine overlap oracle, deterministic structural body packing, and
   group-packing evidence.
+- `src/soft-folder-cohesion.ts` owns deterministic immediate named-folder
+  compaction, Focus pinning, movement evidence, and the final split hard gate.
+- `src/soft-folder-guide-geometry.ts` owns the dependency-free guide-island
+  geometry shared by layout validation and React Flow rendering.
 - `src/soft-radial-spread.ts` translates complete non-root module geometry
   around the fixed root after structural computation, then refreshes cardinal
   attachments and strict geometry-derived quality.
 - `src/soft-folder-display.ts` owns strict sparse File-parent and flattened-layer
   intent, conservative reconciliation, the pure nested displayed tree,
-  pre-compression Direct-parent snapshot, one-child-unit
+  pre-compression Direct-parent snapshot, ancestor-only pass-through
   compression/provenance, action mutations, nearest-only scope, and normalized
   1/3 or 1/4 ancestor weights. It contains no storage, renderer, or
   source-provider logic.
@@ -209,11 +221,12 @@ the bakeoff evidence if changed.
   placeholder policy.
 - `src/selected.ts` maps the accepted A1 computed result to the compatible
   selected candidate/attempt API.
-- `src/worker-protocol.ts` owns the version-11 exact-shape production messages,
+- `src/worker-protocol.ts` owns the version-12 exact-shape production messages,
   macro/strength/scope/decay/display-intent policy normalization, cardinal and
-  Soft Compass evidence, and originating-input result validation. Version 11
-  and Soft evidence schema 6 carry structural compound-group evidence and
-  pre/final quality metrics while radial spread stays outside worker input.
+  Soft Compass evidence, and originating-input result validation. Version 12
+  and Soft evidence schema 7 carry cohesion, structural compound-group
+  evidence, and pre/post/final quality metrics while radial spread stays outside
+  worker input.
 - `src/worker-runtime.ts` validates requests, computes A1, records phase
   timings, and returns either a complete validated result or an explicit
   failure.

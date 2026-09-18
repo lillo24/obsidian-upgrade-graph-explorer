@@ -15,6 +15,10 @@ import type {
 } from '@icarus-graph-explorer/view-projection';
 import type { FocusSchematicSoftClusterSpacingPolicy } from './soft-cluster-spacing';
 import type { FocusSchematicSoftGroupPackingEvidence } from './soft-group-packing';
+import type {
+  FocusSchematicSoftFolderCohesionApplicationEvidence,
+  FocusSchematicSoftFolderCohesionQuality,
+} from './soft-folder-cohesion';
 
 export const FOCUS_SCHEMATIC_LAYOUT_PLAN_SCHEMA_VERSION = 1 as const;
 export const FOCUS_SCHEMATIC_ENDPOINT_PLAN_SCHEMA_VERSION = 1 as const;
@@ -370,7 +374,7 @@ export interface FocusSchematicSoftFileDisplayParentOverride {
   readonly displayParentFolderKey: WorkspaceFolderKey;
 }
 
-/** Sparse workspace intent. Automatic singleton compression is derived. */
+/** Sparse workspace intent. Automatic ancestor pass-through compression is derived. */
 export interface FocusSchematicSoftFolderDisplayIntent {
   readonly fileParentOverrides: readonly FocusSchematicSoftFileDisplayParentOverride[];
   readonly flattenedFolderKeys: readonly WorkspaceFolderKey[];
@@ -387,7 +391,7 @@ export interface FocusSchematicSoftFolderDisplayFile {
   readonly exactFolderKey: WorkspaceFolderKey;
   readonly displayParentFolderKey: WorkspaceFolderKey;
   readonly manualDisplayParentFolderKey: WorkspaceFolderKey;
-  /** Parent after manual intent and before automatic singleton compression. */
+  /** Parent after manual intent and before automatic pass-through compression. */
   readonly directDisplayParentFolderKey: WorkspaceFolderKey;
   readonly suppressedAncestorFolderKeys: readonly WorkspaceFolderKey[];
   readonly provenance: readonly FocusSchematicSoftFolderPlacementProvenance[];
@@ -422,7 +426,7 @@ export type FocusSchematicSoftFolderScopeMode = 'nested' | 'nearest-only';
 export type FocusSchematicSoftAncestorDecayBase = 3 | 4;
 
 export interface FocusSchematicSoftClusterPolicyEvidence {
-  readonly schemaVersion: 6;
+  readonly schemaVersion: 7;
   readonly layoutFamily: 'soft-folder-clusters';
   readonly strength: FocusSchematicSoftClusterStrength;
   readonly structuralSpacing: FocusSchematicSoftClusterSpacingPolicy;
@@ -513,7 +517,7 @@ export interface FocusSchematicSoftClusterRuntimeEvidence {
 }
 
 export interface FocusSchematicSoftClusterEvidence {
-  readonly schemaVersion: 6;
+  readonly schemaVersion: 7;
   readonly developmentOnly: true;
   readonly layoutFamily: 'soft-folder-clusters';
   readonly strength: FocusSchematicSoftClusterStrength;
@@ -534,7 +538,13 @@ export interface FocusSchematicSoftClusterEvidence {
   readonly secondaryGeometryInfluence: 0;
   readonly fixedIterationSchedule: readonly [36, 18];
   readonly compass: FocusSchematicSoftCompassEvidence;
+  readonly cohesion: FocusSchematicSoftFolderCohesionApplicationEvidence &
+    FocusSchematicSoftFolderCohesionQuality;
   readonly groupPacking: FocusSchematicSoftGroupPackingEvidence;
+  /** Geometry quality after Soft relaxation and before mandatory cohesion. */
+  readonly preCohesionMetrics: FocusSchematicSoftClusterMetrics;
+  /** Geometry quality after cohesion and before compound-group packing. */
+  readonly postCohesionMetrics: FocusSchematicSoftClusterMetrics;
   /** Geometry quality immediately before structural compound-group packing. */
   readonly preGroupMetrics: FocusSchematicSoftClusterMetrics;
   readonly metrics: FocusSchematicSoftClusterMetrics;

@@ -69,7 +69,7 @@ describe('Soft folder display context actions', () => {
     ).toEqual(['file:move-up', 'file:restore-exact']);
   });
 
-  it('MC5 uses the surviving displayed parent after singleton compression', () => {
+  it('MC5 keeps a direct named folder after ancestor compression', () => {
     const tree = buildFocusSchematicSoftFolderDisplayTree({
       visibleFiles: [
         { fileId: 'outer', exactFolderKey: 'A' },
@@ -79,7 +79,7 @@ describe('Soft folder display context actions', () => {
     expect(
       tree.files.find(({ fileId }) => fileId === 'only')
         ?.displayParentFolderKey,
-    ).toBe('A');
+    ).toBe('A/B/C');
     expect(
       ids(
         softFolderDisplayMenuItems(tree, {
@@ -94,7 +94,7 @@ describe('Soft folder display context actions', () => {
         { kind: 'file', fileId: 'only' },
         'folder:flatten',
       ),
-    ).toMatchObject({ value: { flattenedFolderKeys: ['A'] } });
+    ).toMatchObject({ value: { flattenedFolderKeys: ['A/B/C'] } });
   });
 
   it('FM1-FM3 folder targets receive folder actions only', () => {

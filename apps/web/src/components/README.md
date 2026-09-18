@@ -381,6 +381,10 @@ geometry-relevant values. Disclosure, reroot, filtering, exact hover, Secondary
 presentation, and camera behavior continue through the existing projection and
 React Flow seams.
 
+HIER4B-SPACING-FIX4 defines Folder strength as additional Soft attraction.
+Mandatory immediate named-folder grouping remains active from 0 through 100;
+the compact helper text beside the slider makes that invariant explicit.
+
 HIER4B-SPACING-FIX2 retains `Direct folders only`, Nested ancestor pull 1/3 or
 1/4, and `Soft spacing` beside Folder strength while Focus + Hierarchy +
 Modular Preview + Soft Folder Clusters is active. Direct-only hides the decay

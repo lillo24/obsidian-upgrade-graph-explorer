@@ -292,7 +292,7 @@ export const SOFT_CLUSTER_FIXTURES: readonly EndpointFixtureSpec[] = [
     {
       hops: 3,
       expectation:
-        'Same-folder attraction improves cohesion without erasing the topology bridge.',
+        'Immediate same-folder unity outranks the topology bridge while its cost remains measurable.',
     },
   ),
   fixture(
@@ -554,7 +554,7 @@ export const SOFT_CLUSTER_FIXTURES: readonly EndpointFixtureSpec[] = [
   ),
   fixture(
     'SC23',
-    'topology legitimately splits one folder',
+    'topology opposes immediate folder unity',
     [
       root,
       doc('SharedA', 'shared'),
@@ -571,7 +571,7 @@ export const SOFT_CLUSTER_FIXTURES: readonly EndpointFixtureSpec[] = [
     {
       hops: 2,
       expectation:
-        'Soft folder attraction must not override two strong topology branches.',
+        'Two strong topology branches may stretch but cannot split one immediate folder.',
     },
   ),
   fixture(

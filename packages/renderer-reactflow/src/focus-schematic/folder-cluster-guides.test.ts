@@ -65,6 +65,39 @@ const folder = (
 });
 
 describe('nested Soft folder guides', () => {
+  it('covers every named immediate File once while leaving workspace-root Files ungrouped', () => {
+    const displayTree = tree([
+      { fileId: 'root', exactFolderKey: '.' },
+      { fileId: 'a1', exactFolderKey: 'A' },
+      { fileId: 'a2', exactFolderKey: 'A' },
+      { fileId: 'single', exactFolderKey: 'Deep/Named' },
+    ]);
+    const nodes = [
+      node('root', -600, 0),
+      node('a1', 0, 0),
+      node('a2', 180, 0),
+      node('single', 700, 0),
+    ];
+    const direct = focusSchematicFolderClusterGuides(displayTree, nodes, {
+      directFoldersOnly: true,
+    });
+    expect(direct.filter(({ folderKey }) => folderKey === 'A')).toHaveLength(1);
+    expect(
+      direct.filter(({ folderKey }) => folderKey === 'Deep/Named'),
+    ).toHaveLength(1);
+    expect(
+      direct.flatMap(({ memberModuleIds }) => memberModuleIds).sort(),
+    ).toEqual(['a1', 'a2', 'single']);
+    expect(
+      direct.some(({ memberModuleIds }) => memberModuleIds.includes('root')),
+    ).toBe(false);
+
+    const nested = focusSchematicFolderClusterGuides(displayTree, nodes);
+    expect(
+      nested.find(({ folderKey }) => folderKey === 'Deep/Named'),
+    ).toMatchObject({ shape: 'singleton', memberModuleIds: ['single'] });
+  });
+
   it('D1-D3 renders named singleton Direct guides from pre-compression parents', () => {
     const chain = tree([{ fileId: 'only', exactFolderKey: 'A/B/C' }]);
     const chainGuides = focusSchematicFolderClusterGuides(
@@ -287,43 +320,38 @@ describe('nested Soft folder guides', () => {
     expect(second).toEqual(first);
   });
 
-  it('L5 anchors each disconnected island label to that island region', () => {
+  it('L5 rejects a split immediate named folder instead of duplicating its label', () => {
     const displayTree = tree([
       { fileId: 'a1', exactFolderKey: 'A' },
       { fileId: 'a2', exactFolderKey: 'A' },
       { fileId: 'a3', exactFolderKey: 'A' },
       { fileId: 'a4', exactFolderKey: 'A' },
     ]);
-    const guides = focusSchematicFolderClusterGuides(displayTree, [
-      node('a1', 0, 0),
-      node('a2', 140, 0),
-      node('a3', 800, 120),
-      node('a4', 940, 120),
-    ]);
-    expect(guides).toHaveLength(2);
-    for (const guide of guides) {
-      expect(guide.regionCount).toBe(2);
-      expect(guide.label).toBe('A');
-      expect(guide.labelX).toBeGreaterThan(guide.x);
-      expect(guide.labelX).toBeLessThan(guide.x + guide.width);
-      expect(guide.labelY).toBeCloseTo(guide.y - 9, 8);
-    }
+    expect(() =>
+      focusSchematicFolderClusterGuides(displayTree, [
+        node('a1', 0, 0),
+        node('a2', 140, 0),
+        node('a3', 800, 120),
+        node('a4', 940, 120),
+      ]),
+    ).toThrow('split immediate named folder "A"');
   });
 
-  it('LR3 suppresses far same-folder islands that each contain one File', () => {
+  it('LR3 rejects far same-folder islands that would hide direct identity', () => {
     const displayTree = tree([
       { fileId: 'a1', exactFolderKey: 'A' },
       { fileId: 'a2', exactFolderKey: 'A' },
       { fileId: 'b1', exactFolderKey: 'B' },
       { fileId: 'b2', exactFolderKey: 'B' },
     ]);
-    const guides = focusSchematicFolderClusterGuides(displayTree, [
-      node('a1', 0, 0),
-      node('b1', 260, 0),
-      node('b2', 390, 0),
-      node('a2', 680, 0),
-    ]);
-    expect(guides.filter(({ folderKey }) => folderKey === 'A')).toEqual([]);
+    expect(() =>
+      focusSchematicFolderClusterGuides(displayTree, [
+        node('a1', 0, 0),
+        node('b1', 260, 0),
+        node('b2', 390, 0),
+        node('a2', 680, 0),
+      ]),
+    ).toThrow('split immediate named folder "A"');
   });
 
   it('LR1 suppresses a parent region around one useful child guide', () => {
@@ -477,7 +505,7 @@ describe('nested Soft folder guides', () => {
     ).toEqual(guides);
   });
 
-  it('LR8 passes a suppressed child File unit into useful ancestor geometry', () => {
+  it('LR8 keeps a singleton immediate child guide and useful ancestor geometry', () => {
     const displayTree = manualTree([
       folder('.', null, 0, [], ['A'], ['outer', 'inner']),
       folder('A', '.', 1, ['outer'], ['A/B'], ['outer', 'inner']),
@@ -487,10 +515,15 @@ describe('nested Soft folder guides', () => {
       node('outer', 0, 0),
       node('inner', 150, 0),
     ]);
-    expect(guides.map(({ folderKey }) => folderKey)).toEqual(['A']);
+    expect(guides.map(({ folderKey }) => folderKey)).toEqual(['A', 'A/B']);
     expect(guides[0]).toMatchObject({
       directVisualUnitCount: 2,
       memberModuleIds: ['inner', 'outer'],
+    });
+    expect(guides[1]).toMatchObject({
+      directVisualUnitCount: 1,
+      memberModuleIds: ['inner'],
+      shape: 'singleton',
     });
   });
 
@@ -638,7 +671,7 @@ describe('nested Soft folder guides', () => {
     ).toBe('A/B/C/D');
   });
 
-  it('HT5 resolves disconnected regions to the same folder target', () => {
+  it('HT5 rejects disconnected immediate regions before hit testing', () => {
     const displayTree = tree([
       { fileId: 'a1', exactFolderKey: 'A' },
       { fileId: 'a2', exactFolderKey: 'A' },
@@ -647,21 +680,15 @@ describe('nested Soft folder guides', () => {
       { fileId: 'b1', exactFolderKey: 'B' },
       { fileId: 'b2', exactFolderKey: 'B' },
     ]);
-    const guides = focusSchematicFolderClusterGuides(displayTree, [
-      node('a1', 0, 0),
-      node('a2', 130, 0),
-      node('b1', 260, 0),
-      node('b2', 390, 0),
-      node('a3', 680, 0),
-      node('a4', 810, 0),
-    ]).filter(({ folderKey }) => folderKey === 'A');
-    expect(guides).toHaveLength(2);
-    for (const guide of guides)
-      expect(
-        hitTestFocusSchematicFolderGuideRegion(guides, {
-          x: guide.x + guide.width / 2,
-          y: guide.y + guide.height / 2,
-        })?.folderKey,
-      ).toBe('A');
+    expect(() =>
+      focusSchematicFolderClusterGuides(displayTree, [
+        node('a1', 0, 0),
+        node('a2', 130, 0),
+        node('b1', 260, 0),
+        node('b2', 390, 0),
+        node('a3', 680, 0),
+        node('a4', 810, 0),
+      ]),
+    ).toThrow('split immediate named folder "A"');
   });
 });

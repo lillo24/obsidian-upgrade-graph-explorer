@@ -19,7 +19,7 @@ import type {
   FocusSchematicSoftClusterEvidence,
 } from './types';
 
-export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 11 as const;
+export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 12 as const;
 
 export interface FocusSchematicLayoutWorkerRequest {
   readonly protocolVersion: typeof FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION;
@@ -144,7 +144,10 @@ function validateSoftClusterEvidence(
       'secondaryGeometryInfluence',
       'fixedIterationSchedule',
       'compass',
+      'cohesion',
       'groupPacking',
+      'preCohesionMetrics',
+      'postCohesionMetrics',
       'preGroupMetrics',
       'metrics',
       'runtime',
@@ -152,7 +155,7 @@ function validateSoftClusterEvidence(
     'Soft Cluster evidence',
   );
   if (
-    evidence.schemaVersion !== 6 ||
+    evidence.schemaVersion !== 7 ||
     evidence.developmentOnly !== true ||
     evidence.layoutFamily !== 'soft-folder-clusters' ||
     evidence.strength !==
@@ -241,6 +244,30 @@ function validateSoftClusterEvidence(
     throw new FocusSchematicLayoutProtocolError(
       'Soft Compass demand matches exceed demanded branches.',
     );
+  const cohesion = record(evidence.cohesion, 'Soft folder cohesion evidence');
+  exactKeys(
+    cohesion,
+    [
+      'immediateFolderGroupCount',
+      'immediateFolderSingletonCount',
+      'immediateFolderCohesionMoveMean',
+      'immediateFolderCohesionMoveP95',
+      'immediateFolderCohesionMoveMax',
+      'immediateFolderRmsRadiusMean',
+      'immediateFolderRmsRadiusP95',
+      'immediateFolderMaxPairDistanceMean',
+      'immediateFolderMaxPairDistanceP95',
+      'immediateFolderSplitViolationCount',
+    ],
+    'Soft folder cohesion evidence',
+  );
+  for (const [key, metric] of Object.entries(cohesion))
+    if (metric !== null)
+      finiteNonNegative(metric, `Soft folder cohesion evidence.${key}`);
+  if (Number(cohesion.immediateFolderSplitViolationCount) !== 0)
+    throw new FocusSchematicLayoutProtocolError(
+      'Soft folder cohesion left a named immediate-folder split.',
+    );
   const groupPacking = record(
     evidence.groupPacking,
     'Soft compound group packing evidence',
@@ -272,6 +299,14 @@ function validateSoftClusterEvidence(
     throw new FocusSchematicLayoutProtocolError(
       'Soft compound group packing evidence is invalid.',
     );
+  const preCohesionMetrics = record(
+    evidence.preCohesionMetrics,
+    'Soft pre-cohesion metrics',
+  );
+  const postCohesionMetrics = record(
+    evidence.postCohesionMetrics,
+    'Soft post-cohesion metrics',
+  );
   const preGroupMetrics = record(
     evidence.preGroupMetrics,
     'Soft pre-group metrics',
@@ -300,6 +335,8 @@ function validateSoftClusterEvidence(
     'minimumModuleGap',
   ] as const;
   for (const [label, value] of [
+    ['Soft pre-cohesion metrics', preCohesionMetrics],
+    ['Soft post-cohesion metrics', postCohesionMetrics],
     ['Soft pre-group metrics', preGroupMetrics],
     ['Soft final metrics', finalMetrics],
   ] as const) {

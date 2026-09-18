@@ -826,6 +826,10 @@ export const GraphSettings = memo(function GraphSettings({
                                 <span>100</span>
                               </small>
                             </label>
+                            <p className="graph-settings__sandbox-note">
+                              Folder strength adds Soft attraction. Immediate
+                              folder grouping remains active at every strength.
+                            </p>
                             <label>
                               <input
                                 aria-label="Direct folders only"

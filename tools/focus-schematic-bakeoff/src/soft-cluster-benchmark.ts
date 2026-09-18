@@ -184,9 +184,14 @@ function soft(
         JSON.stringify(first.evidence.fixedIterationSchedule) === '[36,18]',
       radialSpreadSafety:
         first.evidence.groupPacking.radialSpreadSafetyViolationCount === 0,
+      immediateFolderUnity:
+        first.evidence.cohesion.immediateFolderSplitViolationCount === 0,
     },
     metrics: first.evidence.metrics,
+    preCohesionMetrics: first.evidence.preCohesionMetrics,
+    postCohesionMetrics: first.evidence.postCohesionMetrics,
     preGroupMetrics: first.evidence.preGroupMetrics,
+    cohesion: first.evidence.cohesion,
     groupPacking: first.evidence.groupPacking,
     radialSpacing,
     displayedMetrics: displayedMetrics(displayed),
@@ -469,10 +474,10 @@ const hierarchyForceFixtures: readonly {
     id: 'HFA6',
     spec: {
       id: 'HFA6',
-      label: 'disconnected same-folder islands',
+      label: 'formerly disconnected same-folder islands',
       authored: 'Nested hierarchy force fixture.',
-      expectation: 'Topology may keep one logical folder spatially split.',
-      inspect: 'Compare force without forcing a misleading hull.',
+      expectation: 'Immediate folder unity outranks the topology bridge.',
+      inspect: 'Measure the topology cost of mandatory cohesion.',
       rootDocumentId: 'Focus',
       documents: [
         { id: 'Focus', path: 'Focus.md' },
@@ -735,9 +740,15 @@ function strengthZeroFolderMutation() {
     throw new Error('SC2 strength-zero mutation probe failed.');
   return {
     fixtureId: 'SC2',
-    byteIdentical:
-      JSON.stringify(before.result.candidate) ===
+    geometryChanged:
+      JSON.stringify(before.result.candidate) !==
       JSON.stringify(after.result.candidate),
+    additionalAttractionDisabled:
+      !before.evidence.folderInfluenceEnabled &&
+      !after.evidence.folderInfluenceEnabled,
+    immediateFolderUnity:
+      before.evidence.cohesion.immediateFolderSplitViolationCount === 0 &&
+      after.evidence.cohesion.immediateFolderSplitViolationCount === 0,
   };
 }
 
@@ -900,7 +911,8 @@ function summarizeSpacingRows(rows: readonly SoftRow[]) {
         hardGates.nodeContainment &&
         hardGates.secondaryGeometryInfluence === 0 &&
         hardGates.boundedSchedule &&
-        hardGates.radialSpreadSafety,
+        hardGates.radialSpreadSafety &&
+        hardGates.immediateFolderUnity,
     ),
     minimumModuleGap: metric(
       (row) => row.displayedMetrics.minimumModuleGap,
@@ -1000,6 +1012,38 @@ const strengthSpacingRows = [0, 50, 100].flatMap((strength) =>
 const fixtureRows = SOFT_CLUSTER_FIXTURES.flatMap((spec) =>
   strengths.map((strength) => soft(spec, strength)),
 );
+const cohesionTradeoffRows = fixtureRows.map((row) => {
+  const difference = (
+    after: number | null,
+    before: number | null,
+  ): number | null =>
+    after === null || before === null ? null : after - before;
+  return {
+    fixtureId: row.fixtureId,
+    strength: row.strength,
+    connectedPairDistanceMeanChange: difference(
+      row.postCohesionMetrics.connectedPairDistanceMean,
+      row.preCohesionMetrics.connectedPairDistanceMean,
+    ),
+    exactPrimaryEndpointSpanMeanChange: difference(
+      row.postCohesionMetrics.exactPrimaryEndpointSpanMean,
+      row.preCohesionMetrics.exactPrimaryEndpointSpanMean,
+    ),
+    exactEndpointCrossingCountChange: difference(
+      row.postCohesionMetrics.exactEndpointCrossingCount,
+      row.preCohesionMetrics.exactEndpointCrossingCount,
+    ),
+    hopMeanAbsoluteRadiusErrorChange: difference(
+      row.postCohesionMetrics.hopMeanAbsoluteRadiusError,
+      row.preCohesionMetrics.hopMeanAbsoluteRadiusError,
+    ),
+    boundsAreaChange: difference(
+      row.postCohesionMetrics.boundsArea,
+      row.preCohesionMetrics.boundsArea,
+    ),
+    cohesion: row.cohesion,
+  };
+});
 const groupPackingTradeoffRows = fixtureRows.map((row) => {
   const difference = (
     after: number | null,
@@ -1077,6 +1121,47 @@ const groupPackingTradeoffSummary = {
   ),
   groupPackingMs: summarizeTradeoff((row) => row.groupPackingMs),
 };
+function summarizeCohesionTradeoff(
+  read: (row: (typeof cohesionTradeoffRows)[number]) => number | null,
+) {
+  const values = cohesionTradeoffRows.flatMap((row) => {
+    const value = read(row);
+    return value === null ? [] : [{ row, value }];
+  });
+  const worst = [...values].sort(
+    (left, right) => Math.abs(right.value) - Math.abs(left.value),
+  )[0];
+  return {
+    mean: average(values.map(({ value }) => value)),
+    maximum:
+      values.length === 0
+        ? null
+        : Math.max(...values.map(({ value }) => value)),
+    worstAbsolute:
+      worst === undefined
+        ? null
+        : {
+            fixtureId: worst.row.fixtureId,
+            strength: worst.row.strength,
+            change: worst.value,
+          },
+  };
+}
+const cohesionTradeoffSummary = {
+  connectedPairDistanceMeanChange: summarizeCohesionTradeoff(
+    (row) => row.connectedPairDistanceMeanChange,
+  ),
+  exactPrimaryEndpointSpanMeanChange: summarizeCohesionTradeoff(
+    (row) => row.exactPrimaryEndpointSpanMeanChange,
+  ),
+  exactEndpointCrossingCountChange: summarizeCohesionTradeoff(
+    (row) => row.exactEndpointCrossingCountChange,
+  ),
+  hopMeanAbsoluteRadiusErrorChange: summarizeCohesionTradeoff(
+    (row) => row.hopMeanAbsoluteRadiusErrorChange,
+  ),
+  boundsAreaChange: summarizeCohesionTradeoff((row) => row.boundsAreaChange),
+};
 const sc14GroupPacking = fixtureRows.find(
   ({ fixtureId, strength }) => fixtureId === 'SC14' && strength === 50,
 )!;
@@ -1141,23 +1226,36 @@ const hardGatesPass =
       hardGates.nodeContainment &&
       hardGates.secondaryGeometryInfluence === 0 &&
       hardGates.boundedSchedule &&
-      hardGates.radialSpreadSafety,
+      hardGates.radialSpreadSafety &&
+      hardGates.immediateFolderUnity,
   ) &&
   stressRows.every(
     ({ deterministic, hardGates }) =>
-      deterministic && hardGates.overlapFree && hardGates.radialSpreadSafety,
+      deterministic &&
+      hardGates.overlapFree &&
+      hardGates.radialSpreadSafety &&
+      hardGates.immediateFolderUnity,
   ) &&
   hierarchyForceRows.every(
     ({ deterministic, hardGates, maximumPerFileFolderWeight }) =>
-      deterministic && hardGates.overlapFree && maximumPerFileFolderWeight <= 1,
+      deterministic &&
+      hardGates.overlapFree &&
+      hardGates.immediateFolderUnity &&
+      maximumPerFileFolderWeight <= 1,
   ) &&
   hierarchyStrengthRows.every(
     ({ deterministic, hardGates, maximumPerFileFolderWeight }) =>
-      deterministic && hardGates.overlapFree && maximumPerFileFolderWeight <= 1,
+      deterministic &&
+      hardGates.overlapFree &&
+      hardGates.immediateFolderUnity &&
+      maximumPerFileFolderWeight <= 1,
   ) &&
   scopeDecayRows.every(
     ({ deterministic, hardGates, maximumPerFileFolderWeight }) =>
-      deterministic && hardGates.overlapFree && maximumPerFileFolderWeight <= 1,
+      deterministic &&
+      hardGates.overlapFree &&
+      hardGates.immediateFolderUnity &&
+      maximumPerFileFolderWeight <= 1,
   ) &&
   compassDemandBakeoffRows.every(
     ({ deterministic, hardGates }) => deterministic && hardGates.overlapFree,
@@ -1168,7 +1266,9 @@ const hardGatesPass =
   macroPerturbationRows.every(({ semanticNoOpSatisfied }) =>
     Boolean(semanticNoOpSatisfied),
   ) &&
-  zeroFolderMutation.byteIdentical;
+  zeroFolderMutation.geometryChanged &&
+  zeroFolderMutation.additionalAttractionDisabled &&
+  zeroFolderMutation.immediateFolderUnity;
 const completeHardGatesPass =
   hardGatesPass &&
   fixedStructuralSummary.hardGatesPass &&
@@ -1214,8 +1314,17 @@ const report = {
   secondaryMutation: secondaryInvariant,
   inputPermutation: permutationInvariant,
   fixtureRows,
+  immediateFolderCohesionBakeoff: {
+    hardPriority: 'immediate named-folder unity before topology quality',
+    rows: cohesionTradeoffRows,
+    summary: cohesionTradeoffSummary,
+    priorityFixtures: cohesionTradeoffRows.filter(({ fixtureId }) =>
+      ['SC3', 'SC5', 'SC14', 'SC21', 'SC23', 'SC24'].includes(fixtureId),
+    ),
+  },
   groupPackingBakeoff: {
-    representation: 'exact-rigid-member-rectangles',
+    representation:
+      'padded named-folder envelopes with exact workspace-root atoms',
     continuousScaleDomain: [1, 2.4],
     rows: groupPackingTradeoffRows,
     summary: groupPackingTradeoffSummary,

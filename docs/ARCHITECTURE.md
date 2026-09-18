@@ -1404,9 +1404,11 @@ HIER4B extends that same persisted Folder guides toggle without changing its
 layout isolation. Directional Bands still renders accepted exact strips. Soft
 uses a pure displayed hierarchy derived from canonical source folders, stable
 per-File parent overrides, manually flattened folder layers, and iterative
-one-child-unit compression. Child regions enter parent guide geometry, so
-containment is structural; fixed padding stays bounded and disconnected islands
-remain truthful. Filtered modules are excluded from visible guide membership.
+ancestor-only pass-through compression. A named folder with any direct visible
+File is never auto-compressed. Child regions enter parent guide geometry, so
+containment is structural; fixed padding stays bounded. Immediate named folders
+must be one island, while ancestor wrappers may remain split. Filtered modules
+are excluded from visible guide membership.
 
 HIER4B-FIX2 supersedes FIX1's flat effective groups. Exact folder identity stays
 immutable, while only sparse manual display intent persists under stable
@@ -1462,9 +1464,10 @@ records per-module cardinal counts, demand matches and hard-guard overrides,
 pass-to-pass region and bounds changes, and pass-two crossing/span deltas. A
 separate perturbation diagnostic compares Adaptive and Vertical internal
 rectangles with final File-center displacement and recognizes legitimate
-second-pass region changes. Soft algorithm version 9 covers root-neutral scope,
-normalized decay, the fixed structural policy, and compound immediate-folder
-packing; worker protocol 11 and Soft evidence schema 6 isolate those changes
+second-pass region changes. Soft algorithm version 10 covers root-neutral scope,
+normalized decay, mandatory immediate-folder cohesion, the fixed structural
+policy, and compound immediate-folder packing; worker protocol 12 and Soft
+evidence schema 7 isolate those changes
 while the Directional algorithm version remains 4.
 
 The renderer derives a typed visible-structure marker for each unfiltered module
@@ -1486,7 +1489,7 @@ selected-backbone and Focus-path connections as undirected module pairs, uses
 minimum undirected Focus hops as a soft radial prior, and applies normalized
 decaying attraction across visible displayed ancestor scopes. Nested mode uses
 selectable base 3 (default) or 4; Direct-only selects the immediate parent after
-manual promotion/flattening and before automatic singleton compression. Each
+manual promotion/flattening and before automatic ancestor pass-through compression. Each
 File's total folder-force weight is at most one,
 preventing depth amplification, and the root is excluded from active groups. A stable identity seed,
 fixed 36 + 18 relaxation schedule, bounded variable-rectangle collision pack,
@@ -1494,14 +1497,22 @@ and two internal-layout rounds make the result stateless and reproducible.
 Authored arrows preserve direction while macro coordinates carry no incoming/
 outgoing meaning.
 
-After those rounds, Soft derives exact rigid compound bodies from each File's
+After those rounds, Soft first compacts the direct members of every named
+immediate folder as whole modules. The pass uses the pre-cohesion centroid,
+keeps Focus fixed when present, preserves module dimensions and internal node
+offsets, and must produce one island under the renderer's shared gap, padding,
+and blocker oracle. It runs at Folder strength zero; strength controls only the
+additional force during the preceding equilibrium.
+
+Soft then derives rigid compound bodies from each File's
 immediate displayed parent after manual intent and before automatic singleton
 compression. A bounded deterministic nearest-ring search translates whole
 bodies around the anchored Focus-containing body. An affine interval oracle
-checks every cross-body module rectangle with the 16 px clearance over the full
-continuous 1.0x-2.4x radial range. Root-level Files remain structural singleton
-bodies; the same result is also checked against their optional aggregate. No
-member is internally moved and no collision solver runs after radial spacing.
+checks padded named-folder envelopes and exact atomic bodies with the 16 px
+clearance over the full continuous 1.0x-2.4x radial range. Root-level Files
+remain structural singleton bodies; the same result is also checked against
+their optional aggregate. No member moves within its body after cohesion, and
+no collision solver runs after radial spacing.
 
 The 24-entry exact cache includes macro family plus normalized strength,
 scope/decay, and canonical sparse display intent only for Soft Clusters.
@@ -1535,8 +1546,9 @@ HIER4B-FIX3 adds empty-guide area targeting, composed File/current-folder menus,
 short accessible labels, and displayed-depth styling to FIX2 while retaining
 FIX1's cardinal File ports. POLISH1 then hides empty painted module boundaries
 and makes folder labels visually passive without changing geometry or menu
-behavior. HIER4B-SPACING-FIX3B now awaits native QA for structurally safe rigid
-group spacing and the optional renderer-only `Workspace root` group in PR #106.
+behavior. HIER4B-SPACING-FIX4 now awaits native QA for mandatory immediate
+named-folder unity, structurally safe rigid group spacing, and the optional
+renderer-only `Workspace root` group in PR #106.
 Unified folder-region
 policy and MODULAR-CONTEXT1 remain separate later work;
 HIER5 follows HIER4B, and HIER3C follows HIER5.

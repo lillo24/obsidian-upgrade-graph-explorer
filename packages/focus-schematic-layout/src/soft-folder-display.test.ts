@@ -129,14 +129,14 @@ describe('nested Soft folder display tree', () => {
     {
       name: 'N8 one-File leaf',
       visibleFiles: [file('other', 'A'), file('only', 'A/B')],
-      missing: ['A/B'],
-      kept: ['A'],
+      missing: [],
+      kept: ['A', 'A/B'],
     },
     {
       name: 'N9 deep singleton chain',
       visibleFiles: [file('other', 'A'), file('only', 'A/B/C/D')],
-      missing: ['A/B', 'A/B/C', 'A/B/C/D'],
-      kept: ['A'],
+      missing: ['A/B', 'A/B/C'],
+      kept: ['A', 'A/B/C/D'],
     },
     {
       name: 'N10 two-File folder',
@@ -170,7 +170,7 @@ describe('nested Soft folder display tree', () => {
       kept: ['A', 'A/B', 'A/C'],
     },
   ])(
-    '$name applies the exact one-child-unit compression rule',
+    '$name compresses only ancestor pass-through folders',
     ({ visibleFiles, missing, kept }) => {
       const tree = buildFocusSchematicSoftFolderDisplayTree({ visibleFiles });
       for (const key of missing) expect(folders(tree)).not.toContain(key);
@@ -198,7 +198,7 @@ describe('nested Soft folder display tree', () => {
     ]);
   });
 
-  it('N13 File visibility changes compression while N14 Heading disclosure does not', () => {
+  it('N13 keeps an immediate folder after visibility changes while N14 Heading disclosure changes nothing', () => {
     const all = [
       file('outer', 'A'),
       file('one', 'A/B'),
@@ -224,12 +224,12 @@ describe('nested Soft folder display tree', () => {
       intent,
     });
     expect(folders(before)).toContain('A/B');
-    expect(folders(hidden)).not.toContain('A/B');
+    expect(folders(hidden)).toContain('A/B');
     expect(hidden.reconciledIntent).toEqual(intent);
     expect(disclosureOnly).toEqual(before);
   });
 
-  it('N15 exposes manual and automatic provenance', () => {
+  it('N15 preserves manual provenance without auto-compressing a direct folder', () => {
     const tree = buildFocusSchematicSoftFolderDisplayTree({
       visibleFiles: [file('other', 'A'), file('only', 'A/B/C')],
       intent: {
@@ -241,11 +241,7 @@ describe('nested Soft folder display tree', () => {
     });
     expect(
       tree.files.find(({ fileId }) => fileId === 'only')?.provenance,
-    ).toEqual([
-      'exact',
-      'manual-file-promotion',
-      'automatic-singleton-compression',
-    ]);
+    ).toEqual(['exact', 'manual-file-promotion']);
   });
 
   it('N17 reconciles stale and non-ancestor intent without fuzzy migration', () => {
@@ -326,12 +322,12 @@ describe('nested Soft folder display tree', () => {
     ).toEqual([{ folderKey: 'A/B/C', weight: 1 }]);
   });
 
-  it('D1-D3 keeps the immediate displayed parent before singleton compression for Direct scope', () => {
+  it('D1-D3 keeps the immediate displayed parent before ancestor compression for Direct scope', () => {
     const chain = buildFocusSchematicSoftFolderDisplayTree({
       visibleFiles: [file('only', 'A/B/C')],
     });
     expect(chain.files[0]).toMatchObject({
-      displayParentFolderKey: '.',
+      displayParentFolderKey: 'A/B/C',
       directDisplayParentFolderKey: 'A/B/C',
     });
     expect(
@@ -454,12 +450,8 @@ describe('nested Soft folder display tree', () => {
     expect(second).toEqual(first);
     expect(first.files).toHaveLength(102);
     expect(
-      Math.max(
-        ...first.folders.map(({ folderKey }) =>
-          folderKey === '.' ? 0 : folderKey.split('/').length,
-        ),
-      ),
-    ).toBeLessThan(10);
+      Math.max(...first.folders.map(({ displayDepth }) => displayDepth)),
+    ).toBeLessThanOrEqual(2);
     expect(first.reconciledIntent).toEqual(
       canonicalFocusSchematicSoftFolderDisplayIntent(intent),
     );

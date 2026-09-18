@@ -31,6 +31,10 @@ import {
   focusSchematicSoftFolderScopeMemberships,
 } from './soft-folder-display';
 import { packFocusSchematicSoftFolderGroups } from './soft-group-packing';
+import {
+  applyFocusSchematicSoftFolderCohesion,
+  measureFocusSchematicSoftFolderCohesion,
+} from './soft-folder-cohesion';
 import type {
   FocusSchematicComputedLayout,
   FocusSchematicEndpointPlan,
@@ -50,7 +54,7 @@ import type {
 export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE = [
   36, 18,
 ] as const;
-export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 9 as const;
+export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 10 as const;
 
 const STRATEGY_ID = 'HIER4B-soft-folder-clusters' as const;
 const EPSILON = 1e-6;
@@ -1011,26 +1015,26 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       spacing,
     );
     candidate = anchorRootFile(input, placeAtCenters(candidate, positions));
-    const preGroupAttachments = createFocusSchematicEndpointAttachments(
+    const preCohesionAttachments = createFocusSchematicEndpointAttachments(
       base.endpointPlan,
       candidate,
       'soft-cardinal-files',
     );
-    const preGroupQuality = evaluateFocusSchematicEndpointLayoutQuality(
+    const preCohesionQuality = evaluateFocusSchematicEndpointLayoutQuality(
       input,
       base.modulePlan,
       base.endpointPlan,
       base.internalLanePlan,
       candidate,
-      preGroupAttachments,
+      preCohesionAttachments,
       'soft-cardinal-files',
     );
-    const preGroupMetrics = metrics(
+    const preCohesionMetrics = metrics(
       input,
       candidate,
       base.endpointPlan,
-      preGroupAttachments,
-      preGroupQuality,
+      preCohesionAttachments,
+      preCohesionQuality,
       pairs,
       hops,
       tree,
@@ -1038,6 +1042,40 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       ancestorDecayBase,
       spacing,
     );
+    const cohesion = applyFocusSchematicSoftFolderCohesion(
+      candidate,
+      tree,
+      input.model.rootModuleId,
+    );
+    candidate = cohesion.candidate;
+    const postCohesionAttachments = createFocusSchematicEndpointAttachments(
+      base.endpointPlan,
+      candidate,
+      'soft-cardinal-files',
+    );
+    const postCohesionQuality = evaluateFocusSchematicEndpointLayoutQuality(
+      input,
+      base.modulePlan,
+      base.endpointPlan,
+      base.internalLanePlan,
+      candidate,
+      postCohesionAttachments,
+      'soft-cardinal-files',
+    );
+    const postCohesionMetrics = metrics(
+      input,
+      candidate,
+      base.endpointPlan,
+      postCohesionAttachments,
+      postCohesionQuality,
+      pairs,
+      hops,
+      tree,
+      hierarchyForcePolicy,
+      ancestorDecayBase,
+      spacing,
+    );
+    const preGroupMetrics = postCohesionMetrics;
     const groupPacking = packFocusSchematicSoftFolderGroups(
       input,
       candidate,
@@ -1061,6 +1099,14 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
     if (quality.moduleOverlapPairs.length > 0)
       throw new Error(
         `Soft Clusters left ${quality.moduleOverlapPairs.length} module overlaps: ${quality.moduleOverlapPairs.join(', ')}.`,
+      );
+    const cohesionQuality = measureFocusSchematicSoftFolderCohesion(
+      candidate,
+      tree,
+    );
+    if (cohesionQuality.immediateFolderSplitViolationCount > 0)
+      throw new Error(
+        `Soft Clusters left ${cohesionQuality.immediateFolderSplitViolationCount} immediate named-folder split violations.`,
       );
     const churn = [...secondRegions].filter(
       ([id, region]) => firstRegions.get(id) !== region,
@@ -1122,7 +1168,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       0,
     );
     const evidence: FocusSchematicSoftClusterEvidence = {
-      schemaVersion: 6,
+      schemaVersion: 7,
       developmentOnly: true,
       layoutFamily: 'soft-folder-clusters',
       strength,
@@ -1206,7 +1252,10 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
           secondInternalCandidate,
         ),
       },
+      cohesion: { ...cohesion.evidence, ...cohesionQuality },
       groupPacking: groupPacking.evidence,
+      preCohesionMetrics,
+      postCohesionMetrics,
       preGroupMetrics,
       metrics: metrics(
         input,
@@ -1243,7 +1292,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       internalLayoutEvidence: {
         ...internalLayoutEvidence,
         softClusterPolicyEvidence: {
-          schemaVersion: 6,
+          schemaVersion: 7,
           layoutFamily: 'soft-folder-clusters',
           strength,
           structuralSpacing: spacing,

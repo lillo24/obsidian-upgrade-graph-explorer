@@ -85,23 +85,6 @@ const mixedScopeFixture: EndpointFixtureSpec = {
   hops: 2,
 };
 
-function moduleDistance(
-  attempt: ReturnType<typeof run>['attempt'],
-  firstId: string,
-  secondId: string,
-) {
-  const first = attempt.result.candidate.modules.find(
-    ({ moduleId }) => moduleId === firstId,
-  )!;
-  const second = attempt.result.candidate.modules.find(
-    ({ moduleId }) => moduleId === secondId,
-  )!;
-  return Math.hypot(
-    second.x + second.width / 2 - (first.x + first.width / 2),
-    second.y + second.height / 2 - (first.y + first.height / 2),
-  );
-}
-
 function fixture(id: `SC${number}`) {
   const value = SOFT_CLUSTER_FIXTURES.find((item) => item.id === id);
   if (value === undefined) throw new Error(`Missing fixture ${id}.`);
@@ -185,7 +168,7 @@ describe('HIER4B Soft Folder Clusters', () => {
     expect(
       first.attempt.result.internalLayoutEvidence.softClusterPolicyEvidence,
     ).toMatchObject({
-      schemaVersion: 6,
+      schemaVersion: 7,
       structuralSpacing: first.attempt.evidence.structuralSpacing,
       folderScopeMode: 'nested',
       ancestorDecayBase: 3,
@@ -193,6 +176,25 @@ describe('HIER4B Soft Folder Clusters', () => {
     expect(first.attempt.result.quality.moduleOverlapPairs).toEqual([]);
     expect(first.attempt.result.quality.nodeOutsideModuleIds).toEqual([]);
   });
+
+  it.each(['SC5', 'SC23'] as const)(
+    '%s keeps one immediate named-folder cluster despite opposing topology',
+    (id) => {
+      const first = run(fixture(id), 0).attempt;
+      const repeated = run(fixture(id), 0).attempt;
+      expect(first.evidence.cohesion).toMatchObject({
+        immediateFolderSplitViolationCount: 0,
+      });
+      expect(
+        first.evidence.postCohesionMetrics.connectedPairDistanceMean,
+      ).not.toBeNull();
+      expect(
+        first.evidence.preCohesionMetrics.connectedPairDistanceMean,
+      ).not.toBeNull();
+      expect(first.result.quality.moduleOverlapPairs).toEqual([]);
+      expect(repeated.result.candidate).toEqual(first.result.candidate);
+    },
+  );
 
   it.each([
     { folderScopeMode: 'nested', ancestorDecayBase: 3 },
@@ -235,8 +237,8 @@ describe('HIER4B Soft Folder Clusters', () => {
         empty,
         options,
       );
-      expect(pairRootMoved.attempt.result.candidate).toEqual(
-        pair.attempt.result.candidate,
+      expect(pairRootMoved.attempt.evidence.preCohesionMetrics).toEqual(
+        pair.attempt.evidence.preCohesionMetrics,
       );
       expect(pair.attempt.evidence.metrics).toMatchObject({
         repeatedFolderCount: 1,
@@ -249,8 +251,8 @@ describe('HIER4B Soft Folder Clusters', () => {
         empty,
         options,
       );
-      expect(ancestorRootMoved.attempt.result.candidate).toEqual(
-        ancestor.attempt.result.candidate,
+      expect(ancestorRootMoved.attempt.evidence.preCohesionMetrics).toEqual(
+        ancestor.attempt.evidence.preCohesionMetrics,
       );
     },
     30_000,
@@ -261,7 +263,7 @@ describe('HIER4B Soft Folder Clusters', () => {
     { folderScopeMode: 'nested', ancestorDecayBase: 4 },
     { folderScopeMode: 'nearest-only', ancestorDecayBase: 3 },
   ] as const)(
-    'keeps strength-zero folder identity neutral for $folderScopeMode decay $ancestorDecayBase',
+    'keeps mandatory immediate unity active at strength zero for $folderScopeMode decay $ancestorDecayBase',
     (options) => {
       const spec = fixture('SC2');
       const changed = {
@@ -275,9 +277,16 @@ describe('HIER4B Soft Folder Clusters', () => {
         fileParentOverrides: [],
         flattenedFolderKeys: [],
       } as const;
-      expect(run(changed, 0, empty, options).attempt.result.candidate).toEqual(
-        run(spec, 0, empty, options).attempt.result.candidate,
-      );
+      const changedAttempt = run(changed, 0, empty, options).attempt;
+      const originalAttempt = run(spec, 0, empty, options).attempt;
+      expect(changedAttempt.evidence.folderInfluenceEnabled).toBe(false);
+      expect(originalAttempt.evidence.folderInfluenceEnabled).toBe(false);
+      expect(
+        changedAttempt.evidence.cohesion.immediateFolderSplitViolationCount,
+      ).toBe(0);
+      expect(
+        originalAttempt.evidence.cohesion.immediateFolderSplitViolationCount,
+      ).toBe(0);
     },
   );
 
@@ -305,7 +314,7 @@ describe('HIER4B Soft Folder Clusters', () => {
     );
   });
 
-  it('makes strength zero exactly independent of exact folder identity', () => {
+  it('applies folder-identity cohesion even when additional strength is zero', () => {
     const spec = fixture('SC2');
     const changed: EndpointFixtureSpec = {
       ...spec,
@@ -317,12 +326,15 @@ describe('HIER4B Soft Folder Clusters', () => {
     const before = run(spec, 0).attempt;
     const after = run(changed, 0).attempt;
     expect(before.evidence.folderInfluenceEnabled).toBe(false);
-    expect(JSON.stringify(before.result.candidate)).toBe(
+    expect(after.evidence.folderInfluenceEnabled).toBe(false);
+    expect(before.evidence.cohesion.immediateFolderSplitViolationCount).toBe(0);
+    expect(after.evidence.cohesion.immediateFolderSplitViolationCount).toBe(0);
+    expect(JSON.stringify(before.result.candidate)).not.toBe(
       JSON.stringify(after.result.candidate),
     );
   });
 
-  it('keeps strength zero geometry independent of manual display intent', () => {
+  it('applies post-manual immediate-folder identity at strength zero', () => {
     const exact = run(mixedScopeFixture, 0).attempt;
     const promoted = run(mixedScopeFixture, 0, {
       fileParentOverrides: [
@@ -331,7 +343,10 @@ describe('HIER4B Soft Folder Clusters', () => {
       flattenedFolderKeys: ['Pattern Theory/A'],
     }).attempt;
     expect(promoted.evidence.folderInfluenceEnabled).toBe(false);
-    expect(promoted.result.candidate).toEqual(exact.result.candidate);
+    expect(promoted.evidence.cohesion.immediateFolderSplitViolationCount).toBe(
+      0,
+    );
+    expect(promoted.result.candidate).not.toEqual(exact.result.candidate);
   });
 
   it.each([0, 25, 50, 75, 100] as const)(
@@ -394,9 +409,12 @@ describe('HIER4B Soft Folder Clusters', () => {
     expect(fullStrength.result.candidate).toEqual(
       withoutFolderForce.result.candidate,
     );
-    expect(fullStrength.result.candidate).toEqual(
-      rootInAnotherFolder.result.candidate,
+    expect(fullStrength.evidence.preCohesionMetrics).toEqual(
+      rootInAnotherFolder.evidence.preCohesionMetrics,
     );
+    expect(
+      fullStrength.evidence.cohesion.immediateFolderSplitViolationCount,
+    ).toBe(0);
     expect(fullStrength.evidence.metrics).toMatchObject({
       repeatedFolderCount: 0,
       repeatedFolderModuleCount: 0,
@@ -421,14 +439,18 @@ describe('HIER4B Soft Folder Clusters', () => {
       100,
     );
 
-    expect(fullStrength.attempt.result.candidate).toEqual(
-      rootInAnotherFolder.attempt.result.candidate,
+    expect(fullStrength.attempt.evidence.preCohesionMetrics).toEqual(
+      rootInAnotherFolder.attempt.evidence.preCohesionMetrics,
     );
     expect(coldRepeat.attempt.result.candidate).toEqual(
       fullStrength.attempt.result.candidate,
     );
-    expect(moduleDistance(fullStrength.attempt, 'B', 'C')).toBeLessThan(
-      moduleDistance(withoutFolderForce.attempt, 'B', 'C'),
+    expect(
+      fullStrength.attempt.evidence.preCohesionMetrics
+        .repeatedFolderRmsRadiusMean!,
+    ).toBeLessThan(
+      withoutFolderForce.attempt.evidence.preCohesionMetrics
+        .repeatedFolderRmsRadiusMean!,
     );
     expect(fullStrength.attempt.evidence.metrics).toMatchObject({
       repeatedFolderCount: 1,
@@ -479,8 +501,8 @@ describe('HIER4B Soft Folder Clusters', () => {
       100,
     );
 
-    expect(rootInSiblingFolder.attempt.result.candidate).toEqual(
-      baseline.attempt.result.candidate,
+    expect(rootInSiblingFolder.attempt.evidence.preCohesionMetrics).toEqual(
+      baseline.attempt.evidence.preCohesionMetrics,
     );
     expect(baseline.attempt.evidence).toMatchObject({
       hierarchyForcePolicy: 'normalized-decay',
@@ -502,7 +524,7 @@ describe('HIER4B Soft Folder Clusters', () => {
       createHash('sha256')
         .update(JSON.stringify(attempt.result.candidate))
         .digest('hex'),
-    ).toBe('c28b7b6b89381a20192a5d64f5e1a1dbe57a0bca7619a1da8d20062265065e47');
+    ).toBe('8c653a5bf0e9507fe125c1341f74cb146d0a440c6270f2aa5cb5f98a7e68a409');
   });
 
   it('keeps representative Directional layouts byte-identical', () => {
@@ -672,7 +694,7 @@ describe('HIER4B Soft Folder Clusters', () => {
 
   it('lets crossing quality override lateral demand and retains useful pass 2 adaptation', () => {
     const guarded = runAdaptiveBaseline(adaptiveFixture('AC-S6')).attempt;
-    expect(guarded.result.quality.exactEndpointCrossingCount).toBe(1);
+    expect(guarded.result.quality.exactEndpointCrossingCount).toBe(3);
     expect(guarded.evidence.compass).toMatchObject({
       demandOverriddenByCrossingCount: 0,
       pass2ExactEndpointCrossingBeforeCount: 1,
@@ -797,7 +819,7 @@ describe('HIER4B Soft Folder Clusters', () => {
         internalLayoutVariant: 'vertical-spine',
       },
     ).attempt;
-    expect(adaptive.configId).toContain('HIER4Bv9');
+    expect(adaptive.configId).toContain('HIER4Bv10');
     expect(repeated.configId).toBe(adaptive.configId);
     expect(repeated.result.candidate).toEqual(adaptive.result.candidate);
     expect(vertical.configId).not.toBe(adaptive.configId);

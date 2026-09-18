@@ -435,6 +435,9 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
     ).toBe(false);
     expect(byValue('adaptive-compass').disabled).toBe(false);
     expect(byValue('soft-folder-clusters').checked).toBe(true);
+    expect(container.textContent).toContain(
+      'Immediate folder grouping remains active at every strength.',
+    );
     act(() => byValue('adaptive-compass').click());
     act(() => byValue('crossing-optimized').click());
     act(() => byValue('directional-bands').click());

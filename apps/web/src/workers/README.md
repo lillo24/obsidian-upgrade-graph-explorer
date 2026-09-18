@@ -75,7 +75,7 @@ is created only after Local Free is mounted; Structure startup and ordinary
 Global use do not load it.
 
 The Focus Schematic worker is a fifth independent protocol and loads only after
-Focus + Hierarchy + Modular Preview mounts. Its version-11 request carries the
+Focus + Hierarchy + Modular Preview mounts. Its version-12 request carries the
 plain HIER1 model, Local projection, exact renderer dimensions, and frozen A1
 settings plus macro layout, normalized Soft strength, nested/direct scope,
 canonical ancestor decay, sparse Soft display intent, internal layout,
