@@ -102,7 +102,7 @@ invariance, and exact camera/position preservation.
 Fresh executable:
 
 ```text
-C:\Users\leona\Documents\GitHub\icarus-graph-explorer\output\diagnostics\themesys2-worktree\apps\desktop\src-tauri\target\release\icarus-graph-explorer-desktop.exe
+C:\Users\leona\Documents\GitHub\icarus-graph-explorer\apps\desktop\src-tauri\target\release\icarus-graph-explorer-desktop.exe
 ```
 
 Size: **13,558,784 bytes**
