@@ -354,13 +354,13 @@ Focused validation passes 160 layout tests, 127 renderer tests, 172 web
 component tests, and 91 preference/cache tests. The updated benchmark decision
 is `REQUIRES_GRAPHICAL_REVIEW` with `hardGatesPass: true`.
 
-The complete repository gate passes 276 test files / 2,325 tests plus
+The complete repository gate passes 276 test files / 2,335 tests plus
 formatting, lint, all workspace typechecks, and the production web build.
 Desktop formatting/check, 16 Rust tests, and the optimized release build pass.
 The QA executable is
 `output/hier4b-spacing-fix3b-structural-group-packing-native-candidate.exe`;
 its SHA-256 is
-`D026AE6BE49571F463E6F060A19BAA84C8B9D78D670D9973DC17CA006A3CEE27`.
+`FDD5114D71ED69DB79E7BFCFD4845B69E29F61A032AD7D607F7535766D3008F9`.
 
 The exact FIX3B prompt is archived at
 `history-implementations/HIER4B_SPACING_FIX3B_structural_folder_group_packing_codex_prompt.md`.
