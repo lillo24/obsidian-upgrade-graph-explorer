@@ -434,6 +434,7 @@ describe('Argument Contexts', () => {
       arguments: legacyArguments,
     } as Record<string, unknown>;
     delete legacy.contexts;
+    delete legacy.proposals;
     const source = JSON.stringify(legacy);
     const parsed = parseArgumentLibraryJson(source);
     expect(parsed.status).toBe('valid');

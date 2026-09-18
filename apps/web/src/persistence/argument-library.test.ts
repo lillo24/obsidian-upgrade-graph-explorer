@@ -56,7 +56,14 @@ describe('browser Argument Library storage', () => {
     const loaded = await store.load();
     expect(loaded).toMatchObject({
       status: 'loaded',
-      snapshot: { library: { schemaVersion: 4, arguments: [], contexts: [] } },
+      snapshot: {
+        library: {
+          schemaVersion: 5,
+          arguments: [],
+          contexts: [],
+          proposals: [],
+        },
+      },
     });
     expect(storage.values.get(ARGUMENT_LIBRARY_BROWSER_STORAGE_KEY)).toBe(
       legacy,
@@ -67,7 +74,12 @@ describe('browser Argument Library storage', () => {
     ).toMatchObject({ status: 'saved' });
     expect(
       JSON.parse(storage.values.get(ARGUMENT_LIBRARY_BROWSER_STORAGE_KEY)!),
-    ).toMatchObject({ schemaVersion: 4, arguments: [], contexts: [] });
+    ).toMatchObject({
+      schemaVersion: 5,
+      arguments: [],
+      contexts: [],
+      proposals: [],
+    });
   });
 
   it('uses one profile key and checks the expected snapshot', async () => {

@@ -25,6 +25,7 @@ import {
   serializeArgumentLibrary,
   type ArgumentLibrary,
   type ArgumentLibraryStore,
+  type ArgumentProposal,
   type ArgumentRecordKind,
   type ArgumentWorkspaceInsertPlan,
   type HumanReviewState,
@@ -80,7 +81,9 @@ import {
   findRecord,
   recordTopicIds,
   type ArgumentImportPlan,
+  type ArgumentRecordEditorDraft,
   type ArgumentRecordDraft,
+  type CounterArgumentRecordDraft,
 } from './session';
 import './arguments.css';
 
@@ -105,6 +108,13 @@ interface InsertJsonState {
   readonly fileName?: string;
   readonly plan?: ArgumentWorkspaceInsertPlan;
   readonly errors?: readonly string[];
+}
+
+interface ProposalResolutionState {
+  readonly proposalId: string;
+  readonly mode: 'accept' | 'reject';
+  readonly promoteToCurrent: boolean;
+  readonly decisionNote: string;
 }
 
 interface ContextPreviewState {
@@ -390,6 +400,118 @@ function newDraft(
   };
 }
 
+function proposalArgumentEditor(
+  library: ArgumentLibrary,
+  descriptor: SnapshotDescriptor,
+  proposal: ArgumentProposal,
+  session: ArgumentWorkspaceSession,
+): { readonly editor: EditorState; readonly promoteToCurrent: boolean } {
+  const base = newDraft('argument', descriptor, session, proposal.topicId);
+  if (base.record.kind !== 'argument') {
+    throw new Error('Argument proposal draft initialization failed.');
+  }
+  const target = proposal.target;
+  const commonReplacement =
+    target !== undefined &&
+    proposal.topicId !== undefined &&
+    library.topics.find(({ id }) => id === proposal.topicId)
+      ?.currentArgumentId === target.argumentId;
+  const relations =
+    target === undefined
+      ? []
+      : [
+          {
+            id: session.runtime.createId('relation'),
+            kind: 'attack' as const,
+            targetArgumentId: target.argumentId,
+            targetPart: target.part,
+            reliedOnRevision: target.reliedOnRevision,
+          },
+        ];
+  return {
+    promoteToCurrent: commonReplacement,
+    editor: {
+      ...base,
+      record: {
+        ...base.record,
+        title: proposal.title,
+        examples: proposal.examples.map((text) => ({
+          id: session.runtime.createId('example'),
+          text,
+        })),
+        premises: proposal.premiseHints.map((text) => ({
+          id: session.runtime.createId('premise'),
+          kind: 'text' as const,
+          text,
+        })),
+        ...(proposal.reasoning === undefined
+          ? {}
+          : { reasoning: proposal.reasoning }),
+        conclusion: proposal.conclusion,
+        ...(proposal.boundary === undefined
+          ? {}
+          : { boundary: proposal.boundary }),
+        relations,
+        ...(commonReplacement
+          ? { supersedesArgumentId: target.argumentId }
+          : {}),
+        reviewState: 'accepted',
+      },
+    },
+  };
+}
+
+function proposalCounterArgumentEditor(
+  descriptor: SnapshotDescriptor,
+  proposal: ArgumentProposal,
+  session: ArgumentWorkspaceSession,
+): EditorState {
+  const base = newDraft(
+    'counter-argument',
+    descriptor,
+    session,
+    proposal.topicId,
+  );
+  if (base.record.kind !== 'counter-argument') {
+    throw new Error('Counter-Argument proposal draft initialization failed.');
+  }
+  const observation =
+    proposal.examples.length === 0
+      ? (proposal.reasoning ?? proposal.conclusion)
+      : proposal.examples.join('\n\n');
+  return {
+    ...base,
+    record: {
+      ...base.record,
+      title: proposal.title,
+      observation,
+      challengedClaim: proposal.conclusion,
+      ...(proposal.target === undefined
+        ? proposal.topicId === undefined
+          ? {}
+          : {
+              target: {
+                kind: 'topic-claim' as const,
+                topicId: proposal.topicId,
+              },
+            }
+        : {
+            target: {
+              kind: 'argument' as const,
+              argumentId: proposal.target.argumentId,
+              part: proposal.target.part,
+            },
+          }),
+      responseExplanation: '',
+      outcome: 'refuted',
+      ...(proposal.boundary === undefined
+        ? {}
+        : { boundary: proposal.boundary }),
+      reviewState: 'accepted',
+    },
+  };
+}
+
 function parseSources(
   editor: EditorState,
 ):
@@ -467,6 +589,395 @@ async function copyText(text: string): Promise<void> {
 
 function counts(library: ArgumentLibrary): string {
   return `${library.topics.length} Topic${library.topics.length === 1 ? '' : 's'}, ${library.contexts.length} Context${library.contexts.length === 1 ? '' : 's'}, ${library.axioms.length} Axiom${library.axioms.length === 1 ? '' : 's'}, ${library.arguments.length} Argument${library.arguments.length === 1 ? '' : 's'}, ${library.counterArguments.length} Counter-Argument${library.counterArguments.length === 1 ? '' : 's'}`;
+}
+
+function proposalTargetStaleness(
+  library: ArgumentLibrary,
+  proposal: ArgumentProposal,
+): string | undefined {
+  const target = proposal.target;
+  if (target === undefined) return undefined;
+  const argument = library.arguments.find(({ id }) => id === target.argumentId);
+  if (argument === undefined)
+    return 'The target Argument is no longer present.';
+  if (argument.revision !== target.reliedOnRevision) {
+    return `The proposal targeted revision ${target.reliedOnRevision}; the Argument is now revision ${argument.revision}.`;
+  }
+  if (target.part.kind === 'premise') {
+    const premiseId = target.part.premiseId;
+    if (!argument.premises.some(({ id }) => id === premiseId)) {
+      return `The targeted premise ${premiseId} is no longer present.`;
+    }
+  }
+  if (target.part.kind === 'reasoning' && argument.reasoning === undefined) {
+    return 'The targeted reasoning section is no longer present.';
+  }
+  return undefined;
+}
+
+function proposalTargetText(
+  library: ArgumentLibrary,
+  proposal: ArgumentProposal,
+): string {
+  if (proposal.target === undefined) {
+    const topic = library.topics.find(({ id }) => id === proposal.topicId);
+    return topic === undefined
+      ? 'No canonical target'
+      : `Topic: ${topic.title}`;
+  }
+  const argument = library.arguments.find(
+    ({ id }) => id === proposal.target?.argumentId,
+  );
+  const part =
+    proposal.target.part.kind === 'premise'
+      ? `premise ${proposal.target.part.premiseId}`
+      : proposal.target.part.kind;
+  return `${argument?.title ?? proposal.target.argumentId} — ${part}`;
+}
+
+function MailboxDialog({
+  busy,
+  library,
+  onAccept,
+  onClose,
+  onNavigate,
+  onReject,
+}: {
+  readonly busy: boolean;
+  readonly library: ArgumentLibrary;
+  readonly onAccept: (proposal: ArgumentProposal) => void;
+  readonly onClose: () => void;
+  readonly onNavigate: (selection: ArgumentSelection) => void;
+  readonly onReject: (proposal: ArgumentProposal) => void;
+}) {
+  const [view, setView] = useState<'pending' | 'history'>('pending');
+  const [selectedId, setSelectedId] = useState<string>();
+  const proposals = library.proposals.filter(({ status }) =>
+    view === 'pending' ? status === 'pending' : status !== 'pending',
+  );
+  const selected =
+    proposals.find(({ id }) => id === selectedId) ?? proposals[0];
+  const targetStale =
+    selected === undefined
+      ? undefined
+      : proposalTargetStaleness(library, selected);
+  return (
+    <section
+      aria-labelledby="arguments-mailbox-title"
+      className="arguments-subdialog arguments-mailbox"
+      role="dialog"
+    >
+      <div>
+        <header>
+          <p className="eyebrow">Non-canonical review queue</p>
+          <h2 id="arguments-mailbox-title">Proposal Mailbox</h2>
+          <p>
+            AI proposals are not framework knowledge. Only human resolution can
+            create canonical Argument or Counter-Argument history.
+          </p>
+        </header>
+        <div className="arguments-actions" role="tablist">
+          <button
+            aria-selected={view === 'pending'}
+            onClick={() => {
+              setView('pending');
+              setSelectedId(undefined);
+            }}
+            role="tab"
+            type="button"
+          >
+            Pending (
+            {
+              library.proposals.filter(({ status }) => status === 'pending')
+                .length
+            }
+            )
+          </button>
+          <button
+            aria-selected={view === 'history'}
+            onClick={() => {
+              setView('history');
+              setSelectedId(undefined);
+            }}
+            role="tab"
+            type="button"
+          >
+            History
+          </button>
+        </div>
+        <div className="arguments-mailbox__layout">
+          <nav aria-label={`${view} proposals`}>
+            {proposals.length === 0 ? (
+              <p className="arguments-empty">
+                {view === 'pending'
+                  ? 'No pending proposals.'
+                  : 'No resolved proposals.'}
+              </p>
+            ) : (
+              <ul>
+                {proposals.map((proposal) => (
+                  <li key={proposal.id}>
+                    <button
+                      aria-current={
+                        proposal.id === selected?.id ? 'page' : undefined
+                      }
+                      onClick={() => setSelectedId(proposal.id)}
+                      type="button"
+                    >
+                      <strong>{proposal.title}</strong>
+                      <small>{proposalTargetText(library, proposal)}</small>
+                      <small>
+                        {proposal.status} ·{' '}
+                        {new Date(proposal.createdAt).toLocaleString()}
+                      </small>
+                      <span>{proposal.conclusion}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </nav>
+          {selected === undefined ? null : (
+            <article className="arguments-mailbox__detail">
+              <p className="eyebrow">{selected.status}</p>
+              <h3>{selected.title}</h3>
+              <p>
+                Target: <strong>{proposalTargetText(library, selected)}</strong>
+              </p>
+              {targetStale === undefined ? null : (
+                <p className="arguments-error" role="alert">
+                  Stale target: {targetStale} Review the current record before
+                  resolving.
+                </p>
+              )}
+              <h3>Examples</h3>
+              {selected.examples.length === 0 ? (
+                <p className="arguments-empty">No examples supplied.</p>
+              ) : (
+                <ul>
+                  {selected.examples.map((example, index) => (
+                    <li key={`${index}:${example}`}>{example}</li>
+                  ))}
+                </ul>
+              )}
+              <h3>Premise hints</h3>
+              {selected.premiseHints.length === 0 ? (
+                <p className="arguments-empty">No premise hints supplied.</p>
+              ) : (
+                <ul>
+                  {selected.premiseHints.map((premise, index) => (
+                    <li key={`${index}:${premise}`}>{premise}</li>
+                  ))}
+                </ul>
+              )}
+              {selected.reasoning === undefined ? null : (
+                <>
+                  <h3>Candidate reasoning</h3>
+                  <p>{selected.reasoning}</p>
+                </>
+              )}
+              <h3>Candidate conclusion</h3>
+              <p>{selected.conclusion}</p>
+              {selected.boundary === undefined ? null : (
+                <>
+                  <h3>Boundary / Invariance</h3>
+                  <p>{selected.boundary}</p>
+                </>
+              )}
+              <h3>Why novel or unresolved</h3>
+              <p>{selected.whyNovelOrUnresolved}</p>
+              <h3>Consulted records</h3>
+              <ul>
+                {selected.consultation.records.map((record) => (
+                  <li key={`${record.kind}:${record.id}`}>
+                    {record.kind} <code>{record.id}</code>
+                    {record.revision === undefined
+                      ? ''
+                      : ` at revision ${record.revision}`}
+                  </li>
+                ))}
+              </ul>
+              {selected.decision === undefined ? null : (
+                <section className="arguments-mailbox__decision">
+                  <h3>Human decision</h3>
+                  {selected.decision.note === undefined ? null : (
+                    <p>{selected.decision.note}</p>
+                  )}
+                  {selected.decision.resultingArgumentId ===
+                  undefined ? null : (
+                    <button
+                      onClick={() =>
+                        onNavigate({
+                          kind: 'argument',
+                          id: selected.decision!.resultingArgumentId!,
+                        })
+                      }
+                      type="button"
+                    >
+                      Open resulting Argument
+                    </button>
+                  )}
+                  {selected.decision.resultingCounterArgumentId ===
+                  undefined ? null : (
+                    <button
+                      onClick={() =>
+                        onNavigate({
+                          kind: 'counter-argument',
+                          id: selected.decision!.resultingCounterArgumentId!,
+                        })
+                      }
+                      type="button"
+                    >
+                      Open resulting Counter-Argument
+                    </button>
+                  )}
+                </section>
+              )}
+              {selected.status !== 'pending' ? null : (
+                <div className="arguments-actions">
+                  <button
+                    disabled={busy}
+                    onClick={() => onReject(selected)}
+                    type="button"
+                  >
+                    Reject / Record response
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={() => onAccept(selected)}
+                    type="button"
+                  >
+                    Accept / Integrate
+                  </button>
+                </div>
+              )}
+            </article>
+          )}
+        </div>
+        <div className="arguments-actions">
+          <button onClick={onClose} type="button">
+            Close Mailbox
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ProposalResolutionPanel({
+  draft,
+  library,
+  onDecisionNoteChange,
+  onPromoteChange,
+  onToggleAttack,
+  onToggleSupersession,
+  proposal,
+  resolution,
+}: {
+  readonly draft: ArgumentRecordEditorDraft | CounterArgumentRecordDraft;
+  readonly library: ArgumentLibrary;
+  readonly onDecisionNoteChange: (note: string) => void;
+  readonly onPromoteChange: (promote: boolean) => void;
+  readonly onToggleAttack: (enabled: boolean) => void;
+  readonly onToggleSupersession: (enabled: boolean) => void;
+  readonly proposal: ArgumentProposal;
+  readonly resolution: ProposalResolutionState;
+}) {
+  const target = proposal.target;
+  const attackSelected =
+    draft.kind === 'argument' &&
+    target !== undefined &&
+    draft.relations.some(
+      (relation) =>
+        relation.kind === 'attack' &&
+        relation.targetArgumentId === target.argumentId &&
+        canonicalJson(relation.targetPart) === canonicalJson(target.part),
+    );
+  const supersessionSelected =
+    draft.kind === 'argument' &&
+    target !== undefined &&
+    draft.supersedesArgumentId === target.argumentId;
+  const stale = proposalTargetStaleness(library, proposal);
+  return (
+    <section className="arguments-proposal-resolution">
+      <p className="eyebrow">Human Mailbox resolution</p>
+      <h2>
+        {resolution.mode === 'accept'
+          ? 'Integrate accepted proposal'
+          : 'Record why the proposal failed'}
+      </h2>
+      <p>
+        Proposal <code>{proposal.id}</code> remains pending until this complete
+        canonical transaction is saved.
+      </p>
+      {stale === undefined ? null : (
+        <p className="arguments-error" role="alert">
+          Stale target: {stale}
+        </p>
+      )}
+      {proposal.suggestedAxiomIds.length === 0 ? null : (
+        <div className="arguments-disclosure">
+          Suggested Axioms (not selected automatically):{' '}
+          {proposal.suggestedAxiomIds
+            .map(
+              (id) =>
+                library.axioms.find((axiom) => axiom.id === id)?.title ?? id,
+            )
+            .join('; ')}
+          . Add any accepted dependency through the ordinary Axiom premise or
+          answering-Axiom controls below.
+        </div>
+      )}
+      {resolution.mode === 'reject' ? (
+        <p className="arguments-disclosure">
+          The canonical Counter-Argument will be human-accepted Audit. Record
+          failure in its response outcome, not by rejecting the canonical
+          record.
+        </p>
+      ) : (
+        <fieldset className="arguments-editor__fieldset">
+          <legend>Final relationship to the target</legend>
+          <label>
+            <input
+              checked={attackSelected}
+              disabled={target === undefined}
+              onChange={(event) => onToggleAttack(event.currentTarget.checked)}
+              type="checkbox"
+            />{' '}
+            Attack the proposal target and exact target part
+          </label>
+          <label>
+            <input
+              checked={supersessionSelected}
+              disabled={target === undefined}
+              onChange={(event) =>
+                onToggleSupersession(event.currentTarget.checked)
+              }
+              type="checkbox"
+            />{' '}
+            Supersede the target Argument
+          </label>
+          <label>
+            <input
+              checked={resolution.promoteToCurrent}
+              disabled={draft.topicIds.length === 0}
+              onChange={(event) => onPromoteChange(event.currentTarget.checked)}
+              type="checkbox"
+            />{' '}
+            Promote the new Argument to Current for the selected Topic
+          </label>
+        </fieldset>
+      )}
+      <label>
+        Human decision note
+        <textarea
+          onChange={(event) => onDecisionNoteChange(event.currentTarget.value)}
+          rows={3}
+          value={resolution.decisionNote}
+        />
+      </label>
+    </section>
+  );
 }
 
 function InsertJsonDialog({
@@ -693,7 +1204,7 @@ function WorkspaceOnboarding({
     source: string;
     fileName: string;
     library: ArgumentLibrary;
-    migratedFromSchemaVersion?: 1 | 2 | 3;
+    migratedFromSchemaVersion?: 1 | 2 | 3 | 4;
   }>();
   const [error, setError] = useState<string>();
   async function select(event: ChangeEvent<HTMLInputElement>) {
@@ -1031,6 +1542,9 @@ const ArgumentsWorkspaceContent = forwardRef<
   const [confirmation, setConfirmation] = useState<string>();
   const pendingTransition = useRef<(() => void) | undefined>(undefined);
   const [notice, setNotice] = useState<string>();
+  const [mailboxOpen, setMailboxOpen] = useState(false);
+  const [proposalResolution, setProposalResolution] =
+    useState<ProposalResolutionState>();
   const [insertJson, setInsertJson] = useState<InsertJsonState>();
   const [importPreview, setImportPreview] = useState<ImportPreviewState>();
   const [markdownFiles, setMarkdownFiles] =
@@ -1076,6 +1590,10 @@ const ArgumentsWorkspaceContent = forwardRef<
       setConfirmation(undefined);
       return true;
     }
+    if (mailboxOpen) {
+      setMailboxOpen(false);
+      return true;
+    }
     if (contextExport !== undefined) {
       setContextExport(undefined);
       return true;
@@ -1099,6 +1617,7 @@ const ArgumentsWorkspaceContent = forwardRef<
     contextExport,
     importPreview,
     insertJson,
+    mailboxOpen,
     markdownFiles,
     requestClose,
   ]);
@@ -1187,6 +1706,7 @@ const ArgumentsWorkspaceContent = forwardRef<
       );
       setSelection(next);
       setEditor(undefined);
+      setProposalResolution(undefined);
     });
   }
 
@@ -1198,6 +1718,7 @@ const ArgumentsWorkspaceContent = forwardRef<
       setHistory((current) => current.slice(0, -1));
       setSelection(target);
       setEditor(undefined);
+      setProposalResolution(undefined);
     });
   }
 
@@ -1208,7 +1729,68 @@ const ArgumentsWorkspaceContent = forwardRef<
       setEditor({ ...editor, errors: parsed.errors });
       return false;
     }
-    const result = await session.save(parsed.record);
+    if (
+      proposalResolution?.mode === 'reject' &&
+      parsed.record.kind === 'counter-argument'
+    ) {
+      const resolutionErrors = [
+        ...(parsed.record.responseExplanation.trim() === ''
+          ? ['Response explanation is required to reject a proposal.']
+          : []),
+        ...(parsed.record.outcome === 'unanswered'
+          ? ['A resolved response outcome is required to reject a proposal.']
+          : []),
+      ];
+      if (resolutionErrors.length > 0) {
+        setEditor({ ...editor, errors: resolutionErrors });
+        return false;
+      }
+    }
+    let result;
+    if (
+      proposalResolution?.mode === 'accept' &&
+      parsed.record.kind === 'argument'
+    ) {
+      const proposal =
+        state.phase === 'ready'
+          ? state.snapshot.library.proposals.find(
+              ({ id }) => id === proposalResolution.proposalId,
+            )
+          : undefined;
+      const promotionTopicId = proposalResolution.promoteToCurrent
+        ? proposal?.topicId !== undefined &&
+          parsed.record.topicIds.includes(proposal.topicId)
+          ? proposal.topicId
+          : parsed.record.topicIds[0]
+        : undefined;
+      if (
+        proposalResolution.promoteToCurrent &&
+        promotionTopicId === undefined
+      ) {
+        setEditor({
+          ...editor,
+          errors: ['Select a Topic before promoting the new Argument.'],
+        });
+        return false;
+      }
+      result = await session.resolveProposalAsArgument(
+        proposalResolution.proposalId,
+        parsed.record,
+        promotionTopicId,
+        proposalResolution.decisionNote,
+      );
+    } else if (
+      proposalResolution?.mode === 'reject' &&
+      parsed.record.kind === 'counter-argument'
+    ) {
+      result = await session.resolveProposalAsRejected(
+        proposalResolution.proposalId,
+        parsed.record,
+        proposalResolution.decisionNote,
+      );
+    } else {
+      result = await session.save(parsed.record);
+    }
     if (result.status !== 'ok') {
       setEditor((current) =>
         current === undefined
@@ -1223,7 +1805,8 @@ const ArgumentsWorkspaceContent = forwardRef<
     } as const;
     setSelection(selected);
     setEditor(undefined);
-    setNotice('Saved');
+    setProposalResolution(undefined);
+    setNotice(proposalResolution === undefined ? 'Saved' : 'Proposal resolved');
     afterSave?.();
     return true;
   }
@@ -1233,6 +1816,7 @@ const ArgumentsWorkspaceContent = forwardRef<
     pendingTransition.current = undefined;
     setConfirmation(undefined);
     setEditor(undefined);
+    setProposalResolution(undefined);
     action?.();
   }
 
@@ -1256,7 +1840,109 @@ const ArgumentsWorkspaceContent = forwardRef<
           currentSelection?.kind === 'topic' ? currentSelection.id : undefined,
         ),
       );
+      setProposalResolution(undefined);
     });
+  }
+
+  function openMailbox() {
+    requestTransition('Open Mailbox with unsaved changes?', () => {
+      setEditor(undefined);
+      setProposalResolution(undefined);
+      void session.reload().then(() => setMailboxOpen(true));
+    });
+  }
+
+  function startProposalAcceptance(proposal: ArgumentProposal) {
+    if (state.phase !== 'ready') return;
+    const prepared = proposalArgumentEditor(
+      state.snapshot.library,
+      state.snapshot.descriptor,
+      proposal,
+      session,
+    );
+    setMailboxOpen(false);
+    setEditor(prepared.editor);
+    setProposalResolution({
+      proposalId: proposal.id,
+      mode: 'accept',
+      promoteToCurrent: prepared.promoteToCurrent,
+      decisionNote: '',
+    });
+  }
+
+  function startProposalRejection(proposal: ArgumentProposal) {
+    if (state.phase !== 'ready') return;
+    setMailboxOpen(false);
+    setEditor(
+      proposalCounterArgumentEditor(
+        state.snapshot.descriptor,
+        proposal,
+        session,
+      ),
+    );
+    setProposalResolution({
+      proposalId: proposal.id,
+      mode: 'reject',
+      promoteToCurrent: false,
+      decisionNote: '',
+    });
+  }
+
+  function toggleProposalAttack(enabled: boolean) {
+    if (state.phase !== 'ready' || proposalResolution === undefined) return;
+    const proposal = state.snapshot.library.proposals.find(
+      ({ id }) => id === proposalResolution.proposalId,
+    );
+    const target = proposal?.target;
+    if (target === undefined) return;
+    setEditor((current) => {
+      if (current?.record.kind !== 'argument') return current;
+      const matches = (relation: (typeof current.record.relations)[number]) =>
+        relation.kind === 'attack' &&
+        relation.targetArgumentId === target.argumentId &&
+        canonicalJson(relation.targetPart) === canonicalJson(target.part);
+      const relations = enabled
+        ? current.record.relations.some(matches)
+          ? current.record.relations
+          : [
+              ...current.record.relations,
+              {
+                id: session.runtime.createId('relation'),
+                kind: 'attack' as const,
+                targetArgumentId: target.argumentId,
+                targetPart: target.part,
+                reliedOnRevision: target.reliedOnRevision,
+              },
+            ]
+        : current.record.relations.filter((relation) => !matches(relation));
+      return {
+        ...current,
+        dirty: true,
+        errors: [],
+        record: { ...current.record, relations },
+      };
+    });
+  }
+
+  function toggleProposalSupersession(enabled: boolean) {
+    if (state.phase !== 'ready' || proposalResolution === undefined) return;
+    const target = state.snapshot.library.proposals.find(
+      ({ id }) => id === proposalResolution.proposalId,
+    )?.target;
+    if (target === undefined) return;
+    setEditor((current) =>
+      current?.record.kind !== 'argument'
+        ? current
+        : {
+            ...current,
+            dirty: true,
+            errors: [],
+            record: {
+              ...current.record,
+              supersedesArgumentId: enabled ? target.argumentId : undefined,
+            },
+          },
+    );
   }
 
   async function chooseImport(event: ChangeEvent<HTMLInputElement>) {
@@ -1816,6 +2502,12 @@ const ArgumentsWorkspaceContent = forwardRef<
           currentSelection.id,
         )
       : undefined;
+  const resolvingProposal =
+    state.phase === 'ready' && proposalResolution !== undefined
+      ? state.snapshot.library.proposals.find(
+          ({ id }) => id === proposalResolution.proposalId,
+        )
+      : undefined;
   const displayedContext =
     contextExport?.sourcePacket ?? contextExport?.libraryOnly;
   const contextOrigins =
@@ -1858,6 +2550,19 @@ const ArgumentsWorkspaceContent = forwardRef<
           <div className="arguments-dialog__actions">
             {state.phase !== 'ready' ? null : (
               <>
+                <button
+                  disabled={state.busy}
+                  onClick={openMailbox}
+                  type="button"
+                >
+                  Mailbox (
+                  {
+                    state.snapshot.library.proposals.filter(
+                      ({ status }) => status === 'pending',
+                    ).length
+                  }
+                  )
+                </button>
                 <button
                   disabled={state.busy}
                   onClick={() => setInsertJson({ source: '' })}
@@ -2143,9 +2848,12 @@ const ArgumentsWorkspaceContent = forwardRef<
                     <button
                       disabled={state.busy}
                       onClick={() =>
-                        requestTransition('Cancel this draft?', () =>
-                          setEditor(undefined),
-                        )
+                        requestTransition('Cancel this draft?', () => {
+                          const wasResolving = proposalResolution !== undefined;
+                          setEditor(undefined);
+                          setProposalResolution(undefined);
+                          if (wasResolving) setMailboxOpen(true);
+                        })
                       }
                       type="button"
                     >
@@ -2327,44 +3035,77 @@ const ArgumentsWorkspaceContent = forwardRef<
                   />
                 )
               ) : (
-                <ArgumentRecordEditor
-                  draft={editor.record}
-                  errors={editor.errors}
-                  library={state.snapshot.library}
-                  onChange={(record) =>
-                    setEditor((current) =>
-                      current === undefined
-                        ? current
-                        : { ...current, dirty: true, errors: [], record },
-                    )
-                  }
-                  onCreateExampleId={() => session.runtime.createId('example')}
-                  onCreatePremiseId={() => session.runtime.createId('premise')}
-                  onCreateRelationId={() =>
-                    session.runtime.createId('relation')
-                  }
-                  onRetrievalTextChange={(retrievalText) =>
-                    setEditor((current) =>
-                      current === undefined
-                        ? current
-                        : {
-                            ...current,
-                            dirty: true,
-                            errors: [],
-                            retrievalText,
-                          },
-                    )
-                  }
-                  onSourceChange={(source) =>
-                    setEditor((current) =>
-                      current === undefined
-                        ? current
-                        : { ...current, dirty: true, errors: [], source },
-                    )
-                  }
-                  retrievalText={editor.retrievalText}
-                  source={editor.source}
-                />
+                <>
+                  {proposalResolution === undefined ||
+                  resolvingProposal === undefined ||
+                  (editor.record.kind !== 'argument' &&
+                    editor.record.kind !== 'counter-argument') ? null : (
+                    <ProposalResolutionPanel
+                      draft={editor.record}
+                      library={state.snapshot.library}
+                      onDecisionNoteChange={(decisionNote) =>
+                        setProposalResolution((current) =>
+                          current === undefined
+                            ? current
+                            : { ...current, decisionNote },
+                        )
+                      }
+                      onPromoteChange={(promoteToCurrent) =>
+                        setProposalResolution((current) =>
+                          current === undefined
+                            ? current
+                            : { ...current, promoteToCurrent },
+                        )
+                      }
+                      onToggleAttack={toggleProposalAttack}
+                      onToggleSupersession={toggleProposalSupersession}
+                      proposal={resolvingProposal}
+                      resolution={proposalResolution}
+                    />
+                  )}
+                  <ArgumentRecordEditor
+                    draft={editor.record}
+                    errors={editor.errors}
+                    library={state.snapshot.library}
+                    onChange={(record) =>
+                      setEditor((current) =>
+                        current === undefined
+                          ? current
+                          : { ...current, dirty: true, errors: [], record },
+                      )
+                    }
+                    onCreateExampleId={() =>
+                      session.runtime.createId('example')
+                    }
+                    onCreatePremiseId={() =>
+                      session.runtime.createId('premise')
+                    }
+                    onCreateRelationId={() =>
+                      session.runtime.createId('relation')
+                    }
+                    onRetrievalTextChange={(retrievalText) =>
+                      setEditor((current) =>
+                        current === undefined
+                          ? current
+                          : {
+                              ...current,
+                              dirty: true,
+                              errors: [],
+                              retrievalText,
+                            },
+                      )
+                    }
+                    onSourceChange={(source) =>
+                      setEditor((current) =>
+                        current === undefined
+                          ? current
+                          : { ...current, dirty: true, errors: [], source },
+                      )
+                    }
+                    retrievalText={editor.retrievalText}
+                    source={editor.source}
+                  />
+                </>
               )}
               <details className="arguments-snapshot-metadata">
                 <summary>Library snapshot and receipt identity</summary>
@@ -2392,6 +3133,20 @@ const ArgumentsWorkspaceContent = forwardRef<
               )}
             </main>
           </div>
+        )}
+
+        {!mailboxOpen || state.phase !== 'ready' ? null : (
+          <MailboxDialog
+            busy={state.busy}
+            library={state.snapshot.library}
+            onAccept={startProposalAcceptance}
+            onClose={() => setMailboxOpen(false)}
+            onNavigate={(next) => {
+              setMailboxOpen(false);
+              navigate(next);
+            }}
+            onReject={startProposalRejection}
+          />
         )}
 
         {notice === undefined ? null : (
@@ -2445,8 +3200,9 @@ const ArgumentsWorkspaceContent = forwardRef<
                     <p className="arguments-disclosure">
                       Incoming schema v
                       {importPreview.merge.migratedFromSchemaVersion} was
-                      migrated to v3 without inferring Examples, relations,
-                      Arguments, or Current pointers.
+                      migrated to v5 without inferring canonical records,
+                      relationships, Context bindings, Current pointers, or
+                      Mailbox proposals.
                     </p>
                   )}
                   <p>Status: {importPreview.merge.preview.status}</p>

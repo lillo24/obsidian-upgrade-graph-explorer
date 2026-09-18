@@ -2,7 +2,10 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { serializeArgumentLibrary } from '@icarus-graph-explorer/argument-workspace';
+import {
+  clonePlainData,
+  serializeArgumentLibrary,
+} from '@icarus-graph-explorer/argument-workspace';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
@@ -69,7 +72,7 @@ describe('ArgumentLibraryLoader', () => {
         'Application Support',
         'com.icarus.graph-explorer',
         'argument-workspace',
-        'library-v4.json',
+        'library-v5.json',
       ),
     });
     expect(
@@ -84,12 +87,12 @@ describe('ArgumentLibraryLoader', () => {
         '/data',
         'com.icarus.graph-explorer',
         'argument-workspace',
-        'library-v4.json',
+        'library-v5.json',
       ),
     });
   });
 
-  it('loads strict UTF-8 schema-v4 data through the domain reader', async () => {
+  it('loads strict UTF-8 schema-v5 data through the domain reader', async () => {
     const directory = await temporaryDirectory();
     const path = join(directory, 'library-v4.json');
     const { library } = createSyntheticLibrary();
@@ -103,6 +106,44 @@ describe('ArgumentLibraryLoader', () => {
     if (loaded.status !== 'loaded') return;
     expect(loaded.snapshot.descriptor.libraryId).toBe('library-mcp-test');
     expect(loaded.reader.searchIndex({ query: 'units' }).status).toBe('ok');
+  });
+
+  it('falls back to and deterministically migrates the default v4 file', async () => {
+    const directory = await temporaryDirectory();
+    const dataDirectory = join(directory, 'data');
+    const libraryDirectory = join(
+      dataDirectory,
+      'com.icarus.graph-explorer',
+      'argument-workspace',
+    );
+    await mkdir(libraryDirectory, { recursive: true });
+    const { library } = createSyntheticLibrary();
+    const withoutProposals = clonePlainData(library) as unknown as Record<
+      string,
+      unknown
+    >;
+    delete withoutProposals.proposals;
+    await writeFile(
+      join(libraryDirectory, 'library-v4.json'),
+      JSON.stringify({ ...withoutProposals, schemaVersion: 4 }),
+      'utf8',
+    );
+
+    const loader = new ArgumentLibraryLoader({
+      env: { XDG_DATA_HOME: dataDirectory },
+      platform: 'linux',
+      homeDirectory: directory,
+    });
+    const loaded = await loader.load();
+
+    expect(loaded).toMatchObject({
+      status: 'loaded',
+      library: {
+        schemaVersion: 5,
+        libraryId: 'library-mcp-test',
+        proposals: [],
+      },
+    });
   });
 
   it.each([
@@ -136,7 +177,7 @@ describe('ArgumentLibraryLoader', () => {
     {
       name: 'future schema',
       prepare: async (path: string) =>
-        writeFile(path, JSON.stringify({ schemaVersion: 5 }), 'utf8'),
+        writeFile(path, JSON.stringify({ schemaVersion: 6 }), 'utf8'),
       expected: 'future-schema',
     },
   ])(

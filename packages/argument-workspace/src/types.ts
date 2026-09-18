@@ -1,4 +1,4 @@
-export const ARGUMENT_LIBRARY_SCHEMA_VERSION = 4 as const;
+export const ARGUMENT_LIBRARY_SCHEMA_VERSION = 5 as const;
 export const KNOWLEDGE_READER_CONTRACT_VERSION = 5 as const;
 export const CONTENT_FINGERPRINT_ALGORITHM =
   'sha256-canonical-json-v1' as const;
@@ -231,6 +231,63 @@ export interface ArgumentRelation {
   readonly reliedOnRevision: number;
 }
 
+export type ProposalStatus = 'pending' | 'accepted' | 'rejected';
+
+export interface ArgumentProposalTarget {
+  readonly argumentId: string;
+  readonly part: ArgumentTargetPart;
+  readonly reliedOnRevision: number;
+}
+
+export type ProposalConsultedRecordKind =
+  'topic' | 'axiom' | 'argument' | 'counter-argument';
+
+export interface ProposalConsultedRecord {
+  readonly kind: ProposalConsultedRecordKind;
+  readonly id: string;
+  readonly revision?: number;
+}
+
+export interface ArgumentProposalConsultation {
+  readonly libraryId: string;
+  readonly libraryRevision: number;
+  readonly contentFingerprint?: ContentFingerprint;
+  readonly records: readonly ProposalConsultedRecord[];
+}
+
+export interface ArgumentProposalDecision {
+  readonly decidedAt: string;
+  readonly note?: string;
+  readonly resultingArgumentId?: string;
+  readonly resultingCounterArgumentId?: string;
+}
+
+/**
+ * Non-canonical AI-authored candidate retained in the same durable snapshot.
+ * Only human resolution may link it to a canonical Argument or Counter-Argument.
+ */
+export interface ArgumentProposal {
+  readonly id: string;
+  readonly revision: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly status: ProposalStatus;
+  readonly title: string;
+  readonly topicId?: string;
+  readonly target?: ArgumentProposalTarget;
+  readonly examples: readonly string[];
+  readonly premiseHints: readonly string[];
+  readonly suggestedAxiomIds: readonly string[];
+  readonly reasoning?: string;
+  readonly conclusion: string;
+  readonly boundary?: string;
+  readonly whyNovelOrUnresolved: string;
+  readonly consultation: ArgumentProposalConsultation;
+  readonly clientSubmissionId?: string;
+  readonly submissionFingerprint: ContentFingerprint;
+  readonly decision?: ArgumentProposalDecision;
+}
+
 export interface Argument extends ArgumentRecordMetadata {
   readonly title: string;
   readonly examples: readonly ArgumentExample[];
@@ -292,6 +349,7 @@ export interface ArgumentLibrary {
   readonly axioms: readonly ArgumentAxiom[];
   readonly arguments: readonly Argument[];
   readonly counterArguments: readonly ArgumentCounterArgument[];
+  readonly proposals: readonly ArgumentProposal[];
 }
 
 export interface SnapshotDescriptor {
@@ -339,7 +397,8 @@ export interface ArgumentRuntime {
       | 'source'
       | 'example'
       | 'premise'
-      | 'relation',
+      | 'relation'
+      | 'proposal',
   ) => string;
   readonly now: () => string;
 }
@@ -454,6 +513,38 @@ export interface UpdateCounterArgumentResponseInput {
   readonly outcome?: CounterArgumentOutcome;
   readonly boundary?: string | null;
   readonly reopeningCondition?: string | null;
+}
+
+export interface CreateArgumentProposalInput {
+  readonly clientSubmissionId?: string;
+  readonly title: string;
+  readonly topicId?: string;
+  readonly target?: ArgumentProposalTarget;
+  readonly examples: readonly string[];
+  readonly premiseHints: readonly string[];
+  readonly suggestedAxiomIds?: readonly string[];
+  readonly reasoning?: string;
+  readonly conclusion: string;
+  readonly boundary?: string;
+  readonly whyNovelOrUnresolved: string;
+  readonly consultation: ArgumentProposalConsultation;
+}
+
+export interface ResolveProposalAsArgumentInput {
+  readonly proposalId: string;
+  readonly argument: CreateArgumentInput & { readonly id: string };
+  readonly topicIds: readonly string[];
+  readonly promoteTopicId?: string;
+  readonly note?: string;
+}
+
+export interface ResolveProposalAsRejectedInput {
+  readonly proposalId: string;
+  readonly counterArgument: CreateCounterArgumentInput & {
+    readonly id: string;
+  };
+  readonly topicIds: readonly string[];
+  readonly note?: string;
 }
 
 export type TopicMembershipKind = 'axiom' | 'argument' | 'counter-argument';
@@ -765,7 +856,7 @@ export type ArgumentLibraryJsonParseResult =
   | {
       readonly status: 'valid';
       readonly value: ArgumentLibrary;
-      readonly migratedFromSchemaVersion?: 1 | 2 | 3;
+      readonly migratedFromSchemaVersion?: 1 | 2 | 3 | 4;
     }
   | {
       readonly status: 'invalid-json' | 'future-schema' | 'invalid-library';

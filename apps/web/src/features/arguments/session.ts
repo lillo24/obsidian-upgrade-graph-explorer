@@ -22,6 +22,8 @@ import {
   reassessCounterArgumentResponse,
   reassessArgumentPremises,
   reassessArgumentRelations,
+  resolveProposalAsArgument,
+  resolveProposalAsRejected,
   sameSnapshot,
   setRecordArchived,
   setRecordReviewState,
@@ -45,6 +47,8 @@ import {
   type ArgumentWorkspaceInsertPlan,
   type CounterArgumentOutcome,
   type CounterArgumentTarget,
+  type CreateArgumentInput,
+  type CreateCounterArgumentInput,
   type HumanReviewState,
   type KnowledgeReader,
   type RetrievalMetadata,
@@ -160,7 +164,7 @@ export interface ArgumentImportPlan {
   readonly mode: 'merge' | 'replace';
   readonly preview: ArgumentImportPreview;
   readonly base: SnapshotDescriptor;
-  readonly migratedFromSchemaVersion?: 1 | 2 | 3;
+  readonly migratedFromSchemaVersion?: 1 | 2 | 3 | 4;
 }
 
 export type ArgumentWorkspaceActionResult =
@@ -512,6 +516,56 @@ function saveDraft(
   return next;
 }
 
+function argumentInput(
+  draft: ArgumentRecordEditorDraft,
+): CreateArgumentInput & { readonly id: string } {
+  const reasoning = optional(draft.reasoning);
+  const boundary = optional(draft.boundary);
+  const supersedesArgumentId = optional(draft.supersedesArgumentId);
+  return {
+    id: draft.id,
+    title: draft.title,
+    examples: draft.examples,
+    premises: draft.premises,
+    ...(reasoning === undefined ? {} : { reasoning }),
+    conclusion: draft.conclusion,
+    ...(boundary === undefined ? {} : { boundary }),
+    relations: draft.relations,
+    contextIds: draft.contextIds,
+    retrieval: draft.retrieval,
+    sourceReferences: draft.sourceReferences,
+    ...(supersedesArgumentId === undefined ? {} : { supersedesArgumentId }),
+  };
+}
+
+function counterArgumentInput(
+  library: ArgumentLibrary,
+  draft: CounterArgumentRecordDraft,
+): CreateCounterArgumentInput & { readonly id: string } {
+  const boundary = optional(draft.boundary);
+  const reopeningCondition = optional(draft.reopeningCondition);
+  return {
+    id: draft.id,
+    title: draft.title,
+    observation: draft.observation,
+    challengedClaim: draft.challengedClaim,
+    ...(draft.target === undefined ? {} : { target: draft.target }),
+    retrieval: draft.retrieval,
+    sourceReferences: draft.sourceReferences,
+    response: {
+      answeringAxioms: unique(draft.answeringAxiomIds).map((axiomId) => ({
+        axiomId,
+        reliedOnRevision: library.axioms.find(({ id }) => id === axiomId)!
+          .revision,
+      })),
+      explanation: draft.responseExplanation,
+      outcome: draft.outcome,
+      ...(boundary === undefined ? {} : { boundary }),
+      ...(reopeningCondition === undefined ? {} : { reopeningCondition }),
+    },
+  };
+}
+
 export function findRecord(
   library: ArgumentLibrary,
   kind: 'topic',
@@ -744,7 +798,7 @@ export class ArgumentWorkspaceSession {
       parsed.value,
       parsed.migratedFromSchemaVersion === undefined
         ? undefined
-        : `Migrated schema v${parsed.migratedFromSchemaVersion} to v4 and saved`,
+        : `Migrated schema v${parsed.migratedFromSchemaVersion} to v5 and saved`,
     );
   }
 
@@ -771,6 +825,46 @@ export class ArgumentWorkspaceSession {
   save(draft: ArgumentRecordDraft): Promise<ArgumentWorkspaceActionResult> {
     return this.#commit(draft.expected, (library) =>
       saveDraft(library, draft, this.runtime),
+    );
+  }
+
+  resolveProposalAsArgument(
+    proposalId: string,
+    draft: ArgumentRecordEditorDraft,
+    promoteTopicId?: string,
+    note?: string,
+  ): Promise<ArgumentWorkspaceActionResult> {
+    return this.#commit(draft.expected, (library) =>
+      resolveProposalAsArgument(
+        library,
+        {
+          proposalId,
+          argument: argumentInput(draft),
+          topicIds: draft.topicIds,
+          ...(promoteTopicId === undefined ? {} : { promoteTopicId }),
+          ...(optional(note) === undefined ? {} : { note: optional(note)! }),
+        },
+        this.runtime,
+      ),
+    );
+  }
+
+  resolveProposalAsRejected(
+    proposalId: string,
+    draft: CounterArgumentRecordDraft,
+    note?: string,
+  ): Promise<ArgumentWorkspaceActionResult> {
+    return this.#commit(draft.expected, (library) =>
+      resolveProposalAsRejected(
+        library,
+        {
+          proposalId,
+          counterArgument: counterArgumentInput(library, draft),
+          topicIds: draft.topicIds,
+          ...(optional(note) === undefined ? {} : { note: optional(note)! }),
+        },
+        this.runtime,
+      ),
     );
   }
 

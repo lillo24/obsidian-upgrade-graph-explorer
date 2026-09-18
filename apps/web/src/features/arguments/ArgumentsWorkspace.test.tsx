@@ -20,10 +20,12 @@ import {
   createContext,
   createEmptyArgumentLibrary,
   createTopic,
+  editArgument,
   editAxiom,
   promoteArgumentToCurrent,
   sameSnapshot,
   setTopicMembership,
+  submitArgumentProposal,
   updateCounterArgumentResponse,
   type ArgumentLibrary,
   type ArgumentLibraryStore,
@@ -189,9 +191,63 @@ function fixture(): ArgumentLibrary {
   );
 }
 
+function fixtureWithProposal(staleTarget = false): ArgumentLibrary {
+  const clock = runtime();
+  const base = fixture();
+  const descriptor = captureArgumentLibrarySnapshot(base).descriptor;
+  const target = base.arguments.find(({ id }) => id === 'AR-UI')!;
+  const topic = base.topics.find(({ id }) => id === 'T-UI')!;
+  const axiom = base.axioms.find(({ id }) => id === 'AX-UI')!;
+  let library = submitArgumentProposal(
+    base,
+    {
+      clientSubmissionId: 'ui-proposal-submission',
+      title: 'Verified normalization exception',
+      topicId: topic.id,
+      target: {
+        argumentId: target.id,
+        part: { kind: 'reasoning' },
+        reliedOnRevision: target.revision,
+      },
+      examples: ['The input quantities were normalized upstream.'],
+      premiseHints: ['A current normalization contract exists.'],
+      suggestedAxiomIds: [axiom.id],
+      reasoning: 'Verified normalization can satisfy the compatibility rule.',
+      conclusion: 'A second conversion is unnecessary in this bounded case.',
+      boundary: 'Only while the normalization contract remains current.',
+      whyNovelOrUnresolved:
+        'The canonical reasoning does not discuss pre-normalized inputs.',
+      consultation: {
+        libraryId: descriptor.libraryId,
+        libraryRevision: descriptor.libraryRevision,
+        contentFingerprint: descriptor.contentFingerprint,
+        records: [
+          { kind: 'topic', id: topic.id, revision: topic.revision },
+          { kind: 'argument', id: target.id, revision: target.revision },
+          { kind: 'axiom', id: axiom.id, revision: axiom.revision },
+        ],
+      },
+    },
+    clock,
+  ).library;
+  if (staleTarget) {
+    library = editArgument(
+      library,
+      target.id,
+      { reasoning: 'The canonical reasoning changed after consultation.' },
+      clock,
+    );
+  }
+  return library;
+}
+
 class MemoryStore implements ArgumentLibraryStore {
-  snapshot = captureArgumentLibrarySnapshot(fixture());
+  snapshot: ReturnType<typeof captureArgumentLibrarySnapshot>;
   writes = 0;
+
+  constructor(library: ArgumentLibrary = fixture()) {
+    this.snapshot = captureArgumentLibrarySnapshot(library);
+  }
 
   async load() {
     return { status: 'loaded' as const, snapshot: this.snapshot };
@@ -310,6 +366,25 @@ describe('standalone Arguments workspace', () => {
     return result;
   }
 
+  function fieldsetCheckbox(legend: string, label: string): HTMLInputElement {
+    const fieldset = [
+      ...container.querySelectorAll<HTMLFieldSetElement>('fieldset'),
+    ].find(
+      (candidate) => candidate.querySelector('legend')?.textContent === legend,
+    );
+    const result = [
+      ...(fieldset?.querySelectorAll<HTMLInputElement>(
+        'input[type="checkbox"]',
+      ) ?? []),
+    ].find((candidate) =>
+      candidate.closest('label')?.textContent?.includes(label),
+    );
+    if (result === undefined) {
+      throw new Error(`Missing checkbox ${legend}: ${label}`);
+    }
+    return result;
+  }
+
   async function typeCharacters(control: HTMLTextAreaElement, value: string) {
     for (const character of value) {
       await act(async () => {
@@ -318,6 +393,175 @@ describe('standalone Arguments workspace', () => {
       });
     }
   }
+
+  it('shows pending proposal provenance, stale targets, suggestions, and cancellation without canonical writes', async () => {
+    store = new MemoryStore(fixtureWithProposal(true));
+    session = new ArgumentWorkspaceSession(store, runtime());
+    await mount();
+
+    await click('Mailbox (1)');
+    expect(container.textContent).toContain('Non-canonical review queue');
+    expect(container.textContent).toContain('Pending (1)');
+    expect(container.textContent).toContain('Verified normalization exception');
+    expect(container.textContent).toContain(
+      'A second conversion is unnecessary in this bounded case.',
+    );
+    expect(container.textContent).toContain(
+      'The canonical reasoning does not discuss pre-normalized inputs.',
+    );
+    expect(container.textContent).toContain('argument AR-UI at revision 1');
+    expect(container.textContent).toContain('Stale target:');
+
+    await click('Accept / Integrate');
+    expect(container.textContent).toContain('Integrate accepted proposal');
+    expect(container.textContent).toContain(
+      'Suggested Axioms (not selected automatically): Compatible units',
+    );
+    expect(textarea('Conclusion').value).toBe(
+      'A second conversion is unnecessary in this bounded case.',
+    );
+    expect(
+      fieldsetCheckbox('Final relationship to the target', 'Attack').checked,
+    ).toBe(true);
+    expect(store.writes).toBe(0);
+
+    await click('Cancel');
+    expect(container.textContent).toContain('Cancel this draft?');
+    await click('Discard');
+    expect(container.textContent).toContain('Proposal Mailbox');
+    expect(container.textContent).toContain('Pending (1)');
+    expect(store.snapshot.library.proposals[0]?.status).toBe('pending');
+    expect(store.writes).toBe(0);
+  });
+
+  it('protects a dirty canonical draft before opening the Mailbox', async () => {
+    store = new MemoryStore(fixtureWithProposal());
+    session = new ArgumentWorkspaceSession(store, runtime());
+    await mount();
+    await click('Numeric mismatch');
+    await click('Edit');
+    await act(() => setValue(textarea('Observation'), 'Unsaved Mailbox test.'));
+
+    await click('Mailbox (1)');
+    expect(container.textContent).toContain(
+      'Open Mailbox with unsaved changes?',
+    );
+    expect(container.textContent).not.toContain('Proposal Mailbox');
+    await click('Discard');
+    expect(container.textContent).toContain('Proposal Mailbox');
+    expect(store.writes).toBe(0);
+  });
+
+  it('rejects a proposal into one accepted canonical Audit and exposes it in history', async () => {
+    store = new MemoryStore(fixtureWithProposal());
+    session = new ArgumentWorkspaceSession(store, runtime());
+    await mount();
+    await click('Mailbox (1)');
+    await click('Reject / Record response');
+
+    expect(container.textContent).toContain('Record why the proposal failed');
+    expect(container.textContent).toContain(
+      'canonical Counter-Argument will be human-accepted',
+    );
+    await click('Save');
+    expect(container.textContent).toContain(
+      'Response explanation is required to reject a proposal.',
+    );
+    expect(store.writes).toBe(0);
+    await act(() =>
+      setValue(
+        textarea('Recorded response — why it applies'),
+        'No current normalization contract supports this exception.',
+      ),
+    );
+    await act(() =>
+      setValue(
+        textarea('Human decision note'),
+        'Rejected after checking the current Axiom.',
+      ),
+    );
+    await act(() =>
+      fieldsetCheckbox(
+        'Answered using reusable Axioms',
+        'Compatible units',
+      ).click(),
+    );
+    await click('Save');
+
+    expect(store.writes).toBe(1);
+    const proposal = store.snapshot.library.proposals[0]!;
+    expect(proposal.status).toBe('rejected');
+    const resultingId = proposal.decision?.resultingCounterArgumentId;
+    const result = store.snapshot.library.counterArguments.find(
+      ({ id }) => id === resultingId,
+    );
+    expect(result).toMatchObject({
+      reviewState: 'accepted',
+      response: {
+        explanation:
+          'No current normalization contract supports this exception.',
+        outcome: 'refuted',
+        answeringAxioms: [{ axiomId: 'AX-UI', reliedOnRevision: 1 }],
+      },
+    });
+    expect(store.snapshot.library.topics[0]?.counterArgumentIds).toContain(
+      resultingId,
+    );
+
+    await click('Mailbox (0)');
+    await click('History');
+    expect(container.textContent).toContain('Human decision');
+    expect(container.textContent).toContain(
+      'Rejected after checking the current Axiom.',
+    );
+    expect(button('Open resulting Counter-Argument')).toBeDefined();
+  });
+
+  it('accepts a proposal with explicit attack, supersession, and promotion choices', async () => {
+    store = new MemoryStore(fixtureWithProposal());
+    session = new ArgumentWorkspaceSession(store, runtime());
+    await mount();
+    await click('Mailbox (1)');
+    await click('Accept / Integrate');
+    await act(() =>
+      setValue(
+        textarea('Human decision note'),
+        'Accepted as the Current bounded refinement.',
+      ),
+    );
+    await click('Save');
+
+    expect(store.writes).toBe(1);
+    const proposal = store.snapshot.library.proposals[0]!;
+    expect(proposal.status).toBe('accepted');
+    const resultingId = proposal.decision?.resultingArgumentId;
+    const result = store.snapshot.library.arguments.find(
+      ({ id }) => id === resultingId,
+    );
+    expect(result).toMatchObject({
+      reviewState: 'accepted',
+      supersedesArgumentId: 'AR-UI',
+      relations: [
+        expect.objectContaining({
+          kind: 'attack',
+          targetArgumentId: 'AR-UI',
+          targetPart: { kind: 'reasoning' },
+          reliedOnRevision: 1,
+        }),
+      ],
+    });
+    expect(result?.premises.some(({ kind }) => kind === 'axiom')).toBe(false);
+    expect(store.snapshot.library.topics[0]?.currentArgumentId).toBe(
+      resultingId,
+    );
+
+    await click('Mailbox (0)');
+    await click('History');
+    expect(container.textContent).toContain(
+      'Accepted as the Current bounded refinement.',
+    );
+    expect(button('Open resulting Argument')).toBeDefined();
+  });
 
   it('reads a complete exchange, navigates its shared Axiom, searches, and previews bounded context', async () => {
     await mount();

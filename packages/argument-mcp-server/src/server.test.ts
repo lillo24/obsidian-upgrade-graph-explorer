@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -7,8 +7,10 @@ import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import type { McpServer } from '@modelcontextprotocol/server';
 import {
   createArgument,
+  captureArgumentLibrarySnapshot,
   createContext,
   createKnowledgeReaderFromLibrary,
+  parseArgumentLibraryJson,
   serializeArgumentLibrary,
   setRecordArchived,
   updateCounterArgumentResponse,
@@ -26,7 +28,51 @@ async function temporaryLibrary(): Promise<{
 }> {
   const directory = await mkdtemp(join(tmpdir(), 'icarus-argument-mcp-'));
   temporaryDirectories.push(directory);
-  return { directory, path: join(directory, 'library-v4.json') };
+  return { directory, path: join(directory, 'library-v5.json') };
+}
+
+function proposalArguments(
+  library: ReturnType<typeof createSyntheticLibrary>['library'],
+) {
+  const snapshot = captureArgumentLibrarySnapshot(library).descriptor;
+  const argument = library.arguments[0]!;
+  const topic = library.topics[0]!;
+  return {
+    clientSubmissionId: 'mcp-proposal-1',
+    title: 'Verified normalization exception',
+    topicId: topic.id,
+    target: {
+      argumentId: argument.id,
+      part: { kind: 'reasoning' as const },
+      reliedOnRevision: argument.revision,
+    },
+    examples: ['The quantities were normalized upstream.'],
+    premiseHints: ['A current normalization receipt exists.'],
+    suggestedAxiomIds: ['AX-UNITS'],
+    reasoning: 'A repeated conversion may be unnecessary.',
+    conclusion: 'Verified normalized quantities can be compared directly.',
+    boundary: 'Only while the normalization receipt remains current.',
+    whyNovelOrUnresolved:
+      'The existing response does not discuss pre-normalized quantities.',
+    consultation: {
+      libraryId: snapshot.libraryId,
+      libraryRevision: snapshot.libraryRevision,
+      contentFingerprint: snapshot.contentFingerprint,
+      records: [
+        { kind: 'topic' as const, id: topic.id, revision: topic.revision },
+        {
+          kind: 'argument' as const,
+          id: argument.id,
+          revision: argument.revision,
+        },
+        {
+          kind: 'axiom' as const,
+          id: library.axioms[0]!.id,
+          revision: library.axioms[0]!.revision,
+        },
+      ],
+    },
+  };
 }
 
 async function connect(server: McpServer): Promise<{
@@ -63,7 +109,7 @@ afterEach(async () => {
 });
 
 describe('Argument Library MCP tools', () => {
-  it('registers exactly five read-only tools and no write capability', async () => {
+  it('registers five read-only tools and one proposal-only append capability', async () => {
     const { path } = await temporaryLibrary();
     const session = await connect(
       createArgumentMcpServer({ libraryPath: path }),
@@ -82,6 +128,7 @@ describe('Argument Library MCP tools', () => {
         'compiler_list_index',
         'compiler_search_index',
         'compiler_read_bundle',
+        'compiler_submit_proposal',
       ]);
       expect(
         listed.tools.find(({ name }) => name === 'compiler_usage_guide'),
@@ -99,16 +146,125 @@ describe('Argument Library MCP tools', () => {
           ]),
         },
       });
-      expect(listed.tools).toSatisfy((tools: typeof listed.tools) =>
+      expect(listed.tools.slice(0, 5)).toSatisfy((tools: typeof listed.tools) =>
         tools.every(
           ({ annotations }) =>
             annotations?.readOnlyHint === true &&
             annotations.destructiveHint === false,
         ),
       );
-      expect(JSON.stringify(listed.tools)).not.toMatch(
-        /save|create|update|delete|import|read_source/u,
+      expect(listed.tools[5]).toMatchObject({
+        name: 'compiler_submit_proposal',
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      });
+      expect(listed.tools.map(({ name }) => name)).not.toContain(
+        'compiler_create_argument',
       );
+      expect(listed.tools.map(({ name }) => name)).not.toContain(
+        'compiler_resolve_proposal',
+      );
+    } finally {
+      await session.close();
+    }
+  });
+
+  it('appends only a pending proposal and makes an exact retry idempotent', async () => {
+    const { path } = await temporaryLibrary();
+    const fixture = createSyntheticLibrary();
+    await writeFile(path, serializeArgumentLibrary(fixture.library), 'utf8');
+    const session = await connect(
+      createArgumentMcpServer({
+        libraryPath: path,
+        proposalRuntime: fixture.runtime,
+      }),
+    );
+    const input = proposalArguments(fixture.library);
+    try {
+      const first = await session.client.callTool({
+        name: 'compiler_submit_proposal',
+        arguments: input,
+      });
+      expect(first.isError).not.toBe(true);
+      expect(structured(first)).toMatchObject({
+        status: 'ok',
+        proposalStatus: 'pending',
+        duplicate: false,
+      });
+
+      const retry = await session.client.callTool({
+        name: 'compiler_submit_proposal',
+        arguments: input,
+      });
+      expect(structured(retry)).toMatchObject({
+        status: 'ok',
+        duplicate: true,
+      });
+      const firstId = (structured(first) as { proposalId: string }).proposalId;
+      expect((structured(retry) as { proposalId: string }).proposalId).toBe(
+        firstId,
+      );
+
+      const parsed = parseArgumentLibraryJson(await readFile(path, 'utf8'));
+      expect(parsed.status).toBe('valid');
+      if (parsed.status !== 'valid') return;
+      expect(parsed.value.proposals).toHaveLength(1);
+      expect(parsed.value.proposals[0]).toMatchObject({
+        id: firstId,
+        status: 'pending',
+        consultation: input.consultation,
+      });
+      expect(parsed.value.topics).toEqual(fixture.library.topics);
+      expect(parsed.value.axioms).toEqual(fixture.library.axioms);
+      expect(parsed.value.arguments).toEqual(fixture.library.arguments);
+      expect(parsed.value.counterArguments).toEqual(
+        fixture.library.counterArguments,
+      );
+    } finally {
+      await session.close();
+    }
+  });
+
+  it('rejects malformed, oversized, and stale-target submissions', async () => {
+    const { path } = await temporaryLibrary();
+    const fixture = createSyntheticLibrary();
+    await writeFile(path, serializeArgumentLibrary(fixture.library), 'utf8');
+    const session = await connect(
+      createArgumentMcpServer({
+        libraryPath: path,
+        proposalRuntime: fixture.runtime,
+      }),
+    );
+    const input = proposalArguments(fixture.library);
+    try {
+      const malformed = await session.client.callTool({
+        name: 'compiler_submit_proposal',
+        arguments: { ...input, unexpected: true },
+      });
+      expect(malformed.isError).toBe(true);
+
+      const oversized = await session.client.callTool({
+        name: 'compiler_submit_proposal',
+        arguments: { ...input, conclusion: 'x'.repeat(20_001) },
+      });
+      expect(oversized.isError).toBe(true);
+
+      const stale = await session.client.callTool({
+        name: 'compiler_submit_proposal',
+        arguments: {
+          ...input,
+          clientSubmissionId: 'mcp-proposal-stale',
+          target: { ...input.target, reliedOnRevision: 99 },
+        },
+      });
+      expect(stale.isError).toBe(true);
+      expect(structured(stale)).toMatchObject({
+        status: 'error',
+        error: { code: 'persistence-error' },
+      });
+
+      const parsed = parseArgumentLibraryJson(await readFile(path, 'utf8'));
+      expect(parsed.status).toBe('valid');
+      if (parsed.status === 'valid') expect(parsed.value.proposals).toEqual([]);
     } finally {
       await session.close();
     }
@@ -430,7 +586,7 @@ describe('Argument Library MCP tools', () => {
 
       for (const [source, code] of [
         ['{broken', 'invalid-json'],
-        [JSON.stringify({ schemaVersion: 5 }), 'future-schema'],
+        [JSON.stringify({ schemaVersion: 6 }), 'future-schema'],
       ] as const) {
         await writeFile(path, source, 'utf8');
         const failed = await session.client.callTool({

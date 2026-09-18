@@ -17,6 +17,7 @@ import {
   validateArgumentLibraryV1,
   validateArgumentLibraryV2,
   validateArgumentLibraryV3,
+  validateArgumentLibraryV4,
 } from './validation';
 
 export function serializeArgumentLibrary(library: ArgumentLibrary): string {
@@ -66,6 +67,22 @@ export function parseArgumentLibraryJson(
       ...migration,
       preservedSource: source,
     };
+  }
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value as { readonly schemaVersion?: unknown }).schemaVersion === 4
+  ) {
+    const migration = migrateArgumentLibraryV4(value);
+    if (migration.status === 'valid') {
+      return {
+        status: 'valid',
+        value: migration.value,
+        migratedFromSchemaVersion: 4,
+      };
+    }
+    return { ...migration, preservedSource: source };
   }
   if (
     typeof value === 'object' &&
@@ -216,6 +233,30 @@ export function migrateArgumentLibraryV3(
       (argument) => ({ ...argument, contextIds: [] }),
     ),
   };
+  return migrateArgumentLibraryV4(candidate);
+}
+
+/** Deterministically adds an empty non-canonical Proposal Mailbox. */
+export function migrateArgumentLibraryV4(
+  value: unknown,
+): ArgumentLibraryMigrationResult {
+  const legacyValidation = validateArgumentLibraryV4(value);
+  if (!legacyValidation.valid) {
+    const first = legacyValidation.issues[0];
+    return {
+      status: 'invalid-library',
+      message: `Argument Library v4 is invalid${
+        first === undefined ? '.' : ` at ${first.path}: ${first.message}`
+      }`,
+      issues: legacyValidation.issues,
+    };
+  }
+  const legacy = clonePlainData(legacyValidation.value);
+  const candidate = {
+    ...legacy,
+    schemaVersion: 5,
+    proposals: [],
+  };
   const migratedValidation = validateArgumentLibrary(candidate);
   if (!migratedValidation.valid) {
     const first = migratedValidation.issues[0];
@@ -239,7 +280,7 @@ export type ArgumentImportPreview =
       readonly status: 'merge-ready' | 'replace-ready';
       readonly incoming: SnapshotDescriptor;
       readonly additions: readonly {
-        readonly kind: ArgumentRecordKind;
+        readonly kind: ArgumentRecordKind | 'proposal';
         readonly id: string;
       }[];
     }
@@ -247,14 +288,14 @@ export type ArgumentImportPreview =
       readonly status: 'conflict';
       readonly incoming: SnapshotDescriptor;
       readonly conflicts: readonly {
-        readonly kind: 'library-lineage' | ArgumentRecordKind;
+        readonly kind: 'library-lineage' | ArgumentRecordKind | 'proposal';
         readonly id: string;
         readonly message: string;
       }[];
     };
 
 function recordsByKind(library: ArgumentLibrary): readonly {
-  readonly kind: ArgumentRecordKind;
+  readonly kind: ArgumentRecordKind | 'proposal';
   readonly values: readonly { readonly id: string }[];
 }[] {
   return [
@@ -263,6 +304,7 @@ function recordsByKind(library: ArgumentLibrary): readonly {
     { kind: 'axiom', values: library.axioms },
     { kind: 'argument', values: library.arguments },
     { kind: 'counter-argument', values: library.counterArguments },
+    { kind: 'proposal', values: library.proposals },
   ];
 }
 
@@ -314,11 +356,11 @@ export function previewArgumentLibraryImport(
     };
   }
   const conflicts: {
-    kind: ArgumentRecordKind;
+    kind: ArgumentRecordKind | 'proposal';
     id: string;
     message: string;
   }[] = [];
-  const additions: { kind: ArgumentRecordKind; id: string }[] = [];
+  const additions: { kind: ArgumentRecordKind | 'proposal'; id: string }[] = [];
   const currentById = new Map(
     recordsByKind(current).flatMap(({ kind, values }) =>
       values.map(
@@ -432,6 +474,7 @@ export function mergeArgumentLibraries(
       current.counterArguments,
       incoming.counterArguments,
     ),
+    proposals: merge(current.proposals, incoming.proposals),
   };
   const validation = validateArgumentLibrary(candidate);
   if (!validation.valid) {

@@ -113,7 +113,7 @@ describe('Argument Library interchange', () => {
     });
     expect(
       parseArgumentLibraryJson(
-        JSON.stringify({ ...createNeutralArgumentLibrary(), schemaVersion: 5 }),
+        JSON.stringify({ ...createNeutralArgumentLibrary(), schemaVersion: 6 }),
       ),
     ).toMatchObject({ status: 'future-schema' });
   });
@@ -126,11 +126,12 @@ describe('Argument Library interchange', () => {
       status: 'valid',
       migratedFromSchemaVersion: 1,
       value: {
-        schemaVersion: 4,
+        schemaVersion: 5,
         libraryId: 'library-v1-fixture',
         libraryRevision: 7,
         arguments: [],
         contexts: [],
+        proposals: [],
         topics: [{ id: 'T-V1', argumentIds: [] }],
       },
     });
@@ -158,6 +159,7 @@ describe('Argument Library interchange', () => {
     const legacyArguments = current.arguments.map(withoutV3Fields);
     const currentWithoutContexts = { ...current } as Record<string, unknown>;
     delete currentWithoutContexts.contexts;
+    delete currentWithoutContexts.proposals;
     const legacyV2 = {
       ...currentWithoutContexts,
       schemaVersion: 2,
@@ -170,8 +172,9 @@ describe('Argument Library interchange', () => {
       status: 'valid',
       migratedFromSchemaVersion: 2,
       value: {
-        schemaVersion: 4,
+        schemaVersion: 5,
         contexts: [],
+        proposals: [],
         arguments: [{ examples: [], relations: [], contextIds: [] }],
       },
     });
@@ -181,6 +184,28 @@ describe('Argument Library interchange', () => {
     expect(first.value.topics).toEqual(current.topics);
     expect(first.value.axioms).toEqual(current.axioms);
     expect(first.value.counterArguments).toEqual(current.counterArguments);
+  });
+
+  it('migrates v4 by adding only an empty Proposal Mailbox', () => {
+    const current = clonePlainData(createNeutralArgumentLibrary());
+    const legacyV4 = { ...current } as Record<string, unknown>;
+    delete legacyV4.proposals;
+    legacyV4.schemaVersion = 4;
+
+    const parsed = parseArgumentLibraryJson(JSON.stringify(legacyV4));
+
+    expect(parsed).toMatchObject({
+      status: 'valid',
+      migratedFromSchemaVersion: 4,
+      value: { schemaVersion: 5, proposals: [] },
+    });
+    if (parsed.status !== 'valid') return;
+    const migratedWithoutMailbox = clonePlainData(
+      parsed.value,
+    ) as unknown as Record<string, unknown>;
+    delete migratedWithoutMailbox.proposals;
+    migratedWithoutMailbox.schemaVersion = 4;
+    expect(migratedWithoutMailbox).toEqual(legacyV4);
   });
 
   it('treats identical import as idempotent and same-lineage altered content as conflict', () => {

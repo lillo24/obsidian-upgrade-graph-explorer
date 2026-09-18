@@ -34,16 +34,24 @@ import {
   mergeArgumentLibraries,
   previewArgumentLibraryImport,
 } from './serialization';
+import {
+  resolveProposalAsArgument,
+  resolveProposalAsRejected,
+  submitArgumentProposal,
+} from './proposals';
 import { ArgumentLibraryRepository } from './storage';
 import type {
   ArgumentLibrary,
   ArgumentLibraryCommitResult,
+  ArgumentLibrarySnapshot,
+  ArgumentProposal,
   ArgumentExample,
   ArgumentRelation,
   ArgumentRecordKind,
   ArgumentRuntime,
   CreateAxiomInput,
   CreateArgumentInput,
+  CreateArgumentProposalInput,
   CreateCounterArgumentInput,
   CreateContextInput,
   CreateTopicInput,
@@ -54,10 +62,53 @@ import type {
   EditTopicInput,
   HumanReviewState,
   RecordTheorySourceVersionInput,
+  ResolveProposalAsArgumentInput,
+  ResolveProposalAsRejectedInput,
   SnapshotDescriptor,
   TopicMembershipKind,
   UpdateCounterArgumentResponseInput,
 } from './types';
+
+export type ArgumentProposalSubmissionCommitResult =
+  | {
+      readonly status: 'committed';
+      readonly snapshot: ArgumentLibrarySnapshot;
+      readonly proposal: ArgumentProposal;
+      readonly duplicate: boolean;
+    }
+  | Exclude<ArgumentLibraryCommitResult, { readonly status: 'committed' }>;
+
+/** The only mutation capability exposed to AI-facing Compiler adapters. */
+export class ArgumentProposalSubmissionService {
+  constructor(
+    private readonly repository: ArgumentLibraryRepository,
+    private readonly runtime: ArgumentRuntime,
+  ) {}
+
+  async submitProposal(
+    expected: SnapshotDescriptor,
+    input: CreateArgumentProposalInput,
+  ): Promise<ArgumentProposalSubmissionCommitResult> {
+    let outcome: ReturnType<typeof submitArgumentProposal> | undefined;
+    const committed = await this.repository.commit(expected, (library) => {
+      outcome = submitArgumentProposal(library, input, this.runtime);
+      return outcome.library;
+    });
+    if (committed.status !== 'committed') return committed;
+    if (outcome === undefined) {
+      return {
+        status: 'persistence-error',
+        message: 'Proposal submission did not produce a stored proposal.',
+      };
+    }
+    return {
+      status: 'committed',
+      snapshot: committed.snapshot,
+      proposal: outcome.proposal,
+      duplicate: outcome.duplicate,
+    };
+  }
+}
 
 /** Mutation-only facade. Knowledge consumers receive KnowledgeReader instead. */
 export class ArgumentLibraryAuthoringService {
@@ -406,6 +457,24 @@ export class ArgumentLibraryAuthoringService {
   ): Promise<ArgumentLibraryCommitResult> {
     return this.commit(expected, (library) =>
       setRecordReviewState(library, kind, recordId, state, this.runtime),
+    );
+  }
+
+  resolveProposalAsArgument(
+    expected: SnapshotDescriptor,
+    input: ResolveProposalAsArgumentInput,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      resolveProposalAsArgument(library, input, this.runtime),
+    );
+  }
+
+  resolveProposalAsRejected(
+    expected: SnapshotDescriptor,
+    input: ResolveProposalAsRejectedInput,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      resolveProposalAsRejected(library, input, this.runtime),
     );
   }
 
