@@ -3,7 +3,7 @@
 This folder owns the local read-only MCP adapter for the Argument Library.
 
 - `loader.ts` derives the app-local path, reads strict UTF-8 bytes with a size
-  bound, validates schema-v3 data (or deterministic v1/v2 imports) through
+  bound, validates schema-v4 data (or deterministic v1/v2/v3 imports) through
   Argument Workspace, and creates a new
   retained `KnowledgeReader` for each call.
 - `server.ts` registers the four read-only MCP tools and adapts domain results

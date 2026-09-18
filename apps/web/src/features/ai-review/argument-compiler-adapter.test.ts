@@ -17,10 +17,13 @@ import {
   captureArgumentLibrarySnapshot,
   contentFingerprint,
   createAxiom,
+  createArgument,
+  createContext,
   createCounterArgument,
   createEmptyArgumentLibrary,
   createTopic,
   editAxiom,
+  editContext,
   setTopicMembership,
   updateCounterArgumentResponse,
   type ArgumentLibrary,
@@ -150,6 +153,35 @@ function neutralLibrary(
     'counter-argument',
     'CA-NEUTRAL',
     true,
+    clock,
+  );
+}
+
+function contextLibrary(): ArgumentLibrary {
+  const clock = runtime('context-adapter');
+  let library = neutralLibrary();
+  library = createContext(
+    library,
+    {
+      id: 'CTX-NEUTRAL',
+      title: 'Neutral interpretation framework',
+      description: 'Interpretive background for unit comparisons.',
+      retrieval: { keywords: ['interpretive-frame'] },
+      axiomIds: ['AX-NEUTRAL'],
+      reviewState: 'accepted',
+    },
+    clock,
+  );
+  return createArgument(
+    library,
+    {
+      id: 'AR-CONTEXT-NEUTRAL',
+      title: 'Context-only unit interpretation',
+      premises: [],
+      conclusion: 'Unit compatibility is available as background.',
+      contextIds: ['CTX-NEUTRAL'],
+      reviewState: 'accepted',
+    },
     clock,
   );
 }
@@ -525,6 +557,98 @@ describe('Argument CompilerProvider adapter', () => {
       status: 'not-found',
       error: { code: 'record-not-found' },
     });
+  });
+
+  it('maps Context search and bundles as background while retaining snapshot isolation', async () => {
+    const firstLibrary = contextLibrary();
+    const first = captureArgumentLibrarySnapshot(firstLibrary);
+    let current = first;
+    const provider = providerFor(() => current);
+    const retained = await provider.openSnapshot({
+      workspaceId: WORKSPACE_ID,
+      signal: abortSignal(),
+    });
+
+    const searched = await retained.searchIndex(
+      { query: 'interpretive-frame', limit: 5 },
+      abortSignal(),
+    );
+    expect(searched).toMatchObject({ status: 'ok' });
+    expect(JSON.stringify(searched.content)).toContain('CTX-NEUTRAL');
+
+    const context = await retained.readBundle(
+      { id: 'CTX-NEUTRAL' },
+      abortSignal(),
+    );
+    expect(context).toMatchObject({ status: 'ok', completeness: 'complete' });
+    const contextContent = content<{
+      bundle: { contexts: Array<{ id: string; effectiveAxiomIds: string[] }> };
+      markdown: string;
+    }>(context.content);
+    expect(contextContent.bundle.contexts).toContainEqual(
+      expect.objectContaining({
+        id: 'CTX-NEUTRAL',
+        effectiveAxiomIds: ['AX-NEUTRAL'],
+      }),
+    );
+    expect(contextContent.markdown).toContain(
+      'This is background context, not an inference premise.',
+    );
+
+    const argument = await retained.readBundle(
+      { id: 'AR-CONTEXT-NEUTRAL' },
+      abortSignal(),
+    );
+    const argumentContent = content<{
+      bundle: {
+        arguments: Array<{
+          contextIds: string[];
+          backgroundAxioms: Array<{ axiomId: string }>;
+          resolvedPremises: unknown[];
+        }>;
+      };
+      markdown: string;
+    }>(argument.content);
+    expect(argumentContent.bundle.arguments[0]).toMatchObject({
+      contextIds: ['CTX-NEUTRAL'],
+      backgroundAxioms: [{ axiomId: 'AX-NEUTRAL' }],
+      resolvedPremises: [],
+    });
+    expect(argumentContent.markdown).toContain(
+      'Attached Contexts (background, not premises): CTX-NEUTRAL',
+    );
+
+    const changedContext = editContext(
+      firstLibrary,
+      'CTX-NEUTRAL',
+      { description: 'Later context description.' },
+      runtime('changed-context'),
+    );
+    const changed = editAxiom(
+      changedContext,
+      'AX-NEUTRAL',
+      { statement: 'Later background statement.' },
+      runtime('changed-context-axiom'),
+    );
+    current = captureArgumentLibrarySnapshot(changed);
+    const newest = await provider.openSnapshot({
+      workspaceId: WORKSPACE_ID,
+      signal: abortSignal(),
+    });
+    const retainedAgain = await retained.readBundle(
+      { id: 'AR-CONTEXT-NEUTRAL' },
+      abortSignal(),
+    );
+    const newestBundle = await newest.readBundle(
+      { id: 'AR-CONTEXT-NEUTRAL' },
+      abortSignal(),
+    );
+    expect(JSON.stringify(retainedAgain.content)).not.toContain(
+      'Later background statement.',
+    );
+    expect(JSON.stringify(newestBundle.content)).toContain(
+      'Later background statement.',
+    );
   });
 
   it('preserves an explicit core receipt when a complete bundle exceeds limits', async () => {

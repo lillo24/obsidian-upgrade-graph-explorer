@@ -124,6 +124,23 @@ export function buildDescriptiveIndex(
       ]),
     });
   }
+  for (const context of library.contexts) {
+    entries.push({
+      kind: 'context',
+      id: context.id,
+      revision: context.revision,
+      title: context.title,
+      topicIds: [],
+      archived: context.archived,
+      fields: fields([
+        ['title', context.title, 12],
+        ['description', context.description, 7],
+        ['aliases', context.retrieval.aliases.join(' '), 8],
+        ['keywords', context.retrieval.keywords.join(' '), 6],
+        ['phrases', context.retrieval.phrases.join(' '), 9],
+      ]),
+    });
+  }
   for (const axiom of library.axioms) {
     entries.push({
       kind: 'axiom',
@@ -230,9 +247,10 @@ export function buildDescriptiveIndex(
     entries: entries.sort((left, right) => {
       const kindOrder = {
         topic: 0,
-        axiom: 1,
-        argument: 2,
-        'counter-argument': 3,
+        context: 1,
+        axiom: 2,
+        argument: 3,
+        'counter-argument': 4,
       } as const;
       return (
         kindOrder[left.kind] - kindOrder[right.kind] ||

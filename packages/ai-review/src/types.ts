@@ -234,7 +234,7 @@ export interface CompilerResultEnvelope {
 
 export interface CompilerIndexEntry {
   id: string;
-  kind: 'topic' | 'axiom' | 'counter-argument';
+  kind: 'topic' | 'context' | 'axiom' | 'counter-argument';
   title: string;
   summary: string;
   retrievalHint?: string;

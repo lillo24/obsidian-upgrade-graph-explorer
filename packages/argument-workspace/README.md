@@ -7,9 +7,9 @@ has no UI, renderer, vault, platform, agent, or model dependency.
 
 ## Folder map
 
-- `types.ts` defines Topic, Axiom, Argument, Counter-Argument, source locator,
+- `types.ts` defines Topic, Context, Axiom, Argument, Counter-Argument, source locator,
   persistence, snapshot, bundle, source-read, and receipt contracts.
-- `validation.ts` strictly validates schema-v3 libraries and legacy-v1/v2 migration
+- `validation.ts` strictly validates schema-v4 libraries and legacy-v1/v2/v3 migration
   input, portable relative locators, global record/source-reference identities,
   and relationship/dependency integrity.
 - `canonical.ts` owns canonical JSON, browser/worker/Node-neutral SHA-256,
@@ -18,19 +18,22 @@ has no UI, renderer, vault, platform, agent, or model dependency.
   response, archive/review mutations, revision increments, memoized direct and
   transitive Argument dependency staleness, stale-response detection, explicit
   reassessment, and confirmed full-file source-baseline recording.
+- `contexts.ts` resolves the single-parent Context chain, deterministic
+  effective-Axiom union, and per-Argument background provenance without
+  entering the inference dependency graph.
 - `storage.ts` serializes expected-snapshot commits and adopts data only after a
   store confirms persistence.
 - `authoring.ts` exposes the mutation-only service over that repository.
-- `serialization.ts` owns lossless schema-v3 JSON parsing/export, deterministic
-  schema-v1/v2 migration, non-mutating historical validation, import preview,
+- `serialization.ts` owns lossless schema-v4 JSON parsing/export, deterministic
+  schema-v1/v2/v3 migration, non-mutating historical validation, import preview,
   collision checks, and merge preparation.
 - `insert.ts` owns strict `argument-workspace-insert-v1` parsing, whole-payload
   reference and promotion resolution, revision-pin normalization, non-mutating
   preview, and construction of one snapshot-bound additive candidate.
 - `search.ts` builds one deterministic descriptive index per snapshot and owns
   snapshot/query-bound pagination cursors.
-- `bundle.ts` assembles the bounded argumentative closure for Topic, Axiom,
-  Argument, or Counter-Argument reads.
+- `bundle.ts` assembles the bounded argumentative and background closure for
+  Topic, Context, Axiom, Argument, or Counter-Argument reads.
 - `reader.ts` exposes the read-only facade, validates callable inputs, dispatches
   registered source reads, and creates consultation receipts.
 - `markdown.ts` owns the canonical readable source-locator formatter and purely
@@ -40,8 +43,8 @@ has no UI, renderer, vault, platform, agent, or model dependency.
 
 ## Schema and revisions
 
-Schema v3 stores one library identity/revision and arrays of Topics, Axioms,
-Arguments, and Counter-Arguments. Every record has a stable ID, independent
+Schema v4 stores one library identity/revision and arrays of Topics, Contexts,
+Axioms, Arguments, and Counter-Arguments. Every record has a stable ID, independent
 record revision, human review state, archive state, and timestamps. Topic
 membership is by ID. An Argument has scoped stable-ID Examples; ordered
 stable-ID authored-text, Axiom-reference, prior-Argument-conclusion, or
@@ -53,6 +56,16 @@ relations retain the target Argument revision relied upon. Topics may expose
 one non-archived member as `currentArgumentId`; explicit promotion requires an
 accepted Argument and records the prior Current as its predecessor without
 deleting history. The pointer means Current, not true or proven.
+
+A Context is an ordered Axiom group with its own title, optional description,
+retrieval metadata, and at most one parent Context. Effective Axioms are the
+root-to-parent inherited sequence followed by direct Axioms, de-duplicated by
+first occurrence. Descriptive metadata is not inherited. Missing parents,
+self-parenting, and parent cycles are invalid. Arguments attach Contexts by
+stable `contextIds`; they do not pin a Context revision. Context Axioms are
+background only: they are not premises, do not participate in Argument
+dependency-cycle validation, and do not affect premise staleness or explicit
+premise revision pins.
 
 Counter-Arguments retain observation text separately from the inference being
 challenged, may target a Topic claim, Axiom, another Counter-Argument, or a
@@ -126,23 +139,26 @@ returned explicitly without adopting the candidate. Desktop storage lives in
 with validated temporary-sibling replacement. Neither adapter stores data in a
 vault, graph view state, or workspace identity catalog.
 
-Valid schema-v1 and schema-v2 JSON are accepted only through strict
+Valid schema-v1, schema-v2, and schema-v3 JSON are accepted only through strict
 deterministic migrations:
 record content/revisions/timestamps remain unchanged, each Topic receives an
 empty `argumentIds`, the library receives an empty `arguments`, and no Current
 pointer or theory content is invented. V2 Arguments receive empty `examples`
 and `relations`; premises and every existing ID, revision, timestamp, review
 state, membership, Current pointer, and supersession link remain unchanged.
-No Example provenance or Counter-Argument conversion is inferred. Browser data
-stays under its established profile key and is rewritten as v3 only after a
-successful save. Desktop load prefers `library-v3.json`, then migrates a valid
-`library-v2.json` or `library-v1.json` atomically while retaining the source
+No Example provenance or Counter-Argument conversion is inferred. V3 receives
+an empty `contexts` collection and each Argument receives empty `contextIds`;
+no grouping or attachment is inferred. Browser data stays under its established
+profile key and is rewritten as v4 only after a successful save. Desktop load
+prefers `library-v4.json`, then migrates a valid `library-v3.json`,
+`library-v2.json`, or `library-v1.json` atomically while retaining the source
 file as a recoverable copy.
 
 ## Authoring and interchange
 
-`ArgumentLibraryAuthoringService` supports all four record kinds, Topic
+`ArgumentLibraryAuthoringService` supports all five record kinds, Topic
 membership, explicit Current promotion, Example and relation mutations,
+Context parent/direct-Axiom authoring and Argument Context attachment,
 Argument premise/relation reassessment,
 answering-Axiom attach/detach, response updates/reassessment, source-version
 baseline recording, archive/restore, human review/reopen, and validated merge
@@ -169,8 +185,8 @@ candidate for one expected-snapshot repository commit. See
 [`docs/ARGUMENT_WORKSPACE_INSERT_JSON.md`](../../docs/ARGUMENT_WORKSPACE_INSERT_JSON.md).
 
 Markdown export returns `{path, text}[]`. It writes one file per reusable record
-under `topics/`, `axioms/`, `arguments/`, or `counter-arguments/`; Topic,
-premise, and response files link to reusable records instead of duplicating
+under `topics/`, `contexts/`, `axioms/`, `arguments/`, or `counter-arguments/`;
+Topic, Context, premise, and response files link to reusable records instead of duplicating
 their bodies. Frontmatter keeps
 stable IDs/revisions/review/archive/outcome data, and registered original
 wikilinks are preserved. Filenames exclude portable filesystem-reserved
@@ -195,7 +211,8 @@ or returns `snapshot-mismatch`; cursors also bind snapshot, normalized query,
 archive policy, and offset. Search is deterministic lexical retrieval over
 titles, summaries, statements, challenged claims, observations, response text,
 Argument Examples/premises/reasoning/conclusions/Boundary text and relation
-targets, aliases, keywords, and phrases. It
+targets, and Context title/description/retrieval metadata. Context member-Axiom
+prose is deliberately not flattened into the Context index. It
 preserves authored text and useful numeric
 and operator tokens. Search candidates report score and matched fields, never a
 new verdict.
@@ -207,7 +224,10 @@ resolved premise identities and source-premise provenance, Examples, outgoing
 relations and direct targets, direct/inherited premise cause paths, separate
 relation staleness, Topic/Current
 memberships, predecessor/successor context, and directly targeting
-Counter-Arguments with their complete responses. Relation targets are included
+Counter-Arguments with their complete responses, plus attached Context chains,
+effective background Axioms, and `viaContextIds` provenance. A direct Context
+read includes the selected Context, ancestors, and direct/inherited/effective
+Axioms but never reverse-expands every attaching Argument. Relation targets are included
 directly but their debate networks are not recursively expanded. A
 Counter-Argument includes memberships, structured
 target chain, response, and answering Axioms. An Axiom includes memberships and
@@ -219,7 +239,7 @@ record/depth limit that would split required context returns `limit-exceeded`
 with omissions rather than a success-shaped partial bundle. `theorySources:
 not-read` distinguishes library completeness from live source acquisition.
 
-Every successful index/bundle/source response has a contract-v4 receipt with
+Every successful index/bundle/source response has a contract-v5 receipt with
 the normalized request, exact snapshot, returned record identities/revisions,
 source observations when present, completeness/omissions/warnings, and a
 SHA-256 payload fingerprint computed without the receipt. The retained snapshot

@@ -2,6 +2,7 @@ export * from './types';
 export * from './validation';
 export * from './canonical';
 export * from './library';
+export * from './contexts';
 export * from './serialization';
 export * from './insert';
 export * from './storage';

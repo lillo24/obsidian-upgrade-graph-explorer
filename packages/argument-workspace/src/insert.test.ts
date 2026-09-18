@@ -41,6 +41,23 @@ function completePayload() {
         reviewState: 'accepted',
       },
     ],
+    axioms: [
+      {
+        id: 'AX-DEMO',
+        title: 'Demo background Axiom',
+        statement: 'A neutral background assumption.',
+        reviewState: 'accepted',
+      },
+    ],
+    contexts: [
+      {
+        id: 'CTX-DEMO',
+        title: 'Demo Context',
+        description: 'A named interpretive background.',
+        axiomIds: ['AX-DEMO'],
+        reviewState: 'accepted',
+      },
+    ],
     arguments: [
       {
         id: 'ARG-DEMO-A1',
@@ -97,6 +114,7 @@ function completePayload() {
             targetPart: { kind: 'reasoning' },
           },
         ],
+        contextIds: ['CTX-DEMO'],
         supersedesArgumentId: 'ARG-DEMO-A1',
         reviewState: 'accepted',
       },
@@ -143,13 +161,21 @@ describe('Argument Workspace Insert JSON', () => {
       },
     ]);
     expect(refined.supersedesArgumentId).toBe(original.id);
+    expect(refined.contextIds).toEqual(['CTX-DEMO']);
+    expect(candidate.contexts).toContainEqual(
+      expect.objectContaining({
+        id: 'CTX-DEMO',
+        axiomIds: ['AX-DEMO'],
+      }),
+    );
     expect(topic.argumentIds).toEqual([original.id, refined.id]);
     expect(topic.currentArgumentId).toBe(refined.id);
     expect(candidate.arguments).toContain(original);
     expect(preview.resolvedPins).toHaveLength(3);
     expect(preview.counts).toEqual({
       topics: 1,
-      axioms: 0,
+      contexts: 1,
+      axioms: 1,
       arguments: 2,
       counterArguments: 0,
     });

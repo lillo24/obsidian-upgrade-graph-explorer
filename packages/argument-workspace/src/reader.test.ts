@@ -568,7 +568,7 @@ describe('snapshot-bound knowledge reader', () => {
     if (result.status !== 'ok') return;
     expect(() => JSON.stringify(result.value.receipt)).not.toThrow();
     expect(result.value.receipt).toMatchObject({
-      contractVersion: 4,
+      contractVersion: 5,
       operation: 'read-argument-bundle',
       snapshot: reader.snapshot,
       returnedRecords: expect.arrayContaining([

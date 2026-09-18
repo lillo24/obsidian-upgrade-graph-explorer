@@ -93,6 +93,22 @@ export function formatArgumentBundle(
       `Counter-Argument memberships: ${topic.counterArgumentIds.join(', ') || 'none'}`,
     );
   }
+  for (const context of bundle.contexts) {
+    sections.push(
+      '',
+      `## Context — ${context.title} (${context.id})`,
+      '',
+      context.description ?? 'No description.',
+      '',
+      'This is background context, not an inference premise.',
+      `Parent chain: ${context.parentContextIds.join(' -> ') || 'none'}`,
+      `Direct Axioms: ${context.axiomIds.join(', ') || 'none'}`,
+      `Inherited Axioms: ${context.inheritedAxiomIds.join(', ') || 'none'}`,
+      `Effective Axioms: ${context.effectiveAxiomIds.join(', ') || 'none'}`,
+      `Human review state: ${context.reviewState}`,
+      `Archived: ${context.archived ? 'yes' : 'no'}`,
+    );
+  }
   for (const argument of bundle.arguments) {
     sections.push(
       '',
@@ -158,6 +174,15 @@ export function formatArgumentBundle(
       ...premiseStaleness(argument.premiseStaleness),
       `Topic memberships: ${argument.topicIds.join(', ') || 'none'}`,
       `Current for Topics: ${argument.currentTopicIds.join(', ') || 'none'}`,
+      `Attached Contexts (background, not premises): ${argument.contextIds.join(', ') || 'none'}`,
+      `Effective background Axioms: ${
+        argument.backgroundAxioms
+          .map(
+            ({ axiomId, viaContextIds }) =>
+              `${axiomId} via ${viaContextIds.join('+')}`,
+          )
+          .join(', ') || 'none'
+      }`,
       `Supersedes: ${argument.supersedesArgumentId ?? 'none'}`,
       `Superseded by: ${argument.supersededByArgumentIds.join(', ') || 'none'}`,
       `Targeting Counter-Arguments: ${argument.targetingCounterArgumentIds.join(', ') || 'none'}`,
