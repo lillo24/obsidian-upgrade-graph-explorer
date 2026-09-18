@@ -16,6 +16,10 @@
   text-rendering: optimizeLegibility;
 }
 
+/*
+ * Intentional diagnostic visualization palette. PHYSICS1 Lab is a development
+ * canvas with semantic node/edge colors, not application chrome.
+ */
 .physics1-lab {
   min-height: 100vh;
   padding: 24px;
@@ -157,13 +161,20 @@ select {
   font: inherit;
 }
 
-:focus-visible {
-  outline-color: var(--color-border-focus);
+:where(button, input, textarea, select, summary, a):focus-visible {
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+:where(button, input, textarea, select):disabled {
+  border-color: var(--color-control-disabled-border);
+  color: var(--color-control-disabled-foreground);
+  background: var(--color-control-disabled-background);
 }
 
 button,
 input,
 select,
 summary {
-  -webkit-tap-highlight-color: rgb(35 73 91 / 16%);
+  -webkit-tap-highlight-color: var(--color-tap-highlight);
 }

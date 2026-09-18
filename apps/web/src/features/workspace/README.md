@@ -10,6 +10,8 @@ the Argument session before passing it into this presentation boundary.
   top-level area changes through the Arguments leave guard. It does not create
   the Argument session or the Review compiler provider.
 - `workspace.css` owns the restrained 94vw × 93dvh chrome and responsive shell.
+  It inherits the application semantic tokens and owns no independent
+  Light/Dark selector.
 
 Argument authoring and review capture/history remain in their feature folders;
 the graph only supplies launchers and an overlay-open signal.

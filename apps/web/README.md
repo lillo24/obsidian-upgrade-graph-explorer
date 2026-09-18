@@ -61,6 +61,7 @@ apps/web/
     report-view.ts    Pure reference/hierarchy presentation transformations.
     sample-report.json Deterministic private-safe report generated from fixtures.
     components/       Primary graph workspace and secondary diagnostic panels.
+    theme/            Resolved-theme runtime, React provider, and semantic DOM token contract.
     App.css           Responsive component layout and accessible interaction states.
     index.css         Document defaults, typography, and overflow protection.
 ```
@@ -204,6 +205,20 @@ fresh full scan and replacement worker before adoption; other worker/report
 failures retain the last graph until a successful **Rescan Vault**.
 
 ## Graph-first workspace shell
+
+The root `ThemeRuntime` is the sole Light/Dark/System authority. It applies one
+resolved `data-theme` marker before React renders, and
+`src/theme/tokens.css` maps that marker to semantic surface, text, border,
+control, focus, shadow, and status roles. `App.css` and the Workspace,
+Arguments, and AI Review feature styles consume those variables directly; they
+must not add their own `prefers-color-scheme` or `data-theme` override blocks.
+Consequently an open popover or dialog changes with the application theme
+without remounting or changing view state.
+
+The literal-color audit deliberately permits only canonical entity-kind data
+badges in `App.css` and the development-only PHYSICS1 Lab visualization in
+`index.css`. User Visual Group accents and renderer-owned semantic palettes are
+separate data/presentation contracts, not application chrome tokens.
 
 The normal product shell is the graph workspace: it reaches all viewport edges
 without a permanent app header, centered page wrapper, or outer card framing.
