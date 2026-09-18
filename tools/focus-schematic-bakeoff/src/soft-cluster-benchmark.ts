@@ -186,12 +186,23 @@ function soft(
         first.evidence.groupPacking.radialSpreadSafetyViolationCount === 0,
       immediateFolderUnity:
         first.evidence.cohesion.immediateFolderSplitViolationCount === 0,
+      nestedHierarchy:
+        first.evidence.nestedHierarchy.nestedParentContainmentViolationCount ===
+          0 &&
+        first.evidence.nestedHierarchy.nestedFolderSplitViolationCount === 0 &&
+        first.evidence.nestedHierarchy.nestedGuideBlockerViolationCount === 0,
+      namedFolderCoverage:
+        first.evidence.coverage.missingImmediateFolderGuideCount === 0 &&
+        first.evidence.coverage.nestedAncestorCoverageViolationCount === 0,
     },
     metrics: first.evidence.metrics,
     preCohesionMetrics: first.evidence.preCohesionMetrics,
     postCohesionMetrics: first.evidence.postCohesionMetrics,
+    postNestedMetrics: first.evidence.postNestedMetrics,
     preGroupMetrics: first.evidence.preGroupMetrics,
     cohesion: first.evidence.cohesion,
+    nestedHierarchy: first.evidence.nestedHierarchy,
+    coverage: first.evidence.coverage,
     groupPacking: first.evidence.groupPacking,
     radialSpacing,
     displayedMetrics: displayedMetrics(displayed),
@@ -912,7 +923,9 @@ function summarizeSpacingRows(rows: readonly SoftRow[]) {
         hardGates.secondaryGeometryInfluence === 0 &&
         hardGates.boundedSchedule &&
         hardGates.radialSpreadSafety &&
-        hardGates.immediateFolderUnity,
+        hardGates.immediateFolderUnity &&
+        hardGates.nestedHierarchy &&
+        hardGates.namedFolderCoverage,
     ),
     minimumModuleGap: metric(
       (row) => row.displayedMetrics.minimumModuleGap,
@@ -1077,6 +1090,47 @@ const groupPackingTradeoffRows = fixtureRows.map((row) => {
     groupPacking: row.groupPacking,
   };
 });
+const nestedHierarchyTradeoffRows = fixtureRows.map((row) => {
+  const difference = (
+    after: number | null,
+    before: number | null,
+  ): number | null =>
+    after === null || before === null ? null : after - before;
+  return {
+    fixtureId: row.fixtureId,
+    strength: row.strength,
+    connectedPairDistanceMeanChange: difference(
+      row.postNestedMetrics.connectedPairDistanceMean,
+      row.postCohesionMetrics.connectedPairDistanceMean,
+    ),
+    connectedPairDistanceP95Change: difference(
+      row.postNestedMetrics.connectedPairDistanceP95,
+      row.postCohesionMetrics.connectedPairDistanceP95,
+    ),
+    exactPrimaryEndpointSpanMeanChange: difference(
+      row.postNestedMetrics.exactPrimaryEndpointSpanMean,
+      row.postCohesionMetrics.exactPrimaryEndpointSpanMean,
+    ),
+    exactPrimaryEndpointSpanP95Change: difference(
+      row.postNestedMetrics.exactPrimaryEndpointSpanP95,
+      row.postCohesionMetrics.exactPrimaryEndpointSpanP95,
+    ),
+    exactEndpointCrossingCountChange: difference(
+      row.postNestedMetrics.exactEndpointCrossingCount,
+      row.postCohesionMetrics.exactEndpointCrossingCount,
+    ),
+    hopMeanAbsoluteRadiusErrorChange: difference(
+      row.postNestedMetrics.hopMeanAbsoluteRadiusError,
+      row.postCohesionMetrics.hopMeanAbsoluteRadiusError,
+    ),
+    boundsAreaChange: difference(
+      row.postNestedMetrics.boundsArea,
+      row.postCohesionMetrics.boundsArea,
+    ),
+    nestedHierarchy: row.nestedHierarchy,
+    coverage: row.coverage,
+  };
+});
 
 function summarizeTradeoff(
   read: (row: (typeof groupPackingTradeoffRows)[number]) => number | null,
@@ -1227,20 +1281,26 @@ const hardGatesPass =
       hardGates.secondaryGeometryInfluence === 0 &&
       hardGates.boundedSchedule &&
       hardGates.radialSpreadSafety &&
-      hardGates.immediateFolderUnity,
+      hardGates.immediateFolderUnity &&
+      hardGates.nestedHierarchy &&
+      hardGates.namedFolderCoverage,
   ) &&
   stressRows.every(
     ({ deterministic, hardGates }) =>
       deterministic &&
       hardGates.overlapFree &&
       hardGates.radialSpreadSafety &&
-      hardGates.immediateFolderUnity,
+      hardGates.immediateFolderUnity &&
+      hardGates.nestedHierarchy &&
+      hardGates.namedFolderCoverage,
   ) &&
   hierarchyForceRows.every(
     ({ deterministic, hardGates, maximumPerFileFolderWeight }) =>
       deterministic &&
       hardGates.overlapFree &&
       hardGates.immediateFolderUnity &&
+      hardGates.nestedHierarchy &&
+      hardGates.namedFolderCoverage &&
       maximumPerFileFolderWeight <= 1,
   ) &&
   hierarchyStrengthRows.every(
@@ -1248,6 +1308,8 @@ const hardGatesPass =
       deterministic &&
       hardGates.overlapFree &&
       hardGates.immediateFolderUnity &&
+      hardGates.nestedHierarchy &&
+      hardGates.namedFolderCoverage &&
       maximumPerFileFolderWeight <= 1,
   ) &&
   scopeDecayRows.every(
@@ -1255,6 +1317,8 @@ const hardGatesPass =
       deterministic &&
       hardGates.overlapFree &&
       hardGates.immediateFolderUnity &&
+      hardGates.nestedHierarchy &&
+      hardGates.namedFolderCoverage &&
       maximumPerFileFolderWeight <= 1,
   ) &&
   compassDemandBakeoffRows.every(
@@ -1278,8 +1342,8 @@ const completeHardGatesPass =
   permutationInvariant.byteIdentical;
 
 const report = {
-  schemaVersion: 2,
-  title: 'HIER4B-SPACING Soft Folder Clusters bakeoff',
+  schemaVersion: 3,
+  title: 'HIER4B-SPACING-FIX5 Soft Folder Clusters bakeoff',
   status: 'UNDER_EVALUATION',
   productionLayoutChanged: true,
   defaultLabConfiguration: {
@@ -1320,6 +1384,14 @@ const report = {
     summary: cohesionTradeoffSummary,
     priorityFixtures: cohesionTradeoffRows.filter(({ fixtureId }) =>
       ['SC3', 'SC5', 'SC14', 'SC21', 'SC23', 'SC24'].includes(fixtureId),
+    ),
+  },
+  nestedHierarchyBakeoff: {
+    hardPriority:
+      'retained logical folder containment and named-folder coverage before topology quality',
+    rows: nestedHierarchyTradeoffRows,
+    deepHierarchyRows: nestedHierarchyTradeoffRows.filter(
+      ({ fixtureId }) => fixtureId === 'SC29',
     ),
   },
   groupPackingBakeoff: {

@@ -120,6 +120,7 @@ describe('HIER4B Soft Folder Clusters', () => {
       'SC26',
       'SC27',
       'SC28',
+      'SC29',
     ]);
   });
 
@@ -168,7 +169,7 @@ describe('HIER4B Soft Folder Clusters', () => {
     expect(
       first.attempt.result.internalLayoutEvidence.softClusterPolicyEvidence,
     ).toMatchObject({
-      schemaVersion: 7,
+      schemaVersion: 8,
       structuralSpacing: first.attempt.evidence.structuralSpacing,
       folderScopeMode: 'nested',
       ancestorDecayBase: 3,
@@ -423,7 +424,7 @@ describe('HIER4B Soft Folder Clusters', () => {
     expect(fullStrength.evidence.maximumPerFileFolderWeight).toBe(1);
   });
 
-  it('computes same-folder attraction from non-root Files while preserving root display membership', () => {
+  it('computes same-folder attraction from non-root Files while preserving root semantic metadata', () => {
     const withoutFolderForce = run(rootAndTwoSameFolderFixture, 0);
     const fullStrength = run(rootAndTwoSameFolderFixture, 100);
     const coldRepeat = run(rootAndTwoSameFolderFixture, 100);
@@ -524,7 +525,7 @@ describe('HIER4B Soft Folder Clusters', () => {
       createHash('sha256')
         .update(JSON.stringify(attempt.result.candidate))
         .digest('hex'),
-    ).toBe('8c653a5bf0e9507fe125c1341f74cb146d0a440c6270f2aa5cb5f98a7e68a409');
+    ).toBe('4a9806252a972ed531cbfac6e7fd094362c2d7cdf02ffae4d308ff2876d573c3');
   });
 
   it('keeps representative Directional layouts byte-identical', () => {
@@ -819,7 +820,7 @@ describe('HIER4B Soft Folder Clusters', () => {
         internalLayoutVariant: 'vertical-spine',
       },
     ).attempt;
-    expect(adaptive.configId).toContain('HIER4Bv10');
+    expect(adaptive.configId).toContain('HIER4Bv11');
     expect(repeated.configId).toBe(adaptive.configId);
     expect(repeated.result.candidate).toEqual(adaptive.result.candidate);
     expect(vertical.configId).not.toBe(adaptive.configId);

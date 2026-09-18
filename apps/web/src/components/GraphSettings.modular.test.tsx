@@ -451,7 +451,7 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
     expect(byValue('adaptive-compass').disabled).toBe(false);
     expect(byValue('soft-folder-clusters').checked).toBe(true);
     expect(container.textContent).toContain(
-      'Immediate folder grouping remains active at every strength.',
+      'Direct folder unity stays active at every strength',
     );
     act(() => byValue('adaptive-compass').click());
     act(() => byValue('crossing-optimized').click());
@@ -546,7 +546,7 @@ describe('Modular Focus Hierarchy Sandbox controls', () => {
     ).toBe(true);
     expect(container.querySelector('[aria-label="Ancestor pull"]')).toBeNull();
     expect(container.textContent).toContain(
-      'Move immediate-folder groups outward from the Focus',
+      'Move Direct folder groups or complete Nested top-level subtrees outward',
     );
   });
 });

@@ -7,8 +7,12 @@ import type {
   FocusSchematicLayoutInput,
 } from './types';
 import { focusSchematicSoftRadialSpreadScale } from './soft-cluster-spacing';
-import { buildFocusSchematicSoftFolderDisplayTree } from './soft-folder-display';
+import {
+  buildFocusSchematicSoftFolderDisplayTree,
+  projectFocusSchematicSoftFolderGroupingTree,
+} from './soft-folder-display';
 import { createFocusSchematicSoftCompoundBodies } from './soft-group-packing';
+import { measureFocusSchematicSoftNestedHierarchy } from './soft-nested-hierarchy-packing';
 
 interface Translation {
   readonly x: number;
@@ -32,8 +36,9 @@ const center = (rectangle: {
 
 /**
  * Applies the Sandbox spacing value after structural Soft layout. Every
- * immediate-folder body translates rigidly; structural packing already proves
- * that this affine transform is safe over the full supported scale interval.
+ * Direct folder body or Nested top-level subtree translates rigidly; structural
+ * packing already proves that this affine transform is safe over the full
+ * supported scale interval.
  */
 export function applyFocusSchematicSoftRadialSpread(
   input: FocusSchematicLayoutInput,
@@ -60,18 +65,21 @@ export function applyFocusSchematicSoftRadialSpread(
     throw new Error(
       'Soft radial spread requires Soft Folder Cluster policy evidence.',
     );
-  const tree = buildFocusSchematicSoftFolderDisplayTree({
+  const semanticTree = buildFocusSchematicSoftFolderDisplayTree({
     visibleFiles: input.model.modules
       .filter(({ presentation }) => presentation !== 'filtered')
       .map(({ id, folderKey }) => ({ fileId: id, exactFolderKey: folderKey })),
     intent: policy.displayIntent,
+  });
+  const tree = projectFocusSchematicSoftFolderGroupingTree(semanticTree, {
+    excludedFileIds: [input.model.rootModuleId],
   });
   const translations = new Map<string, Translation>();
   for (const body of createFocusSchematicSoftCompoundBodies(
     input,
     computed.candidate,
     tree,
-    options,
+    { ...options, folderScopeMode: policy.folderScopeMode },
   )) {
     const delta = body.anchored
       ? { x: 0, y: 0 }
@@ -101,6 +109,17 @@ export function applyFocusSchematicSoftRadialSpread(
     modules: computed.candidate.modules.map(translate),
     nodes: computed.candidate.nodes.map(translate),
   };
+  if (policy.folderScopeMode === 'nested') {
+    const nested = measureFocusSchematicSoftNestedHierarchy(candidate, tree);
+    if (
+      nested.nestedParentContainmentViolationCount > 0 ||
+      nested.nestedFolderSplitViolationCount > 0 ||
+      nested.nestedGuideBlockerViolationCount > 0
+    )
+      throw new Error(
+        `Soft radial spread violated Nested hierarchy: containment=${nested.nestedParentContainmentViolationCount}, splits=${nested.nestedFolderSplitViolationCount}, blockers=${nested.nestedGuideBlockerViolationCount}.`,
+      );
+  }
   const attachments = createFocusSchematicEndpointAttachments(
     computed.endpointPlan,
     candidate,

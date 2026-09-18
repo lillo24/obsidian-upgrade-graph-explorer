@@ -527,6 +527,25 @@ export function buildFocusSchematicSoftFolderDisplayTree({
   };
 }
 
+/**
+ * Derives the geometry-facing folder tree without changing semantic display
+ * intent or source-folder metadata. Exclusions are applied before empty-folder
+ * pruning and automatic pass-through compression so every Soft geometry layer
+ * observes the same truthful projection.
+ */
+export function projectFocusSchematicSoftFolderGroupingTree(
+  tree: FocusSchematicSoftFolderDisplayTree,
+  options: { readonly excludedFileIds?: readonly EntityId[] } = {},
+): FocusSchematicSoftFolderDisplayTree {
+  const excluded = new Set(options.excludedFileIds ?? []);
+  return buildFocusSchematicSoftFolderDisplayTree({
+    visibleFiles: tree.files
+      .filter(({ fileId }) => !excluded.has(fileId))
+      .map(({ fileId, exactFolderKey }) => ({ fileId, exactFolderKey })),
+    intent: tree.reconciledIntent,
+  });
+}
+
 export function focusSchematicSoftFolderScopeMemberships(
   tree: FocusSchematicSoftFolderDisplayTree,
   policy: FocusSchematicSoftHierarchyForcePolicy,

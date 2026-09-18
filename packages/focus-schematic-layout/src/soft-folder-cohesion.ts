@@ -198,8 +198,9 @@ function coherentPositions(
 
 /**
  * Compacts direct members of each named immediate folder before compound-body
- * packing. Only whole-module translations are applied; the Focus module is
- * fixed when its immediate folder is compacted.
+ * packing. The Focus-neutral grouping projection excludes Focus; the root guard
+ * keeps it fixed even if a semantic tree is supplied defensively. Only
+ * whole-module translations are applied.
  */
 export function applyFocusSchematicSoftFolderCohesion(
   candidate: FocusSchematicLayoutCandidate,

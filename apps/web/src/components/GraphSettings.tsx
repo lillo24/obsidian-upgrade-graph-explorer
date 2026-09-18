@@ -857,8 +857,10 @@ export const GraphSettings = memo(function GraphSettings({
                               </small>
                             </label>
                             <p className="graph-settings__sandbox-note">
-                              Folder strength adds Soft attraction. Immediate
-                              folder grouping remains active at every strength.
+                              Folder strength adds Soft attraction. Direct
+                              folder unity stays active at every strength;
+                              Nested also keeps retained ancestry contained.
+                              Focus remains folder-neutral.
                             </p>
                             <label>
                               <input
@@ -874,8 +876,8 @@ export const GraphSettings = memo(function GraphSettings({
                               <span>
                                 <strong>Direct folders only</strong>
                                 <small>
-                                  Uses each File’s nearest displayed folder and
-                                  draws flat folder guides.
+                                  Uses immediate named-folder hard groups only
+                                  and draws flat folder guides.
                                 </small>
                               </span>
                             </label>
@@ -956,8 +958,9 @@ export const GraphSettings = memo(function GraphSettings({
                                 <span>Strong spread</span>
                               </small>
                               <small>
-                                Move immediate-folder groups outward from the
-                                Focus without changing their internal spacing.
+                                Move Direct folder groups or complete Nested
+                                top-level subtrees outward from the fixed Focus
+                                without changing their internal geometry.
                               </small>
                             </label>
                             <label>

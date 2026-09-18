@@ -11,7 +11,11 @@ import {
 } from './soft-group-packing';
 import { SOFT_CLUSTER_FIXTURES } from './soft-cluster-fixtures';
 import { computeFocusSchematicSoftClusterLayoutAttempt } from './soft-clusters';
-import { buildFocusSchematicSoftFolderDisplayTree } from './soft-folder-display';
+import {
+  buildFocusSchematicSoftFolderDisplayTree,
+  projectFocusSchematicSoftFolderGroupingTree,
+} from './soft-folder-display';
+import { measureFocusSchematicSoftNestedHierarchy } from './soft-nested-hierarchy-packing';
 import { applyFocusSchematicSoftRadialSpread } from './soft-radial-spread';
 import { FOCUS_SCHEMATIC_LAYOUT_SETTINGS } from './settings';
 import { layoutInput } from './test-helpers';
@@ -44,7 +48,7 @@ function layoutFromSpec(spec: EndpointFixtureSpec) {
       })),
     intent: policy.displayIntent,
   });
-  return { input, result: attempt.result, tree };
+  return { input, result: attempt.result, tree, evidence: attempt.evidence };
 }
 
 function baseLayout(id: string) {
@@ -199,22 +203,34 @@ describe('Soft folder-group radial post-layout spread', () => {
     expect(shared.memberModuleIds).toEqual(['SharedA', 'SharedB']);
   });
 
-  it('anchors a Focus-containing named folder', () => {
+  it('keeps Focus neutral while its former named-folder siblings spread rigidly', () => {
     const { input, result, tree } = baseLayout('SC27');
     const anchored = createFocusSchematicSoftCompoundBodies(
       input,
       result.candidate,
       tree,
     ).find(({ anchored: fixed }) => fixed)!;
-    expect(anchored.memberModuleIds).toEqual(['B', 'C', 'Focus']);
+    expect(anchored).toMatchObject({
+      id: 'focus-anchor',
+      kind: 'focus-anchor',
+      folderKey: null,
+      memberModuleIds: ['Focus'],
+    });
+    const named = createFocusSchematicSoftCompoundBodies(
+      input,
+      result.candidate,
+      tree,
+    ).find(({ memberModuleIds }) => memberModuleIds.includes('B'))!;
+    expect(named.memberModuleIds).toEqual(['B', 'C']);
     const spread = applyFocusSchematicSoftRadialSpread(input, result, 100);
-    for (const moduleId of anchored.memberModuleIds)
-      expect(moduleCenter(spread, moduleId)).toEqual(
-        moduleCenter(result, moduleId),
-      );
+    expect(moduleCenter(spread, 'Focus')).toEqual(
+      moduleCenter(result, 'Focus'),
+    );
+    expect(delta(result, spread, 'B')).toEqual(delta(result, spread, 'C'));
+    expect(delta(result, spread, 'B')).not.toEqual({ x: 0, y: 0 });
   });
 
-  it('keeps Workspace-root grouping presentation-only and anchors its Focus body', () => {
+  it('keeps Workspace-root grouping presentation-only without grouping Focus', () => {
     const source = SOFT_CLUSTER_FIXTURES.find(({ id }) => id === 'SC2')!;
     const fixture: EndpointFixtureSpec = {
       ...source,
@@ -229,16 +245,50 @@ describe('Soft folder-group radial post-layout spread', () => {
     const on = applyFocusSchematicSoftRadialSpread(input, result, 100, {
       includeWorkspaceRootGroup: true,
     });
-    for (const moduleId of ['Focus', 'A1', 'A2'])
-      expect(
-        on.candidate.modules.find((module) => module.moduleId === moduleId),
-      ).toEqual(
-        result.candidate.modules.find((module) => module.moduleId === moduleId),
-      );
+    expect(moduleCenter(on, 'Focus')).toEqual(moduleCenter(result, 'Focus'));
+    expect(delta(result, on, 'A1').x).toBeCloseTo(delta(result, on, 'A2').x, 9);
+    expect(delta(result, on, 'A1').y).toBeCloseTo(delta(result, on, 'A2').y, 9);
+    expect(delta(result, on, 'A1')).not.toEqual({ x: 0, y: 0 });
     expect(
       off.candidate.modules.find((module) => module.moduleId === 'A1'),
     ).not.toEqual(
       result.candidate.modules.find((module) => module.moduleId === 'A1'),
     );
   });
+
+  it('preserves the complete SC29 Nested hierarchy at every integer spacing value', () => {
+    const { input, result, tree, evidence } = baseLayout('SC29');
+    const grouping = projectFocusSchematicSoftFolderGroupingTree(tree, {
+      excludedFileIds: [input.model.rootModuleId],
+    });
+    const focusBefore = moduleCenter(result, 'Focus');
+    expect(evidence.nestedHierarchy).toMatchObject({
+      nestedParentContainmentViolationCount: 0,
+      nestedFolderSplitViolationCount: 0,
+      nestedGuideBlockerViolationCount: 0,
+    });
+    expect(evidence.coverage).toMatchObject({
+      missingImmediateFolderGuideCount: 0,
+      nestedAncestorCoverageViolationCount: 0,
+    });
+    for (let spacing = 0; spacing <= 100; spacing += 1) {
+      const spread = applyFocusSchematicSoftRadialSpread(
+        input,
+        result,
+        spacing,
+      );
+      expect(validateFocusSchematicComputedLayout(input, spread).valid).toBe(
+        true,
+      );
+      expectNoModuleOverlaps(spread);
+      expect(moduleCenter(spread, 'Focus')).toEqual(focusBefore);
+      expect(
+        measureFocusSchematicSoftNestedHierarchy(spread.candidate, grouping),
+      ).toEqual({
+        nestedParentContainmentViolationCount: 0,
+        nestedFolderSplitViolationCount: 0,
+        nestedGuideBlockerViolationCount: 0,
+      });
+    }
+  }, 30_000);
 });

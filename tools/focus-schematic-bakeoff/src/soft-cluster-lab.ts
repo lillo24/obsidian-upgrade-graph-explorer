@@ -13,6 +13,7 @@ import {
   FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
   focusSchematicSoftRadialSpreadScale,
   focusSchematicSoftFolderScopeMemberships,
+  projectFocusSchematicSoftFolderGroupingTree,
   SOFT_ADAPTIVE_COMPASS_FIXTURES,
   SOFT_CLUSTER_FIXTURES,
   SOFT_CLUSTER_STABILITY_PAIRS,
@@ -32,14 +33,21 @@ interface ScenarioGroup {
   readonly revisions: Readonly<Record<string, EndpointFixtureSpec>>;
 }
 
-function rootNeutralFolderAttractionGroups(
-  input: ReturnType<typeof createLayoutInput>,
-) {
-  const tree = buildFocusSchematicSoftFolderDisplayTree({
+function focusNeutralFolderTree(input: ReturnType<typeof createLayoutInput>) {
+  const semanticTree = buildFocusSchematicSoftFolderDisplayTree({
     visibleFiles: input.model.modules
       .filter(({ presentation }) => presentation !== 'filtered')
       .map(({ id, folderKey }) => ({ fileId: id, exactFolderKey: folderKey })),
   });
+  return projectFocusSchematicSoftFolderGroupingTree(semanticTree, {
+    excludedFileIds: [input.model.rootModuleId],
+  });
+}
+
+function rootNeutralFolderAttractionGroups(
+  input: ReturnType<typeof createLayoutInput>,
+) {
+  const tree = focusNeutralFolderTree(input);
   const groups = new Map<string, string[]>();
   for (const [fileId, memberships] of focusSchematicSoftFolderScopeMemberships(
     tree,
@@ -129,6 +137,14 @@ function artifact(spec: EndpointFixtureSpec) {
     ...FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
     directionalFolderBandsEnabled: false,
   });
+  const folderGuides = Object.fromEntries(
+    focusNeutralFolderTree(softInput)
+      .folders.filter(({ folderKey }) => folderKey !== '.')
+      .map(({ folderKey, descendantFileIds }) => [
+        folderKey,
+        descendantFileIds,
+      ]),
+  );
   const folderAttractionGroups = rootNeutralFolderAttractionGroups(softInput);
   const soft = Object.fromEntries(
     orderPolicies.map((policy) => [
@@ -172,6 +188,7 @@ function artifact(spec: EndpointFixtureSpec) {
                         scale: focusSchematicSoftRadialSpreadScale(spacing),
                       },
                       evidence: attempt.evidence,
+                      folderGuides,
                       folderAttraction: {
                         policy: 'root-neutral',
                         rootModuleId: softInput.model.rootModuleId,
@@ -295,9 +312,9 @@ ${[
       `<label><input id="${id}" type="checkbox"${checked ? ' checked' : ''}>${label}</label>`,
   )
   .join('')}
-</div></div><p class="legend">Soft spacing is a display-only radial transform over one fixed structural result: 0 = 1.0× base radius, 50 = 1.7×, and 100 = 2.4×. Values 71/72/73 expose the smooth-regression case directly. Adaptive Compass, crossing order, folder force, collision packing, module sizes, and internal offsets remain fixed. Development comparator combinations remain at spacing 50. Folder hulls may include the root; attraction centroids use eligible non-root Files only. Directional Bands is the unchanged HIER4A reference.</p></div>
+</div></div><p class="legend">Soft spacing is a display-only radial transform over one fixed structural result: 0 = 1.0× base radius, 50 = 1.7×, and 100 = 2.4×. Values 71/72/73 expose the smooth-regression case directly. Adaptive Compass, crossing order, folder force, collision packing, module sizes, and internal offsets remain fixed. Development comparator combinations remain at spacing 50. Focus remains a fixed blocker and is excluded from every folder hull, centroid, and visible grouping count. Directional Bands is the unchanged HIER4A reference.</p></div>
 <main class="content"><div class="notes"><div class="note"><b>Authored</b><span id="authored"></span></div><div class="note"><b>Expected</b><span id="expected"></span></div><div class="note"><b>Inspect</b><span id="inspect"></span></div></div><div id="views" class="views"></div>
-<div class="decision"><b>Graphical review gate</b><br>Inspect spacing 0, 25, 50, 71, 72, 73, 75, and 100 on the priority cases. Verify that 71 → 73 is only a small outward translation, root-neutral force remains intact on SC26–SC28, and Adaptive branch arrangements remain stable on AC-S1–AC-S8. Compare Direct-only and ancestor pull 1/3 vs 1/4 in the optimized native candidate. Soft macro-layout adoption remains a separate decision.</div></main>
+<div class="decision"><b>Graphical review gate</b><br>Inspect spacing 0, 25, 50, 71, 72, 73, 75, and 100 on the priority cases. Verify that 71 → 73 is only a small outward translation, Focus is folder-neutral on SC26–SC29, SC29 retains its complete logical hierarchy, and Adaptive branch arrangements remain stable on AC-S1–AC-S8. Compare Direct-only and ancestor pull 1/3 vs 1/4 in the optimized native candidate. Soft macro-layout adoption remains a separate decision.</div></main>
 <script>const DATA=${serialized};
 const q=id=>document.getElementById(id);const controls=['scenario','revision','macro','strength','spacing','internal','order','links','hulls','centroids','hops','bounds'];
 function options(select,entries){select.innerHTML=entries.map(([value,label])=>'<option value="'+value+'">'+label+'</option>').join('')}
@@ -306,25 +323,24 @@ function revisions(){const g=DATA[q('scenario').value];options(q('revision'),Obj
 function esc(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function boundsOf(candidate){const all=candidate.modules;return{l:Math.min(...all.map(r=>r.x))-180,t:Math.min(...all.map(r=>r.y))-180,r:Math.max(...all.map(r=>r.x+r.width))+180,b:Math.max(...all.map(r=>r.y+r.height))+180}}
 function renderPanel(data,title){const candidate=data.candidate,model=current().model,box=boundsOf(candidate),width=box.r-box.l,height=box.b-box.t;const nodes=new Map(candidate.nodes.map(n=>[n.projectionNodeId,n]));const at=new Map(data.attachments.map(a=>[a.connectionId+':'+a.endpoint,a]));
-const folders={};for(const m of model.modules){if(m.folderKey===null)continue;(folders[m.folderKey]??=[]).push(candidate.modules.find(x=>x.moduleId===m.id))}
-const hulls=q('hulls').checked?Object.entries(folders).filter(([,ms])=>ms.length>1).map(([folder,ms])=>{const x=Math.min(...ms.map(r=>r.x))-36,y=Math.min(...ms.map(r=>r.y))-36,r=Math.max(...ms.map(r=>r.x+r.width))+36,b=Math.max(...ms.map(r=>r.y+r.height))+36;return '<g><rect class="hull" x="'+x+'" y="'+y+'" width="'+(r-x)+'" height="'+(b-y)+'" rx="42"/><text class="module-label" x="'+(x+12)+'" y="'+(y+18)+'">'+esc(folder)+'</text></g>'}).join(''):'';
+const folders=data.folderGuides??{};const hulls=q('hulls').checked?Object.entries(folders).map(([folder,ids])=>[folder,ids.map(id=>candidate.modules.find(x=>x.moduleId===id)).filter(Boolean)]).filter(([,ms])=>ms.length>0).map(([folder,ms])=>{const x=Math.min(...ms.map(r=>r.x))-36,y=Math.min(...ms.map(r=>r.y))-36,r=Math.max(...ms.map(r=>r.x+r.width))+36,b=Math.max(...ms.map(r=>r.y+r.height))+36;return '<g><rect class="hull" x="'+x+'" y="'+y+'" width="'+(r-x)+'" height="'+(b-y)+'" rx="42"/><text class="module-label" x="'+(x+12)+'" y="'+(y+18)+'">'+esc(folder)+'</text></g>'}).join(''):'';
 const centroids=q('centroids').checked&&data.folderAttraction?Object.entries(data.folderAttraction.groups).map(([folder,ids])=>{const ms=ids.map(id=>candidate.modules.find(m=>m.moduleId===id)).filter(Boolean);if(ms.length<2)return'';const x=ms.reduce((s,r)=>s+r.x+r.width/2,0)/ms.length,y=ms.reduce((s,r)=>s+r.y+r.height/2,0)/ms.length;return '<g><circle class="centroid" cx="'+x+'" cy="'+y+'" r="7"/><text class="module-label" x="'+(x+11)+'" y="'+(y-9)+'">'+esc(folder)+' attraction</text></g>'}).join(''):'';
 const hopGuides=q('hops').checked?[1,2,3].map(h=>'<circle class="hop" cx="0" cy="0" r="'+(h*600)+'"/>').join(''):'';
 const edges=q('links').checked?current().connections.map(c=>{const s=at.get(c.id+':source'),t=at.get(c.id+':target');if(!s||!t)return'';return '<path class="edge '+(c.role==='secondary'?'secondary':'')+'" marker-end="url(#arrow)" d="M '+s.x+' '+s.y+' L '+t.x+' '+t.y+'"/>'}).join(''):'';
 const hierarchy=model.hierarchyEdges.map(e=>{const s=nodes.get(e.sourceNodeId),t=nodes.get(e.targetNodeId);if(!s||!t)return'';return '<path class="hierarchy" d="M '+(s.x+s.width/2)+' '+(s.y+s.height)+' L '+(t.x+t.width/2)+' '+t.y+'"/>'}).join('');
-const modules=candidate.modules.map(m=>{const meta=model.modules.find(x=>x.id===m.moduleId);const root=m.moduleId===model.rootModuleId;return '<g><rect class="module '+(root?'root ':'')+(meta.presentation==='filtered'?'filtered':'')+'" x="'+m.x+'" y="'+m.y+'" width="'+m.width+'" height="'+m.height+'" rx="16"/><text class="module-label" x="'+(m.x+10)+'" y="'+(m.y+16)+'">'+esc(m.moduleId)+(meta.folderKey?' · '+esc(meta.folderKey):' · filtered')+'</text>'+(root&&data.folderAttraction?'<text class="root-note" x="'+(m.x+10)+'" y="'+(m.y+m.height-10)+'">ROOT · DISPLAY MEMBER · FORCE-NEUTRAL</text>':'')+(q('bounds').checked?'<rect class="bounds" x="'+m.x+'" y="'+m.y+'" width="'+m.width+'" height="'+m.height+'"/>':'')+'</g>'}).join('');
+const modules=candidate.modules.map(m=>{const meta=model.modules.find(x=>x.id===m.moduleId);const root=m.moduleId===model.rootModuleId;return '<g><rect class="module '+(root?'root ':'')+(meta.presentation==='filtered'?'filtered':'')+'" x="'+m.x+'" y="'+m.y+'" width="'+m.width+'" height="'+m.height+'" rx="16"/><text class="module-label" x="'+(m.x+10)+'" y="'+(m.y+16)+'">'+esc(m.moduleId)+(meta.folderKey?' · '+esc(meta.folderKey):' · filtered')+'</text>'+(root&&data.folderAttraction?'<text class="root-note" x="'+(m.x+10)+'" y="'+(m.y+m.height-10)+'">ROOT · FOLDER-NEUTRAL · FIXED</text>':'')+(q('bounds').checked?'<rect class="bounds" x="'+m.x+'" y="'+m.y+'" width="'+m.width+'" height="'+m.height+'"/>':'')+'</g>'}).join('');
 const nodeShapes=candidate.nodes.map(n=>'<g><rect class="node '+model.nodeKinds[n.projectionNodeId]+'" x="'+n.x+'" y="'+n.y+'" width="'+n.width+'" height="'+n.height+'" rx="8"/><text class="label" x="'+(n.x+n.width/2)+'" y="'+(n.y+n.height/2)+'">'+esc(n.projectionNodeId)+'</text></g>').join('');
-const evidence=data.evidence;const metrics=evidence.metrics??evidence.folderBandQuality;const summary={family:evidence.layoutFamily,strength:evidence.strength??'categorical',radialSpread:data.radialSpread??null,structuralSpacing:evidence.structuralSpacing??null,folderScopeMode:evidence.folderScopeMode??null,ancestorDecayBase:evidence.ancestorDecayBase??null,crossings:data.quality.exactEndpointCrossingCount,overlaps:data.quality.moduleOverlapPairs.length,boundsArea:Math.round(data.quality.totalBoundsArea),minimumModuleGap:metrics.minimumModuleGap??null,folderRmsMean:metrics.repeatedFolderRmsRadiusMean??null,connectedDistanceMean:metrics.connectedPairDistanceMean??null,hopError:metrics.hopMeanAbsoluteRadiusError??null,folderAttraction:data.folderAttraction??null,compass:evidence.compass??null,compassChurn:evidence.runtime?.compassBranchRegionChurn??null,layoutMs:evidence.runtime?.layoutMs??evidence.runtimeMs};
+const evidence=data.evidence;const metrics=evidence.metrics??evidence.folderBandQuality;const summary={family:evidence.layoutFamily,strength:evidence.strength??'categorical',radialSpread:data.radialSpread??null,structuralSpacing:evidence.structuralSpacing??null,folderScopeMode:evidence.folderScopeMode??null,ancestorDecayBase:evidence.ancestorDecayBase??null,crossings:data.quality.exactEndpointCrossingCount,overlaps:data.quality.moduleOverlapPairs.length,boundsArea:Math.round(data.quality.totalBoundsArea),minimumModuleGap:metrics.minimumModuleGap??null,folderRmsMean:metrics.repeatedFolderRmsRadiusMean??null,connectedDistanceMean:metrics.connectedPairDistanceMean??null,hopError:metrics.hopMeanAbsoluteRadiusError??null,nestedHierarchy:evidence.nestedHierarchy??null,coverage:evidence.coverage??null,folderAttraction:data.folderAttraction??null,compass:evidence.compass??null,compassChurn:evidence.runtime?.compassBranchRegionChurn??null,layoutMs:evidence.runtime?.layoutMs??evidence.runtimeMs};
 return '<section class="panel"><h2>'+esc(title)+'</h2><svg class="canvas" viewBox="'+box.l+' '+box.t+' '+width+' '+height+'"><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#b3c8df"/></marker></defs>'+hopGuides+hulls+edges+hierarchy+modules+nodeShapes+centroids+'</svg><pre class="metrics">'+esc(JSON.stringify(summary,null,2))+'</pre></section>'}
 function current(){return DATA[q('scenario').value].revisions[q('revision').value]}
-function render(){const d=current();q('authored').textContent=d.explanation.authored;q('expected').textContent=d.explanation.expectation;q('inspect').textContent=d.explanation.inspect;let panels=[];if(q('macro').value==='directional')panels=[renderPanel(d.directional,'Directional Bands reference')];else{const requestedSpacing=Number(q('spacing').value);const productionConfig=q('order').value==='crossing-optimized'&&q('internal').value==='adaptive-compass';const spacing=productionConfig?requestedSpacing:50;const selected=d.soft[q('order').value][q('internal').value][spacing];const matrix=['SC16','SC26','SC27','SC28'].includes(q('scenario').value);const values=matrix?[0,25,50,75,100]:[Number(q('strength').value)];const comparatorNote=productionConfig?'':' · comparator fixed at spacing 50';panels=values.map(v=>renderPanel(selected[v],'Soft Clusters · spacing '+spacing+' · strength '+v+' · root force-neutral'+comparatorNote))}q('views').innerHTML=panels.join('')}
+function render(){const d=current();q('authored').textContent=d.explanation.authored;q('expected').textContent=d.explanation.expectation;q('inspect').textContent=d.explanation.inspect;let panels=[];if(q('macro').value==='directional')panels=[renderPanel(d.directional,'Directional Bands reference')];else{const requestedSpacing=Number(q('spacing').value);const productionConfig=q('order').value==='crossing-optimized'&&q('internal').value==='adaptive-compass';const spacing=productionConfig?requestedSpacing:50;const selected=d.soft[q('order').value][q('internal').value][spacing];const matrix=['SC16','SC26','SC27','SC28','SC29'].includes(q('scenario').value);const values=matrix?[0,25,50,75,100]:[Number(q('strength').value)];const comparatorNote=productionConfig?'':' · comparator fixed at spacing 50';panels=values.map(v=>renderPanel(selected[v],'Soft Clusters · spacing '+spacing+' · strength '+v+' · Focus folder-neutral'+comparatorNote))}q('views').innerHTML=panels.join('')}
 q('scenario').addEventListener('change',()=>{revisions();render()});for(const id of controls.slice(1))q(id).addEventListener('change',render);revisions();render();</script></body></html>`;
   await mkdir(outputDirectory, { recursive: true });
   const indexPath = resolve(outputDirectory, 'index.html');
   await writeFile(indexPath, html, 'utf8');
   await writeFile(
     resolve(outputDirectory, 'README.txt'),
-    'HIER4B-SPACING-FIX1 development-only radial-spread graphical QA. Compare 0/25/50/71/72/73/75/100 here, then test Direct-only and ancestor pull 1/3 vs 1/4 in the optimized native Sandbox. Directional settings are unchanged.\n',
+    'HIER4B-SPACING-FIX5 development-only Focus-neutral and hard Nested hierarchy graphical QA. Compare 0/25/50/71/72/73/75/100 here, especially SC29, then test Direct-only and ancestor pull 1/3 vs 1/4 in the optimized native Sandbox. Directional settings are unchanged.\n',
     'utf8',
   );
   return indexPath;

@@ -6,6 +6,7 @@ import {
   flattenFocusSchematicSoftFolder,
   focusSchematicSoftFolderScopeMemberships,
   moveFocusSchematicSoftFileUp,
+  projectFocusSchematicSoftFolderGroupingTree,
   reconcileFocusSchematicSoftFolderDisplayIntent,
   restoreFocusSchematicSoftFile,
   restoreFocusSchematicSoftFolderLayer,
@@ -23,6 +24,51 @@ const folders = (
 ) => tree.folders.map(({ folderKey }) => folderKey);
 
 describe('nested Soft folder display tree', () => {
+  it('projects Focus out before pruning and pass-through compression without changing source metadata', () => {
+    const semantic = buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles: [
+        file('focus-only', 'FocusOnly'),
+        file('focus', 'A'),
+        file('child', 'A/B'),
+        file('left', 'Multi/Left'),
+        file('right', 'Multi/Right'),
+      ],
+    });
+    const projected = projectFocusSchematicSoftFolderGroupingTree(semantic, {
+      excludedFileIds: ['focus', 'focus-only'],
+    });
+
+    expect(
+      semantic.files.find(({ fileId }) => fileId === 'focus'),
+    ).toMatchObject({
+      exactFolderKey: 'A',
+      directDisplayParentFolderKey: 'A',
+    });
+    expect(projected.files.map(({ fileId }) => fileId)).not.toContain('focus');
+    expect(folders(projected)).not.toContain('FocusOnly');
+    expect(folders(projected)).not.toContain('A');
+    expect(
+      projected.files.find(({ fileId }) => fileId === 'child'),
+    ).toMatchObject({
+      displayParentFolderKey: 'A/B',
+      directDisplayParentFolderKey: 'A/B',
+      suppressedAncestorFolderKeys: [],
+    });
+    expect(
+      projected.folders.find(({ folderKey }) => folderKey === 'A/B'),
+    ).toMatchObject({
+      displayParentFolderKey: '.',
+      suppressedAncestorFolderKeys: ['A'],
+    });
+    expect(folders(projected)).toEqual([
+      '.',
+      'Multi',
+      'A/B',
+      'Multi/Left',
+      'Multi/Right',
+    ]);
+  });
+
   it('validates and canonicalizes sparse source-neutral intent', () => {
     expect(
       canonicalFocusSchematicSoftFolderDisplayIntent({

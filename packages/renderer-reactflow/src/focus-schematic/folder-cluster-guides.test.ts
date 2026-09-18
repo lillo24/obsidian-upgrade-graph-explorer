@@ -337,6 +337,152 @@ describe('nested Soft folder guides', () => {
     ).toThrow('split immediate named folder "A"');
   });
 
+  it('FOCUS1/FOCUS5 excludes Focus from immediate and ancestor guide membership', () => {
+    const displayTree = tree([
+      { fileId: 'focus', exactFolderKey: 'Pattern/Response' },
+      { fileId: 'a', exactFolderKey: 'Pattern/Response' },
+      { fileId: 'b', exactFolderKey: 'Pattern/Response' },
+      { fileId: 'language', exactFolderKey: 'Pattern/Language' },
+    ]);
+    const nodes = [
+      node('a', 0, 0),
+      node('b', 140, 0),
+      node('language', 280, 0),
+      node('focus', 900, 500),
+    ];
+    const direct = focusSchematicFolderClusterGuides(displayTree, nodes, {
+      directFoldersOnly: true,
+      focusModuleId: 'focus',
+    });
+    const nested = focusSchematicFolderClusterGuides(displayTree, nodes, {
+      focusModuleId: 'focus',
+    });
+    expect(
+      direct.find(({ folderKey }) => folderKey === 'Pattern/Response')
+        ?.memberModuleIds,
+    ).toEqual(['a', 'b']);
+    for (const guide of nested)
+      expect(guide.memberModuleIds).not.toContain('focus');
+    expect(
+      nested.find(({ folderKey }) => folderKey === 'Pattern')?.memberModuleIds,
+    ).toEqual(['a', 'b', 'language']);
+  });
+
+  it('FOCUS6 prunes a Focus-only folder from guide presentation', () => {
+    expect(
+      focusSchematicFolderClusterGuides(
+        tree([{ fileId: 'focus', exactFolderKey: 'Only' }]),
+        [node('focus', 0, 0)],
+        { focusModuleId: 'focus' },
+      ),
+    ).toEqual([]);
+  });
+
+  it('N1/N2 constructs exact deep logical membership in Nested but only immediate membership in Direct', () => {
+    const displayTree = tree([
+      { fileId: 'focus', exactFolderKey: 'PatternTheory/ResponseBehaviour' },
+      {
+        fileId: 'god',
+        exactFolderKey: 'PatternTheory/PatternInstances/GeneralPattern',
+      },
+      {
+        fileId: 'relativity',
+        exactFolderKey:
+          'PatternTheory/PatternInstances/GeneralPattern/Philosophy',
+      },
+      {
+        fileId: 'foundational',
+        exactFolderKey: 'PatternTheory/PatternInstances/Underlying',
+      },
+      { fileId: 'language', exactFolderKey: 'PatternTheory/Language' },
+      { fileId: 'symbols', exactFolderKey: 'PatternTheory/Language' },
+      {
+        fileId: 'emotions',
+        exactFolderKey: 'PatternTheory/ResponseBehaviour',
+      },
+      {
+        fileId: 'body',
+        exactFolderKey: 'PatternTheory/ResponseBehaviour',
+      },
+      {
+        fileId: 'rationale',
+        exactFolderKey: 'PatternTheory/ResponseBehaviour',
+      },
+    ]);
+    const nodes = [
+      node('god', 0, 0),
+      node('relativity', 150, 0),
+      node('foundational', 330, 0),
+      node('language', 0, 250),
+      node('symbols', 150, 250),
+      node('emotions', 330, 250),
+      node('body', 480, 250),
+      node('rationale', 630, 250),
+      node('focus', 1200, 900),
+    ];
+    const nested = focusSchematicFolderClusterGuides(displayTree, nodes, {
+      focusModuleId: 'focus',
+    });
+    const direct = focusSchematicFolderClusterGuides(displayTree, nodes, {
+      directFoldersOnly: true,
+      focusModuleId: 'focus',
+    });
+    const nestedMembers = (folderKey: string) =>
+      nested.find((guide) => guide.folderKey === folderKey)?.memberModuleIds;
+    expect(
+      nestedMembers('PatternTheory/PatternInstances/GeneralPattern/Philosophy'),
+    ).toEqual(['relativity']);
+    expect(
+      nestedMembers('PatternTheory/PatternInstances/GeneralPattern'),
+    ).toEqual(['god', 'relativity']);
+    expect(nestedMembers('PatternTheory/PatternInstances/Underlying')).toEqual([
+      'foundational',
+    ]);
+    expect(nestedMembers('PatternTheory/PatternInstances')).toEqual([
+      'foundational',
+      'god',
+      'relativity',
+    ]);
+    expect(nestedMembers('PatternTheory')).toEqual([
+      'body',
+      'emotions',
+      'foundational',
+      'god',
+      'language',
+      'rationale',
+      'relativity',
+      'symbols',
+    ]);
+    expect(
+      direct.find(
+        ({ folderKey }) =>
+          folderKey === 'PatternTheory/PatternInstances/GeneralPattern',
+      )?.memberModuleIds,
+    ).toEqual(['god']);
+    expect(direct.some(({ folderKey }) => folderKey === 'PatternTheory')).toBe(
+      false,
+    );
+  });
+
+  it('N8 always renders a Context-style named singleton in Direct and Nested', () => {
+    const displayTree = tree([
+      { fileId: 'context', exactFolderKey: 'Z/Theory/Neuroscience' },
+    ]);
+    const nodes = [node('context', 0, 0)];
+    for (const directFoldersOnly of [true, false])
+      expect(
+        focusSchematicFolderClusterGuides(displayTree, nodes, {
+          directFoldersOnly,
+        }),
+      ).toEqual([
+        expect.objectContaining({
+          folderKey: 'Z/Theory/Neuroscience',
+          memberModuleIds: ['context'],
+          regionCount: 1,
+        }),
+      ]);
+  });
+
   it('LR3 rejects far same-folder islands that would hide direct identity', () => {
     const displayTree = tree([
       { fileId: 'a1', exactFolderKey: 'A' },
@@ -354,7 +500,7 @@ describe('nested Soft folder guides', () => {
     ).toThrow('split immediate named folder "A"');
   });
 
-  it('LR1 suppresses a parent region around one useful child guide', () => {
+  it('renders every retained Nested parent as one logical region', () => {
     const displayTree = manualTree([
       folder('.', null, 0, [], ['A'], ['one', 'two']),
       folder('A', '.', 1, [], ['A/B'], ['one', 'two']),
@@ -364,11 +510,14 @@ describe('nested Soft folder guides', () => {
       node('one', 0, 0),
       node('two', 150, 0),
     ]);
-    expect(guides.map(({ folderKey }) => folderKey)).toEqual(['A/B']);
-    expect(guides[0]?.suppressedAncestorFolderKeys).toEqual(['A']);
+    expect(guides.map(({ folderKey }) => folderKey)).toEqual(['A', 'A/B']);
+    expect(guides[0]).toMatchObject({
+      memberModuleIds: ['one', 'two'],
+      regionCount: 1,
+    });
   });
 
-  it('LR6 recursively suppresses local one-child guide chains', () => {
+  it('renders retained manual one-child chains without geometry suppression', () => {
     const displayTree = manualTree([
       folder('.', null, 0, [], ['A'], ['one', 'two']),
       folder('A', '.', 1, [], ['A/B'], ['one', 'two']),
@@ -379,14 +528,19 @@ describe('nested Soft folder guides', () => {
       node('one', 0, 0),
       node('two', 150, 0),
     ]);
-    expect(guides.map(({ folderKey }) => folderKey)).toEqual(['A/B/C']);
-    expect(guides[0]).toMatchObject({
-      directVisualUnitCount: 2,
-      suppressedAncestorFolderKeys: ['A', 'A/B'],
-    });
+    expect(guides.map(({ folderKey }) => folderKey)).toEqual([
+      'A',
+      'A/B',
+      'A/B/C',
+    ]);
+    for (const guide of guides)
+      expect(guide).toMatchObject({
+        memberModuleIds: ['one', 'two'],
+        regionCount: 1,
+      });
   });
 
-  it('LR2/LR9 regresses the screenshot wrapper and hit-tests only the surviving child', () => {
+  it('fails explicitly when an unpacked retained parent remains spatially split', () => {
     const displayTree = tree([
       {
         fileId: 'principles-are-malleable',
@@ -405,28 +559,14 @@ describe('nested Soft folder guides', () => {
         exactFolderKey: 'Integrating the ideas/Other',
       },
     ]);
-    const guides = focusSchematicFolderClusterGuides(displayTree, [
-      node('principles-are-malleable', 0, 0),
-      node('cure-companion', 140, 0),
-      node('far-one', 760, 0),
-      node('far-two', 900, 0),
-    ]);
-    expect(
-      guides.filter(({ folderKey }) => folderKey === 'Integrating the ideas'),
-    ).toEqual([]);
-    const cure = guides.find(
-      ({ folderKey }) => folderKey === 'Integrating the ideas/Cure Framework',
-    )!;
-    expect(cure).toMatchObject({
-      memberModuleIds: ['cure-companion', 'principles-are-malleable'],
-      suppressedAncestorFolderKeys: ['Integrating the ideas'],
-    });
-    expect(
-      hitTestFocusSchematicFolderGuideRegion(guides, {
-        x: cure.x + cure.width / 2,
-        y: cure.y + cure.height / 2,
-      })?.folderKey,
-    ).toBe('Integrating the ideas/Cure Framework');
+    expect(() =>
+      focusSchematicFolderClusterGuides(displayTree, [
+        node('principles-are-malleable', 0, 0),
+        node('cure-companion', 140, 0),
+        node('far-one', 760, 0),
+        node('far-two', 900, 0),
+      ]),
+    ).toThrow('split Nested named folder "Integrating the ideas"');
   });
 
   it('LR4 keeps a parent that locally groups one File and one child guide', () => {
@@ -464,7 +604,7 @@ describe('nested Soft folder guides', () => {
     });
   });
 
-  it('LR7/LR10 keeps only a useful mixed island deterministically', () => {
+  it('rejects a disconnected logical parent instead of dropping its far child', () => {
     const displayTree = tree([
       { fileId: 'b1', exactFolderKey: 'A/B' },
       { fileId: 'b2', exactFolderKey: 'A/B' },
@@ -473,27 +613,7 @@ describe('nested Soft folder guides', () => {
       { fileId: 'd1', exactFolderKey: 'A/D' },
       { fileId: 'd2', exactFolderKey: 'A/D' },
     ]);
-    const guides = focusSchematicFolderClusterGuides(displayTree, [
-      node('b1', 0, 0),
-      node('b2', 130, 0),
-      node('c1', 300, 0),
-      node('c2', 430, 0),
-      node('d1', 900, 0),
-      node('d2', 1030, 0),
-    ]);
-    const parent = guides.filter(({ folderKey }) => folderKey === 'A');
-    expect(parent).toHaveLength(1);
-    expect(parent[0]).toMatchObject({
-      directVisualUnitCount: 2,
-      memberModuleIds: ['b1', 'b2', 'c1', 'c2'],
-      regionIndex: 0,
-      regionCount: 1,
-    });
-    expect(
-      guides.find(({ folderKey }) => folderKey === 'A/D')
-        ?.suppressedAncestorFolderKeys,
-    ).toContain('A');
-    expect(
+    expect(() =>
       focusSchematicFolderClusterGuides(displayTree, [
         node('b1', 0, 0),
         node('b2', 130, 0),
@@ -502,7 +622,7 @@ describe('nested Soft folder guides', () => {
         node('d1', 900, 0),
         node('d2', 1030, 0),
       ]),
-    ).toEqual(guides);
+    ).toThrow('split Nested named folder "A"');
   });
 
   it('LR8 keeps a singleton immediate child guide and useful ancestor geometry', () => {

@@ -1415,13 +1415,16 @@ mean SmoothStep for Classic and every unrelated renderer.
 
 HIER4B extends that same persisted Folder guides toggle without changing its
 layout isolation. Directional Bands still renders accepted exact strips. Soft
-uses a pure displayed hierarchy derived from canonical source folders, stable
+uses a pure semantic hierarchy derived from canonical source folders, stable
 per-File parent overrides, manually flattened folder layers, and iterative
-ancestor-only pass-through compression. A named folder with any direct visible
-File is never auto-compressed. Child regions enter parent guide geometry, so
-containment is structural; fixed padding stays bounded. Immediate named folders
-must be one island, while ancestor wrappers may remain split. Filtered modules
-are excluded from visible guide membership.
+ancestor-only pass-through compression. A second grouping projection removes
+Focus and reruns pruning/compression without changing source metadata or context
+actions. A named folder with any direct non-Focus visible File is never
+auto-compressed. In Nested mode, deepest-first structural packing makes direct
+Files and already-packed child subtrees rigid parent-level units. Every retained
+named folder has one complete logical region; island/blocker geometry validates
+that result instead of changing ancestry. Filtered modules are excluded from
+visible guide membership.
 
 HIER4B-FIX2 supersedes FIX1's flat effective groups. Exact folder identity stays
 immutable, while only sparse manual display intent persists under stable
@@ -1438,8 +1441,8 @@ identity. Guide visibility gates that empty-area path.
 HIER4B-POLISH1 keeps the folder-label button as the keyboard and context-menu
 primitive while presenting it as passive text. Its normal state has no pill,
 background, border, shadow, or pointer cursor; hover changes text emphasis and
-keyboard focus supplies a visible outline. Repeated disconnected-region labels
-retain the same restrained typography.
+keyboard focus supplies a visible outline. FIX5's one-region Nested invariant
+leaves one label per retained folder.
 
 Modular File cards and folder labels now use the same extracted context-menu
 portal as Network Explorer: pointer/keyboard opening, viewport bounding,
@@ -1477,11 +1480,11 @@ records per-module cardinal counts, demand matches and hard-guard overrides,
 pass-to-pass region and bounds changes, and pass-two crossing/span deltas. A
 separate perturbation diagnostic compares Adaptive and Vertical internal
 rectangles with final File-center displacement and recognizes legitimate
-second-pass region changes. Soft algorithm version 10 covers root-neutral scope,
-normalized decay, mandatory immediate-folder cohesion, the fixed structural
-policy, and compound immediate-folder packing; worker protocol 12 and Soft
-evidence schema 7 isolate those changes
-while the Directional algorithm version remains 4.
+second-pass region changes. Soft algorithm version 11 covers normalized decay,
+mandatory immediate-folder cohesion, the Focus-neutral grouping projection,
+hard retained Nested packing, and mode-specific compound bodies; worker protocol
+13 and Soft evidence schema 8 carry the hierarchy, coverage, and post-Nested
+metrics while the Directional algorithm version remains 4.
 
 The renderer derives a typed visible-structure marker for each unfiltered module
 after layout. Modules with only a currently visible File paint a transparent
@@ -1559,11 +1562,10 @@ HIER4B-FIX3 adds empty-guide area targeting, composed File/current-folder menus,
 short accessible labels, and displayed-depth styling to FIX2 while retaining
 FIX1's cardinal File ports. POLISH1 then hides empty painted module boundaries
 and makes folder labels visually passive without changing geometry or menu
-behavior. HIER4B-SPACING-FIX4 now awaits native QA for mandatory immediate
-named-folder unity, structurally safe rigid group spacing, and the optional
-renderer-only `Workspace root` group in PR #106.
-Unified folder-region
-policy and MODULAR-CONTEXT1 remain separate later work;
+behavior. HIER4B-SPACING-FIX5 now awaits native QA for Focus-neutral grouping,
+hard retained Nested hierarchy containment, named-folder coverage, structurally
+safe rigid spacing, and the optional renderer-only `Workspace root` group in PR
+#106. MODULAR-CONTEXT1 remains separate later work;
 HIER5 follows HIER4B, and HIER3C follows HIER5.
 
 ## HIER0 product exposure and geometry

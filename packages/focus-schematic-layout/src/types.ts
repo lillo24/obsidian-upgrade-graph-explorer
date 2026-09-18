@@ -19,6 +19,10 @@ import type {
   FocusSchematicSoftFolderCohesionApplicationEvidence,
   FocusSchematicSoftFolderCohesionQuality,
 } from './soft-folder-cohesion';
+import type {
+  FocusSchematicSoftFolderCoverageEvidence,
+  FocusSchematicSoftNestedHierarchyEvidence,
+} from './soft-nested-hierarchy-packing';
 
 export const FOCUS_SCHEMATIC_LAYOUT_PLAN_SCHEMA_VERSION = 1 as const;
 export const FOCUS_SCHEMATIC_ENDPOINT_PLAN_SCHEMA_VERSION = 1 as const;
@@ -426,7 +430,7 @@ export type FocusSchematicSoftFolderScopeMode = 'nested' | 'nearest-only';
 export type FocusSchematicSoftAncestorDecayBase = 3 | 4;
 
 export interface FocusSchematicSoftClusterPolicyEvidence {
-  readonly schemaVersion: 7;
+  readonly schemaVersion: 8;
   readonly layoutFamily: 'soft-folder-clusters';
   readonly strength: FocusSchematicSoftClusterStrength;
   readonly structuralSpacing: FocusSchematicSoftClusterSpacingPolicy;
@@ -517,7 +521,7 @@ export interface FocusSchematicSoftClusterRuntimeEvidence {
 }
 
 export interface FocusSchematicSoftClusterEvidence {
-  readonly schemaVersion: 7;
+  readonly schemaVersion: 8;
   readonly developmentOnly: true;
   readonly layoutFamily: 'soft-folder-clusters';
   readonly strength: FocusSchematicSoftClusterStrength;
@@ -540,11 +544,15 @@ export interface FocusSchematicSoftClusterEvidence {
   readonly compass: FocusSchematicSoftCompassEvidence;
   readonly cohesion: FocusSchematicSoftFolderCohesionApplicationEvidence &
     FocusSchematicSoftFolderCohesionQuality;
+  readonly nestedHierarchy: FocusSchematicSoftNestedHierarchyEvidence;
+  readonly coverage: FocusSchematicSoftFolderCoverageEvidence;
   readonly groupPacking: FocusSchematicSoftGroupPackingEvidence;
   /** Geometry quality after Soft relaxation and before mandatory cohesion. */
   readonly preCohesionMetrics: FocusSchematicSoftClusterMetrics;
   /** Geometry quality after cohesion and before compound-group packing. */
   readonly postCohesionMetrics: FocusSchematicSoftClusterMetrics;
+  /** Geometry after mandatory Nested packing, or post-cohesion in Direct mode. */
+  readonly postNestedMetrics: FocusSchematicSoftClusterMetrics;
   /** Geometry quality immediately before structural compound-group packing. */
   readonly preGroupMetrics: FocusSchematicSoftClusterMetrics;
   readonly metrics: FocusSchematicSoftClusterMetrics;

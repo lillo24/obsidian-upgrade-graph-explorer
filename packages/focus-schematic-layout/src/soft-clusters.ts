@@ -29,12 +29,18 @@ import {
   canonicalFocusSchematicSoftFolderDisplayIntent,
   EMPTY_FOCUS_SCHEMATIC_SOFT_FOLDER_DISPLAY_INTENT,
   focusSchematicSoftFolderScopeMemberships,
+  projectFocusSchematicSoftFolderGroupingTree,
 } from './soft-folder-display';
 import { packFocusSchematicSoftFolderGroups } from './soft-group-packing';
 import {
   applyFocusSchematicSoftFolderCohesion,
   measureFocusSchematicSoftFolderCohesion,
 } from './soft-folder-cohesion';
+import {
+  applyFocusSchematicSoftNestedHierarchyPacking,
+  measureFocusSchematicSoftFolderCoverage,
+  measureFocusSchematicSoftNestedHierarchy,
+} from './soft-nested-hierarchy-packing';
 import type {
   FocusSchematicComputedLayout,
   FocusSchematicEndpointPlan,
@@ -54,7 +60,7 @@ import type {
 export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE = [
   36, 18,
 ] as const;
-export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 10 as const;
+export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 11 as const;
 
 const STRATEGY_ID = 'HIER4B-soft-folder-clusters' as const;
 const EPSILON = 1e-6;
@@ -337,8 +343,8 @@ function hierarchyFolderGroups(
     policy,
     ancestorDecayBase,
   )) {
-    // The Focus File remains a displayed folder member, but it is the neutral
-    // topology anchor and must not bias Soft folder-attraction centroids.
+    // The Focus-neutral projection normally removes this entry. Keep the guard
+    // so a semantic tree can never bias Soft folder-attraction centroids.
     if (id === rootModuleId) continue;
     for (const { folderKey, weight } of memberships) {
       const members = groups.get(folderKey) ?? [];
@@ -925,7 +931,10 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
         modulePaddingY: spacing.modulePaddingY,
       },
     };
-    const tree = displayTree(input, displayIntent);
+    const semanticTree = displayTree(input, displayIntent);
+    const tree = projectFocusSchematicSoftFolderGroupingTree(semanticTree, {
+      excludedFileIds: [input.model.rootModuleId],
+    });
     const memberships = focusSchematicSoftFolderScopeMemberships(
       tree,
       hierarchyForcePolicy,
@@ -1075,11 +1084,56 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       ancestorDecayBase,
       spacing,
     );
-    const preGroupMetrics = postCohesionMetrics;
+    const nestedPacking =
+      folderScopeMode === 'nested'
+        ? applyFocusSchematicSoftNestedHierarchyPacking(candidate, tree)
+        : {
+            candidate,
+            evidence: {
+              retainedNestedFolderCount: 0,
+              nestedFolderPackingMoveMean: 0,
+              nestedFolderPackingMoveP95: 0,
+              nestedFolderPackingMoveMax: 0,
+              nestedFolderPackingDepth: 0,
+              nestedParentContainmentViolationCount: 0,
+              nestedFolderSplitViolationCount: 0,
+              nestedGuideBlockerViolationCount: 0,
+            },
+          };
+    candidate = nestedPacking.candidate;
+    const postNestedAttachments = createFocusSchematicEndpointAttachments(
+      base.endpointPlan,
+      candidate,
+      'soft-cardinal-files',
+    );
+    const postNestedQuality = evaluateFocusSchematicEndpointLayoutQuality(
+      input,
+      base.modulePlan,
+      base.endpointPlan,
+      base.internalLanePlan,
+      candidate,
+      postNestedAttachments,
+      'soft-cardinal-files',
+    );
+    const postNestedMetrics = metrics(
+      input,
+      candidate,
+      base.endpointPlan,
+      postNestedAttachments,
+      postNestedQuality,
+      pairs,
+      hops,
+      tree,
+      hierarchyForcePolicy,
+      ancestorDecayBase,
+      spacing,
+    );
+    const preGroupMetrics = postNestedMetrics;
     const groupPacking = packFocusSchematicSoftFolderGroups(
       input,
       candidate,
       tree,
+      { folderScopeMode },
     );
     candidate = groupPacking.candidate;
     const attachments = createFocusSchematicEndpointAttachments(
@@ -1107,6 +1161,43 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
     if (cohesionQuality.immediateFolderSplitViolationCount > 0)
       throw new Error(
         `Soft Clusters left ${cohesionQuality.immediateFolderSplitViolationCount} immediate named-folder split violations.`,
+      );
+    const nestedHierarchy = {
+      ...nestedPacking.evidence,
+      ...(folderScopeMode === 'nested'
+        ? measureFocusSchematicSoftNestedHierarchy(candidate, tree)
+        : {
+            nestedParentContainmentViolationCount: 0,
+            nestedFolderSplitViolationCount: 0,
+            nestedGuideBlockerViolationCount: 0,
+          }),
+    };
+    if (
+      nestedHierarchy.nestedParentContainmentViolationCount > 0 ||
+      nestedHierarchy.nestedFolderSplitViolationCount > 0 ||
+      nestedHierarchy.nestedGuideBlockerViolationCount > 0
+    )
+      throw new Error(
+        `Nested Soft hierarchy validation failed: containment=${nestedHierarchy.nestedParentContainmentViolationCount}, splits=${nestedHierarchy.nestedFolderSplitViolationCount}, blockers=${nestedHierarchy.nestedGuideBlockerViolationCount}.`,
+      );
+    const coverage = measureFocusSchematicSoftFolderCoverage(tree, {
+      focusExemptFileCount: input.model.modules.some(
+        ({ id, presentation }) =>
+          id === input.model.rootModuleId && presentation !== 'filtered',
+      )
+        ? 1
+        : 0,
+      filteredBridgeExemptFileCount: input.model.modules.filter(
+        ({ presentation }) => presentation === 'filtered',
+      ).length,
+      nested: folderScopeMode === 'nested',
+    });
+    if (
+      coverage.missingImmediateFolderGuideCount > 0 ||
+      coverage.nestedAncestorCoverageViolationCount > 0
+    )
+      throw new Error(
+        `Soft folder coverage validation failed: immediate=${coverage.missingImmediateFolderGuideCount}, ancestors=${coverage.nestedAncestorCoverageViolationCount}.`,
       );
     const churn = [...secondRegions].filter(
       ([id, region]) => firstRegions.get(id) !== region,
@@ -1168,14 +1259,16 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       0,
     );
     const evidence: FocusSchematicSoftClusterEvidence = {
-      schemaVersion: 7,
+      schemaVersion: 8,
       developmentOnly: true,
       layoutFamily: 'soft-folder-clusters',
       strength,
       structuralSpacing: spacing,
       endpointOrderPolicy,
-      fileParentOverrideCount: tree.reconciledIntent.fileParentOverrides.length,
-      flattenedFolderCount: tree.reconciledIntent.flattenedFolderKeys.length,
+      fileParentOverrideCount:
+        semanticTree.reconciledIntent.fileParentOverrides.length,
+      flattenedFolderCount:
+        semanticTree.reconciledIntent.flattenedFolderKeys.length,
       displayedFolderCount: tree.folders.length,
       automaticallyCompressedFolderCount:
         tree.automaticallyCompressedFolderKeys.length,
@@ -1253,9 +1346,12 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
         ),
       },
       cohesion: { ...cohesion.evidence, ...cohesionQuality },
+      nestedHierarchy,
+      coverage,
       groupPacking: groupPacking.evidence,
       preCohesionMetrics,
       postCohesionMetrics,
+      postNestedMetrics,
       preGroupMetrics,
       metrics: metrics(
         input,
@@ -1292,7 +1388,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       internalLayoutEvidence: {
         ...internalLayoutEvidence,
         softClusterPolicyEvidence: {
-          schemaVersion: 7,
+          schemaVersion: 8,
           layoutFamily: 'soft-folder-clusters',
           strength,
           structuralSpacing: spacing,

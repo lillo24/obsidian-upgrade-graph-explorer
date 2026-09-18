@@ -9,6 +9,7 @@ import {
   focusSchematicSoftFolderGuidePaddedCorners as paddedCorners,
   focusSchematicSoftFolderGuidePointInsidePolygon as pointInsidePolygon,
   partitionFocusSchematicSoftFolderGuideIslands as splitIntoIslands,
+  projectFocusSchematicSoftFolderGroupingTree,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 
 import type { GraphFlowNode } from '../types';
@@ -44,6 +45,8 @@ export interface FocusSchematicFolderClusterGuideOptions {
   readonly directFoldersOnly?: boolean;
   /** Expose the structural workspace root as one visible folder. */
   readonly includeWorkspaceRootGroup?: boolean;
+  /** Focus retains semantic metadata but is excluded from guide membership. */
+  readonly focusModuleId?: string;
 }
 
 export interface FocusSchematicFolderClusterGuide {
@@ -85,9 +88,6 @@ const compareText = (left: string, right: string): number =>
 
 const guideId = (folderKey: string, regionIndex: number): string =>
   `${folderKey}\0${regionIndex}`;
-
-const folderKeyDepth = (folderKey: string): number =>
-  folderKey === '.' ? 0 : folderKey.split('/').length;
 
 function shortFolderLabel(folderKey: string): string {
   return folderKey === '.' ? 'Workspace root' : folderKey.split('/').at(-1)!;
@@ -332,6 +332,12 @@ export function focusSchematicFolderClusterGuides(
 ): readonly FocusSchematicFolderClusterGuide[] {
   const directFoldersOnly = options.directFoldersOnly === true;
   const includeWorkspaceRootGroup = options.includeWorkspaceRootGroup === true;
+  const groupingTree =
+    options.focusModuleId === undefined
+      ? tree
+      : projectFocusSchematicSoftFolderGroupingTree(tree, {
+          excludedFileIds: [options.focusModuleId],
+        });
   const rectangleByModuleId = new Map<string, GuideUnit>();
   for (const node of nodes) {
     if (node.type !== 'module') continue;
@@ -347,13 +353,14 @@ export function focusSchematicFolderClusterGuides(
     });
   }
   const displayedFolders = (
-    directFoldersOnly ? tree.preCompressionFolders : tree.folders
+    directFoldersOnly
+      ? groupingTree.preCompressionFolders
+      : groupingTree.folders
   ).filter(({ folderKey }) => folderKey !== '.' || includeWorkspaceRootGroup);
   const byKey = new Map(
     displayedFolders.map((folder) => [folder.folderKey, folder]),
   );
   const resultByFolder = new Map<string, FolderGuideBuildResult>();
-  const localSuppressedAncestorsByGuideId = new Map<string, Set<string>>();
   const ordered = [...displayedFolders].sort(
     (left, right) =>
       right.displayDepth - left.displayDepth ||
@@ -396,80 +403,44 @@ export function focusSchematicFolderClusterGuides(
         `Soft folder guide received a split immediate named folder "${folder.folderKey}".`,
       );
     const islands = splitIntoIslands(units, blockers);
-    // Nested keeps its accepted local wrapper suppression. Direct renders every
-    // truthful group because a singleton is that File's only folder identity.
-    const renderedIslands = directFoldersOnly
-      ? islands
-      : islands.filter(
-          (island) =>
-            folder.folderKey === '.' ||
-            folder.directFileIds.some((fileId) =>
-              island.some(({ memberModuleIds }) =>
-                memberModuleIds.includes(fileId),
-              ),
-            ) ||
-            island.length >= 2,
-        );
-    const guides = renderedIslands.map((island, regionIndex) =>
-      guideForIsland(
-        folder,
-        byKey,
-        regionIndex,
-        renderedIslands.length,
-        island,
-      ),
-    );
-    const unitByIsland = new Map<readonly GuideUnit[], GuideUnit>();
-    for (const [regionIndex, island] of renderedIslands.entries()) {
-      const guide = guides[regionIndex]!;
-      const id = guideId(folder.folderKey, regionIndex);
-      unitByIsland.set(island, {
-        id: `folder:${id}`,
-        memberModuleIds: guide.memberModuleIds,
-        representedGuideIds: [id],
-        x: guide.x,
-        y: guide.y,
-        width: guide.width,
-        height: guide.height,
-      });
-    }
-    const unitsForParent = directFoldersOnly
-      ? []
-      : islands.map((island) => {
-          const rendered = unitByIsland.get(island);
-          if (rendered !== undefined) return rendered;
-          const survivingUnit = island[0]!;
-          for (const representedGuideId of survivingUnit.representedGuideIds) {
-            const ancestors =
-              localSuppressedAncestorsByGuideId.get(representedGuideId) ??
-              new Set<string>();
-            ancestors.add(folder.folderKey);
-            localSuppressedAncestorsByGuideId.set(
-              representedGuideId,
-              ancestors,
-            );
-          }
-          return survivingUnit;
-        });
-    resultByFolder.set(folder.folderKey, { guides, unitsForParent });
+    if (folder.folderKey !== '.' && islands.length !== 1)
+      throw new Error(
+        `Soft folder guide received a split ${directFoldersOnly ? 'immediate' : 'Nested'} named folder "${folder.folderKey}".`,
+      );
+    const guide = guideForIsland(folder, byKey, 0, 1, units);
+    if (
+      blockers.some((blocker) =>
+        pointInsidePolygon(
+          {
+            x: blocker.x + blocker.width / 2,
+            y: blocker.y + blocker.height / 2,
+          },
+          guide.hullPoints,
+        ),
+      )
+    )
+      throw new Error(
+        `Soft folder guide "${folder.folderKey}" would swallow an unrelated module.`,
+      );
+    resultByFolder.set(folder.folderKey, {
+      guides: [guide],
+      unitsForParent: directFoldersOnly
+        ? []
+        : [
+            {
+              id: `folder:${guideId(folder.folderKey, 0)}`,
+              memberModuleIds: guide.memberModuleIds,
+              representedGuideIds: [guideId(folder.folderKey, 0)],
+              x: guide.x,
+              y: guide.y,
+              width: guide.width,
+              height: guide.height,
+            },
+          ],
+    });
   }
   return [...resultByFolder.values()]
     .flatMap(({ guides }) => guides)
-    .map((guide) => ({
-      ...guide,
-      suppressedAncestorFolderKeys: [
-        ...new Set([
-          ...guide.suppressedAncestorFolderKeys,
-          ...(localSuppressedAncestorsByGuideId.get(
-            guideId(guide.folderKey, guide.regionIndex),
-          ) ?? []),
-        ]),
-      ].sort(
-        (left, right) =>
-          folderKeyDepth(left) - folderKeyDepth(right) ||
-          compareText(left, right),
-      ),
-    }))
     .sort(
       (left, right) =>
         left.depth - right.depth ||

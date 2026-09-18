@@ -698,12 +698,17 @@ export default function ModularStructuredGraphView(
       focusSchematicFolderClusterGuides(
         softFolderDisplayTree,
         displayedGraph.nodes,
-        { directFoldersOnly, includeWorkspaceRootGroup },
+        {
+          directFoldersOnly,
+          includeWorkspaceRootGroup,
+          focusModuleId: model.rootModuleId,
+        },
       ),
     [
       directFoldersOnly,
       displayedGraph.nodes,
       includeWorkspaceRootGroup,
+      model.rootModuleId,
       softFolderDisplayTree,
     ],
   );

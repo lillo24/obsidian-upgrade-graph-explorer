@@ -75,14 +75,16 @@ is created only after Local Free is mounted; Structure startup and ordinary
 Global use do not load it.
 
 The Focus Schematic worker is a fifth independent protocol and loads only after
-Focus + Hierarchy + Modular Preview mounts. Its version-12 request carries the
+Focus + Hierarchy + Modular Preview mounts. Its version-13 request carries the
 plain HIER1 model, Local projection, exact renderer dimensions, and frozen A1
 settings plus macro layout, normalized Soft strength, nested/direct scope,
 canonical ancestor decay, sparse Soft display intent, internal layout,
 Heading-order, and experimental Directional hierarchy policies. Radial Soft
 spacing is a main-thread post-transform and is absent from this contract. The
 worker dispatches unchanged Directional Bands or the
-experimental Soft Folder Clusters solver. Both sides validate exact message
+experimental Soft Folder Clusters solver. Its result evidence includes
+Focus-neutral Nested containment, named-folder coverage, and post-Nested
+topology metrics. Both sides validate exact message
 shape, cardinal File attachment policy, structural compound-group evidence,
 and Soft runtime evidence; success is revalidated
 against the originating input. A new request terminates obsolete compute,

@@ -19,7 +19,7 @@ import type {
   FocusSchematicSoftClusterEvidence,
 } from './types';
 
-export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 12 as const;
+export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 13 as const;
 
 export interface FocusSchematicLayoutWorkerRequest {
   readonly protocolVersion: typeof FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION;
@@ -145,9 +145,12 @@ function validateSoftClusterEvidence(
       'fixedIterationSchedule',
       'compass',
       'cohesion',
+      'nestedHierarchy',
+      'coverage',
       'groupPacking',
       'preCohesionMetrics',
       'postCohesionMetrics',
+      'postNestedMetrics',
       'preGroupMetrics',
       'metrics',
       'runtime',
@@ -155,7 +158,7 @@ function validateSoftClusterEvidence(
     'Soft Cluster evidence',
   );
   if (
-    evidence.schemaVersion !== 7 ||
+    evidence.schemaVersion !== 8 ||
     evidence.developmentOnly !== true ||
     evidence.layoutFamily !== 'soft-folder-clusters' ||
     evidence.strength !==
@@ -268,6 +271,57 @@ function validateSoftClusterEvidence(
     throw new FocusSchematicLayoutProtocolError(
       'Soft folder cohesion left a named immediate-folder split.',
     );
+  const nestedHierarchy = record(
+    evidence.nestedHierarchy,
+    'Soft Nested hierarchy evidence',
+  );
+  exactKeys(
+    nestedHierarchy,
+    [
+      'retainedNestedFolderCount',
+      'nestedFolderPackingMoveMean',
+      'nestedFolderPackingMoveP95',
+      'nestedFolderPackingMoveMax',
+      'nestedFolderPackingDepth',
+      'nestedParentContainmentViolationCount',
+      'nestedFolderSplitViolationCount',
+      'nestedGuideBlockerViolationCount',
+    ],
+    'Soft Nested hierarchy evidence',
+  );
+  for (const [key, metric] of Object.entries(nestedHierarchy))
+    finiteNonNegative(metric, `Soft Nested hierarchy evidence.${key}`);
+  if (
+    Number(nestedHierarchy.nestedParentContainmentViolationCount) !== 0 ||
+    Number(nestedHierarchy.nestedFolderSplitViolationCount) !== 0 ||
+    Number(nestedHierarchy.nestedGuideBlockerViolationCount) !== 0
+  )
+    throw new FocusSchematicLayoutProtocolError(
+      'Soft Nested hierarchy evidence contains a hard-geometry violation.',
+    );
+  const coverage = record(evidence.coverage, 'Soft folder coverage evidence');
+  exactKeys(
+    coverage,
+    [
+      'groupableVisibleFileCount',
+      'workspaceRootExemptFileCount',
+      'focusExemptFileCount',
+      'filteredBridgeExemptFileCount',
+      'immediateFolderCoveredFileCount',
+      'missingImmediateFolderGuideCount',
+      'nestedAncestorCoverageViolationCount',
+    ],
+    'Soft folder coverage evidence',
+  );
+  for (const [key, metric] of Object.entries(coverage))
+    finiteNonNegative(metric, `Soft folder coverage evidence.${key}`);
+  if (
+    Number(coverage.missingImmediateFolderGuideCount) !== 0 ||
+    Number(coverage.nestedAncestorCoverageViolationCount) !== 0
+  )
+    throw new FocusSchematicLayoutProtocolError(
+      'Soft folder coverage evidence contains a hard membership violation.',
+    );
   const groupPacking = record(
     evidence.groupPacking,
     'Soft compound group packing evidence',
@@ -307,6 +361,10 @@ function validateSoftClusterEvidence(
     evidence.postCohesionMetrics,
     'Soft post-cohesion metrics',
   );
+  const postNestedMetrics = record(
+    evidence.postNestedMetrics,
+    'Soft post-Nested metrics',
+  );
   const preGroupMetrics = record(
     evidence.preGroupMetrics,
     'Soft pre-group metrics',
@@ -337,6 +395,7 @@ function validateSoftClusterEvidence(
   for (const [label, value] of [
     ['Soft pre-cohesion metrics', preCohesionMetrics],
     ['Soft post-cohesion metrics', postCohesionMetrics],
+    ['Soft post-Nested metrics', postNestedMetrics],
     ['Soft pre-group metrics', preGroupMetrics],
     ['Soft final metrics', finalMetrics],
   ] as const) {

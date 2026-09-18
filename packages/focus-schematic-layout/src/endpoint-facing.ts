@@ -999,7 +999,7 @@ function validSoftClusterPolicyEvidence(
       (value) => Number.isSafeInteger(value) && Number(value) > 0,
     );
   return (
-    evidence.schemaVersion === 7 &&
+    evidence.schemaVersion === 8 &&
     evidence.layoutFamily === 'soft-folder-clusters' &&
     Number.isFinite(evidence.strength) &&
     evidence.strength >= 0 &&

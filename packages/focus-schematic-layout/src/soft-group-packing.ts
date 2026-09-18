@@ -26,6 +26,7 @@ interface Point {
 }
 
 export type FocusSchematicSoftCompoundBodyKind =
+  | 'focus-anchor'
   | 'named-folder'
   | 'workspace-root-singleton'
   | 'workspace-root-group'
@@ -42,6 +43,13 @@ export interface FocusSchematicSoftCompoundBody {
   })[];
   readonly envelope: FocusSchematicRectangle;
   readonly anchored: boolean;
+}
+
+export interface FocusSchematicSoftCompoundBodyOptions {
+  /** Renderer-only grouping of Files stored directly at workspace root. */
+  readonly includeWorkspaceRootGroup?: boolean;
+  /** Nested moves retained top-level subtrees; Direct moves immediate folders. */
+  readonly folderScopeMode?: 'nested' | 'nearest-only';
 }
 
 export interface FocusSchematicSoftRadialOverlapInterval {
@@ -110,7 +118,6 @@ function body(
   kind: FocusSchematicSoftCompoundBodyKind,
   folderKey: WorkspaceFolderKey | null,
   memberModuleIds: readonly string[],
-  rootModuleId: string,
   moduleById: ReadonlyMap<
     string,
     FocusSchematicLayoutCandidate['modules'][number]
@@ -142,19 +149,20 @@ function body(
     center: reference,
     rectangles,
     envelope: bodyEnvelope(rectangles),
-    anchored: memberModuleIds.includes(rootModuleId),
+    anchored: kind === 'focus-anchor',
   };
 }
 
 /**
- * Builds disjoint immediate-folder bodies. Workspace-root Files remain atomic
- * unless the renderer-only workspace-root grouping option is requested.
+ * Builds disjoint Direct folder or Nested top-level-subtree bodies plus one
+ * explicit Focus anchor. Workspace-root Files remain atomic unless the
+ * renderer-only workspace-root grouping option is requested.
  */
 export function createFocusSchematicSoftCompoundBodies(
   input: FocusSchematicLayoutInput,
   candidate: FocusSchematicLayoutCandidate,
   tree: FocusSchematicSoftFolderDisplayTree,
-  options: { readonly includeWorkspaceRootGroup?: boolean } = {},
+  options: FocusSchematicSoftCompoundBodyOptions = {},
 ): readonly FocusSchematicSoftCompoundBody[] {
   const moduleById = new Map(
     candidate.modules.map((module) => [module.moduleId, module]),
@@ -168,16 +176,44 @@ export function createFocusSchematicSoftCompoundBodies(
     }
   >();
   const assigned = new Set<string>();
+  if (moduleById.has(input.model.rootModuleId)) {
+    grouped.set('focus-anchor', {
+      kind: 'focus-anchor',
+      folderKey: null,
+      memberModuleIds: [input.model.rootModuleId],
+    });
+    assigned.add(input.model.rootModuleId);
+  }
+  const folderByKey = new Map(
+    tree.folders.map((folder) => [folder.folderKey, folder]),
+  );
+  const topLevelFolderKey = (
+    folderKey: WorkspaceFolderKey,
+  ): WorkspaceFolderKey => {
+    let current = folderKey;
+    while (current !== '.') {
+      const parent = folderByKey.get(current)?.displayParentFolderKey;
+      if (parent === null || parent === undefined || parent === '.')
+        return current;
+      current = parent;
+    }
+    return '.';
+  };
   for (const file of tree.files) {
+    if (file.fileId === input.model.rootModuleId) continue;
     if (!moduleById.has(file.fileId)) continue;
-    const atWorkspaceRoot = file.directDisplayParentFolderKey === '.';
+    const groupingFolderKey =
+      options.folderScopeMode === 'nested'
+        ? topLevelFolderKey(file.displayParentFolderKey)
+        : file.directDisplayParentFolderKey;
+    const atWorkspaceRoot = groupingFolderKey === '.';
     const workspaceRootGroup =
       atWorkspaceRoot && options.includeWorkspaceRootGroup === true;
     const id = workspaceRootGroup
       ? 'workspace-root-group'
       : atWorkspaceRoot
         ? `workspace-root-file:${file.fileId}`
-        : `folder:${file.directDisplayParentFolderKey}`;
+        : `folder:${groupingFolderKey}`;
     const value = grouped.get(id) ?? {
       kind: workspaceRootGroup
         ? ('workspace-root-group' as const)
@@ -188,7 +224,7 @@ export function createFocusSchematicSoftCompoundBodies(
         ? ('.' as const)
         : atWorkspaceRoot
           ? null
-          : file.directDisplayParentFolderKey,
+          : groupingFolderKey,
       memberModuleIds: [],
     };
     value.memberModuleIds.push(file.fileId);
@@ -205,14 +241,7 @@ export function createFocusSchematicSoftCompoundBodies(
   }
   return [...grouped.entries()]
     .map(([id, value]) =>
-      body(
-        id,
-        value.kind,
-        value.folderKey,
-        value.memberModuleIds,
-        input.model.rootModuleId,
-        moduleById,
-      ),
+      body(id, value.kind, value.folderKey, value.memberModuleIds, moduleById),
     )
     .sort((left, right) => compareText(left.id, right.id));
 }
@@ -445,6 +474,7 @@ export function packFocusSchematicSoftFolderGroups(
   input: FocusSchematicLayoutInput,
   candidate: FocusSchematicLayoutCandidate,
   tree: FocusSchematicSoftFolderDisplayTree,
+  options: Pick<FocusSchematicSoftCompoundBodyOptions, 'folderScopeMode'> = {},
 ): FocusSchematicSoftGroupPackingResult {
   const started = performance.now();
   const stats: PackingStats = {
@@ -457,12 +487,13 @@ export function packFocusSchematicSoftFolderGroups(
     input,
     packed,
     tree,
+    options,
   );
   const translations = new Map<string, Point>();
   const anchored = structuralBodies.filter(({ anchored }) => anchored);
   if (anchored.length !== 1)
     throw new Error(
-      `Soft group packing requires exactly one Focus-containing body; found ${anchored.length}.`,
+      `Soft group packing requires exactly one Focus anchor body; found ${anchored.length}.`,
     );
   const placed: FocusSchematicSoftCompoundBody[] = [anchored[0]!];
 
@@ -490,12 +521,13 @@ export function packFocusSchematicSoftFolderGroups(
     input,
     packed,
     tree,
+    options,
   );
   const workspaceAggregate = createFocusSchematicSoftCompoundBodies(
     input,
     packed,
     tree,
-    { includeWorkspaceRootGroup: true },
+    { ...options, includeWorkspaceRootGroup: true },
   ).find(({ kind }) => kind === 'workspace-root-group');
   const fixedObstacles = [
     ...structuralBodies.filter(
@@ -522,8 +554,14 @@ export function packFocusSchematicSoftFolderGroups(
     finalBodies.push(result.body);
   }
 
-  const offBodies = createFocusSchematicSoftCompoundBodies(input, packed, tree);
+  const offBodies = createFocusSchematicSoftCompoundBodies(
+    input,
+    packed,
+    tree,
+    options,
+  );
   const onBodies = createFocusSchematicSoftCompoundBodies(input, packed, tree, {
+    ...options,
     includeWorkspaceRootGroup: true,
   });
   const violations =

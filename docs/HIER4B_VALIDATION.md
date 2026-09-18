@@ -1,6 +1,6 @@
 # HIER4B validation
 
-Status: **HIER4B-SPACING-FIX4 CANDIDATE — mandatory immediate-folder unity in PR #106 awaits native graphical approval.**
+Status: **HIER4B-SPACING-FIX5 CANDIDATE — Focus-neutral foldering and hard Nested containment in PR #106 await native graphical approval.**
 
 HIER4B evidence remains synthetic and development-only. Directional Folder
 Bands is the unchanged reference and default. Soft Folder Clusters is merged on
@@ -32,22 +32,28 @@ Automated tests verify:
 - Secondary connections retain zero geometry influence;
 - Soft File/module anchors retain final-geometry left/right/top/bottom ports;
 - Direct and Electronic consume identical selected handles;
-- the root File stays centered, remains visible in folder membership, is
-  excluded from every folder-attraction force group, and all final variable
-  module rectangles remain non-overlapping.
+- the root File stays centered with truthful semantic source-folder metadata,
+  is excluded from every visual/structural folder grouping projection, and all
+  final variable module rectangles remain non-overlapping;
+- every normal visible non-Focus File with a named immediate folder has exactly
+  one immediate guide membership, while root-level and filtered modules retain
+  explicit separate exemptions;
+- Nested retained folders have one region, complete logical child containment,
+  and zero unrelated blockers in their hulls.
 
 ## Root-neutral Compass Lab update
 
 The PATCH1 lab now runs against the merged root-neutral Soft solver and includes
-SC26–SC28 from the shared fixture catalog. Folder hulls retain the root's
-truthful visible exact-folder membership. Attraction centroids use eligible
-non-root Files only, and the root module is labeled `DISPLAY MEMBER ·
-FORCE-NEUTRAL`. SC26 shows that a root plus one peer cannot create an attraction
+SC26–SC29 from the shared fixture catalog. The semantic tree retains the root's
+truthful exact-folder membership, while folder hulls use the Focus-neutral
+grouping projection. Attraction centroids use eligible non-root Files only.
+SC26 shows that a root plus one peer cannot create an attraction
 group; SC27 shows two peers attracting around their own centroid; SC28 covers
-normalized-decay ancestor scopes. These scenarios display strengths 0, 25, 50,
-75, and 100 side by side. Soft cache algorithm version 8 separates the combined
-root-neutral, spatial-Compass, scope/decay, and fixed structural geometry from
-the earlier branches; radial spread remains outside this identity.
+normalized-decay ancestor scopes; SC29 covers the complete retained logical
+hierarchy. These scenarios display strengths 0, 25, 50, 75, and 100 side by
+side. Soft cache algorithm version 11 separates the combined Focus-neutral,
+Nested, spatial-Compass, scope/decay, and fixed structural geometry from earlier
+branches; radial spread remains outside this identity.
 
 ## Display-tree cases
 
@@ -66,13 +72,14 @@ visible File remains, including a named singleton.
 
 ## Guide and interaction cases
 
-Renderer tests prove bottom-up parent containment, direct File plus child-guide
-enclosure, short hierarchy labels, ancestor islands, bounded fixed padding,
-determinism, parent/sibling emphasis, compressed ancestry text, pointer-inert
-hulls, and removal of the old toolbar. HT1–HT10 cover actual rounded-region
-hits, parent/child and depth-3+ priority, parent-only space, disconnected
-regions, area/stable tie-breaks, React Flow screen-to-world conversion, node
-priority, label targeting, and the Guides-off empty input.
+Renderer tests prove bottom-up logical parent containment, direct File plus
+child-guide enclosure, one region per retained folder, Focus exclusion and
+blocker handling, short hierarchy labels, bounded fixed padding, determinism,
+parent/sibling emphasis, compressed ancestry text, pointer-inert hulls, and
+removal of the old toolbar. HT1–HT10 cover actual rounded-region hits,
+parent/child and depth-3+ priority, parent-only space, area/stable tie-breaks,
+React Flow screen-to-world conversion, node priority, label targeting, and the
+Guides-off empty input.
 
 Shared-menu and GraphCanvas tests cover right-click plus Shift+F10/ContextMenu
 entry, semantic separators, disabled actions, keyboard traversal, Escape and
@@ -80,17 +87,17 @@ outside dismissal. MC1–MC7 prove one composed File menu, separator omission,
 folder-only menus, current displayed-parent targeting after promotion and
 compression, root behavior, and pointer/keyboard parity. FM1–FM5 preserve
 folder pointer/keyboard actions and inert hulls. L1–L8 cover short names, parent
-hints, accessible normalized keys, repeated island names, displayed depth
+hints, accessible normalized keys, single-region identity, displayed depth
 updates, and the bounded `3+` style. Menu and hover state remain absent from
 layout policy/cache input.
 
 POLISH1 renderer tests cover File-only root and non-root boundaries, currently
 visible Heading and Block structure, collapsed-to-expanded boundary changes,
 unchanged worker geometry, retained hidden handles, passive primary-label CSS,
-quiet parent hints, matching repeated-region typography, keyboard focusability,
+quiet parent hints, matching region typography, keyboard focusability,
 focus-visible styling, and both Shift+F10 and ContextMenu-key entry. The existing
 HT, MC, FM, and L suites continue to cover empty guide-area targeting, deepest
-nested hits, label right-click, focus restoration, and split-region labels.
+nested hits, label right-click, focus restoration, and stable region labels.
 
 The earlier guide FIX4 adds LR1–LR10 renderer cases for one-child-folder suppression, the reported
 `Integrating the ideas/Cure Framework` split, invalid far same-folder singleton
@@ -189,21 +196,22 @@ angular order, branch/crossing evidence, and base structural result; coordinates
 differ only by the expected continuous root-relative scale. The web cache test
 observes one structural compute across repeated radial changes.
 
-Nested scope now has normalized 1/3 and 1/4 decay rows. Two-scope weights are
+Nested scope has normalized 1/3 and 1/4 decay rows. Two-scope weights are
 `.75/.25` and `.80/.20`; three-scope weights are approximately
 `.6923077/.2307692/.0769231` and `.7619048/.1904762/.0476190`. Direct-only
 selects one nearest displayed scope and produces identical cache identity for
-stored base 3 or 4. All force evidence excludes the root before active group
-assembly while display membership and guides retain it. Direct-guide tests show
+stored base 3 or 4. The semantic tree retains root metadata, while the grouping
+projection excludes it before force, cohesion, packing, guide, and visible-count
+assembly. Direct-guide tests show
 that parents with direct Files remain independently targetable and never wrap
 child-folder regions; switching modes leaves the display tree and intent byte
 identical.
 
 The generated benchmark passes its aggregate hard gate and remains
-`REQUIRES_GRAPHICAL_REVIEW`. It covers 135 fixture/spacing rows, 15 hub stress
+`REQUIRES_GRAPHICAL_REVIEW`. FIX5 covers 140 fixture/strength rows, 15 hub stress
 rows, 21 hierarchy-force rows, 35 hierarchy-strength rows, 28 scope/decay rows,
 32 Compass-demand rows, 40 Compass-strength rows, the 3×3 strength/spacing
-matrix, secondary and permutation identity, root centering, containment,
+matrix, secondary and permutation identity, root centering, Nested containment,
 determinism, overlap freedom, bounded per-File folder weight, and unchanged
 Directional reference hashes. AC-S4 now records its legitimate second-pass
 region change in the macro perturbation diagnostic instead of misclassifying
@@ -417,3 +425,54 @@ The QA executable is
 `output/hier4b-spacing-fix4-immediate-folder-unity-native-candidate.exe`;
 its SHA-256 is
 `DDE4C19948FD8C16A7EC161126036D5D873C50027549912FFDACEC060749EE2D`.
+
+## HIER4B-SPACING-FIX5 candidate
+
+FIX5 separates the truthful semantic display tree from a Focus-neutral grouping
+projection. The projection removes Focus and then reruns empty-folder pruning
+and pass-through compression. It is the only folder source used by force,
+cohesion, structural bodies, radial spacing, guides, and grouping evidence.
+Focus keeps its source folder for context and inspection, remains a fixed
+topology/collision anchor, and is represented structurally by one explicit
+`focus-anchor` body with no folder key.
+
+Direct mode preserves FIX4 immediate named-folder bodies. Nested mode adds a
+deterministic deepest-first structural pass over the retained logical tree. At
+each level, direct Files are one rigid unit and every already-packed child
+subtree is another; parent packing translates only complete units. Final group
+packing and spacing move retained top-level subtrees rigidly. Logical ancestry
+comes from normalized folder paths and cannot be reassigned by proximity.
+
+SC29 mirrors a deep PatternTheory hierarchy. Exact membership assertions cover
+Philosophy, GeneralPattern, Underlying, PatternInstances, and PatternTheory;
+Focus is absent from every set. The integration regression checks all 101
+integer spacing values for fixed Focus geometry, zero overlap, one region per
+retained folder, complete parent/child containment, and zero blocker violations.
+A Context-style Neuroscience singleton is covered in Direct and Nested; a
+workspace-root File and a filtered bridge remain distinct audited exemptions.
+
+Soft structural algorithm/cache version 11 invalidates the changed Soft
+geometry only. Worker protocol 13 and Soft evidence schema 8 serialize Nested
+movement/quality, named-folder coverage, and post-Nested topology metrics.
+Directional algorithm version 4, Adaptive Compass assignment/scoring,
+secondary zero-influence, and post-slider no-repack behavior are unchanged.
+
+The exact FIX5 prompt is archived at
+`history-implementations/HIER4B_SPACING_FIX5_nested_hierarchy_focus_neutral_codex_prompt.md`.
+Its SHA-256 is
+`90399D590ABFD7941F78B07F7F55F456EAD27557AB9833FDE8A5A4D565CB2036`.
+
+The FIX5 benchmark passes all hard gates across 140 fixture/strength rows. The
+Nested stage changes mean connected-pair distance by -5.03 px, mean primary
+endpoint span by -9.09 px, crossings by -0.036, hop-radius error by +7.39 px,
+and bounds area by -45,596 px². SC29 adds no crossings at any strength; its
+worst hop-radius cost is +154.93 px at strength 75. No fixture grows during the
+Nested stage: the worst post-cohesion/post-Nested bounds-area ratio is 1.0.
+
+The complete repository gate passes 287 test files / 2,418 tests plus
+formatting, lint, all workspace typechecks, and the production web build.
+Desktop formatting/check, 16 Rust tests, and the optimized release build pass.
+The QA executable is
+`output/hier4b-spacing-fix5-nested-hierarchy-focus-neutral-native-candidate.exe`;
+its SHA-256 is
+`A9312705B9F93FD12BA0D1636B4AC96D8A7E0128BEBE03BEB2CDA4ECF577264D`.

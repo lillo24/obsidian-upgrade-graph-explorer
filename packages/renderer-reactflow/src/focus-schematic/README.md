@@ -16,9 +16,10 @@ renderer-neutral result to validated React Flow data.
   plans consume worker-owned parent and child rectangles, use short visible
   labels with full-path title metadata, and leave direct-parent File units
   unlabeled.
-- `folder-cluster-guides.tsx` builds child regions before parent regions from the
-  nested displayed tree and final module rectangles. It uses the layout-owned
-  pure island oracle for fixed padding, blocker handling, containment,
+- `folder-cluster-guides.tsx` projects Focus out of the semantic display tree,
+  then builds child regions before parent regions from the retained logical
+  tree and final module rectangles. It uses the layout-owned pure island oracle
+  as a one-region/blocker validator for fixed padding and containment,
   pointer-inert hulls, short accessible
   labels, displayed-depth styling, and renderer-only current/parent/sibling
   emphasis. Its pure actual-shape helper resolves pane context points by depth,
@@ -27,9 +28,10 @@ renderer-neutral result to validated React Flow data.
   from that folder's direct displayed Files, never passes child regions into a
   parent wrapper. Immediate named folders always render, including singletons;
   one-unit suppression applies only to ancestor wrappers without direct Files.
-  A split immediate group is rejected rather than rendered as duplicate
-  same-name regions. Both modes derive from the post-spread module rectangles,
-  so guide visibility never influences layout.
+  A split folder or unrelated blocker inside its hull is rejected rather than
+  rendered as duplicate or incomplete same-name regions. Focus remains a real
+  blocker but is absent from every guide member set. Both modes derive from the
+  post-spread module rectangles, so guide visibility never influences layout.
 
 The mapper is the sole owner of optional modular entity metadata. It derives
 module membership from HIER1 and direct-File ring visibility from the final

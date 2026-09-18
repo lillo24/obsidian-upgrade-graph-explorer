@@ -79,7 +79,7 @@ const tree = buildFocusSchematicSoftFolderDisplayTree({
 });
 
 describe('mandatory immediate-folder cohesion', () => {
-  it('pins Focus, translates whole modules, and creates one island per named folder', () => {
+  it('keeps Focus fixed, translates whole modules, and creates one island per named folder', () => {
     const before = candidate();
     expect(
       measureFocusSchematicSoftFolderCohesion(before, tree)

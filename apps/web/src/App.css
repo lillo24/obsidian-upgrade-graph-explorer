@@ -1024,13 +1024,13 @@ h2 {
   gap: 0.45rem;
   margin: 0.55rem 0;
   padding: 0.65rem 0.75rem;
-  border: 1px solid #d7e1e5;
+  border: 1px solid var(--color-border-subtle);
   border-radius: 0.6rem;
-  background: #f9fbfc;
+  background: var(--color-surface-subtle);
 }
 
 .graph-settings__soft-ancestor-pull > strong {
-  color: #294957;
+  color: var(--color-text-primary);
   font-size: 0.78rem;
 }
 
