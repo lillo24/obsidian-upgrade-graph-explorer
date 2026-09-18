@@ -187,6 +187,11 @@ is inert, source failures retain the prior report/live session, and successful
 opens reset transient search/selection while stable KG9B state hydrates by
 workspace. Watching starts before initial discovery, startup batches are
 buffered, and only a stable identity-persisted open becomes live.
+While an open is running, the bottom-right progress notice exposes **Stop Load**.
+Stopping immediately dismisses progress, preserves the committed workspace,
+stops the provisional watcher/worker, and makes a late native completion
+ineligible for adoption; native calls already issued by Tauri may still settle
+in the background.
 
 The plain `desktop-live-vault.ts` controller serializes watch batches and manual
 rescans. Its narrow async processor asks the dedicated worker to prepare KG10

@@ -374,6 +374,19 @@ describe('Tauri source provider', () => {
     expect(error.message).not.toContain('/vault');
   });
 
+  it('abandons a hung native operation when discovery is aborted', async () => {
+    const bridge = new FakeBridge();
+    bridge.inspectPath = () => new Promise(() => undefined);
+    const abortController = new AbortController();
+    const opening = provider(bridge).discoverSelectedVault(selection(), {
+      signal: abortController.signal,
+    });
+
+    abortController.abort();
+
+    await expect(opening).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
   it('times out a hung directory read with a workspace-relative directory', async () => {
     const bridge = new FakeBridge();
     bridge.addDirectory('/vault/Folder');

@@ -54,6 +54,7 @@ async function readMarkdown(
     );
   } catch (error: unknown) {
     if (error instanceof VaultDiscoveryTimeoutError) throw error;
+    tracker.throwIfAborted();
     throw new Error(`Cannot read Markdown source ${path}.`, { cause: error });
   }
   tracker.recordMarkdownRead(bytes.byteLength);
@@ -103,6 +104,7 @@ async function collectDirectory(
     );
   } catch (error: unknown) {
     if (error instanceof VaultDiscoveryTimeoutError) throw error;
+    tracker.throwIfAborted();
     const relative =
       segments.length === 0 ? 'the selected root' : segments.join('/');
     throw new Error(`Cannot read vault directory ${relative}.`, {
@@ -153,6 +155,7 @@ async function inspect(
     );
   } catch (error: unknown) {
     if (error instanceof VaultDiscoveryTimeoutError) throw error;
+    tracker.throwIfAborted();
     throw new Error(`${description} cannot be inspected.`, { cause: error });
   }
 }
@@ -190,6 +193,7 @@ export async function discoverSelectedVault(
     collector,
     tracker,
   );
+  options.signal?.throwIfAborted();
   return completedInventory(collector);
 }
 
@@ -240,5 +244,6 @@ export async function discoverSelectedVaultSubtree(
   } else {
     throw new Error(`Vault path ${path} is not a regular file or directory.`);
   }
+  options.signal?.throwIfAborted();
   return completedInventory(collector);
 }

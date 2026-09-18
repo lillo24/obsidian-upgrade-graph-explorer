@@ -3440,6 +3440,42 @@ h2 {
   margin-top: 0.3rem;
 }
 
+.workspace-notice__action {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.55rem;
+  pointer-events: auto;
+}
+
+.workspace-notice__action button {
+  display: inline-flex;
+  min-height: 2.25rem;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid #a33c48;
+  border-radius: 0.45rem;
+  color: #ffffff;
+  background: #a33c48;
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.workspace-notice__action button:hover,
+.workspace-notice__action button:active {
+  background: #7b2731;
+}
+
+.workspace-notice__action button svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
 @keyframes workspace-notice-progress {
   from {
     transform: translateX(-105%);

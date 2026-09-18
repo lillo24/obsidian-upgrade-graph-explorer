@@ -400,4 +400,39 @@ describe('App vault progress lifecycle', () => {
     expect(vi.getTimerCount()).toBe(0);
     root = createRoot(container);
   });
+
+  it('stops an in-flight vault open from the progress notice', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    let openSignal: AbortSignal | undefined;
+    mocks.openLiveDesktopVault.mockImplementation(
+      (...args: readonly unknown[]) => {
+        openSignal = args[6] as AbortSignal;
+        return new Promise(() => undefined);
+      },
+    );
+    await act(() =>
+      root.render(<App desktopSourceProvider={provider(SELECTION)} />),
+    );
+    const graph = container.querySelector('[data-testid="current-graph"]');
+    const entityCount = graph?.getAttribute('data-entity-count');
+
+    await act(async () => {
+      button(container, 'Open Vault').click();
+      await vi.waitFor(
+        () => expect(mocks.openLiveDesktopVault).toHaveBeenCalledOnce(),
+        { timeout: 5_000 },
+      );
+    });
+    expect(openSignal?.aborted).toBe(false);
+    expect(container.querySelector('[role="progressbar"]')).not.toBeNull();
+
+    await act(() => button(container, 'Stop Load').click());
+
+    expect(openSignal?.aborted).toBe(true);
+    expect(container.querySelector('[role="progressbar"]')).toBeNull();
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(graph?.getAttribute('data-entity-count')).toBe(entityCount);
+    expect(button(container, 'Open Vault').disabled).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });

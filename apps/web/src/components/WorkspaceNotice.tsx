@@ -96,12 +96,14 @@ const WorkspaceNoticeTiming = memo(function WorkspaceNoticeTiming({
 });
 
 export const WorkspaceNotice = memo(function WorkspaceNotice({
+  action,
   children,
   discoveryProgressStore,
   progressLabel,
   startedAt,
   tone,
 }: {
+  readonly action?: ReactNode;
   readonly children: ReactNode;
   readonly discoveryProgressStore?: VaultDiscoveryProgressStore;
   readonly progressLabel?: string;
@@ -136,6 +138,9 @@ export const WorkspaceNotice = memo(function WorkspaceNotice({
             />
           )}
         </>
+      )}
+      {action === undefined ? null : (
+        <div className="workspace-notice__action">{action}</div>
       )}
     </div>
   );
