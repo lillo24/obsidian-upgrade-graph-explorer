@@ -34,6 +34,7 @@ import { EntityDisclosureProvider } from './disclosure-context';
 import { shouldActivateEntityFocus } from './focus-interaction';
 import { applyRendererInteractionState } from './highlight';
 import { DocumentDirectHoverProvider } from './hover-context';
+import { hierarchyThemeFor, hierarchyThemeStyleFor } from './hierarchy-theme';
 import {
   applyRendererLayoutPositions,
   createRendererLayoutInput,
@@ -159,6 +160,8 @@ function GraphCanvasInner({
   trackpadZoomMode,
   visualVariant = 'extended',
 }: GraphCanvasProps) {
+  const hierarchyTheme = hierarchyThemeFor(theme);
+  const hierarchyThemeStyle = hierarchyThemeStyleFor(theme);
   const [hovered, setHovered] = useState<GraphSelection | null>(null);
   const [documentDirectHover, setDocumentDirectHoverTarget] =
     useState<GraphHoverTarget | null>(null);
@@ -1070,7 +1073,13 @@ function GraphCanvasInner({
 
   if (projection.nodes.length === 0) {
     return (
-      <div className="graph-empty" data-theme={theme} role="status">
+      <div
+        className="graph-empty"
+        data-hierarchy-theme={hierarchyTheme.id}
+        data-theme={theme}
+        role="status"
+        style={hierarchyThemeStyle}
+      >
         <strong>No nodes match this view.</strong>
         <span>Exit focus or adjust the graph controls to restore context.</span>
       </div>
@@ -1082,9 +1091,11 @@ function GraphCanvasInner({
       <div
         className="graph-layout-pending graph-empty"
         data-focus-appearance={focusAppearance}
+        data-hierarchy-theme={hierarchyTheme.id}
         data-theme={theme}
         data-trackpad-zoom-mode={trackpadZoomMode}
         data-visual-variant={visualVariant}
+        style={hierarchyThemeStyle}
       >
         <div role="status" aria-live="polite">
           <strong>{preparedGraphStatus ?? 'Laying out graph…'}</strong>
@@ -1114,12 +1125,14 @@ function GraphCanvasInner({
       aria-label="Projected knowledge graph"
       aria-busy={layoutPending}
       data-focus-appearance={focusAppearance}
+      data-hierarchy-theme={hierarchyTheme.id}
       data-theme={theme}
       data-trackpad-zoom-mode={trackpadZoomMode}
       data-visual-variant={visualVariant}
       onKeyDownCapture={activateFocusedNode}
       ref={containerRef}
       role="region"
+      style={hierarchyThemeStyle}
     >
       {prepared.layoutWarning === null ? null : (
         <p className="graph-layout-warning" role="alert">
@@ -1179,7 +1192,7 @@ function GraphCanvasInner({
             zoomOnScroll={false}
           >
             <Background
-              color="#cbd5da"
+              color={hierarchyTheme.canvasGrid}
               gap={24}
               variant={BackgroundVariant.Dots}
             />

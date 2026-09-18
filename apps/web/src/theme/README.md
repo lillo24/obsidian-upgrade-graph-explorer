@@ -15,6 +15,8 @@ theme.
 - `runtime.test.ts` verifies resolution, OS-change behavior, root application,
   and write-failure behavior. `theme-css-contract.test.ts` audits component CSS
   ownership, intentional literal-color exceptions, and key WCAG contrast pairs.
+  `production-theme-audit.test.ts` scans app and renderer production sources for
+  color drift and enforces the single OS/root-theme ownership boundary.
 - `test-controller.ts` is the fixed light test seam for component tests that do
   not mount the browser runtime.
 

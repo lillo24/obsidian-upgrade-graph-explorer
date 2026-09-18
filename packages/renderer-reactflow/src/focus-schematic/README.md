@@ -38,6 +38,11 @@ entry. Empty-area context targeting is handled separately by world-space
 graph-pane hit testing. Guides are excluded from graph nodes, fitting, layout,
 and cache identity.
 
+Folder strips, nested guides, passive labels, module boundaries, filtered
+bridges, and their context/focus states consume the parent `GraphCanvas`
+Hierarchy semantic variables. They do not resolve theme, read the app root, or
+add palette input to worker plans, geometry, or cache identity.
+
 Module boundary visibility is also renderer-only. `index.ts` derives the typed
 `hasVisibleStructuralDescendants` marker from the module's currently visible
 Heading/Block projection nodes. `nodes.tsx` makes a File-only boundary

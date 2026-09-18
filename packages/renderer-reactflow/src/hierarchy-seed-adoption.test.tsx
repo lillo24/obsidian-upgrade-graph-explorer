@@ -9,7 +9,7 @@ import { GraphCanvas } from './GraphCanvas';
 import { findRectangleOverlaps, HIERARCHY_NODE_CLEARANCE } from './geometry';
 import { rendererTestProjection } from './test-fixture';
 
-it('renders a collision-free complete seed while a deterministic fake worker is delayed, then adopts its layout', async () => {
+it('adopts one layout and keeps geometry, viewport, and renderer identity across theme switches', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1200);
   vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(800);
@@ -24,6 +24,14 @@ it('renders a collision-free complete seed while a deterministic fake worker is 
       finish = resolve;
     });
   });
+  const cancelPending = vi.fn();
+  const onSelectionChange = vi.fn();
+  const onToggleEntity = vi.fn();
+  const layoutService = {
+    layoutLatest: layout,
+    cancelPending,
+    dispose: vi.fn(),
+  };
   const projection = rendererTestProjection();
   const diagnostic = projection.nodes.find(
     (n) => n.kind === 'reference-target',
@@ -63,28 +71,24 @@ it('renders a collision-free complete seed while a deterministic fake worker is 
       };
     });
   }
+  const renderCanvas = (theme: 'light' | 'dark') => (
+    <GraphCanvas
+      projection={withDiagnostics}
+      layoutMode="local-structured"
+      visualVariant="extended"
+      rootEntityId="document-a"
+      layoutService={layoutService}
+      focusAppearance="outline"
+      fitRequestKey={0}
+      trackpadZoomMode="scroll-zoom"
+      onToggleEntity={onToggleEntity}
+      selection={null}
+      onSelectionChange={onSelectionChange}
+      theme={theme}
+    />
+  );
   try {
-    await act(() =>
-      root.render(
-        <GraphCanvas
-          projection={withDiagnostics}
-          layoutMode="local-structured"
-          visualVariant="extended"
-          rootEntityId="document-a"
-          layoutService={{
-            layoutLatest: layout,
-            cancelPending: vi.fn(),
-            dispose: vi.fn(),
-          }}
-          focusAppearance="outline"
-          fitRequestKey={0}
-          trackpadZoomMode="scroll-zoom"
-          onToggleEntity={vi.fn()}
-          selection={null}
-          onSelectionChange={vi.fn()}
-        />,
-      ),
-    );
+    await act(() => root.render(renderCanvas('light')));
     expect(layout).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain('Updating layout');
     const seed = rectangles();
@@ -107,6 +111,27 @@ it('renders a collision-free complete seed while a deterministic fake worker is 
     expect(findRectangleOverlaps(final, HIERARCHY_NODE_CLEARANCE)).toEqual([]);
     expect(final).not.toEqual(seed);
     expect(layout).toHaveBeenCalledTimes(1);
+
+    const canvasBefore = container.querySelector<HTMLElement>('.graph-canvas')!;
+    const viewportBefore = container.querySelector<HTMLElement>(
+      '.react-flow__viewport',
+    )!.style.transform;
+    await act(() => root.render(renderCanvas('dark')));
+
+    const canvasAfter = container.querySelector<HTMLElement>('.graph-canvas')!;
+    expect(canvasAfter).toBe(canvasBefore);
+    expect(canvasAfter.dataset.hierarchyTheme).toBe('icarus-hierarchy-dark');
+    expect(
+      canvasAfter.style.getPropertyValue('--hierarchy-canvas-background'),
+    ).toBe('#10171c');
+    expect(rectangles()).toEqual(final);
+    expect(
+      container.querySelector<HTMLElement>('.react-flow__viewport')!.style
+        .transform,
+    ).toBe(viewportBefore);
+    expect(layout).toHaveBeenCalledTimes(1);
+    expect(onSelectionChange).not.toHaveBeenCalled();
+    expect(onToggleEntity).not.toHaveBeenCalled();
   } finally {
     await act(() => root.unmount());
     container.remove();

@@ -13,6 +13,13 @@ export type {
 export { GRAPH_EDGE_TYPES, GRAPH_NODE_TYPES } from './component-maps';
 export { applyRendererHighlight } from './highlight';
 export {
+  hierarchyThemeFor,
+  hierarchyThemeStyleFor,
+  ICARUS_DARK_HIERARCHY_THEME,
+  ICARUS_LIGHT_HIERARCHY_THEME,
+} from './hierarchy-theme';
+export type { HierarchyTheme, HierarchyThemeStyle } from './hierarchy-theme';
+export {
   shouldActivateEntityFocus,
   shouldToggleDisclosureForClick,
 } from './focus-interaction';
