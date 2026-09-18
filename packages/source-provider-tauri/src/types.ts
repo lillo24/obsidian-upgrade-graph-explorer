@@ -76,6 +76,8 @@ export interface PrepareWorkspaceIdentityOptions {
 
 export interface DiscoverSelectedVaultOptions {
   readonly excludes?: readonly string[];
+  /** Cooperatively stops traversal; an already-issued native call may still finish. */
+  readonly signal?: AbortSignal;
   /** Observer-only aggregate progress; listener failures never control discovery. */
   readonly onProgress?: VaultDiscoveryProgressListener;
   /** Slow-operation UI threshold. Defaults to 3,000 ms. */

@@ -209,7 +209,21 @@ export const GraphSettings = memo(function GraphSettings({
   const preferencesTabRef = useRef<HTMLButtonElement>(null);
   const sandboxTabRef = useRef<HTMLButtonElement>(null);
   const sourceTabRef = useRef<HTMLButtonElement>(null);
+  const settingsRef = useRef<HTMLDivElement>(null);
   const lastSandboxFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!open || typeof window === 'undefined') return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && settingsRef.current?.contains(target)) {
+        return;
+      }
+      onOpenChange(false);
+    };
+    window.addEventListener('pointerdown', closeOnOutsidePointer, true);
+    return () =>
+      window.removeEventListener('pointerdown', closeOnOutsidePointer, true);
+  }, [onOpenChange, open]);
   useEffect(() => {
     const previousFocus = lastSandboxFocusRef.current;
     if (
@@ -260,7 +274,7 @@ export const GraphSettings = memo(function GraphSettings({
     return true;
   };
   return (
-    <div className="graph-settings">
+    <div className="graph-settings" ref={settingsRef}>
       <button
         aria-controls="graph-settings-popover"
         aria-expanded={open}

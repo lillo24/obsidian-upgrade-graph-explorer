@@ -129,6 +129,18 @@ function elapsed(start: number, services: DesktopVaultServices): number {
   return Number((services.now() - start).toFixed(3));
 }
 
+function abortable<T>(task: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (signal === undefined) return task;
+  signal.throwIfAborted();
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(signal.reason);
+    signal.addEventListener('abort', abort, { once: true });
+    void task.then(resolve, reject).finally(() => {
+      signal.removeEventListener('abort', abort);
+    });
+  });
+}
+
 function publishProgress(
   listener: DesktopVaultOpenProgressListener | undefined,
   progress: DesktopVaultOpenProgress,
@@ -229,6 +241,7 @@ async function recoverCommitFailure(input: {
   readonly inventory: VaultSourceInventory;
   readonly onProgress?: DesktopVaultOpenProgressListener;
   readonly onDiscoveryProgress?: VaultDiscoveryProgressListener;
+  readonly signal?: AbortSignal;
 }): Promise<{
   readonly processor: DesktopWorkspaceProcessor;
   readonly prepared: PreparedWorkspaceResult;
@@ -242,17 +255,24 @@ async function recoverCommitFailure(input: {
   );
   input.failedProcessor.terminate();
   const replacement = input.services.createProcessor();
+  const terminateOnAbort = () => replacement.terminate();
+  input.signal?.addEventListener('abort', terminateOnAbort, { once: true });
   const replacementSession: WorkspaceIdentitySession = {
     ...input.identitySession,
     catalog: input.durableCatalog,
   };
   try {
     const acquisitionStart = input.services.now();
-    const inventory = await (input.onDiscoveryProgress === undefined
-      ? input.sourceProvider.discoverSelectedVault(input.selection)
-      : input.sourceProvider.discoverSelectedVault(input.selection, {
-          onProgress: input.onDiscoveryProgress,
-        }));
+    const inventory = await input.sourceProvider.discoverSelectedVault(
+      input.selection,
+      {
+        ...(input.onDiscoveryProgress === undefined
+          ? {}
+          : { onProgress: input.onDiscoveryProgress }),
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+      },
+    );
+    input.signal?.throwIfAborted();
     const sourceAcquisitionMs = elapsed(acquisitionStart, input.services);
     const prepared = await replacement.prepareInitialize({
       workspaceId: replacementSession.workspaceId,
@@ -265,8 +285,11 @@ async function recoverCommitFailure(input: {
       replacementSession,
       prepared.nextIdentityCatalog,
     );
+    input.signal?.throwIfAborted();
     const persistenceMs = elapsed(persistenceStart, input.services);
     await replacement.commitCandidate(prepared.candidateId);
+    input.signal?.throwIfAborted();
+    input.signal?.removeEventListener('abort', terminateOnAbort);
     return {
       processor: replacement,
       prepared,
@@ -276,6 +299,8 @@ async function recoverCommitFailure(input: {
     };
   } catch (error: unknown) {
     replacement.terminate();
+    input.signal?.removeEventListener('abort', terminateOnAbort);
+    if (input.signal?.aborted) input.signal.throwIfAborted();
     throw new DesktopVaultOpenError(
       `Workspace worker commit failed after identity persistence, and replacement recovery failed: ${
         error instanceof Error ? error.message : String(error)
@@ -293,7 +318,9 @@ export async function openSelectedDesktopVault(
   services: DesktopVaultServices = DEFAULT_SERVICES,
   onProgress?: DesktopVaultOpenProgressListener,
   onDiscoveryProgress?: VaultDiscoveryProgressListener,
+  signal?: AbortSignal,
 ): Promise<OpenedDesktopVault> {
+  signal?.throwIfAborted();
   let acquisitionActive = true;
   let acquisition: DesktopVaultOpenAcquisitionProgress = {
     sourceDiscovery: 'pending',
@@ -309,35 +336,41 @@ export async function openSelectedDesktopVault(
   let inventory: VaultSourceInventory;
   let identitySession: WorkspaceIdentitySession;
   try {
-    [inventory, identitySession] = await Promise.all([
-      (onDiscoveryProgress === undefined
-        ? sourceProvider.discoverSelectedVault(selection)
-        : sourceProvider.discoverSelectedVault(selection, {
-            onProgress: onDiscoveryProgress,
+    [inventory, identitySession] = await abortable(
+      Promise.all([
+        sourceProvider
+          .discoverSelectedVault(selection, {
+            ...(onDiscoveryProgress === undefined
+              ? {}
+              : { onProgress: onDiscoveryProgress }),
+            ...(signal === undefined ? {} : { signal }),
           })
-      ).then((discovered) => {
-        acquisition = {
-          ...acquisition,
-          sourceDiscovery: 'complete',
-          markdownFileCount: discovered.markdownDocuments.length,
-          nonMarkdownPathCount: discovered.nonMarkdownPaths.length,
-        };
-        publishAcquisition();
-        return discovered;
-      }),
-      sourceProvider
-        .loadOrPrepareWorkspaceIdentity(selection, identityOptions)
-        .then((preparedIdentity) => {
-          acquisition = {
-            ...acquisition,
-            identityPreparation: 'complete',
-          };
-          publishAcquisition();
-          return preparedIdentity;
-        }),
-    ]);
+          .then((discovered) => {
+            acquisition = {
+              ...acquisition,
+              sourceDiscovery: 'complete',
+              markdownFileCount: discovered.markdownDocuments.length,
+              nonMarkdownPathCount: discovered.nonMarkdownPaths.length,
+            };
+            publishAcquisition();
+            return discovered;
+          }),
+        sourceProvider
+          .loadOrPrepareWorkspaceIdentity(selection, identityOptions)
+          .then((preparedIdentity) => {
+            acquisition = {
+              ...acquisition,
+              identityPreparation: 'complete',
+            };
+            publishAcquisition();
+            return preparedIdentity;
+          }),
+      ]),
+      signal,
+    );
   } catch (error: unknown) {
     acquisitionActive = false;
+    if (signal?.aborted) signal.throwIfAborted();
     throw new DesktopVaultOpenError(
       error instanceof Error ? error.message : String(error),
       selection,
@@ -353,6 +386,8 @@ export async function openSelectedDesktopVault(
   let sourceAcquisitionMs = elapsed(acquisitionStart, services);
 
   let processor = services.createProcessor();
+  const terminateOnAbort = () => processor.terminate();
+  signal?.addEventListener('abort', terminateOnAbort, { once: true });
   publishProgress(
     onProgress,
     inventoryProgress('building-workspace', inventory),
@@ -379,6 +414,7 @@ export async function openSelectedDesktopVault(
     );
     identityPersistenceMs = elapsed(persistenceStart, services);
   } catch (error: unknown) {
+    if (signal?.aborted) signal.throwIfAborted();
     identityPersisted = false;
     identityPersistenceMs = elapsed(persistenceStart, services);
     warning = `The vault is open for this session, but stable identity could not be saved: ${
@@ -403,6 +439,7 @@ export async function openSelectedDesktopVault(
     try {
       await processor.commitCandidate(prepared.candidateId);
     } catch {
+      if (signal?.aborted) signal.throwIfAborted();
       const recovered = await recoverCommitFailure({
         failedProcessor: processor,
         sourceProvider,
@@ -412,6 +449,7 @@ export async function openSelectedDesktopVault(
         services,
         ...(onProgress === undefined ? {} : { onProgress }),
         ...(onDiscoveryProgress === undefined ? {} : { onDiscoveryProgress }),
+        ...(signal === undefined ? {} : { signal }),
         inventory,
       });
       processor = recovered.processor;
@@ -429,6 +467,8 @@ export async function openSelectedDesktopVault(
   const report = identityPersisted
     ? activePrepared.report
     : transientReport(prepared.report, selection);
+  signal?.throwIfAborted();
+  signal?.removeEventListener('abort', terminateOnAbort);
   return {
     status: 'opened',
     displayName: identitySession.selection.displayName,
@@ -469,6 +509,7 @@ export async function selectAndOpenDesktopVault(
   services: DesktopVaultServices = DEFAULT_SERVICES,
   onProgress?: DesktopVaultOpenProgressListener,
   onDiscoveryProgress?: VaultDiscoveryProgressListener,
+  signal?: AbortSignal,
 ): Promise<SelectAndOpenDesktopVaultResult> {
   const selection = await sourceProvider.selectVaultDirectory();
   return selection === undefined
@@ -480,5 +521,6 @@ export async function selectAndOpenDesktopVault(
         services,
         onProgress,
         onDiscoveryProgress,
+        signal,
       );
 }

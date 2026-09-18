@@ -53,6 +53,9 @@ discovery. Every root inspection, directory read, path join, and Markdown read
 has a configurable 60-second default watchdog. A timeout abandons the discovery
 attempt with a relative-path diagnostic but cannot cancel the already-issued
 Tauri Promise. The slow-operation presentation threshold defaults to 3 seconds.
+An optional `AbortSignal` stops traversal at the current operation boundary;
+like a watchdog timeout, it cannot cancel a Tauri Promise that has already been
+issued.
 The pure lexical rules are shared with the Node KG5 scanner through
 `vault-discovery-policy`; Node and Tauri I/O remain separate.
 

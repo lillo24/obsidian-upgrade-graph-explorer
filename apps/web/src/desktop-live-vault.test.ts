@@ -205,6 +205,27 @@ async function openedController(
 }
 
 describe('desktop live vault controller', () => {
+  it('stops the provisional watcher when initial loading is aborted', async () => {
+    const provider = new FakeLiveProvider();
+    provider.onDiscover = () => new Promise(() => undefined);
+    const abortController = new AbortController();
+
+    const opening = openLiveDesktopVault(
+      provider,
+      SELECTION,
+      {},
+      liveServices(),
+      undefined,
+      undefined,
+      abortController.signal,
+    );
+    while (provider.discoverCalls === 0) await Promise.resolve();
+    abortController.abort();
+
+    await expect(opening).rejects.toMatchObject({ name: 'AbortError' });
+    expect(provider.stopCalls).toBe(1);
+  });
+
   it('forwards initial-open progress without changing live startup', async () => {
     const provider = new FakeLiveProvider();
     const progress: DesktopVaultOpenProgress[] = [];

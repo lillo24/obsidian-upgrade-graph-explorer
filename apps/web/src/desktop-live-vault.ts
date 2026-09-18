@@ -600,7 +600,9 @@ export async function openLiveDesktopVault(
   services?: DesktopLiveVaultServices,
   onProgress?: DesktopVaultOpenProgressListener,
   onDiscoveryProgress?: VaultDiscoveryProgressListener,
+  signal?: AbortSignal,
 ): Promise<OpenLiveDesktopVaultResult> {
+  signal?.throwIfAborted();
   const resolvedServices =
     services ??
     ({
@@ -613,15 +615,33 @@ export async function openLiveDesktopVault(
     accept?: DesktopLiveVaultController['acceptWatchBatch'];
   } = {};
   let subscription: VaultWatchSubscription;
+  const subscriptionTask = Promise.resolve().then(() =>
+    sourceProvider.watchSelectedVault(selection, (batch) => {
+      if (batchSink.accept === undefined) bufferedBatches.push(batch);
+      else batchSink.accept(batch);
+    }),
+  );
   try {
-    subscription = await sourceProvider.watchSelectedVault(
-      selection,
-      (batch) => {
-        if (batchSink.accept === undefined) bufferedBatches.push(batch);
-        else batchSink.accept(batch);
-      },
-    );
+    if (signal === undefined) {
+      subscription = await subscriptionTask;
+    } else {
+      subscription = await new Promise<VaultWatchSubscription>(
+        (resolve, reject) => {
+          const abort = () => reject(signal.reason);
+          signal.addEventListener('abort', abort, { once: true });
+          void subscriptionTask.then(resolve, reject).finally(() => {
+            signal.removeEventListener('abort', abort);
+          });
+        },
+      );
+    }
   } catch (error: unknown) {
+    if (signal?.aborted) {
+      void subscriptionTask
+        .then((lateSubscription) => lateSubscription.stop())
+        .catch(() => undefined);
+      signal.throwIfAborted();
+    }
     throw new DesktopVaultOpenError(
       `Could not start live vault watching: ${message(error)}`,
       selection,
@@ -631,14 +651,26 @@ export async function openLiveDesktopVault(
 
   let opened: OpenedDesktopVault;
   try {
-    opened = await openSelectedDesktopVault(
+    const openingTask = openSelectedDesktopVault(
       sourceProvider,
       selection,
       identityOptions,
       resolvedServices,
       onProgress,
       onDiscoveryProgress,
+      signal,
     );
+    if (signal === undefined) {
+      opened = await openingTask;
+    } else {
+      opened = await new Promise<OpenedDesktopVault>((resolve, reject) => {
+        const abort = () => reject(signal.reason);
+        signal.addEventListener('abort', abort, { once: true });
+        void openingTask.then(resolve, reject).finally(() => {
+          signal.removeEventListener('abort', abort);
+        });
+      });
+    }
   } catch (error: unknown) {
     await subscription.stop();
     throw error;
