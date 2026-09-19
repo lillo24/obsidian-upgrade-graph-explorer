@@ -30,12 +30,17 @@ export interface LocalStructuredGraphViewProps {
   readonly centerRequest?: GraphCenterRequest;
   readonly fitRequestKey: number;
   readonly focusAppearance: FocusAppearance;
+  readonly focusHierarchySubfocus?: FocusHierarchySubfocus | null;
   readonly initialTransitionAnchor?: GraphTransitionAnchor;
   readonly instrumentation?: PerformanceInstrumentation;
   readonly layoutRequestKey: number;
   readonly onFailure: (message: string) => void;
   readonly onFitRequestConsumed?: (key: number) => void;
   readonly onFocusEntity: (entityId: string) => void;
+  readonly onSubfocusEntity: (
+    entityId: string,
+    kind: 'section' | 'block',
+  ) => void;
   readonly onSelectionChange: (selection: GraphSelection | null) => void;
   readonly onToggleEntity: (entityId: string, currentlyOpen: boolean) => void;
   readonly onTransitionAnchorApiChange?: (
@@ -51,6 +56,11 @@ export interface LocalStructuredGraphViewProps {
   readonly trackpadZoomMode: TrackpadZoomMode;
   readonly visualGroupStyles?: VisualGroupPresentationMap;
   readonly visualVariant: GraphVisualVariant;
+}
+
+interface FocusHierarchySubfocus {
+  readonly entityId: string;
+  readonly kind: 'section' | 'block';
 }
 
 // Bounded page-lifetime coordinates only. They never enter saved view state or

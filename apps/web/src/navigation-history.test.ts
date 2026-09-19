@@ -155,6 +155,52 @@ describe('renderer-independent graph navigation history', () => {
     });
   });
 
+  it('stores session-only Heading/Block subfocus in Back/Forward checkpoints', () => {
+    const state = {
+      ...initialGraphState(),
+      focus: {
+        rootEntityId: 'doc-a',
+        hops: 1 as const,
+        direction: 'both' as const,
+        hierarchyContext: 'ancestors-and-children' as const,
+      },
+    };
+    const none = createGraphHistoryCheckpoint(state, undefined, 'local');
+    const headingA = createGraphHistoryCheckpoint(
+      state,
+      undefined,
+      'local',
+      {},
+      { entityId: 'section-a', kind: 'section' },
+    );
+    const headingB = createGraphHistoryCheckpoint(
+      state,
+      undefined,
+      'local',
+      {},
+      { entityId: 'section-b', kind: 'section' },
+    );
+    const atA = recordGraphNavigation(
+      createGraphNavigationHistory(),
+      none,
+      headingA,
+    );
+    const atB = recordGraphNavigation(atA, headingA, headingB);
+    const backToA = goBackInGraphHistory(atB, headingB)!;
+    const backToNone = goBackInGraphHistory(backToA.history, backToA.target)!;
+    const forwardToA = goForwardInGraphHistory(
+      backToNone.history,
+      backToNone.target,
+    )!;
+
+    expect(backToA.target.focusHierarchySubfocus?.entityId).toBe('section-a');
+    expect(backToNone.target.focusHierarchySubfocus).toBeUndefined();
+    expect(forwardToA.target.focusHierarchySubfocus?.entityId).toBe(
+      'section-a',
+    );
+    expect(sameGraphHistoryCheckpoint(none, headingA)).toBe(false);
+  });
+
   it('traverses renderer modes with their independent semantic viewports', () => {
     const structure = createGraphHistoryCheckpoint(
       initialGraphState(),

@@ -378,6 +378,40 @@ describe('nested Soft folder guides', () => {
     ).toEqual([]);
   });
 
+  it('R5 reclassifies the old and new Focus roots without stale folder membership', () => {
+    const displayTree = tree([
+      { fileId: 'focus-a', exactFolderKey: 'A' },
+      { fileId: 'focus-b', exactFolderKey: 'B' },
+      { fileId: 'a-peer', exactFolderKey: 'A' },
+      { fileId: 'b-peer', exactFolderKey: 'B' },
+    ]);
+    const nodes = [
+      node('focus-a', 0, 0),
+      node('a-peer', 140, 0),
+      node('focus-b', 320, 0),
+      node('b-peer', 460, 0),
+    ];
+    const atA = focusSchematicFolderClusterGuides(displayTree, nodes, {
+      focusModuleId: 'focus-a',
+    });
+    const atB = focusSchematicFolderClusterGuides(displayTree, nodes, {
+      focusModuleId: 'focus-b',
+    });
+
+    expect(
+      atA.find(({ folderKey }) => folderKey === 'A')?.memberModuleIds,
+    ).toEqual(['a-peer']);
+    expect(
+      atA.find(({ folderKey }) => folderKey === 'B')?.memberModuleIds,
+    ).toEqual(['b-peer', 'focus-b']);
+    expect(
+      atB.find(({ folderKey }) => folderKey === 'A')?.memberModuleIds,
+    ).toEqual(['a-peer', 'focus-a']);
+    expect(
+      atB.find(({ folderKey }) => folderKey === 'B')?.memberModuleIds,
+    ).toEqual(['b-peer']);
+  });
+
   it('N1/N2 constructs exact deep logical membership in Nested but only immediate membership in Direct', () => {
     const displayTree = tree([
       { fileId: 'focus', exactFolderKey: 'PatternTheory/ResponseBehaviour' },

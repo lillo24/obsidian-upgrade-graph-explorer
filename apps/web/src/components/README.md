@@ -435,3 +435,20 @@ File actions with valid current displayed-folder actions through a strong
 semantic separator. Folder targets remain folder-only. Menu/hover state and
 guide visibility remain absent from every model, worker, effect, and cache
 dependency that can request or change layout.
+
+FOCUS-HIERARCHY-UX1 splits Local Hierarchy activation by canonical entity kind:
+File double-click keeps the existing reroot callback, while Heading/Block
+double-click enters session-only presentation subfocus. `GraphExplorer.tsx`
+captures that target in the existing navigation checkpoint, never in KG9 or
+Saved Views; Back/Ctrl+Z, Forward/Ctrl+Shift+Z, and Escape share semantic
+history while editable controls retain native undo. Live or historical stale
+targets are reconciled to ordinary Focus without blanking the graph. Classic
+and Modular receive the same renderer callback seam; Focus Network and All
+Hierarchy retain their previous activation behavior when that seam is absent.
+
+During Modular File reroot, `ModularStructuredGraphView.tsx` keeps the complete
+last validated prepared graph until the replacement worker result is adopted.
+It deliberately does not intersect the old graph with the new File projection:
+disjoint entity identities made that intersection empty and caused the former
+blank-screen interval. Worker/adoption failure keeps the validated graph and
+surfaces the existing warning/retry path.

@@ -47,6 +47,14 @@ entry. Empty-area context targeting is handled separately by world-space
 graph-pane hit testing. Guides are excluded from graph nodes, fitting, layout,
 and cache identity.
 
+FOCUS-HIERARCHY-UX1 keeps Soft folder guide geometry unchanged during subfocus
+and presents guides at context opacity. Its passive HTML label is now one
+baseline-aligned chip: `Folder | Parent`. The Folder stays primary, the parent
+keeps the existing smaller muted style, the separator is aria-hidden, and a
+root/no-parent label renders without a separator. The label anchor remains the
+start of the actual upper horizontal guide segment, and pointer/keyboard
+context-menu behavior is unchanged.
+
 Folder strips, nested guides, passive labels, module boundaries, filtered
 bridges, and their context/focus states consume the parent `GraphCanvas`
 Hierarchy semantic variables. They do not resolve theme, read the app root, or

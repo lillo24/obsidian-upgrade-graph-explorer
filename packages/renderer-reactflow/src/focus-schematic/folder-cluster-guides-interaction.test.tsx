@@ -79,6 +79,20 @@ describe('nested Soft folder guide interaction', () => {
     expect(document.body.textContent).not.toContain('Island');
     expect(child.textContent).toContain('Pragmatics');
     expect(child.textContent).toContain('Language');
+    const separator = child.querySelector(
+      '.focus-schematic-folder-guide-controls__separator',
+    );
+    expect(separator?.textContent).toBe('|');
+    expect(separator?.getAttribute('aria-hidden')).toBe('true');
+    expect(
+      [
+        ...document.querySelectorAll<HTMLButtonElement>(
+          '.focus-schematic-folder-guide-controls__chip',
+        ),
+      ]
+        .find(({ textContent }) => textContent?.trim() === 'Language')
+        ?.querySelector('.focus-schematic-folder-guide-controls__separator'),
+    ).toBeNull();
     expect(child.title).toContain('Language/Pragmatics/');
     expect(child.dataset.folderLabelPresentation).toBe('passive');
     expect(child.tabIndex).toBe(0);

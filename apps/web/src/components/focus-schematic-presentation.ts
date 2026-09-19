@@ -24,6 +24,15 @@ export interface FocusSchematicPresentationResult {
   readonly warning?: string;
 }
 
+/** Retains the complete last validated graph until a new layout is adopted. */
+export function retainFocusSchematicGraphDuringLayoutTransition(
+  adoptedGraph: RendererGraph,
+  adoptedLayoutKey: string,
+  currentLayoutKey: string,
+): RendererGraph | null {
+  return adoptedLayoutKey === currentLayoutKey ? null : adoptedGraph;
+}
+
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 

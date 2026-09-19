@@ -590,9 +590,17 @@ export function FocusSchematicFolderClusterGuides({
                     {guide.label}
                   </span>
                   {guide.parentLabel === null ? null : (
-                    <small className="focus-schematic-folder-guide-controls__parent">
-                      {guide.parentLabel}
-                    </small>
+                    <>
+                      <span
+                        aria-hidden="true"
+                        className="focus-schematic-folder-guide-controls__separator"
+                      >
+                        |
+                      </span>
+                      <small className="focus-schematic-folder-guide-controls__parent">
+                        {guide.parentLabel}
+                      </small>
+                    </>
                   )}
                 </button>
                 {activeFolderKey === guide.folderKey ? (

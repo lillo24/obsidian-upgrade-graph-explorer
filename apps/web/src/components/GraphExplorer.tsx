@@ -96,6 +96,11 @@ import {
 
 import { graphHistoryShortcut } from '../graph-history-shortcuts';
 import {
+  reconcileFocusHierarchySubfocus,
+  sameFocusHierarchySubfocus,
+  type FocusHierarchySubfocus,
+} from '../focus-hierarchy-subfocus';
+import {
   createNetworkExplorerModel,
   type NetworkExplorerFolderState,
   type NetworkExplorerRevealRequest,
@@ -1117,6 +1122,16 @@ export function GraphExplorer({
   const [navigationHistory, setNavigationHistory] =
     useState<GraphNavigationHistory>(createGraphNavigationHistory);
   const navigationHistoryRef = useRef(navigationHistory);
+  const [focusHierarchySubfocus, setFocusHierarchySubfocus] =
+    useState<FocusHierarchySubfocus | null>(null);
+  const focusHierarchySubfocusRef = useRef<FocusHierarchySubfocus | null>(null);
+  const updateFocusHierarchySubfocus = useCallback(
+    (next: FocusHierarchySubfocus | null) => {
+      focusHierarchySubfocusRef.current = next;
+      setFocusHierarchySubfocus(next);
+    },
+    [],
+  );
   const activeViewStateRef = useRef(activeViewState);
   const viewportBookmarkRef = useRef(viewportBookmark);
   const globalViewportBookmarkRef = useRef(globalViewportBookmark);
@@ -1535,6 +1550,42 @@ export function GraphExplorer({
     [projectionWorkspace],
   );
   const projection = result.ok ? result.projection : undefined;
+  useEffect(() => {
+    queueMicrotask(() => updateFocusHierarchySubfocus(null));
+  }, [updateFocusHierarchySubfocus, workspaceId]);
+  useEffect(() => {
+    const target = focusHierarchySubfocusRef.current;
+    if (target === null) return;
+    if (effectiveRendererMode !== 'local' || localLayoutMode !== 'structured') {
+      queueMicrotask(() => updateFocusHierarchySubfocus(null));
+      return;
+    }
+    if (localResult?.ok !== true) return;
+    if (
+      reconcileFocusHierarchySubfocus(
+        projectionWorkspace,
+        localResult.projection,
+        target,
+      ) !== null
+    )
+      return;
+    queueMicrotask(() => {
+      if (
+        sameFocusHierarchySubfocus(focusHierarchySubfocusRef.current, target)
+      ) {
+        updateFocusHierarchySubfocus(null);
+        setNavigationAnnouncement(
+          'The active Heading or Block subfocus is no longer projected and was cleared. The Focus graph remains available.',
+        );
+      }
+    });
+  }, [
+    effectiveRendererMode,
+    localLayoutMode,
+    localResult,
+    projectionWorkspace,
+    updateFocusHierarchySubfocus,
+  ]);
   const visualGroupPresentation = useMemo<VisualGroupPresentation>(() => {
     if (projection === undefined) {
       return { styles: EMPTY_VISUAL_GROUP_PRESENTATIONS };
@@ -1906,6 +1957,7 @@ export function GraphExplorer({
             ? {}
             : { local: localViewportBookmarkRef.current }),
         },
+        focusHierarchySubfocusRef.current,
       ),
     [],
   );
@@ -1928,6 +1980,7 @@ export function GraphExplorer({
             ? {}
             : { local: localViewportBookmarkRef.current }),
         },
+        focusHierarchySubfocusRef.current,
       );
       const nextHistory = recordGraphNavigation(
         navigationHistoryRef.current,
@@ -2022,16 +2075,39 @@ export function GraphExplorer({
         traversal.target.state,
         traversal.target.viewports,
       );
-      replaceNavigationHistory(traversal.history);
-      if (!sameGraphViewState(activeViewStateRef.current, reconciled.state)) {
-        activeViewStateRef.current = reconciled.state;
-        dispatch({ type: 'replace-state', state: reconciled.state });
-      }
       const restoredSessionMode = resolveAvailablePresentationMode(
         traversal.target.presentationMode,
         reconciled.state,
         availabilityRef.current,
       );
+      let restoredSubfocus: FocusHierarchySubfocus | null = null;
+      let staleSubfocusDropped = false;
+      if (
+        traversal.target.focusHierarchySubfocus !== undefined &&
+        restoredSessionMode === 'local' &&
+        localLayoutModeRef.current === 'structured'
+      ) {
+        try {
+          const restoredProjection = projectLocalView(
+            projectionWorkspace,
+            reconciled.state,
+          );
+          restoredSubfocus = reconcileFocusHierarchySubfocus(
+            projectionWorkspace,
+            restoredProjection,
+            traversal.target.focusHierarchySubfocus,
+          );
+        } catch {
+          restoredSubfocus = null;
+        }
+        staleSubfocusDropped = restoredSubfocus === null;
+      }
+      replaceNavigationHistory(traversal.history);
+      if (!sameGraphViewState(activeViewStateRef.current, reconciled.state)) {
+        activeViewStateRef.current = reconciled.state;
+        dispatch({ type: 'replace-state', state: reconciled.state });
+      }
+      updateFocusHierarchySubfocus(restoredSubfocus);
       rendererModeRef.current = restoredSessionMode;
       setRendererMode(restoredSessionMode);
       setSemanticViewportBookmark(reconciled.viewports.structure);
@@ -2054,7 +2130,10 @@ export function GraphExplorer({
               ? ` The Focus root no longer exists, so the checkpoint recovered to All ${restoredSessionMode === 'global' ? 'Network' : 'Hierarchy'}.`
               : restoredSessionMode === 'global'
                 ? ' Experimental All Hierarchy is hidden; this checkpoint is shown in All Network.'
-                : ' All Network is unavailable, so this checkpoint is shown in All Hierarchy for this session.'),
+                : ' All Network is unavailable, so this checkpoint is shown in All Hierarchy for this session.') +
+          (staleSubfocusDropped
+            ? ' The saved Heading or Block subfocus is no longer visible and was dropped.'
+            : ''),
       );
       return true;
     },
@@ -2065,6 +2144,7 @@ export function GraphExplorer({
       setGlobalSemanticViewportBookmark,
       setLocalSemanticViewportBookmark,
       setSemanticViewportBookmark,
+      updateFocusHierarchySubfocus,
     ],
   );
   const traverseGraphHistory = useCallback(
@@ -2196,6 +2276,7 @@ export function GraphExplorer({
       );
       activeViewStateRef.current = allState;
       dispatch({ type: 'replace-state', state: allState });
+      updateFocusHierarchySubfocus(null);
       rendererModeRef.current = targetMode;
       setRendererMode(targetMode);
       if (
@@ -2263,6 +2344,7 @@ export function GraphExplorer({
     setGlobalSemanticViewportBookmark,
     setSemanticViewportBookmark,
     temporaryFileMoveController,
+    updateFocusHierarchySubfocus,
   ]);
   const goBack = useCallback(
     () => void traverseGraphHistory('back'),
@@ -2272,8 +2354,62 @@ export function GraphExplorer({
     () => void traverseGraphHistory('forward'),
     [traverseGraphHistory],
   );
+  const exitFocusHierarchySubfocus = useCallback((): boolean => {
+    if (focusHierarchySubfocusRef.current === null) return false;
+    const normalized = normalizeAvailableGraphHistory(
+      navigationHistoryRef.current,
+      currentHistoryCheckpoint(),
+      availabilityRef.current,
+    );
+    const traversal = goBackInGraphHistory(
+      normalized.history,
+      normalized.current,
+    );
+    if (
+      traversal !== null &&
+      traversal.target.presentationMode === 'local' &&
+      traversal.target.focusHierarchySubfocus === undefined &&
+      sameGraphViewState(traversal.target.state, normalized.current.state)
+    ) {
+      return applyHistoryTraversal(
+        traversal,
+        'Exited Heading or Block subfocus.',
+      );
+    }
+    const current = normalized.current;
+    const destination = createGraphHistoryCheckpoint(
+      current.state,
+      undefined,
+      current.presentationMode,
+      current.viewports,
+    );
+    replaceNavigationHistory(
+      recordGraphNavigation(normalized.history, current, destination),
+    );
+    updateFocusHierarchySubfocus(null);
+    setNavigationError(undefined);
+    setNavigationAnnouncement('Exited Heading or Block subfocus.');
+    return true;
+  }, [
+    applyHistoryTraversal,
+    currentHistoryCheckpoint,
+    replaceNavigationHistory,
+    updateFocusHierarchySubfocus,
+  ]);
   const activateGraphHistoryShortcut = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>) => {
+      const editableTarget = historyShortcutTargetIsExcluded(event.target);
+      if (
+        event.key === 'Escape' &&
+        !event.repeat &&
+        !editableTarget &&
+        !applicationOverlayOpen &&
+        exitFocusHierarchySubfocus()
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       const direction = graphHistoryShortcut({
         key: event.key,
         altKey: event.altKey,
@@ -2281,7 +2417,7 @@ export function GraphExplorer({
         metaKey: event.metaKey,
         shiftKey: event.shiftKey,
         repeat: event.repeat,
-        editableTarget: historyShortcutTargetIsExcluded(event.target),
+        editableTarget,
         graphContext: true,
         applicationOverlayOpen,
         canGoBack: navigationHistoryRef.current.past.length > 0,
@@ -2291,7 +2427,7 @@ export function GraphExplorer({
       event.preventDefault();
       event.stopPropagation();
     },
-    [applicationOverlayOpen, traverseGraphHistory],
+    [applicationOverlayOpen, exitFocusHierarchySubfocus, traverseGraphHistory],
   );
 
   useEffect(() => {
@@ -2681,18 +2817,33 @@ export function GraphExplorer({
     ) {
       return;
     }
+    const removedSubfocus =
+      focusHierarchySubfocusRef.current !== null &&
+      reconcileFocusHierarchySubfocus(
+        projectionWorkspace,
+        projection,
+        focusHierarchySubfocusRef.current,
+      ) === null;
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
       setSelection(null);
+      if (removedSubfocus) updateFocusHierarchySubfocus(null);
       setNavigationAnnouncement(
-        'The selected graph element was removed by a live update; selection was cleared.',
+        removedSubfocus
+          ? 'The active Heading or Block subfocus is no longer projected and was cleared. The Focus graph remains available. The selected graph element was also removed; selection was cleared.'
+          : 'The selected graph element was removed by a live update; selection was cleared.',
       );
     });
     return () => {
       cancelled = true;
     };
-  }, [projection, projectionWorkspace, selection]);
+  }, [
+    projection,
+    projectionWorkspace,
+    selection,
+    updateFocusHierarchySubfocus,
+  ]);
 
   useEffect(() => {
     if (!maximized || typeof document === 'undefined') return;
@@ -3681,6 +3832,7 @@ export function GraphExplorer({
           : (bookmark?.freeRatio ?? LOCAL_NAVIGATION_RATIO);
 
       localLayoutModeRef.current = mode;
+      if (mode === 'free') updateFocusHierarchySubfocus(null);
       setLocalCenterRequest(undefined);
       setLocalStructuredCenterRequest(undefined);
       if (point !== undefined && anchorNode !== undefined) {
@@ -3724,6 +3876,7 @@ export function GraphExplorer({
       selection,
       temporaryFileMoveController,
       transitionNetworkEditing,
+      updateFocusHierarchySubfocus,
     ],
   );
   const changeSettingsOpen = useCallback((open: boolean) => {
@@ -4300,6 +4453,7 @@ export function GraphExplorer({
         cancelPendingHistoryViewportRestore();
         activeViewStateRef.current = plan.state;
         dispatch({ type: 'replace-state', state: plan.state });
+        updateFocusHierarchySubfocus(null);
         if (localLayoutModeRef.current !== targetLayoutMode) {
           localLayoutModeRef.current = targetLayoutMode;
           updateGraphPreferences({ localLayoutMode: targetLayoutMode });
@@ -4355,6 +4509,7 @@ export function GraphExplorer({
       setLocalSemanticViewportBookmark,
       temporaryFileMoveController,
       transitionNetworkEditing,
+      updateFocusHierarchySubfocus,
     ],
   );
   const navigateToEntity = useCallback(
@@ -4405,6 +4560,7 @@ export function GraphExplorer({
           cancelPendingHistoryViewportRestore();
           activeViewStateRef.current = plan.state;
           dispatch({ type: 'replace-state', state: plan.state });
+          updateFocusHierarchySubfocus(null);
           if (enterExactFocus) {
             localLayoutModeRef.current = 'structured';
             updateGraphPreferences({ localLayoutMode: 'structured' });
@@ -4506,11 +4662,70 @@ export function GraphExplorer({
       setGlobalSemanticViewportBookmark,
       setLocalSemanticViewportBookmark,
       setSemanticViewportBookmark,
+      updateFocusHierarchySubfocus,
     ],
   );
   const focusLocalEntity = useCallback(
     (entityId: EntityId) => navigateToEntity(entityId, 'Focus'),
     [navigateToEntity],
+  );
+  const subfocusLocalEntity = useCallback(
+    (entityId: EntityId, kind: 'section' | 'block') => {
+      if (
+        rendererModeRef.current !== 'local' ||
+        localLayoutModeRef.current !== 'structured'
+      )
+        return;
+      const target = projectionWorkspace.entity(entityId);
+      const activeProjection =
+        localResult?.ok === true ? localResult.projection : undefined;
+      const next = { entityId, kind } satisfies FocusHierarchySubfocus;
+      if (
+        target?.kind !== kind ||
+        activeProjection === undefined ||
+        reconcileFocusHierarchySubfocus(
+          projectionWorkspace,
+          activeProjection,
+          next,
+        ) === null
+      ) {
+        setNavigationError(
+          `Subfocus failed: ${kind === 'section' ? 'Heading' : 'Block'} is no longer visible in this Focus hierarchy.`,
+        );
+        return;
+      }
+      if (sameFocusHierarchySubfocus(focusHierarchySubfocusRef.current, next))
+        return;
+      const current = currentHistoryCheckpoint();
+      const destination = createGraphHistoryCheckpoint(
+        current.state,
+        undefined,
+        'local',
+        current.viewports,
+        next,
+      );
+      replaceNavigationHistory(
+        recordGraphNavigation(
+          navigationHistoryRef.current,
+          current,
+          destination,
+        ),
+      );
+      cancelPendingHistoryViewportRestore();
+      updateFocusHierarchySubfocus(next);
+      setNavigationError(undefined);
+      setNavigationAnnouncement(
+        `${kind === 'section' ? 'Heading' : 'Block'} subfocus opened. Use Back, Ctrl+Z, or Escape to return.`,
+      );
+    },
+    [
+      cancelPendingHistoryViewportRestore,
+      currentHistoryCheckpoint,
+      localResult,
+      projectionWorkspace,
+      replaceNavigationHistory,
+      updateFocusHierarchySubfocus,
+    ],
   );
   const focusNetworkExplorerNode = useCallback(
     (nodeId: ProjectionNodeId) => {
@@ -4661,6 +4876,7 @@ export function GraphExplorer({
     clearNavigationHistory();
     dispatch({ type: 'reset-view' });
     activeViewStateRef.current = defaults;
+    updateFocusHierarchySubfocus(null);
     setSelection(null);
     rendererModeRef.current = defaultMode;
     setRendererMode(defaultMode);
@@ -5483,6 +5699,7 @@ export function GraphExplorer({
                   : { centerRequest: localStructuredCenterRequest })}
                 fitRequestKey={localFitRequestKey ?? 0}
                 focusAppearance={focusAppearance}
+                focusHierarchySubfocus={focusHierarchySubfocus}
                 endpointOrderPolicy={modularFocusHeadingOrder}
                 folderGuidesVisible={modularFolderStripsVisible}
                 internalLayoutVariant={modularFocusInternalLayout}
@@ -5516,6 +5733,7 @@ export function GraphExplorer({
                 }
                 onFitRequestConsumed={consumeLocalFitRequest}
                 onFocusEntity={focusLocalEntity}
+                onSubfocusEntity={subfocusLocalEntity}
                 onSelectionChange={changeSelection}
                 onChangeSoftFolderDisplayIntent={softFolderDisplay.commit}
                 onResetSoftFolderDisplay={softFolderDisplay.reset}
@@ -5541,6 +5759,7 @@ export function GraphExplorer({
                   : { centerRequest: localStructuredCenterRequest })}
                 fitRequestKey={localFitRequestKey ?? 0}
                 focusAppearance={focusAppearance}
+                focusHierarchySubfocus={focusHierarchySubfocus}
                 {...(localTransitionAnchor === undefined
                   ? {}
                   : { initialTransitionAnchor: localTransitionAnchor })}
@@ -5555,6 +5774,7 @@ export function GraphExplorer({
                 }
                 onFitRequestConsumed={consumeLocalFitRequest}
                 onFocusEntity={focusLocalEntity}
+                onSubfocusEntity={subfocusLocalEntity}
                 onSelectionChange={changeSelection}
                 onToggleEntity={toggleEntity}
                 onTransitionAnchorApiChange={

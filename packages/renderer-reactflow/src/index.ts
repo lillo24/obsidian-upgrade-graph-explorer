@@ -13,6 +13,12 @@ export type {
 export { GRAPH_EDGE_TYPES, GRAPH_NODE_TYPES } from './component-maps';
 export { applyRendererHighlight } from './highlight';
 export {
+  applyFocusHierarchySubfocus,
+  deriveFocusHierarchySubfocusPresentation,
+  type FocusHierarchySubfocusPresentation,
+  type FocusHierarchySubfocusTarget,
+} from './focus-hierarchy-subfocus';
+export {
   hierarchyThemeFor,
   hierarchyThemeStyleFor,
   ICARUS_DARK_HIERARCHY_THEME,
@@ -20,6 +26,7 @@ export {
 } from './hierarchy-theme';
 export type { HierarchyTheme, HierarchyThemeStyle } from './hierarchy-theme';
 export {
+  entityActivationRoute,
   shouldActivateEntityFocus,
   shouldToggleDisclosureForClick,
 } from './focus-interaction';

@@ -10,6 +10,7 @@ import { focusSchematicNodeDimensions } from '@icarus-graph-explorer/renderer-re
 
 import {
   prepareFocusSchematicDisplayedGraph,
+  retainFocusSchematicGraphDuringLayoutTransition,
   resolveFocusSchematicPresentation,
 } from './focus-schematic-presentation';
 
@@ -109,5 +110,31 @@ describe('Modular Focus Schematic presentation', () => {
     expect(result.warning).toMatch(
       /^Modular presentation failed: .+ The last valid modular graph remains visible\.$/,
     );
+  });
+
+  it('R1 retains every node of the previous validated File graph while reroot is pending', () => {
+    const adopted = {
+      nodes: [{ id: 'file-a' }, { id: 'heading-a' }],
+      edges: [{ id: 'a-hierarchy' }],
+      layoutWarning: null,
+    } as unknown as Parameters<
+      typeof retainFocusSchematicGraphDuringLayoutTransition
+    >[0];
+
+    expect(
+      retainFocusSchematicGraphDuringLayoutTransition(
+        adopted,
+        'focus-file-a',
+        'focus-file-b',
+      ),
+    ).toBe(adopted);
+    expect(adopted.nodes).toHaveLength(2);
+    expect(
+      retainFocusSchematicGraphDuringLayoutTransition(
+        adopted,
+        'focus-file-b',
+        'focus-file-b',
+      ),
+    ).toBeNull();
   });
 });

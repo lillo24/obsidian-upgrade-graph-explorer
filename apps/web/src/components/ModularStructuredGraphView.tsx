@@ -69,7 +69,10 @@ import {
 } from '../soft-folder-display/context-menu';
 import { createFocusSchematicLayoutWorkerService } from '../workers/focus-schematic-layout-worker-client';
 import type { SemanticLocalStructuredViewport } from './LocalStructuredGraphView';
-import { resolveFocusSchematicPresentation } from './focus-schematic-presentation';
+import {
+  resolveFocusSchematicPresentation,
+  retainFocusSchematicGraphDuringLayoutTransition,
+} from './focus-schematic-presentation';
 import { useWorkerServiceDisposal } from './use-worker-service-disposal';
 
 export interface ModularStructuredGraphViewProps {
@@ -77,6 +80,7 @@ export interface ModularStructuredGraphViewProps {
   readonly centerRequest?: GraphCenterRequest;
   readonly fitRequestKey: number;
   readonly focusAppearance: FocusAppearance;
+  readonly focusHierarchySubfocus?: FocusHierarchySubfocus | null;
   readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
   readonly folderGuidesVisible?: boolean;
   readonly initialTransitionAnchor?: GraphTransitionAnchor;
@@ -94,6 +98,10 @@ export interface ModularStructuredGraphViewProps {
   readonly onFatalFailure: (message: string) => void;
   readonly onFitRequestConsumed?: (key: number) => void;
   readonly onFocusEntity: (entityId: string) => void;
+  readonly onSubfocusEntity: (
+    entityId: string,
+    kind: 'section' | 'block',
+  ) => void;
   readonly onSelectionChange: (selection: GraphSelection | null) => void;
   readonly onChangeSoftFolderDisplayIntent: (
     intent: FocusSchematicSoftFolderDisplayIntent,
@@ -115,6 +123,11 @@ export interface ModularStructuredGraphViewProps {
   readonly selection: GraphSelection | null;
   readonly trackpadZoomMode: TrackpadZoomMode;
   readonly visualGroupStyles?: VisualGroupPresentationMap;
+}
+
+interface FocusHierarchySubfocus {
+  readonly entityId: string;
+  readonly kind: 'section' | 'block';
 }
 
 type LifecyclePhase =
@@ -245,27 +258,6 @@ function recordAttemptEvidence(
       soft.runtime.collisionCorrectionCount,
     );
   }
-}
-
-function currentSafeGraph(
-  graph: RendererGraph,
-  projection: ViewProjection,
-  moduleIds: ReadonlySet<string>,
-): RendererGraph {
-  const projectionNodeIds = new Set(projection.nodes.map(({ id }) => id));
-  const nodes = graph.nodes.filter((node) =>
-    node.data.projectionNodeId === null
-      ? moduleIds.has(node.data.moduleId as string)
-      : projectionNodeIds.has(node.data.projectionNodeId),
-  );
-  const nodeIds = new Set(nodes.map(({ id }) => id));
-  return {
-    ...graph,
-    nodes,
-    edges: graph.edges.filter(
-      (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target),
-    ),
-  };
 }
 
 class ModularStructuredErrorBoundary extends Component<
@@ -645,14 +637,16 @@ export default function ModularStructuredGraphView(
   }>(() => {
     const adopted = lifecycle.adopted;
     if (adopted === undefined) return { graph: EMPTY_PREPARED_GRAPH };
-    if (adopted.key !== layoutKey) {
-      return {
-        graph: currentSafeGraph(
-          adopted.graph,
-          projection,
-          new Set(model.modules.map(({ id }) => id)),
-        ),
-      };
+    const retained = retainFocusSchematicGraphDuringLayoutTransition(
+      adopted.graph,
+      adopted.key,
+      layoutKey,
+    );
+    if (retained !== null) {
+      // The adopted graph is already validated. Keep it intact while a new
+      // File root is prepared: filtering it by the new projection can remove
+      // every old entity when the files share no IDs, yielding a blank canvas.
+      return { graph: retained };
     }
     const prepare = () =>
       resolveFocusSchematicPresentation(
