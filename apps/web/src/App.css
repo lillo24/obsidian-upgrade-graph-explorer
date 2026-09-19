@@ -1248,7 +1248,7 @@ h2 {
 .source-settings__privacy,
 .source-settings__recovery p,
 .developer-settings p {
-  color: var(--color-status-error-foreground);
+  color: var(--color-text-muted);
   font-size: 0.7rem;
   line-height: 1.45;
 }
@@ -1286,10 +1286,10 @@ h2 {
   align-items: center;
   justify-content: center;
   padding: 0.55rem 0.7rem;
-  border: 1px solid var(--color-status-error-border);
+  border: 1px solid var(--color-border-default);
   border-radius: 0.5rem;
-  color: var(--color-status-error-foreground);
-  background: var(--color-status-error-background);
+  color: var(--color-control-foreground);
+  background: var(--color-control-background);
   font-size: 0.72rem;
   font-weight: 800;
   line-height: 1.25;
@@ -1326,7 +1326,7 @@ h2 {
 .source-settings__recovery {
   margin-top: 0.75rem;
   padding-top: 0.75rem;
-  border-top: 1px solid var(--color-status-error-border);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .source-settings__recovery p {
