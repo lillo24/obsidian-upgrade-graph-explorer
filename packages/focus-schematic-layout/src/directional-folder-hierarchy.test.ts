@@ -355,6 +355,8 @@ describe('HIER4A-PATCH2 one-level nested Directional Folder Bands', () => {
         policies: {
           macroLayout: 'directional-bands',
           softFolderStrength: 50,
+          softFolderScopeMode: 'nested',
+          softAncestorDecayBase: 3,
           softFolderDisplayIntent: {
             fileParentOverrides: [],
             flattenedFolderKeys: [],

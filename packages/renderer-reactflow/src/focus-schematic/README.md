@@ -16,13 +16,22 @@ renderer-neutral result to validated React Flow data.
   plans consume worker-owned parent and child rectangles, use short visible
   labels with full-path title metadata, and leave direct-parent File units
   unlabeled.
-- `folder-cluster-guides.tsx` builds child regions before parent regions from the
-  nested displayed tree and final module rectangles. It preserves disconnected
-  islands, fixed padding, containment, pointer-inert hulls, short accessible
+- `folder-cluster-guides.tsx` projects Focus out of the semantic display tree,
+  then builds child regions before parent regions from the retained logical
+  tree and final module rectangles. It uses the layout-owned pure island oracle
+  as a one-region/blocker validator for fixed padding and containment,
+  pointer-inert hulls, short accessible
   labels, displayed-depth styling, and renderer-only current/parent/sibling
   emphasis. Its pure actual-shape helper resolves pane context points by depth,
   area, and stable identity. Folder management is supplied through the shared
-  context-menu request seam.
+  context-menu request seam. In Direct-only mode it instead builds each guide
+  from that folder's direct displayed Files, never passes child regions into a
+  parent wrapper. Immediate named folders always render, including singletons;
+  one-unit suppression applies only to ancestor wrappers without direct Files.
+  A split folder or unrelated blocker inside its hull is rejected rather than
+  rendered as duplicate or incomplete same-name regions. Focus remains a real
+  blocker but is absent from every guide member set. Both modes derive from the
+  post-spread module rectangles, so guide visibility never influences layout.
 
 The mapper is the sole owner of optional modular entity metadata. It derives
 module membership from HIER1 and direct-File ring visibility from the final
@@ -37,6 +46,14 @@ keyboard focus, a focus-visible outline, and pointer/keyboard context-menu
 entry. Empty-area context targeting is handled separately by world-space
 graph-pane hit testing. Guides are excluded from graph nodes, fitting, layout,
 and cache identity.
+
+FOCUS-HIERARCHY-UX1 keeps Soft folder guide geometry unchanged during subfocus
+and presents guides at context opacity. Its passive HTML label is now one
+baseline-aligned chip: `Folder | Parent`. The Folder stays primary, the parent
+keeps the existing smaller muted style, the separator is aria-hidden, and a
+root/no-parent label renders without a separator. The label anchor remains the
+start of the actual upper horizontal guide segment, and pointer/keyboard
+context-menu behavior is unchanged.
 
 Folder strips, nested guides, passive labels, module boundaries, filtered
 bridges, and their context/focus states consume the parent `GraphCanvas`

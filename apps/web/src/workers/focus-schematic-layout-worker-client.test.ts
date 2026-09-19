@@ -153,7 +153,7 @@ describe('Focus Schematic worker client', () => {
     expect(workers[3]!.terminated).toBe(false);
   });
 
-  it('adopts only the latest result across rapid strength and macro switches', async () => {
+  it('adopts only the latest result across rapid strength, scope, and macro switches', async () => {
     const { service, workers } = harness();
     const softInput: FocusSchematicLayoutInput = {
       ...input,
@@ -162,11 +162,17 @@ describe('Focus Schematic worker client', () => {
         directionalFolderBandsEnabled: false,
       },
     };
-    const softPolicy = (softFolderStrength: number) =>
+    const softPolicy = (
+      softFolderStrength: number,
+      softFolderScopeMode: 'nested' | 'nearest-only' = 'nested',
+      softAncestorDecayBase: 3 | 4 = 3,
+    ) =>
       ({
         ...DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
         macroLayout: 'soft-folder-clusters',
         softFolderStrength,
+        softFolderScopeMode,
+        softAncestorDecayBase,
       }) as const;
     const strengthRequests = [0, 25, 50, 75, 100].map((strength) =>
       service.layoutLatest(softInput, softPolicy(strength)),
@@ -181,6 +187,28 @@ describe('Focus Schematic worker client', () => {
     expect(await strengthRequests[4]).toMatchObject({
       status: 'success',
       metrics: { softClusterEvidence: { strength: 100 } },
+    });
+
+    const scopeRequests = [
+      softPolicy(50, 'nested', 3),
+      softPolicy(50, 'nested', 4),
+      softPolicy(50, 'nearest-only', 3),
+      softPolicy(50, 'nearest-only', 4),
+    ].map((policy) => service.layoutLatest(softInput, policy));
+    expect(await Promise.all(scopeRequests.slice(0, 3))).toEqual([
+      { status: 'superseded' },
+      { status: 'superseded' },
+      { status: 'superseded' },
+    ]);
+    workers.at(-1)!.succeed();
+    expect(await scopeRequests[3]).toMatchObject({
+      status: 'success',
+      metrics: {
+        softClusterEvidence: {
+          folderScopeMode: 'nearest-only',
+          ancestorDecayBase: null,
+        },
+      },
     });
 
     const macroRequests = [

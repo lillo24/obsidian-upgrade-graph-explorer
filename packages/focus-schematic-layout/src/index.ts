@@ -1,6 +1,12 @@
 export * from './types';
 export * from './policies';
+export * from './soft-cluster-spacing';
+export * from './soft-radial-spread';
+export * from './soft-group-packing';
+export * from './soft-folder-cohesion';
+export * from './soft-folder-guide-geometry';
 export * from './soft-folder-display';
+export * from './soft-nested-hierarchy-packing';
 export {
   FILTERED_MODULE_DIMENSIONS,
   FOCUS_SCHEMATIC_LAYOUT_CLEARANCE,

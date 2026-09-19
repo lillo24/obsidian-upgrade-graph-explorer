@@ -56,6 +56,16 @@ interface GraphSettingsProps {
   ) => void;
   readonly modularFocusSoftFolderStrength?: number;
   readonly onModularFocusSoftFolderStrengthChange?: (strength: number) => void;
+  readonly modularFocusDirectFoldersOnly?: boolean;
+  readonly onModularFocusDirectFoldersOnlyChange?: (direct: boolean) => void;
+  readonly modularFocusSoftAncestorDecayBase?: 3 | 4;
+  readonly onModularFocusSoftAncestorDecayBaseChange?: (base: 3 | 4) => void;
+  readonly modularFocusSoftSpacing?: number;
+  readonly onModularFocusSoftSpacingChange?: (spacing: number) => void;
+  readonly modularFocusIncludeWorkspaceRootGroup?: boolean;
+  readonly onModularFocusIncludeWorkspaceRootGroupChange?: (
+    include: boolean,
+  ) => void;
   readonly modularFolderStripsVisible?: GraphPreferences['modularFolderStripsVisible'];
   readonly onModularFolderStripsVisibleChange?: (visible: boolean) => void;
   readonly modularConnectionStyle?: GraphPreferences['modularConnectionStyle'];
@@ -176,6 +186,14 @@ export const GraphSettings = memo(function GraphSettings({
   onModularFocusMacroLayoutChange,
   modularFocusSoftFolderStrength = 50,
   onModularFocusSoftFolderStrengthChange,
+  modularFocusDirectFoldersOnly = false,
+  onModularFocusDirectFoldersOnlyChange,
+  modularFocusSoftAncestorDecayBase = 3,
+  onModularFocusSoftAncestorDecayBaseChange,
+  modularFocusSoftSpacing = 50,
+  onModularFocusSoftSpacingChange,
+  modularFocusIncludeWorkspaceRootGroup = false,
+  onModularFocusIncludeWorkspaceRootGroupChange,
   modularFolderStripsVisible = true,
   onModularFolderStripsVisibleChange,
   modularConnectionStyle = 'direct',
@@ -801,40 +819,169 @@ export const GraphSettings = memo(function GraphSettings({
                           </span>
                         </label>
                         {modularFocusMacroLayout === 'soft-folder-clusters' ? (
-                          <label className="global-layout-strength">
-                            <span>
-                              Folder strength{' '}
-                              <output>{modularFocusSoftFolderStrength}</output>
-                            </span>
-                            <input
-                              aria-label="Folder strength"
-                              list="modular-focus-folder-strength-marks"
-                              max={100}
-                              min={0}
-                              onChange={(event) =>
-                                onModularFocusSoftFolderStrengthChange?.(
-                                  event.currentTarget.valueAsNumber,
-                                )
-                              }
-                              step={1}
-                              type="range"
-                              value={modularFocusSoftFolderStrength}
-                            />
-                            <datalist id="modular-focus-folder-strength-marks">
-                              <option value="0" />
-                              <option value="25" />
-                              <option value="50" />
-                              <option value="75" />
-                              <option value="100" />
-                            </datalist>
-                            <small>
-                              <span>0</span>
-                              <span>25</span>
-                              <span>50</span>
-                              <span>75</span>
-                              <span>100</span>
-                            </small>
-                          </label>
+                          <>
+                            <label className="global-layout-strength">
+                              <span>
+                                Folder strength{' '}
+                                <output>
+                                  {modularFocusSoftFolderStrength}
+                                </output>
+                              </span>
+                              <input
+                                aria-label="Folder strength"
+                                list="modular-focus-folder-strength-marks"
+                                max={100}
+                                min={0}
+                                onChange={(event) =>
+                                  onModularFocusSoftFolderStrengthChange?.(
+                                    event.currentTarget.valueAsNumber,
+                                  )
+                                }
+                                step={1}
+                                type="range"
+                                value={modularFocusSoftFolderStrength}
+                              />
+                              <datalist id="modular-focus-folder-strength-marks">
+                                <option value="0" />
+                                <option value="25" />
+                                <option value="50" />
+                                <option value="75" />
+                                <option value="100" />
+                              </datalist>
+                              <small>
+                                <span>0</span>
+                                <span>25</span>
+                                <span>50</span>
+                                <span>75</span>
+                                <span>100</span>
+                              </small>
+                            </label>
+                            <p className="graph-settings__sandbox-note">
+                              Folder strength adds Soft attraction. Direct
+                              folder unity stays active at every strength;
+                              Nested also keeps retained ancestry contained.
+                              Focus remains folder-neutral.
+                            </p>
+                            <label>
+                              <input
+                                aria-label="Direct folders only"
+                                checked={modularFocusDirectFoldersOnly}
+                                onChange={(event) =>
+                                  onModularFocusDirectFoldersOnlyChange?.(
+                                    event.currentTarget.checked,
+                                  )
+                                }
+                                type="checkbox"
+                              />
+                              <span>
+                                <strong>Direct folders only</strong>
+                                <small>
+                                  Uses immediate named-folder hard groups only
+                                  and draws flat folder guides.
+                                </small>
+                              </span>
+                            </label>
+                            {!modularFocusDirectFoldersOnly ? (
+                              <div
+                                aria-label="Ancestor pull"
+                                className="graph-settings__soft-ancestor-pull"
+                                role="radiogroup"
+                              >
+                                <strong>Ancestor pull</strong>
+                                {([3, 4] as const).map((base) => (
+                                  <label key={base}>
+                                    <input
+                                      checked={
+                                        modularFocusSoftAncestorDecayBase ===
+                                        base
+                                      }
+                                      name="modular-focus-soft-ancestor-decay"
+                                      onChange={() =>
+                                        onModularFocusSoftAncestorDecayBaseChange?.(
+                                          base,
+                                        )
+                                      }
+                                      type="radio"
+                                      value={base}
+                                    />
+                                    <span>
+                                      <strong>1/{base}</strong>
+                                      <small>
+                                        Each ancestor level receives one {base}
+                                        th of the previous raw pull, normalized
+                                        per File.
+                                      </small>
+                                    </span>
+                                  </label>
+                                ))}
+                              </div>
+                            ) : null}
+                            <label className="global-layout-strength">
+                              <span>
+                                Soft spacing{' '}
+                                <output htmlFor="modular-focus-soft-spacing">
+                                  {modularFocusSoftSpacing}
+                                </output>
+                              </span>
+                              <input
+                                aria-label="Soft spacing"
+                                aria-valuetext={
+                                  modularFocusSoftSpacing === 0
+                                    ? 'base radius'
+                                    : modularFocusSoftSpacing === 50
+                                      ? '1.7 times base radius'
+                                      : modularFocusSoftSpacing === 100
+                                        ? '2.4 times base radius'
+                                        : `${modularFocusSoftSpacing} percent radial spread`
+                                }
+                                id="modular-focus-soft-spacing"
+                                list="modular-focus-soft-spacing-marks"
+                                max={100}
+                                min={0}
+                                onChange={(event) =>
+                                  onModularFocusSoftSpacingChange?.(
+                                    event.currentTarget.valueAsNumber,
+                                  )
+                                }
+                                step={1}
+                                type="range"
+                                value={modularFocusSoftSpacing}
+                              />
+                              <datalist id="modular-focus-soft-spacing-marks">
+                                <option value="0" />
+                                <option value="50" />
+                                <option value="100" />
+                              </datalist>
+                              <small>
+                                <span>Base</span>
+                                <span>1.7×</span>
+                                <span>Strong spread</span>
+                              </small>
+                              <small>
+                                Move Direct folder groups or complete Nested
+                                top-level subtrees outward from the fixed Focus
+                                without changing their internal geometry.
+                              </small>
+                            </label>
+                            <label>
+                              <input
+                                aria-label="Include workspace root group"
+                                checked={modularFocusIncludeWorkspaceRootGroup}
+                                onChange={(event) =>
+                                  onModularFocusIncludeWorkspaceRootGroupChange?.(
+                                    event.currentTarget.checked,
+                                  )
+                                }
+                                type="checkbox"
+                              />
+                              <span>
+                                <strong>Include workspace root group</strong>
+                                <small>
+                                  Group Files stored directly at the vault root.
+                                </small>
+                              </span>
+                            </label>
+                          </>
                         ) : null}
                       </fieldset>
                     ) : null}

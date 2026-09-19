@@ -223,6 +223,11 @@ export interface GraphCanvasProps {
   readonly layoutCache?: LocalStructuredLayoutCache;
   readonly focusAppearance: FocusAppearance;
   readonly selection: GraphSelection | null;
+  /** Session-only Local Hierarchy emphasis; excluded from layout and mapping. */
+  readonly focusHierarchySubfocus?: {
+    readonly entityId: string;
+    readonly kind: 'section' | 'block';
+  } | null;
   /** Disabled by default and never persisted by the renderer. */
   readonly performance?: PerformanceInstrumentation;
   /** Runtime-only token used to correlate a live adoption through paint. */
@@ -243,6 +248,11 @@ export interface GraphCanvasProps {
   readonly onFitRequestConsumed?: (key: number) => void;
   readonly onSelectionChange: (selection: GraphSelection | null) => void;
   readonly onFocusEntity?: (entityId: string) => void;
+  /** Optional Local Hierarchy dispatch for exact Heading/Block presentation. */
+  readonly onSubfocusEntity?: (
+    entityId: string,
+    kind: 'section' | 'block',
+  ) => void;
   readonly onNodeContextMenuRequest?: (
     request: GraphNodeContextRequest,
   ) => void;

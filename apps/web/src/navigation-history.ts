@@ -14,6 +14,10 @@ import {
   resolveAvailablePresentationMode,
   type ExplorationAvailability,
 } from './exploration-model';
+import {
+  sameFocusHierarchySubfocus,
+  type FocusHierarchySubfocus,
+} from './focus-hierarchy-subfocus';
 
 export const GRAPH_NAVIGATION_HISTORY_LIMIT = 100;
 
@@ -23,6 +27,7 @@ export interface GraphHistoryCheckpoint {
   readonly presentationMode: GraphPresentationMode;
   readonly state: ViewProjectionState;
   readonly viewports: PersistedRendererViewports;
+  readonly focusHierarchySubfocus?: FocusHierarchySubfocus;
 }
 
 export interface GraphNavigationHistory {
@@ -151,6 +156,7 @@ export function createGraphHistoryCheckpoint(
   viewport?: PersistedViewportAnchor,
   presentationMode: GraphPresentationMode = 'structure',
   viewports: PersistedRendererViewports = {},
+  focusHierarchySubfocus?: FocusHierarchySubfocus | null,
 ): GraphHistoryCheckpoint {
   return {
     presentationMode,
@@ -164,6 +170,7 @@ export function createGraphHistoryCheckpoint(
       ...(viewports.global === undefined ? {} : { global: viewports.global }),
       ...(viewports.local === undefined ? {} : { local: viewports.local }),
     },
+    ...(focusHierarchySubfocus == null ? {} : { focusHierarchySubfocus }),
   };
 }
 
@@ -174,6 +181,10 @@ export function sameGraphHistoryCheckpoint(
   return (
     left.presentationMode === right.presentationMode &&
     sameGraphViewState(left.state, right.state) &&
+    sameFocusHierarchySubfocus(
+      left.focusHierarchySubfocus,
+      right.focusHierarchySubfocus,
+    ) &&
     sameRendererViewports(left.viewports, right.viewports)
   );
 }
@@ -218,7 +229,14 @@ export function normalizeAvailableGraphHistory(
       (previous.changed || candidate.changed) &&
       previous.checkpoint.presentationMode ===
         candidate.checkpoint.presentationMode &&
-      sameGraphViewState(previous.checkpoint.state, candidate.checkpoint.state)
+      sameGraphViewState(
+        previous.checkpoint.state,
+        candidate.checkpoint.state,
+      ) &&
+      sameFocusHierarchySubfocus(
+        previous.checkpoint.focusHierarchySubfocus,
+        candidate.checkpoint.focusHierarchySubfocus,
+      )
     ) {
       previous.checkpoint = {
         ...candidate.checkpoint,

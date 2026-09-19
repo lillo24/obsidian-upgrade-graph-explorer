@@ -8,7 +8,9 @@ HIER4B's source-neutral nested folder display intent.
 - `use-soft-folder-display.ts` reconciles intent against stable canonical File
   identities and exact folder keys, then exposes one commit/reset boundary.
 - `context-menu.ts` derives File/folder menu actions and maps each action to one
-  pure display-intent change; generic Network actions remain future work.
+  pure display-intent change. Direct guide targets resolve against the
+  post-manual/pre-compression folder projection; generic Network actions remain
+  future work.
 - Tests cover workspace isolation, schema-1 reset, failed writes, File movement,
   one-level/sibling flattening, restore availability, and root/exact disabled
   states.

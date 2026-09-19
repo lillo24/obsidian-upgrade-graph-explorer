@@ -2,6 +2,8 @@ import type {
   FocusSchematicComputedLayout,
   FocusSchematicEndpointOrderPolicy,
   FocusSchematicInternalLayoutVariant,
+  FocusSchematicSoftAncestorDecayBase,
+  FocusSchematicSoftFolderScopeMode,
   FocusSchematicSoftFolderDisplayIntent,
 } from './types';
 import {
@@ -23,6 +25,8 @@ export type FocusSchematicProductMacroLayout =
 export interface FocusSchematicProductLayoutPolicies {
   readonly macroLayout: FocusSchematicProductMacroLayout;
   readonly softFolderStrength: number;
+  readonly softFolderScopeMode: FocusSchematicSoftFolderScopeMode;
+  readonly softAncestorDecayBase: FocusSchematicSoftAncestorDecayBase;
   readonly softFolderDisplayIntent: FocusSchematicSoftFolderDisplayIntent;
   readonly endpointOrderPolicy: FocusSchematicEndpointOrderPolicy;
   readonly internalLayoutVariant: FocusSchematicProductInternalLayoutVariant;
@@ -31,6 +35,8 @@ export interface FocusSchematicProductLayoutPolicies {
 export const DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES = {
   macroLayout: 'directional-bands',
   softFolderStrength: 50,
+  softFolderScopeMode: 'nested',
+  softAncestorDecayBase: 3,
   softFolderDisplayIntent: EMPTY_FOCUS_SCHEMATIC_SOFT_FOLDER_DISPLAY_INTENT,
   endpointOrderPolicy: 'crossing-optimized',
   internalLayoutVariant: 'adaptive-compass',
@@ -48,6 +54,23 @@ export function normalizeFocusSchematicSoftFolderStrength(
   return typeof value === 'number' && Number.isFinite(value)
     ? Math.min(100, Math.max(0, value))
     : DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softFolderStrength;
+}
+
+export {
+  DEFAULT_FOCUS_SCHEMATIC_SOFT_SPACING,
+  normalizeFocusSchematicSoftSpacing,
+} from './soft-cluster-spacing';
+
+export function isFocusSchematicSoftFolderScopeMode(
+  value: unknown,
+): value is FocusSchematicSoftFolderScopeMode {
+  return value === 'nested' || value === 'nearest-only';
+}
+
+export function normalizeFocusSchematicSoftAncestorDecayBase(
+  value: unknown,
+): FocusSchematicSoftAncestorDecayBase {
+  return value === 4 ? 4 : 3;
 }
 
 export function normalizeFocusSchematicSoftFolderDisplayIntent(
@@ -95,8 +118,18 @@ export function focusSchematicLayoutMatchesProductPolicies(
     evidence.endpointOrderPolicy === policies.endpointOrderPolicy &&
     evidence.strength ===
       normalizeFocusSchematicSoftFolderStrength(policies.softFolderStrength) &&
+    evidence.folderScopeMode === policies.softFolderScopeMode &&
+    evidence.ancestorDecayBase ===
+      (policies.softFolderScopeMode === 'nearest-only'
+        ? null
+        : normalizeFocusSchematicSoftAncestorDecayBase(
+            policies.softAncestorDecayBase,
+          )) &&
     JSON.stringify(evidence.displayIntent) === JSON.stringify(expectedIntent) &&
-    evidence.hierarchyForcePolicy === 'normalized-decay' &&
+    evidence.hierarchyForcePolicy ===
+      (policies.softFolderScopeMode === 'nearest-only'
+        ? 'nearest-only'
+        : 'normalized-decay') &&
     evidence.fileAttachmentPolicy === 'spatial-cardinal'
   );
 }

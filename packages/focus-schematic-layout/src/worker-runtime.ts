@@ -45,6 +45,8 @@ export function handleFocusSchematicLayoutWorkerRequest(
       request.policies.macroLayout === 'soft-folder-clusters'
         ? computeFocusSchematicSoftClusterLayoutAttempt(request.input, {
             strength: request.policies.softFolderStrength,
+            folderScopeMode: request.policies.softFolderScopeMode,
+            ancestorDecayBase: request.policies.softAncestorDecayBase,
             displayIntent: request.policies.softFolderDisplayIntent,
             endpointOrderPolicy: request.policies.endpointOrderPolicy,
             internalLayoutVariant: request.policies.internalLayoutVariant,

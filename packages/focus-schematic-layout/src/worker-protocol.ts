@@ -1,10 +1,13 @@
 import { validateFocusSchematicComputedLayout } from './endpoint-facing';
 import { validateFocusSchematicLayoutInput } from './input';
 import {
+  DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
   focusSchematicLayoutMatchesProductPolicies,
   isFocusSchematicEndpointOrderPolicy,
   isFocusSchematicProductMacroLayout,
   isFocusSchematicProductInternalLayoutVariant,
+  isFocusSchematicSoftFolderScopeMode,
+  normalizeFocusSchematicSoftAncestorDecayBase,
   normalizeFocusSchematicSoftFolderDisplayIntent,
   normalizeFocusSchematicSoftFolderStrength,
   type FocusSchematicProductLayoutPolicies,
@@ -16,7 +19,7 @@ import type {
   FocusSchematicSoftClusterEvidence,
 } from './types';
 
-export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 8 as const;
+export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 14 as const;
 
 export interface FocusSchematicLayoutWorkerRequest {
   readonly protocolVersion: typeof FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION;
@@ -124,12 +127,15 @@ function validateSoftClusterEvidence(
       'developmentOnly',
       'layoutFamily',
       'strength',
+      'structuralSpacing',
       'endpointOrderPolicy',
       'fileParentOverrideCount',
       'flattenedFolderCount',
       'displayedFolderCount',
       'automaticallyCompressedFolderCount',
       'maximumDisplayedDepth',
+      'folderScopeMode',
+      'ancestorDecayBase',
       'hierarchyForcePolicy',
       'maximumPerFileFolderWeight',
       'fileAttachmentPolicy',
@@ -138,13 +144,21 @@ function validateSoftClusterEvidence(
       'secondaryGeometryInfluence',
       'fixedIterationSchedule',
       'compass',
+      'cohesion',
+      'nestedHierarchy',
+      'coverage',
+      'groupPacking',
+      'preCohesionMetrics',
+      'postCohesionMetrics',
+      'postNestedMetrics',
+      'preGroupMetrics',
       'metrics',
       'runtime',
     ],
     'Soft Cluster evidence',
   );
   if (
-    evidence.schemaVersion !== 3 ||
+    evidence.schemaVersion !== 9 ||
     evidence.developmentOnly !== true ||
     evidence.layoutFamily !== 'soft-folder-clusters' ||
     evidence.strength !==
@@ -160,7 +174,17 @@ function validateSoftClusterEvidence(
     Number(evidence.automaticallyCompressedFolderCount) < 0 ||
     !Number.isSafeInteger(evidence.maximumDisplayedDepth) ||
     Number(evidence.maximumDisplayedDepth) < 0 ||
-    evidence.hierarchyForcePolicy !== 'normalized-decay' ||
+    evidence.folderScopeMode !== policies.softFolderScopeMode ||
+    evidence.ancestorDecayBase !==
+      (policies.softFolderScopeMode === 'nearest-only'
+        ? null
+        : normalizeFocusSchematicSoftAncestorDecayBase(
+            policies.softAncestorDecayBase,
+          )) ||
+    evidence.hierarchyForcePolicy !==
+      (policies.softFolderScopeMode === 'nearest-only'
+        ? 'nearest-only'
+        : 'normalized-decay') ||
     finiteNonNegative(
       evidence.maximumPerFileFolderWeight,
       'maximumPerFileFolderWeight',
@@ -223,6 +247,223 @@ function validateSoftClusterEvidence(
     throw new FocusSchematicLayoutProtocolError(
       'Soft Compass demand matches exceed demanded branches.',
     );
+  const cohesion = record(evidence.cohesion, 'Soft folder cohesion evidence');
+  exactKeys(
+    cohesion,
+    [
+      'immediateFolderGroupCount',
+      'immediateFolderSingletonCount',
+      'immediateFolderCohesionMoveMean',
+      'immediateFolderCohesionMoveP95',
+      'immediateFolderCohesionMoveMax',
+      'immediateFolderRmsRadiusMean',
+      'immediateFolderRmsRadiusP95',
+      'immediateFolderMaxPairDistanceMean',
+      'immediateFolderMaxPairDistanceP95',
+      'immediateFolderSplitViolationCount',
+    ],
+    'Soft folder cohesion evidence',
+  );
+  for (const [key, metric] of Object.entries(cohesion))
+    if (metric !== null)
+      finiteNonNegative(metric, `Soft folder cohesion evidence.${key}`);
+  if (Number(cohesion.immediateFolderSplitViolationCount) !== 0)
+    throw new FocusSchematicLayoutProtocolError(
+      'Soft folder cohesion left a named immediate-folder split.',
+    );
+  const nestedHierarchy = record(
+    evidence.nestedHierarchy,
+    'Soft Nested hierarchy evidence',
+  );
+  exactKeys(
+    nestedHierarchy,
+    [
+      'retainedNestedFolderCount',
+      'nestedFolderPackingMoveMean',
+      'nestedFolderPackingMoveP95',
+      'nestedFolderPackingMoveMax',
+      'nestedFolderPackingDepth',
+      'nestedParentContainmentViolationCount',
+      'nestedFolderSplitViolationCount',
+      'nestedGuideBlockerViolationCount',
+      'nestedFolderMaxRegionCount',
+      'nestedFolderMemberCountMin',
+      'nestedFolderMemberCountMax',
+      'nestedClosestInterIslandGap',
+      'postCohesionNestedParentContainmentViolationCount',
+      'postCohesionNestedFolderSplitViolationCount',
+      'postCohesionNestedGuideBlockerViolationCount',
+      'postNestedNestedParentContainmentViolationCount',
+      'postNestedNestedFolderSplitViolationCount',
+      'postNestedNestedGuideBlockerViolationCount',
+      'postGroupNestedParentContainmentViolationCount',
+      'postGroupNestedFolderSplitViolationCount',
+      'postGroupNestedGuideBlockerViolationCount',
+      'nestedFirstSplitStage',
+    ],
+    'Soft Nested hierarchy evidence',
+  );
+  for (const [key, metric] of Object.entries(nestedHierarchy)) {
+    if (key === 'nestedFirstSplitStage') continue;
+    if (key === 'nestedClosestInterIslandGap' && metric === null) continue;
+    finiteNonNegative(metric, `Soft Nested hierarchy evidence.${key}`);
+  }
+  if (
+    nestedHierarchy.nestedFirstSplitStage !== null &&
+    nestedHierarchy.nestedFirstSplitStage !== 'post-cohesion' &&
+    nestedHierarchy.nestedFirstSplitStage !== 'post-nested' &&
+    nestedHierarchy.nestedFirstSplitStage !== 'post-group'
+  )
+    throw new FocusSchematicLayoutProtocolError(
+      'Soft Nested hierarchy evidence has an invalid first split stage.',
+    );
+  if (
+    Number(nestedHierarchy.nestedParentContainmentViolationCount) !== 0 ||
+    Number(nestedHierarchy.nestedFolderSplitViolationCount) !== 0 ||
+    Number(nestedHierarchy.nestedGuideBlockerViolationCount) !== 0 ||
+    Number(nestedHierarchy.postNestedNestedParentContainmentViolationCount) !==
+      0 ||
+    Number(nestedHierarchy.postNestedNestedFolderSplitViolationCount) !== 0 ||
+    Number(nestedHierarchy.postNestedNestedGuideBlockerViolationCount) !== 0 ||
+    Number(nestedHierarchy.postGroupNestedParentContainmentViolationCount) !==
+      0 ||
+    Number(nestedHierarchy.postGroupNestedFolderSplitViolationCount) !== 0 ||
+    Number(nestedHierarchy.postGroupNestedGuideBlockerViolationCount) !== 0
+  )
+    throw new FocusSchematicLayoutProtocolError(
+      'Soft Nested hierarchy evidence contains a hard-geometry violation.',
+    );
+  const coverage = record(evidence.coverage, 'Soft folder coverage evidence');
+  exactKeys(
+    coverage,
+    [
+      'groupableVisibleFileCount',
+      'workspaceRootExemptFileCount',
+      'focusExemptFileCount',
+      'filteredBridgeExemptFileCount',
+      'immediateFolderCoveredFileCount',
+      'missingImmediateFolderGuideCount',
+      'nestedAncestorCoverageViolationCount',
+    ],
+    'Soft folder coverage evidence',
+  );
+  for (const [key, metric] of Object.entries(coverage))
+    finiteNonNegative(metric, `Soft folder coverage evidence.${key}`);
+  if (
+    Number(coverage.missingImmediateFolderGuideCount) !== 0 ||
+    Number(coverage.nestedAncestorCoverageViolationCount) !== 0
+  )
+    throw new FocusSchematicLayoutProtocolError(
+      'Soft folder coverage evidence contains a hard membership violation.',
+    );
+  const groupPacking = record(
+    evidence.groupPacking,
+    'Soft compound group packing evidence',
+  );
+  exactKeys(
+    groupPacking,
+    [
+      'compoundGroupCount',
+      'anchoredGroupCount',
+      'groupPackingIterationCount',
+      'groupPackingCollisionCheckCount',
+      'groupPackingCorrectionCount',
+      'groupPackingMs',
+      'groupTranslationMean',
+      'groupTranslationP95',
+      'groupTranslationMax',
+      'groupEnvelopeAreaMean',
+      'groupEnvelopeAreaP95',
+      'radialSpreadSafetyViolationCount',
+    ],
+    'Soft compound group packing evidence',
+  );
+  for (const [key, metric] of Object.entries(groupPacking))
+    finiteNonNegative(metric, `Soft compound group packing evidence.${key}`);
+  if (
+    Number(groupPacking.anchoredGroupCount) !== 1 ||
+    Number(groupPacking.radialSpreadSafetyViolationCount) !== 0
+  )
+    throw new FocusSchematicLayoutProtocolError(
+      'Soft compound group packing evidence is invalid.',
+    );
+  const preCohesionMetrics = record(
+    evidence.preCohesionMetrics,
+    'Soft pre-cohesion metrics',
+  );
+  const postCohesionMetrics = record(
+    evidence.postCohesionMetrics,
+    'Soft post-cohesion metrics',
+  );
+  const postNestedMetrics = record(
+    evidence.postNestedMetrics,
+    'Soft post-Nested metrics',
+  );
+  const preGroupMetrics = record(
+    evidence.preGroupMetrics,
+    'Soft pre-group metrics',
+  );
+  const finalMetrics = record(evidence.metrics, 'Soft final metrics');
+  const metricKeys = [
+    'repeatedFolderCount',
+    'repeatedFolderModuleCount',
+    'repeatedFolderRmsRadiusMean',
+    'repeatedFolderRmsRadiusMedian',
+    'repeatedFolderRmsRadiusP95',
+    'childFolderCoherenceMean',
+    'parentFolderCoherenceMean',
+    'connectedPairCount',
+    'connectedPairDistanceMean',
+    'connectedPairDistanceP95',
+    'exactPrimaryEndpointSpanMean',
+    'exactPrimaryEndpointSpanP95',
+    'exactEndpointCrossingCount',
+    'hopMeanAbsoluteRadiusError',
+    'hopRadiusCorrelation',
+    'boundsWidth',
+    'boundsHeight',
+    'boundsArea',
+    'overlapCount',
+    'minimumModuleGap',
+  ] as const;
+  for (const [label, value] of [
+    ['Soft pre-cohesion metrics', preCohesionMetrics],
+    ['Soft post-cohesion metrics', postCohesionMetrics],
+    ['Soft post-Nested metrics', postNestedMetrics],
+    ['Soft pre-group metrics', preGroupMetrics],
+    ['Soft final metrics', finalMetrics],
+  ] as const) {
+    exactKeys(value, metricKeys, label);
+    for (const key of metricKeys) {
+      const metric = value[key];
+      if (metric !== null) finiteNumber(metric, `${label}.${key}`);
+    }
+  }
+  const resolvedSpacing = record(
+    evidence.structuralSpacing,
+    'Soft Cluster structural spacing',
+  );
+  exactKeys(
+    resolvedSpacing,
+    [
+      'hopSpacing',
+      'moduleGap',
+      'topologyExtraDistance',
+      'packingStep',
+      'radialJitter',
+      'internalNodeSeparation',
+      'internalRankSeparation',
+      'modulePaddingX',
+      'modulePaddingY',
+    ],
+    'Soft Cluster structural spacing',
+  );
+  for (const [key, spacing] of Object.entries(resolvedSpacing)) {
+    if (!Number.isSafeInteger(spacing) || Number(spacing) <= 0)
+      throw new FocusSchematicLayoutProtocolError(
+        `Soft Cluster structural spacing.${key} must be a positive integer.`,
+      );
+  }
   const metrics = record(evidence.metrics, 'Soft Cluster metrics');
   exactKeys(
     metrics,
@@ -318,6 +559,8 @@ export function validateFocusSchematicLayoutWorkerRequest(
     [
       'macroLayout',
       'softFolderStrength',
+      'softFolderScopeMode',
+      'softAncestorDecayBase',
       'softFolderDisplayIntent',
       'endpointOrderPolicy',
       'internalLayoutVariant',
@@ -341,6 +584,10 @@ export function validateFocusSchematicLayoutWorkerRequest(
       'Focus Schematic internal layout policy is invalid.',
     );
   const directional = policies.macroLayout === 'directional-bands';
+  if (!isFocusSchematicSoftFolderScopeMode(policies.softFolderScopeMode))
+    throw new FocusSchematicLayoutProtocolError(
+      'Focus Schematic Soft folder scope mode is invalid.',
+    );
   if (validation.value.settings.directionalFolderBandsEnabled !== directional)
     throw new FocusSchematicLayoutProtocolError(
       'Focus Schematic macro-layout policy does not match the layout input settings.',
@@ -365,6 +612,15 @@ export function validateFocusSchematicLayoutWorkerRequest(
       softFolderStrength: normalizeFocusSchematicSoftFolderStrength(
         policies.softFolderStrength,
       ),
+      softFolderScopeMode: directional
+        ? DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softFolderScopeMode
+        : policies.softFolderScopeMode,
+      softAncestorDecayBase:
+        directional || policies.softFolderScopeMode === 'nearest-only'
+          ? DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softAncestorDecayBase
+          : normalizeFocusSchematicSoftAncestorDecayBase(
+              policies.softAncestorDecayBase,
+            ),
       softFolderDisplayIntent: directional
         ? { fileParentOverrides: [], flattenedFolderKeys: [] }
         : softFolderDisplayIntent,

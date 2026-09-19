@@ -1,6 +1,6 @@
 # HIER4B Soft Folder Clusters
 
-Status: **MERGED IMPLEMENTATION — accepted folder behavior and root-neutral folder force are on `main`; PATCH1 Adaptive Compass compatibility awaits graphical QA.**
+Status: **HIER4B-SPACING-FIX5 CANDIDATE — Focus-neutral grouping and hard retained Nested containment await native graphical QA in PR #106.**
 
 HIER4B evaluates a second macro-layout family for Modular Focus Hierarchy.
 Directional Folder Bands remains the Modular Preview default, and Classic Focus
@@ -16,8 +16,11 @@ folder identity remains immutable. The pure transformation is:
 canonical source folders
 → sparse per-File display-parent overrides
 → sparse manually flattened folder layers
-→ derived one-child-unit compression
+→ derived Direct parent snapshot
+→ derived ancestor-only pass-through compression
 → deterministic nested display tree with provenance
+→ Focus-neutral grouping projection
+→ grouping-only pruning and pass-through recompression
 ```
 
 A File override uses its stable document `EntityId` and a normalized ancestor
@@ -28,11 +31,12 @@ remain nested. Flattening displayed siblings records each sibling layer
 explicitly. Context menus expose affected-layer restore actions and a workspace
 reset, so manual intent is reversible.
 
-After manual intent, every non-root displayed folder with exactly one direct
-child unit is automatically suppressed. A child unit is one direct File or one
-child folder. Suppression repeats until a useful branching level and is never
-persisted. Two Files, a File plus child folder, or two child folders retain the
-folder guide. File visibility may change this derived compression; Heading
+After manual intent, automatic compression suppresses only a non-root folder
+with zero direct visible Files and exactly one child folder. Suppression repeats
+through ancestor-only pass-through chains and is never persisted. A named
+folder with one or more direct visible Files always remains, including a
+one-File leaf. Manual flattening may still remove that layer intentionally.
+File visibility may change which ancestor-only wrappers survive; Heading
 disclosure cannot because it does not change visible File membership.
 
 ## Hierarchical attraction
@@ -43,26 +47,37 @@ variable-rectangle collision packing. Secondary connections remain at zero
 geometry influence.
 
 Each visible File retains truthful membership in its displayed ancestor scopes.
-For attraction, each non-root File participates in those scopes. FIX2 compared:
+For attraction, each non-root File participates in those scopes. The Sandbox
+can compare two scope modes without changing the displayed tree or persisted
+folder intent:
 
 - H0: nearest displayed folder only;
-- H1: normalized decaying ancestor weights;
-- H2: normalized equal ancestor shares.
+- H1: normalized decaying ancestor weights (Nested, the default);
+- Direct folders only: nearest displayed folder only.
 
-H1 is selected internally. The nearest displayed folder receives the strongest
-share while all shares for one File sum to at most one, so depth cannot amplify
-the global Folder strength. At strength 0 the solver builds no folder-force
-groups. Manually promoted Files leave their former child scope; flattened and
-automatically compressed layers receive no separate force.
+Nested mode offers geometric raw decay of `1 / base ** index`, with 1/3 as the
+default and 1/4 as the comparison. The selected raw weights are normalized per
+File: two scopes produce `.75/.25` or `.80/.20`, and three produce about
+`.6923/.2308/.0769` or `.7619/.1905/.0476`. Total force weight therefore stays
+at most one. Direct-only mode selects each File's immediate parent after File
+promotion and manual folder flattening but before automatic singleton
+compression. This derived parent is not persisted, and it remains named even
+when the Nested tree later compresses that folder into an ancestor or the
+workspace root. Direct-only canonicalizes the stored decay choice out of
+structural identity. At strength 0 the solver builds no folder-force groups,
+while mandatory immediate named-folder cohesion still runs.
+Manually promoted Files leave their former child scope, and a manually
+flattened folder assigns its Files to the resulting parent scope.
 
-In Focus Soft Folder Clusters, the Focus/root File remains a topology anchor
-and visible folder member but is excluded from folder-attraction centroids and
-force membership before the two-member active-group threshold. Root Headings
-and Blocks remain internal module geometry and never become folder-force
-members. Display evidence (`displayedFolderCount`, `maximumDisplayedDepth`, and
-`maximumPerFileFolderWeight`) continues to use the root-inclusive memberships.
-Repeated-folder counts, radii, coherence, and runtime group counts describe the
-root-excluded force-active groups.
+In Focus Soft Folder Clusters, the semantic tree keeps the Focus/root File's
+truthful exact folder and manual/display metadata for inspection and context
+actions. A separate grouping projection removes Focus before recomputing
+descendants, pruning empty folders, and compressing pass-through ancestors.
+Folder attraction, cohesion, compound bodies, Nested packing, radial spacing,
+guides, and visible grouping evidence all consume this Focus-neutral tree.
+Focus remains the centered topology anchor and an unrelated collision/blocker
+module. Root Headings and Blocks remain internal module geometry and never
+become independent folder members.
 
 The deterministic schedule remains Adaptive Compass, 36 relaxation/collision
 iterations, Adaptive Compass, then 18 iterations. The Focus File is translated
@@ -98,21 +113,97 @@ with lateral or vertical-only branches, demand matches, hard-guard overrides,
 pass-one/pass-two region and bounds churn, and before/after pass-two crossings
 and span. The macro perturbation diagnostic distinguishes visible region,
 internal rectangle, and module-bound changes from a true geometric no-op. When
-Adaptive and Vertical input rectangles are identical, the downstream Soft
-candidate is byte-identical. Soft cache algorithm version 5 covers the combined
-spatial-Compass and root-neutral force geometry, while worker protocol version 7
-isolates the changed evidence shape without invalidating the Directional
-algorithm version.
+Adaptive and Vertical input rectangles are identical across both bounded passes,
+the downstream Soft candidate is byte-identical. Soft cache algorithm version 11
+covers the Focus-neutral grouping projection, mandatory immediate cohesion,
+hard retained Nested packing, and mode-specific compound bodies. Worker protocol
+version 13 and Soft evidence schema 8 carry cohesion, Nested movement/quality,
+named-folder coverage, post-Nested topology quality, group-packing evidence, and
+the fixed-spacing policy without invalidating the Directional algorithm version.
+
+## Structural group packing and Soft spacing
+
+HIER4B-SPACING-FIX3B retains one fixed structural policy: 600 hop spacing, 88
+module gap, 180 topology distance, 72 packing step, 104 radial jitter, 30/60
+internal node/rank separation, and 34/30 module padding. The `[36, 18]`
+schedule, Adaptive Compass, endpoint ordering, folder relaxation, collision
+packing, and root-neutral force are decided once by that structural result.
+
+After the existing solver finishes, FIX4 first groups non-Focus Files by their immediate
+parent after manual intent and before automatic compression. Every named group
+is deterministically compacted as whole File modules into one connected local
+arrangement. Module sizes and File/Heading/Block offsets stay fixed. The
+pre-cohesion centroid is the preferred center. Focus is absent from the group
+and remains fixed. This stage runs even when Folder strength is zero, so the
+strength control means additional centroid and ancestor attraction beyond
+mandatory structural grouping.
+
+Direct mode then derives disjoint bodies from the immediate displayed parent
+captured after manual intent and before automatic compression. Every named
+folder is a compact rigid list of its member module rectangles. Nested mode
+packs every retained folder deepest-first from one direct-member unit plus its
+already-packed child-folder subtree units. Its final compound bodies are whole
+top-level retained subtrees, so later packing and radial spacing cannot tear an
+ancestor composition apart. Files stored directly at workspace root are
+individual structural bodies. Focus has its own explicit anchored
+`focus-anchor` body with `folderKey = null`; all other bodies may translate as a
+whole without changing any member-relative vector.
+A deterministic nearest-ring search chooses the first safe translation. Its
+exact affine interval oracle checks padded named-folder envelopes against other
+bodies, including the 16 px clearance, over the entire continuous spread domain
+from 1.0x to 2.4x. This prevents an unrelated File from becoming a blocker
+inside a direct-folder hull. A structural attempt fails if any spread-safety or
+shared guide-island violation remains. These passes do not rerun Adaptive
+Compass or change internal module geometry.
+
+The Sandbox `Soft spacing` value from 0 to 100 is now a post-layout radial
+spread. Its linear scale is `1 + 1.4 × value/100`: 0 is 1.0× base radius, 50 is
+1.7×, and 100 is 2.4×. Every member of a Direct folder body or Nested top-level
+subtree receives the same translation from the fixed root center. The explicit
+Focus anchor stays fixed; root-level Files move as singleton bodies by default.
+Endpoint attachments and geometry-derived endpoint/folder quality are then
+recomputed from those final rectangles so strict renderer validation remains
+truthful; no structural search, packing, collision pass, or relaxation reruns.
+The root, module
+dimensions, internal offsets, angular direction, branch assignments, force
+groups, and structural evidence remain unchanged. Folder guides derive from
+the transformed rectangles.
+
+`Include workspace root group` is a persisted Sandbox presentation preference
+and defaults Off. Off shows no `.` guide and keeps root-level Files as separate
+radial bodies. On groups those Files for the radial transform and renders the
+label `Workspace root`. Structural packing always uses the Off singleton
+partition and additionally proves the On aggregate partition safe, so this
+toggle causes no projection, model, worker, structural layout, or cache work.
+
+Radial spread is absent from worker requests and structural cache identity, so
+changing it causes zero projection/model/worker/solver work and reuses one
+base result. A presentation failure keeps the validated adopted graph visible
+and exposes the exact error in the Modular controls rather than silently
+showing an unspread graph. Directional requests ignore all Soft-only scope,
+decay, strength, and radial values. Native graphical QA is pending.
 
 ## Nested Folder guides
 
 Folder guides remain a renderer-only overlay derived from the final displayed
-module rectangles and the pure display tree. Child regions are built first;
-their rectangles then enter parent guide geometry along with the parent's
-direct Files. This makes child containment structural. Fixed per-level padding
-keeps deep nesting bounded. Logical folders may retain multiple disconnected
-regions when topology separates their Files, avoiding a misleading hull across
-unrelated modules.
+module rectangles and the Focus-neutral grouping tree. In Nested mode, child
+regions are built first; their rectangles then enter the one parent guide along
+with the parent's direct Files. Logical membership comes from retained path
+ancestry, never spatial proximity. The island and blocker geometry is a strict
+validator: every retained named folder must produce exactly one coherent region
+containing every logical child and no unrelated module. A failure is surfaced
+instead of dropping a child or drawing duplicate same-name regions.
+
+In Direct-only mode, each folder guide uses Files grouped by the
+pre-compression Direct parent. Child-folder regions never become parent-guide
+units, so a parent with its own Files may render independently without wrapping
+a child folder. A named one-File Direct group renders a singleton guide because
+it is that File's only visible folder identity. Nested mode also retains an
+immediate named folder with one direct File. Grouping-tree pass-through
+compression removes only ancestor-only single-child layers before layout; every
+retained Nested folder then renders exactly once. Area targeting uses the
+Focus-neutral guide projection, while context actions retain the semantic tree.
+Switching modes leaves manual intent unchanged.
 
 The hull SVG remains pointer-inert and behind graph edges and nodes. The graph
 pane converts a context-menu point through React Flow's screen-to-world helper
@@ -122,10 +213,15 @@ guide-area context menus without intercepting ordinary pointer input. Turning
 Folder guides off disables this area hit test.
 
 Visible labels use only the final folder segment plus an optional quiet parent
-segment. The full normalized workspace-relative key remains in title, ARIA,
-menu naming, and development data. Disconnected regions repeat the same short
-name without visible island numbering. Display depth is derived after manual
-flattening and singleton compression: root is 0, top-level folders are 1, and
+segment. Non-singleton labels anchor at the left end of the uppermost visible
+horizontal segment produced by the rounded guide geometry, then retain the
+existing `+12/-9` offset. A deterministic bounding-box fallback covers
+degenerate shapes; singleton rectangles retain their prior anchor. The full
+normalized workspace-relative key remains in title, ARIA, menu naming, and
+development data. One retained folder produces one region and one label; split
+or blocker-invalid geometry is rejected by the shared structural/renderer
+oracle. Display depth is derived after manual
+flattening and automatic pass-through compression: root is 0, top-level folders are 1, and
 CSS styling is capped at `3+`. Hover or keyboard focus still emphasizes the
 current folder, its displayed parent, and sibling folder guides without
 changing layout.
@@ -137,16 +233,13 @@ focus restoration keep the established menu behavior. Hover adds text emphasis
 only and keyboard focus gets a temporary visible outline. Repeated SVG labels
 use the same restrained text weight and size.
 
-FIX4 applies a second, renderer-local compression after spatial island
-splitting. A named folder region is rendered only when its island contains at
-least two direct visual units: direct File rectangles or immediate rendered
-child-folder regions. A one-unit region emits no shape, label, hover target, or
-area hit target. Its one surviving visual unit passes into the parent candidate
-set before parent geometry is built, so recursive local wrapper chains compress
-without losing descendant Files. Useful File-plus-child and two-child regions
-remain. The logical display tree, persisted intent, promotion, flattening,
-forces, spacing, ports, and routing do not change. The workspace root retains
-its existing direct-File-only structural exception.
+The earlier post-island wrapper pass still suppresses a named ancestor region
+when its island contains only one child visual unit and no direct File. Its one
+surviving child passes into the parent candidate set, so recursive local wrapper
+chains compress without losing descendants. Any island containing a direct File
+renders, including named singletons. Useful File-plus-child and two-child
+regions remain. The workspace root retains its existing direct-File-only
+structural exception and is hidden by default.
 
 ## Context menu
 
@@ -203,18 +296,38 @@ guide geometry, and cache identity unchanged.
 ## Ownership
 
 `packages/focus-schematic-layout/src/soft-folder-display.ts` owns validation,
-reconciliation, the pure nested tree, provenance, mutations, and bounded scope
-memberships. `soft-clusters.ts` owns the renderer-neutral solver and H1 policy.
+reconciliation, the pure semantic tree, Focus-neutral grouping projection,
+provenance, mutations, and bounded scope memberships.
+`soft-folder-cohesion.ts` owns mandatory immediate-group compaction and its
+quality evidence. `soft-nested-hierarchy-packing.ts` owns deepest-first retained
+tree packing plus hierarchy and coverage hard gates. `soft-folder-guide-geometry.ts`
+owns the pure island oracle shared with the renderer. `soft-clusters.ts` owns
+the renderer-neutral solver and H1 policy.
 `packages/renderer-reactflow/src/focus-schematic/folder-cluster-guides.tsx`
-owns nested guide geometry, post-island local compression/pass-through, and
+owns hierarchy-driven guide geometry, one-region/blocker validation, and
 renderer-only hierarchy emphasis.
 `packages/renderer-reactflow/src/GraphContextMenu.tsx` owns the shared menu
 surface. The web application owns workspace persistence and action dispatch.
 
-The bakeoff records SC1–SC24 at strengths 0/25/50/75/100, stress profiles,
+The bakeoff records SC1–SC24 and SC26–SC29 at strengths 0/25/50/75/100, stress profiles,
 HFA1–HFA7 across H0/H1/H2, a nested strength matrix, and cardinal attachment
 regressions. PATCH1 adds AC-S1–AC-S8, D0/S1/S2 demand rows, a five-strength
 matrix, and Adaptive/Vertical macro-perturbation evidence.
+
+FIX6 adds SC30 and SC31 plus explicit sparse-rectangle structural fixtures. A
+retained parent no longer accepts AABB proximity as proof of unity: after the
+preferred grid placement, each rigid child is rechecked against current
+blockers and the parent is accepted only when the shared renderer island oracle
+sees one region from the actual module rectangles. Bounded deterministic
+offsets may translate a complete child subtree or parent group; File/Heading/
+Block offsets inside every moved module and child subtree stay rigid. Aggregate
+evidence records post-cohesion, post-Nested, and post-group containment, split,
+and blocker counts, region/member bounds, the closest pre-repair island gap,
+and the first failing stage without exposing folder or File identities.
+
+Soft structural algorithm version 12, worker protocol 14, and evidence schema
+9 invalidate the changed Soft geometry and serialized evidence. Directional
+layout and the renderer-only 0–100 spacing architecture are unchanged.
 
 Before PATCH1, graphical review accepted the nested hierarchy, singleton-chain
 compression, promotion and flattening semantics, passive labels, File-only
@@ -225,9 +338,11 @@ graphical question.
 
 ## Later work
 
-`HIER4B-SPACING` will evaluate wider use of the available canvas and less
-cramped module interiors after folder semantics are frozen.
-`HIER4B-UNIFIED-REGIONS` will separately compare the current split-when-needed
-policy with a policy that prioritizes spatially unified displayed folders.
-`MODULAR-CONTEXT1` will add Network-style Focus, Inspect, Hide File, and Hide
-Folder actions to the same composed menu model. None belongs to PATCH1.
+`HIER4B-SPACING` now has a FIX5 native candidate and Sandbox tuning control;
+native graphical approval is pending. FIX5 makes Focus neutral to folder
+grouping and gives Nested mode hard retained-ancestry containment with one guide
+per named folder. Direct keeps FIX4 immediate named-folder unity.
+`MODULAR-CONTEXT1` will add Network-style
+Focus, Inspect, Hide File, and Hide Folder actions to the same composed menu
+model. Adaptive Compass compatibility remains a separate graphical review
+question.

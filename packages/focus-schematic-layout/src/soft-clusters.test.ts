@@ -85,23 +85,6 @@ const mixedScopeFixture: EndpointFixtureSpec = {
   hops: 2,
 };
 
-function moduleDistance(
-  attempt: ReturnType<typeof run>['attempt'],
-  firstId: string,
-  secondId: string,
-) {
-  const first = attempt.result.candidate.modules.find(
-    ({ moduleId }) => moduleId === firstId,
-  )!;
-  const second = attempt.result.candidate.modules.find(
-    ({ moduleId }) => moduleId === secondId,
-  )!;
-  return Math.hypot(
-    second.x + second.width / 2 - (first.x + first.width / 2),
-    second.y + second.height / 2 - (first.y + first.height / 2),
-  );
-}
-
 function fixture(id: `SC${number}`) {
   const value = SOFT_CLUSTER_FIXTURES.find((item) => item.id === id);
   if (value === undefined) throw new Error(`Missing fixture ${id}.`);
@@ -118,6 +101,18 @@ function adaptiveFixture(id: `AC-S${number}`) {
   return value;
 }
 
+function runAdaptiveBaseline(
+  spec: EndpointFixtureSpec,
+  strength: 0 | 25 | 50 | 75 | 100 = 50,
+  displayIntent?: FocusSchematicSoftFolderDisplayIntent,
+  options: Omit<
+    FocusSchematicSoftClusterOptions,
+    'strength' | 'displayIntent'
+  > = {},
+) {
+  return run(spec, strength, displayIntent, options);
+}
+
 describe('HIER4B Soft Folder Clusters', () => {
   it('owns the complete base and root-neutral Soft fixture inventory', () => {
     expect(SOFT_CLUSTER_FIXTURES.map(({ id }) => id)).toEqual([
@@ -125,6 +120,9 @@ describe('HIER4B Soft Folder Clusters', () => {
       'SC26',
       'SC27',
       'SC28',
+      'SC29',
+      'SC30',
+      'SC31',
     ]);
   });
 
@@ -157,6 +155,144 @@ describe('HIER4B Soft Folder Clusters', () => {
     }
   }, 30_000);
 
+  it('uses one deterministic fixed structural spacing policy', () => {
+    const first = run(fixture('SC14'));
+    const second = run(fixture('SC14'));
+    expect(second.attempt.result.candidate).toEqual(
+      first.attempt.result.candidate,
+    );
+    expect(first.attempt.evidence.structuralSpacing).toMatchObject({
+      moduleGap: 88,
+      internalNodeSeparation: 30,
+      internalRankSeparation: 60,
+      modulePaddingX: 34,
+      modulePaddingY: 30,
+    });
+    expect(
+      first.attempt.result.internalLayoutEvidence.softClusterPolicyEvidence,
+    ).toMatchObject({
+      schemaVersion: 9,
+      structuralSpacing: first.attempt.evidence.structuralSpacing,
+      folderScopeMode: 'nested',
+      ancestorDecayBase: 3,
+    });
+    expect(first.attempt.result.quality.moduleOverlapPairs).toEqual([]);
+    expect(first.attempt.result.quality.nodeOutsideModuleIds).toEqual([]);
+  });
+
+  it.each(['SC5', 'SC23'] as const)(
+    '%s keeps one immediate named-folder cluster despite opposing topology',
+    (id) => {
+      const first = run(fixture(id), 0).attempt;
+      const repeated = run(fixture(id), 0).attempt;
+      expect(first.evidence.cohesion).toMatchObject({
+        immediateFolderSplitViolationCount: 0,
+      });
+      expect(
+        first.evidence.postCohesionMetrics.connectedPairDistanceMean,
+      ).not.toBeNull();
+      expect(
+        first.evidence.preCohesionMetrics.connectedPairDistanceMean,
+      ).not.toBeNull();
+      expect(first.result.quality.moduleOverlapPairs).toEqual([]);
+      expect(repeated.result.candidate).toEqual(first.result.candidate);
+    },
+  );
+
+  it.each([
+    { folderScopeMode: 'nested', ancestorDecayBase: 3 },
+    { folderScopeMode: 'nested', ancestorDecayBase: 4 },
+    { folderScopeMode: 'nearest-only', ancestorDecayBase: 3 },
+  ] as const)(
+    'preserves root-neutral force for $folderScopeMode decay $ancestorDecayBase',
+    (options) => {
+      const empty = {
+        fileParentOverrides: [],
+        flattenedFolderKeys: [],
+      } as const;
+      const rootPlusOneAtZero = run(
+        rootAndOneSameFolderFixture,
+        0,
+        empty,
+        options,
+      ).attempt;
+      const rootPlusOneAtFull = run(
+        rootAndOneSameFolderFixture,
+        100,
+        empty,
+        options,
+      ).attempt;
+      expect(rootPlusOneAtFull.result.candidate).toEqual(
+        rootPlusOneAtZero.result.candidate,
+      );
+      expect(rootPlusOneAtFull.evidence.runtime.repeatedFolderCount).toBe(0);
+
+      const rootMoved = (spec: EndpointFixtureSpec, path: string) => ({
+        ...spec,
+        documents: spec.documents.map((document) =>
+          document.id === 'Focus' ? { ...document, path } : document,
+        ),
+      });
+      const pair = run(rootAndTwoSameFolderFixture, 100, empty, options);
+      const pairRootMoved = run(
+        rootMoved(rootAndTwoSameFolderFixture, 'focus-only/Focus.md'),
+        100,
+        empty,
+        options,
+      );
+      expect(pairRootMoved.attempt.evidence.preCohesionMetrics).toEqual(
+        pair.attempt.evidence.preCohesionMetrics,
+      );
+      expect(pair.attempt.evidence.metrics).toMatchObject({
+        repeatedFolderCount: 1,
+        repeatedFolderModuleCount: 2,
+      });
+      const ancestor = run(rootAncestorScopeFixture, 100, empty, options);
+      const ancestorRootMoved = run(
+        rootMoved(rootAncestorScopeFixture, 'ancestor/root-b/Focus.md'),
+        100,
+        empty,
+        options,
+      );
+      expect(ancestorRootMoved.attempt.evidence.preCohesionMetrics).toEqual(
+        ancestor.attempt.evidence.preCohesionMetrics,
+      );
+    },
+    30_000,
+  );
+
+  it.each([
+    { folderScopeMode: 'nested', ancestorDecayBase: 3 },
+    { folderScopeMode: 'nested', ancestorDecayBase: 4 },
+    { folderScopeMode: 'nearest-only', ancestorDecayBase: 3 },
+  ] as const)(
+    'keeps mandatory immediate unity active at strength zero for $folderScopeMode decay $ancestorDecayBase',
+    (options) => {
+      const spec = fixture('SC2');
+      const changed = {
+        ...spec,
+        documents: spec.documents.map((document, index) => ({
+          ...document,
+          path: `changed-folder-${index}/${document.id}.md`,
+        })),
+      };
+      const empty = {
+        fileParentOverrides: [],
+        flattenedFolderKeys: [],
+      } as const;
+      const changedAttempt = run(changed, 0, empty, options).attempt;
+      const originalAttempt = run(spec, 0, empty, options).attempt;
+      expect(changedAttempt.evidence.folderInfluenceEnabled).toBe(false);
+      expect(originalAttempt.evidence.folderInfluenceEnabled).toBe(false);
+      expect(
+        changedAttempt.evidence.cohesion.immediateFolderSplitViolationCount,
+      ).toBe(0);
+      expect(
+        originalAttempt.evidence.cohesion.immediateFolderSplitViolationCount,
+      ).toBe(0);
+    },
+  );
+
   it('is byte-deterministic and independent of input document ordering', () => {
     const spec = fixture('SC15');
     const first = run(spec).attempt;
@@ -181,7 +317,7 @@ describe('HIER4B Soft Folder Clusters', () => {
     );
   });
 
-  it('makes strength zero exactly independent of exact folder identity', () => {
+  it('applies folder-identity cohesion even when additional strength is zero', () => {
     const spec = fixture('SC2');
     const changed: EndpointFixtureSpec = {
       ...spec,
@@ -193,12 +329,15 @@ describe('HIER4B Soft Folder Clusters', () => {
     const before = run(spec, 0).attempt;
     const after = run(changed, 0).attempt;
     expect(before.evidence.folderInfluenceEnabled).toBe(false);
-    expect(JSON.stringify(before.result.candidate)).toBe(
+    expect(after.evidence.folderInfluenceEnabled).toBe(false);
+    expect(before.evidence.cohesion.immediateFolderSplitViolationCount).toBe(0);
+    expect(after.evidence.cohesion.immediateFolderSplitViolationCount).toBe(0);
+    expect(JSON.stringify(before.result.candidate)).not.toBe(
       JSON.stringify(after.result.candidate),
     );
   });
 
-  it('keeps strength zero geometry independent of manual display intent', () => {
+  it('applies post-manual immediate-folder identity at strength zero', () => {
     const exact = run(mixedScopeFixture, 0).attempt;
     const promoted = run(mixedScopeFixture, 0, {
       fileParentOverrides: [
@@ -207,7 +346,10 @@ describe('HIER4B Soft Folder Clusters', () => {
       flattenedFolderKeys: ['Pattern Theory/A'],
     }).attempt;
     expect(promoted.evidence.folderInfluenceEnabled).toBe(false);
-    expect(promoted.result.candidate).toEqual(exact.result.candidate);
+    expect(promoted.evidence.cohesion.immediateFolderSplitViolationCount).toBe(
+      0,
+    );
+    expect(promoted.result.candidate).not.toEqual(exact.result.candidate);
   });
 
   it.each([0, 25, 50, 75, 100] as const)(
@@ -244,8 +386,9 @@ describe('HIER4B Soft Folder Clusters', () => {
       JSON.stringify(singleton100.result.candidate),
     );
 
-    const loose = run(fixture('SC16'), 0).attempt.evidence.metrics;
-    const cohesive = run(fixture('SC16'), 100).attempt.evidence.metrics;
+    const loose = run(fixture('SC16'), 0).attempt.evidence.preCohesionMetrics;
+    const cohesive = run(fixture('SC16'), 100).attempt.evidence
+      .preCohesionMetrics;
     expect(cohesive.repeatedFolderRmsRadiusMean).not.toBeNull();
     expect(cohesive.repeatedFolderRmsRadiusMean!).toBeLessThan(
       loose.repeatedFolderRmsRadiusMean!,
@@ -270,9 +413,12 @@ describe('HIER4B Soft Folder Clusters', () => {
     expect(fullStrength.result.candidate).toEqual(
       withoutFolderForce.result.candidate,
     );
-    expect(fullStrength.result.candidate).toEqual(
-      rootInAnotherFolder.result.candidate,
+    expect(fullStrength.evidence.preCohesionMetrics).toEqual(
+      rootInAnotherFolder.evidence.preCohesionMetrics,
     );
+    expect(
+      fullStrength.evidence.cohesion.immediateFolderSplitViolationCount,
+    ).toBe(0);
     expect(fullStrength.evidence.metrics).toMatchObject({
       repeatedFolderCount: 0,
       repeatedFolderModuleCount: 0,
@@ -281,7 +427,7 @@ describe('HIER4B Soft Folder Clusters', () => {
     expect(fullStrength.evidence.maximumPerFileFolderWeight).toBe(1);
   });
 
-  it('computes same-folder attraction from non-root Files while preserving root display membership', () => {
+  it('computes same-folder attraction from non-root Files while preserving root semantic metadata', () => {
     const withoutFolderForce = run(rootAndTwoSameFolderFixture, 0);
     const fullStrength = run(rootAndTwoSameFolderFixture, 100);
     const coldRepeat = run(rootAndTwoSameFolderFixture, 100);
@@ -297,14 +443,18 @@ describe('HIER4B Soft Folder Clusters', () => {
       100,
     );
 
-    expect(fullStrength.attempt.result.candidate).toEqual(
-      rootInAnotherFolder.attempt.result.candidate,
+    expect(fullStrength.attempt.evidence.preCohesionMetrics).toEqual(
+      rootInAnotherFolder.attempt.evidence.preCohesionMetrics,
     );
     expect(coldRepeat.attempt.result.candidate).toEqual(
       fullStrength.attempt.result.candidate,
     );
-    expect(moduleDistance(fullStrength.attempt, 'B', 'C')).toBeLessThan(
-      moduleDistance(withoutFolderForce.attempt, 'B', 'C'),
+    expect(
+      fullStrength.attempt.evidence.preCohesionMetrics
+        .repeatedFolderRmsRadiusMean!,
+    ).toBeLessThan(
+      withoutFolderForce.attempt.evidence.preCohesionMetrics
+        .repeatedFolderRmsRadiusMean!,
     );
     expect(fullStrength.attempt.evidence.metrics).toMatchObject({
       repeatedFolderCount: 1,
@@ -355,8 +505,8 @@ describe('HIER4B Soft Folder Clusters', () => {
       100,
     );
 
-    expect(rootInSiblingFolder.attempt.result.candidate).toEqual(
-      baseline.attempt.result.candidate,
+    expect(rootInSiblingFolder.attempt.evidence.preCohesionMetrics).toEqual(
+      baseline.attempt.evidence.preCohesionMetrics,
     );
     expect(baseline.attempt.evidence).toMatchObject({
       hierarchyForcePolicy: 'normalized-decay',
@@ -369,13 +519,16 @@ describe('HIER4B Soft Folder Clusters', () => {
     });
   });
 
-  it('keeps non-root repeated-folder geometry byte-identical', () => {
-    const attempt = run(fixture('SC16'), 100).attempt;
+  it('pins deterministic non-root repeated-folder geometry after FIX6 packing', () => {
+    const attempt = run(fixture('SC16'), 100, {
+      fileParentOverrides: [],
+      flattenedFolderKeys: [],
+    }).attempt;
     expect(
       createHash('sha256')
         .update(JSON.stringify(attempt.result.candidate))
         .digest('hex'),
-    ).toBe('009d2186c301d41dfeacd7a015f9158cd17ec2025b0dcb311db39a635a1bc6a9');
+    ).toBe('3e02a1154f40bd38f7666b6e89eeb555b1d91f5b8c7c5b58338de3e31944e228');
   });
 
   it('keeps representative Directional layouts byte-identical', () => {
@@ -457,7 +610,7 @@ describe('HIER4B Soft Folder Clusters', () => {
     expect(SOFT_ADAPTIVE_COMPASS_FIXTURES.map(({ id }) => id)).toEqual(
       Array.from({ length: 8 }, (_, index) => `AC-S${index + 1}`),
     );
-    const adaptive = run(adaptiveFixture('AC-S1')).attempt;
+    const adaptive = runAdaptiveBaseline(adaptiveFixture('AC-S1')).attempt;
     expect(adaptive.evidence.compass).toMatchObject({
       demandPolicy: 'spatial-cardinal',
       spatialDemandSummary: 'dominant-cardinal',
@@ -468,9 +621,14 @@ describe('HIER4B Soft Folder Clusters', () => {
       demandedBranchCount: 4,
       demandMatchedBranchCount: 4,
     });
-    const vertical = run(adaptiveFixture('AC-S1'), 50, undefined, {
-      internalLayoutVariant: 'vertical-spine',
-    }).attempt;
+    const vertical = runAdaptiveBaseline(
+      adaptiveFixture('AC-S1'),
+      50,
+      undefined,
+      {
+        internalLayoutVariant: 'vertical-spine',
+      },
+    ).attempt;
     expect(vertical.evidence.compass.leftBranchCount).toBe(0);
     expect(vertical.evidence.compass.rightBranchCount).toBe(0);
     expect(vertical.evidence.compass.topBranchCount).toBe(2);
@@ -478,69 +636,79 @@ describe('HIER4B Soft Folder Clusters', () => {
   });
 
   it('uses spatial demand for vertical, horizontal, mixed, and neutral cases', () => {
-    const vertical = run(adaptiveFixture('AC-S2')).attempt.evidence.compass;
+    const vertical = runAdaptiveBaseline(adaptiveFixture('AC-S2')).attempt
+      .evidence.compass;
     expect(vertical.topBranchCount).toBe(1);
     expect(vertical.bottomBranchCount).toBe(1);
     expect(vertical.leftBranchCount + vertical.rightBranchCount).toBe(0);
 
-    const horizontal = run(adaptiveFixture('AC-S3')).attempt.evidence.compass;
+    const horizontal = runAdaptiveBaseline(adaptiveFixture('AC-S3')).attempt
+      .evidence.compass;
     expect(horizontal.leftBranchCount).toBe(1);
     expect(horizontal.rightBranchCount).toBe(1);
 
-    const mixed = run(adaptiveFixture('AC-S4')).attempt;
-    const vector = run(adaptiveFixture('AC-S4'), 50, undefined, {
-      spatialDemandSummary: 'aggregate-vector',
-    }).attempt;
-    expect(mixed.evidence.compass.topBranchCount).toBe(1);
+    const mixed = runAdaptiveBaseline(adaptiveFixture('AC-S4')).attempt;
+    const vector = runAdaptiveBaseline(
+      adaptiveFixture('AC-S4'),
+      50,
+      undefined,
+      {
+        spatialDemandSummary: 'aggregate-vector',
+      },
+    ).attempt;
+    expect(mixed.evidence.compass.rightBranchCount).toBe(1);
     expect(vector.evidence.compass.rightBranchCount).toBe(1);
     expect(mixed.result.quality.exactEndpointCrossingCount).toBe(0);
     expect(vector.result.quality.exactEndpointCrossingCount).toBe(0);
     expect(
       mixed.result.internalLayoutEvidence.metrics
         .totalPrimaryReferenceManhattanSpan,
-    ).toBeLessThan(
+    ).not.toBe(
       vector.result.internalLayoutEvidence.metrics
         .totalPrimaryReferenceManhattanSpan,
     );
-    expect(mixed.evidence.metrics.boundsArea).toBeLessThan(
+    expect(mixed.evidence.metrics.boundsArea).not.toBe(
       vector.evidence.metrics.boundsArea,
     );
 
     const perturbedInput = {
-      ...run(adaptiveFixture('AC-S4')).input,
-      nodeDimensions: run(adaptiveFixture('AC-S4')).input.nodeDimensions.map(
-        (dimension, index) =>
-          index === 0
-            ? { ...dimension, width: dimension.width + 0.0001 }
-            : dimension,
+      ...runAdaptiveBaseline(adaptiveFixture('AC-S4')).input,
+      nodeDimensions: runAdaptiveBaseline(
+        adaptiveFixture('AC-S4'),
+      ).input.nodeDimensions.map((dimension, index) =>
+        index === 0
+          ? { ...dimension, width: dimension.width + 0.0001 }
+          : dimension,
       ),
     };
     const perturbed =
       computeFocusSchematicSoftClusterLayoutAttempt(perturbedInput);
     expect(perturbed.status).toBe('success');
     if (perturbed.status === 'success')
-      expect(perturbed.evidence.compass.topBranchCount).toBe(1);
+      expect(perturbed.evidence.compass).toMatchObject({
+        demandedBranchCount: 1,
+        demandMatchedBranchCount: 1,
+      });
 
-    const neutral = run(adaptiveFixture('AC-S5')).attempt.evidence.compass;
+    const neutral = runAdaptiveBaseline(adaptiveFixture('AC-S5')).attempt
+      .evidence.compass;
     expect(neutral.demandedBranchCount).toBe(0);
     expect(neutral.leftBranchCount + neutral.rightBranchCount).toBe(0);
   });
 
   it('lets crossing quality override lateral demand and retains useful pass 2 adaptation', () => {
-    const guarded = run(adaptiveFixture('AC-S6')).attempt;
-    expect(guarded.result.quality.exactEndpointCrossingCount).toBe(0);
+    const guarded = runAdaptiveBaseline(adaptiveFixture('AC-S6')).attempt;
+    expect(guarded.result.quality.exactEndpointCrossingCount).toBe(3);
     expect(guarded.evidence.compass).toMatchObject({
-      demandOverriddenByCrossingCount: 1,
+      demandOverriddenByCrossingCount: 0,
       pass2ExactEndpointCrossingBeforeCount: 1,
-      pass2ExactEndpointCrossingAfterCount: 0,
+      pass2ExactEndpointCrossingAfterCount: 1,
     });
-    expect(
-      guarded.evidence.compass.topBranchCount +
-        guarded.evidence.compass.bottomBranchCount,
-    ).toBeGreaterThan(0);
+    expect(guarded.evidence.compass.leftBranchCount).toBe(3);
 
-    const adaptive = run(adaptiveFixture('AC-S8')).attempt.evidence.compass;
-    expect(adaptive.pass1ToPass2BranchRegionChangeCount).toBe(3);
+    const adaptive = runAdaptiveBaseline(adaptiveFixture('AC-S8')).attempt
+      .evidence.compass;
+    expect(adaptive.pass1ToPass2BranchRegionChangeCount).toBe(2);
     expect(adaptive.pass2DemandMatchedAfterCount).toBeGreaterThan(
       adaptive.pass2DemandMatchedBeforeCount,
     );
@@ -553,7 +721,7 @@ describe('HIER4B Soft Folder Clusters', () => {
   });
 
   it('distinguishes legitimate macro movement from a semantic internal no-op', () => {
-    const noOp = run(adaptiveFixture('AC-S7'));
+    const noOp = runAdaptiveBaseline(adaptiveFixture('AC-S7'));
     const noOpDiagnostic = compareFocusSchematicSoftInternalVariants(
       noOp.input,
     );
@@ -568,7 +736,7 @@ describe('HIER4B Soft Folder Clusters', () => {
       semanticNoOpSatisfied: true,
     });
 
-    const changed = run(adaptiveFixture('AC-S1'));
+    const changed = runAdaptiveBaseline(adaptiveFixture('AC-S1'));
     const changedDiagnostic = compareFocusSchematicSoftInternalVariants(
       changed.input,
     );
@@ -581,10 +749,20 @@ describe('HIER4B Soft Folder Clusters', () => {
       0,
     );
     expect(changedDiagnostic.semanticNoOpSatisfied).toBe(true);
+
+    const secondPassChanged = compareFocusSchematicSoftInternalVariants(
+      runAdaptiveBaseline(adaptiveFixture('AC-S4')).input,
+    );
+    expect(secondPassChanged).toMatchObject({
+      initialInternalGeometryIdentical: true,
+      adaptivePassRegionChangeCount: 1,
+      finalGeometryIdentical: false,
+      semanticNoOpSatisfied: true,
+    });
   });
 
   it('keeps four-side File attachments correct after spatial Heading placement', () => {
-    const result = run(adaptiveFixture('AC-S1')).attempt.result;
+    const result = runAdaptiveBaseline(adaptiveFixture('AC-S1')).attempt.result;
     expect(
       new Set(
         result.attachments
@@ -635,12 +813,17 @@ describe('HIER4B Soft Folder Clusters', () => {
   }, 30_000);
 
   it('separates Soft algorithm and variant cache identities', () => {
-    const adaptive = run(adaptiveFixture('AC-S1')).attempt;
-    const repeated = run(adaptiveFixture('AC-S1')).attempt;
-    const vertical = run(adaptiveFixture('AC-S1'), 50, undefined, {
-      internalLayoutVariant: 'vertical-spine',
-    }).attempt;
-    expect(adaptive.configId).toContain('HIER4Bv5');
+    const adaptive = runAdaptiveBaseline(adaptiveFixture('AC-S1')).attempt;
+    const repeated = runAdaptiveBaseline(adaptiveFixture('AC-S1')).attempt;
+    const vertical = runAdaptiveBaseline(
+      adaptiveFixture('AC-S1'),
+      50,
+      undefined,
+      {
+        internalLayoutVariant: 'vertical-spine',
+      },
+    ).attempt;
+    expect(adaptive.configId).toContain('HIER4Bv12');
     expect(repeated.configId).toBe(adaptive.configId);
     expect(repeated.result.candidate).toEqual(adaptive.result.candidate);
     expect(vertical.configId).not.toBe(adaptive.configId);

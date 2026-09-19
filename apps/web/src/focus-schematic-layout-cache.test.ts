@@ -8,6 +8,7 @@ import {
   computeFocusSchematicComputedLayout,
   computeFocusSchematicComputedLayoutAttempt,
   computeFocusSchematicSoftClusterLayoutAttempt,
+  applyFocusSchematicSoftRadialSpread,
   type FocusSchematicLayoutInput,
   type FocusSchematicProductLayoutPolicies,
 } from '@icarus-graph-explorer/focus-schematic-layout';
@@ -37,10 +38,10 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     const key = exactFocusSchematicLayoutCacheKey(input);
     expect(key).toContain('modular-focus-hierarchy');
     expect(key).toContain('"algorithmVersion":4');
-    expect(key).toContain('"protocolVersion":8');
-    expect(key.replace('"protocolVersion":8', '"protocolVersion":7')).not.toBe(
-      key,
-    );
+    expect(key).toContain('"protocolVersion":14');
+    expect(
+      key.replace('"protocolVersion":14', '"protocolVersion":13'),
+    ).not.toBe(key);
     expect(exactFocusSchematicLayoutCacheKey(input, 1)).not.toBe(key);
     expect(key).toContain('nodeDimensions');
     expect(key).toContain('settings');
@@ -184,7 +185,7 @@ describe('page-lifetime Focus Schematic layout cache', () => {
       }) as const;
     expect(
       exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)),
-    ).toContain('"algorithmVersion":5');
+    ).toContain('"algorithmVersion":12');
     expect(
       exactFocusSchematicLayoutCacheKey(
         directionalInput,
@@ -218,6 +219,108 @@ describe('page-lifetime Focus Schematic layout cache', () => {
         DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
       ),
     ).not.toBe(exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)));
+  });
+
+  it('keys nested decay, canonicalizes Direct-only decay, and excludes radial spread', () => {
+    const directionalInput = fixtureInput(4);
+    const softInput = {
+      ...directionalInput,
+      settings: {
+        ...directionalInput.settings,
+        directionalFolderBandsEnabled: false,
+      },
+    };
+    const policiesAt = (
+      softFolderScopeMode: 'nested' | 'nearest-only',
+      softAncestorDecayBase: 3 | 4,
+      macroLayout:
+        'soft-folder-clusters' | 'directional-bands' = 'soft-folder-clusters',
+    ) => ({
+      ...DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+      macroLayout,
+      softFolderScopeMode,
+      softAncestorDecayBase,
+    });
+    expect(
+      exactFocusSchematicLayoutCacheKey(
+        directionalInput,
+        policiesAt('nested', 3, 'directional-bands'),
+      ),
+    ).toBe(
+      exactFocusSchematicLayoutCacheKey(
+        directionalInput,
+        policiesAt('nearest-only', 4, 'directional-bands'),
+      ),
+    );
+    expect(
+      exactFocusSchematicLayoutCacheKey(softInput, policiesAt('nested', 3)),
+    ).not.toBe(
+      exactFocusSchematicLayoutCacheKey(softInput, policiesAt('nested', 4)),
+    );
+    expect(
+      exactFocusSchematicLayoutCacheKey(
+        softInput,
+        policiesAt('nearest-only', 3),
+      ),
+    ).toBe(
+      exactFocusSchematicLayoutCacheKey(
+        softInput,
+        policiesAt('nearest-only', 4),
+      ),
+    );
+
+    const nested = computeFocusSchematicSoftClusterLayoutAttempt(softInput, {
+      folderScopeMode: 'nested',
+      ancestorDecayBase: 3,
+    });
+    const direct = computeFocusSchematicSoftClusterLayoutAttempt(softInput, {
+      folderScopeMode: 'nearest-only',
+      ancestorDecayBase: 4,
+    });
+    if (nested.status !== 'success' || direct.status !== 'success')
+      throw new Error('Expected Soft scope cache fixtures to compute.');
+    const cache = new FocusSchematicLayoutCache();
+    cache.set(softInput, policiesAt('nested', 3), nested.result);
+    cache.set(softInput, policiesAt('nearest-only', 4), direct.result);
+    expect(cache.get(softInput, policiesAt('nested', 3))).toMatchObject({
+      status: 'hit',
+      value: nested.result,
+    });
+    expect(cache.get(softInput, policiesAt('nearest-only', 3))).toMatchObject({
+      status: 'hit',
+      value: direct.result,
+    });
+  });
+
+  it('reuses one structural Soft compute across many radial spread values', () => {
+    const input = fixtureInput(4);
+    const softInput = {
+      ...input,
+      settings: { ...input.settings, directionalFolderBandsEnabled: false },
+    };
+    const policies = {
+      ...DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+      macroLayout: 'soft-folder-clusters',
+    } as const;
+    const cache = new FocusSchematicLayoutCache();
+    let structuralComputeCount = 0;
+    const structural = () => {
+      const lookup = cache.get(softInput, policies);
+      if (lookup.status === 'hit') return lookup.value!;
+      structuralComputeCount += 1;
+      const attempt = computeFocusSchematicSoftClusterLayoutAttempt(softInput);
+      if (attempt.status !== 'success') throw new Error(attempt.reason);
+      cache.set(softInput, policies, attempt.result);
+      return attempt.result;
+    };
+    const base = structural();
+    for (const spacing of [0, 25, 50, 71, 72, 73, 75, 100])
+      expect(
+        applyFocusSchematicSoftRadialSpread(softInput, structural(), spacing)
+          .candidate.modules,
+      ).toHaveLength(base.candidate.modules.length);
+    expect(structuralComputeCount).toBe(1);
+    expect(cache.size).toBe(1);
   });
 
   it('keys canonical manual display intent only in Soft mode', () => {

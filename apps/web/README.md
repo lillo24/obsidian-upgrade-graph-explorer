@@ -647,3 +647,23 @@ Focus Network failure offers Focus Hierarchy or Return to All; it does not enabl
 the experiment. No canonical, QUERY1, Saved Filter, or view schema changes occur.
 
 See [HIER0 validation](../../docs/HIER0_VALIDATION.md) for measurements and gates.
+
+## Focus Hierarchy reroot and subfocus
+
+Inside either Focus Hierarchy renderer, activating a File reroots the canonical
+bounded Focus. Activating a Heading or Block instead sets a session-only
+presentation subfocus: the File remains `ViewProjectionState.focus.rootEntityId`,
+and projection, worker input, layout keys, folder geometry, Saved Views, and
+workspace persistence remain unchanged. Heading subfocus emphasizes its rendered
+subtree and exact reference endpoints; Block subfocus emphasizes only the exact
+Block neighborhood. Structural ancestors and module boundaries remain context,
+while unrelated rendered content stays accessible at strongly reduced opacity.
+
+Subfocus is part of the existing in-memory graph-history checkpoint. Back and
+Ctrl/Meta+Z restore the prior checkpoint; Forward and Ctrl/Meta+Shift+Z restore
+the later one. Editable controls retain native text undo, Escape exits subfocus,
+and switching to Focus Network, leaving Focus, reloading, or losing the rendered
+target clears it safely. File reroot clears active subfocus while preserving it
+in the preceding Back checkpoint. Modular reroot retains the complete last
+validated prepared graph until the new File layout is adopted, and reports a
+warning instead of presenting an empty canvas if preparation fails.
