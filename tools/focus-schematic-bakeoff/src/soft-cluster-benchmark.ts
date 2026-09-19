@@ -8,6 +8,7 @@ import {
 } from '@icarus-graph-explorer/focus-schematic';
 import {
   buildEndpointFixture,
+  applyFocusSchematicSoftRadialSpread,
   compareFocusSchematicSoftInternalVariants,
   computeFocusSchematicComputedLayoutAttempt,
   computeFocusSchematicSoftClusterLayoutAttempt,
@@ -17,10 +18,14 @@ import {
   createSoftClusterMultiplicityFixture,
   FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
   SOFT_ADAPTIVE_COMPASS_FIXTURES,
+  FOCUS_SCHEMATIC_SOFT_CLUSTER_BASELINE_SPACING,
+  FOCUS_SCHEMATIC_SOFT_CLUSTER_STRUCTURAL_SPACING,
+  focusSchematicSoftRadialSpreadScale,
   SOFT_CLUSTER_FIXTURES,
   SOFT_CLUSTER_STABILITY_PAIRS,
   type EndpointFixtureSpec,
   type FocusSchematicEndpointPlan,
+  type FocusSchematicComputedLayout,
   type FocusSchematicSoftFolderDisplayIntent,
   type FocusSchematicSoftHierarchyForcePolicy,
   type FocusSchematicSoftClusterStrength,
@@ -39,6 +44,84 @@ function inputFor(spec: EndpointFixtureSpec, bands: boolean) {
   });
 }
 
+function displayedMetrics(layout: FocusSchematicComputedLayout) {
+  const modules = layout.candidate.modules;
+  const centerByModuleId = new Map(
+    modules.map((module) => [
+      module.moduleId,
+      {
+        x: module.x + module.width / 2,
+        y: module.y + module.height / 2,
+      },
+    ]),
+  );
+  const pairKeys = new Set<string>();
+  for (const connection of layout.endpointPlan.connections) {
+    if (
+      connection.role === 'secondary' ||
+      connection.sourceModuleId === connection.targetModuleId
+    )
+      continue;
+    pairKeys.add(
+      [connection.sourceModuleId, connection.targetModuleId].sort().join('\0'),
+    );
+  }
+  const topologyDistances = [...pairKeys].map((key) => {
+    const [leftId, rightId] = key.split('\0');
+    const left = centerByModuleId.get(leftId!)!;
+    const right = centerByModuleId.get(rightId!)!;
+    return Math.hypot(right.x - left.x, right.y - left.y);
+  });
+  const attachmentByKey = new Map(
+    layout.attachments.map((attachment) => [
+      `${attachment.connectionId}:${attachment.endpoint}`,
+      attachment,
+    ]),
+  );
+  const endpointSpans = layout.endpointPlan.connections.flatMap(
+    (connection) => {
+      if (connection.role === 'secondary') return [];
+      const source = attachmentByKey.get(`${connection.id}:source`);
+      const target = attachmentByKey.get(`${connection.id}:target`);
+      return source === undefined || target === undefined
+        ? []
+        : [Math.hypot(target.x - source.x, target.y - source.y)];
+    },
+  );
+  const left = Math.min(...modules.map((module) => module.x));
+  const right = Math.max(...modules.map((module) => module.x + module.width));
+  const top = Math.min(...modules.map((module) => module.y));
+  const bottom = Math.max(...modules.map((module) => module.y + module.height));
+  let minimumModuleGap: number | null = null;
+  for (let a = 0; a < modules.length; a += 1)
+    for (let b = a + 1; b < modules.length; b += 1) {
+      const first = modules[a]!;
+      const second = modules[b]!;
+      const gap = Math.max(
+        second.x - (first.x + first.width),
+        first.x - (second.x + second.width),
+        second.y - (first.y + first.height),
+        first.y - (second.y + second.height),
+      );
+      minimumModuleGap =
+        minimumModuleGap === null ? gap : Math.min(minimumModuleGap, gap);
+    }
+  const mean = (values: readonly number[]) =>
+    values.length === 0
+      ? null
+      : values.reduce((sum, value) => sum + value, 0) / values.length;
+  return {
+    boundsWidth: right - left,
+    boundsHeight: bottom - top,
+    boundsArea: (right - left) * (bottom - top),
+    connectedPairDistanceMean: mean(topologyDistances),
+    exactPrimaryEndpointSpanMean: mean(endpointSpans),
+    exactEndpointCrossingCount: layout.quality.exactEndpointCrossingCount,
+    overlapCount: layout.quality.moduleOverlapPairs.length,
+    minimumModuleGap,
+  };
+}
+
 function soft(
   spec: EndpointFixtureSpec,
   strength: FocusSchematicSoftClusterStrength,
@@ -51,6 +134,7 @@ function soft(
     FocusSchematicSoftClusterOptions,
     'strength' | 'displayIntent' | 'hierarchyForcePolicy'
   > = {},
+  radialSpacing: number = 0,
 ) {
   const input = inputFor(spec, false);
   const first = computeFocusSchematicSoftClusterLayoutAttempt(input, {
@@ -69,6 +153,11 @@ function soft(
     throw new Error(`${spec.id}/${strength}: ${first.reason}`);
   if (second.status !== 'success')
     throw new Error(`${spec.id}/${strength} repeat: ${second.reason}`);
+  const displayed = applyFocusSchematicSoftRadialSpread(
+    input,
+    first.result,
+    radialSpacing,
+  );
   const root = input.model.modules.find(
     ({ id }) => id === input.model.rootModuleId,
   )!;
@@ -80,6 +169,7 @@ function soft(
     fixtureId: spec.id,
     fixtureLabel: spec.label,
     strength,
+    structuralSpacing: first.evidence.structuralSpacing,
     deterministic:
       JSON.stringify(first.result.candidate) ===
       JSON.stringify(second.result.candidate),
@@ -92,8 +182,30 @@ function soft(
       secondaryGeometryInfluence: first.evidence.secondaryGeometryInfluence,
       boundedSchedule:
         JSON.stringify(first.evidence.fixedIterationSchedule) === '[36,18]',
+      radialSpreadSafety:
+        first.evidence.groupPacking.radialSpreadSafetyViolationCount === 0,
+      immediateFolderUnity:
+        first.evidence.cohesion.immediateFolderSplitViolationCount === 0,
+      nestedHierarchy:
+        first.evidence.nestedHierarchy.nestedParentContainmentViolationCount ===
+          0 &&
+        first.evidence.nestedHierarchy.nestedFolderSplitViolationCount === 0 &&
+        first.evidence.nestedHierarchy.nestedGuideBlockerViolationCount === 0,
+      namedFolderCoverage:
+        first.evidence.coverage.missingImmediateFolderGuideCount === 0 &&
+        first.evidence.coverage.nestedAncestorCoverageViolationCount === 0,
     },
     metrics: first.evidence.metrics,
+    preCohesionMetrics: first.evidence.preCohesionMetrics,
+    postCohesionMetrics: first.evidence.postCohesionMetrics,
+    postNestedMetrics: first.evidence.postNestedMetrics,
+    preGroupMetrics: first.evidence.preGroupMetrics,
+    cohesion: first.evidence.cohesion,
+    nestedHierarchy: first.evidence.nestedHierarchy,
+    coverage: first.evidence.coverage,
+    groupPacking: first.evidence.groupPacking,
+    radialSpacing,
+    displayedMetrics: displayedMetrics(displayed),
     runtime: first.evidence.runtime,
     compass: first.evidence.compass,
     internalMetrics: first.result.internalLayoutEvidence.metrics,
@@ -103,6 +215,8 @@ function soft(
     automaticallyCompressedFolderCount:
       first.evidence.automaticallyCompressedFolderCount,
     hierarchyForcePolicy: first.evidence.hierarchyForcePolicy,
+    folderScopeMode: first.evidence.folderScopeMode,
+    ancestorDecayBase: first.evidence.ancestorDecayBase,
     maximumPerFileFolderWeight: first.evidence.maximumPerFileFolderWeight,
     attachmentSideCounts: Object.fromEntries(
       ['left', 'right', 'top', 'bottom'].map((side) => [
@@ -112,6 +226,47 @@ function soft(
         ).length,
       ]),
     ),
+    adaptiveRegionUse: (() => {
+      const modules = first.result.internalLayoutEvidence.moduleMetrics.filter(
+        ({ topLevelBranchCount }) => topLevelBranchCount > 0,
+      );
+      const regionCounts = modules.map(
+        (module) =>
+          [
+            module.branchesLeftOfFile,
+            module.branchesRightOfFile,
+            module.branchesAboveFile,
+            module.branchesBelowFile,
+          ].filter((count) => count > 0).length,
+      );
+      return {
+        modulesByRegionCount: Object.fromEntries(
+          [1, 2, 3, 4].map((count) => [
+            count,
+            regionCounts.filter((value) => value === count).length,
+          ]),
+        ),
+        branches: {
+          left: modules.reduce(
+            (sum, module) => sum + module.branchesLeftOfFile,
+            0,
+          ),
+          right: modules.reduce(
+            (sum, module) => sum + module.branchesRightOfFile,
+            0,
+          ),
+          top: modules.reduce(
+            (sum, module) => sum + module.branchesAboveFile,
+            0,
+          ),
+          bottom: modules.reduce(
+            (sum, module) => sum + module.branchesBelowFile,
+            0,
+          ),
+        },
+        branchRegionChurn: first.evidence.runtime.compassBranchRegionChurn,
+      };
+    })(),
   };
 }
 
@@ -330,10 +485,10 @@ const hierarchyForceFixtures: readonly {
     id: 'HFA6',
     spec: {
       id: 'HFA6',
-      label: 'disconnected same-folder islands',
+      label: 'formerly disconnected same-folder islands',
       authored: 'Nested hierarchy force fixture.',
-      expectation: 'Topology may keep one logical folder spatially split.',
-      inspect: 'Compare force without forcing a misleading hull.',
+      expectation: 'Immediate folder unity outranks the topology bridge.',
+      inspect: 'Measure the topology cost of mandatory cohesion.',
       rootDocumentId: 'Focus',
       documents: [
         { id: 'Focus', path: 'Focus.md' },
@@ -399,6 +554,25 @@ const hierarchyStrengthRows = hierarchyForceFixtures.flatMap(
       id,
       ...soft(spec, strength, intent, 'normalized-decay'),
     })),
+);
+const scopeDecayRows = hierarchyForceFixtures.flatMap(({ id, spec, intent }) =>
+  [
+    { folderScopeMode: 'nested' as const, ancestorDecayBase: 3 as const },
+    { folderScopeMode: 'nested' as const, ancestorDecayBase: 4 as const },
+    {
+      folderScopeMode: 'nearest-only' as const,
+      ancestorDecayBase: 3 as const,
+    },
+    {
+      folderScopeMode: 'nearest-only' as const,
+      ancestorDecayBase: 4 as const,
+    },
+  ].map((options) => ({
+    id,
+    requestedScopeMode: options.folderScopeMode,
+    requestedDecayBase: options.ancestorDecayBase,
+    ...soft(spec, 50, intent, 'normalized-decay', options),
+  })),
 );
 
 function cardinalPlan(
@@ -577,9 +751,15 @@ function strengthZeroFolderMutation() {
     throw new Error('SC2 strength-zero mutation probe failed.');
   return {
     fixtureId: 'SC2',
-    byteIdentical:
-      JSON.stringify(before.result.candidate) ===
+    geometryChanged:
+      JSON.stringify(before.result.candidate) !==
       JSON.stringify(after.result.candidate),
+    additionalAttractionDisabled:
+      !before.evidence.folderInfluenceEnabled &&
+      !after.evidence.folderInfluenceEnabled,
+    immediateFolderUnity:
+      before.evidence.cohesion.immediateFolderSplitViolationCount === 0 &&
+      after.evidence.cohesion.immediateFolderSplitViolationCount === 0,
   };
 }
 
@@ -678,9 +858,367 @@ function stabilityRows() {
   );
 }
 
+const emptyDisplayIntent: FocusSchematicSoftFolderDisplayIntent = {
+  fileParentOverrides: [],
+  flattenedFolderKeys: [],
+};
+
+const representativeSpacingFixtures = [
+  'SC1',
+  'SC2',
+  'SC7',
+  'SC8',
+  'SC11',
+  'SC14',
+  'SC16',
+].map((id) => SOFT_CLUSTER_FIXTURES.find((spec) => spec.id === id)!);
+
+const fixedStructuralRows = representativeSpacingFixtures.map((spec) =>
+  soft(spec, 50, emptyDisplayIntent, 'normalized-decay'),
+);
+
+type SoftRow = ReturnType<typeof soft>;
+
+function numbers(
+  rows: readonly SoftRow[],
+  read: (row: SoftRow) => number | null,
+): number[] {
+  return rows.flatMap((row) => {
+    const value = read(row);
+    return value === null ? [] : [value];
+  });
+}
+
+function average(values: readonly number[]): number | null {
+  return values.length === 0
+    ? null
+    : values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function summarizeSpacingRows(rows: readonly SoftRow[]) {
+  const metric = (
+    read: (row: SoftRow) => number | null,
+    worst: 'maximum' | 'minimum' = 'maximum',
+  ) => {
+    const values = numbers(rows, read);
+    return {
+      mean: average(values),
+      worst:
+        values.length === 0
+          ? null
+          : worst === 'maximum'
+            ? Math.max(...values)
+            : Math.min(...values),
+    };
+  };
+  return {
+    rowCount: rows.length,
+    hardGatesPass: rows.every(
+      ({ deterministic, rootFileCentered, hardGates, displayedMetrics }) =>
+        deterministic &&
+        rootFileCentered &&
+        hardGates.overlapFree &&
+        displayedMetrics.overlapCount === 0 &&
+        hardGates.nodeContainment &&
+        hardGates.secondaryGeometryInfluence === 0 &&
+        hardGates.boundedSchedule &&
+        hardGates.radialSpreadSafety &&
+        hardGates.immediateFolderUnity &&
+        hardGates.nestedHierarchy &&
+        hardGates.namedFolderCoverage,
+    ),
+    minimumModuleGap: metric(
+      (row) => row.displayedMetrics.minimumModuleGap,
+      'minimum',
+    ),
+    boundsWidth: metric((row) => row.displayedMetrics.boundsWidth),
+    boundsHeight: metric((row) => row.displayedMetrics.boundsHeight),
+    boundsArea: metric((row) => row.displayedMetrics.boundsArea),
+    connectedPairDistanceMean: metric(
+      (row) => row.displayedMetrics.connectedPairDistanceMean,
+    ),
+    connectedPairDistanceP95: metric(
+      (row) => row.metrics.connectedPairDistanceP95,
+    ),
+    exactPrimaryEndpointSpanMean: metric(
+      (row) => row.displayedMetrics.exactPrimaryEndpointSpanMean,
+    ),
+    exactPrimaryEndpointSpanP95: metric(
+      (row) => row.metrics.exactPrimaryEndpointSpanP95,
+    ),
+    exactEndpointCrossingCount: metric(
+      (row) => row.displayedMetrics.exactEndpointCrossingCount,
+    ),
+    hopMeanAbsoluteRadiusError: metric(
+      (row) => row.metrics.hopMeanAbsoluteRadiusError,
+    ),
+    repeatedFolderRmsRadiusMean: metric(
+      (row) => row.metrics.repeatedFolderRmsRadiusMean,
+    ),
+    repeatedFolderRmsRadiusMedian: metric(
+      (row) => row.metrics.repeatedFolderRmsRadiusMedian,
+    ),
+    repeatedFolderRmsRadiusP95: metric(
+      (row) => row.metrics.repeatedFolderRmsRadiusP95,
+    ),
+    childFolderCoherenceMean: metric(
+      (row) => row.metrics.childFolderCoherenceMean,
+    ),
+    parentFolderCoherenceMean: metric(
+      (row) => row.metrics.parentFolderCoherenceMean,
+    ),
+    collisionCheckCount: metric((row) => row.runtime.collisionCheckCount),
+    collisionCorrectionCount: metric(
+      (row) => row.runtime.collisionCorrectionCount,
+    ),
+    layoutMs: metric((row) => row.runtime.layoutMs),
+  };
+}
+
+const fixedStructuralSummary = summarizeSpacingRows(fixedStructuralRows);
+
+const spacingSamples = [0, 25, 50, 75, 100] as const;
+const spacingRows = spacingSamples.flatMap((spacing) =>
+  SOFT_CLUSTER_FIXTURES.map((spec) => ({
+    spacing,
+    radialScale: focusSchematicSoftRadialSpreadScale(spacing),
+    ...soft(spec, 50, emptyDisplayIntent, 'normalized-decay', {}, spacing),
+  })),
+);
+const adaptiveSpacingRows = [0, 50, 100].flatMap((spacing) =>
+  SOFT_ADAPTIVE_COMPASS_FIXTURES.map((spec) => ({
+    spacing,
+    radialScale: focusSchematicSoftRadialSpreadScale(spacing),
+    ...soft(spec, 50, emptyDisplayIntent, 'normalized-decay', {}, spacing),
+  })),
+);
+const spacingAnchorSummaries = spacingSamples.map((spacing) => ({
+  spacing,
+  structuralPolicy: FOCUS_SCHEMATIC_SOFT_CLUSTER_STRUCTURAL_SPACING,
+  radialScale: focusSchematicSoftRadialSpreadScale(spacing),
+  summary: summarizeSpacingRows(
+    spacingRows.filter((row) => row.spacing === spacing),
+  ),
+  adaptiveObservation: adaptiveSpacingRows
+    .filter((row) => row.spacing === spacing)
+    .map(({ fixtureId, metrics, adaptiveRegionUse }) => ({
+      fixtureId,
+      exactEndpointCrossingCount: metrics.exactEndpointCrossingCount,
+      ...adaptiveRegionUse,
+    })),
+}));
+
+const strengthSpacingRows = [0, 50, 100].flatMap((strength) =>
+  [0, 50, 100].map((spacing) => ({
+    spacing,
+    ...soft(
+      SOFT_CLUSTER_FIXTURES.find(({ id }) => id === 'SC16')!,
+      strength,
+      emptyDisplayIntent,
+      'normalized-decay',
+      {},
+      spacing,
+    ),
+  })),
+);
+
 const fixtureRows = SOFT_CLUSTER_FIXTURES.flatMap((spec) =>
   strengths.map((strength) => soft(spec, strength)),
 );
+const cohesionTradeoffRows = fixtureRows.map((row) => {
+  const difference = (
+    after: number | null,
+    before: number | null,
+  ): number | null =>
+    after === null || before === null ? null : after - before;
+  return {
+    fixtureId: row.fixtureId,
+    strength: row.strength,
+    connectedPairDistanceMeanChange: difference(
+      row.postCohesionMetrics.connectedPairDistanceMean,
+      row.preCohesionMetrics.connectedPairDistanceMean,
+    ),
+    exactPrimaryEndpointSpanMeanChange: difference(
+      row.postCohesionMetrics.exactPrimaryEndpointSpanMean,
+      row.preCohesionMetrics.exactPrimaryEndpointSpanMean,
+    ),
+    exactEndpointCrossingCountChange: difference(
+      row.postCohesionMetrics.exactEndpointCrossingCount,
+      row.preCohesionMetrics.exactEndpointCrossingCount,
+    ),
+    hopMeanAbsoluteRadiusErrorChange: difference(
+      row.postCohesionMetrics.hopMeanAbsoluteRadiusError,
+      row.preCohesionMetrics.hopMeanAbsoluteRadiusError,
+    ),
+    boundsAreaChange: difference(
+      row.postCohesionMetrics.boundsArea,
+      row.preCohesionMetrics.boundsArea,
+    ),
+    cohesion: row.cohesion,
+  };
+});
+const groupPackingTradeoffRows = fixtureRows.map((row) => {
+  const difference = (
+    after: number | null,
+    before: number | null,
+  ): number | null =>
+    after === null || before === null ? null : after - before;
+  return {
+    fixtureId: row.fixtureId,
+    strength: row.strength,
+    boundsAreaChange: difference(
+      row.metrics.boundsArea,
+      row.preGroupMetrics.boundsArea,
+    ),
+    connectedPairDistanceMeanChange: difference(
+      row.metrics.connectedPairDistanceMean,
+      row.preGroupMetrics.connectedPairDistanceMean,
+    ),
+    exactPrimaryEndpointSpanMeanChange: difference(
+      row.metrics.exactPrimaryEndpointSpanMean,
+      row.preGroupMetrics.exactPrimaryEndpointSpanMean,
+    ),
+    hopMeanAbsoluteRadiusErrorChange: difference(
+      row.metrics.hopMeanAbsoluteRadiusError,
+      row.preGroupMetrics.hopMeanAbsoluteRadiusError,
+    ),
+    exactEndpointCrossingCountChange: difference(
+      row.metrics.exactEndpointCrossingCount,
+      row.preGroupMetrics.exactEndpointCrossingCount,
+    ),
+    groupPackingMs: row.groupPacking.groupPackingMs,
+    groupPacking: row.groupPacking,
+  };
+});
+const nestedHierarchyTradeoffRows = fixtureRows.map((row) => {
+  const difference = (
+    after: number | null,
+    before: number | null,
+  ): number | null =>
+    after === null || before === null ? null : after - before;
+  return {
+    fixtureId: row.fixtureId,
+    strength: row.strength,
+    connectedPairDistanceMeanChange: difference(
+      row.postNestedMetrics.connectedPairDistanceMean,
+      row.postCohesionMetrics.connectedPairDistanceMean,
+    ),
+    connectedPairDistanceP95Change: difference(
+      row.postNestedMetrics.connectedPairDistanceP95,
+      row.postCohesionMetrics.connectedPairDistanceP95,
+    ),
+    exactPrimaryEndpointSpanMeanChange: difference(
+      row.postNestedMetrics.exactPrimaryEndpointSpanMean,
+      row.postCohesionMetrics.exactPrimaryEndpointSpanMean,
+    ),
+    exactPrimaryEndpointSpanP95Change: difference(
+      row.postNestedMetrics.exactPrimaryEndpointSpanP95,
+      row.postCohesionMetrics.exactPrimaryEndpointSpanP95,
+    ),
+    exactEndpointCrossingCountChange: difference(
+      row.postNestedMetrics.exactEndpointCrossingCount,
+      row.postCohesionMetrics.exactEndpointCrossingCount,
+    ),
+    hopMeanAbsoluteRadiusErrorChange: difference(
+      row.postNestedMetrics.hopMeanAbsoluteRadiusError,
+      row.postCohesionMetrics.hopMeanAbsoluteRadiusError,
+    ),
+    boundsAreaChange: difference(
+      row.postNestedMetrics.boundsArea,
+      row.postCohesionMetrics.boundsArea,
+    ),
+    nestedHierarchy: row.nestedHierarchy,
+    coverage: row.coverage,
+  };
+});
+
+function summarizeTradeoff(
+  read: (row: (typeof groupPackingTradeoffRows)[number]) => number | null,
+) {
+  const values = groupPackingTradeoffRows.flatMap((row) => {
+    const value = read(row);
+    return value === null ? [] : [{ row, value }];
+  });
+  const ordered = [...values].sort((left, right) => left.value - right.value);
+  const worst = [...values].sort(
+    (left, right) => Math.abs(right.value) - Math.abs(left.value),
+  )[0];
+  return {
+    mean: average(values.map(({ value }) => value)),
+    p95:
+      ordered[Math.max(0, Math.ceil(ordered.length * 0.95) - 1)]?.value ?? null,
+    maximum: ordered.at(-1)?.value ?? null,
+    worstAbsolute:
+      worst === undefined
+        ? null
+        : {
+            fixtureId: worst.row.fixtureId,
+            strength: worst.row.strength,
+            change: worst.value,
+          },
+  };
+}
+
+const groupPackingTradeoffSummary = {
+  boundsAreaChange: summarizeTradeoff((row) => row.boundsAreaChange),
+  connectedPairDistanceMeanChange: summarizeTradeoff(
+    (row) => row.connectedPairDistanceMeanChange,
+  ),
+  exactPrimaryEndpointSpanMeanChange: summarizeTradeoff(
+    (row) => row.exactPrimaryEndpointSpanMeanChange,
+  ),
+  hopMeanAbsoluteRadiusErrorChange: summarizeTradeoff(
+    (row) => row.hopMeanAbsoluteRadiusErrorChange,
+  ),
+  exactEndpointCrossingCountChange: summarizeTradeoff(
+    (row) => row.exactEndpointCrossingCountChange,
+  ),
+  groupPackingMs: summarizeTradeoff((row) => row.groupPackingMs),
+};
+function summarizeCohesionTradeoff(
+  read: (row: (typeof cohesionTradeoffRows)[number]) => number | null,
+) {
+  const values = cohesionTradeoffRows.flatMap((row) => {
+    const value = read(row);
+    return value === null ? [] : [{ row, value }];
+  });
+  const worst = [...values].sort(
+    (left, right) => Math.abs(right.value) - Math.abs(left.value),
+  )[0];
+  return {
+    mean: average(values.map(({ value }) => value)),
+    maximum:
+      values.length === 0
+        ? null
+        : Math.max(...values.map(({ value }) => value)),
+    worstAbsolute:
+      worst === undefined
+        ? null
+        : {
+            fixtureId: worst.row.fixtureId,
+            strength: worst.row.strength,
+            change: worst.value,
+          },
+  };
+}
+const cohesionTradeoffSummary = {
+  connectedPairDistanceMeanChange: summarizeCohesionTradeoff(
+    (row) => row.connectedPairDistanceMeanChange,
+  ),
+  exactPrimaryEndpointSpanMeanChange: summarizeCohesionTradeoff(
+    (row) => row.exactPrimaryEndpointSpanMeanChange,
+  ),
+  exactEndpointCrossingCountChange: summarizeCohesionTradeoff(
+    (row) => row.exactEndpointCrossingCountChange,
+  ),
+  hopMeanAbsoluteRadiusErrorChange: summarizeCohesionTradeoff(
+    (row) => row.hopMeanAbsoluteRadiusErrorChange,
+  ),
+  boundsAreaChange: summarizeCohesionTradeoff((row) => row.boundsAreaChange),
+};
+const sc14GroupPacking = fixtureRows.find(
+  ({ fixtureId, strength }) => fixtureId === 'SC14' && strength === 50,
+)!;
 const compassDemandBakeoffRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.flatMap(
   (spec) => [
     {
@@ -712,7 +1250,7 @@ const compassDemandBakeoffRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.flatMap(
   ],
 );
 const compassStrengthRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.flatMap((spec) =>
-  strengths.map((strength) => soft(spec, strength)),
+  strengths.map((strength) => soft(spec, strength, undefined, undefined)),
 );
 const macroPerturbationRows = SOFT_ADAPTIVE_COMPASS_FIXTURES.map((spec) => ({
   fixtureId: spec.id,
@@ -741,18 +1279,47 @@ const hardGatesPass =
       hardGates.overlapFree &&
       hardGates.nodeContainment &&
       hardGates.secondaryGeometryInfluence === 0 &&
-      hardGates.boundedSchedule,
+      hardGates.boundedSchedule &&
+      hardGates.radialSpreadSafety &&
+      hardGates.immediateFolderUnity &&
+      hardGates.nestedHierarchy &&
+      hardGates.namedFolderCoverage,
   ) &&
   stressRows.every(
-    ({ deterministic, hardGates }) => deterministic && hardGates.overlapFree,
+    ({ deterministic, hardGates }) =>
+      deterministic &&
+      hardGates.overlapFree &&
+      hardGates.radialSpreadSafety &&
+      hardGates.immediateFolderUnity &&
+      hardGates.nestedHierarchy &&
+      hardGates.namedFolderCoverage,
   ) &&
   hierarchyForceRows.every(
     ({ deterministic, hardGates, maximumPerFileFolderWeight }) =>
-      deterministic && hardGates.overlapFree && maximumPerFileFolderWeight <= 1,
+      deterministic &&
+      hardGates.overlapFree &&
+      hardGates.immediateFolderUnity &&
+      hardGates.nestedHierarchy &&
+      hardGates.namedFolderCoverage &&
+      maximumPerFileFolderWeight <= 1,
   ) &&
   hierarchyStrengthRows.every(
     ({ deterministic, hardGates, maximumPerFileFolderWeight }) =>
-      deterministic && hardGates.overlapFree && maximumPerFileFolderWeight <= 1,
+      deterministic &&
+      hardGates.overlapFree &&
+      hardGates.immediateFolderUnity &&
+      hardGates.nestedHierarchy &&
+      hardGates.namedFolderCoverage &&
+      maximumPerFileFolderWeight <= 1,
+  ) &&
+  scopeDecayRows.every(
+    ({ deterministic, hardGates, maximumPerFileFolderWeight }) =>
+      deterministic &&
+      hardGates.overlapFree &&
+      hardGates.immediateFolderUnity &&
+      hardGates.nestedHierarchy &&
+      hardGates.namedFolderCoverage &&
+      maximumPerFileFolderWeight <= 1,
   ) &&
   compassDemandBakeoffRows.every(
     ({ deterministic, hardGates }) => deterministic && hardGates.overlapFree,
@@ -763,20 +1330,26 @@ const hardGatesPass =
   macroPerturbationRows.every(({ semanticNoOpSatisfied }) =>
     Boolean(semanticNoOpSatisfied),
   ) &&
-  zeroFolderMutation.byteIdentical;
+  zeroFolderMutation.geometryChanged &&
+  zeroFolderMutation.additionalAttractionDisabled &&
+  zeroFolderMutation.immediateFolderUnity;
 const completeHardGatesPass =
   hardGatesPass &&
+  fixedStructuralSummary.hardGatesPass &&
+  spacingAnchorSummaries.every(({ summary }) => summary.hardGatesPass) &&
+  summarizeSpacingRows(strengthSpacingRows).hardGatesPass &&
   secondaryInvariant.byteIdentical &&
   permutationInvariant.byteIdentical;
 
 const report = {
-  schemaVersion: 1,
-  title: 'HIER4B Soft Folder Clusters bakeoff',
+  schemaVersion: 3,
+  title: 'HIER4B-SPACING-FIX5 Soft Folder Clusters bakeoff',
   status: 'UNDER_EVALUATION',
-  productionLayoutChanged: false,
+  productionLayoutChanged: true,
   defaultLabConfiguration: {
     macroLayout: 'soft-folder-clusters',
     strength: 50,
+    spacing: 50,
     internalLayout: 'adaptive-compass',
     headingOrder: 'crossing-optimized',
   },
@@ -785,22 +1358,73 @@ const report = {
     : 'SOFT_CLUSTERS_REQUIRE_REDESIGN',
   strengths,
   fixedIterationSchedule: [36, 18],
+  oldBaselineSpacing: FOCUS_SCHEMATIC_SOFT_CLUSTER_BASELINE_SPACING,
+  frozenStructuralSpacing: {
+    representativeFixtureIds: representativeSpacingFixtures.map(({ id }) => id),
+    policy: FOCUS_SCHEMATIC_SOFT_CLUSTER_STRUCTURAL_SPACING,
+    summary: fixedStructuralSummary,
+  },
+  spacingAnchors: {
+    baseScale: focusSchematicSoftRadialSpreadScale(0),
+    defaultScale: focusSchematicSoftRadialSpreadScale(50),
+    strongScale: focusSchematicSoftRadialSpreadScale(100),
+  },
+  spacingRows,
+  adaptiveSpacingRows,
+  spacingAnchorSummaries,
+  strengthSpacingRows,
   hardGatesPass: completeHardGatesPass,
   strengthZeroFolderMutation: zeroFolderMutation,
   secondaryMutation: secondaryInvariant,
   inputPermutation: permutationInvariant,
   fixtureRows,
+  immediateFolderCohesionBakeoff: {
+    hardPriority: 'immediate named-folder unity before topology quality',
+    rows: cohesionTradeoffRows,
+    summary: cohesionTradeoffSummary,
+    priorityFixtures: cohesionTradeoffRows.filter(({ fixtureId }) =>
+      ['SC3', 'SC5', 'SC14', 'SC21', 'SC23', 'SC24'].includes(fixtureId),
+    ),
+  },
+  nestedHierarchyBakeoff: {
+    hardPriority:
+      'retained logical folder containment and named-folder coverage before topology quality',
+    rows: nestedHierarchyTradeoffRows,
+    deepHierarchyRows: nestedHierarchyTradeoffRows.filter(
+      ({ fixtureId }) => fixtureId === 'SC29',
+    ),
+  },
+  groupPackingBakeoff: {
+    representation:
+      'padded named-folder envelopes with exact workspace-root atoms',
+    continuousScaleDomain: [1, 2.4],
+    rows: groupPackingTradeoffRows,
+    summary: groupPackingTradeoffSummary,
+    sc14: {
+      preGroupMetrics: sc14GroupPacking.preGroupMetrics,
+      finalMetrics: sc14GroupPacking.metrics,
+      groupPacking: sc14GroupPacking.groupPacking,
+      spacing: spacingRows
+        .filter(({ fixtureId }) => fixtureId === 'SC14')
+        .map(({ spacing, radialScale, displayedMetrics }) => ({
+          spacing,
+          radialScale,
+          displayedMetrics,
+        })),
+    },
+  },
   directionalReferenceRows: referenceRows,
   stabilityRows: stability,
   stressRows,
   multiplicityRows,
   fix2IntentRows,
   hierarchyForceBakeoff: {
-    selectedPolicy: 'normalized-decay',
+    selectedPolicy: 'nested-normalized-decay-1/3',
     rationale:
       'Nearest scopes receive more weight while every File has one normalized total folder-force budget.',
     rows: hierarchyForceRows,
   },
+  scopeDecayRows,
   hierarchyStrengthRows,
   cardinalGeometryRows,
   adaptiveCompassPatch: {

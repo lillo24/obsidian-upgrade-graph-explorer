@@ -2,7 +2,19 @@
 import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type {
+  AddressableEntity,
+  KnowledgeSnapshot,
+} from '@icarus-graph-explorer/core';
 import { createRuntimePerformanceRecorder } from '@icarus-graph-explorer/performance';
+import { createFocusSchematicModel } from '@icarus-graph-explorer/focus-schematic';
+import {
+  FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
+  FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
+  type FocusSchematicLayoutInput,
+  type FocusSchematicProductLayoutPolicies,
+} from '@icarus-graph-explorer/focus-schematic-layout';
+import { handleFocusSchematicLayoutWorkerRequest } from '@icarus-graph-explorer/focus-schematic-layout/worker-runtime';
 import {
   createProjectionWorkspace,
   documentOnlyProjectionState,
@@ -12,7 +24,14 @@ import {
   serializePersistedWorkspaceView,
 } from '@icarus-graph-explorer/view-state';
 import { validateObsidianDiagnosticReport } from '@icarus-graph-explorer/diagnostics-obsidian';
-import type { GraphCanvasProps } from '@icarus-graph-explorer/renderer-reactflow';
+import {
+  focusSchematicNodeDimensions,
+  prepareFocusSchematicRendererGraph,
+} from '@icarus-graph-explorer/renderer-reactflow/focus-schematic';
+import type {
+  GraphCanvasProps,
+  RendererGraph,
+} from '@icarus-graph-explorer/renderer-reactflow';
 import type { GlobalGraphViewProps } from './GlobalGraphView';
 import type { LocalGraphViewProps } from './LocalGraphView';
 import type { LocalStructuredGraphViewProps } from './LocalStructuredGraphView';
@@ -92,8 +111,100 @@ const snapshot = validation.value.snapshot;
 const source = snapshot.entities.find(
   (e) => e.kind === 'document' && e.source.path === 'Source.md',
 )!;
-const workspace = createProjectionWorkspace(snapshot);
 const state = documentOnlyProjectionState();
+const rerootEntities: readonly AddressableEntity[] = ['a', 'b', 'c'].map(
+  (id) => ({
+    id: `reroot-${id}`,
+    kind: 'document',
+    source: {
+      path: `Folder/${id.toUpperCase()}.md`,
+      span: {
+        start: { line: 1, column: 1, offset: 0 },
+        end: { line: 2, column: 1, offset: 10 },
+      },
+    },
+  }),
+);
+const rerootSnapshot: KnowledgeSnapshot = {
+  schemaVersion: 1,
+  workspace: { id: 'modular-reroot-regression' },
+  entities: rerootEntities,
+  references: [
+    {
+      id: 'reroot-a-b',
+      sourceEntityId: 'reroot-a',
+      kind: 'link',
+      rawTarget: 'B',
+      sourceSpan: {
+        start: { line: 1, column: 1, offset: 0 },
+        end: { line: 1, column: 2, offset: 1 },
+      },
+      resolution: { status: 'resolved', targetEntityId: 'reroot-b' },
+    },
+    {
+      id: 'reroot-b-c',
+      sourceEntityId: 'reroot-b',
+      kind: 'link',
+      rawTarget: 'C',
+      sourceSpan: {
+        start: { line: 1, column: 1, offset: 0 },
+        end: { line: 1, column: 2, offset: 1 },
+      },
+      resolution: { status: 'resolved', targetEntityId: 'reroot-c' },
+    },
+  ],
+};
+
+function prepareModularGraph(
+  props: ModularStructuredGraphViewProps,
+): RendererGraph {
+  const model = createFocusSchematicModel({
+    workspace: props.projectionWorkspace,
+    state: props.projectionState,
+    projection: props.projection,
+  });
+  const input: FocusSchematicLayoutInput = {
+    model,
+    projection: props.projection,
+    nodeDimensions: focusSchematicNodeDimensions(props.projection, model),
+    settings: {
+      ...FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
+      directionalFolderBandsEnabled: props.macroLayout === 'directional-bands',
+      directionalFolderHierarchy: 'nested-one-level',
+    },
+  };
+  const policies: FocusSchematicProductLayoutPolicies = {
+    macroLayout: props.macroLayout,
+    softFolderStrength: props.softFolderStrength,
+    softFolderScopeMode: props.directFoldersOnly ? 'nearest-only' : 'nested',
+    softAncestorDecayBase: props.softAncestorDecayBase,
+    softFolderDisplayIntent: props.softFolderDisplayIntent,
+    endpointOrderPolicy: props.endpointOrderPolicy,
+    internalLayoutVariant: props.internalLayoutVariant,
+  };
+  let clock = 0;
+  const response = handleFocusSchematicLayoutWorkerRequest(
+    {
+      protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
+      requestId: 1,
+      kind: 'layout',
+      input,
+      policies,
+    },
+    () => ++clock,
+  );
+  if (response.kind !== 'success') throw new Error(response.message);
+  return prepareFocusSchematicRendererGraph({
+    projection: props.projection,
+    model,
+    layoutInput: input,
+    computedLayout: response.result,
+    rootEntityId: props.rootEntityId,
+    secondaryRelationshipsVisible: false,
+    ...(props.routeStyle === undefined ? {} : { routeStyle: props.routeStyle }),
+    visualVariant: 'extended',
+  });
+}
 
 describe('GraphExplorer experimental availability integration', () => {
   let container: HTMLDivElement;
@@ -136,7 +247,11 @@ describe('GraphExplorer experimental availability integration', () => {
     initialViewport?: 'fit' | 'restore',
     localLayoutMode: 'free' | 'structured' = 'structured',
     focusHierarchyImplementation: 'classic' | 'modular-preview' = 'classic',
+    focusHops: 1 | 2 | 3 = 1,
+    mountedSnapshot: KnowledgeSnapshot = snapshot,
+    mountedSource: AddressableEntity = source,
   ) {
+    const mountedWorkspace = createProjectionWorkspace(mountedSnapshot);
     values.set(
       GRAPH_PREFERENCES_STORAGE_KEY,
       JSON.stringify({
@@ -146,34 +261,34 @@ describe('GraphExplorer experimental availability integration', () => {
       }),
     );
     values.set(
-      workspaceViewStorageKey(snapshot.workspace.id),
+      workspaceViewStorageKey(mountedSnapshot.workspace.id),
       serializePersistedWorkspaceView(
         createPersistedWorkspaceView({
-          workspace,
+          workspace: mountedWorkspace,
           presentationMode: mode,
           state:
             mode === 'local'
               ? {
                   ...state,
                   focus: {
-                    rootEntityId: source.id,
-                    hops: 1,
+                    rootEntityId: mountedSource.id,
+                    hops: focusHops,
                     direction: 'both',
                     hierarchyContext: 'ancestors',
                   },
                 }
               : state,
           viewports: {
-            structure: { anchorEntityId: source.id, zoom: 0.65 },
-            global: { anchorEntityId: source.id, ratio: 0.4 },
+            structure: { anchorEntityId: mountedSource.id, zoom: 0.65 },
+            global: { anchorEntityId: mountedSource.id, ratio: 0.4 },
           },
         }),
       ),
     );
-    await act(() =>
+    await act(async () =>
       root.render(
         <GraphExplorer
-          snapshot={snapshot}
+          snapshot={mountedSnapshot}
           storage={storage}
           identityStability="stable"
           {...(initialViewport === undefined ? {} : { initialViewport })}
@@ -183,6 +298,9 @@ describe('GraphExplorer experimental availability integration', () => {
         />,
       ),
     );
+    await act(async () => {
+      await Promise.resolve();
+    });
   }
   function button(name: string) {
     const result = [...container.querySelectorAll('button')].find(
@@ -194,7 +312,10 @@ describe('GraphExplorer experimental availability integration', () => {
     return result;
   }
   async function click(name: string) {
-    await act(() => button(name).click());
+    await act(async () => {
+      button(name).click();
+      await Promise.resolve();
+    });
   }
   async function experimental(show: boolean) {
     if (!container.querySelector('#graph-settings-popover'))
@@ -564,6 +685,313 @@ describe('GraphExplorer experimental availability integration', () => {
     expect(preference().focusHierarchyImplementation).toBe('modular-preview');
     expect(container.textContent).toContain(
       'Classic Focus Hierarchy is active',
+    );
+  });
+  it('R1-R4 reroots Modular File focus through non-empty prepared graphs and symmetric history', async () => {
+    await mount(
+      'local',
+      false,
+      undefined,
+      'structured',
+      'modular-preview',
+      1,
+      rerootSnapshot,
+      rerootEntities[0]!,
+    );
+    const initialRoot = captured.modular!.rootEntityId;
+    expect(prepareModularGraph(captured.modular!).nodes.length).toBeGreaterThan(
+      0,
+    );
+    const firstTarget = captured.modular!.projection.nodes.find(
+      (node) =>
+        node.kind === 'entity' &&
+        node.entityKind === 'document' &&
+        node.entityId !== initialRoot,
+    );
+    if (firstTarget?.kind !== 'entity')
+      throw new Error('Missing first connected File target.');
+
+    await act(async () => {
+      captured.modular!.onFocusEntity(firstTarget.entityId);
+      await Promise.resolve();
+    });
+    const firstReroot = captured.modular!;
+    expect(mode()).toBe('local-modular');
+    expect(firstReroot.projectionState.focus?.rootEntityId).toBe(
+      firstTarget.entityId,
+    );
+    expect(firstReroot.rootEntityId).toBe(firstTarget.entityId);
+    expect(firstReroot.projection.nodes.length).toBeGreaterThan(0);
+    expect(prepareModularGraph(firstReroot).nodes.length).toBeGreaterThan(0);
+    expect(
+      firstReroot.projection.nodes.some(
+        ({ id }) => id === firstReroot.centerRequest?.nodeId,
+      ),
+    ).toBe(true);
+    expect(firstReroot.selection).toEqual({
+      kind: 'node',
+      id: firstReroot.centerRequest!.nodeId,
+    });
+
+    await click('Back in graph history');
+    expect(captured.modular!.rootEntityId).toBe(initialRoot);
+    await click('Forward in graph history');
+    expect(captured.modular!.rootEntityId).toBe(firstTarget.entityId);
+
+    const secondTarget = captured.modular!.projection.nodes.find(
+      (node) =>
+        node.kind === 'entity' &&
+        node.entityKind === 'document' &&
+        node.entityId !== firstTarget.entityId &&
+        node.entityId !== initialRoot,
+    );
+    if (secondTarget?.kind !== 'entity')
+      throw new Error('Missing second connected File target.');
+    await act(async () => {
+      captured.modular!.onFocusEntity(secondTarget.entityId);
+      await Promise.resolve();
+    });
+    expect(captured.modular!.rootEntityId).toBe(secondTarget.entityId);
+    expect(prepareModularGraph(captured.modular!).nodes.length).toBeGreaterThan(
+      0,
+    );
+    await click('Back in graph history');
+    expect(captured.modular!.rootEntityId).toBe(firstTarget.entityId);
+    await click('Forward in graph history');
+    expect(captured.modular!.rootEntityId).toBe(secondTarget.entityId);
+    const validatedGraph = captured.modular!;
+    await act(async () => {
+      captured.modular!.onFocusEntity('removed-file');
+      await Promise.resolve();
+    });
+    expect(captured.modular!.rootEntityId).toBe(secondTarget.entityId);
+    expect(captured.modular!.projection).toBe(validatedGraph.projection);
+    expect(container.textContent).toContain(
+      'Cannot navigate: entity "removed-file" is no longer present',
+    );
+  });
+
+  it('S4-S9 keeps subfocus presentation-only and restores it with history shortcuts', async () => {
+    await mount('local', false, undefined, 'structured', 'modular-preview');
+    const sourceSections = snapshot.entities.filter(
+      (entity) =>
+        entity.kind === 'section' && entity.source.path === source.source.path,
+    );
+    const nested = sourceSections.find(
+      (entity) => entity.kind === 'section' && entity.title === 'Nested',
+    )!;
+    await act(() => captured.navigate!(nested.id, 'Search Result'));
+    const visibleSections = captured.modular!.projection.nodes.filter(
+      (node) => node.kind === 'entity' && node.entityKind === 'section',
+    );
+    expect(visibleSections.length).toBeGreaterThanOrEqual(2);
+    const [headingA, headingB] = visibleSections;
+    if (headingA?.kind !== 'entity' || headingB?.kind !== 'entity')
+      throw new Error('Missing visible Heading pair.');
+    const projection = captured.modular!.projection;
+    const projectionState = captured.modular!.projectionState;
+    performance.reset();
+
+    await act(() =>
+      captured.modular!.onSubfocusEntity(headingA.entityId, 'section'),
+    );
+    expect(captured.modular!.focusHierarchySubfocus).toEqual({
+      entityId: headingA.entityId,
+      kind: 'section',
+    });
+    expect(captured.modular!.projection).toBe(projection);
+    expect(captured.modular!.projectionState).toBe(projectionState);
+    expect(performance.snapshot().operations['local-projections']).toBe(0);
+
+    await act(() =>
+      captured.modular!.onSubfocusEntity(headingB.entityId, 'section'),
+    );
+    await click('Back in graph history');
+    expect(captured.modular!.focusHierarchySubfocus?.entityId).toBe(
+      headingA.entityId,
+    );
+    const workspace = container.querySelector<HTMLElement>('.graph-workspace')!;
+    await act(() =>
+      workspace.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          ctrlKey: true,
+          key: 'z',
+        }),
+      ),
+    );
+    expect(captured.modular!.focusHierarchySubfocus).toBeNull();
+    await act(() =>
+      workspace.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          ctrlKey: true,
+          shiftKey: true,
+          key: 'z',
+        }),
+      ),
+    );
+    expect(captured.modular!.focusHierarchySubfocus?.entityId).toBe(
+      headingA.entityId,
+    );
+
+    const input = document.createElement('input');
+    workspace.append(input);
+    const editableUndo = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: true,
+      key: 'z',
+    });
+    await act(() => input.dispatchEvent(editableUndo));
+    expect(editableUndo.defaultPrevented).toBe(false);
+    expect(captured.modular!.focusHierarchySubfocus?.entityId).toBe(
+      headingA.entityId,
+    );
+
+    await act(() =>
+      workspace.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          key: 'Escape',
+        }),
+      ),
+    );
+    expect(captured.modular!.focusHierarchySubfocus).toBeNull();
+    await click('Forward in graph history');
+    expect(captured.modular!.focusHierarchySubfocus?.entityId).toBe(
+      headingA.entityId,
+    );
+    await click('Network');
+    expect(mode()).toBe('local-free');
+    await click('Hierarchy');
+    expect(captured.modular!.focusHierarchySubfocus).toBeNull();
+  });
+
+  it('S9 clears subfocus for File reroot and Back restores both Focus and subfocus', async () => {
+    await mount('local', false, undefined, 'structured', 'modular-preview');
+    const heading = snapshot.entities.find(
+      (entity) =>
+        entity.kind === 'section' && entity.source.path === source.source.path,
+    )!;
+    await act(() => captured.navigate!(heading.id, 'Search Result'));
+    await act(() => captured.modular!.onSubfocusEntity(heading.id, 'section'));
+    const originalRoot = captured.modular!.rootEntityId;
+    const file = captured.modular!.projection.nodes.find(
+      (node) =>
+        node.kind === 'entity' &&
+        node.entityKind === 'document' &&
+        node.entityId !== originalRoot,
+    );
+    if (file?.kind !== 'entity') throw new Error('Missing connected File.');
+
+    await act(() => captured.modular!.onFocusEntity(file.entityId));
+    expect(captured.modular!.rootEntityId).toBe(file.entityId);
+    expect(captured.modular!.focusHierarchySubfocus).toBeNull();
+    await click('Back in graph history');
+    expect(captured.modular!.rootEntityId).toBe(originalRoot);
+    expect(captured.modular!.focusHierarchySubfocus).toEqual({
+      entityId: heading.id,
+      kind: 'section',
+    });
+  });
+  it('S10/S11 clears a removed live subfocus target without blanking Focus', async () => {
+    await mount('local', false, undefined, 'structured', 'modular-preview');
+    const block = snapshot.entities.find(
+      (entity) =>
+        entity.kind === 'block' && entity.source.path === source.source.path,
+    )!;
+    await act(() => captured.navigate!(block.id, 'Search Result'));
+    await act(() => captured.modular!.onSubfocusEntity(block.id, 'block'));
+    expect(captured.modular!.focusHierarchySubfocus?.entityId).toBe(block.id);
+
+    const revisedSnapshot: KnowledgeSnapshot = {
+      ...snapshot,
+      entities: snapshot.entities.filter(({ id }) => id !== block.id),
+      references: snapshot.references.filter(
+        (reference) =>
+          reference.sourceEntityId !== block.id &&
+          !(
+            reference.resolution.status === 'resolved' &&
+            reference.resolution.targetEntityId === block.id
+          ),
+      ),
+    };
+    await act(async () => {
+      root.render(
+        <GraphExplorer
+          snapshot={revisedSnapshot}
+          storage={storage}
+          identityStability="stable"
+          maximized={false}
+          onMaximizedChange={() => undefined}
+          performance={performance}
+        />,
+      );
+      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mode()).toBe('local-modular');
+    expect(captured.modular!.focusHierarchySubfocus).toBeNull();
+    expect(captured.modular!.projection.nodes.length).toBeGreaterThan(0);
+    expect(container.textContent).toContain(
+      'subfocus is no longer projected and was cleared',
+    );
+  });
+  it('drops a stale historical subfocus target while restoring the remaining checkpoint', async () => {
+    await mount('local', false, undefined, 'structured', 'modular-preview');
+    const block = snapshot.entities.find(
+      (entity) =>
+        entity.kind === 'block' && entity.source.path === source.source.path,
+    )!;
+    await act(() => captured.navigate!(block.id, 'Search Result'));
+    await act(() => captured.modular!.onSubfocusEntity(block.id, 'block'));
+    const originalRoot = captured.modular!.rootEntityId;
+    const file = captured.modular!.projection.nodes.find(
+      (node) =>
+        node.kind === 'entity' &&
+        node.entityKind === 'document' &&
+        node.entityId !== originalRoot,
+    );
+    if (file?.kind !== 'entity') throw new Error('Missing connected File.');
+    await act(() => captured.modular!.onFocusEntity(file.entityId));
+
+    const revisedSnapshot: KnowledgeSnapshot = {
+      ...snapshot,
+      entities: snapshot.entities.filter(({ id }) => id !== block.id),
+      references: snapshot.references.filter(
+        (reference) =>
+          reference.sourceEntityId !== block.id &&
+          !(
+            reference.resolution.status === 'resolved' &&
+            reference.resolution.targetEntityId === block.id
+          ),
+      ),
+    };
+    await act(async () => {
+      root.render(
+        <GraphExplorer
+          snapshot={revisedSnapshot}
+          storage={storage}
+          identityStability="stable"
+          maximized={false}
+          onMaximizedChange={() => undefined}
+          performance={performance}
+        />,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await click('Back in graph history');
+
+    expect(captured.modular!.rootEntityId).toBe(originalRoot);
+    expect(captured.modular!.focusHierarchySubfocus).toBeNull();
+    expect(captured.modular!.projection.nodes.length).toBeGreaterThan(0);
+    expect(container.textContent).toContain(
+      'saved Heading or Block subfocus is no longer visible and was dropped',
     );
   });
   it('normalizes the All Network → All Hierarchy → Focus history without duplicate Back steps', async () => {

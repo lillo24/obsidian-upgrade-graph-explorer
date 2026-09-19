@@ -31,8 +31,12 @@ import {
   shouldApplyGraphFitRequest,
 } from './center-request';
 import { EntityDisclosureProvider } from './disclosure-context';
-import { shouldActivateEntityFocus } from './focus-interaction';
+import {
+  entityActivationRoute,
+  shouldActivateEntityFocus,
+} from './focus-interaction';
 import { applyRendererInteractionState } from './highlight';
+import { applyFocusHierarchySubfocus } from './focus-hierarchy-subfocus';
 import { DocumentDirectHoverProvider } from './hover-context';
 import { hierarchyThemeFor, hierarchyThemeStyleFor } from './hierarchy-theme';
 import {
@@ -132,6 +136,7 @@ function GraphCanvasInner({
   centerRequest,
   fitRequestKey,
   focusAppearance,
+  focusHierarchySubfocus,
   initialTransitionAnchor,
   layoutCache,
   layoutMode,
@@ -144,6 +149,7 @@ function GraphCanvasInner({
   onNodeContextMenuRequest,
   onPaneContextMenuRequest,
   onSelectionChange,
+  onSubfocusEntity,
   onTransitionAnchorApiChange,
   onTransitionAnchorConsumed,
   onToggleEntity,
@@ -467,14 +473,21 @@ function GraphCanvasInner({
     if (prepared === null) return null;
     const apply = () =>
       applyRendererInteractionState(
-        prepared,
+        applyFocusHierarchySubfocus(prepared, focusHierarchySubfocus),
         documentDirectHover ?? hovered,
         selection,
       );
     return performance === undefined
       ? apply()
       : performance.measure('highlight', 'highlight-applications', apply);
-  }, [documentDirectHover, hovered, performance, prepared, selection]);
+  }, [
+    documentDirectHover,
+    focusHierarchySubfocus,
+    hovered,
+    performance,
+    prepared,
+    selection,
+  ]);
   const nodes = useMemo(
     () => (interactive === null ? [] : [...interactive.nodes]),
     [interactive],
@@ -640,11 +653,18 @@ function GraphCanvasInner({
   );
   const focusNode = useCallback<NodeMouseHandler<GraphFlowNode>>(
     (_event, node) => {
-      if (node.type !== 'entity' || onFocusEntity === undefined) return;
+      if (node.type !== 'entity') return;
+      const route = entityActivationRoute(
+        node.data.entityKind,
+        onSubfocusEntity !== undefined,
+      );
+      if (route === 'focus' && onFocusEntity === undefined) return;
       onSelectionChange({ kind: 'node', id: node.data.projectionNodeId });
-      onFocusEntity(node.data.entityId);
+      if (route === 'subfocus' && node.data.entityKind !== 'document')
+        onSubfocusEntity?.(node.data.entityId, node.data.entityKind);
+      else onFocusEntity?.(node.data.entityId);
     },
-    [onFocusEntity, onSelectionChange],
+    [onFocusEntity, onSelectionChange, onSubfocusEntity],
   );
   const selectEdge = useCallback<EdgeMouseHandler<GraphFlowEdge>>(
     (_event, edge) => {
@@ -1012,7 +1032,6 @@ function GraphCanvasInner({
           return;
         }
       }
-      if (onFocusEntity === undefined) return;
       const entityCard = flowNode?.querySelector<HTMLElement>(
         '.entity-card[data-entity-id][data-projection-node-id]',
       );
@@ -1032,12 +1051,32 @@ function GraphCanvasInner({
       const entityId = entityCard.dataset.entityId;
       const projectionNodeId = entityCard.dataset.projectionNodeId;
       if (entityId === undefined || projectionNodeId === undefined) return;
+      const entityKind = entityCard.dataset.entityKind;
+      if (
+        entityKind !== 'document' &&
+        entityKind !== 'section' &&
+        entityKind !== 'block'
+      )
+        return;
+      const route = entityActivationRoute(
+        entityKind,
+        onSubfocusEntity !== undefined,
+      );
+      if (route === 'focus' && onFocusEntity === undefined) return;
       event.preventDefault();
       event.stopPropagation();
       onSelectionChange({ kind: 'node', id: projectionNodeId });
-      onFocusEntity(entityId);
+      if (route === 'subfocus' && entityKind !== 'document')
+        onSubfocusEntity?.(entityId, entityKind);
+      else onFocusEntity?.(entityId);
     },
-    [nodes, onFocusEntity, onNodeContextMenuRequest, onSelectionChange],
+    [
+      nodes,
+      onFocusEntity,
+      onNodeContextMenuRequest,
+      onSelectionChange,
+      onSubfocusEntity,
+    ],
   );
   const openNodeContextMenu = useCallback<NodeMouseHandler<GraphFlowNode>>(
     (event, node) => {
@@ -1125,6 +1164,11 @@ function GraphCanvasInner({
       aria-label="Projected knowledge graph"
       aria-busy={layoutPending}
       data-focus-appearance={focusAppearance}
+      data-focus-hierarchy-subfocus={
+        focusHierarchySubfocus === null || focusHierarchySubfocus === undefined
+          ? undefined
+          : focusHierarchySubfocus.kind
+      }
       data-hierarchy-theme={hierarchyTheme.id}
       data-theme={theme}
       data-trackpad-zoom-mode={trackpadZoomMode}

@@ -4,6 +4,7 @@ import { createRuntimePerformanceRecorder } from '@icarus-graph-explorer/perform
 
 import { GRAPH_EDGE_TYPES, GRAPH_NODE_TYPES } from './component-maps';
 import {
+  entityActivationRoute,
   shouldActivateEntityFocus,
   shouldToggleDisclosureForClick,
 } from './focus-interaction';
@@ -62,6 +63,14 @@ describe('renderer interaction helpers', () => {
     expect(shouldToggleDisclosureForClick(0)).toBe(true);
     expect(shouldToggleDisclosureForClick(1)).toBe(true);
     expect(shouldToggleDisclosureForClick(2)).toBe(false);
+  });
+
+  it('dispatches File activation to reroot and opts Heading/Block into subfocus', () => {
+    expect(entityActivationRoute('document', true)).toBe('focus');
+    expect(entityActivationRoute('section', true)).toBe('subfocus');
+    expect(entityActivationRoute('block', true)).toBe('subfocus');
+    expect(entityActivationRoute('section', false)).toBe('focus');
+    expect(entityActivationRoute('block', false)).toBe('focus');
   });
 
   it('highlights the direct incident neighborhood and de-emphasizes the rest', () => {

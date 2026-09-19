@@ -66,6 +66,43 @@
   filter: saturate(1.15);
 }
 
+.graph-canvas .react-flow__node.is-subfocus-primary,
+.graph-canvas .react-flow__edge.is-subfocus-primary {
+  opacity: 1;
+}
+
+.graph-canvas .react-flow__node.is-subfocus-context,
+.graph-canvas .react-flow__edge.is-subfocus-context {
+  opacity: 0.3;
+}
+
+.graph-canvas .react-flow__node.is-subfocus-dimmed,
+.graph-canvas .react-flow__edge.is-subfocus-dimmed {
+  opacity: 0.08;
+}
+
+.graph-canvas .react-flow__node.is-subfocus-primary.is-deemphasized,
+.graph-canvas .react-flow__edge.is-subfocus-primary.is-deemphasized {
+  opacity: 0.72;
+}
+
+.graph-canvas .react-flow__node.is-subfocus-context.is-highlighted,
+.graph-canvas .react-flow__edge.is-subfocus-context.is-highlighted {
+  opacity: 0.45;
+}
+
+.graph-canvas .react-flow__node.is-subfocus-dimmed.is-highlighted,
+.graph-canvas .react-flow__edge.is-subfocus-dimmed.is-highlighted {
+  opacity: 0.16;
+}
+
+.graph-canvas[data-focus-hierarchy-subfocus] .focus-schematic-folder-guides,
+.graph-canvas[data-focus-hierarchy-subfocus]
+  .focus-schematic-folder-guide-controls,
+.graph-canvas[data-focus-hierarchy-subfocus] .focus-schematic-folder-strips {
+  opacity: 0.3;
+}
+
 .focus-schematic-folder-strips {
   position: absolute;
   z-index: -1;
@@ -187,8 +224,9 @@
 }
 
 .focus-schematic-folder-guide-controls__chip {
-  display: grid;
-  grid-template-columns: auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.32rem;
   min-height: 0;
   padding: 0.12rem 0.18rem;
   border: 0;
@@ -202,6 +240,7 @@
   letter-spacing: 0.03em;
   cursor: default;
   text-align: left;
+  white-space: nowrap;
 }
 
 .focus-schematic-folder-guide-controls[data-folder-depth-style='2']
@@ -219,13 +258,17 @@
 }
 
 .focus-schematic-folder-guide-controls__parent {
-  display: block;
-  margin-top: 0.1rem;
   color: var(--hierarchy-folder-muted-text);
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.02em;
   line-height: 1.1;
+}
+
+.focus-schematic-folder-guide-controls__separator {
+  color: var(--hierarchy-folder-muted-text);
+  font-size: 10px;
+  font-weight: 600;
 }
 
 .focus-schematic-folder-guide-controls__chip:hover {

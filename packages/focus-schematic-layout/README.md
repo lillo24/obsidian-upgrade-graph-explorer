@@ -99,6 +99,54 @@ sibling-branch pass; module X, dimensions, ownership, lanes, and exact endpoint
 identity stay fixed. The default remains Off until graphical approval selects
 the HIER4A candidate and visual Heading-order policy.
 
+HIER4B-SPACING-FIX2 retains one Soft structural policy at 600 hop spacing,
+88 module clearance, 180 topology distance, 72 packing steps, 104 radial
+jitter, 30/60 internal node/rank separation, and 34/30 module padding. The
+0–100 Sandbox spacing value is a post-layout radial transform with scale
+`1 + 1.4 × value/100`. It translates complete non-root modules and their nodes
+around the fixed root, then recomputes cardinal attachments and
+geometry-derived quality without changing dimensions, internal offsets,
+Adaptive Compass, folder force, or packing. It is excluded from the worker
+request and structural cache key.
+
+HIER4B-SPACING-FIX3B adds one deterministic structural packing stage after the
+Soft solver and before radial spacing. In Direct mode, each immediate named
+folder is an exact rigid compound of its final module rectangles; root-level
+Files remain atomic structural bodies. A bounded nearest-ring
+search translates whole bodies until an affine interval oracle proves that no
+cross-group module pair can violate the 16 px clearance anywhere over the
+continuous 1.0x-2.4x spread range. The optional Workspace-root group remains a
+renderer-only preference: structural packing also validates the aggregate root
+body, so toggling it does not enter worker input or cache identity. No collision
+or repacking pass runs after radial spacing.
+
+HIER4B-SPACING-FIX4 inserts mandatory immediate-folder cohesion before that
+compound pack. It groups by the post-manual/pre-compression direct parent,
+compacts whole modules around their prior centroid, and shares the renderer's
+island oracle. Named singleton folders remain in the
+display tree. Automatic compression removes only ancestor-only pass-through
+folders. Folder strength zero disables extra attraction but still runs this
+cohesion stage.
+
+HIER4B-SPACING-FIX5 derives a Focus-neutral grouping projection from the
+truthful semantic display tree. It removes Focus, then reruns empty-folder
+pruning and pass-through compression for cohesion, compound bodies, hierarchy
+packing, radial spacing, guides, and visible-folder evidence. Focus remains a
+fixed topology/collision anchor with its source-folder metadata intact. Nested
+mode packs the retained logical tree deepest-first: direct Files form one rigid
+unit, each packed child subtree forms another, and parent-level packing moves
+only whole units. Final compound packing and radial spacing treat each retained
+top-level subtree as one body, preserving all descendant containment. Direct
+mode keeps the FIX4 immediate-folder bodies. Named-folder coverage and Nested
+containment, split, and blocker counts are hard zero gates.
+
+Nested Soft force uses normalized `1 / base ** index` membership with selectable
+base 3 (default) or 4. Direct-only selects each File's immediate displayed
+parent after manual promotion/flattening and before automatic singleton
+compression, then canonicalizes decay out of the cache identity. Both modes
+exclude the root File from the grouping projection while retaining truthful
+source membership in the semantic tree used by context actions. The fixed
+`[36, 18]` schedule and secondary zero-influence rule are unchanged.
 Directional physical sides retain HIER4A's signed-rank policy: a counterpart at
 a smaller rank attaches left, a counterpart at a larger rank attaches right,
 and same-rank secondary display uses `auto`. Soft Folder Clusters instead chooses
@@ -160,20 +208,41 @@ the bakeoff evidence if changed.
   packing, and bounded two-round internal-layout evidence. The Modular worker
   calls it only when the persisted Sandbox macro policy selects Soft Folder
   Clusters; Directional Bands remains the default.
+- `src/soft-cluster-spacing.ts` owns the fixed structural policy, bounded 0–100
+  radial-spread normalization, and continuous 1.0×–2.4× scale mapping.
+- `src/soft-group-packing.ts` owns immediate-folder compound bodies, the exact
+  Focus anchor, Nested top-level subtree bodies, the exact continuous affine
+  overlap oracle, deterministic structural body packing, and packing evidence.
+- `src/soft-folder-cohesion.ts` owns deterministic immediate named-folder
+  compaction, movement evidence, and the final split hard gate.
+- `src/soft-nested-hierarchy-packing.ts` owns deterministic deepest-first
+  retained-tree packing, rigid child-subtree translation, Focus-blocker and
+  one-region validation, named-folder coverage auditing, and Nested evidence.
+- `src/soft-folder-guide-geometry.ts` owns the dependency-free guide-island
+  geometry shared by layout validation and React Flow rendering.
+- `src/soft-radial-spread.ts` translates complete non-root module geometry
+  around the fixed root after structural computation, then refreshes cardinal
+  attachments and strict geometry-derived quality.
 - `src/soft-folder-display.ts` owns strict sparse File-parent and flattened-layer
   intent, conservative reconciliation, the pure nested displayed tree,
-  one-child-unit compression/provenance, action mutations, and bounded H0/H1/H2
-  membership weights. It contains no storage, renderer, or source-provider logic.
-- `src/soft-cluster-fixtures.ts` owns SC1–SC24 plus SC17–SC19 stability pairs.
+  pre-compression Direct-parent snapshot, ancestor-only pass-through
+  compression/provenance, the Focus-neutral grouping projection, action
+  mutations, nearest-only scope, and normalized 1/3 or 1/4 ancestor weights. It
+  contains no storage, renderer, or source-provider logic.
+- `src/soft-cluster-fixtures.ts` owns SC1–SC24 and SC26–SC29 plus SC17–SC19
+  stability pairs.
 - `src/source-order.ts` derives public Dagre adjacent-sibling constraints from
   canonical source order.
 - `src/settings.ts` owns the frozen spacing, reserve, clearance, and filtered
   placeholder policy.
 - `src/selected.ts` maps the accepted A1 computed result to the compatible
   selected candidate/attempt API.
-- `src/worker-protocol.ts` owns the version-8 exact-shape production messages,
-  macro/strength/display-intent policy normalization, cardinal attachment evidence,
-  and originating-input result validation.
+- `src/worker-protocol.ts` owns the version-13 exact-shape production messages,
+  macro/strength/scope/decay/display-intent policy normalization, cardinal and
+  Soft Compass evidence, and originating-input result validation. Version 13
+  and Soft evidence schema 8 add Focus-neutral Nested hierarchy/coverage
+  evidence and post-Nested quality metrics while radial spread stays outside
+  worker input.
 - `src/worker-runtime.ts` validates requests, computes A1, records phase
   timings, and returns either a complete validated result or an explicit
   failure.

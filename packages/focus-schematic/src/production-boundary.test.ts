@@ -36,6 +36,7 @@ describe('HIER3B semantic-model production boundary', () => {
     expect(imports).toEqual(
       [
         'apps/web/src/components/ModularStructuredGraphView.tsx',
+        'apps/web/src/components/focus-schematic-presentation.ts',
         'apps/web/src/focus-schematic-layout-cache.ts',
         'apps/web/src/persistence/soft-folder-display.ts',
         'apps/web/src/preferences/graph-preferences.ts',

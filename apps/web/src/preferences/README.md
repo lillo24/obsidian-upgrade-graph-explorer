@@ -69,6 +69,21 @@ horizontal strips and Soft Folder Clusters renders spatial regions. The value is
 consumed only after renderer adoption and never enters the model, worker, or
 cache key.
 
+HIER4B-SPACING-FIX1 adds `modularFocusDirectFoldersOnly` and
+`modularFocusSoftAncestorDecayBase` beside the existing
+`modularFocusSoftSpacing` value in the v1 preference record. Defaults are
+Nested, 1/3 decay, and spacing 50. The boolean and `3 | 4` decay value recover
+malformed storage to those defaults; spacing clamps to 0–100 and malformed
+values use 50. Reset Sandbox restores all three defaults.
+
+Scope and decay are captured in `SavedFocusHierarchySettings`; legacy profiles
+without those keys validate as Nested/1/3. Radial spacing remains deliberately
+outside the Saved View profile, so applying any profile preserves the current
+Sandbox spread. Direct-only retains the stored decay choice for a later return
+to Nested, while structural cache identity ignores it. Directional Bands
+retains all three preferences but gives them no geometry, worker, or cache
+influence.
+
 SPACING1B-QA keeps separate All Network and Focus Network density-framing
 strengths outside this durable record. Both start at 100% on every application
 launch and exist only to compare legacy ratio 1 with each production density

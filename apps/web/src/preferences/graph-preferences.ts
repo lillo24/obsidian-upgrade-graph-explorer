@@ -11,10 +11,13 @@ import {
 import type { LocalLayoutMode } from '@icarus-graph-explorer/view-state';
 import {
   DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+  DEFAULT_FOCUS_SCHEMATIC_SOFT_SPACING,
   isFocusSchematicEndpointOrderPolicy,
   isFocusSchematicProductMacroLayout,
   isFocusSchematicProductInternalLayoutVariant,
+  normalizeFocusSchematicSoftAncestorDecayBase,
   normalizeFocusSchematicSoftFolderStrength,
+  normalizeFocusSchematicSoftSpacing,
   type FocusSchematicEndpointOrderPolicy,
   type FocusSchematicProductMacroLayout,
   type FocusSchematicProductInternalLayoutVariant,
@@ -41,6 +44,14 @@ export interface GraphPreferences {
   readonly modularFocusMacroLayout: FocusSchematicProductMacroLayout;
   /** Experimental Soft Folder Clusters strength, normalized to [0, 100]. */
   readonly modularFocusSoftFolderStrength: number;
+  /** Nearest-only Soft force and flat guide presentation. */
+  readonly modularFocusDirectFoldersOnly: boolean;
+  /** Nested Soft ancestor-force decay; retained while Direct-only is active. */
+  readonly modularFocusSoftAncestorDecayBase: 3 | 4;
+  /** Sandbox-only radial post-layout spread, normalized to [0, 100]. */
+  readonly modularFocusSoftSpacing: number;
+  /** Presentation-only grouping for Files stored directly at workspace root. */
+  readonly modularFocusIncludeWorkspaceRootGroup: boolean;
   /** Historical storage key for both macro-specific Folder guide overlays. */
   readonly modularFolderStripsVisible: boolean;
   /** Modular Preview edge drawing only; omitted from the Classic renderer. */
@@ -58,6 +69,8 @@ export interface SavedFocusHierarchySettings {
   readonly modularFocusHeadingOrder: FocusSchematicEndpointOrderPolicy;
   readonly modularFocusMacroLayout: FocusSchematicProductMacroLayout;
   readonly modularFocusSoftFolderStrength: number;
+  readonly modularFocusDirectFoldersOnly: boolean;
+  readonly modularFocusSoftAncestorDecayBase: 3 | 4;
   readonly modularFolderStripsVisible: boolean;
   readonly modularConnectionStyle: GraphEdgePathStyle;
 }
@@ -75,6 +88,10 @@ export const DEFAULT_GRAPH_PREFERENCES: GraphPreferences = {
     DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.macroLayout,
   modularFocusSoftFolderStrength:
     DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES.softFolderStrength,
+  modularFocusDirectFoldersOnly: false,
+  modularFocusSoftAncestorDecayBase: 3,
+  modularFocusSoftSpacing: DEFAULT_FOCUS_SCHEMATIC_SOFT_SPACING,
+  modularFocusIncludeWorkspaceRootGroup: false,
   modularFolderStripsVisible: true,
   modularConnectionStyle: 'direct',
   showExperimentalAllHierarchy: false,
@@ -135,6 +152,9 @@ export function captureFocusHierarchySettings(
     modularFocusHeadingOrder: preferences.modularFocusHeadingOrder,
     modularFocusMacroLayout: preferences.modularFocusMacroLayout,
     modularFocusSoftFolderStrength: preferences.modularFocusSoftFolderStrength,
+    modularFocusDirectFoldersOnly: preferences.modularFocusDirectFoldersOnly,
+    modularFocusSoftAncestorDecayBase:
+      preferences.modularFocusSoftAncestorDecayBase,
     modularFolderStripsVisible: preferences.modularFolderStripsVisible,
     modularConnectionStyle: preferences.modularConnectionStyle,
   };
@@ -150,10 +170,20 @@ export function validateFocusHierarchySettings(
     'modularFocusHeadingOrder',
     'modularFocusMacroLayout',
     'modularFocusSoftFolderStrength',
+    'modularFocusDirectFoldersOnly',
+    'modularFocusSoftAncestorDecayBase',
     'modularFolderStripsVisible',
     'modularConnectionStyle',
   ] as const satisfies readonly (keyof SavedFocusHierarchySettings)[];
-  if (!isPlainRecord(value) || !exactFields(value, keys)) {
+  const legacyKeys = keys.filter(
+    (key) =>
+      key !== 'modularFocusDirectFoldersOnly' &&
+      key !== 'modularFocusSoftAncestorDecayBase',
+  );
+  if (
+    !isPlainRecord(value) ||
+    (!exactFields(value, keys) && !exactFields(value, legacyKeys))
+  ) {
     throw new Error('Focus Hierarchy profile fields are incompatible.');
   }
   if (!isFocusAppearance(value.focusAppearance)) {
@@ -202,6 +232,11 @@ export function validateFocusHierarchySettings(
     modularFocusHeadingOrder: value.modularFocusHeadingOrder,
     modularFocusMacroLayout: value.modularFocusMacroLayout,
     modularFocusSoftFolderStrength: strength,
+    modularFocusDirectFoldersOnly: value.modularFocusDirectFoldersOnly === true,
+    modularFocusSoftAncestorDecayBase:
+      normalizeFocusSchematicSoftAncestorDecayBase(
+        value.modularFocusSoftAncestorDecayBase,
+      ),
     modularFolderStripsVisible: value.modularFolderStripsVisible,
     modularConnectionStyle: value.modularConnectionStyle,
   };
@@ -209,7 +244,7 @@ export function validateFocusHierarchySettings(
 
 export function applyFocusHierarchySettings(
   current: GraphPreferences,
-  saved: SavedFocusHierarchySettings,
+  saved: unknown,
 ): GraphPreferences {
   return { ...current, ...validateFocusHierarchySettings(saved) };
 }
@@ -224,6 +259,16 @@ export function normalizeModularFocusSoftFolderStrength(
   value: unknown,
 ): number {
   return normalizeFocusSchematicSoftFolderStrength(value);
+}
+
+export function normalizeModularFocusSoftSpacing(value: unknown): number {
+  return normalizeFocusSchematicSoftSpacing(value);
+}
+
+export function normalizeModularFocusSoftAncestorDecayBase(
+  value: unknown,
+): 3 | 4 {
+  return normalizeFocusSchematicSoftAncestorDecayBase(value);
 }
 
 export function loadGraphPreferences(
@@ -253,6 +298,10 @@ export function loadGraphPreferences(
         readonly modularFocusHeadingOrder?: unknown;
         readonly modularFocusMacroLayout?: unknown;
         readonly modularFocusSoftFolderStrength?: unknown;
+        readonly modularFocusDirectFoldersOnly?: unknown;
+        readonly modularFocusSoftAncestorDecayBase?: unknown;
+        readonly modularFocusSoftSpacing?: unknown;
+        readonly modularFocusIncludeWorkspaceRootGroup?: unknown;
         readonly modularFolderStripsVisible?: unknown;
         readonly modularConnectionStyle?: unknown;
         readonly showExperimentalAllHierarchy?: unknown;
@@ -304,6 +353,17 @@ export function loadGraphPreferences(
             normalizeModularFocusSoftFolderStrength(
               stored.modularFocusSoftFolderStrength,
             ),
+          modularFocusDirectFoldersOnly:
+            stored.modularFocusDirectFoldersOnly === true,
+          modularFocusSoftAncestorDecayBase:
+            normalizeModularFocusSoftAncestorDecayBase(
+              stored.modularFocusSoftAncestorDecayBase,
+            ),
+          modularFocusSoftSpacing: normalizeModularFocusSoftSpacing(
+            stored.modularFocusSoftSpacing,
+          ),
+          modularFocusIncludeWorkspaceRootGroup:
+            stored.modularFocusIncludeWorkspaceRootGroup === true,
           modularFolderStripsVisible:
             typeof stored.modularFolderStripsVisible === 'boolean'
               ? stored.modularFolderStripsVisible
@@ -355,6 +415,14 @@ export function serializeGraphPreferences(
     modularFocusHeadingOrder: hierarchy.modularFocusHeadingOrder,
     modularFocusMacroLayout: hierarchy.modularFocusMacroLayout,
     modularFocusSoftFolderStrength: hierarchy.modularFocusSoftFolderStrength,
+    modularFocusDirectFoldersOnly: hierarchy.modularFocusDirectFoldersOnly,
+    modularFocusSoftAncestorDecayBase:
+      hierarchy.modularFocusSoftAncestorDecayBase,
+    modularFocusSoftSpacing: normalizeModularFocusSoftSpacing(
+      preferences.modularFocusSoftSpacing,
+    ),
+    modularFocusIncludeWorkspaceRootGroup:
+      preferences.modularFocusIncludeWorkspaceRootGroup,
     modularFolderStripsVisible: hierarchy.modularFolderStripsVisible,
     modularConnectionStyle: hierarchy.modularConnectionStyle,
     showExperimentalAllHierarchy: preferences.showExperimentalAllHierarchy,

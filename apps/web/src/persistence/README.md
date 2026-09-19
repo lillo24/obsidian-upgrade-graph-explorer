@@ -165,6 +165,6 @@ Soft folder display intent uses
 The key is retained for a narrow Experimental schema-1 reset. Stable workspaces
 write canonical sparse intent before adopting it; transient or legacy reports
 keep it in memory. Invalid or stale File/folder identities are ignored with no
-rename inference. Derived singleton compression, visible membership, layout,
+rename inference. Derived ancestor pass-through compression, visible membership, layout,
 hover, and menu state never persist. This record remains separate from Graph
 Preferences and SPATIAL2 folder rules.

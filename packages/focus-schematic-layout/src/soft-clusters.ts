@@ -16,13 +16,31 @@ import {
   evaluateFocusSchematicEndpointLayoutQuality,
 } from './endpoint-facing';
 import { evaluateFocusSchematicFolderBandQuality } from './folder-bands';
-import { normalizeFocusSchematicSoftFolderStrength } from './policies';
+import {
+  normalizeFocusSchematicSoftAncestorDecayBase,
+  normalizeFocusSchematicSoftFolderStrength,
+} from './policies';
+import {
+  FOCUS_SCHEMATIC_SOFT_CLUSTER_STRUCTURAL_SPACING,
+  type FocusSchematicSoftClusterSpacingPolicy,
+} from './soft-cluster-spacing';
 import {
   buildFocusSchematicSoftFolderDisplayTree,
   canonicalFocusSchematicSoftFolderDisplayIntent,
   EMPTY_FOCUS_SCHEMATIC_SOFT_FOLDER_DISPLAY_INTENT,
   focusSchematicSoftFolderScopeMemberships,
+  projectFocusSchematicSoftFolderGroupingTree,
 } from './soft-folder-display';
+import { packFocusSchematicSoftFolderGroups } from './soft-group-packing';
+import {
+  applyFocusSchematicSoftFolderCohesion,
+  measureFocusSchematicSoftFolderCohesion,
+} from './soft-folder-cohesion';
+import {
+  applyFocusSchematicSoftNestedHierarchyPacking,
+  measureFocusSchematicSoftFolderCoverage,
+  measureFocusSchematicSoftNestedHierarchy,
+} from './soft-nested-hierarchy-packing';
 import type {
   FocusSchematicComputedLayout,
   FocusSchematicEndpointPlan,
@@ -42,11 +60,9 @@ import type {
 export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE = [
   36, 18,
 ] as const;
-export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 5 as const;
+export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 12 as const;
 
 const STRATEGY_ID = 'HIER4B-soft-folder-clusters' as const;
-const HOP_SPACING = 520;
-const MODULE_GAP = 72;
 const EPSILON = 1e-6;
 
 interface Position {
@@ -269,6 +285,7 @@ function initialPositions(
   input: FocusSchematicLayoutInput,
   candidate: FocusSchematicLayoutCandidate,
   hops: ReadonlyMap<string, number>,
+  spacing: FocusSchematicSoftClusterSpacingPolicy,
 ): Map<string, Position> {
   return new Map(
     [...candidate.modules]
@@ -282,8 +299,12 @@ function initialPositions(
         const hop =
           hops.get(module.moduleId) ?? Math.max(1, semantic.focusDistance);
         const angle = hashUnit(`module:${module.moduleId}`) * Math.PI * 2;
-        const radialJitter = (hashUnit(`radius:${module.moduleId}`) - 0.5) * 90;
-        const radius = Math.max(HOP_SPACING, hop * HOP_SPACING + radialJitter);
+        const radialJitter =
+          (hashUnit(`radius:${module.moduleId}`) - 0.5) * spacing.radialJitter;
+        const radius = Math.max(
+          spacing.hopSpacing,
+          hop * spacing.hopSpacing + radialJitter,
+        );
         return [
           module.moduleId,
           { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius },
@@ -309,6 +330,7 @@ function hierarchyFolderGroups(
   strength: FocusSchematicSoftClusterStrength,
   policy: FocusSchematicSoftHierarchyForcePolicy,
   rootModuleId: string,
+  ancestorDecayBase: 3 | 4,
 ) {
   if (strength === 0)
     return new Map<
@@ -319,9 +341,10 @@ function hierarchyFolderGroups(
   for (const [id, memberships] of focusSchematicSoftFolderScopeMemberships(
     tree,
     policy,
+    ancestorDecayBase,
   )) {
-    // The Focus File remains a displayed folder member, but it is the neutral
-    // topology anchor and must not bias Soft folder-attraction centroids.
+    // The Focus-neutral projection normally removes this entry. Keep the guard
+    // so a semantic tree can never bias Soft folder-attraction centroids.
     if (id === rootModuleId) continue;
     for (const { folderKey, weight } of memberships) {
       const members = groups.get(folderKey) ?? [];
@@ -341,6 +364,7 @@ function collisionPass(
   positions: Map<string, Position>,
   rootId: string,
   stats: RelaxationStats,
+  spacing: FocusSchematicSoftClusterSpacingPolicy,
 ) {
   for (let leftIndex = 0; leftIndex < modules.length; leftIndex += 1) {
     const left = modules[leftIndex]!;
@@ -354,9 +378,13 @@ function collisionPass(
       const a = positions.get(left.moduleId)!;
       const b = positions.get(right.moduleId)!;
       const overlapX =
-        (left.width + right.width) / 2 + MODULE_GAP - Math.abs(b.x - a.x);
+        (left.width + right.width) / 2 +
+        spacing.moduleGap -
+        Math.abs(b.x - a.x);
       const overlapY =
-        (left.height + right.height) / 2 + MODULE_GAP - Math.abs(b.y - a.y);
+        (left.height + right.height) / 2 +
+        spacing.moduleGap -
+        Math.abs(b.y - a.y);
       if (overlapX <= 0 || overlapY <= 0) continue;
       stats.collisionCorrectionCount += 1;
       const axis = overlapX < overlapY ? 'x' : 'y';
@@ -389,6 +417,7 @@ function packWithoutOverlaps(
   positions: Map<string, Position>,
   rootId: string,
   stats: RelaxationStats,
+  spacing: FocusSchematicSoftClusterSpacingPolicy,
 ) {
   const ordered = [...modules].sort((left, right) => {
     if (left.moduleId === rootId) return -1;
@@ -410,7 +439,7 @@ function packWithoutOverlaps(
       const sampleCount = ring === 0 ? 1 : 32;
       for (let sample = 0; sample < sampleCount; sample += 1) {
         const angle = phase + (sample / sampleCount) * Math.PI * 2;
-        const radius = ring * 64;
+        const radius = ring * spacing.packingStep;
         const point = {
           x: target.x + Math.cos(angle) * radius,
           y: target.y + Math.sin(angle) * radius,
@@ -420,9 +449,9 @@ function packWithoutOverlaps(
             stats.collisionCheckCount += 1;
             return (
               Math.abs(point.x - otherPoint.x) <
-                (module.width + other.width) / 2 + MODULE_GAP &&
+                (module.width + other.width) / 2 + spacing.moduleGap &&
               Math.abs(point.y - otherPoint.y) <
-                (module.height + other.height) / 2 + MODULE_GAP
+                (module.height + other.height) / 2 + spacing.moduleGap
             );
           },
         );
@@ -452,8 +481,10 @@ function relax(
   strength: FocusSchematicSoftClusterStrength,
   tree: FocusSchematicSoftFolderDisplayTree,
   hierarchyForcePolicy: FocusSchematicSoftHierarchyForcePolicy,
+  ancestorDecayBase: 3 | 4,
   iterations: number,
   stats: RelaxationStats,
+  spacing: FocusSchematicSoftClusterSpacingPolicy,
 ) {
   const positions = new Map(starting);
   const seed = new Map(starting);
@@ -466,6 +497,7 @@ function relax(
     strength,
     hierarchyForcePolicy,
     input.model.rootModuleId,
+    ancestorDecayBase,
   );
   const folderFactor = strength / 100;
   for (let iteration = 0; iteration < iterations; iteration += 1) {
@@ -490,7 +522,7 @@ function relax(
         Math.hypot(
           (aSize.width + bSize.width) / 2,
           (aSize.height + bSize.height) / 2,
-        ) + 155;
+        ) + spacing.topologyExtraDistance;
       const force = Math.max(
         -55,
         Math.min(55, (distance - desired) * 0.055 * pair.weight),
@@ -533,7 +565,7 @@ function relax(
       const point = positions.get(module.moduleId)!;
       const change = changes.get(module.moduleId)!;
       const hop = hops.get(module.moduleId) ?? 1;
-      const targetRadius = Math.max(1, hop) * HOP_SPACING;
+      const targetRadius = Math.max(1, hop) * spacing.hopSpacing;
       const radius = Math.max(EPSILON, Math.hypot(point.x, point.y));
       const radial = (targetRadius - radius) * 0.032;
       change.x += (point.x / radius) * radial;
@@ -550,13 +582,19 @@ function relax(
         y: point.y + change.y * scale,
       });
     }
-    collisionPass(modules, positions, input.model.rootModuleId, stats);
+    collisionPass(modules, positions, input.model.rootModuleId, stats, spacing);
   }
   // A short fixed pairwise tail preserves local structure, then a bounded
   // deterministic spiral pack guarantees valid variable-rectangle geometry.
   for (let pass = 0; pass < 24; pass += 1)
-    collisionPass(modules, positions, input.model.rootModuleId, stats);
-  packWithoutOverlaps(modules, positions, input.model.rootModuleId, stats);
+    collisionPass(modules, positions, input.model.rootModuleId, stats, spacing);
+  packWithoutOverlaps(
+    modules,
+    positions,
+    input.model.rootModuleId,
+    stats,
+    spacing,
+  );
   return positions;
 }
 
@@ -652,6 +690,7 @@ function regionDifferenceCount(
 
 export interface FocusSchematicSoftMacroPerturbationDiagnostic {
   readonly internalRegionAssignmentDifferenceCount: number;
+  readonly adaptivePassRegionChangeCount: number;
   readonly internalNodeGeometryDifferenceCount: number;
   readonly moduleBoundsDifferenceCount: number;
   readonly finalNodeGeometryDifferenceCount: number;
@@ -711,6 +750,8 @@ function metrics(
   hops: ReadonlyMap<string, number>,
   tree: FocusSchematicSoftFolderDisplayTree,
   hierarchyForcePolicy: FocusSchematicSoftHierarchyForcePolicy,
+  ancestorDecayBase: 3 | 4,
+  spacing: FocusSchematicSoftClusterSpacingPolicy,
 ): FocusSchematicSoftClusterMetrics {
   const positions = new Map(
     candidate.modules.map((module) => [module.moduleId, center(module)]),
@@ -720,6 +761,7 @@ function metrics(
     100,
     hierarchyForcePolicy,
     input.model.rootModuleId,
+    ancestorDecayBase,
   );
   const folderRadiiByKey = [...repeated].map(([folderKey, members]) => {
     const centroid = members.reduce(
@@ -774,7 +816,7 @@ function metrics(
     const radius = Math.hypot(point.x, point.y);
     hopValues.push(hop);
     radiusValues.push(radius);
-    hopErrors.push(Math.abs(radius - hop * HOP_SPACING));
+    hopErrors.push(Math.abs(radius - hop * spacing.hopSpacing));
   }
   const modules = [...candidate.modules];
   const left = Math.min(...modules.map((module) => module.x));
@@ -841,6 +883,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
   options: FocusSchematicSoftClusterOptions = {},
 ): FocusSchematicSoftClusterLayoutAttempt {
   const strength = normalizeFocusSchematicSoftFolderStrength(options.strength);
+  const spacing = FOCUS_SCHEMATIC_SOFT_CLUSTER_STRUCTURAL_SPACING;
   const internalLayoutVariant =
     options.internalLayoutVariant ?? 'adaptive-compass';
   const compassDemandPolicy: FocusSchematicCompassDemandPolicy =
@@ -852,30 +895,57 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
   const displayIntent = canonicalFocusSchematicSoftFolderDisplayIntent(
     options.displayIntent ?? EMPTY_FOCUS_SCHEMATIC_SOFT_FOLDER_DISPLAY_INTENT,
   );
+  const folderScopeMode =
+    options.folderScopeMode ??
+    (options.hierarchyForcePolicy === 'nearest-only'
+      ? 'nearest-only'
+      : 'nested');
+  const ancestorDecayBase = normalizeFocusSchematicSoftAncestorDecayBase(
+    options.ancestorDecayBase,
+  );
   const hierarchyForcePolicy =
-    options.hierarchyForcePolicy ?? 'normalized-decay';
+    folderScopeMode === 'nearest-only'
+      ? 'nearest-only'
+      : (options.hierarchyForcePolicy ?? 'normalized-decay');
   const intentFingerprint = Math.floor(
     hashUnit(JSON.stringify(displayIntent)) * 0x1_0000_0000,
   )
     .toString(16)
     .padStart(8, '0');
-  const configId = `HIER4Bv${FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION}-soft-clusters-s${strength}-${internalLayoutVariant}-${endpointOrderPolicy}-${hierarchyForcePolicy}-${compassDemandPolicy}-${spatialDemandSummary}-intent-${displayIntent.fileParentOverrides.length}-${displayIntent.flattenedFolderKeys.length}-${intentFingerprint}`;
+  const decayIdentity =
+    folderScopeMode === 'nearest-only' ? 'direct' : ancestorDecayBase;
+  const configId = `HIER4Bv${FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION}-soft-clusters-s${strength}-${internalLayoutVariant}-${endpointOrderPolicy}-${folderScopeMode}-decay-${decayIdentity}-${hierarchyForcePolicy}-${compassDemandPolicy}-${spatialDemandSummary}-intent-${displayIntent.fileParentOverrides.length}-${displayIntent.flattenedFolderKeys.length}-${intentFingerprint}`;
   const started = performance.now();
   try {
     const baseAttempt = computeFocusSchematicRevision2LayoutAttempt(input);
     if (baseAttempt.status !== 'success') throw new Error(baseAttempt.reason);
     const softStarted = performance.now();
     const base = baseAttempt.result;
-    const tree = displayTree(input, displayIntent);
+    const softInput: FocusSchematicLayoutInput = {
+      ...input,
+      settings: {
+        ...input.settings,
+        internalNodeSeparation: spacing.internalNodeSeparation,
+        internalRankSeparation: spacing.internalRankSeparation,
+        modulePaddingX: spacing.modulePaddingX,
+        modulePaddingY: spacing.modulePaddingY,
+      },
+    };
+    const semanticTree = displayTree(input, displayIntent);
+    const tree = projectFocusSchematicSoftFolderGroupingTree(semanticTree, {
+      excludedFileIds: [input.model.rootModuleId],
+    });
     const memberships = focusSchematicSoftFolderScopeMemberships(
       tree,
       hierarchyForcePolicy,
+      ancestorDecayBase,
     );
     const forceGroups = hierarchyFolderGroups(
       tree,
       100,
       hierarchyForcePolicy,
       input.model.rootModuleId,
+      ancestorDecayBase,
     );
     const pairs = primaryPairs(base.endpointPlan);
     const moduleIds = base.candidate.modules
@@ -887,10 +957,10 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       collisionCheckCount: 0,
       collisionCorrectionCount: 0,
     };
-    let positions = initialPositions(input, base.candidate, hops);
+    let positions = initialPositions(input, base.candidate, hops, spacing);
     let candidate = placeAtCenters(base.candidate, positions);
     candidate = applyFocusSchematicInternalLayoutVariant(
-      input,
+      softInput,
       base.modulePlan,
       base.endpointPlan,
       candidate,
@@ -915,13 +985,15 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       strength,
       tree,
       hierarchyForcePolicy,
+      ancestorDecayBase,
       FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE[0],
       relaxation,
+      spacing,
     );
     candidate = placeAtCenters(candidate, positions);
     const secondPassDemandCandidate = candidate;
     candidate = applyFocusSchematicInternalLayoutVariant(
-      input,
+      softInput,
       base.modulePlan,
       base.endpointPlan,
       candidate,
@@ -946,10 +1018,138 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       strength,
       tree,
       hierarchyForcePolicy,
+      ancestorDecayBase,
       FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE[1],
       relaxation,
+      spacing,
     );
     candidate = anchorRootFile(input, placeAtCenters(candidate, positions));
+    const preCohesionAttachments = createFocusSchematicEndpointAttachments(
+      base.endpointPlan,
+      candidate,
+      'soft-cardinal-files',
+    );
+    const preCohesionQuality = evaluateFocusSchematicEndpointLayoutQuality(
+      input,
+      base.modulePlan,
+      base.endpointPlan,
+      base.internalLanePlan,
+      candidate,
+      preCohesionAttachments,
+      'soft-cardinal-files',
+    );
+    const preCohesionMetrics = metrics(
+      input,
+      candidate,
+      base.endpointPlan,
+      preCohesionAttachments,
+      preCohesionQuality,
+      pairs,
+      hops,
+      tree,
+      hierarchyForcePolicy,
+      ancestorDecayBase,
+      spacing,
+    );
+    const cohesion = applyFocusSchematicSoftFolderCohesion(
+      candidate,
+      tree,
+      input.model.rootModuleId,
+    );
+    candidate = cohesion.candidate;
+    const postCohesionAttachments = createFocusSchematicEndpointAttachments(
+      base.endpointPlan,
+      candidate,
+      'soft-cardinal-files',
+    );
+    const postCohesionQuality = evaluateFocusSchematicEndpointLayoutQuality(
+      input,
+      base.modulePlan,
+      base.endpointPlan,
+      base.internalLanePlan,
+      candidate,
+      postCohesionAttachments,
+      'soft-cardinal-files',
+    );
+    const postCohesionMetrics = metrics(
+      input,
+      candidate,
+      base.endpointPlan,
+      postCohesionAttachments,
+      postCohesionQuality,
+      pairs,
+      hops,
+      tree,
+      hierarchyForcePolicy,
+      ancestorDecayBase,
+      spacing,
+    );
+    const nestedPacking =
+      folderScopeMode === 'nested'
+        ? applyFocusSchematicSoftNestedHierarchyPacking(candidate, tree)
+        : {
+            candidate,
+            evidence: {
+              retainedNestedFolderCount: 0,
+              nestedFolderPackingMoveMean: 0,
+              nestedFolderPackingMoveP95: 0,
+              nestedFolderPackingMoveMax: 0,
+              nestedFolderPackingDepth: 0,
+              nestedParentContainmentViolationCount: 0,
+              nestedFolderSplitViolationCount: 0,
+              nestedGuideBlockerViolationCount: 0,
+              nestedFolderMaxRegionCount: 0,
+              nestedFolderMemberCountMin: 0,
+              nestedFolderMemberCountMax: 0,
+              nestedClosestInterIslandGap: null,
+              postCohesionNestedParentContainmentViolationCount: 0,
+              postCohesionNestedFolderSplitViolationCount: 0,
+              postCohesionNestedGuideBlockerViolationCount: 0,
+              postNestedNestedParentContainmentViolationCount: 0,
+              postNestedNestedFolderSplitViolationCount: 0,
+              postNestedNestedGuideBlockerViolationCount: 0,
+              postGroupNestedParentContainmentViolationCount: 0,
+              postGroupNestedFolderSplitViolationCount: 0,
+              postGroupNestedGuideBlockerViolationCount: 0,
+              nestedFirstSplitStage: null,
+            },
+          };
+    candidate = nestedPacking.candidate;
+    const postNestedAttachments = createFocusSchematicEndpointAttachments(
+      base.endpointPlan,
+      candidate,
+      'soft-cardinal-files',
+    );
+    const postNestedQuality = evaluateFocusSchematicEndpointLayoutQuality(
+      input,
+      base.modulePlan,
+      base.endpointPlan,
+      base.internalLanePlan,
+      candidate,
+      postNestedAttachments,
+      'soft-cardinal-files',
+    );
+    const postNestedMetrics = metrics(
+      input,
+      candidate,
+      base.endpointPlan,
+      postNestedAttachments,
+      postNestedQuality,
+      pairs,
+      hops,
+      tree,
+      hierarchyForcePolicy,
+      ancestorDecayBase,
+      spacing,
+    );
+    const preGroupMetrics = postNestedMetrics;
+    const groupPacking = packFocusSchematicSoftFolderGroups(
+      input,
+      candidate,
+      tree,
+      { folderScopeMode },
+    );
+    candidate = groupPacking.candidate;
     const attachments = createFocusSchematicEndpointAttachments(
       base.endpointPlan,
       candidate,
@@ -968,6 +1168,83 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       throw new Error(
         `Soft Clusters left ${quality.moduleOverlapPairs.length} module overlaps: ${quality.moduleOverlapPairs.join(', ')}.`,
       );
+    const cohesionQuality = measureFocusSchematicSoftFolderCohesion(
+      candidate,
+      tree,
+    );
+    if (cohesionQuality.immediateFolderSplitViolationCount > 0)
+      throw new Error(
+        `Soft Clusters left ${cohesionQuality.immediateFolderSplitViolationCount} immediate named-folder split violations.`,
+      );
+    const postGroupNestedQuality =
+      folderScopeMode === 'nested'
+        ? measureFocusSchematicSoftNestedHierarchy(candidate, tree)
+        : {
+            nestedParentContainmentViolationCount: 0,
+            nestedFolderSplitViolationCount: 0,
+            nestedGuideBlockerViolationCount: 0,
+            nestedFolderMaxRegionCount: 0,
+            nestedFolderMemberCountMin: 0,
+            nestedFolderMemberCountMax: 0,
+            nestedClosestInterIslandGap: null,
+          };
+    const nestedHierarchy = {
+      ...nestedPacking.evidence,
+      ...postGroupNestedQuality,
+      nestedFolderMaxRegionCount: Math.max(
+        nestedPacking.evidence.nestedFolderMaxRegionCount,
+        postGroupNestedQuality.nestedFolderMaxRegionCount,
+      ),
+      nestedFolderMemberCountMin: Math.min(
+        nestedPacking.evidence.nestedFolderMemberCountMin,
+        postGroupNestedQuality.nestedFolderMemberCountMin,
+      ),
+      nestedFolderMemberCountMax: Math.max(
+        nestedPacking.evidence.nestedFolderMemberCountMax,
+        postGroupNestedQuality.nestedFolderMemberCountMax,
+      ),
+      nestedClosestInterIslandGap:
+        nestedPacking.evidence.nestedClosestInterIslandGap ??
+        postGroupNestedQuality.nestedClosestInterIslandGap,
+      postGroupNestedParentContainmentViolationCount:
+        postGroupNestedQuality.nestedParentContainmentViolationCount,
+      postGroupNestedFolderSplitViolationCount:
+        postGroupNestedQuality.nestedFolderSplitViolationCount,
+      postGroupNestedGuideBlockerViolationCount:
+        postGroupNestedQuality.nestedGuideBlockerViolationCount,
+      nestedFirstSplitStage:
+        nestedPacking.evidence.nestedFirstSplitStage ??
+        (postGroupNestedQuality.nestedFolderSplitViolationCount > 0
+          ? ('post-group' as const)
+          : null),
+    };
+    if (
+      nestedHierarchy.nestedParentContainmentViolationCount > 0 ||
+      nestedHierarchy.nestedFolderSplitViolationCount > 0 ||
+      nestedHierarchy.nestedGuideBlockerViolationCount > 0
+    )
+      throw new Error(
+        `Nested Soft hierarchy validation failed: containment=${nestedHierarchy.nestedParentContainmentViolationCount}, splits=${nestedHierarchy.nestedFolderSplitViolationCount}, blockers=${nestedHierarchy.nestedGuideBlockerViolationCount}.`,
+      );
+    const coverage = measureFocusSchematicSoftFolderCoverage(tree, {
+      focusExemptFileCount: input.model.modules.some(
+        ({ id, presentation }) =>
+          id === input.model.rootModuleId && presentation !== 'filtered',
+      )
+        ? 1
+        : 0,
+      filteredBridgeExemptFileCount: input.model.modules.filter(
+        ({ presentation }) => presentation === 'filtered',
+      ).length,
+      nested: folderScopeMode === 'nested',
+    });
+    if (
+      coverage.missingImmediateFolderGuideCount > 0 ||
+      coverage.nestedAncestorCoverageViolationCount > 0
+    )
+      throw new Error(
+        `Soft folder coverage validation failed: immediate=${coverage.missingImmediateFolderGuideCount}, ancestors=${coverage.nestedAncestorCoverageViolationCount}.`,
+      );
     const churn = [...secondRegions].filter(
       ([id, region]) => firstRegions.get(id) !== region,
     ).length;
@@ -980,7 +1257,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       quality,
     );
     const internalLayoutEvidence = createFocusSchematicInternalLayoutEvidence(
-      input,
+      softInput,
       base.endpointPlan,
       candidate,
       base.candidate,
@@ -1028,13 +1305,16 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       0,
     );
     const evidence: FocusSchematicSoftClusterEvidence = {
-      schemaVersion: 3,
+      schemaVersion: 9,
       developmentOnly: true,
       layoutFamily: 'soft-folder-clusters',
       strength,
+      structuralSpacing: spacing,
       endpointOrderPolicy,
-      fileParentOverrideCount: tree.reconciledIntent.fileParentOverrides.length,
-      flattenedFolderCount: tree.reconciledIntent.flattenedFolderKeys.length,
+      fileParentOverrideCount:
+        semanticTree.reconciledIntent.fileParentOverrides.length,
+      flattenedFolderCount:
+        semanticTree.reconciledIntent.flattenedFolderKeys.length,
       displayedFolderCount: tree.folders.length,
       automaticallyCompressedFolderCount:
         tree.automaticallyCompressedFolderKeys.length,
@@ -1042,6 +1322,9 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
         0,
         ...tree.files.map(({ fileId }) => memberships.get(fileId)?.length ?? 0),
       ),
+      folderScopeMode,
+      ancestorDecayBase:
+        folderScopeMode === 'nearest-only' ? null : ancestorDecayBase,
       hierarchyForcePolicy,
       maximumPerFileFolderWeight: Math.max(
         0,
@@ -1108,6 +1391,14 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
           secondInternalCandidate,
         ),
       },
+      cohesion: { ...cohesion.evidence, ...cohesionQuality },
+      nestedHierarchy,
+      coverage,
+      groupPacking: groupPacking.evidence,
+      preCohesionMetrics,
+      postCohesionMetrics,
+      postNestedMetrics,
+      preGroupMetrics,
       metrics: metrics(
         input,
         candidate,
@@ -1118,6 +1409,8 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
         hops,
         tree,
         hierarchyForcePolicy,
+        ancestorDecayBase,
+        spacing,
       ),
       runtime: {
         moduleCount: candidate.modules.length,
@@ -1141,11 +1434,15 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       internalLayoutEvidence: {
         ...internalLayoutEvidence,
         softClusterPolicyEvidence: {
-          schemaVersion: 3,
+          schemaVersion: 9,
           layoutFamily: 'soft-folder-clusters',
           strength,
+          structuralSpacing: spacing,
           endpointOrderPolicy,
           displayIntent,
+          folderScopeMode,
+          ancestorDecayBase:
+            folderScopeMode === 'nearest-only' ? null : ancestorDecayBase,
           hierarchyForcePolicy,
           fileAttachmentPolicy: 'spatial-cardinal',
           compassDemandPolicy,
@@ -1191,15 +1488,26 @@ export function compareFocusSchematicSoftInternalVariants(
     .map(({ moduleId }) => moduleId)
     .sort(compareText);
   const hops = hopDistances(input.model.rootModuleId, moduleIds, pairs);
+  const spacing = FOCUS_SCHEMATIC_SOFT_CLUSTER_STRUCTURAL_SPACING;
+  const softInput: FocusSchematicLayoutInput = {
+    ...input,
+    settings: {
+      ...input.settings,
+      internalNodeSeparation: spacing.internalNodeSeparation,
+      internalRankSeparation: spacing.internalRankSeparation,
+      modulePaddingX: spacing.modulePaddingX,
+      modulePaddingY: spacing.modulePaddingY,
+    },
+  };
   const common = placeAtCenters(
     base.candidate,
-    initialPositions(input, base.candidate, hops),
+    initialPositions(softInput, base.candidate, hops, spacing),
   );
   const demandPolicy = options.compassDemandPolicy ?? 'spatial-cardinal';
   const spatialDemandSummary =
     options.spatialDemandSummary ?? 'dominant-cardinal';
   const adaptiveInitial = applyFocusSchematicInternalLayoutVariant(
-    input,
+    softInput,
     base.modulePlan,
     base.endpointPlan,
     common,
@@ -1211,7 +1519,7 @@ export function compareFocusSchematicSoftInternalVariants(
     spatialDemandSummary,
   );
   const verticalInitial = applyFocusSchematicInternalLayoutVariant(
-    input,
+    softInput,
     base.modulePlan,
     base.endpointPlan,
     common,
@@ -1281,11 +1589,14 @@ export function compareFocusSchematicSoftInternalVariants(
   const initialInternalGeometryIdentical =
     internalNodeGeometryDifferenceCount === 0 &&
     moduleBoundsDifferenceCount === 0;
+  const adaptivePassRegionChangeCount =
+    adaptiveAttempt.evidence.compass.pass1ToPass2BranchRegionChangeCount;
   const finalGeometryIdentical =
     finalNodeGeometryDifferenceCount === 0 &&
     finalModuleGeometryDifferenceCount === 0;
   return {
     internalRegionAssignmentDifferenceCount,
+    adaptivePassRegionChangeCount,
     internalNodeGeometryDifferenceCount,
     moduleBoundsDifferenceCount,
     finalNodeGeometryDifferenceCount,
@@ -1299,7 +1610,9 @@ export function compareFocusSchematicSoftInternalVariants(
     initialInternalGeometryIdentical,
     finalGeometryIdentical,
     semanticNoOpSatisfied:
-      !initialInternalGeometryIdentical || finalGeometryIdentical,
+      !initialInternalGeometryIdentical ||
+      adaptivePassRegionChangeCount > 0 ||
+      finalGeometryIdentical,
   };
 }
 

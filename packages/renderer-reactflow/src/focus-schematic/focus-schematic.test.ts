@@ -4,6 +4,7 @@ import {
   ENDPOINT_FIXTURES,
   SOFT_CLUSTER_FIXTURES,
   FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+  applyFocusSchematicSoftRadialSpread,
   buildEndpointFixture,
   computeFocusSchematicComputedLayout,
   computeFocusSchematicSoftClusterLayoutAttempt,
@@ -124,6 +125,92 @@ function moduleBoundary(
 }
 
 describe('production Focus Schematic React Flow mapping', () => {
+  it('adopts 0/50/100 Soft radial spread through strict renderer preparation', () => {
+    const fixture = buildEndpointFixture(
+      SOFT_CLUSTER_FIXTURES.find(({ id }) => id === 'SC20')!,
+    );
+    const layoutInput = {
+      model: fixture.model,
+      projection: fixture.projection,
+      nodeDimensions: focusSchematicNodeDimensions(
+        fixture.projection,
+        fixture.model,
+      ),
+      settings: {
+        ...FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+        directionalFolderBandsEnabled: false,
+      },
+    };
+    const attempt = computeFocusSchematicSoftClusterLayoutAttempt(layoutInput, {
+      strength: 50,
+    });
+    if (attempt.status !== 'success') throw new Error(attempt.reason);
+    const inputs = [0, 50, 100].map((spacing) => ({
+      projection: fixture.projection,
+      model: fixture.model,
+      layoutInput,
+      computedLayout: applyFocusSchematicSoftRadialSpread(
+        layoutInput,
+        attempt.result,
+        spacing,
+      ),
+      rootEntityId: fixture.model.rootModuleId,
+      secondaryRelationshipsVisible: false,
+    }));
+    const graphs = inputs.map((input) =>
+      prepareFocusSchematicRendererGraph(input),
+    );
+    for (const [index, graph] of graphs.entries()) {
+      expect(
+        validateFocusSchematicRendererGraph(inputs[index]!, graph),
+      ).toEqual({ valid: true });
+      expect(
+        graph.edges.every(
+          ({ sourceHandle, targetHandle }) =>
+            sourceHandle !== undefined && targetHandle !== undefined,
+        ),
+      ).toBe(true);
+    }
+    const moduleAt = (index: number, moduleId: string) =>
+      moduleBoundary(graphs[index]!, moduleId);
+    const rootAtZero = moduleAt(0, fixture.model.rootModuleId);
+    expect(moduleAt(1, fixture.model.rootModuleId).position).toEqual(
+      rootAtZero.position,
+    );
+    expect(moduleAt(2, fixture.model.rootModuleId).position).toEqual(
+      rootAtZero.position,
+    );
+    const nonRootId = fixture.model.modules.find(
+      ({ id }) => id !== fixture.model.rootModuleId,
+    )!.id;
+    const rootFile = attempt.result.candidate.nodes.find(
+      ({ projectionNodeId }) =>
+        projectionNodeId ===
+        fixture.model.modules.find(
+          ({ id }) => id === fixture.model.rootModuleId,
+        )!.documentProjectionNodeId,
+    )!;
+    const rootCenter = {
+      x: rootFile.x + rootFile.width / 2,
+      y: rootFile.y + rootFile.height / 2,
+    };
+    const radii = graphs.map((_, index) => {
+      const module = moduleAt(index, nonRootId);
+      return Math.hypot(
+        module.position.x + module.width! / 2 - rootCenter.x,
+        module.position.y + module.height! / 2 - rootCenter.y,
+      );
+    });
+    expect(radii[1]).toBeGreaterThan(radii[0]!);
+    expect(radii[2]).toBeGreaterThan(radii[1]!);
+    expect(moduleAt(1, nonRootId).position).not.toEqual(
+      moduleAt(0, nonRootId).position,
+    );
+    expect(moduleAt(2, nonRootId).position).not.toEqual(
+      moduleAt(1, nonRootId).position,
+    );
+  });
+
   it('maps the worker-selected Soft Cluster geometry while Secondary remains presentation-only', () => {
     const fixture = buildEndpointFixture(
       SOFT_CLUSTER_FIXTURES.find(({ id }) => id === 'SC20')!,

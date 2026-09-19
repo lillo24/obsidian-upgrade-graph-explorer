@@ -292,7 +292,7 @@ export const SOFT_CLUSTER_FIXTURES: readonly EndpointFixtureSpec[] = [
     {
       hops: 3,
       expectation:
-        'Same-folder attraction improves cohesion without erasing the topology bridge.',
+        'Immediate same-folder unity outranks the topology bridge while its cost remains measurable.',
     },
   ),
   fixture(
@@ -554,7 +554,7 @@ export const SOFT_CLUSTER_FIXTURES: readonly EndpointFixtureSpec[] = [
   ),
   fixture(
     'SC23',
-    'topology legitimately splits one folder',
+    'topology opposes immediate folder unity',
     [
       root,
       doc('SharedA', 'shared'),
@@ -571,7 +571,7 @@ export const SOFT_CLUSTER_FIXTURES: readonly EndpointFixtureSpec[] = [
     {
       hops: 2,
       expectation:
-        'Soft folder attraction must not override two strong topology branches.',
+        'Two strong topology branches may stretch but cannot split one immediate folder.',
     },
   ),
   fixture(
@@ -599,9 +599,9 @@ export const SOFT_CLUSTER_FIXTURES: readonly EndpointFixtureSpec[] = [
       hops: 1,
       authored: 'Synthetic PATCH2 root-folder force exclusion case.',
       expectation:
-        'The root stays a displayed folder member, but the lone peer cannot form an attraction group by itself.',
+        'The root keeps truthful source-folder metadata but is absent from grouping, so the lone peer cannot form an attraction group by itself.',
       inspect:
-        'Compare strengths 0 and 100: geometry stays identical and no attraction centroid appears.',
+        'Compare strengths 0 and 100: geometry stays identical, no attraction centroid appears, and no Focus folder guide is created.',
     },
   ),
   fixture(
@@ -625,7 +625,7 @@ export const SOFT_CLUSTER_FIXTURES: readonly EndpointFixtureSpec[] = [
       expectation:
         'Only the two non-root Files participate in folder attraction.',
       inspect:
-        'The folder guide still includes the root, while the attraction centroid uses B and C only.',
+        'The folder guide and attraction centroid both use B and C only; Focus remains a separate fixed blocker.',
     },
   ),
   fixture(
@@ -655,6 +655,97 @@ export const SOFT_CLUSTER_FIXTURES: readonly EndpointFixtureSpec[] = [
         'Moving only the root between stable sibling folders cannot alter Soft geometry.',
       inspect:
         'Exact sibling groups and their shared ancestor contain only non-root force members.',
+    },
+  ),
+  fixture(
+    'SC29',
+    'deep Focus-neutral retained folder hierarchy',
+    [
+      doc('Focus', 'PatternTheory/ResponseBehaviour'),
+      doc('God', 'PatternTheory/PatternInstances/GeneralPattern'),
+      doc(
+        'Relativity',
+        'PatternTheory/PatternInstances/GeneralPattern/Philosophy',
+      ),
+      doc('Foundational', 'PatternTheory/PatternInstances/Underlying'),
+      doc('Language', 'PatternTheory/Language'),
+      doc('Symbols', 'PatternTheory/Language'),
+      doc('Emotions', 'PatternTheory/ResponseBehaviour'),
+      doc('BodyState', 'PatternTheory/ResponseBehaviour'),
+      doc('Rationale', 'PatternTheory/ResponseBehaviour'),
+    ],
+    [
+      ref('Focus', 'God'),
+      ref('Focus', 'Relativity'),
+      ref('Focus', 'Foundational'),
+      ref('Focus', 'Language'),
+      ref('Language', 'Symbols'),
+      ref('Focus', 'Emotions'),
+      ref('Focus', 'BodyState'),
+      ref('Focus', 'Rationale'),
+    ],
+    {
+      hops: 2,
+      authored:
+        'Synthetic FIX5 deep retained hierarchy and Focus-neutral grouping case.',
+      expectation:
+        'Direct mode keeps immediate named folders while Nested mode packs the complete retained logical ancestry around a neutral Focus blocker.',
+      inspect:
+        'Verify exact memberships, one region per retained folder, and hard containment throughout the spacing scale.',
+    },
+  ),
+  fixture(
+    'SC30',
+    'sparse asymmetric retained parent regression',
+    [
+      doc('Focus', 'Other'),
+      doc('Direct', 'Parent'),
+      doc('C1', 'Parent/Child'),
+      doc('C2', 'Parent/Child'),
+      doc('C3', 'Parent/Child'),
+    ],
+    [
+      ref('Focus', 'Direct'),
+      ref('Focus', 'C1'),
+      ref('C1', 'C2'),
+      ref('C2', 'C3'),
+    ],
+    {
+      hops: 3,
+      authored: 'Synthetic FIX6 retained-parent occupied-geometry regression.',
+      expectation:
+        'Parent remains one blocker-free guide region after structural packing and every radial spacing value.',
+      inspect:
+        'Direct.md and the asymmetric Child subtree stay connected by actual occupied rectangles.',
+    },
+  ),
+  fixture(
+    'SC31',
+    'deep sparse parent with sibling subtree regression',
+    [
+      doc('Focus', 'Other'),
+      doc('Direct', 'GrandParent/Parent'),
+      doc('C1', 'GrandParent/Parent/Child'),
+      doc('C2', 'GrandParent/Parent/Child'),
+      doc('C3', 'GrandParent/Parent/Child'),
+      doc('S1', 'GrandParent/SiblingSubtree'),
+      doc('S2', 'GrandParent/SiblingSubtree'),
+    ],
+    [
+      ref('Focus', 'Direct'),
+      ref('Focus', 'C1'),
+      ref('C1', 'C2'),
+      ref('C2', 'C3'),
+      ref('Focus', 'S1'),
+      ref('S1', 'S2'),
+    ],
+    {
+      hops: 3,
+      authored: 'Synthetic FIX6 deeper occupied-geometry regression.',
+      expectation:
+        'Parent, Child, SiblingSubtree, and GrandParent remain coherent without blocker swallowing.',
+      inspect:
+        'The repaired Parent subtree moves rigidly when GrandParent packs it with its sibling subtree.',
     },
   ),
 ];

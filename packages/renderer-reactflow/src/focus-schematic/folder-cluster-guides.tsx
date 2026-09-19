@@ -4,12 +4,17 @@ import type {
   FocusSchematicSoftFolderDisplayTree,
   FocusSchematicSoftFolderDisplayNode,
 } from '@icarus-graph-explorer/focus-schematic-layout';
+import {
+  focusSchematicSoftFolderGuideConvexHull as convexHull,
+  focusSchematicSoftFolderGuidePaddedCorners as paddedCorners,
+  focusSchematicSoftFolderGuidePointInsidePolygon as pointInsidePolygon,
+  partitionFocusSchematicSoftFolderGuideIslands as splitIntoIslands,
+  projectFocusSchematicSoftFolderGroupingTree,
+} from '@icarus-graph-explorer/focus-schematic-layout';
 
 import type { GraphFlowNode } from '../types';
 
-const GUIDE_PADDING = 24;
 const GUIDE_CORNER_RADIUS = 18;
-const GUIDE_ISLAND_GAP = 216;
 
 export interface FocusSchematicFolderGuidePoint {
   readonly x: number;
@@ -33,6 +38,15 @@ interface FolderGuideBuildResult {
   readonly guides: readonly FocusSchematicFolderClusterGuide[];
   /** One unit per region exposed to the immediate logical parent. */
   readonly unitsForParent: readonly GuideUnit[];
+}
+
+export interface FocusSchematicFolderClusterGuideOptions {
+  /** Render each displayed folder from its direct Files without child regions. */
+  readonly directFoldersOnly?: boolean;
+  /** Expose the structural workspace root as one visible folder. */
+  readonly includeWorkspaceRootGroup?: boolean;
+  /** Focus retains semantic metadata but is excluded from guide membership. */
+  readonly focusModuleId?: string;
 }
 
 export interface FocusSchematicFolderClusterGuide {
@@ -75,15 +89,12 @@ const compareText = (left: string, right: string): number =>
 const guideId = (folderKey: string, regionIndex: number): string =>
   `${folderKey}\0${regionIndex}`;
 
-const folderKeyDepth = (folderKey: string): number =>
-  folderKey === '.' ? 0 : folderKey.split('/').length;
-
 function shortFolderLabel(folderKey: string): string {
-  return folderKey === '.' ? 'Root folder' : folderKey.split('/').at(-1)!;
+  return folderKey === '.' ? 'Workspace root' : folderKey.split('/').at(-1)!;
 }
 
 function accessibleFolderLabel(folderKey: string): string {
-  return folderKey === '.' ? 'Root folder' : `${folderKey}/`;
+  return folderKey === '.' ? 'Workspace root' : `${folderKey}/`;
 }
 
 function rectangleSize(
@@ -99,85 +110,6 @@ function rectangleSize(
     height <= 0
     ? undefined
     : { width, height };
-}
-
-function rectangleGap(left: GuideUnit, right: GuideUnit): number {
-  const dx = Math.max(
-    0,
-    left.x - (right.x + right.width),
-    right.x - (left.x + left.width),
-  );
-  const dy = Math.max(
-    0,
-    left.y - (right.y + right.height),
-    right.y - (left.y + left.height),
-  );
-  return Math.hypot(dx, dy);
-}
-
-function cross(origin: Point, left: Point, right: Point): number {
-  return (
-    (left.x - origin.x) * (right.y - origin.y) -
-    (left.y - origin.y) * (right.x - origin.x)
-  );
-}
-
-function convexHull(points: readonly Point[]): readonly Point[] {
-  const ordered = [...points].sort(
-    (left, right) => left.x - right.x || left.y - right.y,
-  );
-  const unique = ordered.filter(
-    (point, index) =>
-      index === 0 ||
-      point.x !== ordered[index - 1]!.x ||
-      point.y !== ordered[index - 1]!.y,
-  );
-  if (unique.length <= 2) return unique;
-  const lower: Point[] = [];
-  for (const point of unique) {
-    while (lower.length >= 2 && cross(lower.at(-2)!, lower.at(-1)!, point) <= 0)
-      lower.pop();
-    lower.push(point);
-  }
-  const upper: Point[] = [];
-  for (const point of [...unique].reverse()) {
-    while (upper.length >= 2 && cross(upper.at(-2)!, upper.at(-1)!, point) <= 0)
-      upper.pop();
-    upper.push(point);
-  }
-  return [...lower.slice(0, -1), ...upper.slice(0, -1)];
-}
-
-function pointInsidePolygon(point: Point, polygon: readonly Point[]): boolean {
-  const onSegment = (left: Point, right: Point) => {
-    const crossProduct =
-      (point.x - left.x) * (right.y - left.y) -
-      (point.y - left.y) * (right.x - left.x);
-    return (
-      Math.abs(crossProduct) <= 1e-7 &&
-      point.x >= Math.min(left.x, right.x) &&
-      point.x <= Math.max(left.x, right.x) &&
-      point.y >= Math.min(left.y, right.y) &&
-      point.y <= Math.max(left.y, right.y)
-    );
-  };
-  let inside = false;
-  for (
-    let index = 0, previous = polygon.length - 1;
-    index < polygon.length;
-    previous = index++
-  ) {
-    const left = polygon[index]!;
-    const right = polygon[previous]!;
-    if (onSegment(left, right)) return true;
-    if (
-      left.y > point.y !== right.y > point.y &&
-      point.x <
-        ((right.x - left.x) * (point.y - left.y)) / (right.y - left.y) + left.x
-    )
-      inside = !inside;
-  }
-  return inside;
 }
 
 function polygonArea(points: readonly Point[]): number {
@@ -241,85 +173,6 @@ export function hitTestFocusSchematicFolderGuideRegion(
   );
 }
 
-function paddedCorners(unit: GuideUnit): readonly Point[] {
-  const left = unit.x - GUIDE_PADDING;
-  const top = unit.y - GUIDE_PADDING;
-  const right = unit.x + unit.width + GUIDE_PADDING;
-  const bottom = unit.y + unit.height + GUIDE_PADDING;
-  return [
-    { x: left, y: top },
-    { x: right, y: top },
-    { x: right, y: bottom },
-    { x: left, y: bottom },
-  ];
-}
-
-function connectionSwallowsBlocker(
-  left: GuideUnit,
-  right: GuideUnit,
-  blockers: readonly GuideUnit[],
-): boolean {
-  const envelope = convexHull([
-    ...paddedCorners(left),
-    ...paddedCorners(right),
-  ]);
-  return blockers.some((blocker) =>
-    pointInsidePolygon(
-      {
-        x: blocker.x + blocker.width / 2,
-        y: blocker.y + blocker.height / 2,
-      },
-      envelope,
-    ),
-  );
-}
-
-function splitIntoIslands(
-  units: readonly GuideUnit[],
-  blockers: readonly GuideUnit[],
-): readonly (readonly GuideUnit[])[] {
-  const ordered = [...units].sort((left, right) =>
-    compareText(left.id, right.id),
-  );
-  const remaining = new Set(ordered.map(({ id }) => id));
-  const byId = new Map(ordered.map((item) => [item.id, item]));
-  const islands: GuideUnit[][] = [];
-  for (const seed of ordered) {
-    if (!remaining.delete(seed.id)) continue;
-    const island: GuideUnit[] = [];
-    const pending = [seed];
-    while (pending.length > 0) {
-      const current = pending.shift()!;
-      island.push(current);
-      for (const candidateId of [...remaining].sort(compareText)) {
-        const candidate = byId.get(candidateId)!;
-        if (
-          rectangleGap(current, candidate) > GUIDE_ISLAND_GAP ||
-          connectionSwallowsBlocker(current, candidate, blockers)
-        )
-          continue;
-        remaining.delete(candidateId);
-        pending.push(candidate);
-      }
-    }
-    islands.push(
-      island.sort(
-        (left, right) =>
-          left.y - right.y ||
-          left.x - right.x ||
-          compareText(left.id, right.id),
-      ),
-    );
-  }
-  return islands.sort((left, right) => {
-    const leftY = Math.min(...left.map(({ y }) => y));
-    const rightY = Math.min(...right.map(({ y }) => y));
-    const leftX = Math.min(...left.map(({ x }) => x));
-    const rightX = Math.min(...right.map(({ x }) => x));
-    return leftY - rightY || leftX - rightX;
-  });
-}
-
 function toward(from: Point, to: Point, distance: number): Point {
   const length = Math.hypot(to.x - from.x, to.y - from.y);
   if (length === 0) return from;
@@ -330,8 +183,21 @@ function toward(from: Point, to: Point, distance: number): Point {
   };
 }
 
-function roundedPolygonPath(points: readonly Point[], radius: number): string {
-  if (points.length < 3) return '';
+interface RoundedPolygonGeometry {
+  readonly path: string;
+  readonly hitPoints: readonly Point[];
+  readonly straightSegments: readonly {
+    readonly start: Point;
+    readonly end: Point;
+  }[];
+}
+
+function roundedPolygonGeometry(
+  points: readonly Point[],
+  radius: number,
+): RoundedPolygonGeometry {
+  if (points.length < 3)
+    return { path: '', hitPoints: points, straightSegments: [] };
   const entries = points.map((point, index) => {
     const previous = points[(index + points.length - 1) % points.length]!;
     const next = points[(index + 1) % points.length]!;
@@ -342,27 +208,16 @@ function roundedPolygonPath(points: readonly Point[], radius: number): string {
     };
   });
   const last = entries.at(-1)!;
-  return [
-    `M ${last.end.x} ${last.end.y}`,
-    ...entries.flatMap(({ point, start, end }) => [
-      `L ${start.x} ${start.y}`,
-      `Q ${point.x} ${point.y} ${end.x} ${end.y}`,
-    ]),
-    'Z',
-  ].join(' ');
-}
-
-function roundedPolygonHitPoints(
-  points: readonly Point[],
-  radius: number,
-): readonly Point[] {
-  if (points.length < 3) return points;
-  return points.flatMap((point, index) => {
-    const previous = points[(index + points.length - 1) % points.length]!;
-    const next = points[(index + 1) % points.length]!;
-    const start = toward(point, previous, radius);
-    const end = toward(point, next, radius);
-    return [
+  return {
+    path: [
+      `M ${last.end.x} ${last.end.y}`,
+      ...entries.flatMap(({ point, start, end }) => [
+        `L ${start.x} ${start.y}`,
+        `Q ${point.x} ${point.y} ${end.x} ${end.y}`,
+      ]),
+      'Z',
+    ].join(' '),
+    hitPoints: entries.flatMap(({ point, start, end }) => [
       start,
       ...Array.from({ length: 6 }, (_, step) => {
         const t = (step + 1) / 6;
@@ -378,8 +233,28 @@ function roundedPolygonHitPoints(
             t * t * end.y,
         };
       }),
-    ];
-  });
+    ]),
+    straightSegments: entries.map((entry, index) => ({
+      start: entries[(index + entries.length - 1) % entries.length]!.end,
+      end: entry.start,
+    })),
+  };
+}
+
+function upperHorizontalSegmentStart(
+  geometry: RoundedPolygonGeometry,
+): Point | undefined {
+  return geometry.straightSegments
+    .filter(
+      ({ start, end }) =>
+        Math.abs(start.y - end.y) <= 1e-7 &&
+        Math.hypot(end.x - start.x, end.y - start.y) > 1e-7,
+    )
+    .map(({ start, end }) => ({
+      x: Math.min(start.x, end.x),
+      y: (start.y + end.y) / 2,
+    }))
+    .sort((left, right) => left.y - right.y || left.x - right.x)[0];
 }
 
 function guideForIsland(
@@ -405,8 +280,11 @@ function guideForIsland(
     .filter((key) => key !== folder.folderKey)
     .sort(compareText);
   const radius = GUIDE_CORNER_RADIUS;
-  const hitPolygon =
-    shape === 'singleton' ? hull : roundedPolygonHitPoints(hull, radius);
+  const rounded =
+    shape === 'singleton' ? undefined : roundedPolygonGeometry(hull, radius);
+  const hitPolygon = rounded?.hitPoints ?? hull;
+  const labelAnchor =
+    rounded === undefined ? undefined : upperHorizontalSegmentStart(rounded);
   const area =
     shape === 'singleton'
       ? (right - x) * (bottom - y) - (4 - Math.PI) * radius ** 2
@@ -438,14 +316,11 @@ function guideForIsland(
     width: right - x,
     height: bottom - y,
     radius,
-    path:
-      shape === 'singleton'
-        ? null
-        : roundedPolygonPath(hull, GUIDE_CORNER_RADIUS),
+    path: rounded?.path ?? null,
     hullPoints: hitPolygon,
     area,
-    labelX: x + 12,
-    labelY: y - 9,
+    labelX: (labelAnchor?.x ?? x) + 12,
+    labelY: (labelAnchor?.y ?? y) - 9,
   };
 }
 
@@ -453,7 +328,16 @@ function guideForIsland(
 export function focusSchematicFolderClusterGuides(
   tree: FocusSchematicSoftFolderDisplayTree,
   nodes: readonly GraphFlowNode[],
+  options: FocusSchematicFolderClusterGuideOptions = {},
 ): readonly FocusSchematicFolderClusterGuide[] {
+  const directFoldersOnly = options.directFoldersOnly === true;
+  const includeWorkspaceRootGroup = options.includeWorkspaceRootGroup === true;
+  const groupingTree =
+    options.focusModuleId === undefined
+      ? tree
+      : projectFocusSchematicSoftFolderGroupingTree(tree, {
+          excludedFileIds: [options.focusModuleId],
+        });
   const rectangleByModuleId = new Map<string, GuideUnit>();
   for (const node of nodes) {
     if (node.type !== 'module') continue;
@@ -468,12 +352,16 @@ export function focusSchematicFolderClusterGuides(
       ...size,
     });
   }
+  const displayedFolders = (
+    directFoldersOnly
+      ? groupingTree.preCompressionFolders
+      : groupingTree.folders
+  ).filter(({ folderKey }) => folderKey !== '.' || includeWorkspaceRootGroup);
   const byKey = new Map(
-    tree.folders.map((folder) => [folder.folderKey, folder]),
+    displayedFolders.map((folder) => [folder.folderKey, folder]),
   );
   const resultByFolder = new Map<string, FolderGuideBuildResult>();
-  const localSuppressedAncestorsByGuideId = new Map<string, Set<string>>();
-  const ordered = [...tree.folders].sort(
+  const ordered = [...displayedFolders].sort(
     (left, right) =>
       right.displayDepth - left.displayDepth ||
       compareText(left.folderKey, right.folderKey),
@@ -483,9 +371,11 @@ export function focusSchematicFolderClusterGuides(
       const rectangle = rectangleByModuleId.get(fileId);
       return rectangle === undefined ? [] : [rectangle];
     });
-    const children = folder.childFolderKeys.flatMap(
-      (childKey) => resultByFolder.get(childKey)?.unitsForParent ?? [],
-    );
+    const children = directFoldersOnly
+      ? []
+      : folder.childFolderKeys.flatMap(
+          (childKey) => resultByFolder.get(childKey)?.unitsForParent ?? [],
+        );
     const units = [...direct, ...children];
     // Workspace root is structural unless it contains a directly displayed File.
     if (
@@ -498,71 +388,59 @@ export function focusSchematicFolderClusterGuides(
       });
       continue;
     }
-    const descendants = new Set(folder.descendantFileIds);
+    const descendants = new Set(
+      directFoldersOnly ? folder.directFileIds : folder.descendantFileIds,
+    );
     const blockers = [...rectangleByModuleId]
       .filter(([moduleId]) => !descendants.has(moduleId))
       .map(([, rectangle]) => rectangle);
+    if (
+      folder.folderKey !== '.' &&
+      direct.length > 0 &&
+      splitIntoIslands(direct, blockers).length !== 1
+    )
+      throw new Error(
+        `Soft folder guide received a split immediate named folder "${folder.folderKey}".`,
+      );
     const islands = splitIntoIslands(units, blockers);
-    // Root keeps its existing direct-File structural policy. Named folders
-    // expose only regions that locally group at least two direct visual units.
-    const renderedIslands = islands.filter(
-      (island) => folder.folderKey === '.' || island.length >= 2,
-    );
-    const guides = renderedIslands.map((island, regionIndex) =>
-      guideForIsland(
-        folder,
-        byKey,
-        regionIndex,
-        renderedIslands.length,
-        island,
-      ),
-    );
-    const unitByIsland = new Map<readonly GuideUnit[], GuideUnit>();
-    for (const [regionIndex, island] of renderedIslands.entries()) {
-      const guide = guides[regionIndex]!;
-      const id = guideId(folder.folderKey, regionIndex);
-      unitByIsland.set(island, {
-        id: `folder:${id}`,
-        memberModuleIds: guide.memberModuleIds,
-        representedGuideIds: [id],
-        x: guide.x,
-        y: guide.y,
-        width: guide.width,
-        height: guide.height,
-      });
-    }
-    const unitsForParent = islands.map((island) => {
-      const rendered = unitByIsland.get(island);
-      if (rendered !== undefined) return rendered;
-      const survivingUnit = island[0]!;
-      for (const representedGuideId of survivingUnit.representedGuideIds) {
-        const ancestors =
-          localSuppressedAncestorsByGuideId.get(representedGuideId) ??
-          new Set<string>();
-        ancestors.add(folder.folderKey);
-        localSuppressedAncestorsByGuideId.set(representedGuideId, ancestors);
-      }
-      return survivingUnit;
+    if (folder.folderKey !== '.' && islands.length !== 1)
+      throw new Error(
+        `Soft folder guide received a split ${directFoldersOnly ? 'immediate' : 'Nested'} named folder "${folder.folderKey}".`,
+      );
+    const guide = guideForIsland(folder, byKey, 0, 1, units);
+    if (
+      blockers.some((blocker) =>
+        pointInsidePolygon(
+          {
+            x: blocker.x + blocker.width / 2,
+            y: blocker.y + blocker.height / 2,
+          },
+          guide.hullPoints,
+        ),
+      )
+    )
+      throw new Error(
+        `Soft folder guide "${folder.folderKey}" would swallow an unrelated module.`,
+      );
+    resultByFolder.set(folder.folderKey, {
+      guides: [guide],
+      unitsForParent: directFoldersOnly
+        ? []
+        : [
+            {
+              id: `folder:${guideId(folder.folderKey, 0)}`,
+              memberModuleIds: guide.memberModuleIds,
+              representedGuideIds: [guideId(folder.folderKey, 0)],
+              x: guide.x,
+              y: guide.y,
+              width: guide.width,
+              height: guide.height,
+            },
+          ],
     });
-    resultByFolder.set(folder.folderKey, { guides, unitsForParent });
   }
   return [...resultByFolder.values()]
     .flatMap(({ guides }) => guides)
-    .map((guide) => ({
-      ...guide,
-      suppressedAncestorFolderKeys: [
-        ...new Set([
-          ...guide.suppressedAncestorFolderKeys,
-          ...(localSuppressedAncestorsByGuideId.get(
-            guideId(guide.folderKey, guide.regionIndex),
-          ) ?? []),
-        ]),
-      ].sort(
-        (left, right) =>
-          folderKeyDepth(left) - folderKeyDepth(right) ||
-          compareText(left, right),
-      ),
-    }))
     .sort(
       (left, right) =>
         left.depth - right.depth ||
@@ -712,9 +590,17 @@ export function FocusSchematicFolderClusterGuides({
                     {guide.label}
                   </span>
                   {guide.parentLabel === null ? null : (
-                    <small className="focus-schematic-folder-guide-controls__parent">
-                      {guide.parentLabel}
-                    </small>
+                    <>
+                      <span
+                        aria-hidden="true"
+                        className="focus-schematic-folder-guide-controls__separator"
+                      >
+                        |
+                      </span>
+                      <small className="focus-schematic-folder-guide-controls__parent">
+                        {guide.parentLabel}
+                      </small>
+                    </>
                   )}
                 </button>
                 {activeFolderKey === guide.folderKey ? (

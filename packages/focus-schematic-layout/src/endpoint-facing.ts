@@ -977,17 +977,47 @@ function validSoftClusterPolicyEvidence(
   const intentValidation = validateFocusSchematicSoftFolderDisplayIntent(
     evidence.displayIntent,
   );
+  const resolvedSpacing = evidence.structuralSpacing as unknown;
+  const resolvedSpacingKeys = [
+    'hopSpacing',
+    'moduleGap',
+    'topologyExtraDistance',
+    'packingStep',
+    'radialJitter',
+    'internalNodeSeparation',
+    'internalRankSeparation',
+    'modulePaddingX',
+    'modulePaddingY',
+  ];
+  const validResolvedSpacing =
+    resolvedSpacing !== null &&
+    typeof resolvedSpacing === 'object' &&
+    !Array.isArray(resolvedSpacing) &&
+    Object.keys(resolvedSpacing).length === resolvedSpacingKeys.length &&
+    resolvedSpacingKeys.every((key) => key in resolvedSpacing) &&
+    Object.values(resolvedSpacing).every(
+      (value) => Number.isSafeInteger(value) && Number(value) > 0,
+    );
   return (
-    evidence.schemaVersion === 3 &&
+    evidence.schemaVersion === 9 &&
     evidence.layoutFamily === 'soft-folder-clusters' &&
     Number.isFinite(evidence.strength) &&
     evidence.strength >= 0 &&
     evidence.strength <= 100 &&
+    validResolvedSpacing &&
     (evidence.endpointOrderPolicy === 'crossing-optimized' ||
       evidence.endpointOrderPolicy === 'document-order') &&
     intentValidation.valid &&
     JSON.stringify(intentValidation.value) ===
       JSON.stringify(evidence.displayIntent) &&
+    (evidence.folderScopeMode === 'nested' ||
+      evidence.folderScopeMode === 'nearest-only') &&
+    (evidence.folderScopeMode === 'nearest-only'
+      ? evidence.ancestorDecayBase === null &&
+        evidence.hierarchyForcePolicy === 'nearest-only'
+      : (evidence.ancestorDecayBase === 3 ||
+          evidence.ancestorDecayBase === 4) &&
+        evidence.hierarchyForcePolicy !== 'nearest-only') &&
     (evidence.hierarchyForcePolicy === 'nearest-only' ||
       evidence.hierarchyForcePolicy === 'normalized-decay' ||
       evidence.hierarchyForcePolicy === 'normalized-equal') &&

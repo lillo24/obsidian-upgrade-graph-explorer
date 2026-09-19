@@ -386,6 +386,29 @@ geometry-relevant values. Disclosure, reroot, filtering, exact hover, Secondary
 presentation, and camera behavior continue through the existing projection and
 React Flow seams.
 
+HIER4B-SPACING-FIX4 defines Folder strength as additional Soft attraction.
+Mandatory immediate named-folder grouping remains active from 0 through 100;
+the compact helper text beside the slider makes that invariant explicit.
+
+HIER4B-SPACING-FIX2 retains `Direct folders only`, Nested ancestor pull 1/3 or
+1/4, and `Soft spacing` beside Folder strength while Focus + Hierarchy +
+Modular Preview + Soft Folder Clusters is active. Direct-only hides the decay
+comparison while retaining its stored value. `GraphExplorer.tsx` persists and
+normalizes these controls, and Reset Sandbox restores Nested, 1/3, and spacing 50. Scope and decay enter the typed structural worker policy; direct mode
+canonicalizes decay. Direct mode groups by the post-manual/pre-compression
+parent and therefore retains named singleton guides.
+
+`focus-schematic-presentation.ts` applies Soft spacing after structural
+adoption and owns the exact transformed-computed → prepared-RendererGraph seam
+used by `GraphCanvas`. The 0–100 value maps continuously from 1.0× to 2.4×
+root-relative radius. It never enters the worker request or cache key, so rapid
+spread input creates no projection, model, worker, Adaptive Compass, force, or
+collision recomputation. Geometry-derived attachments and quality refresh
+before strict preparation. `ModularStructuredGraphView.tsx` exposes any
+presentation failure while retaining the validated adopted graph. Folder
+guides consume the transformed rectangles. Directional mode ignores all
+Soft-only controls.
+
 HIER4B-FIX2 keeps exact folders as source truth while `GraphExplorer.tsx`
 derives stable File identity/folder pairs from the canonical snapshot and owns
 the workspace-keyed sparse display-intent session. `ModularStructuredGraphView.tsx`
@@ -412,3 +435,29 @@ File actions with valid current displayed-folder actions through a strong
 semantic separator. Folder targets remain folder-only. Menu/hover state and
 guide visibility remain absent from every model, worker, effect, and cache
 dependency that can request or change layout.
+
+FOCUS-HIERARCHY-UX1 splits Local Hierarchy activation by canonical entity kind:
+File double-click keeps the existing reroot callback, while Heading/Block
+double-click enters session-only presentation subfocus. `GraphExplorer.tsx`
+captures that target in the existing navigation checkpoint, never in KG9 or
+Saved Views; Back/Ctrl+Z, Forward/Ctrl+Shift+Z, and Escape share semantic
+history while editable controls retain native undo. Live or historical stale
+targets are reconciled to ordinary Focus without blanking the graph. Classic
+and Modular receive the same renderer callback seam; Focus Network and All
+Hierarchy retain their previous activation behavior when that seam is absent.
+
+During Modular File reroot, `ModularStructuredGraphView.tsx` keeps the complete
+last validated prepared graph until the replacement worker result is adopted.
+It deliberately does not intersect the old graph with the new File projection:
+disjoint entity identities made that intersection empty and caused the former
+blank-screen interval. Worker/adoption failure keeps the validated graph and
+surfaces the existing warning/retry path.
+
+FIX6 makes retained presentation generation-coherent. While the adopted graph
+key differs from the incoming layout key, geometry-dependent folder guides,
+folder hit testing, and folder context menus are suppressed instead of being
+derived from the incoming tree/root against old nodes. A failed replacement
+therefore leaves the previous validated Modular graph visible with warning and
+Retry; only a failure with no adopted result invokes the session Classic
+fallback. Expected worker or validation failures remain lifecycle state and do
+not reach the null-rendering error boundary.

@@ -322,3 +322,13 @@ second line fits without changing 156 x 46 geometry. Unique compact Files,
 Heading/Block details, extended Focus cards, full paths and ARIA stay unchanged.
 `compact-file-labels.test.tsx` verifies the rendered contexts and fixed sizes.
 No File-module, folder-band, or rank redesign is part of HIER0.
+
+FOCUS-HIERARCHY-UX1 adds an optional Local Hierarchy activation seam. File
+activation continues to call `onFocusEntity`; Heading and Block activation call
+`onSubfocusEntity` only when supplied, so All Hierarchy and Focus Network keep
+their prior behavior. `focus-hierarchy-subfocus.ts` derives O(nodes + edges)
+primary, context, and dim tiers from rendered hierarchy/reference truth and
+applies classes only after geometry is prepared. Heading descendants and their
+precise reference endpoints are primary; Block scope is exact; structural
+ancestors and relevant module boundaries are context. Hover and selection
+compose with these persistent classes without removing or aria-hiding nodes.

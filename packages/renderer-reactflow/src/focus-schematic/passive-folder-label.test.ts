@@ -16,6 +16,9 @@ function rule(selector: string): string {
 describe('Soft folder label presentation', () => {
   it('has plain default styling and quiet parent context', () => {
     const label = rule('.focus-schematic-folder-guide-controls__chip');
+    expect(label).toMatch(/display:\s*inline-flex;/);
+    expect(label).toMatch(/align-items:\s*baseline;/);
+    expect(label).toMatch(/gap:\s*0\.32rem;/);
     expect(label).toMatch(/background:\s*transparent;/);
     expect(label).toMatch(/border:\s*0;/);
     expect(label).toMatch(/border-radius:\s*0;/);
@@ -25,6 +28,11 @@ describe('Soft folder label presentation', () => {
     const parent = rule('.focus-schematic-folder-guide-controls__parent');
     expect(parent).toMatch(/font-size:\s*9px;/);
     expect(parent).toMatch(/font-weight:\s*600;/);
+    expect(parent).not.toMatch(/display:\s*block;/);
+    expect(parent).not.toMatch(/margin-top:/);
+
+    const separator = rule('.focus-schematic-folder-guide-controls__separator');
+    expect(separator).toMatch(/color:\s*var\(--hierarchy-folder-muted-text\);/);
   });
 
   it('keeps subtle hover emphasis and a clear keyboard focus indicator', () => {
