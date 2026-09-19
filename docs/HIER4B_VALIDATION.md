@@ -476,3 +476,56 @@ The QA executable is
 `output/hier4b-spacing-fix5-nested-hierarchy-focus-neutral-native-candidate.exe`;
 its SHA-256 is
 `A9312705B9F93FD12BA0D1636B4AC96D8A7E0128BEBE03BEB2CDA4ECF577264D`.
+
+## HIER4B-FIX6 candidate
+
+FIX6 reproduces the real-vault failure with a sparse asymmetric child subtree:
+the previous envelope grid left the parent with zero containment violations,
+zero blocker violations, and more than one region because close AABBs did not
+imply close occupied rectangles. A deeper GrandParent/Parent/SiblingSubtree
+fixture reproduces the same condition across two retained levels.
+
+The repaired deepest-first pass retains the grid as a preference, rechecks each
+rigid child against current blockers, and accepts a parent only when the shared
+folder-guide island oracle sees one region from actual module rectangles.
+Post-cohesion diagnostics record the reproduced splits; post-Nested and
+post-group containment, split, and blocker counts are all zero. SC29, SC30, and
+SC31 also retain zero violations and overlaps for all 101 integer radial
+spacing values without a post-slider pack.
+
+The File-reroot blank was a presentation-generation defect. The old validated
+graph was retained correctly, but Soft guide derivation still combined its
+nodes with the incoming tree and root, and could throw into the null-rendering
+error boundary before the overlay guard ran. FIX6 suppresses every folder
+guide, folder hit-test, and folder context derivation until the adopted key
+matches the incoming key. Replacement failure keeps the old graph plus warning
+and Retry; first-result failure alone invokes the explicit Classic fallback.
+
+The benchmark passes all hard gates across 150 fixture/strength rows, 15 stress
+rows, 21 hierarchy-force rows, 35 hierarchy-strength rows, 32 Compass rows,
+and 40 Compass-strength rows. Against the FIX5 artifact over 140 common rows,
+mean layout time changes by +7.67 ms, bounds area by +46,234 px², connected-pair
+distance by +17.26 px, hop-radius error by -4.34 px, and crossings by -0.186.
+The largest common-row bounds ratio is 1.54x (SC7 strength 0). SC21 averages
++22.80 ms and +367,109 px² while removing 6.6 crossings; SC29 averages +28.26
+ms, +219,626 px², +241.71 px connected distance, +79.62 px hop error, and zero
+crossing change. SC30/SC31 have zero final crossings and zero post-Nested/
+post-group split violations at every strength. No hard gate or continuous
+spacing check fails.
+
+Soft structural algorithm/cache version 12, worker protocol 14, and Soft
+evidence schema 9 own the geometry and aggregate stage-evidence changes.
+Directional algorithm version 4 remains unchanged.
+
+The complete repository gate passes 288 test files / 2,440 tests plus
+formatting, lint, all workspace typechecks, and the production web build.
+Desktop formatting/check, 16 Rust tests, and the optimized release build pass.
+The QA executable is
+`output/hier4b-fix6-nested-split-reroot-failure-native-candidate.exe`; its
+SHA-256 is
+`404BB949F2EDBEEAC69832335B657A4C3559BC8E9E524690AE18610D117CF371`.
+
+The exact FIX6 prompt is archived at
+`history-implementations/HIER4B_FIX6_nested_split_reroot_failure_hardening_codex_prompt.md`.
+Its SHA-256 is
+`9553524C38222C6A057A528920E15DDA7F8396AD329A936A2F8BE148FFE0366D`.

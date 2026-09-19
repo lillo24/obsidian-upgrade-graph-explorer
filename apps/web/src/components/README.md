@@ -452,3 +452,12 @@ It deliberately does not intersect the old graph with the new File projection:
 disjoint entity identities made that intersection empty and caused the former
 blank-screen interval. Worker/adoption failure keeps the validated graph and
 surfaces the existing warning/retry path.
+
+FIX6 makes retained presentation generation-coherent. While the adopted graph
+key differs from the incoming layout key, geometry-dependent folder guides,
+folder hit testing, and folder context menus are suppressed instead of being
+derived from the incoming tree/root against old nodes. A failed replacement
+therefore leaves the previous validated Modular graph visible with warning and
+Retry; only a failure with no adopted result invokes the session Classic
+fallback. Expected worker or validation failures remain lifecycle state and do
+not reach the null-rendering error boundary.

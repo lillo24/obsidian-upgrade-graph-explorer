@@ -100,8 +100,16 @@ export function applyFocusSchematicSoftRadialSpread(
       );
     return {
       ...rectangle,
-      x: (rectangle as Rectangle & { readonly x: number }).x + delta.x,
-      y: (rectangle as Rectangle & { readonly y: number }).y + delta.y,
+      // Stable decimal quantization prevents an exact 16 px clearance from
+      // becoming 15.999999999999px after the affine display transform.
+      x:
+        Math.round(
+          ((rectangle as Rectangle & { readonly x: number }).x + delta.x) * 1e9,
+        ) / 1e9,
+      y:
+        Math.round(
+          ((rectangle as Rectangle & { readonly y: number }).y + delta.y) * 1e9,
+        ) / 1e9,
     };
   };
   const candidate = {

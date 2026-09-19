@@ -430,7 +430,7 @@ export type FocusSchematicSoftFolderScopeMode = 'nested' | 'nearest-only';
 export type FocusSchematicSoftAncestorDecayBase = 3 | 4;
 
 export interface FocusSchematicSoftClusterPolicyEvidence {
-  readonly schemaVersion: 8;
+  readonly schemaVersion: 9;
   readonly layoutFamily: 'soft-folder-clusters';
   readonly strength: FocusSchematicSoftClusterStrength;
   readonly structuralSpacing: FocusSchematicSoftClusterSpacingPolicy;
@@ -521,7 +521,7 @@ export interface FocusSchematicSoftClusterRuntimeEvidence {
 }
 
 export interface FocusSchematicSoftClusterEvidence {
-  readonly schemaVersion: 8;
+  readonly schemaVersion: 9;
   readonly developmentOnly: true;
   readonly layoutFamily: 'soft-folder-clusters';
   readonly strength: FocusSchematicSoftClusterStrength;

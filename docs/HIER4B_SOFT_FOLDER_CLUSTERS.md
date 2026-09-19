@@ -314,6 +314,21 @@ HFA1–HFA7 across H0/H1/H2, a nested strength matrix, and cardinal attachment
 regressions. PATCH1 adds AC-S1–AC-S8, D0/S1/S2 demand rows, a five-strength
 matrix, and Adaptive/Vertical macro-perturbation evidence.
 
+FIX6 adds SC30 and SC31 plus explicit sparse-rectangle structural fixtures. A
+retained parent no longer accepts AABB proximity as proof of unity: after the
+preferred grid placement, each rigid child is rechecked against current
+blockers and the parent is accepted only when the shared renderer island oracle
+sees one region from the actual module rectangles. Bounded deterministic
+offsets may translate a complete child subtree or parent group; File/Heading/
+Block offsets inside every moved module and child subtree stay rigid. Aggregate
+evidence records post-cohesion, post-Nested, and post-group containment, split,
+and blocker counts, region/member bounds, the closest pre-repair island gap,
+and the first failing stage without exposing folder or File identities.
+
+Soft structural algorithm version 12, worker protocol 14, and evidence schema
+9 invalidate the changed Soft geometry and serialized evidence. Directional
+layout and the renderer-only 0–100 spacing architecture are unchanged.
+
 Before PATCH1, graphical review accepted the nested hierarchy, singleton-chain
 compression, promotion and flattening semantics, passive labels, File-only
 module-boundary suppression, redundant region-wrapper suppression, folder-area

@@ -30,12 +30,14 @@ const center = (rectangle: {
   y: rectangle.y + rectangle.height / 2,
 });
 
-function layoutFromSpec(spec: EndpointFixtureSpec) {
+function layoutFromSpec(spec: EndpointFixtureSpec, strength = 50) {
   const input = layoutInput(buildEndpointFixture(spec), {
     ...FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
     directionalFolderBandsEnabled: false,
   });
-  const attempt = computeFocusSchematicSoftClusterLayoutAttempt(input);
+  const attempt = computeFocusSchematicSoftClusterLayoutAttempt(input, {
+    strength,
+  });
   if (attempt.status !== 'success') throw new Error(attempt.reason);
   const policy =
     attempt.result.internalLayoutEvidence.softClusterPolicyEvidence!;
@@ -51,9 +53,10 @@ function layoutFromSpec(spec: EndpointFixtureSpec) {
   return { input, result: attempt.result, tree, evidence: attempt.evidence };
 }
 
-function baseLayout(id: string) {
+function baseLayout(id: string, strength = 50) {
   return layoutFromSpec(
     SOFT_CLUSTER_FIXTURES.find((fixture) => fixture.id === id)!,
+    strength,
   );
 }
 
@@ -256,39 +259,75 @@ describe('Soft folder-group radial post-layout spread', () => {
     );
   });
 
-  it('preserves the complete SC29 Nested hierarchy at every integer spacing value', () => {
-    const { input, result, tree, evidence } = baseLayout('SC29');
-    const grouping = projectFocusSchematicSoftFolderGroupingTree(tree, {
-      excludedFileIds: [input.model.rootModuleId],
-    });
-    const focusBefore = moduleCenter(result, 'Focus');
-    expect(evidence.nestedHierarchy).toMatchObject({
-      nestedParentContainmentViolationCount: 0,
-      nestedFolderSplitViolationCount: 0,
-      nestedGuideBlockerViolationCount: 0,
-    });
-    expect(evidence.coverage).toMatchObject({
-      missingImmediateFolderGuideCount: 0,
-      nestedAncestorCoverageViolationCount: 0,
-    });
-    for (let spacing = 0; spacing <= 100; spacing += 1) {
-      const spread = applyFocusSchematicSoftRadialSpread(
-        input,
-        result,
-        spacing,
-      );
-      expect(validateFocusSchematicComputedLayout(input, spread).valid).toBe(
-        true,
-      );
-      expectNoModuleOverlaps(spread);
-      expect(moduleCenter(spread, 'Focus')).toEqual(focusBefore);
-      expect(
-        measureFocusSchematicSoftNestedHierarchy(spread.candidate, grouping),
-      ).toEqual({
+  it('preserves the complete SC29 Nested hierarchy at every strength and integer spacing value', () => {
+    for (const strength of [0, 25, 50, 75, 100]) {
+      const { input, result, tree, evidence } = baseLayout('SC29', strength);
+      const grouping = projectFocusSchematicSoftFolderGroupingTree(tree, {
+        excludedFileIds: [input.model.rootModuleId],
+      });
+      const focusBefore = moduleCenter(result, 'Focus');
+      expect(evidence.nestedHierarchy).toMatchObject({
         nestedParentContainmentViolationCount: 0,
         nestedFolderSplitViolationCount: 0,
         nestedGuideBlockerViolationCount: 0,
       });
+      expect(evidence.coverage).toMatchObject({
+        missingImmediateFolderGuideCount: 0,
+        nestedAncestorCoverageViolationCount: 0,
+      });
+      for (let spacing = 0; spacing <= 100; spacing += 1) {
+        const spread = applyFocusSchematicSoftRadialSpread(
+          input,
+          result,
+          spacing,
+        );
+        expect(validateFocusSchematicComputedLayout(input, spread).valid).toBe(
+          true,
+        );
+        expectNoModuleOverlaps(spread);
+        expect(moduleCenter(spread, 'Focus')).toEqual(focusBefore);
+        expect(
+          measureFocusSchematicSoftNestedHierarchy(spread.candidate, grouping),
+        ).toMatchObject({
+          nestedParentContainmentViolationCount: 0,
+          nestedFolderSplitViolationCount: 0,
+          nestedGuideBlockerViolationCount: 0,
+        });
+      }
     }
   }, 30_000);
+
+  it.each(['SC30', 'SC31'] as const)(
+    '%s keeps the FIX6 hierarchy safe at every integer spacing value',
+    (id) => {
+      const { input, result, tree, evidence } = baseLayout(id);
+      const grouping = projectFocusSchematicSoftFolderGroupingTree(tree, {
+        excludedFileIds: [input.model.rootModuleId],
+      });
+      expect(evidence.nestedHierarchy).toMatchObject({
+        postNestedNestedFolderSplitViolationCount: 0,
+        postGroupNestedFolderSplitViolationCount: 0,
+        nestedFolderSplitViolationCount: 0,
+      });
+      for (let spacing = 0; spacing <= 100; spacing += 1) {
+        const spread = applyFocusSchematicSoftRadialSpread(
+          input,
+          result,
+          spacing,
+        );
+        expect(validateFocusSchematicComputedLayout(input, spread).valid).toBe(
+          true,
+        );
+        expectNoModuleOverlaps(spread);
+        expect(
+          measureFocusSchematicSoftNestedHierarchy(spread.candidate, grouping),
+        ).toMatchObject({
+          nestedParentContainmentViolationCount: 0,
+          nestedFolderSplitViolationCount: 0,
+          nestedGuideBlockerViolationCount: 0,
+        });
+      }
+    },
+    30_000,
+  );
 });

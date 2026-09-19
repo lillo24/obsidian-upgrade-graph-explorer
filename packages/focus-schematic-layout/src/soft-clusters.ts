@@ -60,7 +60,7 @@ import type {
 export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE = [
   36, 18,
 ] as const;
-export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 11 as const;
+export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 12 as const;
 
 const STRATEGY_ID = 'HIER4B-soft-folder-clusters' as const;
 const EPSILON = 1e-6;
@@ -1098,6 +1098,20 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
               nestedParentContainmentViolationCount: 0,
               nestedFolderSplitViolationCount: 0,
               nestedGuideBlockerViolationCount: 0,
+              nestedFolderMaxRegionCount: 0,
+              nestedFolderMemberCountMin: 0,
+              nestedFolderMemberCountMax: 0,
+              nestedClosestInterIslandGap: null,
+              postCohesionNestedParentContainmentViolationCount: 0,
+              postCohesionNestedFolderSplitViolationCount: 0,
+              postCohesionNestedGuideBlockerViolationCount: 0,
+              postNestedNestedParentContainmentViolationCount: 0,
+              postNestedNestedFolderSplitViolationCount: 0,
+              postNestedNestedGuideBlockerViolationCount: 0,
+              postGroupNestedParentContainmentViolationCount: 0,
+              postGroupNestedFolderSplitViolationCount: 0,
+              postGroupNestedGuideBlockerViolationCount: 0,
+              nestedFirstSplitStage: null,
             },
           };
     candidate = nestedPacking.candidate;
@@ -1162,15 +1176,47 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       throw new Error(
         `Soft Clusters left ${cohesionQuality.immediateFolderSplitViolationCount} immediate named-folder split violations.`,
       );
-    const nestedHierarchy = {
-      ...nestedPacking.evidence,
-      ...(folderScopeMode === 'nested'
+    const postGroupNestedQuality =
+      folderScopeMode === 'nested'
         ? measureFocusSchematicSoftNestedHierarchy(candidate, tree)
         : {
             nestedParentContainmentViolationCount: 0,
             nestedFolderSplitViolationCount: 0,
             nestedGuideBlockerViolationCount: 0,
-          }),
+            nestedFolderMaxRegionCount: 0,
+            nestedFolderMemberCountMin: 0,
+            nestedFolderMemberCountMax: 0,
+            nestedClosestInterIslandGap: null,
+          };
+    const nestedHierarchy = {
+      ...nestedPacking.evidence,
+      ...postGroupNestedQuality,
+      nestedFolderMaxRegionCount: Math.max(
+        nestedPacking.evidence.nestedFolderMaxRegionCount,
+        postGroupNestedQuality.nestedFolderMaxRegionCount,
+      ),
+      nestedFolderMemberCountMin: Math.min(
+        nestedPacking.evidence.nestedFolderMemberCountMin,
+        postGroupNestedQuality.nestedFolderMemberCountMin,
+      ),
+      nestedFolderMemberCountMax: Math.max(
+        nestedPacking.evidence.nestedFolderMemberCountMax,
+        postGroupNestedQuality.nestedFolderMemberCountMax,
+      ),
+      nestedClosestInterIslandGap:
+        nestedPacking.evidence.nestedClosestInterIslandGap ??
+        postGroupNestedQuality.nestedClosestInterIslandGap,
+      postGroupNestedParentContainmentViolationCount:
+        postGroupNestedQuality.nestedParentContainmentViolationCount,
+      postGroupNestedFolderSplitViolationCount:
+        postGroupNestedQuality.nestedFolderSplitViolationCount,
+      postGroupNestedGuideBlockerViolationCount:
+        postGroupNestedQuality.nestedGuideBlockerViolationCount,
+      nestedFirstSplitStage:
+        nestedPacking.evidence.nestedFirstSplitStage ??
+        (postGroupNestedQuality.nestedFolderSplitViolationCount > 0
+          ? ('post-group' as const)
+          : null),
     };
     if (
       nestedHierarchy.nestedParentContainmentViolationCount > 0 ||
@@ -1259,7 +1305,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       0,
     );
     const evidence: FocusSchematicSoftClusterEvidence = {
-      schemaVersion: 8,
+      schemaVersion: 9,
       developmentOnly: true,
       layoutFamily: 'soft-folder-clusters',
       strength,
@@ -1388,7 +1434,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       internalLayoutEvidence: {
         ...internalLayoutEvidence,
         softClusterPolicyEvidence: {
-          schemaVersion: 8,
+          schemaVersion: 9,
           layoutFamily: 'soft-folder-clusters',
           strength,
           structuralSpacing: spacing,

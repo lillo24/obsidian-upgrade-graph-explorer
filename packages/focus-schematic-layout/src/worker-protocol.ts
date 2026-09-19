@@ -19,7 +19,7 @@ import type {
   FocusSchematicSoftClusterEvidence,
 } from './types';
 
-export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 13 as const;
+export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 14 as const;
 
 export interface FocusSchematicLayoutWorkerRequest {
   readonly protocolVersion: typeof FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION;
@@ -158,7 +158,7 @@ function validateSoftClusterEvidence(
     'Soft Cluster evidence',
   );
   if (
-    evidence.schemaVersion !== 8 ||
+    evidence.schemaVersion !== 9 ||
     evidence.developmentOnly !== true ||
     evidence.layoutFamily !== 'soft-folder-clusters' ||
     evidence.strength !==
@@ -286,15 +286,49 @@ function validateSoftClusterEvidence(
       'nestedParentContainmentViolationCount',
       'nestedFolderSplitViolationCount',
       'nestedGuideBlockerViolationCount',
+      'nestedFolderMaxRegionCount',
+      'nestedFolderMemberCountMin',
+      'nestedFolderMemberCountMax',
+      'nestedClosestInterIslandGap',
+      'postCohesionNestedParentContainmentViolationCount',
+      'postCohesionNestedFolderSplitViolationCount',
+      'postCohesionNestedGuideBlockerViolationCount',
+      'postNestedNestedParentContainmentViolationCount',
+      'postNestedNestedFolderSplitViolationCount',
+      'postNestedNestedGuideBlockerViolationCount',
+      'postGroupNestedParentContainmentViolationCount',
+      'postGroupNestedFolderSplitViolationCount',
+      'postGroupNestedGuideBlockerViolationCount',
+      'nestedFirstSplitStage',
     ],
     'Soft Nested hierarchy evidence',
   );
-  for (const [key, metric] of Object.entries(nestedHierarchy))
+  for (const [key, metric] of Object.entries(nestedHierarchy)) {
+    if (key === 'nestedFirstSplitStage') continue;
+    if (key === 'nestedClosestInterIslandGap' && metric === null) continue;
     finiteNonNegative(metric, `Soft Nested hierarchy evidence.${key}`);
+  }
+  if (
+    nestedHierarchy.nestedFirstSplitStage !== null &&
+    nestedHierarchy.nestedFirstSplitStage !== 'post-cohesion' &&
+    nestedHierarchy.nestedFirstSplitStage !== 'post-nested' &&
+    nestedHierarchy.nestedFirstSplitStage !== 'post-group'
+  )
+    throw new FocusSchematicLayoutProtocolError(
+      'Soft Nested hierarchy evidence has an invalid first split stage.',
+    );
   if (
     Number(nestedHierarchy.nestedParentContainmentViolationCount) !== 0 ||
     Number(nestedHierarchy.nestedFolderSplitViolationCount) !== 0 ||
-    Number(nestedHierarchy.nestedGuideBlockerViolationCount) !== 0
+    Number(nestedHierarchy.nestedGuideBlockerViolationCount) !== 0 ||
+    Number(nestedHierarchy.postNestedNestedParentContainmentViolationCount) !==
+      0 ||
+    Number(nestedHierarchy.postNestedNestedFolderSplitViolationCount) !== 0 ||
+    Number(nestedHierarchy.postNestedNestedGuideBlockerViolationCount) !== 0 ||
+    Number(nestedHierarchy.postGroupNestedParentContainmentViolationCount) !==
+      0 ||
+    Number(nestedHierarchy.postGroupNestedFolderSplitViolationCount) !== 0 ||
+    Number(nestedHierarchy.postGroupNestedGuideBlockerViolationCount) !== 0
   )
     throw new FocusSchematicLayoutProtocolError(
       'Soft Nested hierarchy evidence contains a hard-geometry violation.',

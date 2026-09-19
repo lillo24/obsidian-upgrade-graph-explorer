@@ -15,7 +15,7 @@ export interface FocusSchematicSoftFolderGuideUnit extends FocusSchematicRectang
 const compareText = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
 
-function rectangleGap(
+export function focusSchematicSoftFolderGuideRectangleGap(
   left: FocusSchematicRectangle,
   right: FocusSchematicRectangle,
 ): number {
@@ -168,8 +168,8 @@ export function partitionFocusSchematicSoftFolderGuideIslands<
       for (const candidateId of [...remaining].sort(compareText)) {
         const candidate = byId.get(candidateId)!;
         if (
-          rectangleGap(current, candidate) >
-            FOCUS_SCHEMATIC_SOFT_FOLDER_GUIDE_ISLAND_GAP ||
+          focusSchematicSoftFolderGuideRectangleGap(current, candidate) >
+            FOCUS_SCHEMATIC_SOFT_FOLDER_GUIDE_ISLAND_GAP + 1e-7 ||
           connectionSwallowsBlocker(current, candidate, blockers)
         )
           continue;

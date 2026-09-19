@@ -121,6 +121,8 @@ describe('HIER4B Soft Folder Clusters', () => {
       'SC27',
       'SC28',
       'SC29',
+      'SC30',
+      'SC31',
     ]);
   });
 
@@ -169,7 +171,7 @@ describe('HIER4B Soft Folder Clusters', () => {
     expect(
       first.attempt.result.internalLayoutEvidence.softClusterPolicyEvidence,
     ).toMatchObject({
-      schemaVersion: 8,
+      schemaVersion: 9,
       structuralSpacing: first.attempt.evidence.structuralSpacing,
       folderScopeMode: 'nested',
       ancestorDecayBase: 3,
@@ -384,8 +386,9 @@ describe('HIER4B Soft Folder Clusters', () => {
       JSON.stringify(singleton100.result.candidate),
     );
 
-    const loose = run(fixture('SC16'), 0).attempt.evidence.metrics;
-    const cohesive = run(fixture('SC16'), 100).attempt.evidence.metrics;
+    const loose = run(fixture('SC16'), 0).attempt.evidence.preCohesionMetrics;
+    const cohesive = run(fixture('SC16'), 100).attempt.evidence
+      .preCohesionMetrics;
     expect(cohesive.repeatedFolderRmsRadiusMean).not.toBeNull();
     expect(cohesive.repeatedFolderRmsRadiusMean!).toBeLessThan(
       loose.repeatedFolderRmsRadiusMean!,
@@ -516,7 +519,7 @@ describe('HIER4B Soft Folder Clusters', () => {
     });
   });
 
-  it('keeps non-root repeated-folder geometry byte-identical', () => {
+  it('pins deterministic non-root repeated-folder geometry after FIX6 packing', () => {
     const attempt = run(fixture('SC16'), 100, {
       fileParentOverrides: [],
       flattenedFolderKeys: [],
@@ -525,7 +528,7 @@ describe('HIER4B Soft Folder Clusters', () => {
       createHash('sha256')
         .update(JSON.stringify(attempt.result.candidate))
         .digest('hex'),
-    ).toBe('4a9806252a972ed531cbfac6e7fd094362c2d7cdf02ffae4d308ff2876d573c3');
+    ).toBe('3e02a1154f40bd38f7666b6e89eeb555b1d91f5b8c7c5b58338de3e31944e228');
   });
 
   it('keeps representative Directional layouts byte-identical', () => {
@@ -820,7 +823,7 @@ describe('HIER4B Soft Folder Clusters', () => {
         internalLayoutVariant: 'vertical-spine',
       },
     ).attempt;
-    expect(adaptive.configId).toContain('HIER4Bv11');
+    expect(adaptive.configId).toContain('HIER4Bv12');
     expect(repeated.configId).toBe(adaptive.configId);
     expect(repeated.result.candidate).toEqual(adaptive.result.candidate);
     expect(vertical.configId).not.toBe(adaptive.configId);

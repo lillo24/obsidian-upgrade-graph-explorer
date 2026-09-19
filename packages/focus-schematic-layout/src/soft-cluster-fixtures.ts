@@ -694,6 +694,60 @@ export const SOFT_CLUSTER_FIXTURES: readonly EndpointFixtureSpec[] = [
         'Verify exact memberships, one region per retained folder, and hard containment throughout the spacing scale.',
     },
   ),
+  fixture(
+    'SC30',
+    'sparse asymmetric retained parent regression',
+    [
+      doc('Focus', 'Other'),
+      doc('Direct', 'Parent'),
+      doc('C1', 'Parent/Child'),
+      doc('C2', 'Parent/Child'),
+      doc('C3', 'Parent/Child'),
+    ],
+    [
+      ref('Focus', 'Direct'),
+      ref('Focus', 'C1'),
+      ref('C1', 'C2'),
+      ref('C2', 'C3'),
+    ],
+    {
+      hops: 3,
+      authored: 'Synthetic FIX6 retained-parent occupied-geometry regression.',
+      expectation:
+        'Parent remains one blocker-free guide region after structural packing and every radial spacing value.',
+      inspect:
+        'Direct.md and the asymmetric Child subtree stay connected by actual occupied rectangles.',
+    },
+  ),
+  fixture(
+    'SC31',
+    'deep sparse parent with sibling subtree regression',
+    [
+      doc('Focus', 'Other'),
+      doc('Direct', 'GrandParent/Parent'),
+      doc('C1', 'GrandParent/Parent/Child'),
+      doc('C2', 'GrandParent/Parent/Child'),
+      doc('C3', 'GrandParent/Parent/Child'),
+      doc('S1', 'GrandParent/SiblingSubtree'),
+      doc('S2', 'GrandParent/SiblingSubtree'),
+    ],
+    [
+      ref('Focus', 'Direct'),
+      ref('Focus', 'C1'),
+      ref('C1', 'C2'),
+      ref('C2', 'C3'),
+      ref('Focus', 'S1'),
+      ref('S1', 'S2'),
+    ],
+    {
+      hops: 3,
+      authored: 'Synthetic FIX6 deeper occupied-geometry regression.',
+      expectation:
+        'Parent, Child, SiblingSubtree, and GrandParent remain coherent without blocker swallowing.',
+      inspect:
+        'The repaired Parent subtree moves rigidly when GrandParent packs it with its sibling subtree.',
+    },
+  ),
 ];
 
 const cardinalDocuments = [

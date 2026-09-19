@@ -70,8 +70,10 @@ import {
 import { createFocusSchematicLayoutWorkerService } from '../workers/focus-schematic-layout-worker-client';
 import type { SemanticLocalStructuredViewport } from './LocalStructuredGraphView';
 import {
+  deriveFocusSchematicCurrentGenerationValue,
   resolveFocusSchematicPresentation,
   retainFocusSchematicGraphDuringLayoutTransition,
+  resolveFocusSchematicReplacementFailure,
 } from './focus-schematic-presentation';
 import { useWorkerServiceDisposal } from './use-worker-service-disposal';
 
@@ -324,6 +326,7 @@ export default function ModularStructuredGraphView(
   const [softFolderContext, setSoftFolderContext] = useState<
     | {
         readonly kind: 'file';
+        readonly layoutKey: string;
         readonly fileId: string;
         readonly x: number;
         readonly y: number;
@@ -331,6 +334,7 @@ export default function ModularStructuredGraphView(
       }
     | {
         readonly kind: 'folder';
+        readonly layoutKey: string;
         readonly folderKey: string;
         readonly x: number;
         readonly y: number;
@@ -557,17 +561,11 @@ export default function ModularStructuredGraphView(
             recordAttemptTimings(instrumentation, result.metrics.timings);
           if (result.status === 'failure') {
             setLifecycle((state) => {
-              if (state.adopted !== undefined) {
-                return {
-                  phase: 'warning-with-last-valid',
-                  adopted: state.adopted,
-                  message: `${result.message} The last valid modular graph remains visible.`,
-                };
-              }
-              return {
-                phase: 'fatal-no-valid-result',
-                message: result.message,
-              };
+              const failure = resolveFocusSchematicReplacementFailure(
+                state.adopted,
+                result.message,
+              );
+              return { phase: failure.kind, ...failure };
             });
             return;
           }
@@ -593,15 +591,13 @@ export default function ModularStructuredGraphView(
             });
           } catch (error: unknown) {
             const message = `Modular renderer adoption failed: ${errorMessage(error)}`;
-            setLifecycle((state) =>
-              state.adopted === undefined
-                ? { phase: 'fatal-no-valid-result', message }
-                : {
-                    phase: 'warning-with-last-valid',
-                    adopted: state.adopted,
-                    message: `${message} The last valid modular graph remains visible.`,
-                  },
-            );
+            setLifecycle((state) => {
+              const failure = resolveFocusSchematicReplacementFailure(
+                state.adopted,
+                message,
+              );
+              return { phase: failure.kind, ...failure };
+            });
           }
         });
     });
@@ -687,27 +683,37 @@ export default function ModularStructuredGraphView(
     layoutInput,
   ]);
   const displayedGraph = presentation.graph;
+  const presentationGenerationCurrent = lifecycle.adopted?.key === layoutKey;
   const softFolderGuides = useMemo(
     () =>
-      focusSchematicFolderClusterGuides(
-        softFolderDisplayTree,
-        displayedGraph.nodes,
-        {
-          directFoldersOnly,
-          includeWorkspaceRootGroup,
-          focusModuleId: model.rootModuleId,
-        },
-      ),
+      deriveFocusSchematicCurrentGenerationValue(
+        lifecycle.adopted?.key,
+        layoutKey,
+        () =>
+          focusSchematicFolderClusterGuides(
+            softFolderDisplayTree,
+            displayedGraph.nodes,
+            {
+              directFoldersOnly,
+              includeWorkspaceRootGroup,
+              focusModuleId: model.rootModuleId,
+            },
+          ),
+      ) ?? [],
     [
       directFoldersOnly,
       displayedGraph.nodes,
       includeWorkspaceRootGroup,
+      layoutKey,
+      lifecycle.adopted?.key,
       model.rootModuleId,
       softFolderDisplayTree,
     ],
   );
   const activeSoftFolderContext =
+    !presentationGenerationCurrent ||
     softFolderContext === null ||
+    softFolderContext.layoutKey !== layoutKey ||
     (softFolderContext.kind === 'file'
       ? !softFolderDisplayTree.files.some(
           ({ fileId }) => fileId === softFolderContext.fileId,
@@ -737,6 +743,7 @@ export default function ModularStructuredGraphView(
     ({ node, x, y, origin }: GraphNodeContextRequest) => {
       if (
         macroLayout !== 'soft-folder-clusters' ||
+        !presentationGenerationCurrent ||
         node.type !== 'entity' ||
         node.data.entityKind !== 'document' ||
         node.data.focusSchematicModuleId === undefined
@@ -744,13 +751,14 @@ export default function ModularStructuredGraphView(
         return;
       setSoftFolderContext({
         kind: 'file',
+        layoutKey,
         fileId: node.data.focusSchematicModuleId,
         x,
         y,
         origin,
       });
     },
-    [macroLayout],
+    [layoutKey, macroLayout, presentationGenerationCurrent],
   );
   const openSoftFolderAreaContext = useCallback(
     ({ x, y, world }: GraphPaneContextRequest): boolean => {
@@ -768,6 +776,7 @@ export default function ModularStructuredGraphView(
       if (guide === null) return false;
       setSoftFolderContext({
         kind: 'folder',
+        layoutKey,
         folderKey: guide.folderKey,
         x,
         y,
@@ -837,7 +846,7 @@ export default function ModularStructuredGraphView(
       <FocusSchematicFolderClusterGuides
         guides={softFolderGuides}
         onFolderContextMenu={(request) =>
-          setSoftFolderContext({ kind: 'folder', ...request })
+          setSoftFolderContext({ kind: 'folder', layoutKey, ...request })
         }
       />
     );

@@ -172,11 +172,19 @@ function artifact(spec: EndpointFixtureSpec) {
                     throw new Error(
                       `${spec.id}/${policy}/${internal}/spacing-${spacing}/strength-${strength}: ${attempt.reason}`,
                     );
-                  const displayed = applyFocusSchematicSoftRadialSpread(
-                    softInput,
-                    attempt.result,
-                    spacing,
-                  );
+                  let displayed;
+                  try {
+                    displayed = applyFocusSchematicSoftRadialSpread(
+                      softInput,
+                      attempt.result,
+                      spacing,
+                    );
+                  } catch (error: unknown) {
+                    throw new Error(
+                      `${spec.id}/${policy}/${internal}/spacing-${spacing}/strength-${strength}: ${error instanceof Error ? error.message : String(error)}`,
+                      { cause: error },
+                    );
+                  }
                   return [
                     strength,
                     {

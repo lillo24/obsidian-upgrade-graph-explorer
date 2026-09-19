@@ -9,8 +9,10 @@ import {
 import { focusSchematicNodeDimensions } from '@icarus-graph-explorer/renderer-reactflow/focus-schematic';
 
 import {
+  deriveFocusSchematicCurrentGenerationValue,
   prepareFocusSchematicDisplayedGraph,
   retainFocusSchematicGraphDuringLayoutTransition,
+  resolveFocusSchematicReplacementFailure,
   resolveFocusSchematicPresentation,
 } from './focus-schematic-presentation';
 
@@ -136,5 +138,46 @@ describe('Modular Focus Schematic presentation', () => {
         'focus-file-b',
       ),
     ).toBeNull();
+  });
+
+  it('RF1/RF5 derives overlays for the adopted generation and suppresses mixed-generation work', () => {
+    let derivations = 0;
+    expect(
+      deriveFocusSchematicCurrentGenerationValue('focus-b', 'focus-b', () => {
+        derivations += 1;
+        return ['guide-b'];
+      }),
+    ).toEqual(['guide-b']);
+    expect(
+      deriveFocusSchematicCurrentGenerationValue('focus-a', 'focus-b', () => {
+        derivations += 1;
+        throw new Error('old graph was combined with the new tree');
+      }),
+    ).toBeNull();
+    expect(derivations).toBe(1);
+  });
+
+  it('RF2/RF3 preserves a prior adopted presentation for worker or Nested replacement failure', () => {
+    const adopted = { key: 'focus-a', graph: { nodes: ['a'] } };
+    for (const message of [
+      'Worker failed.',
+      'Nested Soft hierarchy validation failed: containment=0, splits=2, blockers=0.',
+    ])
+      expect(resolveFocusSchematicReplacementFailure(adopted, message)).toEqual(
+        {
+          kind: 'warning-with-last-valid',
+          adopted,
+          message: `${message} The last valid modular graph remains visible.`,
+        },
+      );
+  });
+
+  it('RF4 promotes only a first-result failure to the explicit fatal lifecycle', () => {
+    expect(
+      resolveFocusSchematicReplacementFailure(undefined, 'First failed.'),
+    ).toEqual({
+      kind: 'fatal-no-valid-result',
+      message: 'First failed.',
+    });
   });
 });

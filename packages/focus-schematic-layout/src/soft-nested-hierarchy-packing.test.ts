@@ -94,6 +94,65 @@ function members(folderKey: string) {
     ?.descendantFileIds;
 }
 
+function sparseNestedFixture(deep = false) {
+  const sparseFiles = [
+    { fileId: 'focus', exactFolderKey: 'Other' },
+    { fileId: 'direct', exactFolderKey: deep ? 'Grand/Parent' : 'Parent' },
+    {
+      fileId: 'c1',
+      exactFolderKey: deep ? 'Grand/Parent/Child' : 'Parent/Child',
+    },
+    {
+      fileId: 'c2',
+      exactFolderKey: deep ? 'Grand/Parent/Child' : 'Parent/Child',
+    },
+    {
+      fileId: 'c3',
+      exactFolderKey: deep ? 'Grand/Parent/Child' : 'Parent/Child',
+    },
+    ...(deep
+      ? [
+          { fileId: 's1', exactFolderKey: 'Grand/SiblingSubtree' },
+          { fileId: 's2', exactFolderKey: 'Grand/SiblingSubtree' },
+        ]
+      : []),
+  ];
+  const rectangles = [
+    { moduleId: 'focus', x: -1_000, y: 360, width: 120, height: 80 },
+    { moduleId: 'direct', x: 0, y: 350, width: 100, height: 100 },
+    { moduleId: 'c1', x: 172, y: 0, width: 200, height: 100 },
+    { moduleId: 'c2', x: 488, y: 0, width: 100, height: 800 },
+    { moduleId: 'c3', x: 172, y: 700, width: 200, height: 100 },
+    ...(deep
+      ? [
+          { moduleId: 's1', x: 1_200, y: 300, width: 100, height: 100 },
+          { moduleId: 's2', x: 1_200, y: 472, width: 100, height: 100 },
+        ]
+      : []),
+  ];
+  const semantic = buildFocusSchematicSoftFolderDisplayTree({
+    visibleFiles: sparseFiles,
+  });
+  const grouping = projectFocusSchematicSoftFolderGroupingTree(semantic, {
+    excludedFileIds: ['focus'],
+  });
+  const sparseCandidate: FocusSchematicLayoutCandidate = {
+    modelSchemaVersion: 1,
+    rootModuleId: 'focus',
+    modules: rectangles,
+    nodes: rectangles.map((rectangle) => ({
+      projectionNodeId: `node:${rectangle.moduleId}`,
+      moduleId: rectangle.moduleId,
+      x: rectangle.x + 10,
+      y: rectangle.y + 10,
+      width: Math.max(20, rectangle.width - 20),
+      height: Math.max(20, rectangle.height - 20),
+    })),
+    routes: [],
+  };
+  return { candidate: sparseCandidate, grouping };
+}
+
 describe('Focus-neutral nested Soft hierarchy packing', () => {
   it('N1/N4/N5 retains exact logical memberships and excludes Focus everywhere', () => {
     const { semantic, grouping } = groupingTree();
@@ -147,7 +206,7 @@ describe('Focus-neutral nested Soft hierarchy packing', () => {
     });
     expect(
       measureFocusSchematicSoftNestedHierarchy(packed.candidate, grouping),
-    ).toEqual({
+    ).toMatchObject({
       nestedParentContainmentViolationCount: 0,
       nestedFolderSplitViolationCount: 0,
       nestedGuideBlockerViolationCount: 0,
@@ -172,6 +231,72 @@ describe('Focus-neutral nested Soft hierarchy packing', () => {
       );
     }
   });
+
+  it.each([
+    ['N17 sparse parent', false],
+    ['N18 deep sparse parent and sibling subtree', true],
+  ] as const)(
+    '%s reproduces a blocker-free split and repairs it with rigid occupied geometry',
+    (_label, deep) => {
+      const fixture = sparseNestedFixture(deep);
+      const before = measureFocusSchematicSoftNestedHierarchy(
+        fixture.candidate,
+        fixture.grouping,
+      );
+      expect(before).toMatchObject({
+        nestedParentContainmentViolationCount: 0,
+        nestedGuideBlockerViolationCount: 0,
+      });
+      expect(before.nestedFolderSplitViolationCount).toBeGreaterThan(0);
+      expect(before.nestedFolderMaxRegionCount).toBeGreaterThan(1);
+      expect(before.nestedClosestInterIslandGap).not.toBeNull();
+
+      const childBefore = fixture.candidate.modules
+        .filter(({ moduleId }) => /^c\d$/.test(moduleId))
+        .map(({ moduleId, x, y }) => ({ moduleId, x, y }));
+      const packed = applyFocusSchematicSoftNestedHierarchyPacking(
+        fixture.candidate,
+        fixture.grouping,
+      );
+      expect(packed.evidence).toMatchObject({
+        postCohesionNestedFolderSplitViolationCount:
+          before.nestedFolderSplitViolationCount,
+        postNestedNestedFolderSplitViolationCount: 0,
+        nestedFolderSplitViolationCount: 0,
+        nestedGuideBlockerViolationCount: 0,
+        nestedFirstSplitStage: 'post-cohesion',
+      });
+      expect(
+        measureFocusSchematicSoftNestedHierarchy(
+          packed.candidate,
+          fixture.grouping,
+        ),
+      ).toMatchObject({
+        nestedParentContainmentViolationCount: 0,
+        nestedFolderSplitViolationCount: 0,
+        nestedGuideBlockerViolationCount: 0,
+        nestedFolderMaxRegionCount: 1,
+      });
+      const childAfter = packed.candidate.modules
+        .filter(({ moduleId }) => /^c\d$/.test(moduleId))
+        .map(({ moduleId, x, y }) => ({ moduleId, x, y }));
+      const beforeOrigin = childBefore[0]!;
+      const afterOrigin = childAfter[0]!;
+      expect(
+        childAfter.map(({ moduleId, x, y }) => ({
+          moduleId,
+          x: x - afterOrigin.x,
+          y: y - afterOrigin.y,
+        })),
+      ).toEqual(
+        childBefore.map(({ moduleId, x, y }) => ({
+          moduleId,
+          x: x - beforeOrigin.x,
+          y: y - beforeOrigin.y,
+        })),
+      );
+    },
+  );
 
   it('N16 is deterministic under module and node input-order permutation', () => {
     const { grouping } = groupingTree();

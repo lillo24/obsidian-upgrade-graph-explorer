@@ -1530,6 +1530,14 @@ remain structural singleton bodies; the same result is also checked against
 their optional aggregate. No member moves within its body after cohesion, and
 no collision solver runs after radial spacing.
 
+Nested Soft packing uses envelopes only for its preferred coarse placement.
+It rechecks actual occupied module rectangles with the same island and blocker
+oracle used by folder-guide rendering. Each child subtree is a rigid unit;
+current blocker positions can translate that whole unit, and a bounded
+deterministic join search must leave every retained parent with one region
+before compound-group packing. The post-group stage repeats the same hard
+check. Stage evidence contains aggregate counts and distances only.
+
 The 24-entry exact cache includes macro family plus normalized strength,
 scope/decay, and canonical sparse display intent only for Soft Clusters.
 Direct-only canonicalizes decay. The 0–100 spacing preference is excluded: the
@@ -1546,6 +1554,13 @@ deterministic policy identity. The real projection continues to own disclosure,
 reroot, filters, hidden modules, and watcher updates; the renderer continues to
 own exact hover, Secondary edge presentation, and the camera. No Classic/
 Modular default changes until graphical review selects an outcome.
+
+During a File reroot, an adopted graph whose key differs from the incoming key
+is a complete last-valid presentation. The web does not combine it with the
+incoming folder tree, root, hit-test regions, or context-menu membership;
+generation-dependent overlays remain absent until the new result is adopted.
+Replacement failure retains that presentation and raises a warning. A first
+result failure still invokes the explicit session Classic fallback.
 
 Optimized desktop graphical QA approved the preview with visible module
 boundaries and confirmed exact endpoints, root/rank positioning, multi-hop
