@@ -76,8 +76,13 @@ canonical truth, or own a platform storage implementation.
   visible, and currently undisclosed state. `../focus-explorer-files.ts` filters
   the completed projection to File modules and uses the pure folder grouping in
   `../network-explorer-folders.ts`; `../focus-outline-model.ts` derives the
-  canonical Heading rows. Tab and folder state are session-only presentation
-  state. None of these layers owns projection, layout, worker, or persistence.
+  canonical Heading rows and explicit parent/child metadata.
+  `../focus-explorer-heading-disclosure.ts` owns per-document session-only
+  Heading branch choices. Initial graph-visible descendants and later
+  visibility transitions open only their required ancestor paths; local
+  collapse never changes graph disclosure. Tab, folder, and Heading-tree state
+  are presentation-only. None of these layers owns projection, layout, worker,
+  history, or persistence.
   The **Arguments** launcher is the sole integration with the application-level
   Argument Workspace. It appears beside Filters/Groups in the normal toolbar
   and inside maximized Tools, blocks opening while a movement or unsaved folder
@@ -413,6 +418,14 @@ Hierarchy. A manual File expansion from Files only remains one compact override,
 presented as `1 level · Custom`; All Files converts it to the ordinary level-1
 preset with one history/projection/layout transition while preserving explicit
 Heading Hide state. The presentation is derived and adds no persistence field.
+
+The Focus Explorer Heading tree also has an independent local disclosure layer.
+Canonical source-order rows remain complete, graph expansion opens ancestor
+branches only when a Heading becomes newly visible, and graph collapse never
+forces a local branch closed. Per-document collapse choices survive tab changes,
+drawer close/reopen, and reroot/return for the mounted session. Their state is
+excluded from projection, Classic fingerprints, Modular keys, workers, graph
+history, Current View, and Saved Views.
 
 HIER4B-SPACING-FIX4 defines Folder strength as additional Soft attraction.
 Mandatory immediate named-folder grouping remains active from 0 through 100;

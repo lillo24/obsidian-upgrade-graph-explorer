@@ -848,6 +848,14 @@ manual expand/collapse overrides relevant to the current neighborhood; explicit
 Heading Hide remains orthogonal. All Files dispatches the existing `set-depth`
 action once, so it clears manual overrides, preserves hidden Heading IDs, and
 creates one normal Back/Forward checkpoint without a persistence-schema change.
+Focus Explorer adds a separate per-document, session-only Heading-tree
+disclosure map after the canonical outline model is built. The first visit opens
+ancestor paths required by graph-visible descendants; later synchronization
+reacts only to newly visible Heading IDs. A local collapse therefore survives
+ordinary rerenders, graph collapse, tab changes, drawer remounts, and
+reroot/return, while a later graph reveal can reopen its required path. This map
+is not projection, graph history, Current View, Saved View, Classic fingerprint,
+Modular cache-key, or worker input.
 
 KG5 search, resolution filters, disclosure state, and pagination are transient
 diagnostic UI state. They are not KG6 projection contracts or KG9 persisted view

@@ -12,6 +12,8 @@ export interface FocusOutlineRow {
   readonly title: string;
   readonly depth: number;
   readonly headingLevel: number;
+  readonly parentEntityId?: EntityId;
+  readonly hasChildHeadings: boolean;
   readonly status: FocusOutlineRowStatus;
   readonly explicitlyHidden: boolean;
 }
@@ -89,6 +91,10 @@ export function createFocusOutlineModel(
             : child.title,
         depth,
         headingLevel: child.level,
+        ...(parentId === documentEntityId ? {} : { parentEntityId: parentId }),
+        hasChildHeadings: workspace
+          .children(child.id)
+          .some((descendant) => descendant.kind === 'section'),
         status,
         explicitlyHidden: hidden,
       });

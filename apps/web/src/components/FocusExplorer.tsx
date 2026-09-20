@@ -18,6 +18,7 @@ import type {
   FocusOutlineModel,
   FocusOutlineRowStatus,
 } from '../focus-outline-model';
+import { focusExplorerVisibleHeadingRows } from '../focus-explorer-heading-disclosure';
 import {
   flattenSourceFolderRows,
   type NetworkExplorerFolderState,
@@ -31,6 +32,7 @@ interface FocusExplorerProps {
   readonly files: FocusExplorerFilesModel;
   readonly folderState: NetworkExplorerFolderState;
   readonly headings: FocusOutlineModel;
+  readonly collapsedHeadingIds: ReadonlySet<EntityId>;
   readonly selectedNodeId?: ProjectionNodeId;
   readonly onActiveTabChange: (tab: FocusExplorerTab) => void;
   readonly onClose: () => void;
@@ -39,6 +41,7 @@ interface FocusExplorerProps {
   readonly onSelectFile: (nodeId: ProjectionNodeId) => void;
   readonly onSetHeadingHidden: (entityId: EntityId, hidden: boolean) => void;
   readonly onShowAll: () => void;
+  readonly onToggleHeadingBranch: (entityId: EntityId) => void;
 }
 
 const TABS: readonly FocusExplorerTab[] = ['files', 'headings'];
@@ -166,14 +169,22 @@ function FocusFiles({
 }
 
 function FocusHeadings({
+  collapsedHeadingIds,
   model,
   onSetHeadingHidden,
   onShowAll,
+  onToggleHeadingBranch,
 }: {
+  readonly collapsedHeadingIds: ReadonlySet<EntityId>;
   readonly model: FocusOutlineModel;
   readonly onSetHeadingHidden: (entityId: EntityId, hidden: boolean) => void;
   readonly onShowAll: () => void;
+  readonly onToggleHeadingBranch: (entityId: EntityId) => void;
 }) {
+  const visibleRows = useMemo(
+    () => focusExplorerVisibleHeadingRows(model, collapsedHeadingIds),
+    [collapsedHeadingIds, model],
+  );
   return (
     <div
       className="focus-explorer__headings"
@@ -200,9 +211,10 @@ function FocusHeadings({
         <p className="focus-explorer__empty">This File has no Headings.</p>
       ) : (
         <div aria-label="Headings" className="focus-explorer__tree" role="tree">
-          {model.rows.map((row) => {
+          {visibleRows.map((row) => {
             const hiddenByAncestor = row.status === 'hidden-by-ancestor';
             const hidden = row.status === 'hidden';
+            const expanded = !collapsedHeadingIds.has(row.entityId);
             const label = hidden
               ? `Show Heading ${row.title}`
               : hiddenByAncestor
@@ -210,12 +222,29 @@ function FocusHeadings({
                 : `Hide Heading ${row.title}`;
             return (
               <div
+                {...(row.hasChildHeadings ? { 'aria-expanded': expanded } : {})}
                 aria-level={row.depth}
                 className={`focus-explorer__heading-row focus-explorer__heading-row--${row.status}`}
                 key={row.entityId}
                 role="treeitem"
                 style={{ '--focus-explorer-depth': row.depth } as CSSProperties}
               >
+                {row.hasChildHeadings ? (
+                  <button
+                    aria-label={`${expanded ? 'Collapse' : 'Expand'} children in Focus Explorer`}
+                    className="focus-explorer__heading-disclosure"
+                    onClick={() => onToggleHeadingBranch(row.entityId)}
+                    title={`${expanded ? 'Collapse' : 'Expand'} children in Focus Explorer`}
+                    type="button"
+                  >
+                    <span aria-hidden="true">{expanded ? '▾' : '▸'}</span>
+                  </button>
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className="focus-explorer__heading-disclosure-spacer"
+                  />
+                )}
                 <span className="focus-explorer__row-copy">
                   <strong title={row.title}>{row.title}</strong>
                   <small>
@@ -228,6 +257,7 @@ function FocusHeadings({
                 <button
                   aria-label={label}
                   aria-pressed={hidden || hiddenByAncestor}
+                  className="focus-explorer__heading-visibility"
                   disabled={hiddenByAncestor}
                   onClick={() =>
                     onSetHeadingHidden(row.entityId, !row.explicitlyHidden)
@@ -254,6 +284,7 @@ function FocusHeadings({
 
 export const FocusExplorer = memo(function FocusExplorer({
   activeTab,
+  collapsedHeadingIds,
   files,
   folderState,
   headings,
@@ -265,6 +296,7 @@ export const FocusExplorer = memo(function FocusExplorer({
   onSelectFile,
   onSetHeadingHidden,
   onShowAll,
+  onToggleHeadingBranch,
 }: FocusExplorerProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const fileTabRef = useRef<HTMLButtonElement>(null);
@@ -350,9 +382,11 @@ export const FocusExplorer = memo(function FocusExplorer({
         />
       ) : (
         <FocusHeadings
+          collapsedHeadingIds={collapsedHeadingIds}
           model={headings}
           onSetHeadingHidden={onSetHeadingHidden}
           onShowAll={onShowAll}
+          onToggleHeadingBranch={onToggleHeadingBranch}
         />
       )}
     </aside>

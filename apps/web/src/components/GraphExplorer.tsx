@@ -112,6 +112,12 @@ import {
 } from '../focus-outline-model';
 import { createFocusExplorerFilesModel } from '../focus-explorer-files';
 import {
+  EMPTY_FOCUS_EXPLORER_HEADING_DISCLOSURE,
+  focusExplorerCollapsedHeadingIds,
+  synchronizeFocusExplorerHeadingDisclosure,
+  toggleFocusExplorerHeadingDisclosure,
+} from '../focus-explorer-heading-disclosure';
+import {
   containingDocumentEntityId,
   effectiveGlobalProjectionState,
   withExplicitGlobalReferenceStatus,
@@ -1527,6 +1533,45 @@ export function GraphExplorer({
     useState<NetworkExplorerFolderState>(() => new Map());
   const [focusExplorerFolderState, setFocusExplorerFolderState] =
     useState<NetworkExplorerFolderState>(() => new Map());
+  // Per-document sidebar disclosure survives drawer remounts and rerooting, but
+  // never enters projection, graph history, layout identity, or persistence.
+  const [focusExplorerHeadingState, setFocusExplorerHeadingState] = useState(
+    () => ({
+      model: undefined as typeof focusOutlineModel,
+      disclosure: EMPTY_FOCUS_EXPLORER_HEADING_DISCLOSURE,
+    }),
+  );
+  let synchronizedFocusExplorerHeadingState = focusExplorerHeadingState;
+  if (focusExplorerHeadingState.model !== focusOutlineModel) {
+    synchronizedFocusExplorerHeadingState = {
+      model: focusOutlineModel,
+      disclosure:
+        focusOutlineModel === undefined
+          ? focusExplorerHeadingState.disclosure
+          : synchronizeFocusExplorerHeadingDisclosure(
+              focusExplorerHeadingState.disclosure,
+              focusOutlineModel,
+            ),
+    };
+    setFocusExplorerHeadingState(synchronizedFocusExplorerHeadingState);
+  }
+  const toggleFocusExplorerHeadingBranch = useCallback(
+    (headingEntityId: EntityId) => {
+      if (focusOutlineModel === undefined) return;
+      setFocusExplorerHeadingState((current) => ({
+        model: focusOutlineModel,
+        disclosure: toggleFocusExplorerHeadingDisclosure(
+          synchronizeFocusExplorerHeadingDisclosure(
+            current.disclosure,
+            focusOutlineModel,
+          ),
+          focusOutlineModel.documentEntityId,
+          headingEntityId,
+        ),
+      }));
+    },
+    [focusOutlineModel],
+  );
   const [graphClickSelection, setGraphClickSelection] =
     useState<GraphSelection | null>(null);
   const [networkExplorerRevealRequest, setNetworkExplorerRevealRequest] =
@@ -6136,6 +6181,10 @@ export function GraphExplorer({
           focusOutlineVisible ? (
             <FocusExplorer
               activeTab={focusExplorerTab}
+              collapsedHeadingIds={focusExplorerCollapsedHeadingIds(
+                synchronizedFocusExplorerHeadingState.disclosure,
+                focusOutlineModel.documentEntityId,
+              )}
               files={focusExplorerFilesModel}
               folderState={focusExplorerFolderState}
               headings={focusOutlineModel}
@@ -6146,6 +6195,7 @@ export function GraphExplorer({
               onSelectFile={selectFocusExplorerFile}
               onSetHeadingHidden={setHeadingHidden}
               onShowAll={showAllFocusHeadings}
+              onToggleHeadingBranch={toggleFocusExplorerHeadingBranch}
               {...(activeSelection?.kind === 'node'
                 ? { selectedNodeId: activeSelection.id }
                 : {})}

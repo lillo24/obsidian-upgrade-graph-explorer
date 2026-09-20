@@ -94,12 +94,18 @@ describe('Focus Outline canonical model', () => {
     );
 
     expect(
-      model?.rows.map((row) => [row.entityId, row.depth, row.status]),
+      model?.rows.map((row) => [
+        row.entityId,
+        row.depth,
+        row.parentEntityId,
+        row.hasChildHeadings,
+        row.status,
+      ]),
     ).toEqual([
-      ['h1', 1, 'hidden'],
-      ['h1-child', 2, 'hidden-by-ancestor'],
-      ['h2', 1, 'visible'],
-      ['h3', 1, 'visible'],
+      ['h1', 1, undefined, true, 'hidden'],
+      ['h1-child', 2, 'h1', false, 'hidden-by-ancestor'],
+      ['h2', 1, undefined, false, 'visible'],
+      ['h3', 1, undefined, false, 'visible'],
     ]);
     expect(model?.rows[1]?.explicitlyHidden).toBe(true);
     expect(model?.hiddenEntityIds).toEqual(['h1', 'h1-child']);

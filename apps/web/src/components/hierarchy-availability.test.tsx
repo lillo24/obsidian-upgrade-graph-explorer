@@ -28,9 +28,11 @@ import {
   focusSchematicNodeDimensions,
   prepareFocusSchematicRendererGraph,
 } from '@icarus-graph-explorer/renderer-reactflow/focus-schematic';
-import type {
-  GraphCanvasProps,
-  RendererGraph,
+import {
+  localStructuredLayoutFingerprint,
+  mapProjectionToReactFlow,
+  type GraphCanvasProps,
+  type RendererGraph,
 } from '@icarus-graph-explorer/renderer-reactflow';
 import type { GlobalGraphViewProps } from './GlobalGraphView';
 import type { LocalGraphViewProps } from './LocalGraphView';
@@ -41,6 +43,7 @@ import { GRAPH_PREFERENCES_STORAGE_KEY } from '../preferences/graph-preferences'
 import { workspaceViewStorageKey } from '../persistence/storage';
 import sampleReport from '../sample-report.json';
 import { TEST_THEME_CONTROLLER } from '../theme/test-controller';
+import { exactFocusSchematicLayoutCacheKey } from '../focus-schematic-layout-cache';
 
 function GraphExplorer(
   props: Omit<ComponentProps<typeof GraphExplorerComponent>, 'theme'>,
@@ -158,6 +161,32 @@ const rerootSnapshot: KnowledgeSnapshot = {
 function prepareModularGraph(
   props: ModularStructuredGraphViewProps,
 ): RendererGraph {
+  const { input, policies } = modularLayoutIdentityInput(props);
+  let clock = 0;
+  const response = handleFocusSchematicLayoutWorkerRequest(
+    {
+      protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
+      requestId: 1,
+      kind: 'layout',
+      input,
+      policies,
+    },
+    () => ++clock,
+  );
+  if (response.kind !== 'success') throw new Error(response.message);
+  return prepareFocusSchematicRendererGraph({
+    projection: props.projection,
+    model: input.model,
+    layoutInput: input,
+    computedLayout: response.result,
+    rootEntityId: props.rootEntityId,
+    secondaryRelationshipsVisible: false,
+    ...(props.routeStyle === undefined ? {} : { routeStyle: props.routeStyle }),
+    visualVariant: 'extended',
+  });
+}
+
+function modularLayoutIdentityInput(props: ModularStructuredGraphViewProps) {
   const model = createFocusSchematicModel({
     workspace: props.projectionWorkspace,
     state: props.projectionState,
@@ -182,28 +211,24 @@ function prepareModularGraph(
     endpointOrderPolicy: props.endpointOrderPolicy,
     internalLayoutVariant: props.internalLayoutVariant,
   };
-  let clock = 0;
-  const response = handleFocusSchematicLayoutWorkerRequest(
+  return { input, policies };
+}
+
+function modularLayoutIdentity(props: ModularStructuredGraphViewProps): string {
+  const { input, policies } = modularLayoutIdentityInput(props);
+  return exactFocusSchematicLayoutCacheKey(input, policies);
+}
+
+function classicLayoutIdentity(props: LocalStructuredGraphViewProps): string {
+  const mapped = mapProjectionToReactFlow(
+    props.projection,
+    'local-structured',
     {
-      protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
-      requestId: 1,
-      kind: 'layout',
-      input,
-      policies,
+      rootEntityId: props.rootEntityId,
+      visualVariant: props.visualVariant,
     },
-    () => ++clock,
   );
-  if (response.kind !== 'success') throw new Error(response.message);
-  return prepareFocusSchematicRendererGraph({
-    projection: props.projection,
-    model,
-    layoutInput: input,
-    computedLayout: response.result,
-    rootEntityId: props.rootEntityId,
-    secondaryRelationshipsVisible: false,
-    ...(props.routeStyle === undefined ? {} : { routeStyle: props.routeStyle }),
-    visualVariant: 'extended',
-  });
+  return localStructuredLayoutFingerprint(mapped.nodes, mapped.edges);
 }
 
 describe('GraphExplorer experimental availability integration', () => {
@@ -724,6 +749,10 @@ describe('GraphExplorer experimental availability integration', () => {
     expect(performance.snapshot().operations['local-projections']).toBe(0);
     await click('Headings');
     expect(performance.snapshot().operations['local-projections']).toBe(0);
+    const expandBranch = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Expand children in Focus Explorer"]',
+    );
+    if (expandBranch !== null) await act(() => expandBranch.click());
     await click(`Hide Heading ${heading.title}`);
     expect(
       captured.modular!.projectionState.disclosure.hiddenEntityIds,
@@ -757,6 +786,135 @@ describe('GraphExplorer experimental availability integration', () => {
     expect(
       container.querySelector('[aria-label="Open Focus Explorer"]'),
     ).toBeNull();
+  });
+
+  it('E3-E7 keeps Explorer disclosure directional and layout/history/persistence neutral', async () => {
+    await mount('local', false, undefined, 'structured', 'modular-preview');
+    const overview = snapshot.entities.find(
+      (entity) =>
+        entity.kind === 'section' &&
+        entity.source.path === source.source.path &&
+        entity.title === 'Overview',
+    );
+    const nested = snapshot.entities.find(
+      (entity) =>
+        entity.kind === 'section' &&
+        entity.source.path === source.source.path &&
+        entity.title === 'Nested',
+    );
+    if (overview?.kind !== 'section' || nested?.kind !== 'section')
+      throw new Error('Missing canonical Heading hierarchy.');
+
+    await click('Open Focus Explorer');
+    await click('Headings');
+    expect(
+      container.querySelector(
+        '[aria-label="Expand children in Focus Explorer"]',
+      ),
+    ).not.toBeNull();
+    expect(container.textContent).not.toContain('Nested');
+
+    await act(async () => {
+      captured.modular!.onToggleEntity(source.id, false);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      captured.modular!.onToggleEntity(overview.id, false);
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain('Nested');
+    expect(
+      container.querySelector(
+        '[aria-label="Collapse children in Focus Explorer"]',
+      ),
+    ).not.toBeNull();
+
+    const projection = captured.modular!.projection;
+    const projectionState = captured.modular!.projectionState;
+    const layoutKey = modularLayoutIdentity(captured.modular!);
+    const persistedView = values.get(
+      workspaceViewStorageKey(snapshot.workspace.id),
+    );
+    const performanceBefore = performance.snapshot();
+    const backDisabledBefore = button('Back in graph history').disabled;
+    await click('Collapse children in Focus Explorer');
+
+    expect(container.textContent).not.toContain('Nested');
+    expect(
+      projection.nodes.some(
+        (node) => node.kind === 'entity' && node.entityId === nested.id,
+      ),
+    ).toBe(true);
+    expect(captured.modular!.projection).toBe(projection);
+    expect(captured.modular!.projectionState).toBe(projectionState);
+    expect(modularLayoutIdentity(captured.modular!)).toBe(layoutKey);
+    expect(performance.snapshot().operations).toEqual(
+      performanceBefore.operations,
+    );
+    expect(button('Back in graph history').disabled).toBe(backDisabledBefore);
+    expect(values.get(workspaceViewStorageKey(snapshot.workspace.id))).toBe(
+      persistedView,
+    );
+
+    await act(async () => {
+      captured.modular!.onToggleEntity(overview.id, true);
+      await Promise.resolve();
+    });
+    await click('Expand children in Focus Explorer');
+    expect(container.textContent).toContain('Nested');
+    expect(container.textContent).toContain('Not disclosed');
+    await click('Collapse children in Focus Explorer');
+    await act(async () => {
+      captured.modular!.onToggleEntity(overview.id, false);
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain('Nested');
+    expect(
+      container.querySelector(
+        '[aria-label="Collapse children in Focus Explorer"]',
+      ),
+    ).not.toBeNull();
+  });
+
+  it('E4/E10/E11 retains local branches across tabs and drawer remounts with an unchanged Classic fingerprint', async () => {
+    await mount('local', false, undefined, 'structured', 'classic');
+    await click('Open Focus Explorer');
+    await click('Headings');
+    await click('Expand children in Focus Explorer');
+    expect(container.textContent).toContain('Nested');
+
+    const projection = captured.hierarchy!.projection;
+    const layoutRequestKey = captured.hierarchy!.layoutRequestKey;
+    const fingerprint = classicLayoutIdentity(captured.hierarchy!);
+    const persistedView = values.get(
+      workspaceViewStorageKey(snapshot.workspace.id),
+    );
+    const performanceBefore = performance.snapshot();
+    await click('Collapse children in Focus Explorer');
+    expect(container.textContent).not.toContain('Nested');
+    expect(captured.hierarchy!.projection).toBe(projection);
+    expect(captured.hierarchy!.layoutRequestKey).toBe(layoutRequestKey);
+    expect(classicLayoutIdentity(captured.hierarchy!)).toBe(fingerprint);
+    expect(performance.snapshot().operations).toEqual(
+      performanceBefore.operations,
+    );
+    expect(button('Back in graph history').disabled).toBe(true);
+    expect(values.get(workspaceViewStorageKey(snapshot.workspace.id))).toBe(
+      persistedView,
+    );
+
+    await click('Files');
+    await click('Headings');
+    expect(container.textContent).not.toContain('Nested');
+    await click('Close Focus Explorer');
+    await click('Open Focus Explorer');
+    expect(button('Headings').getAttribute('aria-selected')).toBe('true');
+    expect(container.textContent).not.toContain('Nested');
+    expect(
+      container.querySelector(
+        '[aria-label="Expand children in Focus Explorer"]',
+      ),
+    ).not.toBeNull();
   });
 
   it('keeps the hidden Heading set identical when switching Classic and Modular', async () => {

@@ -2222,6 +2222,28 @@ h2 {
   font-weight: 800;
 }
 
+.focus-explorer__heading-row .focus-explorer__heading-disclosure {
+  width: 1.75rem;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0;
+  border-color: transparent;
+  color: var(--color-text-muted);
+  background: transparent;
+  font-size: 0.85rem;
+}
+
+.focus-explorer__heading-row .focus-explorer__heading-disclosure:hover {
+  border-color: var(--color-border-default);
+  color: var(--color-text-primary);
+  background: var(--color-surface-subtle);
+}
+
+.focus-explorer__heading-disclosure-spacer {
+  width: 1.75rem;
+  flex: 0 0 1.75rem;
+}
+
 .focus-explorer__heading-row--hidden,
 .focus-explorer__heading-row--hidden-by-ancestor {
   background: var(--color-surface-subtle);
