@@ -5914,6 +5914,7 @@ export function GraphExplorer({
                 folderGuidesVisible={modularFolderStripsVisible}
                 internalLayoutVariant={modularFocusInternalLayout}
                 macroLayout={modularFocusMacroLayout}
+                maximized={maximized}
                 directFoldersOnly={modularFocusDirectFoldersOnly}
                 softAncestorDecayBase={modularFocusSoftAncestorDecayBase}
                 softFolderStrength={modularFocusSoftFolderStrength}
@@ -5943,6 +5944,7 @@ export function GraphExplorer({
                 }
                 onFitRequestConsumed={consumeLocalFitRequest}
                 onFocusEntity={focusLocalEntity}
+                onMaximizedChange={changeMaximized}
                 onSubfocusEntity={subfocusLocalEntity}
                 onSelectionChange={changeSelection}
                 onChangeSoftFolderDisplayIntent={softFolderDisplay.commit}
@@ -5977,6 +5979,7 @@ export function GraphExplorer({
                   ? {}
                   : { instrumentation: performance })}
                 layoutRequestKey={localLayoutRequestKey}
+                maximized={maximized}
                 onFailure={(message) =>
                   setLocalStructuredUnavailable(
                     `Focus Hierarchy renderer failed: ${message} Use an available Focus layout or return to All.`,
@@ -5984,6 +5987,7 @@ export function GraphExplorer({
                 }
                 onFitRequestConsumed={consumeLocalFitRequest}
                 onFocusEntity={focusLocalEntity}
+                onMaximizedChange={changeMaximized}
                 onSubfocusEntity={subfocusLocalEntity}
                 onSelectionChange={changeSelection}
                 onToggleEntity={toggleEntity}

@@ -20,8 +20,9 @@ canonical truth, or own a platform storage implementation.
   and semantic viewport context, and safely clears missing selections. It keeps
   the canvas and the single stateful Search instance mounted across shell/live
   changes and does not re-derive graph edges or persist renderer coordinates or
-  shell visibility. Maximize/restore is passed to the renderer as a narrow
-  callback so the canvas control stack remains the mode trigger. KG13B1 adds
+  shell visibility. Maximize/restore is passed to every Network and Hierarchy
+  renderer as a narrow callback so its control directly below Fit remains the
+  mode trigger. KG13B1 adds
   internal Structure/Global/Local renderers through the user-facing Scope ×
   Layout model, each with separate
   semantic viewports and cross-mode history/context. Local uses the KG6 Focus

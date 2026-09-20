@@ -88,6 +88,7 @@ export interface ModularStructuredGraphViewProps {
   readonly initialTransitionAnchor?: GraphTransitionAnchor;
   readonly internalLayoutVariant: FocusSchematicProductInternalLayoutVariant;
   readonly macroLayout: FocusSchematicProductMacroLayout;
+  readonly maximized?: boolean;
   readonly directFoldersOnly: boolean;
   readonly softAncestorDecayBase: 3 | 4;
   readonly softFolderStrength: number;
@@ -100,6 +101,7 @@ export interface ModularStructuredGraphViewProps {
   readonly onFatalFailure: (message: string) => void;
   readonly onFitRequestConsumed?: (key: number) => void;
   readonly onFocusEntity: (entityId: string) => void;
+  readonly onMaximizedChange?: (maximized: boolean) => void;
   readonly onSubfocusEntity: (
     entityId: string,
     kind: 'section' | 'block',

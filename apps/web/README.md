@@ -230,8 +230,9 @@ live in **Settings → Source**. Routine healthy status stays there; opening,
 catch-up, resync, paused, and failure states use compact floating notices that do
 not reduce canvas height.
 
-**Maximize graph**, exposed in the canvas control stack, remains an application
-mode, not the browser Fullscreen API. The existing `GraphExplorer` and
+**Maximize graph**, exposed directly below **Fit graph to view** in every
+Network and Hierarchy canvas control stack, remains an application mode, not the
+browser Fullscreen API. The existing `GraphExplorer` and
 `GraphCanvas` instances remain mounted in place while the workspace becomes a
 fixed `100dvh` surface. Body scrolling is locked, and **Restore graph** or
 `Escape` restores the prior body overflow value. Maximizing is intentionally

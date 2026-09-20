@@ -395,7 +395,7 @@ describe('GraphExplorer experimental availability integration', () => {
     expect(captured.global?.centerRequest).toBeUndefined();
   });
 
-  it('routes the shared maximized workspace owner into both Network renderers', async () => {
+  it('routes the shared maximized workspace owner into every active renderer', async () => {
     await mount('global');
     expect(captured.global?.maximized).toBe(false);
     expect(captured.global?.onMaximizedChange).toEqual(expect.any(Function));
@@ -405,6 +405,18 @@ describe('GraphExplorer experimental availability integration', () => {
     await mount('local', false, undefined, 'free');
     expect(captured.local?.maximized).toBe(false);
     expect(captured.local?.onMaximizedChange).toEqual(expect.any(Function));
+
+    await act(() => root.unmount());
+    root = createRoot(container);
+    await mount('local', false, undefined, 'structured', 'classic');
+    expect(captured.hierarchy?.maximized).toBe(false);
+    expect(captured.hierarchy?.onMaximizedChange).toEqual(expect.any(Function));
+
+    await act(() => root.unmount());
+    root = createRoot(container);
+    await mount('local', false, undefined, 'structured', 'modular-preview');
+    expect(captured.modular?.maximized).toBe(false);
+    expect(captured.modular?.onMaximizedChange).toEqual(expect.any(Function));
   });
 
   it('keeps All density strength transient and camera-only', async () => {
