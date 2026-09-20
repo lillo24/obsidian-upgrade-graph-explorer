@@ -502,3 +502,12 @@ therefore leaves the previous validated Modular graph visible with warning and
 Retry; only a failure with no adopted result invokes the session Classic
 fallback. Expected worker or validation failures remain lifecycle state and do
 not reach the null-rendering error boundary.
+
+HIERSTAB1 keeps `ModularStructuredGraphView.tsx` as lifecycle owner without
+moving layout policy into React. An exact cache lookup still happens first. On
+a miss, the component sends its last validated layout as an ephemeral
+transition prior to the worker. Incremental results update the presentation and
+future prior but never populate the exact cold cache; cold and cold-fallback
+results do. The prior is held only in a ref for the mounted session and is not a
+view-state, history, persistence, renderer, or workspace handle. Superseded
+requests still terminate and only the newest validated generation can adopt.

@@ -74,6 +74,7 @@ pnpm generate:focus-schematic-nested-directional-folder-lab
 
 pnpm benchmark:focus-schematic-soft-clusters
 pnpm generate:focus-schematic-soft-cluster-lab -- --out output/hier4b-soft-clusters-lab
+pnpm generate:focus-schematic-incremental-layout-lab -- --out output/hierstab1-incremental-layout-lab
 ```
 
 Medium and hub attempts run in disposable worker threads with hard timeouts.
@@ -139,6 +140,8 @@ adjacent keyboard-accessible list. Generated output is gitignored.
 - `src/soft-cluster-lab.ts` generates the self-contained HIER4B comparison with
   primary arrows, exact-folder hulls/centroids, hop guides, module bounds,
   internal-layout and Heading-order controls, and SC16's five-way view.
+- `src/incremental-layout-lab.ts` generates HIERSTAB1 Before/cold/incremental
+  SVG evidence with File-center movement vectors.
 - `src/folder-lab.test.ts` verifies the required graphical-review cases,
   accessibility labels, and offline output.
 - `src/endpoint-*.test.ts` covers the inherited HIER2 corpus and review-lab

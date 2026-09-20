@@ -1786,3 +1786,42 @@ while presentation continues until both scale-relative position error and
 velocity are negligible; only then does the client adopt exact raw coordinates
 and stop rAF work. The held File remains exact on re-grab and reduced-motion
 continues to bypass decorative catch-up.
+
+## HIERSTAB1 transition-aware Focus layout
+
+Modular Focus layout has two deliberately separate reuse paths. The 24-entry
+exact cache remains a current-input, deterministic-cold-result cache. Its key
+continues to use exact-cache schema/version 14 even though worker transport is
+protocol 15. An exact hit always wins and is adopted without a worker request.
+
+On an exact miss, `ModularStructuredGraphView` may send the last validated
+layout as a plain, session-only transition prior. The prior contains the prior
+validated structural input, normalized policies, their fingerprint, and the
+computed layout. It is never persisted, never becomes Current View or Saved
+View state, and never enters the exact cache key. The strict worker boundary
+revalidates the prior input, policy fingerprint, computed result, and finite
+geometry before classification.
+
+The classifier currently accepts only Soft Folder Cluster transitions with the
+same root File, File-module set, folder hierarchy, primary inter-File topology,
+macro/internal/order/folder policies, and structural settings. Heading/Block
+projection, endpoint roll-up, and dimension changes may differ. Reroots,
+File-set changes, policy changes, source/module structure changes, and
+Directional transitions use the existing cold solver.
+
+For an eligible transition the worker preserves prior File centers, exact
+unchanged module geometry, and surviving internal nodes. It places newly
+revealed structural subtrees around their visible parent using a bounded
+deterministic cardinal search. The candidate is rebuilt with current endpoint,
+lane, attachment, folder, and quality data and must pass the ordinary computed
+layout, collision, Focus anchor, immediate-folder, retained Nested, blocker,
+coverage, and continuous radial-safety gates. A failing candidate gets at most
+two deterministic compound-folder repair rounds; failure then invokes the
+unchanged cold solver. Transition-conditioned results are adopted but are not
+written to the exact cache. Cold and cold-fallback results are cacheable.
+
+The worker response reports aggregate transition classification, movement,
+Compass continuity, repair frontier, and fallback evidence. It contains no
+folder, path, or source names. Rapid requests retain the existing
+latest-result-wins worker lifecycle, and a double failure retains the last
+validated presentation with the existing warning/retry behavior.

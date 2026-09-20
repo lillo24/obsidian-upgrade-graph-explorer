@@ -362,6 +362,34 @@ export interface FocusSchematicLayoutInput {
   readonly settings: FocusSchematicPrototypeSettings;
 }
 
+export type FocusSchematicTransitionMode =
+  | 'cold'
+  | 'exact-cache'
+  | 'incremental-no-macro-move'
+  | 'incremental-local-repair'
+  | 'cold-fallback';
+
+export interface FocusSchematicLayoutTransitionEvidence {
+  readonly schemaVersion: 1;
+  readonly mode: FocusSchematicTransitionMode;
+  readonly eligible: boolean;
+  readonly classification: 'cold-required' | 'local-internal-change';
+  readonly rejectionReason: string | null;
+  readonly priorModuleCount: number;
+  readonly survivingModuleCount: number;
+  readonly affectedModuleCount: number;
+  readonly unchangedModuleCount: number;
+  readonly movedUnaffectedModuleCount: number;
+  readonly meanUnaffectedModuleDisplacement: number;
+  readonly p95UnaffectedModuleDisplacement: number;
+  readonly maxUnaffectedModuleDisplacement: number;
+  readonly changedSurvivingCompassBranchCount: number;
+  readonly localRepairFrontierModuleCount: number;
+  readonly localRepairIterations: number;
+  readonly localRepairCandidates: number;
+  readonly coldFallbackUsed: boolean;
+}
+
 export interface FocusSchematicComputedLayoutOptions {
   /** Visual ordering policy. Ignored while Folder Bands are Off. */
   readonly endpointOrderPolicy?: FocusSchematicEndpointOrderPolicy;

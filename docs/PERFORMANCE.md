@@ -1432,3 +1432,20 @@ limits. Connected-core mean response remained `11.791331` versus `11.762995`,
 the target error stayed zero, and all production scenarios reached sleeping
 with zero post-sleep work. Native interaction and rendering remain the release
 gate.
+
+## HIERSTAB1 incremental Focus layout
+
+`pnpm generate:focus-schematic-incremental-layout-lab` produces deterministic
+Before/cold/incremental geometry evidence. Eligible local disclosure work
+rebuilds current internal geometry at established File centers and skips Soft's
+36+18 force relaxation, cohesion, Nested packing, and compound packing when the
+preserved candidate already passes every hard gate. Bounded repair invokes only
+the existing deterministic structural folder stages, with two rounds and six
+stage candidates as hard caps; it never runs a force simulation.
+
+Transition timing is returned beside the existing phase timings. The
+32-File/96-Heading regression records movement and fallback frequency but has no
+wall-clock CI threshold, because worker creation and host load are noisy. Cold
+Soft benchmark gates remain owned by
+`pnpm benchmark:focus-schematic-soft-clusters`; HIERSTAB1 does not change the
+cold algorithm or its version 13 evidence.
