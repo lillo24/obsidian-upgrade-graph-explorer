@@ -109,6 +109,7 @@ import {
   createFocusOutlineModel,
   structuralSubtreeContains,
 } from '../focus-outline-model';
+import { createFocusExplorerFilesModel } from '../focus-explorer-files';
 import {
   containingDocumentEntityId,
   effectiveGlobalProjectionState,
@@ -240,7 +241,7 @@ import {
 import { activateMaximizedGraphMode } from './maximized-graph-mode';
 import { ProvenanceInspector } from './ProvenanceInspector';
 import { NetworkExplorer } from './NetworkExplorer';
-import { FocusOutline } from './FocusOutline';
+import { FocusExplorer, type FocusExplorerTab } from './FocusExplorer';
 import { NetworkEditingControls } from './NetworkEditingControls';
 import type { SavedGraphQueriesState } from './SavedGraphQueries';
 import type { SavedViewsState } from './SavedViews';
@@ -1499,6 +1500,14 @@ export function GraphExplorer({
       activeViewState.disclosure.hiddenEntityIds,
     );
   }, [activeViewState, projectionWorkspace, result]);
+  const focusExplorerFilesModel = useMemo(() => {
+    if (focusOutlineModel === undefined || !result.ok) return undefined;
+    return createFocusExplorerFilesModel(
+      result.projection,
+      projectionWorkspace,
+      focusOutlineModel.documentEntityId,
+    );
+  }, [focusOutlineModel, projectionWorkspace, result]);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const inspectorToolbarRef = useRef<HTMLButtonElement>(null);
   const inspectorHandleRef = useRef<HTMLButtonElement>(null);
@@ -1506,8 +1515,12 @@ export function GraphExplorer({
   const [inspectorFocusRequestKey, setInspectorFocusRequestKey] = useState(0);
   const [networkExplorerOpen, setNetworkExplorerOpen] = useState(false);
   const [focusOutlineOpen, setFocusOutlineOpen] = useState(false);
+  const [focusExplorerTab, setFocusExplorerTab] =
+    useState<FocusExplorerTab>('files');
   // Folder overrides survive query/live membership changes and sidebar remounts.
   const [networkExplorerFolderState, setNetworkExplorerFolderState] =
+    useState<NetworkExplorerFolderState>(() => new Map());
+  const [focusExplorerFolderState, setFocusExplorerFolderState] =
     useState<NetworkExplorerFolderState>(() => new Map());
   const [graphClickSelection, setGraphClickSelection] =
     useState<GraphSelection | null>(null);
@@ -4819,6 +4832,30 @@ export function GraphExplorer({
     (entityId: EntityId) => navigateToEntity(entityId, 'Focus'),
     [navigateToEntity],
   );
+  const selectFocusExplorerFile = useCallback(
+    (nodeId: ProjectionNodeId) => {
+      if (focusExplorerFilesModel?.fileById.has(nodeId) !== true) return;
+      setSelection({ kind: 'node', id: nodeId });
+      const bookmark = localViewportBookmarkRef.current;
+      requestLocalSemanticCenter({
+        nodeId,
+        freeRatio: bookmark?.freeRatio ?? LOCAL_NAVIGATION_RATIO,
+        structuredZoom:
+          bookmark?.structuredZoom ?? LOCAL_STRUCTURED_NAVIGATION_ZOOM,
+      });
+      setNavigationAnnouncement(
+        'Focus Explorer selected and centered the visible File.',
+      );
+    },
+    [focusExplorerFilesModel, requestLocalSemanticCenter],
+  );
+  const focusFocusExplorerFile = useCallback(
+    (nodeId: ProjectionNodeId) => {
+      const entityId = focusExplorerFilesModel?.fileById.get(nodeId)?.entityId;
+      if (entityId !== undefined) focusLocalEntity(entityId);
+    },
+    [focusExplorerFilesModel, focusLocalEntity],
+  );
   const subfocusLocalEntity = useCallback(
     (entityId: EntityId, kind: 'section' | 'block') => {
       if (
@@ -5562,8 +5599,8 @@ export function GraphExplorer({
                 <button
                   aria-label={
                     focusOutlineVisible
-                      ? 'Close Focus Outline'
-                      : 'Open Focus Outline'
+                      ? 'Close Focus Explorer'
+                      : 'Open Focus Explorer'
                   }
                   aria-pressed={focusOutlineVisible}
                   className="graph-inspector-toggle graph-focus-outline-toggle"
@@ -5571,8 +5608,8 @@ export function GraphExplorer({
                   ref={focusOutlineToolbarRef}
                   title={
                     focusOutlineVisible
-                      ? 'Close Focus Outline'
-                      : 'Open Focus Outline'
+                      ? 'Close Focus Explorer'
+                      : 'Open Focus Explorer'
                   }
                   type="button"
                 >
@@ -6059,13 +6096,14 @@ export function GraphExplorer({
           ) : null}
           {focusOutlineAvailable &&
           focusOutlineModel !== undefined &&
+          focusExplorerFilesModel !== undefined &&
           !focusOutlineVisible ? (
             <button
-              aria-label="Open Focus Outline"
+              aria-label="Open Focus Explorer"
               className="graph-focus-outline-handle"
               onClick={toggleFocusOutline}
               ref={focusOutlineHandleRef}
-              title="Open Focus Outline"
+              title="Open Focus Explorer"
               type="button"
             >
               <span aria-hidden="true">›</span>
@@ -6073,12 +6111,23 @@ export function GraphExplorer({
           ) : null}
           {focusOutlineAvailable &&
           focusOutlineModel !== undefined &&
+          focusExplorerFilesModel !== undefined &&
           focusOutlineVisible ? (
-            <FocusOutline
-              model={focusOutlineModel}
+            <FocusExplorer
+              activeTab={focusExplorerTab}
+              files={focusExplorerFilesModel}
+              folderState={focusExplorerFolderState}
+              headings={focusOutlineModel}
+              onActiveTabChange={setFocusExplorerTab}
               onClose={closeFocusOutline}
+              onFocusFile={focusFocusExplorerFile}
+              onFolderStateChange={setFocusExplorerFolderState}
+              onSelectFile={selectFocusExplorerFile}
               onSetHeadingHidden={setHeadingHidden}
               onShowAll={showAllFocusHeadings}
+              {...(activeSelection?.kind === 'node'
+                ? { selectedNodeId: activeSelection.id }
+                : {})}
             />
           ) : null}
           {!inspectorOpen ? (

@@ -326,15 +326,28 @@ transition never steals focus from the Layout control. The DOM companion stays
 usable when a valid Network projection exists even if the visual Sigma mount
 reports a failure.
 
-Focus + Hierarchy exposes a separate transient **Focus Outline** on the left.
-It lists every canonical Heading in source order, including Headings outside the
-current depth and Headings hidden by an ancestor. Hide omits the selected
-Heading subtree from the shared Classic/Modular projection while retaining the
-row for Restore. Show all affects only the current Focus File. These semantic
-actions use graph history and Current View/Saved View persistence; opening,
-closing, or reading the drawer performs no projection or layout work. On wide
-screens it can coexist with Inspector; at 900 px the most recently opened one
-replaces the other.
+Focus + Hierarchy exposes a transient **Focus Explorer** on the left. Its Files
+tab lists only File modules in the completed Focus projection and reuses the
+Network Explorer's pure canonical source-folder grouping. Selecting a File
+centers it in the current hierarchy; the separate Focus action uses the existing
+File-reroot navigation. Its Headings tab lists every canonical Heading in source
+order, including Headings outside the current depth and Headings hidden by an
+ancestor. Hide omits the selected Heading subtree from the shared
+Classic/Modular projection while retaining the row for Restore. Show all affects
+only the current Focus File. The selected tab and folder expansion are transient
+session state. Opening, closing, grouping, or switching tabs performs no
+projection or layout work. Semantic Hide/Restore actions use graph history and
+Current View/Saved View persistence. On wide screens Focus Explorer can coexist
+with Inspector; at 900 px the most recently opened one replaces the other.
+
+Classic layout coordinates are keyed by the exact visible node/edge/dimension
+fingerprint; Modular input, cache, and adoption are keyed by the complete model,
+projection, dimensions, settings, and policies. Hide and Restore therefore
+cannot accept geometry from a different visible topology. While a matching
+replacement is pending, native disclosure buttons remain safely disabled and
+the global Updating layout status remains visible; disabled disclosure controls
+keep a transparent border/background so the transition does not resemble a
+selected translucent card control.
 
 The normal Inspector view is deliberately user-facing: entities show their name,
 kind, location, outgoing links, and backlinks; reference edges show the actual

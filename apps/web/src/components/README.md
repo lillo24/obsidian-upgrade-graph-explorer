@@ -7,7 +7,7 @@ canonical truth, or own a platform storage implementation.
 - `GraphExplorer.tsx` composes report-scoped projection/inspection workspaces,
   compact structural/focus/workspace controls, controlled Filters and Settings
   overlays, shared canonical navigation, graph selection, the transient unified
-  Inspector drawer, the transient Network Explorer drawer, and the Focus Outline,
+  Inspector drawer, the transient Network Explorer drawer, and Focus Explorer,
   Current View hydration/alert/reset orchestration, Named Saved Views session
   mutations and cross-key profile application, transient graph Back/Forward
   checkpoints, and semantic renderer viewport requests. Applying a named view
@@ -68,12 +68,15 @@ canonical truth, or own a platform storage implementation.
   screens both side drawers may coexist; at the existing 900 px breakpoint the
   most recently opened drawer owns the overlay and the other closes without
   stealing focus.
-- `FocusOutline.tsx` presents the canonical source-order Heading tree for the
-  current Focus File. It keeps hidden rows visible for recovery, distinguishes
-  explicit, inherited, visible, and currently undisclosed state, and emits only
-  Hide/Restore/Show-all intents. `../focus-outline-model.ts` derives those rows
-  from canonical hierarchy plus the completed projection. Neither layer owns
-  projection, layout, worker, or persistence work.
+- `FocusExplorer.tsx` owns the transient Files/Headings tab shell for Focus +
+  Hierarchy. Files selects/centers current projection File modules and exposes a
+  separate existing-pipeline reroot action; Headings keeps hidden rows available
+  for Hide/Restore/Show-all recovery and distinguishes explicit, inherited,
+  visible, and currently undisclosed state. `../focus-explorer-files.ts` filters
+  the completed projection to File modules and uses the pure folder grouping in
+  `../network-explorer-folders.ts`; `../focus-outline-model.ts` derives the
+  canonical Heading rows. Tab and folder state are session-only presentation
+  state. None of these layers owns projection, layout, worker, or persistence.
   The **Arguments** launcher is the sole integration with the application-level
   Argument Workspace. It appears beside Filters/Groups in the normal toolbar
   and inside maximized Tools, blocks opening while a movement or unsaved folder

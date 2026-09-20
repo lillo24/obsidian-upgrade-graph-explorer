@@ -815,11 +815,17 @@ mutates source truth. Early releases remain read-only with respect to Markdown.
 HIERDISC1 adds `hiddenEntityIds` as a shared KG6 disclosure layer. A hidden
 Heading removes its canonical structural subtree before endpoint roll-up; it
 does not rewrite depth or collapse intent. Focus Hierarchy's web-owned Focus
-Outline derives a source-order section tree from the canonical workspace and
-annotates it with the completed projection, so hidden rows remain available for
-recovery without becoming renderer or layout truth. Classic and Modular consume
-the same projection. Drawer visibility is session-only, while semantic hides
-participate in graph history, Current View schema v4, and Named Saved Views.
+Explorer combines a current-projection File tree with the canonical source-order
+Heading tree. The File view shares the pure canonical folder grouper with
+Network Explorer but owns no Sigma or Network tools. The Heading view annotates
+canonical rows with the completed projection, so hidden rows remain available
+for recovery without becoming renderer or layout truth. Classic and Modular
+consume the same projection. Classic's exact mapped-topology fingerprint and
+Modular's complete serialized layout input keep cache/adoption geometry aligned
+with that projection; latest-only generation checks reject stale async results,
+while replacement failure retains the explicit last-valid warning behavior.
+Drawer/tab/folder visibility is session-only, while semantic hides participate
+in graph history, Current View schema v4, and Named Saved Views.
 
 KG5 search, resolution filters, disclosure state, and pagination are transient
 diagnostic UI state. They are not KG6 projection contracts or KG9 persisted view

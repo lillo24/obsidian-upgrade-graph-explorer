@@ -589,7 +589,15 @@
 
 .entity-disclosure:disabled {
   cursor: wait;
-  opacity: 0.55;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0.72;
+}
+
+.entity-disclosure:disabled:hover {
+  border-color: transparent;
+  background: transparent;
 }
 
 .entity-disclosure:focus-visible {

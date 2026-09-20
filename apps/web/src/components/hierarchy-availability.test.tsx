@@ -675,7 +675,7 @@ describe('GraphExplorer experimental availability integration', () => {
     expect(button('Back in graph history').disabled).toBe(true);
   });
 
-  it('exposes the canonical Focus Outline only in Focus Hierarchy and records Hide, Back, Forward, and Show all', async () => {
+  it('exposes Focus Explorer only in Focus Hierarchy and records Hide, Back, Forward, and Show all', async () => {
     await mount('local', false, undefined, 'structured', 'modular-preview');
     const heading = snapshot.entities.find(
       (entity) =>
@@ -688,11 +688,29 @@ describe('GraphExplorer experimental availability integration', () => {
 
     const projection = captured.modular!.projection;
     performance.reset();
-    await click('Open Focus Outline');
+    await click('Open Focus Explorer');
     expect(
-      container.querySelector('[aria-label="Focus Outline"]'),
+      container.querySelector('[aria-label="Focus Explorer"]'),
     ).not.toBeNull();
+    expect(button('Files').getAttribute('aria-selected')).toBe('true');
     expect(captured.modular!.projection).toBe(projection);
+    expect(performance.snapshot().operations['local-projections']).toBe(0);
+    const fileSelect = container.querySelector<HTMLButtonElement>(
+      '[aria-label^="Select and center File "]',
+    );
+    if (fileSelect === null) throw new Error('Missing Focus Explorer File.');
+    await act(async () => {
+      fileSelect.click();
+      await Promise.resolve();
+    });
+    expect(captured.modular!.selection).toMatchObject({ kind: 'node' });
+    expect(captured.modular!.centerRequest?.nodeId).toBe(
+      captured.modular!.selection?.kind === 'node'
+        ? captured.modular!.selection.id
+        : undefined,
+    );
+    expect(performance.snapshot().operations['local-projections']).toBe(0);
+    await click('Headings');
     expect(performance.snapshot().operations['local-projections']).toBe(0);
     await click(`Hide Heading ${heading.title}`);
     expect(
@@ -714,15 +732,18 @@ describe('GraphExplorer experimental availability integration', () => {
     ).toEqual([]);
     await click('Open Inspector');
     expect(
-      container.querySelector('[aria-label="Focus Outline"]'),
+      container.querySelector('[aria-label="Focus Explorer"]'),
     ).not.toBeNull();
     expect(button('Close Inspector')).toBeDefined();
     await click('Close Inspector');
-    await click('Close Focus Outline');
-    expect(document.activeElement).toBe(button('Open Focus Outline'));
+    await click('Close Focus Explorer');
+    expect(document.activeElement).toBe(button('Open Focus Explorer'));
+    await click('Open Focus Explorer');
+    expect(button('Headings').getAttribute('aria-selected')).toBe('true');
+    await click('Close Focus Explorer');
     await click('All');
     expect(
-      container.querySelector('[aria-label="Open Focus Outline"]'),
+      container.querySelector('[aria-label="Open Focus Explorer"]'),
     ).toBeNull();
   });
 
@@ -737,7 +758,8 @@ describe('GraphExplorer experimental availability integration', () => {
     if (heading?.kind !== 'section')
       throw new Error('Missing canonical Nested Heading.');
     await act(() => captured.navigate!(heading.id, 'Search Result'));
-    await click('Open Focus Outline');
+    await click('Open Focus Explorer');
+    await click('Headings');
     await click(`Hide Heading ${heading.title}`);
     const classicProjection = captured.hierarchy!.projection;
     expect(
@@ -765,7 +787,8 @@ describe('GraphExplorer experimental availability integration', () => {
       throw new Error('Missing canonical Nested Heading.');
     await act(() => captured.navigate!(heading.id, 'Search Result'));
     await act(() => captured.modular!.onSubfocusEntity(heading.id, 'section'));
-    await click('Open Focus Outline');
+    await click('Open Focus Explorer');
+    await click('Headings');
     await click(`Hide Heading ${heading.title}`);
 
     expect(captured.modular!.focusHierarchySubfocus).toBeNull();
@@ -782,7 +805,7 @@ describe('GraphExplorer experimental availability integration', () => {
     ).not.toContain(heading.id);
   });
 
-  it('keeps Focus Outline and Inspector mutually exclusive in a narrow graph workspace', async () => {
+  it('keeps Focus Explorer and Inspector mutually exclusive in a narrow graph workspace', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({
       matches: query === '(max-width: 900px)',
       media: query,
@@ -795,17 +818,17 @@ describe('GraphExplorer experimental availability integration', () => {
     }));
     await mount('local');
 
-    await click('Open Focus Outline');
+    await click('Open Focus Explorer');
     expect(
-      container.querySelector('[aria-label="Focus Outline"]'),
+      container.querySelector('[aria-label="Focus Explorer"]'),
     ).not.toBeNull();
     await click('Open Inspector');
-    expect(container.querySelector('[aria-label="Focus Outline"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Focus Explorer"]')).toBeNull();
 
-    await click('Open Focus Outline');
+    await click('Open Focus Explorer');
     expect(button('Open Inspector')).toBeDefined();
     expect(
-      container.querySelector('[aria-label="Focus Outline"]'),
+      container.querySelector('[aria-label="Focus Explorer"]'),
     ).not.toBeNull();
   });
 
