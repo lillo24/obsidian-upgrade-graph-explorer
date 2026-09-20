@@ -116,6 +116,7 @@ describe('Network Explorer projection model', () => {
         expandedEntityIds: snapshot.entities
           .filter((entity) => entity.kind === 'section')
           .map((entity) => entity.id),
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: true,
       },

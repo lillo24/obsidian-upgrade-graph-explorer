@@ -73,6 +73,7 @@ export function createPersistedWorkspaceView({
           state.disclosure.expandedEntityIds,
         ).filter((entityId) => !collapsed.has(entityId)),
         collapsedEntityIds,
+        hiddenEntityIds: sortedUnique(state.disclosure.hiddenEntityIds),
         includeBlocks: state.disclosure.includeBlocks,
       },
       ...(state.focus === undefined ? {} : { focus: state.focus }),

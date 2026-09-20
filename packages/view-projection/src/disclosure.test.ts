@@ -115,6 +115,7 @@ describe('structural disclosure', () => {
         disclosure: {
           defaultDepth,
           expandedEntityIds: [],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: false,
         },
@@ -144,6 +145,7 @@ describe('structural disclosure', () => {
           defaultDepth,
           ...(maxSectionLevel === undefined ? {} : { maxSectionLevel }),
           expandedEntityIds: [],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: false,
         },
@@ -167,6 +169,7 @@ describe('structural disclosure', () => {
       disclosure: {
         defaultDepth: 1,
         expandedEntityIds: ['a-overview', 'a-detail'],
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: false,
       },
@@ -175,6 +178,7 @@ describe('structural disclosure', () => {
       disclosure: {
         defaultDepth: 3,
         expandedEntityIds: [],
+        hiddenEntityIds: [],
         collapsedEntityIds: ['a-overview'],
         includeBlocks: false,
       },
@@ -193,6 +197,7 @@ describe('structural disclosure', () => {
       disclosure: {
         defaultDepth: 3,
         expandedEntityIds: [],
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: true,
       },
@@ -223,6 +228,7 @@ describe('structural disclosure', () => {
         disclosure: {
           defaultDepth,
           expandedEntityIds: [],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: false,
         },
@@ -278,6 +284,7 @@ describe('structural disclosure', () => {
           'doc-b',
           'b-target',
         ],
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: true,
       },
@@ -291,6 +298,7 @@ describe('structural disclosure', () => {
       disclosure: {
         defaultDepth: limited.disclosure.defaultDepth,
         expandedEntityIds: limited.disclosure.expandedEntityIds,
+        hiddenEntityIds: [],
         collapsedEntityIds: limited.disclosure.collapsedEntityIds,
         includeBlocks: limited.disclosure.includeBlocks,
       },
@@ -342,6 +350,7 @@ describe('structural disclosure', () => {
       disclosure: {
         defaultDepth: 0,
         expandedEntityIds: ['doc-a', 'a-overview', 'a-detail'],
+        hiddenEntityIds: [],
         collapsedEntityIds: ['doc-a'],
         includeBlocks: false,
       },
@@ -358,6 +367,7 @@ describe('structural disclosure', () => {
       disclosure: {
         defaultDepth: 0,
         expandedEntityIds: ['doc-a', 'a-overview'],
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: false,
       },
@@ -394,6 +404,7 @@ describe('structural disclosure', () => {
         defaultDepth: 1,
         maxSectionLevel: 2,
         expandedEntityIds: ['a-overview'],
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: false,
       },
@@ -416,6 +427,7 @@ describe('structural disclosure', () => {
       disclosure: {
         defaultDepth: 1,
         expandedEntityIds: ['a-overview'],
+        hiddenEntityIds: [],
         collapsedEntityIds: ['a-overview'],
         includeBlocks: true,
       },
@@ -433,6 +445,7 @@ describe('structural disclosure', () => {
       disclosure: {
         defaultDepth: 0,
         expandedEntityIds: ['doc-a', 'a-overview', 'a-detail'],
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: false,
       },
@@ -461,6 +474,7 @@ describe('structural disclosure', () => {
       disclosure: {
         defaultDepth: 0,
         expandedEntityIds: ['doc-a', 'a-overview', 'a-detail'],
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: false,
       },
@@ -512,6 +526,7 @@ describe('structural disclosure', () => {
       disclosure: {
         defaultDepth: 0,
         expandedEntityIds: ['doc-a', 'a-overview', 'a-detail'],
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: true,
       },
@@ -533,6 +548,7 @@ describe('structural disclosure', () => {
       disclosure: {
         defaultDepth: 0,
         expandedEntityIds: ['missing-expanded'],
+        hiddenEntityIds: [],
         collapsedEntityIds: ['missing-collapsed'],
         includeBlocks: false,
       },
@@ -543,6 +559,132 @@ describe('structural disclosure', () => {
     expect(projection.issues.map(({ code }) => code)).toEqual([
       'unknown-collapsed-entity',
       'unknown-expanded-entity',
+    ]);
+  });
+
+  it('hides a Heading and its complete subtree without affecting siblings', () => {
+    const base = topLevelSectionProjectionState();
+    const state: ViewProjectionState = {
+      ...base,
+      disclosure: {
+        ...base.disclosure,
+        defaultDepth: 3,
+        expandedEntityIds: ['a-detail'],
+        includeBlocks: true,
+        hiddenEntityIds: ['a-detail'],
+      },
+    };
+
+    const visible = entityIds(state);
+    expect(visible).toHaveLength(7);
+    expect(visible).toEqual(
+      expect.arrayContaining([
+        'doc-a',
+        'a-overview',
+        'doc-b',
+        'b-target',
+        'b-leaf',
+        'doc-c',
+        'c-third',
+      ]),
+    );
+    expect(visible).not.toContain('a-detail');
+    expect(visible).not.toContain('a-deep');
+    expect(visible).not.toContain('a-block');
+  });
+
+  it('keeps three of five sibling Headings when two explicit subtrees are hidden', () => {
+    const fixture = projectionFixture();
+    const source = (line: number, offset: number) => ({
+      path: 'A.md',
+      span: {
+        start: { line, column: 1, offset },
+        end: { line, column: 2, offset: offset + 1 },
+      },
+    });
+    const snapshot = {
+      ...fixture,
+      entities: [
+        ...fixture.entities,
+        {
+          id: 'a-h2',
+          kind: 'section' as const,
+          parentId: 'doc-a',
+          title: 'H2',
+          level: 1,
+          source: source(6, 50),
+        },
+        {
+          id: 'a-h2-child',
+          kind: 'section' as const,
+          parentId: 'a-h2',
+          title: 'H2 child',
+          level: 2,
+          source: source(7, 60),
+        },
+        {
+          id: 'a-h3',
+          kind: 'section' as const,
+          parentId: 'doc-a',
+          title: 'H3',
+          level: 1,
+          source: source(8, 70),
+        },
+        {
+          id: 'a-h4',
+          kind: 'section' as const,
+          parentId: 'doc-a',
+          title: 'H4',
+          level: 1,
+          source: source(9, 80),
+        },
+        {
+          id: 'a-h5',
+          kind: 'section' as const,
+          parentId: 'doc-a',
+          title: 'H5',
+          level: 1,
+          source: source(10, 90),
+        },
+      ],
+    };
+    const base = topLevelSectionProjectionState();
+    const projection = projectSnapshot(snapshot, {
+      ...base,
+      disclosure: {
+        ...base.disclosure,
+        defaultDepth: 2,
+        hiddenEntityIds: ['a-h2', 'a-h4'],
+      },
+    });
+    const visible = projection.nodes.flatMap((node) =>
+      node.kind === 'entity' ? [node.entityId] : [],
+    );
+
+    expect(visible).toEqual(
+      expect.arrayContaining(['a-overview', 'a-h3', 'a-h5']),
+    );
+    expect(visible).not.toContain('a-h2');
+    expect(visible).not.toContain('a-h2-child');
+    expect(visible).not.toContain('a-h4');
+  });
+
+  it('ignores unsupported hidden kinds and reports stale hidden IDs deterministically', () => {
+    const base = documentOnlyProjectionState();
+    const state: ViewProjectionState = {
+      ...base,
+      disclosure: {
+        ...base.disclosure,
+        hiddenEntityIds: ['a-block', 'doc-a', 'missing-hidden'],
+      },
+    };
+    const projection = projectSnapshot(projectionFixture(), state);
+
+    expect(entityIds(state)).toEqual(['doc-a', 'doc-b', 'doc-c']);
+    expect(projection.issues.map(({ code }) => code)).toEqual([
+      'invalid-hidden-entity-kind',
+      'invalid-hidden-entity-kind',
+      'unknown-hidden-entity',
     ]);
   });
 });

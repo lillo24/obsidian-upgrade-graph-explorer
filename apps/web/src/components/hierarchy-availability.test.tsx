@@ -675,6 +675,140 @@ describe('GraphExplorer experimental availability integration', () => {
     expect(button('Back in graph history').disabled).toBe(true);
   });
 
+  it('exposes the canonical Focus Outline only in Focus Hierarchy and records Hide, Back, Forward, and Show all', async () => {
+    await mount('local', false, undefined, 'structured', 'modular-preview');
+    const heading = snapshot.entities.find(
+      (entity) =>
+        entity.kind === 'section' &&
+        entity.source.path === source.source.path &&
+        entity.title === 'Nested',
+    );
+    if (heading?.kind !== 'section')
+      throw new Error('Missing canonical Nested Heading.');
+
+    const projection = captured.modular!.projection;
+    performance.reset();
+    await click('Open Focus Outline');
+    expect(
+      container.querySelector('[aria-label="Focus Outline"]'),
+    ).not.toBeNull();
+    expect(captured.modular!.projection).toBe(projection);
+    expect(performance.snapshot().operations['local-projections']).toBe(0);
+    await click(`Hide Heading ${heading.title}`);
+    expect(
+      captured.modular!.projectionState.disclosure.hiddenEntityIds,
+    ).toContain(heading.id);
+
+    await click('Back in graph history');
+    expect(
+      captured.modular!.projectionState.disclosure.hiddenEntityIds,
+    ).not.toContain(heading.id);
+    await click('Forward in graph history');
+    expect(
+      captured.modular!.projectionState.disclosure.hiddenEntityIds,
+    ).toContain(heading.id);
+
+    await click('Show all');
+    expect(
+      captured.modular!.projectionState.disclosure.hiddenEntityIds,
+    ).toEqual([]);
+    await click('Open Inspector');
+    expect(
+      container.querySelector('[aria-label="Focus Outline"]'),
+    ).not.toBeNull();
+    expect(button('Close Inspector')).toBeDefined();
+    await click('Close Inspector');
+    await click('Close Focus Outline');
+    expect(document.activeElement).toBe(button('Open Focus Outline'));
+    await click('All');
+    expect(
+      container.querySelector('[aria-label="Open Focus Outline"]'),
+    ).toBeNull();
+  });
+
+  it('keeps the hidden Heading set identical when switching Classic and Modular', async () => {
+    await mount('local');
+    const heading = snapshot.entities.find(
+      (entity) =>
+        entity.kind === 'section' &&
+        entity.source.path === source.source.path &&
+        entity.title === 'Nested',
+    );
+    if (heading?.kind !== 'section')
+      throw new Error('Missing canonical Nested Heading.');
+    await act(() => captured.navigate!(heading.id, 'Search Result'));
+    await click('Open Focus Outline');
+    await click(`Hide Heading ${heading.title}`);
+    const classicProjection = captured.hierarchy!.projection;
+    expect(
+      classicProjection.nodes.some(
+        (node) => node.kind === 'entity' && node.entityId === heading.id,
+      ),
+    ).toBe(false);
+
+    await focusImplementation('modular-preview');
+    expect(captured.modular!.projection).toBe(classicProjection);
+    expect(
+      captured.modular!.projectionState.disclosure.hiddenEntityIds,
+    ).toContain(heading.id);
+  });
+
+  it('clears a hidden Heading subfocus and restores visibility plus subfocus in one Back step', async () => {
+    await mount('local', false, undefined, 'structured', 'modular-preview');
+    const heading = snapshot.entities.find(
+      (entity) =>
+        entity.kind === 'section' &&
+        entity.source.path === source.source.path &&
+        entity.title === 'Nested',
+    );
+    if (heading?.kind !== 'section')
+      throw new Error('Missing canonical Nested Heading.');
+    await act(() => captured.navigate!(heading.id, 'Search Result'));
+    await act(() => captured.modular!.onSubfocusEntity(heading.id, 'section'));
+    await click('Open Focus Outline');
+    await click(`Hide Heading ${heading.title}`);
+
+    expect(captured.modular!.focusHierarchySubfocus).toBeNull();
+    expect(
+      captured.modular!.projectionState.disclosure.hiddenEntityIds,
+    ).toContain(heading.id);
+    await click('Back in graph history');
+    expect(captured.modular!.focusHierarchySubfocus).toEqual({
+      entityId: heading.id,
+      kind: 'section',
+    });
+    expect(
+      captured.modular!.projectionState.disclosure.hiddenEntityIds,
+    ).not.toContain(heading.id);
+  });
+
+  it('keeps Focus Outline and Inspector mutually exclusive in a narrow graph workspace', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === '(max-width: 900px)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(() => true),
+    }));
+    await mount('local');
+
+    await click('Open Focus Outline');
+    expect(
+      container.querySelector('[aria-label="Focus Outline"]'),
+    ).not.toBeNull();
+    await click('Open Inspector');
+    expect(container.querySelector('[aria-label="Focus Outline"]')).toBeNull();
+
+    await click('Open Focus Outline');
+    expect(button('Open Inspector')).toBeDefined();
+    expect(
+      container.querySelector('[aria-label="Focus Outline"]'),
+    ).not.toBeNull();
+  });
+
   it('falls back to Classic for the session without rewriting the preview preference', async () => {
     await mount('local', false, undefined, 'structured', 'modular-preview');
     expect(mode()).toBe('local-modular');

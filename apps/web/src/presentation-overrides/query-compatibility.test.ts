@@ -171,7 +171,7 @@ describe('size overrides remain separate from QUERY1/navigation', () => {
       );
       expect(back?.target.state).toEqual(before.state);
       expect(serializePresentationOverrideRegistry(registry)).toBe(serialized);
-      expect(PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION).toBe(3);
+      expect(PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION).toBe(4);
       expect(
         JSON.stringify(
           createPersistedWorkspaceView({ workspace, state: restored }),

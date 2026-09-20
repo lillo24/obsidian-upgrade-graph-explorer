@@ -26,6 +26,8 @@ export interface StructuralDisclosureState {
   readonly expandedEntityIds: readonly EntityId[];
   /** Hides an entity's descendants without hiding the entity itself. */
   readonly collapsedEntityIds: readonly EntityId[];
+  /** Hides a Heading and its complete structural subtree. */
+  readonly hiddenEntityIds: readonly EntityId[];
   /** Blocks still require their visible parent to be explicitly expanded. */
   readonly includeBlocks: boolean;
 }
@@ -104,6 +106,8 @@ export type ProjectedEdge = ProjectedHierarchyEdge | ProjectedReferenceEdge;
 export type ProjectionIssueCode =
   | 'unknown-expanded-entity'
   | 'unknown-collapsed-entity'
+  | 'unknown-hidden-entity'
+  | 'invalid-hidden-entity-kind'
   | 'conflicting-disclosure-state'
   | 'unknown-focus-root'
   | 'hidden-focus-root'

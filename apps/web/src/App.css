@@ -1966,6 +1966,184 @@ h2 {
   white-space: nowrap;
 }
 
+.focus-outline {
+  position: absolute;
+  z-index: 35;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  width: min(21rem, 100%);
+  max-width: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--color-border-default);
+  color: var(--color-text-primary);
+  background: var(--color-surface-overlay);
+  box-shadow: 1rem 0 2.5rem var(--color-shadow-elevated);
+}
+
+.focus-outline__heading {
+  display: flex;
+  min-height: 4rem;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.focus-outline__heading > div {
+  min-width: 0;
+}
+
+.focus-outline__heading h3,
+.focus-outline__heading p {
+  overflow: hidden;
+  margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focus-outline__heading h3 {
+  font-size: 0.76rem;
+  font-weight: 850;
+  letter-spacing: 0.065em;
+  text-transform: uppercase;
+}
+
+.focus-outline__heading p {
+  margin-top: 0.2rem;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.focus-outline__close {
+  display: grid;
+  width: 2.25rem;
+  min-height: 2.25rem;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.6rem;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-inset);
+  font-size: 1.35rem;
+  cursor: pointer;
+  place-items: center;
+}
+
+.focus-outline__close:hover,
+.focus-outline__close:focus-visible {
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+  background: var(--color-surface-selected);
+}
+
+.focus-outline__toolbar {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.focus-outline__toolbar button,
+.focus-outline__row button {
+  min-height: 2rem;
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.5rem;
+  color: var(--color-control-foreground);
+  background: var(--color-surface-inset);
+  cursor: pointer;
+}
+
+.focus-outline__toolbar button:focus-visible,
+.focus-outline__row button:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.focus-outline__toolbar button:disabled,
+.focus-outline__row button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.focus-outline__toolbar span,
+.focus-outline__empty {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.focus-outline__empty {
+  margin: 0;
+  padding: 1rem;
+}
+
+.focus-outline__tree {
+  min-height: 0;
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.focus-outline__row {
+  display: flex;
+  min-height: 3.25rem;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.45rem 0.65rem 0.45rem
+    calc(0.65rem + (var(--focus-outline-depth) - 1) * 0.85rem);
+  border-bottom: 1px solid var(--color-border-subtle);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 3.25rem;
+}
+
+.focus-outline__row-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 0.15rem;
+}
+
+.focus-outline__row-copy strong,
+.focus-outline__row-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focus-outline__row-copy strong {
+  font-size: 0.8rem;
+}
+
+.focus-outline__row-copy small {
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+}
+
+.focus-outline__row button {
+  display: grid;
+  width: 2rem;
+  flex: 0 0 2rem;
+  padding: 0;
+  place-items: center;
+}
+
+.focus-outline__row--hidden,
+.focus-outline__row--hidden-by-ancestor {
+  background: var(--color-surface-subtle);
+}
+
+.focus-outline__row--hidden-by-ancestor .focus-outline__row-copy {
+  opacity: 0.65;
+}
+
 .network-explorer__row-title {
   font-size: 0.77rem;
   font-weight: 800;
@@ -2870,7 +3048,8 @@ h2 {
   transform: translateY(-50%);
 }
 
-.graph-network-explorer-handle {
+.graph-network-explorer-handle,
+.graph-focus-outline-handle {
   position: absolute;
   z-index: 30;
   top: 50%;
@@ -4161,7 +4340,8 @@ a:focus-visible {
     width: 100%;
   }
 
-  .network-explorer {
+  .network-explorer,
+  .focus-outline {
     width: 100%;
   }
 

@@ -279,6 +279,7 @@ function projectionStates(snapshot: KnowledgeSnapshot): Readonly<
         disclosure: {
           defaultDepth: 1,
           expandedEntityIds: expandable.slice(0, boundedExpansionCount),
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: true,
         },
@@ -352,6 +353,7 @@ function projectionStates(snapshot: KnowledgeSnapshot): Readonly<
         disclosure: {
           defaultDepth: 1,
           expandedEntityIds: expandable,
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: true,
         },

@@ -255,7 +255,8 @@ owns source-session activation and presentation, not the mutation transaction.
 
 `packages/view-projection` depends inward on core only. It validates and indexes
 one canonical snapshot, then derives plain visible nodes/edges from structural
-disclosure, focus, and filter state. It owns nearest-visible-ancestor endpoint
+disclosure, including section-only selective Heading-subtree visibility, focus,
+and filter state. It owns nearest-visible-ancestor endpoint
 roll-up, aggregated reference provenance, internal collapsed relationships, and
 projection-only diagnostic targets. Source adapters, filesystem/platform APIs,
 renderers, layout engines, application code, and graph libraries are
@@ -290,8 +291,9 @@ ADR 0018 and ADR 0019.
 `packages/view-state` depends inward on core and view-projection only. It owns a
 versioned plain-data subset of KG6 disclosure, focus, user-facing filters,
 presentation mode, and separate semantic Structure/Global/Local
-canonical-entity viewport bookmarks. Schema v3 migrates schema-v1 Structure
-and schema-v2 Structure/Global bookmarks losslessly without inferring Local
+canonical-entity viewport bookmarks. Schema v4 adds section-only hidden Heading
+IDs and migrates schema-v1 Structure, schema-v2 Structure/Global, and schema-v3
+bookmarks losslessly without inferring Local
 from Focus. It strictly validates saved data,
 reconciles persisted or current in-memory state against a
 `ProjectionWorkspace`, drops stale identities/path scopes without fuzzy
@@ -328,7 +330,7 @@ node display reducers only; automatic sizes remain in mapping/layout inputs and
 fingerprints. Size edits refresh affected node reducers with Sigma indexation
 for labels/picking but never submit layout or change coordinates. Sparse map
 diffs use a topology-owned File-key index, and pending topology processing gates
-style refreshes. Group colors remain independent. Saved-view schema v3,
+style refreshes. Group colors remain independent. Current View schema v4,
 preferences, query membership,
 visibility, canonical snapshots, and identity catalogs are unchanged.
 
@@ -810,6 +812,15 @@ canonical semantic/profile snapshots; no active Saved View identity is stored or
 replayed at startup. A UI action such as hiding or focusing an entity never
 mutates source truth. Early releases remain read-only with respect to Markdown.
 
+HIERDISC1 adds `hiddenEntityIds` as a shared KG6 disclosure layer. A hidden
+Heading removes its canonical structural subtree before endpoint roll-up; it
+does not rewrite depth or collapse intent. Focus Hierarchy's web-owned Focus
+Outline derives a source-order section tree from the canonical workspace and
+annotates it with the completed projection, so hidden rows remain available for
+recovery without becoming renderer or layout truth. Classic and Modular consume
+the same projection. Drawer visibility is session-only, while semantic hides
+participate in graph history, Current View schema v4, and Named Saved Views.
+
 KG5 search, resolution filters, disclosure state, and pagination are transient
 diagnostic UI state. They are not KG6 projection contracts or KG9 persisted view
 state. KG8 global search is a separate canonical inspection operation: it finds
@@ -914,7 +925,7 @@ change; scrolling and virtual-window updates do not reassert an unchanged
 selection. The overlay never resizes the graph;
 it may coexist with Inspector above 900 px, while the last-opened drawer wins at
 the existing narrow breakpoint. Drawer, expansion, active-row, and scroll state
-are memory-only and absent from schema v3. NETWORKPOLISH1 gives disclosure only
+are memory-only and absent from schema v4. NETWORKPOLISH1 gives disclosure only
 to folders: depths 1/2 default open, 3+ closed (root excluded); path-keyed overrides
 survive ordinary query/live membership changes and sidebar remounts until the
 source session ends. Files never disclose. Projected headings/blocks visually
@@ -970,7 +981,7 @@ All Hierarchy depth remains global.
 
 The user-facing exploration model is the product of two independent choices:
 `Scope = All | Focus` and `Layout = Network | Hierarchy`. The existing internal
-schema-v3 modes remain implementation details: All Network maps to `global`,
+schema-v4 modes remain implementation details: All Network maps to `global`,
 All Hierarchy to `structure`, Focus Network to `local/free`, and Focus Hierarchy
 to `local/structured`. This is a UI normalization, not a persisted-contract
 rename. Regional remains ordinary visual LOD inside Network rather than a fifth
@@ -1201,7 +1212,7 @@ seed medians are 0.748 ms and 0.410 ms; worker-equivalent Dagre is 93.297 ms
 and remains off-main, apply/root normalization is 0.231 ms, and an exact cache
 hit is 0.077 ms. Layout-only switching issues zero KG6/Global/workspace work.
 The React Flow variant exposes only a projected-node screen-point query and
-retains schema v3 with optional `structuredZoom`. Those figures record the
+retains schema v4 with optional `structuredZoom`. Those figures record the
 original compact-Focus assignment; PRE-KG14A4 reuses the same density grammar
 for All and gives Focus extended cards without changing either Dagre mode. See
 ADR 0015 and the current renderer contract.
@@ -1588,7 +1599,7 @@ HIER5 follows HIER4B, and HIER3C follows HIER5.
 All Hierarchy is retained as an experimental whole-vault presentation, hidden by
 default and available for All Network failure recovery. Focus Hierarchy remains
 supported normally. A web-owned pure availability policy gates all activation
-routes; the boolean is a general v1 preference, not schema-v3 view state.
+routes; the boolean is a general v1 preference, not schema-v4 view state.
 Renderer-owned rectangle geometry now packs the immediate Focus seed and reserves
 entities/diagnostics during final diagnostic placement. Dagre topology, canonical
 semantics, Focus document membership and fixed dimensions are unchanged. This is

@@ -93,6 +93,7 @@ export function graphFixture(input: {
     disclosure: {
       defaultDepth: input.withStructure ? 3 : 0,
       expandedEntityIds: input.withStructure ? input.documents : [],
+      hiddenEntityIds: [],
       collapsedEntityIds: [],
       includeBlocks: true,
     },

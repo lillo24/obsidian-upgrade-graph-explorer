@@ -24,6 +24,7 @@ describe('canonical entity reveal state', () => {
       disclosure: {
         ...documentOnlyProjectionState().disclosure,
         expandedEntityIds: ['stays-expanded'],
+        hiddenEntityIds: [],
         collapsedEntityIds: ['doc-a', 'a-overview', 'a-detail'],
       },
     };
@@ -101,6 +102,27 @@ describe('canonical entity reveal state', () => {
 
     expect(unlimited.disclosure.maxSectionLevel).toBeUndefined();
     expect(alreadyWide.disclosure.maxSectionLevel).toBe(6);
+  });
+
+  it('removes the target and hidden structural ancestors during explicit navigation', () => {
+    const workspace = createProjectionWorkspace(projectionFixture());
+    const base = documentOnlyProjectionState();
+    const state: ViewProjectionState = {
+      ...base,
+      disclosure: {
+        ...base.disclosure,
+        hiddenEntityIds: ['a-overview', 'a-detail', 'b-target'],
+      },
+    };
+    const revealed = revealEntityInViewState(workspace, state, 'a-deep');
+
+    expect(revealed.disclosure.hiddenEntityIds).toEqual(['b-target']);
+    expect(projectedEntityIds(workspace, revealed)).toContain('a-deep');
+    expect(state.disclosure.hiddenEntityIds).toEqual([
+      'a-overview',
+      'a-detail',
+      'b-target',
+    ]);
   });
 
   it('preserves focus and filters because the helper owns disclosure only', () => {

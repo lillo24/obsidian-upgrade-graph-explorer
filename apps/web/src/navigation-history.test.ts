@@ -103,6 +103,32 @@ describe('renderer-independent graph navigation history', () => {
     expect(forwardToTwo.target.state.disclosure.defaultDepth).toBe(2);
   });
 
+  it('restores hidden Heading state symmetrically through Back and Forward', () => {
+    const visible = createGraphHistoryCheckpoint(initialGraphState());
+    const hidden = createGraphHistoryCheckpoint(
+      graphStateReducer(initialGraphState(), {
+        type: 'set-heading-hidden',
+        entityId: 'section-a',
+        hidden: true,
+      }),
+    );
+    const history = recordGraphNavigation(
+      createGraphNavigationHistory(),
+      visible,
+      hidden,
+    );
+
+    const back = goBackInGraphHistory(history, hidden);
+    if (back === null) throw new Error('Expected Back to restore the Heading.');
+    expect(back.target.state.disclosure.hiddenEntityIds).toEqual([]);
+    const forward = goForwardInGraphHistory(back.history, back.target);
+    if (forward === null)
+      throw new Error('Expected Forward to hide the Heading.');
+    expect(forward.target.state.disclosure.hiddenEntityIds).toEqual([
+      'section-a',
+    ]);
+  });
+
   it('starts empty and cannot traverse', () => {
     const history = createGraphNavigationHistory();
     const current = createGraphHistoryCheckpoint(initialGraphState());
@@ -382,6 +408,10 @@ describe('renderer-independent graph navigation history', () => {
       },
       {
         ...base,
+        disclosure: { ...base.disclosure, hiddenEntityIds: ['section-a'] },
+      },
+      {
+        ...base,
         focus: {
           rootEntityId: 'doc-a',
           hops: 2,
@@ -425,6 +455,8 @@ describe('renderer-independent graph navigation history', () => {
     const recordActions: readonly GraphStateAction[] = [
       { type: 'toggle-entity', entityId: 'doc-a', currentlyOpen: false },
       { type: 'set-depth', depth: 1 },
+      { type: 'set-heading-hidden', entityId: 'section-a', hidden: true },
+      { type: 'show-headings', entityIds: ['section-a'] },
       { type: 'set-heading-limit', maxSectionLevel: 2 },
       { type: 'set-include-blocks', includeBlocks: true },
       { type: 'enter-focus', entityId: 'doc-a' },

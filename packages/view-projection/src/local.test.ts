@@ -24,6 +24,7 @@ describe('Local KG6 projection', () => {
         disclosure: {
           defaultDepth: 3,
           expandedEntityIds: [],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: false,
         },
@@ -60,6 +61,7 @@ describe('Local KG6 projection', () => {
         disclosure: {
           defaultDepth: 2,
           expandedEntityIds: ['doc-b'],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: false,
         },
@@ -85,6 +87,7 @@ describe('Local KG6 projection', () => {
         disclosure: {
           defaultDepth: 0,
           expandedEntityIds: ['doc-b'],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: false,
         },
@@ -113,6 +116,7 @@ describe('Local KG6 projection', () => {
         disclosure: {
           defaultDepth: 0,
           expandedEntityIds: [],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: false,
         },
@@ -144,6 +148,7 @@ describe('Local KG6 projection', () => {
         disclosure: {
           defaultDepth: 0,
           expandedEntityIds: [],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: false,
         },
@@ -171,6 +176,7 @@ describe('Local KG6 projection', () => {
       disclosure: {
         defaultDepth: 1 as const,
         expandedEntityIds: [] as readonly string[],
+        hiddenEntityIds: [],
         collapsedEntityIds: ['doc-a'] as readonly string[],
         includeBlocks: false,
       },

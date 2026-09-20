@@ -34,6 +34,7 @@ function expandedCandidateState(
     expandedEntityIds: [
       ...new Set([...state.expandedEntityIds, ...owners]),
     ].sort(),
+    hiddenEntityIds: state.hiddenEntityIds,
     collapsedEntityIds: state.collapsedEntityIds.filter(
       (entityId) => !owners.has(entityId),
     ),
@@ -91,6 +92,7 @@ describe('DISC1 canonical candidate fast path', () => {
     {
       ...structuralDepthProjectionState(3).disclosure,
       maxSectionLevel: 2,
+      hiddenEntityIds: [],
       collapsedEntityIds: ['b-target'],
     },
   ];
@@ -370,6 +372,7 @@ describe('pre-PERFQ1A projection byte oracle', () => {
           maxSectionLevel: 2,
           includeBlocks: true,
           expandedEntityIds: ['doc-a', 'a-overview', 'a-detail'],
+          hiddenEntityIds: [],
           collapsedEntityIds: ['b-target'],
         },
         filters: { query: 'documents OR sections' },

@@ -78,6 +78,7 @@ const expanded: ViewProjectionState = {
   disclosure: {
     defaultDepth: 3,
     expandedEntityIds: ['doc', 'section'],
+    hiddenEntityIds: [],
     collapsedEntityIds: [],
     includeBlocks: true,
   },

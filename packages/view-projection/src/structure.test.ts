@@ -20,6 +20,7 @@ function focusState(
     disclosure: {
       defaultDepth,
       expandedEntityIds: [],
+      hiddenEntityIds: [],
       collapsedEntityIds: [],
       includeBlocks: false,
       ...overrides.disclosure,
@@ -94,6 +95,7 @@ describe('Structure Focus projection', () => {
         disclosure: {
           defaultDepth: 1,
           expandedEntityIds: ['doc-b'],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: false,
         },
@@ -150,6 +152,7 @@ describe('Structure Focus projection', () => {
           defaultDepth: 3,
           maxSectionLevel: 3,
           expandedEntityIds: [],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: true,
         },
@@ -161,6 +164,7 @@ describe('Structure Focus projection', () => {
         disclosure: {
           defaultDepth: 3,
           expandedEntityIds: ['a-detail'],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: true,
         },
@@ -172,6 +176,7 @@ describe('Structure Focus projection', () => {
         disclosure: {
           defaultDepth: 3,
           expandedEntityIds: [],
+          hiddenEntityIds: [],
           collapsedEntityIds: ['doc-a'],
           includeBlocks: false,
         },
@@ -243,6 +248,7 @@ describe('Structure Focus projection', () => {
       disclosure: {
         defaultDepth: 1,
         expandedEntityIds: [],
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: false,
       },

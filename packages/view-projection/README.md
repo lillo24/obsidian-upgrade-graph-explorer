@@ -86,6 +86,15 @@ is fully eligible at depth 3. Expanding a visible entity may reveal descendants
 beyond the baseline one parent at a time. A collapsed entity remains visible
 but hides all descendants and takes precedence over expansion/default depth.
 
+`hiddenEntityIds` is the independent selective-visibility layer for canonical
+Headings. A hidden Heading and its entire structural subtree are omitted even
+when depth or expansion would otherwise disclose them. Hidden state survives
+depth changes and collapse/expand actions; restoring the Heading reveals it
+under the unchanged disclosure state. Only section IDs are accepted. Documents
+and Blocks are ignored with a validation issue, and live reconciliation drops
+stale IDs. Explicit navigation removes the target Heading and any hidden
+section ancestors from this set before applying the ordinary reveal rules.
+
 Optional `maxSectionLevel` is a separate literal Markdown heading ceiling using
 canonical `SectionEntity.level`. It applies to both default depth and explicit
 expansion, so an H2 cannot appear under an H1-only ceiling even when its parent
@@ -119,7 +128,8 @@ without changing the fixed file neighborhood. Exact Collapse affordances and
 explicit expanded/collapsed intent remain preserved when Blocks, heading
 limits, filters, or Focus temporarily remove an affordance.
 
-`revealEntityInViewState` opens and uncollapses the target's ancestor chain. It
+`revealEntityInViewState` restores any selectively hidden target/ancestor
+Headings, then opens and uncollapses the target's ancestor chain. It
 also enables blocks when the target is a block and minimally widens an existing
 heading ceiling to include the target and its structural section ancestors. It
 deliberately leaves focus and filters unchanged: application navigation owns

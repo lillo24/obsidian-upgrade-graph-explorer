@@ -8,6 +8,7 @@ export function structuralDepthProjectionState(
       defaultDepth,
       expandedEntityIds: [],
       collapsedEntityIds: [],
+      hiddenEntityIds: [],
       includeBlocks: false,
     },
   };

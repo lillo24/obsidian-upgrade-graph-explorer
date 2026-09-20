@@ -45,6 +45,7 @@ function detailedState(focused: boolean): ViewProjectionState {
       defaultDepth: 2,
       maxSectionLevel: 4,
       expandedEntityIds: sections[0] === undefined ? [] : [sections[0].id],
+      hiddenEntityIds: [],
       collapsedEntityIds: sections[1] === undefined ? [] : [sections[1].id],
       includeBlocks: true,
     },
@@ -164,7 +165,7 @@ describe('Named Saved View semantic composition', () => {
         }),
       },
       view: expect.objectContaining({
-        schemaVersion: 3,
+        schemaVersion: 4,
         workspaceId: snapshot.workspace.id,
         presentationMode: 'local',
         projection: expect.objectContaining({
