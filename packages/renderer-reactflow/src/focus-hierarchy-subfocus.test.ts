@@ -233,4 +233,27 @@ describe('Focus Hierarchy subfocus presentation', () => {
       /is-subfocus-dimmed\.is-highlighted[\s\S]*?opacity:\s*0\.16;/,
     );
   });
+
+  it('keeps pending disclosure controls transparent and visually distinct from focus, selection, and subfocus', () => {
+    const styles = readFileSync(
+      new URL('./styles.css', import.meta.url),
+      'utf8',
+    );
+    expect(styles).toMatch(
+      /\.entity-disclosure\s*\{[\s\S]*?border:\s*1px solid transparent;[\s\S]*?background:\s*transparent;/,
+    );
+    expect(styles).toMatch(
+      /\.entity-disclosure:disabled\s*\{[\s\S]*?border-color:\s*transparent;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;/,
+    );
+    expect(styles).toMatch(
+      /\.entity-disclosure:disabled:hover\s*\{[\s\S]*?border-color:\s*transparent;[\s\S]*?background:\s*transparent;/,
+    );
+    expect(styles).toMatch(
+      /\.entity-disclosure:focus-visible\s*\{[\s\S]*?outline:\s*3px solid var\(--hierarchy-focus-outline\);/,
+    );
+    expect(styles).toMatch(
+      /\.react-flow__node\.selected[\s\S]*?\.entity-card[\s\S]*?outline:/,
+    );
+    expect(styles).toMatch(/is-subfocus-primary[\s\S]*?opacity:\s*1;/);
+  });
 });

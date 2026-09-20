@@ -34,9 +34,11 @@ export interface LocalStructuredGraphViewProps {
   readonly initialTransitionAnchor?: GraphTransitionAnchor;
   readonly instrumentation?: PerformanceInstrumentation;
   readonly layoutRequestKey: number;
+  readonly maximized?: boolean;
   readonly onFailure: (message: string) => void;
   readonly onFitRequestConsumed?: (key: number) => void;
   readonly onFocusEntity: (entityId: string) => void;
+  readonly onMaximizedChange?: (maximized: boolean) => void;
   readonly onSubfocusEntity: (
     entityId: string,
     kind: 'section' | 'block',

@@ -12,7 +12,7 @@ import type {
   ViewProjectionState,
 } from '@icarus-graph-explorer/view-projection';
 
-export const PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION = 3 as const;
+export const PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION = 4 as const;
 export type GraphPresentationMode = 'structure' | 'global' | 'local';
 /** Compatibility name for callers compiled against the schema-v2 API. */
 export type RendererEntryMode = GraphPresentationMode;
@@ -50,6 +50,7 @@ export interface PersistedProjectionState {
     readonly maxSectionLevel?: SectionHeadingLevel;
     readonly expandedEntityIds: readonly EntityId[];
     readonly collapsedEntityIds: readonly EntityId[];
+    readonly hiddenEntityIds: readonly EntityId[];
     readonly includeBlocks: boolean;
   };
   readonly focus?: FocusProjectionState;
@@ -88,6 +89,8 @@ export type PersistedViewValidationResult =
 export type ViewRestoreIssueCode =
   | 'unknown-expanded-entity'
   | 'unknown-collapsed-entity'
+  | 'unknown-hidden-entity'
+  | 'invalid-hidden-entity-kind'
   | 'conflicting-disclosure-state'
   | 'legacy-local-root-expansion-removed'
   | 'focus-root-missing'

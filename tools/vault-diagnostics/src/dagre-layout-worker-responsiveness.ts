@@ -70,6 +70,7 @@ function createProductionInput(profile: 'small' | 'medium'): {
     disclosure: {
       defaultDepth: 1,
       expandedEntityIds,
+      hiddenEntityIds: [],
       collapsedEntityIds: [],
       includeBlocks: true,
     },

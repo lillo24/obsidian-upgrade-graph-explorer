@@ -16,6 +16,10 @@ export {
   type FocusedDocumentNeighborhoodDescription,
 } from './focused-documents';
 export {
+  describeFocusedDisclosureDepth,
+  type FocusedDisclosureDepthPresentation,
+} from './focused-disclosure-depth';
+export {
   containingDocumentEntityId,
   deriveLocalProjectionState,
   projectLocalView,

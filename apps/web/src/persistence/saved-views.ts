@@ -10,7 +10,6 @@ import {
   type SpatialOverrideRegistry,
 } from '@icarus-graph-explorer/spatial-overrides';
 import {
-  PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION,
   validatePersistedWorkspaceView,
   type PersistedWorkspaceView,
 } from '@icarus-graph-explorer/view-state';
@@ -149,7 +148,8 @@ function validateDeterministicView(
   const disclosure = view.projection.disclosure;
   if (
     !isSortedUnique(disclosure.expandedEntityIds) ||
-    !isSortedUnique(disclosure.collapsedEntityIds)
+    !isSortedUnique(disclosure.collapsedEntityIds) ||
+    !isSortedUnique(disclosure.hiddenEntityIds)
   ) {
     return 'Saved View disclosure identities are not deterministically sorted.';
   }
@@ -424,14 +424,6 @@ export function validateSavedViewRegistry(
       return {
         valid: false,
         message: `Saved View "${candidate.name}" needs a persisted view object.`,
-      };
-    }
-    if (
-      candidate.view.schemaVersion !== PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION
-    ) {
-      return {
-        valid: false,
-        message: `Saved View "${candidate.name}" requires view-state schema ${PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION}.`,
       };
     }
     const validation = validatePersistedWorkspaceView(candidate.view);

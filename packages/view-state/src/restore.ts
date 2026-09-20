@@ -131,6 +131,10 @@ function sameViewState(
       leftDisclosure.collapsedEntityIds,
       rightDisclosure.collapsedEntityIds,
     ) &&
+    sameValues(
+      leftDisclosure.hiddenEntityIds,
+      rightDisclosure.hiddenEntityIds,
+    ) &&
     ((leftFocus === undefined && rightFocus === undefined) ||
       (leftFocus !== undefined &&
         rightFocus !== undefined &&
@@ -183,6 +187,21 @@ function reconcileWorkspaceView(
     });
     return false;
   });
+  const hiddenEntityIds = restoreIds(
+    workspace,
+    current.disclosure.hiddenEntityIds,
+    'unknown-hidden-entity',
+    issues,
+    origin,
+  ).filter((entityId) => {
+    if (workspace.requireEntity(entityId).kind === 'section') return true;
+    issues.push({
+      code: 'invalid-hidden-entity-kind',
+      subject: entityId,
+      message: `${origin} entity "${entityId}" is not a Heading and was removed from explicit hide state.`,
+    });
+    return false;
+  });
   const focus = current.focus;
   const restoredFocus =
     focus === undefined || workspace.entity(focus.rootEntityId) !== undefined
@@ -207,6 +226,7 @@ function reconcileWorkspaceView(
       ...current.disclosure,
       expandedEntityIds,
       collapsedEntityIds,
+      hiddenEntityIds,
     },
     ...(restoredFocus === undefined ? {} : { focus: restoredFocus }),
     ...(filters === undefined ? {} : { filters }),
@@ -329,6 +349,7 @@ export function restorePersistedWorkspaceView(
           }),
       expandedEntityIds: localExpanded,
       collapsedEntityIds: persistedDisclosure.collapsedEntityIds,
+      hiddenEntityIds: persistedDisclosure.hiddenEntityIds,
       includeBlocks: persistedDisclosure.includeBlocks,
     },
     ...(normalizedFocus === undefined ? {} : { focus: normalizedFocus }),

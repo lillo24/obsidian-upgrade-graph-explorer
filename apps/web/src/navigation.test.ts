@@ -81,6 +81,28 @@ const snapshot: KnowledgeSnapshot = {
 };
 
 describe('shared canonical navigation planning', () => {
+  it('reveals a hidden Heading and its hidden ancestors as one navigation state', () => {
+    const workspace = createProjectionWorkspace(snapshot);
+    const base = documentOnlyProjectionState();
+    const state: ViewProjectionState = {
+      ...base,
+      disclosure: {
+        ...base.disclosure,
+        hiddenEntityIds: ['section-a', 'section-deep'],
+      },
+    };
+    const plan = planEntityNavigation(workspace, state, 'section-deep');
+
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.state.disclosure.hiddenEntityIds).toEqual([]);
+    expect(
+      projectView(workspace, plan.state).nodes.some(
+        (node) => node.kind === 'entity' && node.entityId === 'section-deep',
+      ),
+    ).toBe(true);
+  });
+
   it('exits focus, reveals a nested target, and returns its projected selection', () => {
     const workspace = createProjectionWorkspace(snapshot);
     const state: ViewProjectionState = {

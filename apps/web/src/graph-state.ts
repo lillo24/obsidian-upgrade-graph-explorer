@@ -35,6 +35,15 @@ export type GraphStateAction =
     }
   | { readonly type: 'set-depth'; readonly depth: StructuralDepth }
   | {
+      readonly type: 'set-heading-hidden';
+      readonly entityId: EntityId;
+      readonly hidden: boolean;
+    }
+  | {
+      readonly type: 'show-headings';
+      readonly entityIds: readonly EntityId[];
+    }
+  | {
       readonly type: 'set-heading-limit';
       readonly maxSectionLevel: SectionHeadingLevel | null;
     }
@@ -186,6 +195,28 @@ export function graphStateReducer(
           collapsedEntityIds: [],
         },
       };
+    case 'set-heading-hidden':
+      return {
+        ...state,
+        disclosure: {
+          ...state.disclosure,
+          hiddenEntityIds: action.hidden
+            ? withId(state.disclosure.hiddenEntityIds, action.entityId)
+            : withoutId(state.disclosure.hiddenEntityIds, action.entityId),
+        },
+      };
+    case 'show-headings': {
+      const shown = new Set(action.entityIds);
+      return {
+        ...state,
+        disclosure: {
+          ...state.disclosure,
+          hiddenEntityIds: state.disclosure.hiddenEntityIds.filter(
+            (entityId) => !shown.has(entityId),
+          ),
+        },
+      };
+    }
     case 'set-heading-limit': {
       const disclosure = { ...state.disclosure };
       if (action.maxSectionLevel === null) {

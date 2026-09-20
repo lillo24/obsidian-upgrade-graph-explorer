@@ -126,6 +126,7 @@ function normalizedPathPrefix(
 function validateDisclosure(
   value: unknown,
   issues: PersistedViewValidationIssue[],
+  requireHiddenEntityIds: boolean,
 ): void {
   const path = '$.projection.disclosure';
   if (!isRecord(value)) {
@@ -138,6 +139,7 @@ function validateDisclosure(
       'defaultDepth',
       'expandedEntityIds',
       'collapsedEntityIds',
+      ...(requireHiddenEntityIds ? ['hiddenEntityIds'] : []),
       'includeBlocks',
     ],
     ['maxSectionLevel'],
@@ -172,6 +174,9 @@ function validateDisclosure(
     `${path}.collapsedEntityIds`,
     issues,
   );
+  if (requireHiddenEntityIds) {
+    uniqueStringArray(value.hiddenEntityIds, `${path}.hiddenEntityIds`, issues);
+  }
   if (typeof value.includeBlocks !== 'boolean') {
     issue(issues, `${path}.includeBlocks`, 'Expected a boolean.');
   }
@@ -275,6 +280,7 @@ function validateFilters(
 function validateProjection(
   value: unknown,
   issues: PersistedViewValidationIssue[],
+  requireHiddenEntityIds: boolean,
 ): void {
   const path = '$.projection';
   if (!isRecord(value)) {
@@ -282,9 +288,27 @@ function validateProjection(
     return;
   }
   fields(value, ['disclosure'], ['focus', 'filters'], path, issues);
-  validateDisclosure(value.disclosure, issues);
+  validateDisclosure(value.disclosure, issues, requireHiddenEntityIds);
   if (Object.hasOwn(value, 'focus')) validateFocus(value.focus, issues);
   if (Object.hasOwn(value, 'filters')) validateFilters(value.filters, issues);
+}
+
+function migrateLegacyProjection(
+  value: unknown,
+): PersistedWorkspaceView['projection'] {
+  const projection = value as Omit<
+    PersistedWorkspaceView['projection'],
+    'disclosure'
+  > & {
+    readonly disclosure: Omit<
+      PersistedWorkspaceView['projection']['disclosure'],
+      'hiddenEntityIds'
+    >;
+  };
+  return {
+    ...projection,
+    disclosure: { ...projection.disclosure, hiddenEntityIds: [] },
+  };
 }
 
 function validateStructureViewport(
@@ -405,7 +429,7 @@ export function validatePersistedWorkspaceView(
       issues,
     );
     nonEmptyString(value.workspaceId, '$.workspaceId', issues);
-    validateProjection(value.projection, issues);
+    validateProjection(value.projection, issues, false);
     if (Object.hasOwn(value, 'viewport')) {
       validateStructureViewport(value.viewport, '$.viewport', issues);
     }
@@ -414,7 +438,7 @@ export function validatePersistedWorkspaceView(
       schemaVersion: PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION,
       workspaceId: value.workspaceId as string,
       presentationMode: 'structure',
-      projection: value.projection as PersistedWorkspaceView['projection'],
+      projection: migrateLegacyProjection(value.projection),
       ...(Object.hasOwn(value, 'viewport')
         ? {
             viewports: {
@@ -439,7 +463,7 @@ export function validatePersistedWorkspaceView(
     if (value.rendererMode !== 'structure' && value.rendererMode !== 'global') {
       issue(issues, '$.rendererMode', 'Expected "structure" or "global".');
     }
-    validateProjection(value.projection, issues);
+    validateProjection(value.projection, issues, false);
     if (Object.hasOwn(value, 'viewports')) {
       const legacyViewports = value.viewports;
       if (!isRecord(legacyViewports)) {
@@ -477,7 +501,59 @@ export function validatePersistedWorkspaceView(
         schemaVersion: PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION,
         workspaceId: value.workspaceId as string,
         presentationMode: value.rendererMode as 'structure' | 'global',
-        projection: value.projection as PersistedWorkspaceView['projection'],
+        projection: migrateLegacyProjection(value.projection),
+        ...(Object.hasOwn(value, 'viewports')
+          ? {
+              viewports:
+                value.viewports as unknown as PersistedRendererViewports,
+            }
+          : {}),
+      },
+      issues: [],
+    };
+  }
+  if (value.schemaVersion === 3) {
+    fields(
+      value,
+      ['schemaVersion', 'workspaceId', 'presentationMode', 'projection'],
+      ['viewports'],
+      '$',
+      issues,
+    );
+    nonEmptyString(value.workspaceId, '$.workspaceId', issues);
+    if (
+      value.presentationMode !== 'structure' &&
+      value.presentationMode !== 'global' &&
+      value.presentationMode !== 'local'
+    ) {
+      issue(
+        issues,
+        '$.presentationMode',
+        'Expected "structure", "global", or "local".',
+      );
+    }
+    validateProjection(value.projection, issues, false);
+    if (
+      value.presentationMode === 'local' &&
+      (!isRecord(value.projection) || !Object.hasOwn(value.projection, 'focus'))
+    ) {
+      issue(
+        issues,
+        '$.projection.focus',
+        'Local presentation requires a KG6 Focus root.',
+      );
+    }
+    if (Object.hasOwn(value, 'viewports'))
+      validateViewports(value.viewports, issues);
+    if (issues.length > 0) return { valid: false, issues };
+    return {
+      valid: true,
+      value: {
+        schemaVersion: PERSISTED_WORKSPACE_VIEW_SCHEMA_VERSION,
+        workspaceId: value.workspaceId as string,
+        presentationMode: value.presentationMode as
+          'structure' | 'global' | 'local',
+        projection: migrateLegacyProjection(value.projection),
         ...(Object.hasOwn(value, 'viewports')
           ? {
               viewports:
@@ -514,7 +590,7 @@ export function validatePersistedWorkspaceView(
       'Expected "structure", "global", or "local".',
     );
   }
-  validateProjection(value.projection, issues);
+  validateProjection(value.projection, issues, true);
   if (
     value.presentationMode === 'local' &&
     (!isRecord(value.projection) || !Object.hasOwn(value.projection, 'focus'))

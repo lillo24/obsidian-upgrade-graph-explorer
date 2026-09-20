@@ -55,5 +55,30 @@ describe('Hierarchy depth control', () => {
 
     expect(markup).toContain('>Custom</span>');
     expect(markup).toContain('<option value="2" selected="">2 levels</option>');
+    expect(markup).not.toContain('>All Files</button>');
+  });
+
+  it('offers All Files only for a custom Focus depth', () => {
+    const custom = renderToStaticMarkup(
+      <StructureDepthControl
+        custom
+        depth={1}
+        onApplyToAllFiles={() => undefined}
+        onChange={() => undefined}
+      />,
+    );
+    const uniform = renderToStaticMarkup(
+      <StructureDepthControl
+        custom={false}
+        depth={1}
+        onApplyToAllFiles={() => undefined}
+        onChange={() => undefined}
+      />,
+    );
+
+    expect(custom).toContain('<option value="1" selected="">1 level</option>');
+    expect(custom).toContain('>Custom</span>');
+    expect(custom).toContain('>All Files</button>');
+    expect(uniform).not.toContain('>All Files</button>');
   });
 });

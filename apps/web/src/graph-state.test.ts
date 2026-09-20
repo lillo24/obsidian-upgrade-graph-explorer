@@ -16,6 +16,7 @@ describe('graph projection interaction state', () => {
           ...initialGraphState().disclosure,
           maxSectionLevel: 3 as const,
           expandedEntityIds: ['expanded'],
+          hiddenEntityIds: ['hidden'],
           collapsedEntityIds: ['collapsed'],
           includeBlocks: true,
         },
@@ -35,6 +36,7 @@ describe('graph projection interaction state', () => {
           ...initial.disclosure,
           defaultDepth: depth,
           expandedEntityIds: [],
+          hiddenEntityIds: ['hidden'],
           collapsedEntityIds: [],
         },
       });
@@ -61,8 +63,53 @@ describe('graph projection interaction state', () => {
       ...expanded.disclosure,
       defaultDepth: 2,
       expandedEntityIds: [],
+      hiddenEntityIds: [],
       collapsedEntityIds: [],
     });
+  });
+
+  it('keeps explicit Heading hide independent from collapse and broad depth changes', () => {
+    const hidden = graphStateReducer(initialGraphState(), {
+      type: 'set-heading-hidden',
+      entityId: 'h2',
+      hidden: true,
+    });
+    const collapsed = graphStateReducer(hidden, {
+      type: 'toggle-entity',
+      entityId: 'h1',
+      currentlyOpen: true,
+    });
+    const hiddenParent = graphStateReducer(collapsed, {
+      type: 'set-heading-hidden',
+      entityId: 'h1',
+      hidden: true,
+    });
+    const restoredParent = graphStateReducer(hiddenParent, {
+      type: 'set-heading-hidden',
+      entityId: 'h1',
+      hidden: false,
+    });
+    const depthChanged = graphStateReducer(collapsed, {
+      type: 'set-depth',
+      depth: 2,
+    });
+    const alsoHidden = graphStateReducer(depthChanged, {
+      type: 'set-heading-hidden',
+      entityId: 'h4',
+      hidden: true,
+    });
+    const shown = graphStateReducer(alsoHidden, {
+      type: 'show-headings',
+      entityIds: ['h2'],
+    });
+
+    expect(collapsed.disclosure.hiddenEntityIds).toEqual(['h2']);
+    expect(collapsed.disclosure.collapsedEntityIds).toEqual(['h1']);
+    expect(restoredParent.disclosure.collapsedEntityIds).toEqual(['h1']);
+    expect(restoredParent.disclosure.hiddenEntityIds).toEqual(['h2']);
+    expect(depthChanged.disclosure.hiddenEntityIds).toEqual(['h2']);
+    expect(depthChanged.disclosure.collapsedEntityIds).toEqual([]);
+    expect(shown.disclosure.hiddenEntityIds).toEqual(['h4']);
   });
 
   it('replaces state atomically after live snapshot reconciliation', () => {

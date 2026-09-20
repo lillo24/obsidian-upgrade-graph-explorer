@@ -15,6 +15,7 @@ describe('focused document neighborhood description', () => {
         disclosure: {
           defaultDepth: 2,
           expandedEntityIds: [],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: false,
         },
@@ -35,6 +36,7 @@ describe('focused document neighborhood description', () => {
         disclosure: {
           defaultDepth: 0,
           expandedEntityIds: [],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: false,
         },

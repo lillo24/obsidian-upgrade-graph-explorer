@@ -21,8 +21,8 @@ function detailDepths(
 
 /**
  * Projects the renderer-neutral Focus detail shared by Network and Hierarchy.
- * The document neighborhood is fixed before disclosure is applied, and
- * automatic depth is scoped to the focused root document only.
+ * The document neighborhood is fixed before disclosure is applied, and the
+ * selected automatic depth is shared by every document in that neighborhood.
  */
 export function projectFocusedDetailView(
   workspace: ProjectionWorkspace,
@@ -44,10 +44,8 @@ export function projectFocusedDetailView(
       ...(state.filters === undefined ? {} : { filters: state.filters }),
     },
     {
-      // The Set-based seam keeps today's single root isolated from a future
-      // multi-focus model without changing the persisted KG6 Focus schema.
       defaultDepthByDocumentId: detailDepths(
-        new Set([neighborhood.rootDocumentId]),
+        new Set(neighborhood.documentDistance.keys()),
         state.disclosure.defaultDepth,
       ),
     },

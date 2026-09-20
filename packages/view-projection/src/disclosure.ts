@@ -38,6 +38,7 @@ export function calculateDisclosure(
   const issues: ProjectionIssue[] = [];
   const expanded = new Set<EntityId>();
   const collapsed = new Set<EntityId>();
+  const hidden = new Set<EntityId>();
 
   for (const entityId of [...new Set(state.expandedEntityIds)].sort()) {
     if (workspace.entity(entityId) === undefined) {
@@ -65,6 +66,28 @@ export function calculateDisclosure(
       collapsed.add(entityId);
     }
   }
+  for (const entityId of [...new Set(state.hiddenEntityIds)].sort()) {
+    const entity = workspace.entity(entityId);
+    if (entity === undefined) {
+      issues.push(
+        issue(
+          'unknown-hidden-entity',
+          entityId,
+          `Hidden entity "${entityId}" is not present in the canonical snapshot.`,
+        ),
+      );
+    } else if (entity.kind !== 'section') {
+      issues.push(
+        issue(
+          'invalid-hidden-entity-kind',
+          entityId,
+          `Hidden entity "${entityId}" is not a Heading; only section entities can be hidden.`,
+        ),
+      );
+    } else {
+      hidden.add(entityId);
+    }
+  }
   for (const entityId of [...expanded].sort()) {
     if (collapsed.has(entityId)) {
       issues.push(
@@ -87,6 +110,7 @@ export function calculateDisclosure(
   ): void => {
     if (collapsed.has(parentId)) return;
     for (const child of workspace.children(parentId)) {
+      if (hidden.has(child.id)) continue;
       const withinHeadingLimit =
         child.kind !== 'section' ||
         state.maxSectionLevel === undefined ||
@@ -133,6 +157,7 @@ export function calculateDisclosure(
     if (parentId !== ownerId && collapsed.has(parentId)) return;
     const parentExpanded = parentId === ownerId || expanded.has(parentId);
     for (const child of workspace.children(parentId)) {
+      if (hidden.has(child.id)) continue;
       const withinHeadingLimit =
         child.kind !== 'section' ||
         state.maxSectionLevel === undefined ||

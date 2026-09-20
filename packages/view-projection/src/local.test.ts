@@ -17,13 +17,14 @@ describe('Local KG6 projection', () => {
     expect(containingDocumentEntityId(workspace, 'missing')).toBeUndefined();
   });
 
-  it('uses root-scoped automatic depth while keeping neighbor documents collapsed', () => {
+  it('applies automatic depth uniformly across the Focus neighborhood', () => {
     const state = deriveLocalProjectionState(
       workspace,
       {
         disclosure: {
           defaultDepth: 3,
           expandedEntityIds: [],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: false,
         },
@@ -43,8 +44,9 @@ describe('Local KG6 projection', () => {
     expect(entities).toContain('a-deep');
     expect(entities).toContain('doc-b');
     expect(entities).toContain('doc-c');
-    expect(entities).not.toContain('b-target');
-    expect(entities).not.toContain('c-third');
+    expect(entities).toContain('b-target');
+    expect(entities).toContain('b-leaf');
+    expect(entities).toContain('c-third');
     expect(
       projection.nodes.flatMap((node) =>
         node.kind === 'reference-target' ? node.referenceIds : [],
@@ -60,6 +62,7 @@ describe('Local KG6 projection', () => {
         disclosure: {
           defaultDepth: 2,
           expandedEntityIds: ['doc-b'],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: false,
         },
@@ -85,6 +88,7 @@ describe('Local KG6 projection', () => {
         disclosure: {
           defaultDepth: 0,
           expandedEntityIds: ['doc-b'],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: false,
         },
@@ -113,6 +117,7 @@ describe('Local KG6 projection', () => {
         disclosure: {
           defaultDepth: 0,
           expandedEntityIds: [],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: false,
         },
@@ -144,6 +149,7 @@ describe('Local KG6 projection', () => {
         disclosure: {
           defaultDepth: 0,
           expandedEntityIds: [],
+          hiddenEntityIds: [],
           collapsedEntityIds: [],
           includeBlocks: false,
         },
@@ -171,6 +177,7 @@ describe('Local KG6 projection', () => {
       disclosure: {
         defaultDepth: 1 as const,
         expandedEntityIds: [] as readonly string[],
+        hiddenEntityIds: [],
         collapsedEntityIds: ['doc-a'] as readonly string[],
         includeBlocks: false,
       },

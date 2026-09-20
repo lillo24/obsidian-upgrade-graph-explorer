@@ -86,6 +86,10 @@ export function sameGraphViewState(
       leftDisclosure.collapsedEntityIds,
       rightDisclosure.collapsedEntityIds,
     ) &&
+    sameValues(
+      leftDisclosure.hiddenEntityIds,
+      rightDisclosure.hiddenEntityIds,
+    ) &&
     ((leftFocus === undefined && rightFocus === undefined) ||
       (leftFocus !== undefined &&
         rightFocus !== undefined &&
@@ -381,6 +385,8 @@ export function graphHistoryActionPolicy(
   switch (action.type) {
     case 'toggle-entity':
     case 'set-depth':
+    case 'set-heading-hidden':
+    case 'show-headings':
     case 'set-heading-limit':
     case 'set-include-blocks':
     case 'enter-focus':

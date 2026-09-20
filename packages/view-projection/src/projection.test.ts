@@ -36,12 +36,42 @@ describe('endpoint roll-up and provenance', () => {
     ]);
   });
 
+  it('rolls a selectively hidden Heading subtree reference to its nearest visible ancestor', () => {
+    const projection = projectSnapshot(projectionFixture(), {
+      disclosure: {
+        defaultDepth: 3,
+        expandedEntityIds: [],
+        hiddenEntityIds: ['a-detail'],
+        collapsedEntityIds: [],
+        includeBlocks: false,
+      },
+    });
+    const edge = projection.edges.find(
+      (candidate): candidate is ProjectedReferenceEdge =>
+        candidate.kind === 'reference' &&
+        candidate.referenceIds.includes('r-a-detail-to-b-leaf'),
+    );
+
+    expect(
+      projection.nodes.find((node) => node.id === edge?.sourceNodeId),
+    ).toMatchObject({ kind: 'entity', entityId: 'a-overview' });
+    expect(
+      projection.nodes.find((node) => node.id === edge?.targetNodeId),
+    ).toMatchObject({ kind: 'entity', entityId: 'b-leaf' });
+    expect(
+      projection.nodes.some(
+        (node) => node.kind === 'entity' && node.entityId === 'a-deep',
+      ),
+    ).toBe(false);
+  });
+
   it('rolls and aggregates references from heading-limited sections', () => {
     const projection = projectSnapshot(projectionFixture(), {
       disclosure: {
         defaultDepth: 1,
         maxSectionLevel: 1,
         expandedEntityIds: ['a-overview', 'a-detail', 'b-target'],
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: false,
       },
@@ -149,6 +179,7 @@ describe('endpoint roll-up and provenance', () => {
       disclosure: {
         defaultDepth: 1,
         expandedEntityIds: ['a-overview', 'a-detail', 'b-target'],
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: false,
       },
@@ -175,6 +206,7 @@ describe('endpoint roll-up and provenance', () => {
       disclosure: {
         defaultDepth: 1,
         expandedEntityIds: ['a-overview'],
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: false,
       },

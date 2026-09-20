@@ -325,9 +325,19 @@ evidence records post-cohesion, post-Nested, and post-group containment, split,
 and blocker counts, region/member bounds, the closest pre-repair island gap,
 and the first failing stage without exposing folder or File identities.
 
-Soft structural algorithm version 12, worker protocol 14, and evidence schema
-9 invalidate the changed Soft geometry and serialized evidence. Directional
-layout and the renderer-only 0–100 spacing architecture are unchanged.
+HIERDISC1-FIX2 extends that guarantee to dynamic renderer dimensions. Parent
+packing revalidates every already-retained child guide against sibling units,
+then stabilizes the complete parent as one rigid body against external
+blockers. Group packing still translates each retained top-level subtree only
+as a whole and canonicalizes translated coordinates; Nested placement keeps a
+small deterministic clearance guard so a rigid translation cannot turn an
+exact-boundary separation into a floating-point overlap. Heading Hide changes
+visible nodes and module rectangles only; folder membership remains unchanged.
+
+Soft structural algorithm version 13 invalidates the changed Soft geometry.
+Worker protocol 14 and evidence schema 9 remain unchanged because the payload
+shape is unchanged. Directional layout and the renderer-only 0–100 spacing
+architecture are unchanged.
 
 Before PATCH1, graphical review accepted the nested hierarchy, singleton-chain
 compression, promotion and flattening semantics, passive labels, File-only

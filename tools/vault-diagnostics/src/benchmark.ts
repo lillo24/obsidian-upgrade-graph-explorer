@@ -270,6 +270,7 @@ function main(): void {
       disclosure: {
         defaultDepth: 1,
         expandedEntityIds: expandableEntityIds,
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: true,
       },

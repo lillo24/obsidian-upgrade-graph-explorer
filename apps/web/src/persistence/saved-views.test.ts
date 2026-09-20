@@ -119,6 +119,38 @@ describe('Named Saved Views registry', () => {
     ).toBe(true);
   });
 
+  it('loads schema-v3 views embedded in the current Saved View registry', () => {
+    const storage = memoryStorage();
+    const current = entry('Legacy view');
+    const { hiddenEntityIds: _hidden, ...legacyDisclosure } =
+      current.view.projection.disclosure;
+    expect(_hidden).toEqual([]);
+    const legacyView = {
+      ...current.view,
+      schemaVersion: 3,
+      projection: {
+        ...current.view.projection,
+        disclosure: legacyDisclosure,
+      },
+    };
+    storage.values.set(
+      savedViewStorageKey(workspaceId),
+      JSON.stringify({
+        schemaVersion: 2,
+        workspaceId,
+        views: [{ ...current, view: legacyView }],
+      }),
+    );
+
+    const loaded = loadSavedViews(storage, workspaceId);
+    expect(loaded.status).toBe('loaded');
+    if (loaded.status !== 'loaded') return;
+    expect(loaded.value.views[0]?.view.schemaVersion).toBe(4);
+    expect(
+      loaded.value.views[0]?.view.projection.disclosure.hiddenEntityIds,
+    ).toEqual([]);
+  });
+
   it('strictly loads schema v1 in memory without rewriting and writes v2 on the next mutation', () => {
     const storage = memoryStorage();
     const current = entry('Legacy');

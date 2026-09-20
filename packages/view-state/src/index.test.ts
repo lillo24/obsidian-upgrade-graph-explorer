@@ -44,6 +44,14 @@ const ENTITIES: readonly AddressableEntity[] = [
     parentId: 'section-one',
     source: source('folder/A.md', 3),
   },
+  {
+    id: 'section-two',
+    kind: 'section',
+    parentId: 'doc-a',
+    title: 'Section Two',
+    level: 1,
+    source: source('folder/A.md', 4),
+  },
   { id: 'doc-b', kind: 'document', source: source('B.md', 1) },
 ];
 
@@ -66,6 +74,7 @@ function fullState(): ViewProjectionState {
       maxSectionLevel: 1,
       expandedEntityIds: ['section-one', 'doc-a'],
       collapsedEntityIds: ['doc-b'],
+      hiddenEntityIds: ['section-two'],
       includeBlocks: true,
     },
     focus: {
@@ -102,7 +111,7 @@ describe('persisted workspace view', () => {
   });
 
   it.each([0, 1, 2, 3] as const)(
-    'round-trips structural depth %i under schema v3',
+    'round-trips structural depth %i under schema v4',
     (defaultDepth) => {
       const workspace = createProjectionWorkspace(snapshot());
       const value = createPersistedWorkspaceView({
@@ -116,7 +125,7 @@ describe('persisted workspace view', () => {
         JSON.parse(serializePersistedWorkspaceView(value)),
       );
 
-      expect(value.schemaVersion).toBe(3);
+      expect(value.schemaVersion).toBe(4);
       expect(validation.valid).toBe(true);
       if (!validation.valid) return;
       expect(
@@ -168,19 +177,22 @@ describe('persisted workspace view', () => {
     ).toBeUndefined();
   });
 
-  it('migrates a schema-v1 Structure viewport losslessly into schema v3', () => {
+  it('migrates a schema-v1 Structure viewport losslessly into schema v4', () => {
     const value = persisted();
+    const { hiddenEntityIds: _hidden, ...legacyDisclosure } =
+      value.projection.disclosure;
+    expect(_hidden).toEqual(['section-two']);
     const validation = validatePersistedWorkspaceView({
       schemaVersion: 1,
       workspaceId: value.workspaceId,
-      projection: value.projection,
+      projection: { ...value.projection, disclosure: legacyDisclosure },
       viewport: { anchorEntityId: 'section-one', zoom: 1.25 },
     });
 
     expect(validation.valid).toBe(true);
     if (!validation.valid) return;
     expect(validation.value).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       presentationMode: 'structure',
       viewports: {
         structure: { anchorEntityId: 'section-one', zoom: 1.25 },
@@ -190,21 +202,44 @@ describe('persisted workspace view', () => {
 
   it('migrates schema-v2 Global conservatively without inferring Local from Focus', () => {
     const value = persisted();
+    const { hiddenEntityIds: _hidden, ...legacyDisclosure } =
+      value.projection.disclosure;
+    expect(_hidden).toEqual(['section-two']);
     const validation = validatePersistedWorkspaceView({
       schemaVersion: 2,
       workspaceId: value.workspaceId,
       rendererMode: 'global',
-      projection: value.projection,
+      projection: { ...value.projection, disclosure: legacyDisclosure },
       viewports: { global: { anchorEntityId: 'doc-a', ratio: 0.4 } },
     });
 
     expect(validation.valid).toBe(true);
     if (!validation.valid) return;
     expect(validation.value).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       presentationMode: 'global',
       projection: { focus: { rootEntityId: 'section-one' } },
     });
+  });
+
+  it('migrates schema-v3 Current Views with no hidden Headings', () => {
+    const value = persisted();
+    const { hiddenEntityIds: _hidden, ...legacyDisclosure } =
+      value.projection.disclosure;
+    expect(_hidden).toEqual(['section-two']);
+    const validation = validatePersistedWorkspaceView({
+      ...value,
+      schemaVersion: 3,
+      projection: { ...value.projection, disclosure: legacyDisclosure },
+    });
+
+    expect(validation.valid).toBe(true);
+    if (!validation.valid) return;
+    expect(validation.value.schemaVersion).toBe(4);
+    expect(validation.value.projection.disclosure.hiddenEntityIds).toEqual([]);
+    expect(validation.value.projection.disclosure.expandedEntityIds).toEqual(
+      value.projection.disclosure.expandedEntityIds,
+    );
   });
 
   it('round-trips separate Structure and Global semantic viewports', () => {
@@ -266,6 +301,7 @@ describe('persisted workspace view', () => {
           defaultDepth: 0,
           expandedEntityIds: ['doc-a', 'section-one'],
           collapsedEntityIds: ['doc-b'],
+          hiddenEntityIds: [],
           includeBlocks: false,
         },
         focus: {
@@ -312,6 +348,7 @@ describe('persisted workspace view', () => {
           defaultDepth: 2,
           expandedEntityIds: ['doc-a'],
           collapsedEntityIds: [],
+          hiddenEntityIds: [],
           includeBlocks: false,
         },
         focus: {
@@ -369,7 +406,7 @@ describe('persisted workspace view', () => {
     });
     const future = validatePersistedWorkspaceView({
       ...value,
-      schemaVersion: 4,
+      schemaVersion: 5,
     });
 
     expect(local.valid).toBe(false);
@@ -555,7 +592,7 @@ describe('persisted workspace view', () => {
     };
     const saved = createPersistedWorkspaceView({ workspace, state });
 
-    expect(saved.schemaVersion).toBe(3);
+    expect(saved.schemaVersion).toBe(4);
     expect(saved.projection.filters?.query).toBe(
       'kind:section OR path:"folder"',
     );
@@ -631,7 +668,7 @@ describe('persisted workspace view', () => {
     const value = persisted();
     const result = validatePersistedWorkspaceView({
       ...value,
-      schemaVersion: 4,
+      schemaVersion: 5,
       projection: {
         ...value.projection,
         filters: {
@@ -732,6 +769,7 @@ describe('persisted workspace view', () => {
           defaultDepth: 1,
           expandedEntityIds: [firstSectionId],
           collapsedEntityIds: [],
+          hiddenEntityIds: [],
           includeBlocks: true,
         },
         focus: {
@@ -846,6 +884,7 @@ describe('current workspace view reconciliation', () => {
     expect(reconciled.issues.map(({ code }) => code)).toEqual([
       'unknown-expanded-entity',
       'unknown-expanded-entity',
+      'unknown-hidden-entity',
       'focus-root-missing',
       'path-filter-no-longer-matches',
       'viewport-anchor-missing',

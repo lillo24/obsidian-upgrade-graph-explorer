@@ -1966,6 +1966,293 @@ h2 {
   white-space: nowrap;
 }
 
+.focus-explorer {
+  position: absolute;
+  z-index: 35;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  width: min(21rem, 100%);
+  max-width: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--color-border-default);
+  color: var(--color-text-primary);
+  background: var(--color-surface-overlay);
+  box-shadow: 1rem 0 2.5rem var(--color-shadow-elevated);
+}
+
+.focus-explorer__heading {
+  display: flex;
+  min-height: 4rem;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.focus-explorer__heading h3 {
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 850;
+  letter-spacing: 0.065em;
+  text-transform: uppercase;
+}
+
+.focus-explorer__close {
+  display: grid;
+  width: 2.25rem;
+  min-height: 2.25rem;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.6rem;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-inset);
+  font-size: 1.35rem;
+  cursor: pointer;
+  place-items: center;
+}
+
+.focus-explorer__close:hover,
+.focus-explorer__close:focus-visible {
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+  background: var(--color-surface-selected);
+}
+
+.focus-explorer__tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem;
+  padding: 0.4rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-inset);
+}
+
+.focus-explorer__tabs button {
+  min-height: 2.35rem;
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.5rem;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.focus-explorer__tabs button[aria-selected='true'] {
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+  background: var(--color-surface-selected);
+}
+
+.focus-explorer__heading-context {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.2rem 0.65rem;
+  align-items: center;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.focus-explorer__heading-context strong {
+  overflow: hidden;
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focus-explorer__heading-context span {
+  grid-column: 1 / -1;
+}
+
+.focus-explorer__heading-context button,
+.focus-explorer__heading-row button,
+.focus-explorer__focus-file {
+  min-height: 2.35rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.5rem;
+  color: var(--color-control-foreground);
+  background: var(--color-surface-inset);
+  cursor: pointer;
+}
+
+.focus-explorer button:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.focus-explorer button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.focus-explorer__heading-context span,
+.focus-explorer__empty {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.focus-explorer__empty {
+  margin: 0;
+  padding: 1rem;
+}
+
+.focus-explorer__files,
+.focus-explorer__headings,
+.focus-explorer__tree {
+  min-height: 0;
+  flex: 1;
+}
+
+.focus-explorer__files,
+.focus-explorer__headings {
+  display: flex;
+  flex-direction: column;
+}
+
+.focus-explorer__tree {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.focus-explorer__folder,
+.focus-explorer__file,
+.focus-explorer__heading-row {
+  display: flex;
+  min-height: 3.25rem;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.45rem 0.65rem 0.45rem
+    calc(0.65rem + (var(--focus-explorer-depth) - 1) * 0.85rem);
+  border-bottom: 1px solid var(--color-border-subtle);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 3.25rem;
+}
+
+.focus-explorer__folder {
+  width: 100%;
+  border: 0;
+  color: var(--color-text-primary);
+  background: var(--color-surface-subtle);
+  text-align: left;
+  cursor: pointer;
+}
+
+.focus-explorer__file {
+  padding-right: 0.45rem;
+}
+
+.focus-explorer__file--selected {
+  background: var(--color-surface-selected);
+}
+
+.focus-explorer__file-select {
+  display: flex;
+  min-width: 0;
+  min-height: 2.5rem;
+  flex: 1;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.25rem;
+  border: 0;
+  color: var(--color-text-primary);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.focus-explorer__file-icon {
+  color: var(--color-text-muted);
+}
+
+.focus-explorer__file-copy,
+.focus-explorer__row-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 0.15rem;
+}
+
+.focus-explorer__file-copy strong,
+.focus-explorer__file-copy small,
+.focus-explorer__row-copy strong,
+.focus-explorer__row-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focus-explorer__file-copy strong,
+.focus-explorer__row-copy strong {
+  font-size: 0.8rem;
+}
+
+.focus-explorer__file-copy small,
+.focus-explorer__row-copy small {
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+}
+
+.focus-explorer__badge {
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--color-border-default);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-subtle);
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+
+.focus-explorer__focus-file {
+  flex: 0 0 auto;
+  font-size: 0.67rem;
+}
+
+.focus-explorer__heading-row button {
+  min-width: 3.6rem;
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.focus-explorer__heading-row .focus-explorer__heading-disclosure {
+  width: 1.75rem;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0;
+  border-color: transparent;
+  color: var(--color-text-muted);
+  background: transparent;
+  font-size: 0.85rem;
+}
+
+.focus-explorer__heading-row .focus-explorer__heading-disclosure:hover {
+  border-color: var(--color-border-default);
+  color: var(--color-text-primary);
+  background: var(--color-surface-subtle);
+}
+
+.focus-explorer__heading-disclosure-spacer {
+  width: 1.75rem;
+  flex: 0 0 1.75rem;
+}
+
+.focus-explorer__heading-row--hidden,
+.focus-explorer__heading-row--hidden-by-ancestor {
+  background: var(--color-surface-subtle);
+}
+
+.focus-explorer__heading-row--hidden-by-ancestor .focus-explorer__row-copy {
+  opacity: 0.65;
+}
+
 .network-explorer__row-title {
   font-size: 0.77rem;
   font-weight: 800;
@@ -2870,7 +3157,8 @@ h2 {
   transform: translateY(-50%);
 }
 
-.graph-network-explorer-handle {
+.graph-network-explorer-handle,
+.graph-focus-outline-handle {
   position: absolute;
   z-index: 30;
   top: 50%;
@@ -4161,7 +4449,8 @@ a:focus-visible {
     width: 100%;
   }
 
-  .network-explorer {
+  .network-explorer,
+  .focus-explorer {
     width: 100%;
   }
 

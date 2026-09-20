@@ -8,10 +8,12 @@ import {
 export function StructureDepthControl({
   custom,
   depth,
+  onApplyToAllFiles,
   onChange,
 }: {
   readonly custom: boolean;
   readonly depth: StructuralDepth;
+  readonly onApplyToAllFiles?: () => void;
   readonly onChange: (depth: StructuralDepth) => void;
 }) {
   return (
@@ -32,6 +34,11 @@ export function StructureDepthControl({
         </select>
       </label>
       {custom ? <span className="depth-custom-indicator">Custom</span> : null}
+      {custom && onApplyToAllFiles !== undefined ? (
+        <button onClick={onApplyToAllFiles} type="button">
+          All Files
+        </button>
+      ) : null}
     </div>
   );
 }

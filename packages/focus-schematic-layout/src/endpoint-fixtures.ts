@@ -205,6 +205,7 @@ export function buildEndpointFixture(spec: EndpointFixtureSpec) {
         ...spec.documents.map(({ id }) => id),
         ...sectionIds,
       ],
+      hiddenEntityIds: [],
       collapsedEntityIds: spec.collapsedEntityIds ?? [],
       includeBlocks: true,
     },

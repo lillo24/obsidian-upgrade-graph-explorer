@@ -2,6 +2,45 @@ import type { WorkspaceFolderKey } from '@icarus-graph-explorer/core';
 import type { ProjectionNodeId } from '@icarus-graph-explorer/view-projection';
 import type { NetworkExplorerNode } from './network-explorer-model';
 
+export interface SourceFolderNode {
+  readonly id: ProjectionNodeId;
+  readonly sourcePath: string;
+}
+
+export interface SourceFolder<TNode extends SourceFolderNode> {
+  readonly path: WorkspaceFolderKey;
+  readonly name: string;
+  readonly depth: number;
+  readonly entries: readonly SourceFolderEntry<TNode>[];
+}
+
+export type SourceFolderEntry<TNode extends SourceFolderNode> =
+  | { readonly kind: 'folder'; readonly folder: SourceFolder<TNode> }
+  | {
+      readonly kind: 'node';
+      readonly node: TNode;
+      readonly nestedInFile: boolean;
+    };
+
+export interface SourceFolders<TNode extends SourceFolderNode> {
+  readonly roots: readonly SourceFolderEntry<TNode>[];
+  readonly folderByPath: ReadonlyMap<WorkspaceFolderKey, SourceFolder<TNode>>;
+}
+
+export type SourceFolderRow<TNode extends SourceFolderNode> = RowPosition &
+  (
+    | {
+        readonly kind: 'folder';
+        readonly folder: SourceFolder<TNode>;
+        readonly expanded: boolean;
+      }
+    | {
+        readonly kind: 'node';
+        readonly node: TNode;
+        readonly nestedInFile: boolean;
+      }
+  );
+
 export type NetworkExplorerFolderState = ReadonlyMap<
   WorkspaceFolderKey,
   boolean
@@ -49,39 +88,20 @@ export type NetworkExplorerRow = RowPosition &
       }
   );
 
-/** Only real source folders disclose; root is not a folder level. */
-export function networkExplorerFolderExpanded(
-  folder: NetworkExplorerFolder,
-  overrides: NetworkExplorerFolderState,
-): boolean {
-  return overrides.get(folder.path) ?? folder.depth <= 2;
-}
-
-/** Nodes are already in deterministic source order. Never reads graph edges or the vault. */
-export function createNetworkExplorerFolders(
-  nodes: readonly NetworkExplorerNode[],
-): NetworkExplorerFolders {
-  const roots: NetworkExplorerEntry[] = [];
+/** Shared canonical path grouping for projection-scoped source trees. */
+export function createSourceFolders<TNode extends SourceFolderNode>(
+  nodes: readonly TNode[],
+  isDocument: (node: TNode) => boolean,
+): SourceFolders<TNode> {
+  const roots: SourceFolderEntry<TNode>[] = [];
   const folders = new Map<
     WorkspaceFolderKey,
-    NetworkExplorerFolder & { entries: NetworkExplorerEntry[] }
+    SourceFolder<TNode> & { entries: SourceFolderEntry<TNode>[] }
   >();
   const documentPaths = new Set(
-    nodes
-      .filter((node) => node.kindLabel === 'File')
-      .map((node) => node.sourcePath),
+    nodes.filter(isDocument).map((node) => node.sourcePath),
   );
-  const diagnostics: NetworkExplorerEntry[] = [];
   for (const node of nodes) {
-    if (node.kindLabel === 'Diagnostic') {
-      diagnostics.push({ kind: 'node', node, nestedInFile: false });
-      continue;
-    }
-    if (node.sourcePath === undefined) {
-      throw new Error(
-        `Network Explorer source node ${JSON.stringify(node.id)} has no canonical source path.`,
-      );
-    }
     const parts = node.sourcePath.split('/').slice(0, -1);
     let entries = roots;
     let path = '';
@@ -98,12 +118,13 @@ export function createNetworkExplorerFolders(
     entries.push({
       kind: 'node',
       node,
-      nestedInFile:
-        node.kindLabel !== 'File' && documentPaths.has(node.sourcePath),
+      nestedInFile: !isDocument(node) && documentPaths.has(node.sourcePath),
     });
   }
-  // Folders first, then source-ordered file groups. Stable sort retains entity order.
-  const compare = (left: NetworkExplorerEntry, right: NetworkExplorerEntry) => {
+  const compare = (
+    left: SourceFolderEntry<TNode>,
+    right: SourceFolderEntry<TNode>,
+  ) => {
     if (left.kind !== right.kind) return left.kind === 'folder' ? -1 : 1;
     if (left.kind !== 'folder' || right.kind !== 'folder') return 0;
     return left.folder.path < right.folder.path
@@ -114,8 +135,85 @@ export function createNetworkExplorerFolders(
   };
   roots.sort(compare);
   for (const folder of folders.values()) folder.entries.sort(compare);
-  roots.push(...diagnostics);
   return { roots, folderByPath: folders };
+}
+
+export function flattenSourceFolderRows<TNode extends SourceFolderNode>(
+  model: SourceFolders<TNode>,
+  overrides: NetworkExplorerFolderState,
+): readonly SourceFolderRow<TNode>[] {
+  const rows: SourceFolderRow<TNode>[] = [];
+  const stack: {
+    entry: SourceFolderEntry<TNode>;
+    level: number;
+    parentFolderId: string | undefined;
+    position: number;
+    setSize: number;
+  }[] = [];
+  const push = (
+    entries: readonly SourceFolderEntry<TNode>[],
+    level: number,
+    parentFolderId: string | undefined,
+  ) => {
+    for (let index = entries.length - 1; index >= 0; index -= 1) {
+      stack.push({
+        entry: entries[index]!,
+        level,
+        parentFolderId,
+        position: index + 1,
+        setSize: entries.length,
+      });
+    }
+  };
+  push(model.roots, 1, undefined);
+  while (stack.length > 0) {
+    const { entry, ...position } = stack.pop()!;
+    if (entry.kind === 'node') {
+      rows.push({ ...position, ...entry, id: `node:${entry.node.id}` });
+    } else {
+      const id = `folder:${entry.folder.path}`;
+      const expanded =
+        overrides.get(entry.folder.path) ?? entry.folder.depth <= 2;
+      rows.push({ ...position, ...entry, id, expanded });
+      if (expanded) push(entry.folder.entries, position.level + 1, id);
+    }
+  }
+  return rows;
+}
+
+/** Only real source folders disclose; root is not a folder level. */
+export function networkExplorerFolderExpanded(
+  folder: NetworkExplorerFolder,
+  overrides: NetworkExplorerFolderState,
+): boolean {
+  return overrides.get(folder.path) ?? folder.depth <= 2;
+}
+
+/** Nodes are already in deterministic source order. Never reads graph edges or the vault. */
+export function createNetworkExplorerFolders(
+  nodes: readonly NetworkExplorerNode[],
+): NetworkExplorerFolders {
+  const sourceNodes: (NetworkExplorerNode & SourceFolderNode)[] = [];
+  const diagnostics: NetworkExplorerEntry[] = [];
+  for (const node of nodes) {
+    if (node.kindLabel === 'Diagnostic') {
+      diagnostics.push({ kind: 'node', node, nestedInFile: false });
+      continue;
+    }
+    if (node.sourcePath === undefined) {
+      throw new Error(
+        `Network Explorer source node ${JSON.stringify(node.id)} has no canonical source path.`,
+      );
+    }
+    sourceNodes.push(node as NetworkExplorerNode & SourceFolderNode);
+  }
+  const grouped = createSourceFolders(
+    sourceNodes,
+    (node) => node.kindLabel === 'File',
+  );
+  const roots: NetworkExplorerEntry[] = [...grouped.roots];
+  roots.push(...diagnostics);
+  return { roots, folderByPath: grouped.folderByPath };
 }
 
 /** Iterative traversal stays safe for deeply nested paths; files never collapse. */

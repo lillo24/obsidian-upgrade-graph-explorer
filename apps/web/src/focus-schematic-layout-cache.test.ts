@@ -12,7 +12,12 @@ import {
   type FocusSchematicLayoutInput,
   type FocusSchematicProductLayoutPolicies,
 } from '@icarus-graph-explorer/focus-schematic-layout';
-import { focusSchematicNodeDimensions } from '@icarus-graph-explorer/renderer-reactflow/focus-schematic';
+import { createFocusSchematicModel } from '@icarus-graph-explorer/focus-schematic';
+import {
+  focusSchematicNodeDimensions,
+  prepareFocusSchematicRendererGraph,
+} from '@icarus-graph-explorer/renderer-reactflow/focus-schematic';
+import { projectLocalView } from '@icarus-graph-explorer/view-projection';
 
 import {
   exactFocusSchematicLayoutCacheKey,
@@ -153,6 +158,106 @@ describe('page-lifetime Focus Schematic layout cache', () => {
     );
   });
 
+  it('L3/L4/L6 keys, adopts, and revisits exact Hide/Restore module geometry', () => {
+    const fixture = buildEndpointFixture(ENDPOINT_FIXTURES[1]!);
+    const visibleInput: FocusSchematicLayoutInput = {
+      model: fixture.model,
+      projection: fixture.projection,
+      nodeDimensions: focusSchematicNodeDimensions(
+        fixture.projection,
+        fixture.model,
+      ),
+      settings: FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
+    };
+    const hiddenState = {
+      ...fixture.state,
+      disclosure: {
+        ...fixture.state.disclosure,
+        hiddenEntityIds: ['Atlas-launch'],
+      },
+    };
+    const hiddenProjection = projectLocalView(fixture.workspace, hiddenState);
+    const hiddenModel = createFocusSchematicModel({
+      workspace: fixture.workspace,
+      state: hiddenState,
+      projection: hiddenProjection,
+    });
+    const hiddenInput: FocusSchematicLayoutInput = {
+      model: hiddenModel,
+      projection: hiddenProjection,
+      nodeDimensions: focusSchematicNodeDimensions(
+        hiddenProjection,
+        hiddenModel,
+      ),
+      settings: FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
+    };
+    const visibleKey = exactFocusSchematicLayoutCacheKey(visibleInput);
+    const hiddenKey = exactFocusSchematicLayoutCacheKey(hiddenInput);
+    const restoredProjection = projectLocalView(
+      fixture.workspace,
+      fixture.state,
+    );
+    const restoredModel = createFocusSchematicModel({
+      workspace: fixture.workspace,
+      state: fixture.state,
+      projection: restoredProjection,
+    });
+    const restoredInput: FocusSchematicLayoutInput = {
+      model: restoredModel,
+      projection: restoredProjection,
+      nodeDimensions: focusSchematicNodeDimensions(
+        restoredProjection,
+        restoredModel,
+      ),
+      settings: FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
+    };
+
+    expect(
+      hiddenProjection.nodes.some(
+        (node) => node.kind === 'entity' && node.entityId === 'Atlas-launch',
+      ),
+    ).toBe(false);
+    expect(hiddenKey).not.toBe(visibleKey);
+    expect(exactFocusSchematicLayoutCacheKey(restoredInput)).toBe(visibleKey);
+    expect(hiddenInput.model).not.toEqual(visibleInput.model);
+    expect(hiddenInput.nodeDimensions).not.toEqual(visibleInput.nodeDimensions);
+
+    const visibleAttempt = computeFocusSchematicComputedLayoutAttempt(
+      visibleInput,
+      DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+    );
+    const hiddenAttempt = computeFocusSchematicComputedLayoutAttempt(
+      hiddenInput,
+      DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+    );
+    if (visibleAttempt.status !== 'success')
+      throw new Error(visibleAttempt.reason);
+    if (hiddenAttempt.status !== 'success')
+      throw new Error(hiddenAttempt.reason);
+    const cache = new FocusSchematicLayoutCache();
+    cache.set(visibleInput, visibleAttempt.result);
+    cache.set(hiddenInput, hiddenAttempt.result);
+    const hiddenGraph = prepareFocusSchematicRendererGraph({
+      projection: hiddenProjection,
+      model: hiddenModel,
+      layoutInput: hiddenInput,
+      computedLayout: hiddenAttempt.result,
+      rootEntityId: fixture.spec.rootDocumentId,
+      secondaryRelationshipsVisible: false,
+      routeStyle: 'direct',
+      visualVariant: 'extended',
+    });
+
+    expect(
+      hiddenGraph.nodes.some(
+        (node) =>
+          node.type === 'entity' && node.data.entityId === 'Atlas-launch',
+      ),
+    ).toBe(false);
+    expect(cache.get(restoredInput).status).toBe('hit');
+    expect(cache.get(hiddenInput).status).toBe('hit');
+  });
+
   it('keys Soft strength only when Soft Clusters is active and restores prior strengths', () => {
     const directionalInput = fixtureInput(4);
     const softInput = {
@@ -185,7 +290,7 @@ describe('page-lifetime Focus Schematic layout cache', () => {
       }) as const;
     expect(
       exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)),
-    ).toContain('"algorithmVersion":12');
+    ).toContain('"algorithmVersion":13');
     expect(
       exactFocusSchematicLayoutCacheKey(
         directionalInput,

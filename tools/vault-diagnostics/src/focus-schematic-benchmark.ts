@@ -97,6 +97,7 @@ const state: ViewProjectionState = {
   disclosure: {
     defaultDepth: 3,
     expandedEntityIds: documents,
+    hiddenEntityIds: [],
     collapsedEntityIds: [],
     includeBlocks: false,
   },

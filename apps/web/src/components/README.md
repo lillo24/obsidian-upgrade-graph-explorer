@@ -7,7 +7,7 @@ canonical truth, or own a platform storage implementation.
 - `GraphExplorer.tsx` composes report-scoped projection/inspection workspaces,
   compact structural/focus/workspace controls, controlled Filters and Settings
   overlays, shared canonical navigation, graph selection, the transient unified
-  Inspector drawer, and the transient Network Explorer drawer,
+  Inspector drawer, the transient Network Explorer drawer, and Focus Explorer,
   Current View hydration/alert/reset orchestration, Named Saved Views session
   mutations and cross-key profile application, transient graph Back/Forward
   checkpoints, and semantic renderer viewport requests. Applying a named view
@@ -20,8 +20,9 @@ canonical truth, or own a platform storage implementation.
   and semantic viewport context, and safely clears missing selections. It keeps
   the canvas and the single stateful Search instance mounted across shell/live
   changes and does not re-derive graph edges or persist renderer coordinates or
-  shell visibility. Maximize/restore is passed to the renderer as a narrow
-  callback so the canvas control stack remains the mode trigger. KG13B1 adds
+  shell visibility. Maximize/restore is passed to every Network and Hierarchy
+  renderer as a narrow callback so its control directly below Fit remains the
+  mode trigger. KG13B1 adds
   internal Structure/Global/Local renderers through the user-facing Scope ×
   Layout model, each with separate
   semantic viewports and cross-mode history/context. Local uses the KG6 Focus
@@ -68,6 +69,20 @@ canonical truth, or own a platform storage implementation.
   screens both side drawers may coexist; at the existing 900 px breakpoint the
   most recently opened drawer owns the overlay and the other closes without
   stealing focus.
+- `FocusExplorer.tsx` owns the transient Files/Headings tab shell for Focus +
+  Hierarchy. Files selects/centers current projection File modules and exposes a
+  separate existing-pipeline reroot action; Headings keeps hidden rows available
+  for Hide/Restore/Show-all recovery and distinguishes explicit, inherited,
+  visible, and currently undisclosed state. `../focus-explorer-files.ts` filters
+  the completed projection to File modules and uses the pure folder grouping in
+  `../network-explorer-folders.ts`; `../focus-outline-model.ts` derives the
+  canonical Heading rows and explicit parent/child metadata.
+  `../focus-explorer-heading-disclosure.ts` owns per-document session-only
+  Heading branch choices. Initial graph-visible descendants and later
+  visibility transitions open only their required ancestor paths; local
+  collapse never changes graph disclosure. Tab, folder, and Heading-tree state
+  are presentation-only. None of these layers owns projection, layout, worker,
+  history, or persistence.
   The **Arguments** launcher is the sole integration with the application-level
   Argument Workspace. It appears beside Filters/Groups in the normal toolbar
   and inside maximized Tools, blocks opening while a movement or unsaved folder
@@ -80,7 +95,7 @@ canonical truth, or own a platform storage implementation.
   editor but do not change graph selection, projection, topology, navigation
   history, or automatic layout.
   `ExplorationControls.tsx` presents accessible All/Focus and Network/Hierarchy
-  choices derived from schema-v3 state. Both Focus layouts share the same
+  choices derived from schema-v4 state. Both Focus layouts share the same
   memoized projection. The selected visible node, or root fallback, crosses the
   renderer boundary only as a transient viewport point. Layout switching is not
   history and never starts hidden workers or Global/projection work. Inactive Focus
@@ -110,12 +125,15 @@ canonical truth, or own a platform storage implementation.
   bounded overlay below the stable toolbar shell rather than toolbar-flow content,
   so capability adoption cannot resize the graph stage after its startup Fit or
   cover wrapped controls.
-- `StructureDepthControl.tsx` owns the labeled Hierarchy depth select and
-  compact Custom override indicator, and
+- `StructureDepthControl.tsx` owns the labeled Hierarchy depth select, the
+  compact Custom override indicator, and the Focus-only All Files action, and
   `structure-depth-selection.ts` maps its four options onto the existing
   structural-depth action. Choosing a depth is a fresh preset: it clears
   per-entity expand/collapse exceptions while preserving the independent
-  Heading limit, Blocks option, Focus, and graph filters.
+  Heading Hide state, Heading limit, Blocks option, Focus, and graph filters.
+  In Focus the selected value is the derived effective canonical generation;
+  Custom ignores overrides outside the current document neighborhood. All Files
+  commits that effective depth through the same single history action.
 - `NodeSizeControl.tsx` is the controlled multiplier slider for Network File
   actions. It always displays a value (1.00× without an entry), and Reset removes
   the entry. There is no sizing-mode selector. It emits one multiplier/reset
@@ -385,6 +403,29 @@ normalized policy to the dedicated worker and keys the bounded cache by only
 geometry-relevant values. Disclosure, reroot, filtering, exact hover, Secondary
 presentation, and camera behavior continue through the existing projection and
 React Flow seams.
+
+HIERDISC1-FIX2 keeps selective Heading visibility on that same production path.
+The exact projected nodes and renderer dimensions remain part of the worker and
+cache identity, so a geometry-significant Hide requests a new Soft layout and
+Restore can reuse only the exact prior-size result. Rapid Hide → Restore → Hide
+uses the existing latest-only worker generation owner. Valid Nested results
+stay Modular; replacement failure still retains the last validated graph and
+uses the existing explicit warning/fallback policy.
+
+HIERDISC1-FIX3 applies Focus automatic depth uniformly to every File in the
+bounded document neighborhood shared by Network, Classic Hierarchy, and Modular
+Hierarchy. A manual File expansion from Files only remains one compact override,
+presented as `1 level · Custom`; All Files converts it to the ordinary level-1
+preset with one history/projection/layout transition while preserving explicit
+Heading Hide state. The presentation is derived and adds no persistence field.
+
+The Focus Explorer Heading tree also has an independent local disclosure layer.
+Canonical source-order rows remain complete, graph expansion opens ancestor
+branches only when a Heading becomes newly visible, and graph collapse never
+forces a local branch closed. Per-document collapse choices survive tab changes,
+drawer close/reopen, and reroot/return for the mounted session. Their state is
+excluded from projection, Classic fingerprints, Modular keys, workers, graph
+history, Current View, and Saved Views.
 
 HIER4B-SPACING-FIX4 defines Folder strength as additional Soft attraction.
 Mandatory immediate named-folder grouping remains active from 0 through 100;

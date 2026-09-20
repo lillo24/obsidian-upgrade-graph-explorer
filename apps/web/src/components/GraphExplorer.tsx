@@ -50,6 +50,7 @@ import {
 } from '@icarus-graph-explorer/view-state';
 import {
   createProjectionWorkspace,
+  describeFocusedDisclosureDepth,
   projectLocalView,
   projectStructureView,
   projectView,
@@ -105,6 +106,17 @@ import {
   type NetworkExplorerFolderState,
   type NetworkExplorerRevealRequest,
 } from '../network-explorer-model';
+import {
+  createFocusOutlineModel,
+  structuralSubtreeContains,
+} from '../focus-outline-model';
+import { createFocusExplorerFilesModel } from '../focus-explorer-files';
+import {
+  EMPTY_FOCUS_EXPLORER_HEADING_DISCLOSURE,
+  focusExplorerCollapsedHeadingIds,
+  synchronizeFocusExplorerHeadingDisclosure,
+  toggleFocusExplorerHeadingDisclosure,
+} from '../focus-explorer-heading-disclosure';
 import {
   containingDocumentEntityId,
   effectiveGlobalProjectionState,
@@ -236,6 +248,7 @@ import {
 import { activateMaximizedGraphMode } from './maximized-graph-mode';
 import { ProvenanceInspector } from './ProvenanceInspector';
 import { NetworkExplorer } from './NetworkExplorer';
+import { FocusExplorer, type FocusExplorerTab } from './FocusExplorer';
 import { NetworkEditingControls } from './NetworkEditingControls';
 import type { SavedGraphQueriesState } from './SavedGraphQueries';
 import type { SavedViewsState } from './SavedViews';
@@ -374,6 +387,20 @@ function NetworkExplorerIcon() {
     >
       <rect height="16" rx="2" width="18" x="3" y="4" />
       <path d="M9 4v16M5.5 8h1M5.5 12h1M5.5 16h1" />
+    </svg>
+  );
+}
+
+function FocusOutlineIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="graph-shell-icon"
+      focusable="false"
+      viewBox="0 0 24 24"
+    >
+      <rect height="16" rx="2" width="18" x="3" y="4" />
+      <path d="M9 4v16M5.5 8h1M5.5 12h1M11.5 8H19M13.5 12H19M13.5 16H19" />
     </svg>
   );
 }
@@ -1470,15 +1497,81 @@ export function GraphExplorer({
     window.addEventListener('keydown', handleEscape, true);
     return () => window.removeEventListener('keydown', handleEscape, true);
   }, [finishNetworkEditing, networkEditingState.phase]);
+  const focusOutlineModel = useMemo(() => {
+    const focusRootEntityId = activeViewState.focus?.rootEntityId;
+    if (focusRootEntityId === undefined || !result.ok) return undefined;
+    return createFocusOutlineModel(
+      projectionWorkspace,
+      focusRootEntityId,
+      result.projection,
+      activeViewState.disclosure.hiddenEntityIds,
+    );
+  }, [activeViewState, projectionWorkspace, result]);
+  const focusExplorerFilesModel = useMemo(() => {
+    if (focusOutlineModel === undefined || !result.ok) return undefined;
+    return createFocusExplorerFilesModel(
+      result.projection,
+      projectionWorkspace,
+      focusOutlineModel.documentEntityId,
+    );
+  }, [focusOutlineModel, projectionWorkspace, result]);
+  const focusedDisclosureDepth = useMemo(() => {
+    if (activeViewState.focus === undefined || !result.ok) return undefined;
+    return describeFocusedDisclosureDepth(projectionWorkspace, activeViewState);
+  }, [activeViewState, projectionWorkspace, result]);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const inspectorToolbarRef = useRef<HTMLButtonElement>(null);
   const inspectorHandleRef = useRef<HTMLButtonElement>(null);
   const inspectorRestoreTarget = useRef<HTMLElement | null>(null);
   const [inspectorFocusRequestKey, setInspectorFocusRequestKey] = useState(0);
   const [networkExplorerOpen, setNetworkExplorerOpen] = useState(false);
+  const [focusOutlineOpen, setFocusOutlineOpen] = useState(false);
+  const [focusExplorerTab, setFocusExplorerTab] =
+    useState<FocusExplorerTab>('files');
   // Folder overrides survive query/live membership changes and sidebar remounts.
   const [networkExplorerFolderState, setNetworkExplorerFolderState] =
     useState<NetworkExplorerFolderState>(() => new Map());
+  const [focusExplorerFolderState, setFocusExplorerFolderState] =
+    useState<NetworkExplorerFolderState>(() => new Map());
+  // Per-document sidebar disclosure survives drawer remounts and rerooting, but
+  // never enters projection, graph history, layout identity, or persistence.
+  const [focusExplorerHeadingState, setFocusExplorerHeadingState] = useState(
+    () => ({
+      model: undefined as typeof focusOutlineModel,
+      disclosure: EMPTY_FOCUS_EXPLORER_HEADING_DISCLOSURE,
+    }),
+  );
+  let synchronizedFocusExplorerHeadingState = focusExplorerHeadingState;
+  if (focusExplorerHeadingState.model !== focusOutlineModel) {
+    synchronizedFocusExplorerHeadingState = {
+      model: focusOutlineModel,
+      disclosure:
+        focusOutlineModel === undefined
+          ? focusExplorerHeadingState.disclosure
+          : synchronizeFocusExplorerHeadingDisclosure(
+              focusExplorerHeadingState.disclosure,
+              focusOutlineModel,
+            ),
+    };
+    setFocusExplorerHeadingState(synchronizedFocusExplorerHeadingState);
+  }
+  const toggleFocusExplorerHeadingBranch = useCallback(
+    (headingEntityId: EntityId) => {
+      if (focusOutlineModel === undefined) return;
+      setFocusExplorerHeadingState((current) => ({
+        model: focusOutlineModel,
+        disclosure: toggleFocusExplorerHeadingDisclosure(
+          synchronizeFocusExplorerHeadingDisclosure(
+            current.disclosure,
+            focusOutlineModel,
+          ),
+          focusOutlineModel.documentEntityId,
+          headingEntityId,
+        ),
+      }));
+    },
+    [focusOutlineModel],
+  );
   const [graphClickSelection, setGraphClickSelection] =
     useState<GraphSelection | null>(null);
   const [networkExplorerRevealRequest, setNetworkExplorerRevealRequest] =
@@ -1490,11 +1583,17 @@ export function GraphExplorer({
   const networkExplorerToolbarRef = useRef<HTMLButtonElement>(null);
   const networkExplorerHandleRef = useRef<HTMLButtonElement>(null);
   const networkExplorerRestoreTarget = useRef<HTMLButtonElement | null>(null);
+  const focusOutlineToolbarRef = useRef<HTMLButtonElement>(null);
+  const focusOutlineHandleRef = useRef<HTMLButtonElement>(null);
+  const focusOutlineRestoreTarget = useRef<HTMLButtonElement | null>(null);
   const [narrowGraphWorkspace, setNarrowGraphWorkspace] = useState(false);
-  const mostRecentlyOpenedDrawer = useRef<'inspector' | 'network-explorer'>(
-    'inspector',
-  );
+  const mostRecentlyOpenedDrawer = useRef<
+    'inspector' | 'network-explorer' | 'focus-outline'
+  >('inspector');
   const networkExplorerVisible = networkExplorerOpen && networkLayoutActive;
+  const focusOutlineAvailable =
+    activeScope === 'focus' && activeLayout === 'hierarchy';
+  const focusOutlineVisible = focusOutlineOpen && focusOutlineAvailable;
   useEffect(() => {
     if (typeof window === 'undefined' || window.matchMedia === undefined)
       return;
@@ -1505,13 +1604,30 @@ export function GraphExplorer({
     return () => mediaQuery.removeEventListener('change', observe);
   }, []);
   useEffect(() => {
-    if (!narrowGraphWorkspace || !inspectorOpen || !networkExplorerOpen) return;
-    if (mostRecentlyOpenedDrawer.current === 'network-explorer') {
-      setInspectorOpen(false);
-    } else {
-      setNetworkExplorerOpen(false);
-    }
-  }, [inspectorOpen, narrowGraphWorkspace, networkExplorerOpen]);
+    if (
+      !narrowGraphWorkspace ||
+      !inspectorOpen ||
+      (!networkExplorerOpen && !focusOutlineOpen)
+    )
+      return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      if (mostRecentlyOpenedDrawer.current !== 'inspector') {
+        setInspectorOpen(false);
+      } else if (networkExplorerOpen) {
+        setNetworkExplorerOpen(false);
+      } else setFocusOutlineOpen(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    focusOutlineOpen,
+    inspectorOpen,
+    narrowGraphWorkspace,
+    networkExplorerOpen,
+  ]);
   useEffect(() => {
     if (networkLayoutActive || !networkExplorerOpen) return;
     let cancelled = false;
@@ -1522,6 +1638,16 @@ export function GraphExplorer({
       cancelled = true;
     };
   }, [networkExplorerOpen, networkLayoutActive]);
+  useEffect(() => {
+    if (focusOutlineAvailable || !focusOutlineOpen) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setFocusOutlineOpen(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [focusOutlineAvailable, focusOutlineOpen]);
   const [initialSerializedView] = useState(() =>
     hydration.writable
       ? serializePersistedWorkspaceView(
@@ -1965,6 +2091,7 @@ export function GraphExplorer({
     (
       nextState: ViewProjectionState,
       nextViewport: PersistedViewportAnchor | undefined,
+      nextFocusHierarchySubfocus: FocusHierarchySubfocus | null = focusHierarchySubfocusRef.current,
     ): boolean => {
       const current = currentHistoryCheckpoint();
       const destination = createGraphHistoryCheckpoint(
@@ -1980,7 +2107,7 @@ export function GraphExplorer({
             ? {}
             : { local: localViewportBookmarkRef.current }),
         },
-        focusHierarchySubfocusRef.current,
+        nextFocusHierarchySubfocus,
       );
       const nextHistory = recordGraphNavigation(
         navigationHistoryRef.current,
@@ -1995,6 +2122,14 @@ export function GraphExplorer({
         dispatch({ type: 'replace-state', state: nextState });
       }
       setSemanticViewportBookmark(nextViewport);
+      if (
+        !sameFocusHierarchySubfocus(
+          focusHierarchySubfocusRef.current,
+          nextFocusHierarchySubfocus,
+        )
+      ) {
+        updateFocusHierarchySubfocus(nextFocusHierarchySubfocus);
+      }
       return true;
     },
     [
@@ -2002,12 +2137,16 @@ export function GraphExplorer({
       currentHistoryCheckpoint,
       replaceNavigationHistory,
       setSemanticViewportBookmark,
+      updateFocusHierarchySubfocus,
     ],
   );
   const commitHistoryGraphAction = useCallback(
     (
       action: GraphStateAction,
-      options: { readonly fitDestination?: boolean } = {},
+      options: {
+        readonly fitDestination?: boolean;
+        readonly nextFocusHierarchySubfocus?: FocusHierarchySubfocus | null;
+      } = {},
     ): boolean => {
       if (graphHistoryActionPolicy(action) !== 'record') {
         throw new Error(
@@ -2023,6 +2162,9 @@ export function GraphExplorer({
         options.fitDestination && rendererModeRef.current === 'structure'
           ? undefined
           : viewportBookmarkRef.current,
+        options.nextFocusHierarchySubfocus === undefined
+          ? focusHierarchySubfocusRef.current
+          : options.nextFocusHierarchySubfocus,
       );
       if (committed) {
         if (rendererModeRef.current === 'global') {
@@ -2950,6 +3092,52 @@ export function GraphExplorer({
       }),
     [commitHistoryGraphAction],
   );
+  const setHeadingHidden = useCallback(
+    (entityId: EntityId, hidden: boolean) => {
+      const entity = projectionWorkspace.entity(entityId);
+      if (entity?.kind !== 'section') {
+        setNavigationError('Only canonical Headings can be hidden.');
+        return;
+      }
+      const activeSubfocus = focusHierarchySubfocusRef.current;
+      const clearsSubfocus =
+        hidden &&
+        activeSubfocus !== null &&
+        structuralSubtreeContains(
+          projectionWorkspace,
+          entityId,
+          activeSubfocus.entityId,
+        );
+      if (
+        commitHistoryGraphAction(
+          { type: 'set-heading-hidden', entityId, hidden },
+          {
+            nextFocusHierarchySubfocus: clearsSubfocus ? null : activeSubfocus,
+          },
+        )
+      ) {
+        setNavigationError(undefined);
+        setNavigationAnnouncement(
+          `${hidden ? 'Hidden' : 'Restored'} Heading ${
+            entity.title.trim().length === 0 ? 'without a title' : entity.title
+          }${clearsSubfocus ? '; Heading subfocus was cleared' : ''}.`,
+        );
+      }
+    },
+    [commitHistoryGraphAction, projectionWorkspace],
+  );
+  const showAllFocusHeadings = useCallback(() => {
+    const entityIds = focusOutlineModel?.hiddenEntityIds ?? [];
+    if (
+      entityIds.length > 0 &&
+      commitHistoryGraphAction({ type: 'show-headings', entityIds })
+    ) {
+      setNavigationError(undefined);
+      setNavigationAnnouncement(
+        `Restored ${entityIds.length} hidden Heading${entityIds.length === 1 ? '' : 's'} in the current Focus File.`,
+      );
+    }
+  }, [commitHistoryGraphAction, focusOutlineModel]);
   const changeSelection = useCallback(
     (nextSelection: GraphSelection | null) =>
       setSelection((current) => retainGraphSelection(current, nextSelection)),
@@ -3984,6 +4172,15 @@ export function GraphExplorer({
       } else networkExplorerHandleRef.current?.focus();
     });
   }, []);
+  const closeFocusOutline = useCallback(() => {
+    setFocusOutlineOpen(false);
+    queueMicrotask(() => {
+      const target = focusOutlineRestoreTarget.current;
+      if (target?.isConnected && target.closest('[hidden]') === null) {
+        target.focus();
+      } else focusOutlineHandleRef.current?.focus();
+    });
+  }, []);
   const toggleInspector = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>) => {
       if (inspectorOpen) {
@@ -3992,7 +4189,10 @@ export function GraphExplorer({
       }
       inspectorRestoreTarget.current = event.currentTarget;
       mostRecentlyOpenedDrawer.current = 'inspector';
-      if (narrowGraphWorkspace) setNetworkExplorerOpen(false);
+      if (narrowGraphWorkspace) {
+        setNetworkExplorerOpen(false);
+        setFocusOutlineOpen(false);
+      }
       setInspectorOpen(true);
     },
     [closeInspector, inspectorOpen, narrowGraphWorkspace],
@@ -4010,6 +4210,19 @@ export function GraphExplorer({
       setGraphClickSelection(null);
     },
     [closeNetworkExplorer, narrowGraphWorkspace, networkExplorerOpen],
+  );
+  const toggleFocusOutline = useCallback(
+    (event: ReactMouseEvent<HTMLButtonElement>) => {
+      if (focusOutlineOpen) {
+        closeFocusOutline();
+        return;
+      }
+      focusOutlineRestoreTarget.current = event.currentTarget;
+      mostRecentlyOpenedDrawer.current = 'focus-outline';
+      if (narrowGraphWorkspace) setInspectorOpen(false);
+      setFocusOutlineOpen(true);
+    },
+    [closeFocusOutline, focusOutlineOpen, narrowGraphWorkspace],
   );
   const selectNetworkExplorerNode = useCallback(
     (nodeId: ProjectionNodeId) => {
@@ -4669,6 +4882,30 @@ export function GraphExplorer({
     (entityId: EntityId) => navigateToEntity(entityId, 'Focus'),
     [navigateToEntity],
   );
+  const selectFocusExplorerFile = useCallback(
+    (nodeId: ProjectionNodeId) => {
+      if (focusExplorerFilesModel?.fileById.has(nodeId) !== true) return;
+      setSelection({ kind: 'node', id: nodeId });
+      const bookmark = localViewportBookmarkRef.current;
+      requestLocalSemanticCenter({
+        nodeId,
+        freeRatio: bookmark?.freeRatio ?? LOCAL_NAVIGATION_RATIO,
+        structuredZoom:
+          bookmark?.structuredZoom ?? LOCAL_STRUCTURED_NAVIGATION_ZOOM,
+      });
+      setNavigationAnnouncement(
+        'Focus Explorer selected and centered the visible File.',
+      );
+    },
+    [focusExplorerFilesModel, requestLocalSemanticCenter],
+  );
+  const focusFocusExplorerFile = useCallback(
+    (nodeId: ProjectionNodeId) => {
+      const entityId = focusExplorerFilesModel?.fileById.get(nodeId)?.entityId;
+      if (entityId !== undefined) focusLocalEntity(entityId);
+    },
+    [focusExplorerFilesModel, focusLocalEntity],
+  );
   const subfocusLocalEntity = useCallback(
     (entityId: EntityId, kind: 'section' | 'block') => {
       if (
@@ -5136,10 +5373,22 @@ export function GraphExplorer({
             {activeScope === 'focus' || activeLayout === 'hierarchy' ? (
               <StructureDepthControl
                 custom={
-                  activeViewState.disclosure.expandedEntityIds.length > 0 ||
-                  activeViewState.disclosure.collapsedEntityIds.length > 0
+                  focusedDisclosureDepth?.custom ??
+                  (activeViewState.disclosure.expandedEntityIds.length > 0 ||
+                    activeViewState.disclosure.collapsedEntityIds.length > 0)
                 }
-                depth={activeViewState.disclosure.defaultDepth}
+                depth={
+                  focusedDisclosureDepth?.effectiveDepth ??
+                  activeViewState.disclosure.defaultDepth
+                }
+                {...(focusedDisclosureDepth?.custom === true
+                  ? {
+                      onApplyToAllFiles: () =>
+                        changeHierarchyDepth(
+                          focusedDisclosureDepth.effectiveDepth,
+                        ),
+                    }
+                  : {})}
                 onChange={changeHierarchyDepth}
               />
             ) : null}
@@ -5408,6 +5657,27 @@ export function GraphExplorer({
                   <NetworkExplorerIcon />
                 </button>
               ) : null}
+              {focusOutlineAvailable && focusOutlineModel !== undefined ? (
+                <button
+                  aria-label={
+                    focusOutlineVisible
+                      ? 'Close Focus Explorer'
+                      : 'Open Focus Explorer'
+                  }
+                  aria-pressed={focusOutlineVisible}
+                  className="graph-inspector-toggle graph-focus-outline-toggle"
+                  onClick={toggleFocusOutline}
+                  ref={focusOutlineToolbarRef}
+                  title={
+                    focusOutlineVisible
+                      ? 'Close Focus Explorer'
+                      : 'Open Focus Explorer'
+                  }
+                  type="button"
+                >
+                  <FocusOutlineIcon />
+                </button>
+              ) : null}
               <button
                 aria-label={
                   inspectorOpen ? 'Close Inspector' : 'Open Inspector'
@@ -5498,7 +5768,9 @@ export function GraphExplorer({
         <div
           className={`graph-stage${
             inspectorOpen ? ' graph-stage--inspector-drawer-open' : ''
-          }${networkExplorerVisible ? ' graph-stage--network-explorer-open' : ''}`}
+          }${networkExplorerVisible ? ' graph-stage--network-explorer-open' : ''}${
+            focusOutlineVisible ? ' graph-stage--focus-outline-open' : ''
+          }`}
         >
           {effectiveRendererMode === 'global' ? (
             GlobalGraphView === undefined ? (
@@ -5704,6 +5976,7 @@ export function GraphExplorer({
                 folderGuidesVisible={modularFolderStripsVisible}
                 internalLayoutVariant={modularFocusInternalLayout}
                 macroLayout={modularFocusMacroLayout}
+                maximized={maximized}
                 directFoldersOnly={modularFocusDirectFoldersOnly}
                 softAncestorDecayBase={modularFocusSoftAncestorDecayBase}
                 softFolderStrength={modularFocusSoftFolderStrength}
@@ -5733,6 +6006,7 @@ export function GraphExplorer({
                 }
                 onFitRequestConsumed={consumeLocalFitRequest}
                 onFocusEntity={focusLocalEntity}
+                onMaximizedChange={changeMaximized}
                 onSubfocusEntity={subfocusLocalEntity}
                 onSelectionChange={changeSelection}
                 onChangeSoftFolderDisplayIntent={softFolderDisplay.commit}
@@ -5767,6 +6041,7 @@ export function GraphExplorer({
                   ? {}
                   : { instrumentation: performance })}
                 layoutRequestKey={localLayoutRequestKey}
+                maximized={maximized}
                 onFailure={(message) =>
                   setLocalStructuredUnavailable(
                     `Focus Hierarchy renderer failed: ${message} Use an available Focus layout or return to All.`,
@@ -5774,6 +6049,7 @@ export function GraphExplorer({
                 }
                 onFitRequestConsumed={consumeLocalFitRequest}
                 onFocusEntity={focusLocalEntity}
+                onMaximizedChange={changeMaximized}
                 onSubfocusEntity={subfocusLocalEntity}
                 onSelectionChange={changeSelection}
                 onToggleEntity={toggleEntity}
@@ -5882,6 +6158,47 @@ export function GraphExplorer({
                   ? networkExplorerRevealRequest
                   : undefined
               }
+            />
+          ) : null}
+          {focusOutlineAvailable &&
+          focusOutlineModel !== undefined &&
+          focusExplorerFilesModel !== undefined &&
+          !focusOutlineVisible ? (
+            <button
+              aria-label="Open Focus Explorer"
+              className="graph-focus-outline-handle"
+              onClick={toggleFocusOutline}
+              ref={focusOutlineHandleRef}
+              title="Open Focus Explorer"
+              type="button"
+            >
+              <span aria-hidden="true">›</span>
+            </button>
+          ) : null}
+          {focusOutlineAvailable &&
+          focusOutlineModel !== undefined &&
+          focusExplorerFilesModel !== undefined &&
+          focusOutlineVisible ? (
+            <FocusExplorer
+              activeTab={focusExplorerTab}
+              collapsedHeadingIds={focusExplorerCollapsedHeadingIds(
+                synchronizedFocusExplorerHeadingState.disclosure,
+                focusOutlineModel.documentEntityId,
+              )}
+              files={focusExplorerFilesModel}
+              folderState={focusExplorerFolderState}
+              headings={focusOutlineModel}
+              onActiveTabChange={setFocusExplorerTab}
+              onClose={closeFocusOutline}
+              onFocusFile={focusFocusExplorerFile}
+              onFolderStateChange={setFocusExplorerFolderState}
+              onSelectFile={selectFocusExplorerFile}
+              onSetHeadingHidden={setHeadingHidden}
+              onShowAll={showAllFocusHeadings}
+              onToggleHeadingBranch={toggleFocusExplorerHeadingBranch}
+              {...(activeSelection?.kind === 'node'
+                ? { selectedNodeId: activeSelection.id }
+                : {})}
             />
           ) : null}
           {!inspectorOpen ? (

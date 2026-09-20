@@ -60,7 +60,7 @@ import type {
 export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ITERATION_SCHEDULE = [
   36, 18,
 ] as const;
-export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 12 as const;
+export const FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION = 13 as const;
 
 const STRATEGY_ID = 'HIER4B-soft-folder-clusters' as const;
 const EPSILON = 1e-6;
@@ -1166,7 +1166,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
     );
     if (quality.moduleOverlapPairs.length > 0)
       throw new Error(
-        `Soft Clusters left ${quality.moduleOverlapPairs.length} module overlaps: ${quality.moduleOverlapPairs.join(', ')}.`,
+        `Soft Clusters left ${quality.moduleOverlapPairs.length} module overlaps (stage=${postNestedQuality.moduleOverlapPairs.length > 0 ? 'post-nested' : 'post-group'}, postNested=${postNestedQuality.moduleOverlapPairs.length}).`,
       );
     const cohesionQuality = measureFocusSchematicSoftFolderCohesion(
       candidate,
@@ -1224,7 +1224,7 @@ export function computeFocusSchematicSoftClusterLayoutAttempt(
       nestedHierarchy.nestedGuideBlockerViolationCount > 0
     )
       throw new Error(
-        `Nested Soft hierarchy validation failed: containment=${nestedHierarchy.nestedParentContainmentViolationCount}, splits=${nestedHierarchy.nestedFolderSplitViolationCount}, blockers=${nestedHierarchy.nestedGuideBlockerViolationCount}.`,
+        `Nested Soft hierarchy validation failed: stage=post-group, containment=${nestedHierarchy.nestedParentContainmentViolationCount}, splits=${nestedHierarchy.nestedFolderSplitViolationCount}, blockers=${nestedHierarchy.nestedGuideBlockerViolationCount}; postCohesion[containment=${nestedHierarchy.postCohesionNestedParentContainmentViolationCount} splits=${nestedHierarchy.postCohesionNestedFolderSplitViolationCount} blockers=${nestedHierarchy.postCohesionNestedGuideBlockerViolationCount}]; postNested[containment=${nestedHierarchy.postNestedNestedParentContainmentViolationCount} splits=${nestedHierarchy.postNestedNestedFolderSplitViolationCount} blockers=${nestedHierarchy.postNestedNestedGuideBlockerViolationCount}]; postGroup[containment=${nestedHierarchy.postGroupNestedParentContainmentViolationCount} splits=${nestedHierarchy.postGroupNestedFolderSplitViolationCount} blockers=${nestedHierarchy.postGroupNestedGuideBlockerViolationCount}]; maxRegions=${nestedHierarchy.nestedFolderMaxRegionCount}; closestGap=${nestedHierarchy.nestedClosestInterIslandGap ?? 'none'}; memberCount=${nestedHierarchy.nestedFolderMemberCountMin}-${nestedHierarchy.nestedFolderMemberCountMax}.`,
       );
     const coverage = measureFocusSchematicSoftFolderCoverage(tree, {
       focusExemptFileCount: input.model.modules.some(

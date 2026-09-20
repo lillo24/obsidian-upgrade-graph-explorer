@@ -346,6 +346,9 @@ function collisionRectangles(
   ];
 }
 
+const translatedCoordinate = (value: number, delta: number): number =>
+  Math.round((value + delta) * 1e9) / 1e9;
+
 function translateBody(
   value: FocusSchematicSoftCompoundBody,
   dx: number,
@@ -353,12 +356,15 @@ function translateBody(
 ): FocusSchematicSoftCompoundBody {
   const rectangles = value.rectangles.map((rectangle) => ({
     ...rectangle,
-    x: rectangle.x + dx,
-    y: rectangle.y + dy,
+    x: translatedCoordinate(rectangle.x, dx),
+    y: translatedCoordinate(rectangle.y, dy),
   }));
   return {
     ...value,
-    center: { x: value.center.x + dx, y: value.center.y + dy },
+    center: {
+      x: translatedCoordinate(value.center.x, dx),
+      y: translatedCoordinate(value.center.y, dy),
+    },
     rectangles,
     envelope: bodyEnvelope(rectangles),
   };
@@ -438,14 +444,18 @@ function translateCandidateModules(
       moduleIds.has(module.moduleId)
         ? {
             ...module,
-            x: module.x + translation.x,
-            y: module.y + translation.y,
+            x: translatedCoordinate(module.x, translation.x),
+            y: translatedCoordinate(module.y, translation.y),
           }
         : module,
     ),
     nodes: candidate.nodes.map((node) =>
       moduleIds.has(node.moduleId)
-        ? { ...node, x: node.x + translation.x, y: node.y + translation.y }
+        ? {
+            ...node,
+            x: translatedCoordinate(node.x, translation.x),
+            y: translatedCoordinate(node.y, translation.y),
+          }
         : node,
     ),
     routes: [],

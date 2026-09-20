@@ -113,6 +113,7 @@ export function buildFixture(spec: FixtureSpec) {
                 : []),
             ]
           : [],
+      hiddenEntityIds: [],
       collapsedEntityIds: [],
       includeBlocks: true,
     },

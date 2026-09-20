@@ -170,13 +170,14 @@ describe('Local navigation planning', () => {
     ).toBe(true);
   });
 
-  it('starts Focus with the requested depth and no prior manual overrides', () => {
+  it('starts Focus with requested depth, clears collapse overrides, and preserves Heading hides', () => {
     const plan = planLocalEntry(
       workspace,
       {
         disclosure: {
           defaultDepth: 1,
           expandedEntityIds: ['doc-b'],
+          hiddenEntityIds: ['section-b'],
           collapsedEntityIds: ['doc-a'],
           includeBlocks: false,
         },
@@ -188,6 +189,7 @@ describe('Local navigation planning', () => {
     expect(plan.state.disclosure).toMatchObject({
       defaultDepth: 2,
       expandedEntityIds: [],
+      hiddenEntityIds: ['section-b'],
       collapsedEntityIds: [],
     });
     expect(

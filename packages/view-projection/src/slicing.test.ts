@@ -320,6 +320,7 @@ describe('projected filters', () => {
       disclosure: {
         defaultDepth: 3,
         expandedEntityIds: [],
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: false,
       },
@@ -349,6 +350,7 @@ describe('projected filters', () => {
       disclosure: {
         defaultDepth: 3,
         expandedEntityIds: [],
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: true,
       },

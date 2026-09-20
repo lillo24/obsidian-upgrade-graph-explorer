@@ -19,15 +19,18 @@ export function revealEntityInViewState(
   const target = workspace.requireEntity(entityId);
   const expanded = new Set(state.disclosure.expandedEntityIds);
   const collapsed = new Set(state.disclosure.collapsedEntityIds);
+  const hidden = new Set(state.disclosure.hiddenEntityIds);
   let requiredHeadingLevel: SectionHeadingLevel | undefined =
     target.kind === 'section'
       ? (target.level as SectionHeadingLevel)
       : undefined;
 
+  if (target.kind === 'section') hidden.delete(target.id);
   let ancestor = workspace.parent(target.id);
   while (ancestor !== undefined) {
     expanded.add(ancestor.id);
     collapsed.delete(ancestor.id);
+    if (ancestor.kind === 'section') hidden.delete(ancestor.id);
     if (ancestor.kind === 'section') {
       requiredHeadingLevel = Math.max(
         requiredHeadingLevel ?? 1,
@@ -51,6 +54,7 @@ export function revealEntityInViewState(
       ...state.disclosure,
       expandedEntityIds: sortedIds(expanded),
       collapsedEntityIds: sortedIds(collapsed),
+      hiddenEntityIds: sortedIds(hidden),
       includeBlocks:
         target.kind === 'block' ? true : state.disclosure.includeBlocks,
       ...(widenedHeadingLevel === undefined

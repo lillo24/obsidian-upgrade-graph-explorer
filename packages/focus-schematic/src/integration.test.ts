@@ -48,6 +48,7 @@ describe('Markdown-to-Focus-Schematic integration', () => {
       disclosure: {
         defaultDepth: 2,
         expandedEntityIds: [],
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: false,
       },

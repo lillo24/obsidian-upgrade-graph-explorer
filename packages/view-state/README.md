@@ -3,15 +3,15 @@
 Status: **STABLE — persisted and live-snapshot reconciliation are pure-test-backed.**
 
 This package owns the renderer-independent, versioned saved-view contract and
-its reconciliation against a current KG6 `ProjectionWorkspace`. Schema v3
+its reconciliation against a current KG6 `ProjectionWorkspace`. Schema v4
 persists structural disclosure, focus, visible graph filters, the current
 presentation mode, and separate semantic Structure/Global/Local viewport bookmarks.
 It does not access storage, files, reports, React, renderer libraries,
 diagnostics, or the KG9A identity catalog.
 
 ```text
-current KG6 state + presentation bookmarks → deterministic schema-v3 record
-schema-v1/v2/v3 record + current workspace → reconciled KG6 state + restore issues
+current KG6 state + presentation bookmarks → deterministic schema-v4 record
+schema-v1/v2/v3/v4 record + current workspace → reconciled KG6 state + restore issues
 current KG6 state + newer workspace    → reconciled live state + update issues
 ```
 
@@ -41,12 +41,13 @@ current transient text filter and every still-valid disclosure, focus, path,
 entity-kind, reference-status, graph-query, and semantic viewport choice. Missing canonical
 IDs and stale paths are removed deterministically before projection.
 
-Schema v3 remains the internal compatibility contract beneath the user-facing
+Schema v4 is the internal compatibility contract beneath the user-facing
 `Scope = All | Focus` and `Layout = Network | Hierarchy` controls. Their mapping
-is `global`, `structure`, `local/free`, and `local/structured` respectively; no
-schema v4 or renderer-coordinate state is required.
+is `global`, `structure`, `local/free`, and `local/structured` respectively.
+It adds section-only `hiddenEntityIds`; schema-v3 records migrate with an empty
+hidden set. No renderer-coordinate state is accepted.
 
-Schema v3 accepts structural `defaultDepth` values 0–3 plus an optional literal
+Schema v4 accepts structural `defaultDepth` values 0–3 plus an optional literal
 Markdown heading ceiling, `presentationMode: structure | global | local`, a
 Structure canonical anchor plus React Flow zoom, a Global canonical anchor plus
 Sigma ratio, and a Local canonical anchor plus Free ratio and optional
@@ -54,7 +55,8 @@ Structured React Flow zoom. Each Local renderer updates its own scale while
 preserving the other. Existing schema-v1
 records migrate losslessly to Structure. Schema-v2 records preserve their
 explicit Structure/Global renderer mode; an active focus does not guess Local.
-Local restoration normalizes focus to a surviving containing document and exits
+Schema-v3 records retain their prior disclosure and semantic viewport state and
+gain `hiddenEntityIds: []`. Local restoration normalizes focus to a surviving containing document and exits
 to Global if that root is lost. Earlier schema-v3 Local records represented
 automatic top-level detail as depth 0 plus an expanded root document. Restore
 removes only that root marker and reports the normalization; all other expansion

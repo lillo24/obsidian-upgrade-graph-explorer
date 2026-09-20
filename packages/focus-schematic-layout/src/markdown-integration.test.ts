@@ -53,6 +53,7 @@ describe('Markdown-to-HIER3A endpoint integration', () => {
           .entities()
           .filter(({ kind }) => kind === 'document' || kind === 'section')
           .map(({ id }) => id),
+        hiddenEntityIds: [],
         collapsedEntityIds: [],
         includeBlocks: true,
       },

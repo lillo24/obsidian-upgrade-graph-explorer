@@ -166,4 +166,53 @@ describe('Local Structured schematic preparation', () => {
     expect(hit).toEqual([{ id: 'b', x: 3, y: 4 }]);
     expect(hit).not.toBe(cache.get('b'));
   });
+
+  it('L1/L2/L6 keys Hide and Restore to their exact visible topology', () => {
+    const visible = localMapping();
+    const hiddenNode = visible.nodes.find(
+      (node) => node.data.projectionNodeId === 'projection-section',
+    )!;
+    const hidden = {
+      nodes: visible.nodes.filter((node) => node.id !== hiddenNode.id),
+      edges: visible.edges.filter(
+        (edge) =>
+          edge.source !== hiddenNode.id && edge.target !== hiddenNode.id,
+      ),
+    };
+    const visibleFingerprint = localStructuredLayoutFingerprint(
+      visible.nodes,
+      visible.edges,
+    );
+    const hiddenFingerprint = localStructuredLayoutFingerprint(
+      hidden.nodes,
+      hidden.edges,
+    );
+    const cache = new LocalStructuredLayoutCache();
+    const visibleSeed = seedLocalStructuredGraph(
+      visible.nodes,
+      visible.edges,
+      rendererNodeId('projection-document'),
+    );
+    const hiddenSeed = seedLocalStructuredGraph(
+      hidden.nodes,
+      hidden.edges,
+      rendererNodeId('projection-document'),
+    );
+
+    expect(hiddenFingerprint).not.toBe(visibleFingerprint);
+    expect(hiddenSeed.nodes.some((node) => node.id === hiddenNode.id)).toBe(
+      false,
+    );
+    cache.set(visibleFingerprint, localStructuredGraphPositions(visibleSeed));
+    cache.set(hiddenFingerprint, localStructuredGraphPositions(hiddenSeed));
+    expect(cache.get(hiddenFingerprint)?.map(({ id }) => id)).toEqual(
+      hiddenSeed.nodes.map(({ id }) => id),
+    );
+    expect(cache.get(visibleFingerprint)?.map(({ id }) => id)).toEqual(
+      visibleSeed.nodes.map(({ id }) => id),
+    );
+    expect(cache.get(hiddenFingerprint)?.map(({ id }) => id)).toEqual(
+      hiddenSeed.nodes.map(({ id }) => id),
+    );
+  });
 });

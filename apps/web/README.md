@@ -44,7 +44,8 @@ apps/web/
     performance.ts    Query-gated browser recorder and local inspection API.
     graph-state.ts    Pure disclosure/focus/filter interaction reducer.
     network-editing.ts Pure transient one-tool-at-a-time editing-mode contract.
-    exploration-model.ts Pure Scope/Layout mapping onto schema-v3 internal modes.
+    exploration-model.ts Pure Scope/Layout mapping onto schema-v4 internal modes.
+    focus-outline-model.ts Canonical current-File Heading tree and visibility states.
     saved-view.ts      Canonical profile capture, reconciliation planning, and exact-match derivation.
     saved-view-profile-transaction.ts Cross-key profile persistence and rollback before UI adoption.
     navigation.ts     Shared reveal/filter-widening/navigation planner.
@@ -110,7 +111,7 @@ GROUP1B adds user-facing configuration.
 The separate schema-v1 registry adapter is keyed by encoded stable workspace
 ID. It strictly retains ordered priority and stores only name, canonical QUERY1
 string, fixed palette token, and enabled boolean. It is not graph-view state,
-does not bump schema v3, and is not wired into GraphExplorer, NAV1 history,
+does not alter Current View schema v4, and is not wired into GraphExplorer, NAV1 history,
 DISC1 counts, active QUERY1 filtering, or Saved Filters.
 
 SPATIAL1 wires a separate source-neutral normalized folder-rule registry and
@@ -119,7 +120,7 @@ session uses declared identity provenance and an encoded workspace key;
 transient/legacy or storage-unavailable sources stay session-only. The renderer
 receives only the resolved exact-folder anchor map. Focus Network, both Hierarchy
 presentations, KG6 projection, navigation history, Graph Preferences, saved view
-schema v3, and the per-File size registry do not observe it. Automatic layout
+schema v4, and the per-File size registry do not observe it. Automatic layout
 positions remain distinct from displayed translated positions, so anchor edits
 neither submit layout work nor contaminate the automatic cache. GraphExplorer
 owns a transient editor lifecycle and delegates raw pointer state to the Sigma
@@ -229,8 +230,9 @@ live in **Settings → Source**. Routine healthy status stays there; opening,
 catch-up, resync, paused, and failure states use compact floating notices that do
 not reduce canvas height.
 
-**Maximize graph**, exposed in the canvas control stack, remains an application
-mode, not the browser Fullscreen API. The existing `GraphExplorer` and
+**Maximize graph**, exposed directly below **Fit graph to view** in every
+Network and Hierarchy canvas control stack, remains an application mode, not the
+browser Fullscreen API. The existing `GraphExplorer` and
 `GraphCanvas` instances remain mounted in place while the workspace becomes a
 fixed `100dvh` surface. Body scrolling is locked, and **Restore graph** or
 `Escape` restores the prior body overflow value. Maximizing is intentionally
@@ -325,6 +327,29 @@ transition never steals focus from the Layout control. The DOM companion stays
 usable when a valid Network projection exists even if the visual Sigma mount
 reports a failure.
 
+Focus + Hierarchy exposes a transient **Focus Explorer** on the left. Its Files
+tab lists only File modules in the completed Focus projection and reuses the
+Network Explorer's pure canonical source-folder grouping. Selecting a File
+centers it in the current hierarchy; the separate Focus action uses the existing
+File-reroot navigation. Its Headings tab lists every canonical Heading in source
+order, including Headings outside the current depth and Headings hidden by an
+ancestor. Hide omits the selected Heading subtree from the shared
+Classic/Modular projection while retaining the row for Restore. Show all affects
+only the current Focus File. The selected tab and folder expansion are transient
+session state. Opening, closing, grouping, or switching tabs performs no
+projection or layout work. Semantic Hide/Restore actions use graph history and
+Current View/Saved View persistence. On wide screens Focus Explorer can coexist
+with Inspector; at 900 px the most recently opened one replaces the other.
+
+Classic layout coordinates are keyed by the exact visible node/edge/dimension
+fingerprint; Modular input, cache, and adoption are keyed by the complete model,
+projection, dimensions, settings, and policies. Hide and Restore therefore
+cannot accept geometry from a different visible topology. While a matching
+replacement is pending, native disclosure buttons remain safely disabled and
+the global Updating layout status remains visible; disabled disclosure controls
+keep a transparent border/background so the transition does not resemble a
+selected translucent card control.
+
 The normal Inspector view is deliberately user-facing: entities show their name,
 kind, location, outgoing links, and backlinks; reference edges show the actual
 source-to-destination link occurrences; hierarchy edges use containment language;
@@ -346,17 +371,17 @@ resize or remount the graph workspace.
 Cross-session persistence activates only when a report explicitly declares
 `identity.stability: "stable"`. Transient and legacy schema-v1 reports remain
 usable in memory and never read or write persistent graph state. The automatic
-**Current View** is the one schema-v3 resume record keyed by encoded stable
+**Current View** is the one schema-v4 resume record keyed by encoded stable
 workspace ID. It contains only structural disclosure, the optional literal
-heading ceiling, focus, user-facing path/entity/status filters, explicit
+heading ceiling, section-only hidden Heading IDs, focus, user-facing path/entity/status filters, explicit
 presentation mode, and canonical renderer viewport bookmarks.
-Internally those bookmarks remain named Structure/Global/Local for schema-v3
-compatibility. Schema v1 migrates to Structure; schema v2 preserves its explicit
+Internally those bookmarks remain named Structure/Global/Local. Schema v1 migrates to Structure; schema v2 preserves its explicit
 Structure/Global mode and does not infer Local from an active focus. The Local
 bookmark stores an anchor plus Free ratio and optional Structured zoom. The
 Free/Structured preference remains in the existing graph-preference key and
 does not enter graph history. Raw x/y, transition
-screen points, Graphology objects, and worker positions are forbidden.
+screen points, Graphology objects, and worker positions are forbidden. Schema
+v3 records migrate to v4 with no hidden Headings.
 
 Hydration and source-evolution reconciliation happen synchronously before the
 autosave effect. Stale disclosure IDs, focus roots, path scopes, and viewport
@@ -562,10 +587,14 @@ layout identity, or camera policy. Scope labels distinguish the All-only layout
 and visual controls from Focus Root and the two camera-only density controls.
 
 **Hierarchy Depth** is hidden in All Network and visible in the other three
-combinations. In Focus it applies automatic depth only beneath the root file;
-depth 0 has no automatic headings, while depths 1–3 reveal the corresponding
-structural generations. Choosing a preset clears manual disclosure overrides.
-A compact **Custom** marker reports surviving explicit expand/collapse choices.
+combinations. In Focus, depth 0 has no automatic headings, while depths 1–3
+reveal the corresponding structural generations beneath every File in the
+bounded Focus neighborhood. Choosing a preset clears manual expand/collapse
+overrides while preserving explicit Heading Hide choices. The displayed depth
+is derived from canonical structural generations. A compact **Custom** marker
+appears when relevant per-File disclosure differs from that depth applied
+uniformly; **All Files** commits the effective depth as one ordinary preset and
+one history/projection/layout transition.
 Focus depth changes preserve the root's screen point in either renderer without
 persisting raw coordinates. Old schema-v3 Local state that encoded automatic
 detail as depth 0 plus an expanded root is normalized on restore; other manual
@@ -629,7 +658,7 @@ All opens in Network by default. All Hierarchy remains intact behind Settings >
 Sandbox > Experimental > Show All Hierarchy (Off by default), or as emergency
 recovery when All Network is unavailable. Focus always exposes Network and
 Hierarchy. The collapsed Experimental disclosure is transient; its checkbox is a
-general graph preference in the existing v1 record, separate from schema-v3 views.
+general graph preference in the existing v1 record, separate from schema-v4 views.
 Enabling it does not prepare a projection/layout or change the active layout.
 Disabling it while All Hierarchy is active performs the normal anchored Network
 transition and retains renderer viewport bookmarks. Other graph controls patch

@@ -72,4 +72,36 @@ describe('async renderer layout state', () => {
 
     expect(committed.committed?.disclosureAnchor).toEqual(anchor);
   });
+
+  it('L1/L2/L5 ends pending only on the latest Hide/Restore generation', () => {
+    const visibleInput = input('visible-heading');
+    const hiddenInput = input('hidden-heading');
+    const hidePending = beginRendererLayout(INITIAL_RENDERER_LAYOUT_STATE, 1);
+    const restorePending = beginRendererLayout(hidePending, 2);
+    const finalHidePending = beginRendererLayout(restorePending, 3);
+    const staleHide = commitRendererLayout(finalHidePending, {
+      generation: 1,
+      input: hiddenInput,
+      graph: graph('first-hide'),
+      disclosureAnchor: null,
+    });
+    const staleRestore = commitRendererLayout(staleHide, {
+      generation: 2,
+      input: visibleInput,
+      graph: graph('restore'),
+      disclosureAnchor: null,
+    });
+    const finalHide = commitRendererLayout(staleRestore, {
+      generation: 3,
+      input: hiddenInput,
+      graph: graph('final-hide'),
+      disclosureAnchor: null,
+    });
+
+    expect(staleHide).toBe(finalHidePending);
+    expect(staleRestore).toBe(finalHidePending);
+    expect(finalHide.pendingGeneration).toBeNull();
+    expect(finalHide.committed?.input).toBe(hiddenInput);
+    expect(finalHide.committed?.graph.layoutWarning).toBe('final-hide');
+  });
 });

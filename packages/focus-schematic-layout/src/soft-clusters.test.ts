@@ -26,6 +26,7 @@ import { FOCUS_SCHEMATIC_LAYOUT_SETTINGS } from './settings';
 import { layoutInput } from './test-helpers';
 import type { EndpointFixtureSpec } from './endpoint-fixtures';
 import type {
+  FocusSchematicLayoutInput,
   FocusSchematicSoftClusterOptions,
   FocusSchematicSoftFolderDisplayIntent,
 } from './types';
@@ -53,6 +54,42 @@ function run(
   });
   if (attempt.status !== 'success')
     throw new Error(`${spec.id}/${strength} failed: ${attempt.reason}`);
+  return { input, attempt };
+}
+
+function dimensionProfileInput(
+  scales: Readonly<Record<string, number>>,
+): FocusSchematicLayoutInput {
+  const spec = fixture('SC29');
+  const input = layoutInput(buildEndpointFixture(spec), {
+    ...FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+    directionalFolderBandsEnabled: false,
+  });
+  const moduleByNode = new Map(
+    input.model.modules.flatMap((module) =>
+      module.visibleEntityNodeIds.map((nodeId) => [nodeId, module.id] as const),
+    ),
+  );
+  return {
+    ...input,
+    nodeDimensions: input.nodeDimensions.map((dimension) => {
+      const scale = scales[moduleByNode.get(dimension.projectionNodeId)!] ?? 1;
+      return {
+        ...dimension,
+        width: Math.max(24, dimension.width * scale),
+        height: Math.max(20, dimension.height * scale),
+      };
+    }),
+  };
+}
+
+function runDimensionProfile(
+  scales: Readonly<Record<string, number>>,
+  options: FocusSchematicSoftClusterOptions,
+) {
+  const input = dimensionProfileInput(scales);
+  const attempt = computeFocusSchematicSoftClusterLayoutAttempt(input, options);
+  if (attempt.status !== 'success') throw new Error(attempt.reason);
   return { input, attempt };
 }
 
@@ -528,7 +565,7 @@ describe('HIER4B Soft Folder Clusters', () => {
       createHash('sha256')
         .update(JSON.stringify(attempt.result.candidate))
         .digest('hex'),
-    ).toBe('3e02a1154f40bd38f7666b6e89eeb555b1d91f5b8c7c5b58338de3e31944e228');
+    ).toBe('addc18bc1fdca7ae33db7c1052d4325b2f9fe815c1aad105a58c0da7e3924b3b');
   });
 
   it('keeps representative Directional layouts byte-identical', () => {
@@ -812,6 +849,78 @@ describe('HIER4B Soft Folder Clusters', () => {
     }
   }, 30_000);
 
+  it('keeps the SC29 Nested hierarchy valid across renderer-sized module mutations', () => {
+    const profiles = [
+      { label: 'large', scales: { BodyState: 2.5, Rationale: 2.5 } },
+      { label: 'medium', scales: { BodyState: 1.5, Rationale: 1.5 } },
+      { label: 'small', scales: { BodyState: 0.5, Rationale: 0.5 } },
+      { label: 'asymmetric non-root shrink', scales: { Rationale: 0.5 } },
+      { label: 'root shrink', scales: { Focus: 0.3 } },
+      {
+        label: 'root and neighbor shrink',
+        scales: { Focus: 0.3, BodyState: 0.3 },
+      },
+    ] as const;
+    const canonicalFolders = dimensionProfileInput({}).model.modules.map(
+      ({ id, folderKey }) => ({ id, folderKey }),
+    );
+    for (const profile of profiles)
+      for (const strength of [0, 50, 100] as const)
+        for (const ancestorDecayBase of [3, 4] as const) {
+          const { input, attempt } = runDimensionProfile(profile.scales, {
+            strength,
+            folderScopeMode: 'nested',
+            ancestorDecayBase,
+          });
+          expect(
+            input.model.modules.map(({ id, folderKey }) => ({ id, folderKey })),
+            `${profile.label}/${strength}/${ancestorDecayBase}`,
+          ).toEqual(canonicalFolders);
+          expect(
+            attempt.evidence.nestedHierarchy,
+            `${profile.label}/${strength}/${ancestorDecayBase}`,
+          ).toMatchObject({
+            postNestedNestedParentContainmentViolationCount: 0,
+            postNestedNestedFolderSplitViolationCount: 0,
+            postNestedNestedGuideBlockerViolationCount: 0,
+            postGroupNestedParentContainmentViolationCount: 0,
+            postGroupNestedFolderSplitViolationCount: 0,
+            postGroupNestedGuideBlockerViolationCount: 0,
+          });
+          expect(attempt.result.quality.moduleOverlapPairs).toEqual([]);
+        }
+
+    const exactRegression = runDimensionProfile(
+      { Rationale: 0.5 },
+      {
+        strength: 100,
+        folderScopeMode: 'nested',
+        ancestorDecayBase: 4,
+      },
+    );
+    expect(
+      runDimensionProfile(
+        { Rationale: 0.5 },
+        {
+          strength: 100,
+          folderScopeMode: 'nested',
+          ancestorDecayBase: 4,
+        },
+      ).attempt.result.candidate,
+    ).toEqual(exactRegression.attempt.result.candidate);
+
+    expect(
+      runDimensionProfile(
+        { Rationale: 0.5 },
+        {
+          strength: 100,
+          folderScopeMode: 'nearest-only',
+          ancestorDecayBase: 3,
+        },
+      ).attempt.result.quality.moduleOverlapPairs,
+    ).toEqual([]);
+  }, 30_000);
+
   it('separates Soft algorithm and variant cache identities', () => {
     const adaptive = runAdaptiveBaseline(adaptiveFixture('AC-S1')).attempt;
     const repeated = runAdaptiveBaseline(adaptiveFixture('AC-S1')).attempt;
@@ -823,7 +932,7 @@ describe('HIER4B Soft Folder Clusters', () => {
         internalLayoutVariant: 'vertical-spine',
       },
     ).attempt;
-    expect(adaptive.configId).toContain('HIER4Bv12');
+    expect(adaptive.configId).toContain('HIER4Bv13');
     expect(repeated.configId).toBe(adaptive.configId);
     expect(repeated.result.candidate).toEqual(adaptive.result.candidate);
     expect(vertical.configId).not.toBe(adaptive.configId);

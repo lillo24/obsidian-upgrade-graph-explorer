@@ -161,7 +161,7 @@ describe('Modular Focus Schematic presentation', () => {
     const adopted = { key: 'focus-a', graph: { nodes: ['a'] } };
     for (const message of [
       'Worker failed.',
-      'Nested Soft hierarchy validation failed: containment=0, splits=2, blockers=0.',
+      'Nested Soft hierarchy validation failed: stage=post-group, containment=0, splits=2, blockers=0; postCohesion[containment=0 splits=2 blockers=0]; postNested[containment=0 splits=0 blockers=0]; postGroup[containment=0 splits=2 blockers=0]; maxRegions=2; closestGap=24; memberCount=1-4.',
     ])
       expect(resolveFocusSchematicReplacementFailure(adopted, message)).toEqual(
         {
