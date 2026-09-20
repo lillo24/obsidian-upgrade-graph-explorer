@@ -827,6 +827,18 @@ while replacement failure retains the explicit last-valid warning behavior.
 Drawer/tab/folder visibility is session-only, while semantic hides participate
 in graph history, Current View schema v4, and Named Saved Views.
 
+HIERDISC1-FIX2 keeps that projection contract separate from Soft folder
+semantics. A Heading Hide may remove enough structural nodes to resize its File
+module substantially, but the File retains the same displayed-folder ancestry.
+Nested packing protects every already-packed descendant guide while arranging
+parent sibling units, then translates the complete parent against external
+blockers. The later group stage owns disjoint top-level compound bodies and may
+translate a retained subtree only rigidly. The production worker/cache key
+already includes the exact projection and renderer dimensions, so Hide and
+Restore compute or retrieve distinct validated generations without a Classic
+fallback. Soft algorithm version 13 invalidates the geometry; protocol 14 and
+evidence schema 9 remain shape-compatible.
+
 KG5 search, resolution filters, disclosure state, and pagination are transient
 diagnostic UI state. They are not KG6 projection contracts or KG9 persisted view
 state. KG8 global search is a separate canonical inspection operation: it finds

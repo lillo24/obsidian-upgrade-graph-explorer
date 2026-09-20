@@ -396,6 +396,14 @@ geometry-relevant values. Disclosure, reroot, filtering, exact hover, Secondary
 presentation, and camera behavior continue through the existing projection and
 React Flow seams.
 
+HIERDISC1-FIX2 keeps selective Heading visibility on that same production path.
+The exact projected nodes and renderer dimensions remain part of the worker and
+cache identity, so a geometry-significant Hide requests a new Soft layout and
+Restore can reuse only the exact prior-size result. Rapid Hide → Restore → Hide
+uses the existing latest-only worker generation owner. Valid Nested results
+stay Modular; replacement failure still retains the last validated graph and
+uses the existing explicit warning/fallback policy.
+
 HIER4B-SPACING-FIX4 defines Folder strength as additional Soft attraction.
 Mandatory immediate named-folder grouping remains active from 0 through 100;
 the compact helper text beside the slider makes that invariant explicit.

@@ -60,6 +60,53 @@ function baseLayout(id: string, strength = 50) {
   );
 }
 
+function dimensionMutatedLayout(
+  scales: Readonly<Record<string, number>>,
+  strength: 0 | 50 | 100,
+  ancestorDecayBase: 3 | 4,
+) {
+  const spec = SOFT_CLUSTER_FIXTURES.find(({ id }) => id === 'SC29')!;
+  const fixture = buildEndpointFixture(spec);
+  const original = layoutInput(fixture, {
+    ...FOCUS_SCHEMATIC_LAYOUT_SETTINGS,
+    directionalFolderBandsEnabled: false,
+  });
+  const moduleByNode = new Map(
+    original.model.modules.flatMap((module) =>
+      module.visibleEntityNodeIds.map((nodeId) => [nodeId, module.id] as const),
+    ),
+  );
+  const input = {
+    ...original,
+    nodeDimensions: original.nodeDimensions.map((dimension) => {
+      const scale = scales[moduleByNode.get(dimension.projectionNodeId)!] ?? 1;
+      return {
+        ...dimension,
+        width: Math.max(24, dimension.width * scale),
+        height: Math.max(20, dimension.height * scale),
+      };
+    }),
+  };
+  const attempt = computeFocusSchematicSoftClusterLayoutAttempt(input, {
+    strength,
+    folderScopeMode: 'nested',
+    ancestorDecayBase,
+  });
+  if (attempt.status !== 'success') throw new Error(attempt.reason);
+  const tree = projectFocusSchematicSoftFolderGroupingTree(
+    buildFocusSchematicSoftFolderDisplayTree({
+      visibleFiles: input.model.modules
+        .filter(({ presentation }) => presentation !== 'filtered')
+        .map(({ id: fileId, folderKey: exactFolderKey }) => ({
+          fileId,
+          exactFolderKey,
+        })),
+    }),
+    { excludedFileIds: [input.model.rootModuleId] },
+  );
+  return { input, result: attempt.result, tree };
+}
+
 function moduleCenter(
   result: ReturnType<typeof baseLayout>['result'],
   moduleId: string,
@@ -288,6 +335,50 @@ describe('Soft folder-group radial post-layout spread', () => {
         expect(moduleCenter(spread, 'Focus')).toEqual(focusBefore);
         expect(
           measureFocusSchematicSoftNestedHierarchy(spread.candidate, grouping),
+        ).toMatchObject({
+          nestedParentContainmentViolationCount: 0,
+          nestedFolderSplitViolationCount: 0,
+          nestedGuideBlockerViolationCount: 0,
+        });
+      }
+    }
+  }, 30_000);
+
+  it('preserves size-mutated Nested geometry at every integer spacing value', () => {
+    for (const profile of [
+      { scales: { Rationale: 0.5 }, strength: 100, ancestorDecayBase: 4 },
+      { scales: { Focus: 0.3 }, strength: 0, ancestorDecayBase: 3 },
+      {
+        scales: { Focus: 0.3, BodyState: 0.3 },
+        strength: 50,
+        ancestorDecayBase: 4,
+      },
+    ] as const) {
+      const { input, result, tree } = dimensionMutatedLayout(
+        profile.scales,
+        profile.strength,
+        profile.ancestorDecayBase,
+      );
+      const focusBefore = moduleCenter(result, 'Focus');
+      for (let spacing = 0; spacing <= 100; spacing += 1) {
+        const spread = applyFocusSchematicSoftRadialSpread(
+          input,
+          result,
+          spacing,
+        );
+        expect(validateFocusSchematicComputedLayout(input, spread).valid).toBe(
+          true,
+        );
+        expectNoModuleOverlaps(spread);
+        expect(
+          center(
+            spread.candidate.modules.find(
+              ({ moduleId }) => moduleId === 'Focus',
+            )!,
+          ),
+        ).toEqual(focusBefore);
+        expect(
+          measureFocusSchematicSoftNestedHierarchy(spread.candidate, tree),
         ).toMatchObject({
           nestedParentContainmentViolationCount: 0,
           nestedFolderSplitViolationCount: 0,

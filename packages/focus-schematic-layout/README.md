@@ -212,12 +212,15 @@ the bakeoff evidence if changed.
   radial-spread normalization, and continuous 1.0×–2.4× scale mapping.
 - `src/soft-group-packing.ts` owns immediate-folder compound bodies, the exact
   Focus anchor, Nested top-level subtree bodies, the exact continuous affine
-  overlap oracle, deterministic structural body packing, and packing evidence.
+  overlap oracle, deterministic structural body packing, canonical rigid
+  translations, and packing evidence.
 - `src/soft-folder-cohesion.ts` owns deterministic immediate named-folder
   compaction, movement evidence, and the final split hard gate.
 - `src/soft-nested-hierarchy-packing.ts` owns deterministic deepest-first
-  retained-tree packing, rigid child-subtree translation, Focus-blocker and
-  one-region validation, named-folder coverage auditing, and Nested evidence.
+  retained-tree packing, protected child-guide invariants during parent joins,
+  rigid child/parent translation, Focus-blocker and one-region validation,
+  named-folder coverage auditing, and Nested evidence across dynamic module
+  dimensions.
 - `src/soft-folder-guide-geometry.ts` owns the dependency-free guide-island
   geometry shared by layout validation and React Flow rendering.
 - `src/soft-radial-spread.ts` translates complete non-root module geometry
@@ -237,12 +240,13 @@ the bakeoff evidence if changed.
   placeholder policy.
 - `src/selected.ts` maps the accepted A1 computed result to the compatible
   selected candidate/attempt API.
-- `src/worker-protocol.ts` owns the version-13 exact-shape production messages,
+- `src/worker-protocol.ts` owns the version-14 exact-shape production messages,
   macro/strength/scope/decay/display-intent policy normalization, cardinal and
   Soft Compass evidence, and originating-input result validation. Version 13
-  and Soft evidence schema 8 add Focus-neutral Nested hierarchy/coverage
-  evidence and post-Nested quality metrics while radial spread stays outside
-  worker input.
+  and Soft evidence schema 9 carry Focus-neutral Nested hierarchy/coverage and
+  stage-specific post-Nested/post-group quality while radial spread stays
+  outside worker input. Soft algorithm version 13 changes geometry without
+  changing this payload shape.
 - `src/worker-runtime.ts` validates requests, computes A1, records phase
   timings, and returns either a complete validated result or an explicit
   failure.

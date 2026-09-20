@@ -10,7 +10,11 @@ import {
 } from './soft-group-packing';
 import { SOFT_CLUSTER_FIXTURES } from './soft-cluster-fixtures';
 import { computeFocusSchematicSoftClusterLayoutAttempt } from './soft-clusters';
-import { buildFocusSchematicSoftFolderDisplayTree } from './soft-folder-display';
+import {
+  buildFocusSchematicSoftFolderDisplayTree,
+  projectFocusSchematicSoftFolderGroupingTree,
+} from './soft-folder-display';
+import { measureFocusSchematicSoftNestedHierarchy } from './soft-nested-hierarchy-packing';
 import { FOCUS_SCHEMATIC_LAYOUT_SETTINGS } from './settings';
 import { layoutInput } from './test-helpers';
 
@@ -229,5 +233,81 @@ describe('Soft structural folder-group packing', () => {
     expect(baseLayout('SC14').attempt.result.candidate).toEqual(
       attempt.result.candidate,
     );
+  });
+
+  it('partitions one Nested top-level subtree and translates every descendant rigidly', () => {
+    const { input, attempt, tree: semanticTree } = baseLayout('SC29');
+    const tree = projectFocusSchematicSoftFolderGroupingTree(semanticTree, {
+      excludedFileIds: [input.model.rootModuleId],
+    });
+    const before = attempt.result.candidate;
+    const bodies = createFocusSchematicSoftCompoundBodies(input, before, tree, {
+      folderScopeMode: 'nested',
+    });
+    const named = bodies.filter(({ kind }) => kind === 'named-folder');
+    const nonRootModuleIds = before.modules
+      .map(({ moduleId }) => moduleId)
+      .filter((moduleId) => moduleId !== input.model.rootModuleId)
+      .sort();
+    expect(named).toHaveLength(1);
+    expect(named[0]!.memberModuleIds).toEqual(nonRootModuleIds);
+    expect(bodies.some(({ kind }) => kind === 'ungrouped-module')).toBe(false);
+    expect(
+      new Set(bodies.flatMap(({ memberModuleIds }) => memberModuleIds)).size,
+    ).toBe(before.modules.length);
+
+    const namedIds = new Set(named[0]!.memberModuleIds);
+    const root = before.modules.find(
+      ({ moduleId }) => moduleId === input.model.rootModuleId,
+    )!;
+    const shifted = {
+      ...before,
+      modules: before.modules.map((module) =>
+        namedIds.has(module.moduleId)
+          ? {
+              ...module,
+              x: module.x - named[0]!.center.x,
+              y: module.y - named[0]!.center.y,
+            }
+          : module,
+      ),
+      nodes: before.nodes.map((node) =>
+        namedIds.has(node.moduleId)
+          ? {
+              ...node,
+              x: node.x - named[0]!.center.x,
+              y: node.y - named[0]!.center.y,
+            }
+          : node,
+      ),
+    };
+    const packed = packFocusSchematicSoftFolderGroups(input, shifted, tree, {
+      folderScopeMode: 'nested',
+    });
+    expect(
+      packed.candidate.modules.find(
+        ({ moduleId }) => moduleId === input.model.rootModuleId,
+      ),
+    ).toEqual(root);
+    const translations = nonRootModuleIds.map((moduleId) => {
+      const first = shifted.modules.find(
+        (module) => module.moduleId === moduleId,
+      )!;
+      const second = packed.candidate.modules.find(
+        (module) => module.moduleId === moduleId,
+      )!;
+      return { x: second.x - first.x, y: second.y - first.y };
+    });
+    for (const translation of translations.slice(1)) {
+      expect(translation.x).toBeCloseTo(translations[0]!.x, 8);
+      expect(translation.y).toBeCloseTo(translations[0]!.y, 8);
+    }
+    expect(
+      measureFocusSchematicSoftNestedHierarchy(packed.candidate, tree),
+    ).toMatchObject({
+      nestedParentContainmentViolationCount: 0,
+      nestedFolderSplitViolationCount: 0,
+      nestedGuideBlockerViolationCount: 0,
+    });
   });
 });

@@ -16,6 +16,7 @@ import type { FocusSchematicSoftFolderDisplayTree } from './types';
 
 const UNIT_GAP = 72;
 const EPSILON = 1e-9;
+const CLEARANCE_GUARD = 1e-6;
 const TANGENTIAL_OFFSETS = [
   0, -36, 36, -72, 72, -108, 108, -144, 144, -180, 180, -216, 216, -288, 288,
   -360, 360,
@@ -229,11 +230,12 @@ function overlapsWithClearance(
   left: FocusSchematicRectangle,
   right: FocusSchematicRectangle,
 ): boolean {
+  const clearance = FOCUS_SCHEMATIC_LAYOUT_CLEARANCE + CLEARANCE_GUARD;
   return !(
-    left.x + left.width + FOCUS_SCHEMATIC_LAYOUT_CLEARANCE <= right.x ||
-    right.x + right.width + FOCUS_SCHEMATIC_LAYOUT_CLEARANCE <= left.x ||
-    left.y + left.height + FOCUS_SCHEMATIC_LAYOUT_CLEARANCE <= right.y ||
-    right.y + right.height + FOCUS_SCHEMATIC_LAYOUT_CLEARANCE <= left.y
+    left.x + left.width + clearance <= right.x ||
+    right.x + right.width + clearance <= left.x ||
+    left.y + left.height + clearance <= right.y ||
+    right.y + right.height + clearance <= left.y
   );
 }
 
@@ -255,6 +257,32 @@ function rectanglesOverlap(
 ): boolean {
   return left.some((first) =>
     right.some((second) => overlapsWithClearance(first, second)),
+  );
+}
+
+function folderGuideIsValid(
+  candidate: FocusSchematicLayoutCandidate,
+  memberModuleIds: readonly string[],
+): boolean {
+  const memberIds = new Set(memberModuleIds);
+  const allIds = candidate.modules.map(({ moduleId }) => moduleId);
+  const members = moduleRectangles(candidate, memberIds);
+  const blockers = moduleRectangles(
+    candidate,
+    new Set(allIds.filter((moduleId) => !memberIds.has(moduleId))),
+  );
+  return (
+    partitionFocusSchematicSoftFolderGuideIslands(members, blockers).length ===
+      1 && !hullSwallowsBlocker(members, blockers)
+  );
+}
+
+function protectedFolderGuidesAreValid(
+  candidate: FocusSchematicLayoutCandidate,
+  protectedFolderMemberIds: readonly (readonly string[])[],
+): boolean {
+  return protectedFolderMemberIds.every((memberModuleIds) =>
+    folderGuideIsValid(candidate, memberModuleIds),
   );
 }
 
@@ -306,6 +334,7 @@ function repairFolderConnectivity(
   candidate: FocusSchematicLayoutCandidate,
   units: readonly PackingUnit[],
   folderMemberIds: readonly string[],
+  protectedFolderMemberIds: readonly (readonly string[])[],
   allowWholeFolderRelocation = true,
 ): FocusSchematicLayoutCandidate {
   if (units.length <= 1) return candidate;
@@ -333,7 +362,8 @@ function repairFolderConnectivity(
       !rectanglesOverlap(connected(), moving()) &&
       partitionFocusSchematicSoftFolderGuideIslands(combined(), blockers)
         .length === 1 &&
-      !hullSwallowsBlocker(combined(), blockers)
+      !hullSwallowsBlocker(combined(), blockers) &&
+      protectedFolderGuidesAreValid(repaired, protectedFolderMemberIds)
     ) {
       unit.memberModuleIds.forEach((moduleId) => connectedIds.add(moduleId));
       continue;
@@ -406,12 +436,8 @@ function repairFolderConnectivity(
         translation,
       );
       const moved = moduleRectangles(trial, movingIds);
-      const stationaryIds = new Set([
-        ...connectedIds,
-        ...blockers.map(({ id }) => id),
-      ]);
-      const stationary = trial.modules.filter(({ moduleId }) =>
-        stationaryIds.has(moduleId),
+      const stationary = trial.modules.filter(
+        ({ moduleId }) => !movingIds.has(moduleId),
       );
       if (
         moved.some((left) =>
@@ -430,6 +456,10 @@ function repairFolderConnectivity(
         continue;
       }
       if (hullSwallowsBlocker(members, blockers)) {
+        blockerRejectCount += 1;
+        continue;
+      }
+      if (!protectedFolderGuidesAreValid(trial, protectedFolderMemberIds)) {
         blockerRejectCount += 1;
         continue;
       }
@@ -495,6 +525,7 @@ function repairFolderConnectivity(
             relocated,
             units,
             folderMemberIds,
+            protectedFolderMemberIds,
             false,
           );
         } catch (error: unknown) {
@@ -640,27 +671,41 @@ export function applyFocusSchematicSoftNestedHierarchyPacking(
     packed = packUnits(packed, units);
     const folderIds = new Set(folder.descendantFileIds);
     const allIds = new Set(packed.modules.map(({ moduleId }) => moduleId));
+    const protectedFolderMemberIds = namedFolders(tree)
+      .filter(
+        (protectedFolder) =>
+          protectedFolder.folderKey !== folder.folderKey &&
+          protectedFolder.descendantFileIds.every((fileId) =>
+            folderIds.has(fileId),
+          ),
+      )
+      .map(({ descendantFileIds }) => descendantFileIds);
     const blockers = moduleRectangles(
       packed,
       new Set([...allIds].filter((moduleId) => !folderIds.has(moduleId))),
     );
-    for (const unit of [...units].sort((left, right) =>
-      compareText(left.id, right.id),
-    ))
-      packed = stabilizeRigidUnit(packed, unit, blockers);
-    packed = repairFolderConnectivity(packed, units, folder.descendantFileIds);
-    const members = moduleRectangles(packed, folderIds);
-    const finalBlockers = moduleRectangles(
+    packed = repairFolderConnectivity(
       packed,
-      new Set([...allIds].filter((moduleId) => !folderIds.has(moduleId))),
+      units,
+      folder.descendantFileIds,
+      protectedFolderMemberIds,
     );
-    if (
-      units.length > 1 &&
-      partitionFocusSchematicSoftFolderGuideIslands(members, finalBlockers)
-        .length !== 1
-    )
+    packed = stabilizeRigidUnit(
+      packed,
+      {
+        id: `folder:${folder.folderKey}`,
+        memberModuleIds: folder.descendantFileIds,
+        envelope: moduleEnvelope(packed, folder.descendantFileIds),
+      },
+      blockers,
+    );
+    if (!folderGuideIsValid(packed, folder.descendantFileIds))
       throw new Error(
-        'Nested Soft packing left a retained parent folder geometrically split.',
+        'Nested Soft packing left a retained folder geometrically invalid.',
+      );
+    if (!protectedFolderGuidesAreValid(packed, protectedFolderMemberIds))
+      throw new Error(
+        'Nested Soft packing invalidated a retained child folder.',
       );
   }
   const movements = packed.modules.map((module) => {

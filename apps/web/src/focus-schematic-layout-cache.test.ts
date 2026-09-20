@@ -290,7 +290,7 @@ describe('page-lifetime Focus Schematic layout cache', () => {
       }) as const;
     expect(
       exactFocusSchematicLayoutCacheKey(softInput, policiesAt(50)),
-    ).toContain('"algorithmVersion":12');
+    ).toContain('"algorithmVersion":13');
     expect(
       exactFocusSchematicLayoutCacheKey(
         directionalInput,

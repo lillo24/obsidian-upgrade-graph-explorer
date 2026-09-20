@@ -529,3 +529,58 @@ The exact FIX6 prompt is archived at
 `history-implementations/HIER4B_FIX6_nested_split_reroot_failure_hardening_codex_prompt.md`.
 Its SHA-256 is
 `9553524C38222C6A057A528920E15DDA7F8396AD329A936A2F8BE148FFE0366D`.
+
+## HIERDISC1-FIX2 hidden-Heading geometry hardening
+
+The synthetic SC29 size mutation reproduces the native failure exactly when
+the Rationale module shrinks to half size at strength 100 and ancestor decay
+1/4. Before the correction, stage evidence was:
+
+```text
+postCohesion: containment=0, splits=4, blockers=6
+postNested:   containment=0, splits=1, blockers=1
+postGroup:    containment=0, splits=1, blockers=1
+```
+
+The invalid retained folder was created during parent-level Nested packing:
+moving sibling subtree units could leave a sibling module inside an already
+packed child hull. Group packing preserved the invalid geometry rigidly; it was
+not the originating stage. Parent joins now accept a candidate only when every
+retained descendant guide remains one blocker-free region. External blockers
+are handled by translating the complete parent after the internal join, and
+the final top-level group translation preserves equal descendant deltas.
+
+The permanent matrix covers large, medium, small, asymmetric non-root, root,
+and root-plus-neighbor size profiles at strengths 0/50/100 and decay 1/3 and
+1/4. Representative mutations also pass all 101 integer spacing values with a
+fixed Focus, zero module overlap, and zero post-Nested/post-group containment,
+split, or blocker violations. An inline Markdown integration fixture exercises
+workspace parsing, KG6 projection, HIER1 model construction, renderer
+dimensions, the production worker, exact cache identity, Hide, Restore/cache
+hit, and rapid Hide → Restore → Hide latest-wins adoption.
+
+Failures now report the safe aggregate failing stage, post-cohesion,
+post-Nested, and post-group counts, maximum region count, closest gap, and
+member-count range. No private path, folder, File, or Markdown identity is
+included. Soft structural algorithm/cache version 13 owns the geometry change;
+worker protocol 14 and evidence schema 9 remain unchanged. Directional remains
+unchanged.
+
+The full Soft benchmark passes every hard gate before and after the correction.
+Across its 150 standard rows, the corrected layout changes the mean bounds area
+by -0.87%, connected-pair distance by -1.54%, exact primary endpoint span by
+-1.60%, and hop-radius error by +0.11%. Mean Nested packing movement increases
+1.65% while mean group translation decreases 35.98%. Exact endpoint crossings
+increase from 203 to 208 across the complete corpus (SC7 at strengths 0/25/50
+and SC29 at strength 50); the affected layouts remain overlap-free and retain
+valid Nested geometry. The largest per-row area increase is 8.83%, and the
+101-module stress fixture has byte-identical geometry at every measured
+strength. Its mean measured layout time changes from 74.63 ms to 90.03 ms; the
+150-row mean changes from 4.85 ms to 7.72 ms. These are deterministic geometry
+checks with single-run timing observations, not a statistical performance
+benchmark.
+
+The exact FIX2 prompt is archived at
+`history-implementations/HIERDISC1_FIX2_hidden_heading_nested_soft_geometry_codex_prompt.md`.
+Its SHA-256 is
+`A15A6F6FCB72A77AC29B98E55E77669BDA540D71BCF0159486B8F47467CFB260`.
