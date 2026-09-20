@@ -36,7 +36,8 @@ src/
   presets.ts           Generic structural-depth and compatibility state helpers.
   reveal.ts            Canonical-target disclosure helper for navigation.
   focused-documents.ts Shared containing-document, filtered neighborhood, and detail-retention helpers.
-  focused-detail.ts    Shared bounded Focus detail with root-scoped automatic depth.
+  focused-detail.ts    Shared bounded Focus detail with uniform neighborhood depth.
+  focused-disclosure-depth.ts Derived effective depth and Custom presentation for Focus.
   local.ts             Document-root normalization and the Focus projection entry point.
   structure.ts         Full Hierarchy projection plus compatibility Focus routing.
   project.ts           Public orchestration and one-call snapshot wrapper.
@@ -188,14 +189,27 @@ descendant. Filters still decide visible content and relationships; they cannot
 erase the anchor required by both Focus renderers and Focus navigation.
 
 The detailed pass sets ordinary automatic depth to zero and applies the stored
-depth only to a projection-only set of detail document IDs—today the one Focus
-root document. Depths 0/1/2/3 therefore retain the same file IDs while revealing
-zero through three canonical section generations beneath the root. Neighbor
-documents remain collapsed until manually expanded; manual collapse retains
-precedence. Blocks still require both the Blocks opt-in and a genuinely manual
-parent expansion, so root-scoped automatic depth cannot reveal them by itself.
-Visible headings may take over precise reference endpoints without changing the
-precomputed document neighborhood.
+depth through a projection-only map containing every document in the bounded
+Focus neighborhood. Depths 0/1/2/3 therefore retain the same file IDs while
+revealing zero through three canonical section generations beneath every File.
+Manual expansion and collapse retain precedence. Blocks still require both the
+Blocks opt-in and a genuinely manual parent expansion, so automatic depth cannot
+reveal them by itself. Visible headings may take over precise reference
+endpoints without changing the precomputed document neighborhood.
+
+`describeFocusedDisclosureDepth` derives the toolbar presentation without a new
+persistence field. It compares the structurally visible Heading IDs produced by
+the active manual expand/collapse state with the same effective depth applied
+uniformly to the current canonical Focus documents. Explicit hidden Headings are
+excluded from that calculation because Hide is an independent visibility layer.
+The effective depth follows canonical parent generations rather than Markdown H
+numbers and is capped at 3; deeper manual disclosure is therefore `3 levels ·
+Custom`.
+
+The multi-File regression fixture projects 32 Files and 96 Headings through one
+shared Focus detail call and verifies deterministic output. The implementation
+builds one document-to-depth map and invokes the detailed projection once; it
+does not project or dispatch separately for each File or Heading.
 
 ## Focus state normalization
 

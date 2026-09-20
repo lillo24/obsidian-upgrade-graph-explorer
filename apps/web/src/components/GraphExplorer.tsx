@@ -50,6 +50,7 @@ import {
 } from '@icarus-graph-explorer/view-state';
 import {
   createProjectionWorkspace,
+  describeFocusedDisclosureDepth,
   projectLocalView,
   projectStructureView,
   projectView,
@@ -1508,6 +1509,10 @@ export function GraphExplorer({
       focusOutlineModel.documentEntityId,
     );
   }, [focusOutlineModel, projectionWorkspace, result]);
+  const focusedDisclosureDepth = useMemo(() => {
+    if (activeViewState.focus === undefined || !result.ok) return undefined;
+    return describeFocusedDisclosureDepth(projectionWorkspace, activeViewState);
+  }, [activeViewState, projectionWorkspace, result]);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const inspectorToolbarRef = useRef<HTMLButtonElement>(null);
   const inspectorHandleRef = useRef<HTMLButtonElement>(null);
@@ -5323,10 +5328,22 @@ export function GraphExplorer({
             {activeScope === 'focus' || activeLayout === 'hierarchy' ? (
               <StructureDepthControl
                 custom={
-                  activeViewState.disclosure.expandedEntityIds.length > 0 ||
-                  activeViewState.disclosure.collapsedEntityIds.length > 0
+                  focusedDisclosureDepth?.custom ??
+                  (activeViewState.disclosure.expandedEntityIds.length > 0 ||
+                    activeViewState.disclosure.collapsedEntityIds.length > 0)
                 }
-                depth={activeViewState.disclosure.defaultDepth}
+                depth={
+                  focusedDisclosureDepth?.effectiveDepth ??
+                  activeViewState.disclosure.defaultDepth
+                }
+                {...(focusedDisclosureDepth?.custom === true
+                  ? {
+                      onApplyToAllFiles: () =>
+                        changeHierarchyDepth(
+                          focusedDisclosureDepth.effectiveDepth,
+                        ),
+                    }
+                  : {})}
                 onChange={changeHierarchyDepth}
               />
             ) : null}

@@ -120,12 +120,15 @@ canonical truth, or own a platform storage implementation.
   bounded overlay below the stable toolbar shell rather than toolbar-flow content,
   so capability adoption cannot resize the graph stage after its startup Fit or
   cover wrapped controls.
-- `StructureDepthControl.tsx` owns the labeled Hierarchy depth select and
-  compact Custom override indicator, and
+- `StructureDepthControl.tsx` owns the labeled Hierarchy depth select, the
+  compact Custom override indicator, and the Focus-only All Files action, and
   `structure-depth-selection.ts` maps its four options onto the existing
   structural-depth action. Choosing a depth is a fresh preset: it clears
   per-entity expand/collapse exceptions while preserving the independent
-  Heading limit, Blocks option, Focus, and graph filters.
+  Heading Hide state, Heading limit, Blocks option, Focus, and graph filters.
+  In Focus the selected value is the derived effective canonical generation;
+  Custom ignores overrides outside the current document neighborhood. All Files
+  commits that effective depth through the same single history action.
 - `NodeSizeControl.tsx` is the controlled multiplier slider for Network File
   actions. It always displays a value (1.00× without an entry), and Reset removes
   the entry. There is no sizing-mode selector. It emits one multiplier/reset
@@ -403,6 +406,13 @@ Restore can reuse only the exact prior-size result. Rapid Hide → Restore → H
 uses the existing latest-only worker generation owner. Valid Nested results
 stay Modular; replacement failure still retains the last validated graph and
 uses the existing explicit warning/fallback policy.
+
+HIERDISC1-FIX3 applies Focus automatic depth uniformly to every File in the
+bounded document neighborhood shared by Network, Classic Hierarchy, and Modular
+Hierarchy. A manual File expansion from Files only remains one compact override,
+presented as `1 level · Custom`; All Files converts it to the ordinary level-1
+preset with one history/projection/layout transition while preserving explicit
+Heading Hide state. The presentation is derived and adds no persistence field.
 
 HIER4B-SPACING-FIX4 defines Folder strength as additional Soft attraction.
 Mandatory immediate named-folder grouping remains active from 0 through 100;

@@ -17,7 +17,7 @@ describe('Local KG6 projection', () => {
     expect(containingDocumentEntityId(workspace, 'missing')).toBeUndefined();
   });
 
-  it('uses root-scoped automatic depth while keeping neighbor documents collapsed', () => {
+  it('applies automatic depth uniformly across the Focus neighborhood', () => {
     const state = deriveLocalProjectionState(
       workspace,
       {
@@ -44,8 +44,9 @@ describe('Local KG6 projection', () => {
     expect(entities).toContain('a-deep');
     expect(entities).toContain('doc-b');
     expect(entities).toContain('doc-c');
-    expect(entities).not.toContain('b-target');
-    expect(entities).not.toContain('c-third');
+    expect(entities).toContain('b-target');
+    expect(entities).toContain('b-leaf');
+    expect(entities).toContain('c-third');
     expect(
       projection.nodes.flatMap((node) =>
         node.kind === 'reference-target' ? node.referenceIds : [],

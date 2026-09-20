@@ -129,6 +129,70 @@ describe('renderer-independent graph navigation history', () => {
     ]);
   });
 
+  it('records All Files as one depth action and restores Custom through Back and Forward', () => {
+    const filesOnly = {
+      ...initialGraphState(),
+      disclosure: {
+        ...initialGraphState().disclosure,
+        hiddenEntityIds: ['section-a'],
+      },
+      focus: {
+        rootEntityId: 'doc-a',
+        hops: 1 as const,
+        direction: 'both' as const,
+        hierarchyContext: 'ancestors' as const,
+      },
+    };
+    const custom = graphStateReducer(filesOnly, {
+      type: 'toggle-entity',
+      entityId: 'doc-a',
+      currentlyOpen: false,
+    });
+    const allFiles = graphStateReducer(custom, {
+      type: 'set-depth',
+      depth: 1,
+    });
+    const filesCheckpoint = createGraphHistoryCheckpoint(filesOnly);
+    const customCheckpoint = createGraphHistoryCheckpoint(custom);
+    const allFilesCheckpoint = createGraphHistoryCheckpoint(allFiles);
+    const atCustom = recordGraphNavigation(
+      createGraphNavigationHistory(),
+      filesCheckpoint,
+      customCheckpoint,
+    );
+    const atAllFiles = recordGraphNavigation(
+      atCustom,
+      customCheckpoint,
+      allFilesCheckpoint,
+    );
+
+    expect(atAllFiles.past).toHaveLength(2);
+    expect(allFiles.disclosure).toMatchObject({
+      defaultDepth: 1,
+      expandedEntityIds: [],
+      collapsedEntityIds: [],
+      hiddenEntityIds: ['section-a'],
+    });
+
+    const backToCustom = goBackInGraphHistory(atAllFiles, allFilesCheckpoint)!;
+    expect(backToCustom.target.state).toEqual(custom);
+    const backToFiles = goBackInGraphHistory(
+      backToCustom.history,
+      backToCustom.target,
+    )!;
+    expect(backToFiles.target.state).toEqual(filesOnly);
+    const forwardToCustom = goForwardInGraphHistory(
+      backToFiles.history,
+      backToFiles.target,
+    )!;
+    expect(forwardToCustom.target.state).toEqual(custom);
+    const forwardToAllFiles = goForwardInGraphHistory(
+      forwardToCustom.history,
+      forwardToCustom.target,
+    )!;
+    expect(forwardToAllFiles.target.state).toEqual(allFiles);
+  });
+
   it('starts empty and cannot traverse', () => {
     const history = createGraphNavigationHistory();
     const current = createGraphHistoryCheckpoint(initialGraphState());

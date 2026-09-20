@@ -839,6 +839,16 @@ Restore compute or retrieve distinct validated generations without a Classic
 fallback. Soft algorithm version 13 invalidates the geometry; protocol 14 and
 evidence schema 9 remain shape-compatible.
 
+HIERDISC1-FIX3 keeps Focus membership fixed by the documents-only first pass but
+applies the selected automatic structural depth to every document ID in that
+bounded neighborhood during the one detailed pass. Network, Classic Hierarchy,
+and Modular Hierarchy therefore receive identical all-Files disclosure. The web
+toolbar derives effective depth and Custom from canonical parent generations and
+manual expand/collapse overrides relevant to the current neighborhood; explicit
+Heading Hide remains orthogonal. All Files dispatches the existing `set-depth`
+action once, so it clears manual overrides, preserves hidden Heading IDs, and
+creates one normal Back/Forward checkpoint without a persistence-schema change.
+
 KG5 search, resolution filters, disclosure state, and pagination are transient
 diagnostic UI state. They are not KG6 projection contracts or KG9 persisted view
 state. KG8 global search is a separate canonical inspection operation: it finds
@@ -989,13 +999,13 @@ Hide folder is disabled when its subtree contains the focused source file or the
 same managed folder exclusion already exists. File and Folder recovery remove
 only the selected top-level QUERY1 clause.
 
-Focus is a source-neutral two-pass projection. A documents-only,
-prefiltered hop traversal first fixes file membership from the containing
-document of the exact Focus root. A second pass applies full filters and precise
-endpoint routing while automatic structural depth is scoped only to that root
-document. Neighbor files remain manually expandable, and precise heading
-endpoints cannot add or remove files from the established neighborhood. Ordinary
-All Hierarchy depth remains global.
+Focus is a source-neutral two-pass projection. A documents-only, prefiltered hop
+traversal first fixes file membership from the containing document of the exact
+Focus root. A second pass applies full filters, precise endpoint routing, and the
+selected automatic structural depth uniformly to every File in that fixed
+neighborhood. Manual per-File expansion/collapse remains available, and precise
+heading endpoints cannot add or remove files from the established neighborhood.
+Ordinary All Hierarchy depth remains global.
 
 The user-facing exploration model is the product of two independent choices:
 `Scope = All | Focus` and `Layout = Network | Hierarchy`. The existing internal
@@ -1007,13 +1017,12 @@ mode.
 
 Both All layouts enter Focus through one application planner and NAV1 history
 path. Focus normalizes the root to a stable document and projects only that
-bounded document neighborhood plus root-scoped hierarchy detail and exact
+bounded document neighborhood plus uniform all-Files hierarchy detail and exact
 diagnostics. Hierarchy Depth is hidden in All Network, global in All Hierarchy,
-and root-scoped in both Focus layouts. A fresh All Network entry starts at depth
-0; All Hierarchy entry inherits its current preset. Both clear unrelated manual
-disclosure overrides. Network and Hierarchy consume the same memoized Focus
-projection, so changing layout does not rerun KG6. Neighbor files remain
-collapsed unless manually expanded.
+and neighborhood-wide in both Focus layouts. A fresh All Network entry starts at
+depth 0; All Hierarchy entry inherits its current preset. Both clear unrelated
+manual disclosure overrides. Network and Hierarchy consume the same memoized
+Focus projection, so changing layout does not rerun KG6.
 
 The Focus projection feeds Sigma plus the latest-only ForceAtlas2 Worker for
 Network, or extended React Flow cards plus the existing latest-only W3 Dagre

@@ -69,31 +69,33 @@ describe('Structure Focus projection', () => {
     expect(documentSets[3]).toEqual(documentSets[0]);
   });
 
-  it('unfolds automatic depth only beneath the focused document', () => {
+  it('unfolds every Focus File to the selected structural depth', () => {
     const depth0 = entityIds(projectStructureView(workspace, focusState(0)));
     const depth1 = entityIds(projectStructureView(workspace, focusState(1)));
     const depth2 = entityIds(projectStructureView(workspace, focusState(2)));
     const depth3 = entityIds(projectStructureView(workspace, focusState(3)));
 
     expect(depth0).not.toContain('a-overview');
+    expect(depth0).not.toContain('b-target');
+    expect(depth0).not.toContain('c-third');
     expect(depth1).toContain('a-overview');
+    expect(depth1).toContain('b-target');
+    expect(depth1).toContain('c-third');
     expect(depth1).not.toContain('a-detail');
+    expect(depth1).not.toContain('b-leaf');
     expect(depth2).toContain('a-detail');
+    expect(depth2).toContain('b-leaf');
     expect(depth2).not.toContain('a-deep');
     expect(depth3).toContain('a-deep');
-    for (const ids of [depth1, depth2, depth3]) {
-      expect(ids).not.toContain('b-target');
-      expect(ids).not.toContain('c-third');
-    }
   });
 
   it('supports truthful manual neighbor expansion without changing file reachability', () => {
-    const collapsed = projectStructureView(workspace, focusState(1));
+    const collapsed = projectStructureView(workspace, focusState(0));
     const expanded = projectStructureView(
       workspace,
-      focusState(1, {
+      focusState(0, {
         disclosure: {
-          defaultDepth: 1,
+          defaultDepth: 0,
           expandedEntityIds: ['doc-b'],
           hiddenEntityIds: [],
           collapsedEntityIds: [],
@@ -122,7 +124,7 @@ describe('Structure Focus projection', () => {
     });
     expect(referenceWith(twoLevels, 'r-a-detail-to-b-leaf')).toMatchObject({
       sourceNodeId: entityNodeId('a-detail'),
-      targetNodeId: entityNodeId('doc-b'),
+      targetNodeId: entityNodeId('b-leaf'),
     });
     expect(documentIds(twoLevels)).toContain('doc-b');
   });

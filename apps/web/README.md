@@ -587,10 +587,14 @@ layout identity, or camera policy. Scope labels distinguish the All-only layout
 and visual controls from Focus Root and the two camera-only density controls.
 
 **Hierarchy Depth** is hidden in All Network and visible in the other three
-combinations. In Focus it applies automatic depth only beneath the root file;
-depth 0 has no automatic headings, while depths 1–3 reveal the corresponding
-structural generations. Choosing a preset clears manual disclosure overrides.
-A compact **Custom** marker reports surviving explicit expand/collapse choices.
+combinations. In Focus, depth 0 has no automatic headings, while depths 1–3
+reveal the corresponding structural generations beneath every File in the
+bounded Focus neighborhood. Choosing a preset clears manual expand/collapse
+overrides while preserving explicit Heading Hide choices. The displayed depth
+is derived from canonical structural generations. A compact **Custom** marker
+appears when relevant per-File disclosure differs from that depth applied
+uniformly; **All Files** commits the effective depth as one ordinary preset and
+one history/projection/layout transition.
 Focus depth changes preserve the root's screen point in either renderer without
 persisting raw coordinates. Old schema-v3 Local state that encoded automatic
 detail as depth 0 plus an expanded root is normalized on restore; other manual
