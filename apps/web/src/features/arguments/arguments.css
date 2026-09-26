@@ -159,7 +159,7 @@
   border: 1px solid var(--color-border-default);
   border-radius: 0.55rem;
   background: var(--color-surface-elevated);
-  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 18%);
+  box-shadow: 0 0.5rem 1.5rem var(--color-shadow-elevated);
 }
 
 .argument-action-menu__popover--start {
