@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "esbuild src/cli.ts --bundle --platform=node --format=esm --target=node22 --loader:.md=text --outfile=dist/server.js",
-    "start": "pnpm run build && node dist/server.js",
+    "start": "pnpm run build 1>&2 && node dist/server.js",
     "test": "vitest run --root ../.. packages/argument-mcp-server/src",
     "typecheck": "tsc --noEmit"
   },
