@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,10 +23,11 @@ function inheritedEnvironment(): Record<string, string> {
 it('serves initialize, tools/list, and tools/call over clean stdio', async () => {
   const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
   const temporary = await mkdtemp(join(tmpdir(), 'icarus-argument-mcp-stdio-'));
-  const serverPath = join(temporary, 'server.mjs');
+  const serverPath = join(packageRoot, 'dist', 'server.js');
   const libraryPath = join(temporary, 'library-v7.json');
   const { library } = createSyntheticLibrary();
   await writeFile(libraryPath, serializeArgumentLibrary(library), 'utf8');
+  await mkdir(dirname(serverPath), { recursive: true });
   await build({
     entryPoints: [resolve(packageRoot, 'src/cli.ts')],
     bundle: true,
@@ -61,6 +62,23 @@ it('serves initialize, tools/list, and tools/call over clean stdio', async () =>
       'compiler_usage_guide',
     );
     expect(tools.tools.map(({ name }) => name)).toContain('compiler_status');
+    const proposalTool = tools.tools.find(
+      ({ name }) => name === 'compiler_submit_proposal',
+    );
+    expect(proposalTool).toBeDefined();
+    const proposalProperties = (
+      proposalTool?.inputSchema as {
+        properties?: Record<string, unknown>;
+      }
+    ).properties;
+    expect(Object.keys(proposalProperties ?? {})).toEqual(
+      expect.arrayContaining([
+        'intent',
+        'premises',
+        'reasoningSteps',
+        'sourceObservations',
+      ]),
+    );
     const guide = await client.callTool({
       name: 'compiler_usage_guide',
       arguments: {},
@@ -73,6 +91,9 @@ it('serves initialize, tools/list, and tools/call over clean stdio', async () =>
         'search result -> plausible prior record -> compiler_read_bundle',
       ),
     });
+    expect((guide.structuredContent as { guide: string }).guide).toContain(
+      'Run an argument-evolution resolution sweep',
+    );
     const status = await client.callTool({
       name: 'compiler_status',
       arguments: {},

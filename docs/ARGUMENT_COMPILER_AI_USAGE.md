@@ -114,7 +114,55 @@ Choose the resulting action:
 
 The Compiler gives you someone to argue with, not doctrine to repeat.
 
-## 5. Respect retrieval limits
+## 5. Run an argument-evolution resolution sweep
+
+When a task concerns an evolving theory, Obsidian note, or sequence of commits,
+prefer arguments that survived meaningful criticism, counterexamples,
+ambiguity, contradiction, research pressure, or revision over interesting
+hypotheses that merely appeared in the latest revision.
+
+When useful, compare the current revision with earlier revisions, earlier
+assistant critiques, explicit warning or question blocks, counterexamples
+introduced during development, competing explanations or mechanisms, research
+conflicts or constraints, and relevant Argument Library arguments,
+Counter-Arguments, and responses. The purpose is to detect claims that were
+fought implicitly during local development.
+
+Internally reconstruct the argumentative path:
+
+```text
+earlier claim
+-> challenge / counterexample / ambiguity
+-> revision
+-> further pressure if any
+-> surviving argument
+```
+
+Commit history is evidence of theory development, not proof that the survivor
+is correct. Do not infer a dramatic fight from every wording change; require
+meaningful conceptual pressure. Classify an earlier finding approximately as
+still unresolved, wording or local cleanup only, partially resolved, resolved
+into a defensible argument, superseded, or transformed into a different claim.
+This classification is an internal review aid, not required user-facing
+boilerplate.
+
+A resolution or supersession is Mailbox-worthy only when the survivor can be
+expressed as a durable, reusable argument with premises or assumptions,
+reasoning, a conclusion, and a useful boundary or counterexample. Do not submit
+formatting cleanup, wording polish, transient brainstorming, an untested
+"maybe," or a note merely because it changed across commits.
+
+After reconstructing a survivor:
+
+1. Reason about it independently.
+2. Run the normal Compiler retrieval and cross-check.
+3. Determine whether it is already represented, defeated, needs refinement or
+   a boundary, supersedes something, or is genuinely new.
+4. Only then present and submit the surviving new or revised argument, using
+   the current proposal schema, review intents, and target semantics rather
+   than inventing a relation type.
+
+## 6. Respect retrieval limits
 
 Treat `not-found`, missing records, omissions, `limit-exceeded`, stale
 snapshots or revisions, archived or pending-review records, stale warnings,
@@ -128,12 +176,15 @@ future/current tool list exposes an authorized source-reading capability, use
 it selectively only when meaning, scope, or a stored dependency cannot be
 resolved from the bundle.
 
-## 6. Present and submit survivors
+## 7. Present and submit survivors
 
 Do not clutter the final answer with every retrieval step. Omit candidates
 defeated by existing reasoning. Present surviving or genuinely new arguments
 clearly, briefly explain a relevant prior relationship when it matters, and
 preserve uncertainty when the library did not settle the issue.
+
+Prefer proposals that represent arguments which survived meaningful criticism
+or revision over speculative ideas that have not yet been pressure-tested.
 
 For this Compiler, `compiler_submit_proposal` is the action that sends a
 candidate to the human-reviewed Compiler Mailbox.
