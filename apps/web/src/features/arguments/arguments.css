@@ -392,6 +392,17 @@
   align-items: center;
 }
 
+.arguments-mailbox__action-footer {
+  position: sticky;
+  z-index: 2;
+  bottom: 0;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0.7rem 0.25rem 0.25rem;
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--color-status-info-background);
+}
+
 .arguments-record,
 .arguments-editor,
 .arguments-snapshot-metadata {
@@ -945,9 +956,19 @@
 }
 
 .arguments-mailbox__detail {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+.arguments-mailbox__detail-scroll {
   display: grid;
   min-width: 0;
   min-height: 0;
+  flex: 1 1 auto;
   gap: 0.8rem;
   overflow: auto;
   overscroll-behavior: contain;
@@ -964,7 +985,21 @@
 
 .arguments-mailbox__proposal-header,
 .arguments-mailbox__section,
+.arguments-mailbox__disclosure,
 .arguments-mailbox__technical {
+  min-width: 0;
+}
+
+.arguments-mailbox__proposal-header {
+  padding: 0.1rem 0.1rem 0.75rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.arguments-mailbox__section {
+  padding: 0.1rem 0 0.35rem;
+}
+
+form.arguments-mailbox__section {
   padding: 0.8rem;
   border: 1px solid var(--color-border-subtle);
   border-radius: 0.5rem;
@@ -985,34 +1020,110 @@
 }
 
 .arguments-mailbox__soft-explanation h4,
-.arguments-mailbox__formal-title {
+.arguments-mailbox__section h4 {
   margin: 0.3rem 0 0.55rem;
 }
 
-.arguments-mailbox__formal-title {
-  padding-top: 0.15rem;
-  border-bottom: 1px solid var(--color-border-subtle);
+.arguments-mailbox__target-summary {
+  margin-bottom: 0.35rem;
 }
 
-.arguments-mailbox__chain {
+.arguments-mailbox__disclosure {
+  padding: 0.7rem 0.1rem 0;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.arguments-mailbox__disclosure > summary,
+.arguments-mailbox__context-record > summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.arguments-mailbox__formal > summary {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.arguments-mailbox__formal > summary small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.arguments-mailbox__disclosure[open] > summary,
+.arguments-mailbox__context-record[open] > summary {
+  margin-bottom: 0.55rem;
+}
+
+.arguments-mailbox__disclosure-content {
+  display: grid;
+  min-width: 0;
+  gap: 0.55rem;
+}
+
+.arguments-mailbox__context-strip {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
   gap: 0.65rem;
 }
 
-.arguments-mailbox__chain > article,
+.arguments-mailbox__context-record,
+.arguments-mailbox__proposal-marker {
+  min-width: 0;
+  padding: 0.6rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 0.45rem;
+}
+
+.arguments-mailbox__context-strip > [role='listitem'] {
+  min-width: 0;
+}
+
+.arguments-mailbox__context-record > summary {
+  display: grid;
+  min-width: 0;
+  gap: 0.35rem;
+}
+
+.arguments-mailbox__context-record > summary strong {
+  overflow-wrap: anywhere;
+}
+
+.arguments-mailbox__relationship-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.arguments-mailbox__relationship-labels > span {
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  color: var(--color-control-foreground);
+  background: var(--color-control-background);
+  font-size: 0.72rem;
+}
+
 .arguments-mailbox__premise,
 .arguments-mailbox__sources > li,
 .arguments-mailbox__reasoning > li {
-  padding: 0.7rem;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 0.45rem;
-  background: var(--color-surface-panel);
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .arguments-mailbox__proposal-marker {
+  display: grid;
+  gap: 0.35rem;
   border-style: dashed !important;
   border-color: var(--color-status-info-border) !important;
+}
+
+.arguments-mailbox__proposal-marker .arguments-badge {
+  justify-self: start;
 }
 
 .arguments-mailbox__premises,
@@ -1189,5 +1300,14 @@
 
   .arguments-mailbox__detail {
     overflow: visible;
+  }
+
+  .arguments-mailbox__detail-scroll {
+    overflow: visible;
+  }
+
+  .arguments-mailbox__action-footer {
+    position: static;
+    margin-inline: 0;
   }
 }
