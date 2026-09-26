@@ -26,3 +26,6 @@ resolution.
 - `loader.test.ts`, `server.test.ts`, and `stdio.test.ts` cover file handling,
   tool/domain parity, read-only preparation, atomic/idempotent application,
   guide invariants, and a spawned bundled stdio session.
+- `deployment-launcher.test.ts` protects the repository-owned Windows tunnel
+  launcher contract: fresh build, fail-closed artifact verification, fixed
+  profile, and build-before-tunnel ordering.

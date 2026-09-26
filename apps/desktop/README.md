@@ -78,6 +78,13 @@ task or its external startup script, and closing Arguments or Graph Explorer
 does not shut the tunnel down. Browser builds do not expose this capability;
 non-Windows desktop builds return a clean unsupported-platform result.
 
+The external startup script's canonical repository source and manual refresh
+procedure live in
+[`tools/argument-compiler-tunnel`](../../tools/argument-compiler-tunnel/README.md).
+That launcher always rebuilds and verifies the Argument MCP deployment bundle
+before starting the fixed tunnel profile. This does not expand the desktop
+runtime boundary: Rust still only queries or starts the existing fixed task.
+
 The main window enables Tauri's `zoomHotkeysEnabled` input path because Wry
 otherwise disables WebView2 precision-touchpad pinch before the graph can
 receive its ctrl-modified wheel signal. The graph's non-passive wheel handler

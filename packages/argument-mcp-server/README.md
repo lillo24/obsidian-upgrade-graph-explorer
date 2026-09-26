@@ -169,6 +169,13 @@ rediscovers the current tool schemas. The spawned stdio tests build and launch
 that exact deployment artifact and connect through the repository-supported
 `start` command against synthetic libraries.
 
+The canonical launcher for the existing Windows tunnel is
+[`tools/argument-compiler-tunnel/start-icarus-compiler.ps1`](../../tools/argument-compiler-tunnel/start-icarus-compiler.ps1).
+It always rebuilds this package and verifies `dist/server.js` before it starts
+the fixed `icarus-compiler` profile. Its adjacent README documents the installed
+copy and refresh procedure; the `%LOCALAPPDATA%` copy is not updated merely by
+pulling repository changes.
+
 After building, launch the official MCP Inspector from the repository root.
 Inspector 2.6.0 requires Node 22.19 or newer. Inspector gives spawned servers a
 restricted environment, so pass the custom library variable explicitly with
