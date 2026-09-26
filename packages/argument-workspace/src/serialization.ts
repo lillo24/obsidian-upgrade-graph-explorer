@@ -22,6 +22,7 @@ import {
   validateArgumentLibraryV5,
   validateArgumentLibraryV6,
   validateArgumentLibraryV7,
+  validateArgumentLibraryV8,
 } from './validation';
 
 export function serializeArgumentLibrary(library: ArgumentLibrary): string {
@@ -52,6 +53,22 @@ export function parseArgumentLibraryJson(
       issues: [],
       preservedSource: source,
     };
+  }
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value as { readonly schemaVersion?: unknown }).schemaVersion === 8
+  ) {
+    const migration = migrateArgumentLibraryV8(value);
+    if (migration.status === 'valid') {
+      return {
+        status: 'valid',
+        value: migration.value,
+        migratedFromSchemaVersion: 8,
+      };
+    }
+    return { ...migration, preservedSource: source };
   }
   if (
     typeof value === 'object' &&
@@ -451,6 +468,59 @@ export function migrateArgumentLibraryV7(
         draftRelations: [],
         revisionHistory: [],
       }),
+    ),
+  };
+  return migrateArgumentLibraryV8(candidate);
+}
+
+/** Replaces accepted/rejected status names with typed stored results. */
+export function migrateArgumentLibraryV8(
+  value: unknown,
+): ArgumentLibraryMigrationResult {
+  const legacyValidation = validateArgumentLibraryV8(value);
+  if (!legacyValidation.valid) {
+    const first = legacyValidation.issues[0];
+    return {
+      status: 'invalid-library',
+      message: `Argument Library v8 is invalid${
+        first === undefined ? '.' : ` at ${first.path}: ${first.message}`
+      }`,
+      issues: legacyValidation.issues,
+    };
+  }
+  const legacy = clonePlainData(legacyValidation.value);
+  const candidate = {
+    ...legacy,
+    schemaVersion: 9,
+    proposals: (legacy.proposals as readonly Record<string, unknown>[]).map(
+      (proposal) => {
+        if (proposal.status === 'pending') return proposal;
+        const decision = proposal.decision as Record<string, unknown>;
+        const retainedDecision = { ...decision };
+        delete retainedDecision.resultingArgumentId;
+        delete retainedDecision.resultingCounterArgumentId;
+        const resultingRecords =
+          proposal.status === 'accepted'
+            ? [
+                {
+                  kind: 'argument' as const,
+                  id: String(decision.resultingArgumentId),
+                },
+              ]
+            : proposal.status === 'rejected'
+              ? [
+                  {
+                    kind: 'counter-argument' as const,
+                    id: String(decision.resultingCounterArgumentId),
+                  },
+                ]
+              : [];
+        return {
+          ...proposal,
+          status: proposal.status === 'discarded' ? 'discarded' : 'stored',
+          decision: { ...retainedDecision, resultingRecords },
+        };
+      },
     ),
   };
   const migratedValidation = validateArgumentLibrary(candidate);

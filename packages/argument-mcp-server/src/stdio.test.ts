@@ -24,7 +24,7 @@ it('serves initialize, tools/list, and tools/call over clean stdio', async () =>
   const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
   const temporary = await mkdtemp(join(tmpdir(), 'icarus-argument-mcp-stdio-'));
   const serverPath = join(packageRoot, 'dist', 'server.js');
-  const libraryPath = join(temporary, 'library-v8.json');
+  const libraryPath = join(temporary, 'library-v9.json');
   const { library } = createSyntheticLibrary();
   await writeFile(libraryPath, serializeArgumentLibrary(library), 'utf8');
   await mkdir(dirname(serverPath), { recursive: true });
@@ -85,7 +85,7 @@ it('serves initialize, tools/list, and tools/call over clean stdio', async () =>
     });
     expect(guide.structuredContent).toMatchObject({
       status: 'ok',
-      version: 'argument-compiler-ai-usage-v5',
+      version: 'argument-compiler-ai-usage-v6',
       format: 'markdown',
       guide: expect.stringContaining(
         'search result -> plausible prior record -> compiler_read_bundle',
@@ -120,7 +120,7 @@ it('rebuilds before repository-supported start without polluting protocol stdout
     );
   }
   const temporary = await mkdtemp(join(tmpdir(), 'icarus-argument-mcp-start-'));
-  const libraryPath = join(temporary, 'library-v8.json');
+  const libraryPath = join(temporary, 'library-v9.json');
   const { library } = createSyntheticLibrary();
   await writeFile(libraryPath, serializeArgumentLibrary(library), 'utf8');
 
@@ -153,7 +153,7 @@ it('rebuilds before repository-supported start without polluting protocol stdout
     });
     expect(guide.structuredContent).toMatchObject({
       status: 'ok',
-      version: 'argument-compiler-ai-usage-v5',
+      version: 'argument-compiler-ai-usage-v6',
       guide: expect.stringContaining(
         'Run an argument-evolution resolution sweep',
       ),

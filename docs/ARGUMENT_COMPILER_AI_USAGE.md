@@ -1,6 +1,6 @@
 # Icarus Argument Compiler AI cross-check protocol
 
-Protocol version: `argument-compiler-ai-usage-v5`
+Protocol version: `argument-compiler-ai-usage-v6`
 
 Use this protocol when substantive candidate ideas already exist and the
 Compiler cross-check is beginning. The Compiler is not the generator of the
@@ -266,10 +266,49 @@ that action:
   relations.
 
 Discard is not theoretical rejection. It preserves a discarded history state
-and creates no canonical Argument or Counter-Argument. Canonical storage and
-canonical refutation remain human UI workflows and are intentionally not MCP
-tools. The fact that the AI submitted or revised a Proposal does not imply
-permission to discard or canonically store it.
+and creates no canonical Argument or Counter-Argument. A standing
+Counter-Argument is not a rejected Proposal: it is a canonical objection whose
+response outcome may remain `unanswered` or `standing`. The fact that the AI
+submitted or revised a Proposal does not imply permission to discard or
+canonically store it.
+
+An explicit request such as "store these Proposals", "resolve this Mailbox
+package", or "make this Proposal canonical" authorizes the bounded canonical
+resolution workflow for the named or unambiguously referenced Proposal set.
+Ordinary review, cross-check, critique, staging, or "what should we do with
+this?" language does not. Do not broaden the authorized set.
+
+For an authorized resolution:
+
+1. Read every selected Proposal at its current revision and inspect its draft
+   links. Decide explicitly whether each becomes an Argument or a
+   Counter-Argument, and state every topic membership, target, response,
+   canonical relation, supersession, and Current promotion that should exist.
+2. Treat omission as `none`: never infer Current promotion, supersession,
+   attack/support, a Counter-Argument target, or conversion of a draft Proposal
+   relation. Every draft relation on a selected Proposal must be mapped to one
+   exact canonical effect or marked `staging-only`. Soft Explanation and source
+   observations stay non-canonical unless separately represented in an
+   authorized canonical field.
+3. Call `compiler_prepare_resolution`. This is read-only. If it returns
+   `needs-decision`, ask the user only for the consequential unresolved choice;
+   do not apply. If it returns `ready`, compare the exact preview, Proposal
+   revisions, resulting record IDs, membership, targets, responses, relations,
+   supersession, Current changes, and warnings with the user's request.
+4. When the user already requested canonical storage and the ready plan contains
+   no consequential ambiguity or new choice, call `compiler_apply_resolution`
+   in the same turn with the unchanged plan. A separate confirmation is not
+   required. If applying would add a material interpretation the user did not
+   choose, stop and ask.
+5. Apply exactly the prepared plan. Never edit its payload, reconstruct it from
+   prose, or silently rebase it. A stale snapshot or changed Proposal means no
+   canonical write occurred: read current state and prepare a new plan before
+   trying again. Retrying the exact already-applied plan is safe and returns its
+   durable resolution receipt.
+6. Report the resulting Argument and Counter-Argument IDs, topic memberships,
+   relations, supersession and Current effects, and which Proposals are now
+   `stored` versus still `pending`. A successful apply changes canonical theory;
+   a successful prepare does not.
 
 If a named Proposal tool is not present in the current tool list, do not invent
 or claim its action. Present the survivor or intended staging change to the

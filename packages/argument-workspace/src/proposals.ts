@@ -730,7 +730,9 @@ export function submitArgumentProposal(
   };
 }
 
-function proposalDraft(proposal: ArgumentProposal): ArgumentProposalDraft {
+export function argumentProposalDraft(
+  proposal: ArgumentProposal,
+): ArgumentProposalDraft {
   return clonePlainData({
     title: proposal.title,
     ...(proposal.softExplanationMarkdown === undefined
@@ -833,7 +835,7 @@ export function reviseArgumentProposal(
   );
   const normalized = normalizedSubmission(library, input, proposal.id);
   validateProposalContentReferences(library, input, normalized.premises);
-  const previousContent = proposalDraft(proposal);
+  const previousContent = argumentProposalDraft(proposal);
   if (canonicalJson(previousContent) === canonicalJson(normalized)) {
     throw new Error('Proposal revision must change the active draft content.');
   }
@@ -899,12 +901,13 @@ export function discardArgumentProposal(
         replacedAt: decidedAt,
         revisionReason:
           note ?? 'Discarded from active To store staging by the user.',
-        content: proposalDraft(proposal),
+        content: argumentProposalDraft(proposal),
       },
     ],
     decision: {
       decidedAt,
       ...(note === undefined ? {} : { note }),
+      resultingRecords: [],
     },
   };
   return withProposals(
@@ -938,11 +941,8 @@ function resolveProposal(
   library: ArgumentLibrary,
   proposal: ArgumentProposal,
   resolution:
-    | { readonly status: 'accepted'; readonly resultingArgumentId: string }
-    | {
-        readonly status: 'rejected';
-        readonly resultingCounterArgumentId: string;
-      },
+    | { readonly kind: 'argument'; readonly id: string }
+    | { readonly kind: 'counter-argument'; readonly id: string },
   note: string | undefined,
   runtime: ArgumentRuntime,
 ): ArgumentLibrary {
@@ -956,27 +956,23 @@ function resolveProposal(
     ...proposal,
     revision: proposal.revision + 1,
     updatedAt: decidedAt,
-    status: resolution.status,
+    status: 'stored',
     revisionHistory: [
       ...proposal.revisionHistory,
       {
         revision: proposal.revision,
         replacedAt: decidedAt,
         revisionReason:
-          resolution.status === 'accepted'
+          resolution.kind === 'argument'
             ? 'Stored as a canonical Argument by human resolution.'
             : 'Stored as a canonical Counter-Argument by human resolution.',
-        content: proposalDraft(proposal),
+        content: argumentProposalDraft(proposal),
       },
     ],
     decision: {
       decidedAt,
       ...(note === undefined ? {} : { note }),
-      ...(resolution.status === 'accepted'
-        ? { resultingArgumentId: resolution.resultingArgumentId }
-        : {
-            resultingCounterArgumentId: resolution.resultingCounterArgumentId,
-          }),
+      resultingRecords: [resolution],
     },
   };
   return withProposals(
@@ -1044,7 +1040,7 @@ export function resolveProposalAsArgument(
   return resolveProposal(
     next,
     proposal,
-    { status: 'accepted', resultingArgumentId: input.argument.id },
+    { kind: 'argument', id: input.argument.id },
     resolutionNote(input.note),
     runtime,
   );
@@ -1086,10 +1082,7 @@ export function resolveProposalAsRejected(
   return resolveProposal(
     next,
     proposal,
-    {
-      status: 'rejected',
-      resultingCounterArgumentId: input.counterArgument.id,
-    },
+    { kind: 'counter-argument', id: input.counterArgument.id },
     resolutionNote(input.note),
     runtime,
   );

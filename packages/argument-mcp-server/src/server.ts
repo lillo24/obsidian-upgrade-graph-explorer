@@ -8,10 +8,14 @@ import {
   ARGUMENT_PROPOSAL_MAX_TEXT_LENGTH,
   ARGUMENT_PROPOSAL_MAX_TITLE_LENGTH,
   ARGUMENT_LIBRARY_SCHEMA_VERSION,
+  ArgumentCanonicalResolutionService,
   ArgumentLibraryRepository,
   ArgumentProposalSubmissionService,
   CONTENT_FINGERPRINT_ALGORITHM,
   KNOWLEDGE_READER_CONTRACT_VERSION,
+  prepareCanonicalResolution,
+  type CanonicalResolutionPackageSpec,
+  type CanonicalResolutionPlan,
   type ArgumentRuntime,
   type CreateArgumentProposalInput,
   type ReviseArgumentProposalInput,
@@ -57,6 +61,13 @@ const DISCARD_ANNOTATIONS = {
   readOnlyHint: false,
   destructiveHint: true,
   idempotentHint: false,
+  openWorldHint: false,
+} as const;
+
+const CANONICAL_WRITE_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: true,
   openWorldHint: false,
 } as const;
 
@@ -339,9 +350,7 @@ const proposalSnapshotInput = z
 const listProposalsInput = z
   .object({
     query: z.string().trim().max(2_000).optional(),
-    status: z
-      .enum(['pending', 'discarded', 'accepted', 'rejected', 'all'])
-      .optional(),
+    status: z.enum(['pending', 'discarded', 'stored', 'all']).optional(),
     limit: z.number().int().min(1).max(100).optional(),
   })
   .strict();
@@ -355,6 +364,207 @@ const discardProposalInput = z
     expectedSnapshot: proposalSnapshotInput,
     note: proposalText.optional(),
   })
+  .strict();
+
+const retrievalInput = z
+  .object({
+    aliases: z
+      .array(proposalText)
+      .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+      .optional(),
+    keywords: z
+      .array(proposalText)
+      .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+      .optional(),
+    phrases: z
+      .array(proposalText)
+      .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+      .optional(),
+  })
+  .strict();
+const sourcePositionInput = z
+  .object({
+    line: z.number().int().min(1),
+    column: z.number().int().min(1),
+    offset: z.number().int().min(0).optional(),
+  })
+  .strict();
+const theorySourceReferenceInput = z
+  .object({
+    id: proposalId,
+    sourceSpaceHint: proposalText.optional(),
+    path: proposalText,
+    heading: proposalText.optional(),
+    block: proposalText.optional(),
+    label: proposalText,
+    originalWikilink: proposalText.optional(),
+    role: z.enum(['target', 'basis', 'support']),
+    entityIdHint: proposalText.optional(),
+    recordedVersion: z
+      .object({
+        sourceVersion: proposalText.optional(),
+        contentFingerprint:
+          proposalSnapshotInput.shape.contentFingerprint.optional(),
+        fingerprintScope: z.enum(['file', 'heading', 'block', 'span']),
+        span: z
+          .object({ start: sourcePositionInput, end: sourcePositionInput })
+          .strict()
+          .optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+const resolutionArgumentReferenceInput = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('existing'),
+      argumentId: proposalId,
+      expectedRevision: z.number().int().min(1),
+    })
+    .strict(),
+  z.object({ kind: z.literal('proposal'), proposalId }).strict(),
+]);
+const resolutionRelationInput = z
+  .object({
+    id: proposalId.optional(),
+    kind: z.enum(['attack', 'support']),
+    target: resolutionArgumentReferenceInput,
+    targetPart: targetPartInput,
+  })
+  .strict();
+const resolutionPremiseBindingInput = z
+  .object({
+    premiseId: proposalId,
+    targetProposalId: proposalId,
+    targetPart: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('conclusion') }).strict(),
+      z.object({ kind: z.literal('premise'), premiseId: proposalId }).strict(),
+    ]),
+  })
+  .strict();
+const resolutionCounterTargetInput = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('argument'),
+      argument: resolutionArgumentReferenceInput,
+      part: targetPartInput,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('topic-claim'),
+      topicId: proposalId,
+      expectedRevision: z.number().int().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('axiom'),
+      axiomId: proposalId,
+      expectedRevision: z.number().int().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('counter-argument'),
+      counterArgumentId: proposalId,
+      expectedRevision: z.number().int().min(1),
+    })
+    .strict(),
+]);
+const resolutionResponseInput = z
+  .object({
+    answeringAxioms: z
+      .array(
+        z
+          .object({
+            axiomId: proposalId,
+            reliedOnRevision: z.number().int().min(1),
+          })
+          .strict(),
+      )
+      .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+      .optional(),
+    explanation: z.string().max(ARGUMENT_PROPOSAL_MAX_TEXT_LENGTH).optional(),
+    outcome: z
+      .enum([
+        'unanswered',
+        'standing',
+        'partially-addressed',
+        'refuted',
+        'inapplicable-under-stated-scope',
+      ])
+      .optional(),
+    boundary: proposalText.optional(),
+    reopeningCondition: proposalText.optional(),
+  })
+  .strict();
+const resolutionBaseFields = {
+  proposalId,
+  expectedRevision: z.number().int().min(1),
+  canonicalId: proposalId.optional(),
+  topicIds: z.array(proposalId).max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS),
+  retrieval: retrievalInput.optional(),
+  sourceReferences: z
+    .array(theorySourceReferenceInput)
+    .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+    .optional(),
+  note: proposalText.optional(),
+} as const;
+const resolutionProposalInput = z.discriminatedUnion('kind', [
+  z
+    .object({
+      ...resolutionBaseFields,
+      kind: z.literal('argument'),
+      contextIds: z
+        .array(proposalId)
+        .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+        .optional(),
+      relations: z
+        .array(resolutionRelationInput)
+        .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+        .optional(),
+      supersedes: resolutionArgumentReferenceInput.optional(),
+      premiseBindings: z
+        .array(resolutionPremiseBindingInput)
+        .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+        .optional(),
+      promoteTopicId: proposalId.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      ...resolutionBaseFields,
+      kind: z.literal('counter-argument'),
+      target: resolutionCounterTargetInput.optional(),
+      response: resolutionResponseInput.optional(),
+    })
+    .strict(),
+]);
+const prepareResolutionInput = z
+  .object({
+    proposals: z.array(resolutionProposalInput).min(1).max(20),
+    draftRelationDispositions: z
+      .array(
+        z
+          .object({
+            sourceProposalId: proposalId,
+            relationId: proposalId,
+            action: z.enum([
+              'staging-only',
+              'counter-target',
+              'argument-relation',
+              'supersession',
+            ]),
+          })
+          .strict(),
+      )
+      .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS),
+  })
+  .strict();
+const applyResolutionInput = z
+  .object({ plan: z.record(z.string(), z.unknown()) })
   .strict();
 
 type JsonObject = Record<string, unknown>;
@@ -575,7 +785,7 @@ export function createArgumentMcpServer(
     { name: ARGUMENT_MCP_SERVER_NAME, version: ARGUMENT_MCP_SERVER_VERSION },
     {
       instructions:
-        'After independent candidate reasoning, call compiler_usage_guide before a Compiler cross-check. Canonical index tools exclude Mailbox drafts. You may create, read, revise, and link material non-canonical To store Proposals autonomously. Discard and every canonical store/resolve action require an explicit user request; canonical resolution is not exposed by this server.',
+        'After independent candidate reasoning, call compiler_usage_guide before a Compiler cross-check. Canonical index tools exclude Mailbox drafts. You may create, read, revise, and link material non-canonical To store Proposals autonomously. Discard and canonical prepare/apply require an explicit user request. Prepare exact canonical packages first; apply only an unchanged ready plan, never infer Current, supersession, or draft-link conversion.',
     },
   );
 
@@ -630,6 +840,9 @@ export function createArgumentMcpServer(
           ).length,
           discardedProposals: loaded.library.proposals.filter(
             ({ status }) => status === 'discarded',
+          ).length,
+          storedProposals: loaded.library.proposals.filter(
+            ({ status }) => status === 'stored',
           ).length,
         },
         knowledgeReaderContractVersion: KNOWLEDGE_READER_CONTRACT_VERSION,
@@ -783,6 +996,49 @@ export function createArgumentMcpServer(
         proposal,
         linkedFrom,
       });
+    },
+  );
+
+  server.registerTool(
+    'compiler_prepare_resolution',
+    {
+      title: 'Prepare an atomic canonical resolution package',
+      description:
+        'Explicit-user-only and read-only: validate an exact multi-Proposal canonical package against the current snapshot and return an immutable plan, preview, and fingerprint. Omitted Current promotion, supersession, and canonical relations mean none. Every selected draft relation must be explicitly mapped or marked staging-only. Preparation never changes canonical theory.',
+      inputSchema: prepareResolutionInput,
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
+    async (input) => {
+      const loaded = await loader.load();
+      if (loaded.status === 'error') return loadErrorResult(loaded);
+      try {
+        const prepared = prepareCanonicalResolution(
+          loaded.library,
+          input as CanonicalResolutionPackageSpec,
+          proposalRuntime,
+        );
+        if (prepared.status === 'needs-decision') {
+          return serializedResult({
+            status: prepared.status,
+            snapshot: prepared.base,
+            unresolvedChoices: prepared.unresolvedChoices,
+          });
+        }
+        return serializedResult({
+          status: 'ready',
+          plan: prepared.plan,
+          preview: prepared.plan.preview,
+        });
+      } catch (error: unknown) {
+        const response = {
+          status: 'error',
+          error: {
+            code: 'resolution-preparation-invalid',
+            message: error instanceof Error ? error.message : String(error),
+          },
+        };
+        return { ...serializedResult(response), isError: true };
+      }
     },
   );
 
@@ -965,6 +1221,62 @@ export function createArgumentMcpServer(
         proposalStatus: proposal.status,
         proposalRevision: proposal.revision,
         canonicalRecordsCreated: 0,
+        snapshot: result.snapshot.descriptor,
+      });
+    },
+  );
+
+  server.registerTool(
+    'compiler_apply_resolution',
+    {
+      title: 'Apply an exact atomic canonical resolution plan',
+      description:
+        'Explicit-user-only canonical mutation: apply exactly one unchanged ready plan returned by compiler_prepare_resolution in a single expected-snapshot commit. Never reinterpret or silently rebase a stale plan. Exact retries are idempotent through the durable resolution receipt. A successful call changes canonical theory.',
+      inputSchema: applyResolutionInput,
+      annotations: CANONICAL_WRITE_ANNOTATIONS,
+    },
+    async (input) => {
+      const repository = new ArgumentLibraryRepository(loader.store());
+      const opened = await repository.open();
+      if (opened.status !== 'ready') {
+        const error = {
+          status: 'error',
+          error: {
+            code: 'resolution-apply-unavailable',
+            message:
+              opened.status === 'missing'
+                ? 'The Argument Library is missing.'
+                : opened.message,
+          },
+        };
+        return { ...serializedResult(error), isError: true };
+      }
+      const service = new ArgumentCanonicalResolutionService(
+        repository,
+        proposalRuntime,
+      );
+      const result = await service.apply(
+        input.plan as unknown as CanonicalResolutionPlan,
+      );
+      if (
+        result.status !== 'committed' &&
+        result.status !== 'already-applied'
+      ) {
+        const error = {
+          status: 'error',
+          error: {
+            code: result.status,
+            message: result.message,
+            ...(result.actual === undefined ? {} : { actual: result.actual }),
+          },
+        };
+        return { ...serializedResult(error), isError: true };
+      }
+      return serializedResult({
+        status: 'ok',
+        alreadyApplied: result.status === 'already-applied',
+        resolutionReceipt: result.receipt,
+        canonicalRecords: result.receipt.resultingRecords,
         snapshot: result.snapshot.descriptor,
       });
     },

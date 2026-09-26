@@ -41,12 +41,15 @@ import {
   resolveProposalAsRejected,
   submitArgumentProposal,
 } from './proposals';
+import { applyCanonicalResolution } from './resolution';
+import { sameSnapshot } from './canonical';
 import { ArgumentLibraryRepository } from './storage';
 import type {
   ArgumentLibrary,
   ArgumentLibraryCommitResult,
   ArgumentLibrarySnapshot,
   ArgumentProposal,
+  ArgumentProposalResolutionReceipt,
   ArgumentExample,
   ArgumentRelation,
   ArgumentRecordKind,
@@ -72,6 +75,7 @@ import type {
   TopicMembershipKind,
   UpdateCounterArgumentResponseInput,
 } from './types';
+import type { CanonicalResolutionPlan } from './resolution';
 
 export type ArgumentProposalSubmissionCommitResult =
   | {
@@ -81,6 +85,78 @@ export type ArgumentProposalSubmissionCommitResult =
       readonly duplicate: boolean;
     }
   | Exclude<ArgumentLibraryCommitResult, { readonly status: 'committed' }>;
+
+export type CanonicalResolutionCommitResult =
+  | {
+      readonly status: 'committed';
+      readonly snapshot: ArgumentLibrarySnapshot;
+      readonly receipt: ArgumentProposalResolutionReceipt;
+    }
+  | {
+      readonly status: 'already-applied';
+      readonly snapshot: ArgumentLibrarySnapshot;
+      readonly receipt: ArgumentProposalResolutionReceipt;
+    }
+  | Exclude<ArgumentLibraryCommitResult, { readonly status: 'committed' }>;
+
+/** Explicit canonical package mutation; callers enforce user authorization. */
+export class ArgumentCanonicalResolutionService {
+  constructor(
+    private readonly repository: ArgumentLibraryRepository,
+    private readonly runtime: ArgumentRuntime,
+  ) {}
+
+  async apply(
+    plan: CanonicalResolutionPlan,
+  ): Promise<CanonicalResolutionCommitResult> {
+    const current = this.repository.current();
+    if (current === undefined) {
+      return {
+        status: 'not-loaded',
+        message: 'Argument Library has not been loaded.',
+      };
+    }
+    if (!sameSnapshot(current.descriptor, plan.base)) {
+      try {
+        const retry = applyCanonicalResolution(
+          current.library,
+          plan,
+          this.runtime,
+        );
+        if (retry.alreadyApplied) {
+          return {
+            status: 'already-applied',
+            snapshot: current,
+            receipt: retry.receipt,
+          };
+        }
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.includes('stale') && !message.includes('changed')) {
+          return { status: 'persistence-error', message };
+        }
+      }
+    }
+    let receipt: ArgumentProposalResolutionReceipt | undefined;
+    const committed = await this.repository.commit(plan.base, (library) => {
+      const outcome = applyCanonicalResolution(library, plan, this.runtime);
+      receipt = outcome.receipt;
+      return outcome.library;
+    });
+    if (committed.status !== 'committed') return committed;
+    if (receipt === undefined) {
+      return {
+        status: 'persistence-error',
+        message: 'Canonical resolution committed without a receipt.',
+      };
+    }
+    return {
+      status: 'committed',
+      snapshot: committed.snapshot,
+      receipt,
+    };
+  }
+}
 
 /** Non-canonical Proposal staging mutations exposed to Compiler adapters. */
 export class ArgumentProposalSubmissionService {

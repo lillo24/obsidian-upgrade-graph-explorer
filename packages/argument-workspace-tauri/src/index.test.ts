@@ -60,22 +60,22 @@ const runtime = {
 };
 
 describe('Tauri Argument Library storage', () => {
-  it('prefers and preserves a recoverable v7 file while creating v8', async () => {
+  it('prefers and preserves a recoverable v8 file while creating v9', async () => {
     const bridge = new MemoryBridge();
-    const legacyPath = '/app-local/argument-workspace/library-v7.json';
-    const currentPath = '/app-local/argument-workspace/library-v8.json';
-    const current = createEmptyArgumentLibrary(runtime, 'legacy-v6-library');
-    const legacy = JSON.stringify({ ...current, schemaVersion: 7 });
+    const legacyPath = '/app-local/argument-workspace/library-v8.json';
+    const currentPath = '/app-local/argument-workspace/library-v9.json';
+    const current = createEmptyArgumentLibrary(runtime, 'legacy-v8-library');
+    const legacy = JSON.stringify({ ...current, schemaVersion: 8 });
     bridge.files.set(legacyPath, legacy);
     const store = createTauriArgumentLibraryStore({
       bridge,
-      temporaryToken: () => 'v6-migration',
+      temporaryToken: () => 'v8-migration',
     });
 
     expect(await store.load()).toMatchObject({
       status: 'loaded',
       snapshot: {
-        library: { schemaVersion: 8, libraryId: 'legacy-v6-library' },
+        library: { schemaVersion: 9, libraryId: 'legacy-v8-library' },
       },
     });
     expect(bridge.files.get(legacyPath)).toBe(legacy);
@@ -83,14 +83,14 @@ describe('Tauri Argument Library storage', () => {
       parseArgumentLibraryJson(bridge.files.get(currentPath)!),
     ).toMatchObject({
       status: 'valid',
-      value: { schemaVersion: 8, libraryId: 'legacy-v6-library' },
+      value: { schemaVersion: 9, libraryId: 'legacy-v8-library' },
     });
   });
 
-  it('preserves a recoverable v4 file while creating v8 with an empty Mailbox', async () => {
+  it('preserves a recoverable v4 file while creating v9 with an empty Mailbox', async () => {
     const bridge = new MemoryBridge();
     const legacyPath = '/app-local/argument-workspace/library-v4.json';
-    const currentPath = '/app-local/argument-workspace/library-v8.json';
+    const currentPath = '/app-local/argument-workspace/library-v9.json';
     const current = createEmptyArgumentLibrary(runtime, 'legacy-v4-library');
     const withoutProposals = clonePlainData(current) as unknown as Record<
       string,
@@ -108,7 +108,7 @@ describe('Tauri Argument Library storage', () => {
       status: 'loaded',
       snapshot: {
         library: {
-          schemaVersion: 8,
+          schemaVersion: 9,
           libraryId: 'legacy-v4-library',
           proposals: [],
         },
@@ -120,17 +120,17 @@ describe('Tauri Argument Library storage', () => {
     ).toMatchObject({
       status: 'valid',
       value: {
-        schemaVersion: 8,
+        schemaVersion: 9,
         libraryId: 'legacy-v4-library',
         proposals: [],
       },
     });
   });
 
-  it('prefers and preserves a recoverable v3 file while creating v8', async () => {
+  it('prefers and preserves a recoverable v3 file while creating v9', async () => {
     const bridge = new MemoryBridge();
     const legacyPath = '/app-local/argument-workspace/library-v3.json';
-    const currentPath = '/app-local/argument-workspace/library-v8.json';
+    const currentPath = '/app-local/argument-workspace/library-v9.json';
     const legacy = JSON.stringify({
       schemaVersion: 3,
       libraryId: 'legacy-v3-library',
@@ -156,7 +156,7 @@ describe('Tauri Argument Library storage', () => {
       status: 'loaded',
       snapshot: {
         library: {
-          schemaVersion: 8,
+          schemaVersion: 9,
           libraryId: 'legacy-v3-library',
           proposals: [],
         },
@@ -168,7 +168,7 @@ describe('Tauri Argument Library storage', () => {
     ).toMatchObject({
       status: 'valid',
       value: {
-        schemaVersion: 8,
+        schemaVersion: 9,
         libraryId: 'legacy-v3-library',
         proposals: [],
       },
@@ -178,7 +178,7 @@ describe('Tauri Argument Library storage', () => {
   it('migrates a legacy file atomically and keeps the v1 source recoverable', async () => {
     const bridge = new MemoryBridge();
     const legacyPath = '/app-local/argument-workspace/library-v1.json';
-    const currentPath = '/app-local/argument-workspace/library-v8.json';
+    const currentPath = '/app-local/argument-workspace/library-v9.json';
     const legacy = JSON.stringify({
       schemaVersion: 1,
       libraryId: 'legacy-library',
@@ -201,7 +201,7 @@ describe('Tauri Argument Library storage', () => {
       status: 'loaded',
       snapshot: {
         library: {
-          schemaVersion: 8,
+          schemaVersion: 9,
           arguments: [],
           contexts: [],
           proposals: [],
@@ -214,17 +214,17 @@ describe('Tauri Argument Library storage', () => {
     expect(parseArgumentLibraryJson(current!)).toMatchObject({
       status: 'valid',
       value: {
-        schemaVersion: 8,
+        schemaVersion: 9,
         libraryId: 'legacy-library',
         proposals: [],
       },
     });
   });
 
-  it('prefers and preserves a recoverable v2 file while creating v8', async () => {
+  it('prefers and preserves a recoverable v2 file while creating v9', async () => {
     const bridge = new MemoryBridge();
     const legacyPath = '/app-local/argument-workspace/library-v2.json';
-    const currentPath = '/app-local/argument-workspace/library-v8.json';
+    const currentPath = '/app-local/argument-workspace/library-v9.json';
     const legacy = JSON.stringify({
       schemaVersion: 2,
       libraryId: 'legacy-v2-library',
@@ -244,7 +244,7 @@ describe('Tauri Argument Library storage', () => {
 
     expect(await store.load()).toMatchObject({
       status: 'loaded',
-      snapshot: { library: { schemaVersion: 8, proposals: [] } },
+      snapshot: { library: { schemaVersion: 9, proposals: [] } },
     });
     expect(bridge.files.get(legacyPath)).toBe(legacy);
     expect(
@@ -252,7 +252,7 @@ describe('Tauri Argument Library storage', () => {
     ).toMatchObject({
       status: 'valid',
       value: {
-        schemaVersion: 8,
+        schemaVersion: 9,
         libraryId: 'legacy-v2-library',
         proposals: [],
       },
@@ -269,7 +269,7 @@ describe('Tauri Argument Library storage', () => {
     const saved = await store.save(first, 'missing');
     expect(saved.status).toBe('saved');
     expect([...bridge.files.keys()]).toEqual([
-      '/app-local/argument-workspace/library-v8.json',
+      '/app-local/argument-workspace/library-v9.json',
     ]);
     if (saved.status !== 'saved') return;
     const second = createTopic(

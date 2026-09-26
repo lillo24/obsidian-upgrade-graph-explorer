@@ -12,6 +12,7 @@ import {
   createTopic,
 } from './library';
 import {
+  discardArgumentProposal,
   resolveProposalAsArgument,
   resolveProposalAsRejected,
   submitArgumentProposal,
@@ -118,7 +119,10 @@ describe('Argument Library interchange', () => {
     });
     expect(
       parseArgumentLibraryJson(
-        JSON.stringify({ ...createNeutralArgumentLibrary(), schemaVersion: 9 }),
+        JSON.stringify({
+          ...createNeutralArgumentLibrary(),
+          schemaVersion: 10,
+        }),
       ),
     ).toMatchObject({ status: 'future-schema' });
   });
@@ -131,7 +135,7 @@ describe('Argument Library interchange', () => {
       status: 'valid',
       migratedFromSchemaVersion: 1,
       value: {
-        schemaVersion: 8,
+        schemaVersion: 9,
         libraryId: 'library-v1-fixture',
         libraryRevision: 7,
         arguments: [],
@@ -177,7 +181,7 @@ describe('Argument Library interchange', () => {
       status: 'valid',
       migratedFromSchemaVersion: 2,
       value: {
-        schemaVersion: 8,
+        schemaVersion: 9,
         contexts: [],
         proposals: [],
         arguments: [{ examples: [], relations: [], contextIds: [] }],
@@ -202,7 +206,7 @@ describe('Argument Library interchange', () => {
     expect(parsed).toMatchObject({
       status: 'valid',
       migratedFromSchemaVersion: 4,
-      value: { schemaVersion: 8, proposals: [] },
+      value: { schemaVersion: 9, proposals: [] },
     });
     if (parsed.status !== 'valid') return;
     const migratedWithoutMailbox = clonePlainData(
@@ -285,7 +289,7 @@ describe('Argument Library interchange', () => {
       status: 'valid',
       migratedFromSchemaVersion: 5,
       value: {
-        schemaVersion: 8,
+        schemaVersion: 9,
         proposals: [
           {
             intent: 'unspecified',
@@ -360,7 +364,7 @@ describe('Argument Library interchange', () => {
     expect(parsed).toMatchObject({
       status: 'valid',
       migratedFromSchemaVersion: 6,
-      value: { schemaVersion: 8 },
+      value: { schemaVersion: 9 },
     });
     if (parsed.status !== 'valid') return;
     expect(parsed.value.proposals[0]).not.toHaveProperty(
@@ -371,7 +375,7 @@ describe('Argument Library interchange', () => {
     ).toMatchObject({ status: 'valid', value: parsed.value });
   });
 
-  it('migrates v7 pending, stored, and canonically refuted history into v8 staging', () => {
+  it('migrates v7 pending, stored, and canonically refuted history into v9 staging', () => {
     const runtime = deterministicRuntime('legacy-v7');
     const original = createNeutralArgumentLibrary();
     const descriptor = captureArgumentLibrarySnapshot(original).descriptor;
@@ -456,6 +460,17 @@ describe('Argument Library interchange', () => {
       const legacy = { ...proposal } as Record<string, unknown>;
       delete legacy.draftRelations;
       delete legacy.revisionHistory;
+      const result = proposal.decision!.resultingRecords[0]!;
+      legacy.status = result.kind === 'argument' ? 'accepted' : 'rejected';
+      legacy.decision = {
+        decidedAt: proposal.decision!.decidedAt,
+        ...(proposal.decision!.note === undefined
+          ? {}
+          : { note: proposal.decision!.note }),
+        ...(result.kind === 'argument'
+          ? { resultingArgumentId: result.id }
+          : { resultingCounterArgumentId: result.id }),
+      };
       return legacy;
     });
     const legacy = {
@@ -469,14 +484,14 @@ describe('Argument Library interchange', () => {
     expect(parsed).toMatchObject({
       status: 'valid',
       migratedFromSchemaVersion: 7,
-      value: { schemaVersion: 8 },
+      value: { schemaVersion: 9 },
     });
     if (parsed.status !== 'valid') return;
     expect(parsed.value.arguments).toEqual(resolved.arguments);
     expect(parsed.value.counterArguments).toEqual(resolved.counterArguments);
     expect(parsed.value.proposals.map(({ status }) => status)).toEqual([
-      'accepted',
-      'rejected',
+      'stored',
+      'stored',
     ]);
     expect(parsed.value.proposals).toEqual(
       resolved.proposals.map((proposal) => ({
@@ -485,6 +500,127 @@ describe('Argument Library interchange', () => {
         revisionHistory: [],
       })),
     );
+  });
+
+  it('migrates v8 stored and discarded outcomes into typed v9 decisions', () => {
+    const runtime = deterministicRuntime('legacy-v8');
+    const original = createNeutralArgumentLibrary();
+    const descriptor = captureArgumentLibrarySnapshot(original).descriptor;
+    const input = {
+      title: 'V8 lifecycle proposal',
+      intent: 'new' as const,
+      examples: [],
+      premises: [],
+      reasoningSteps: [],
+      conclusion: 'A v8 lifecycle conclusion.',
+      sourceObservations: [],
+      whyNovelOrUnresolved: 'Migration must preserve its outcome.',
+      consultation: {
+        libraryId: descriptor.libraryId,
+        libraryRevision: descriptor.libraryRevision,
+        contentFingerprint: descriptor.contentFingerprint,
+        records: [
+          {
+            kind: 'topic' as const,
+            id: original.topics[0]!.id,
+            revision: original.topics[0]!.revision,
+          },
+        ],
+      },
+    };
+    const first = submitArgumentProposal(original, input, runtime);
+    const stored = resolveProposalAsArgument(
+      first.library,
+      {
+        proposalId: first.proposal.id,
+        topicIds: ['T-NEUTRAL'],
+        argument: {
+          id: 'AR-V8-STORED',
+          title: first.proposal.title,
+          premises: [],
+          conclusion: first.proposal.conclusion,
+        },
+      },
+      runtime,
+    );
+    const nextDescriptor = captureArgumentLibrarySnapshot(stored).descriptor;
+    const second = submitArgumentProposal(
+      stored,
+      {
+        ...input,
+        clientSubmissionId: 'v8-discarded',
+        title: 'V8 discarded proposal',
+        consultation: {
+          libraryId: nextDescriptor.libraryId,
+          libraryRevision: nextDescriptor.libraryRevision,
+          contentFingerprint: nextDescriptor.contentFingerprint,
+          records: [
+            {
+              kind: 'topic',
+              id: stored.topics[0]!.id,
+              revision: stored.topics[0]!.revision,
+            },
+          ],
+        },
+      },
+      runtime,
+    );
+    const resolved = discardArgumentProposal(
+      second.library,
+      {
+        proposalId: second.proposal.id,
+        expectedRevision: second.proposal.revision,
+        note: 'No longer active.',
+      },
+      runtime,
+    );
+    const legacy = {
+      ...resolved,
+      schemaVersion: 8,
+      proposals: resolved.proposals.map((proposal) => {
+        if (proposal.status === 'discarded') {
+          return {
+            ...proposal,
+            decision: {
+              decidedAt: proposal.decision!.decidedAt,
+              note: proposal.decision!.note,
+            },
+          };
+        }
+        const result = proposal.decision!.resultingRecords[0]!;
+        return {
+          ...proposal,
+          status: result.kind === 'argument' ? 'accepted' : 'rejected',
+          decision: {
+            decidedAt: proposal.decision!.decidedAt,
+            ...(result.kind === 'argument'
+              ? { resultingArgumentId: result.id }
+              : { resultingCounterArgumentId: result.id }),
+          },
+        };
+      }),
+    };
+
+    const parsed = parseArgumentLibraryJson(JSON.stringify(legacy));
+
+    expect(parsed).toMatchObject({
+      status: 'valid',
+      migratedFromSchemaVersion: 8,
+      value: { schemaVersion: 9 },
+    });
+    if (parsed.status !== 'valid') return;
+    expect(parsed.value.arguments).toEqual(resolved.arguments);
+    expect(parsed.value.proposals.map(({ status }) => status)).toEqual([
+      'stored',
+      'discarded',
+    ]);
+    expect(parsed.value.proposals[0]?.decision?.resultingRecords).toEqual([
+      { kind: 'argument', id: 'AR-V8-STORED' },
+    ]);
+    expect(parsed.value.proposals[1]?.decision?.resultingRecords).toEqual([]);
+    expect(
+      parsed.value.proposals.map(({ revisionHistory }) => revisionHistory),
+    ).toEqual(resolved.proposals.map(({ revisionHistory }) => revisionHistory));
   });
 
   it('treats identical import as idempotent and same-lineage altered content as conflict', () => {

@@ -165,7 +165,7 @@ export interface ArgumentImportPlan {
   readonly mode: 'merge' | 'replace';
   readonly preview: ArgumentImportPreview;
   readonly base: SnapshotDescriptor;
-  readonly migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  readonly migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 }
 
 export type ArgumentWorkspaceActionResult =
@@ -799,7 +799,7 @@ export class ArgumentWorkspaceSession {
       parsed.value,
       parsed.migratedFromSchemaVersion === undefined
         ? undefined
-        : `Migrated schema v${parsed.migratedFromSchemaVersion} to v8 and saved`,
+        : `Migrated schema v${parsed.migratedFromSchemaVersion} to v9 and saved`,
     );
   }
 

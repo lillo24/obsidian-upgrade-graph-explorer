@@ -22,12 +22,13 @@ const OUTCOMES = new Set([
   'refuted',
   'inapplicable-under-stated-scope',
 ]);
-const PROPOSAL_STATUSES = new Set([
+const LEGACY_PROPOSAL_STATUSES = new Set([
   'pending',
   'discarded',
   'accepted',
   'rejected',
 ]);
+const PROPOSAL_STATUSES = new Set(['pending', 'discarded', 'stored']);
 const PROPOSAL_INTENTS = new Set([
   'unspecified',
   'new',
@@ -435,7 +436,7 @@ function validateTopic(
   value: unknown,
   path: string,
   issues: ArgumentLibraryValidationIssue[],
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 = 8,
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 = 9,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected a Topic.');
@@ -479,7 +480,7 @@ function validateArgumentPremise(
   path: string,
   ownerId: unknown,
   issues: ArgumentLibraryValidationIssue[],
-  schemaVersion: 2 | 3 | 4 | 5 | 6 | 7 | 8 = 8,
+  schemaVersion: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 = 9,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected an Argument premise.');
@@ -589,7 +590,7 @@ function validateArgument(
   path: string,
   issues: ArgumentLibraryValidationIssue[],
   sourceIds: Set<string>,
-  schemaVersion: 2 | 3 | 4 | 5 | 6 | 7 | 8 = 8,
+  schemaVersion: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 = 9,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected an Argument.');
@@ -1303,7 +1304,7 @@ function validateProposalRevisionHistory(
       },
       `${entryPath}.content`,
       issues,
-      8,
+      9,
     );
   });
 }
@@ -1312,7 +1313,7 @@ function validateProposal(
   value: unknown,
   path: string,
   issues: ArgumentLibraryValidationIssue[],
-  schemaVersion: 5 | 6 | 7 | 8,
+  schemaVersion: 5 | 6 | 7 | 8 | 9,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected a Mailbox proposal.');
@@ -1353,8 +1354,10 @@ function validateProposal(
   positiveRevision(value.revision, `${path}.revision`, issues);
   timestamp(value.createdAt, `${path}.createdAt`, issues);
   timestamp(value.updatedAt, `${path}.updatedAt`, issues);
+  const supportedStatuses =
+    schemaVersion >= 9 ? PROPOSAL_STATUSES : LEGACY_PROPOSAL_STATUSES;
   if (
-    !PROPOSAL_STATUSES.has(value.status as string) ||
+    !supportedStatuses.has(value.status as string) ||
     (schemaVersion < 8 && value.status === 'discarded')
   ) {
     issue(
@@ -1760,14 +1763,167 @@ function validateProposal(
   }
   fields(
     value.decision,
-    ['decidedAt'],
-    ['note', 'resultingArgumentId', 'resultingCounterArgumentId'],
+    schemaVersion >= 9 ? ['decidedAt', 'resultingRecords'] : ['decidedAt'],
+    schemaVersion >= 9
+      ? ['note', 'resolutionReceipt']
+      : ['note', 'resultingArgumentId', 'resultingCounterArgumentId'],
     `${path}.decision`,
     issues,
   );
   timestamp(value.decision.decidedAt, `${path}.decision.decidedAt`, issues);
   if (Object.hasOwn(value.decision, 'note')) {
     nonEmptyString(value.decision.note, `${path}.decision.note`, issues);
+  }
+  if (schemaVersion >= 9) {
+    const validateResults = (results: unknown, resultsPath: string): number => {
+      if (!Array.isArray(results)) {
+        issue(issues, resultsPath, 'invalid-type', 'Expected an array.');
+        return 0;
+      }
+      const keys = new Set<string>();
+      results.forEach((result, index) => {
+        const resultPath = `${resultsPath}[${index}]`;
+        if (!isRecord(result)) {
+          issue(
+            issues,
+            resultPath,
+            'invalid-type',
+            'Expected a canonical result identity.',
+          );
+          return;
+        }
+        fields(result, ['kind', 'id'], [], resultPath, issues);
+        if (result.kind !== 'argument' && result.kind !== 'counter-argument')
+          issue(
+            issues,
+            `${resultPath}.kind`,
+            'invalid-value',
+            'Unsupported canonical result kind.',
+          );
+        if (nonEmptyString(result.id, `${resultPath}.id`, issues)) {
+          const key = `${String(result.kind)}:${String(result.id)}`;
+          if (keys.has(key))
+            issue(
+              issues,
+              resultPath,
+              'duplicate-id',
+              'Duplicate canonical result identity.',
+            );
+          keys.add(key);
+        }
+      });
+      return results.length;
+    };
+    const resultCount = validateResults(
+      value.decision.resultingRecords,
+      `${path}.decision.resultingRecords`,
+    );
+    if (value.status === 'stored' && resultCount === 0)
+      issue(
+        issues,
+        `${path}.decision.resultingRecords`,
+        'invalid-value',
+        'Stored Proposals require at least one canonical result.',
+      );
+    if (value.status === 'discarded' && resultCount !== 0)
+      issue(
+        issues,
+        `${path}.decision.resultingRecords`,
+        'invalid-value',
+        'Discarded Proposals cannot have canonical results.',
+      );
+    if (Object.hasOwn(value.decision, 'resolutionReceipt')) {
+      const receiptPath = `${path}.decision.resolutionReceipt`;
+      const receipt = value.decision.resolutionReceipt;
+      if (value.status !== 'stored')
+        issue(
+          issues,
+          receiptPath,
+          'invalid-value',
+          'Only stored Proposals may carry a canonical resolution receipt.',
+        );
+      if (!isRecord(receipt)) {
+        issue(
+          issues,
+          receiptPath,
+          'invalid-type',
+          'Expected a canonical resolution receipt.',
+        );
+      } else {
+        fields(
+          receipt,
+          ['id', 'planFingerprint', 'proposalRevisions', 'resultingRecords'],
+          [],
+          receiptPath,
+          issues,
+        );
+        nonEmptyString(receipt.id, `${receiptPath}.id`, issues);
+        validateFingerprint(
+          receipt.planFingerprint,
+          `${receiptPath}.planFingerprint`,
+          issues,
+        );
+        if (!Array.isArray(receipt.proposalRevisions)) {
+          issue(
+            issues,
+            `${receiptPath}.proposalRevisions`,
+            'invalid-type',
+            'Expected an array.',
+          );
+        } else {
+          if (receipt.proposalRevisions.length === 0)
+            issue(
+              issues,
+              `${receiptPath}.proposalRevisions`,
+              'invalid-value',
+              'A resolution receipt requires at least one Proposal revision.',
+            );
+          const ids = new Set<string>();
+          receipt.proposalRevisions.forEach((entry, index) => {
+            const entryPath = `${receiptPath}.proposalRevisions[${index}]`;
+            if (!isRecord(entry)) {
+              issue(
+                issues,
+                entryPath,
+                'invalid-type',
+                'Expected a Proposal revision identity.',
+              );
+              return;
+            }
+            fields(entry, ['proposalId', 'revision'], [], entryPath, issues);
+            if (
+              nonEmptyString(
+                entry.proposalId,
+                `${entryPath}.proposalId`,
+                issues,
+              )
+            ) {
+              if (ids.has(String(entry.proposalId)))
+                issue(
+                  issues,
+                  `${entryPath}.proposalId`,
+                  'duplicate-id',
+                  'Duplicate Proposal receipt identity.',
+                );
+              ids.add(String(entry.proposalId));
+            }
+            positiveRevision(entry.revision, `${entryPath}.revision`, issues);
+          });
+        }
+        const receiptResultCount = validateResults(
+          receipt.resultingRecords,
+          `${receiptPath}.resultingRecords`,
+        );
+        if (receiptResultCount === 0)
+          issue(
+            issues,
+            `${receiptPath}.resultingRecords`,
+            'invalid-value',
+            'A resolution receipt requires at least one canonical result.',
+          );
+      }
+    }
+    return;
   }
   const argumentResult = Object.hasOwn(value.decision, 'resultingArgumentId');
   const counterResult = Object.hasOwn(
@@ -2414,6 +2570,96 @@ function validateIntegrity(
           `Unknown resulting Counter-Argument "${entry.decision.resultingCounterArgumentId}".`,
         );
       }
+      const validateResultReferences = (
+        results: unknown,
+        resultsPath: string,
+      ): void => {
+        if (!Array.isArray(results)) return;
+        results.forEach((result, resultIndex) => {
+          if (!isRecord(result) || typeof result.id !== 'string') return;
+          const exists =
+            (result.kind === 'argument' && argumentIds.has(result.id)) ||
+            (result.kind === 'counter-argument' && counterIds.has(result.id));
+          if (!exists)
+            issue(
+              issues,
+              `${resultsPath}[${resultIndex}].id`,
+              'missing-reference',
+              `Unknown resulting ${String(result.kind)} "${result.id}".`,
+            );
+        });
+      };
+      validateResultReferences(
+        entry.decision.resultingRecords,
+        `$.proposals[${index}].decision.resultingRecords`,
+      );
+      if (isRecord(entry.decision.resolutionReceipt)) {
+        const receipt = entry.decision.resolutionReceipt;
+        const receiptResults = receipt.resultingRecords;
+        validateResultReferences(
+          receiptResults,
+          `$.proposals[${index}].decision.resolutionReceipt.resultingRecords`,
+        );
+        if (Array.isArray(receipt.proposalRevisions)) {
+          if (
+            !receipt.proposalRevisions.some(
+              (identity) =>
+                isRecord(identity) && identity.proposalId === entry.id,
+            )
+          )
+            issue(
+              issues,
+              `$.proposals[${index}].decision.resolutionReceipt.proposalRevisions`,
+              'missing-reference',
+              'Resolution receipt must identify the Proposal carrying it.',
+            );
+          receipt.proposalRevisions.forEach((identity, identityIndex) => {
+            if (
+              !isRecord(identity) ||
+              typeof identity.proposalId !== 'string' ||
+              typeof identity.revision !== 'number'
+            )
+              return;
+            const referencedProposal = proposalsById.get(identity.proposalId);
+            const revisionExists =
+              referencedProposal?.revision === identity.revision ||
+              (Array.isArray(referencedProposal?.revisionHistory) &&
+                referencedProposal.revisionHistory.some(
+                  (revision) =>
+                    isRecord(revision) &&
+                    revision.revision === identity.revision,
+                ));
+            if (!revisionExists)
+              issue(
+                issues,
+                `$.proposals[${index}].decision.resolutionReceipt.proposalRevisions[${identityIndex}]`,
+                'missing-reference',
+                `Resolution receipt Proposal "${identity.proposalId}" revision ${identity.revision} is not recoverable.`,
+              );
+          });
+        }
+        if (
+          Array.isArray(entry.decision.resultingRecords) &&
+          Array.isArray(receiptResults)
+        ) {
+          entry.decision.resultingRecords.forEach((result, resultIndex) => {
+            if (!isRecord(result)) return;
+            const included = receiptResults.some(
+              (receiptResult) =>
+                isRecord(receiptResult) &&
+                receiptResult.kind === result.kind &&
+                receiptResult.id === result.id,
+            );
+            if (!included)
+              issue(
+                issues,
+                `$.proposals[${index}].decision.resultingRecords[${resultIndex}]`,
+                'missing-reference',
+                'Proposal result is absent from its canonical resolution receipt.',
+              );
+          });
+        }
+      }
     });
   }
 
@@ -2500,7 +2746,7 @@ function validateIntegrity(
 
 function validateArgumentLibraryVersion(
   value: unknown,
-  expectedVersion: 2 | 3 | 4 | 5 | 6 | 7 | 8,
+  expectedVersion: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9,
 ): ArgumentLibraryValidationResult {
   const issues: ArgumentLibraryValidationIssue[] = [];
   if (!isRecord(value)) {
@@ -2617,13 +2863,15 @@ function validateArgumentLibraryVersion(
         entry,
         `$.proposals[${index}]`,
         issues,
-        expectedVersion >= 8
-          ? 8
-          : expectedVersion >= 7
-            ? 7
-            : expectedVersion >= 6
-              ? 6
-              : 5,
+        expectedVersion >= 9
+          ? 9
+          : expectedVersion >= 8
+            ? 8
+            : expectedVersion >= 7
+              ? 7
+              : expectedVersion >= 6
+                ? 6
+                : 5,
       ),
     );
   }
@@ -2644,7 +2892,28 @@ function validateArgumentLibraryVersion(
 export function validateArgumentLibrary(
   value: unknown,
 ): ArgumentLibraryValidationResult {
-  return validateArgumentLibraryVersion(value, 8);
+  return validateArgumentLibraryVersion(value, 9);
+}
+
+export type ArgumentLibraryV8ValidationResult =
+  | {
+      readonly valid: true;
+      readonly value: PlainRecord;
+      readonly issues: readonly [];
+    }
+  | {
+      readonly valid: false;
+      readonly issues: readonly ArgumentLibraryValidationIssue[];
+    };
+
+/** Strictly validates the schema-v8 Proposal lifecycle before migration. */
+export function validateArgumentLibraryV8(
+  value: unknown,
+): ArgumentLibraryV8ValidationResult {
+  const validation = validateArgumentLibraryVersion(value, 8);
+  return validation.valid
+    ? { valid: true, value: value as PlainRecord, issues: [] }
+    : validation;
 }
 
 export type ArgumentLibraryV7ValidationResult =

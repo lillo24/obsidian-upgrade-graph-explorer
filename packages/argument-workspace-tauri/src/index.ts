@@ -58,6 +58,7 @@ const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true });
 
 async function libraryPaths(bridge: ArgumentLibraryTauriBridge): Promise<{
   readonly current: string;
+  readonly legacyV8: string;
   readonly legacyV7: string;
   readonly legacyV6: string;
   readonly legacyV5: string;
@@ -71,7 +72,8 @@ async function libraryPaths(bridge: ArgumentLibraryTauriBridge): Promise<{
     'argument-workspace',
   );
   return {
-    current: await bridge.joinPath(directory, 'library-v8.json'),
+    current: await bridge.joinPath(directory, 'library-v9.json'),
+    legacyV8: await bridge.joinPath(directory, 'library-v8.json'),
     legacyV7: await bridge.joinPath(directory, 'library-v7.json'),
     legacyV6: await bridge.joinPath(directory, 'library-v6.json'),
     legacyV5: await bridge.joinPath(directory, 'library-v5.json'),
@@ -159,7 +161,9 @@ export function createTauriArgumentLibraryStore(
     const paths = await libraryPaths(bridge);
     const current = await loadAt(bridge, paths.current);
     if (current.status !== 'missing') return current;
-    const v7 = await loadAt(bridge, paths.legacyV7);
+    const v8 = await loadAt(bridge, paths.legacyV8);
+    const v7 =
+      v8.status === 'missing' ? await loadAt(bridge, paths.legacyV7) : v8;
     const v6 =
       v7.status === 'missing' ? await loadAt(bridge, paths.legacyV6) : v7;
     const v5 =
@@ -184,7 +188,7 @@ export function createTauriArgumentLibraryStore(
     } catch (error: unknown) {
       return {
         status: 'unreadable',
-        message: `Could not migrate the private Argument Library to schema v8: ${message(error)} The recoverable prior-version file was preserved.`,
+        message: `Could not migrate the private Argument Library to schema v9: ${message(error)} The recoverable prior-version file was preserved.`,
       };
     }
   };
