@@ -420,6 +420,15 @@ describe('Argument Library MCP tools', () => {
         'not authority and not external empirical proof',
       );
       expect(normalizedGuide).toContain('Prior response still applies');
+      expect(normalizedGuide).toContain(
+        'Run an argument-evolution resolution sweep',
+      );
+      expect(normalizedGuide).toContain(
+        'earlier claim -> challenge / counterexample / ambiguity -> revision',
+      );
+      expect(normalizedGuide).toContain(
+        'arguments which survived meaningful criticism or revision',
+      );
       expect(normalizedGuide).toContain('Compiler Mailbox');
       expect(normalizedGuide).toContain('compiler_submit_proposal');
       expect(normalizedGuide).toContain(
