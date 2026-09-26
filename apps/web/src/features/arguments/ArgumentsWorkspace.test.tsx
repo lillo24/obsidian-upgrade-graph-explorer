@@ -854,8 +854,11 @@ describe('standalone Arguments workspace', () => {
 
     expect(store.writes).toBe(1);
     const proposal = store.snapshot.library.proposals[0]!;
-    expect(proposal.status).toBe('rejected');
-    const resultingId = proposal.decision?.resultingCounterArgumentId;
+    expect(proposal.status).toBe('stored');
+    const resultingId = proposal.decision?.resultingRecords[0]?.id;
+    expect(proposal.decision?.resultingRecords[0]?.kind).toBe(
+      'counter-argument',
+    );
     const result = store.snapshot.library.counterArguments.find(
       ({ id }) => id === resultingId,
     );
@@ -876,7 +879,7 @@ describe('standalone Arguments workspace', () => {
 
     await click('To store (0)');
     await click('History');
-    expect(container.textContent).toContain('Human canonical decision');
+    expect(container.textContent).toContain('Canonical storage decision');
     expect(container.textContent).toContain(
       'Rejected after checking the current Axiom.',
     );
@@ -911,8 +914,9 @@ describe('standalone Arguments workspace', () => {
 
     expect(store.writes).toBe(1);
     const proposal = store.snapshot.library.proposals[0]!;
-    expect(proposal.status).toBe('accepted');
-    const resultingId = proposal.decision?.resultingArgumentId;
+    expect(proposal.status).toBe('stored');
+    const resultingId = proposal.decision?.resultingRecords[0]?.id;
+    expect(proposal.decision?.resultingRecords[0]?.kind).toBe('argument');
     const result = store.snapshot.library.arguments.find(
       ({ id }) => id === resultingId,
     );

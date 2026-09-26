@@ -1,4 +1,4 @@
-export const ARGUMENT_LIBRARY_SCHEMA_VERSION = 8 as const;
+export const ARGUMENT_LIBRARY_SCHEMA_VERSION = 9 as const;
 export const KNOWLEDGE_READER_CONTRACT_VERSION = 5 as const;
 export const CONTENT_FINGERPRINT_ALGORITHM =
   'sha256-canonical-json-v1' as const;
@@ -231,7 +231,7 @@ export interface ArgumentRelation {
   readonly reliedOnRevision: number;
 }
 
-export type ProposalStatus = 'pending' | 'discarded' | 'accepted' | 'rejected';
+export type ProposalStatus = 'pending' | 'discarded' | 'stored';
 
 /** Review intent only; canonical attack/support/supersession remains a human choice. */
 export type ArgumentProposalIntent =
@@ -266,11 +266,26 @@ export interface ArgumentProposalConsultation {
   readonly records: readonly ProposalConsultedRecord[];
 }
 
+export interface ArgumentProposalResultingRecord {
+  readonly kind: 'argument' | 'counter-argument';
+  readonly id: string;
+}
+
+export interface ArgumentProposalResolutionReceipt {
+  readonly id: string;
+  readonly planFingerprint: ContentFingerprint;
+  readonly proposalRevisions: readonly {
+    readonly proposalId: string;
+    readonly revision: number;
+  }[];
+  readonly resultingRecords: readonly ArgumentProposalResultingRecord[];
+}
+
 export interface ArgumentProposalDecision {
   readonly decidedAt: string;
   readonly note?: string;
-  readonly resultingArgumentId?: string;
-  readonly resultingCounterArgumentId?: string;
+  readonly resultingRecords: readonly ArgumentProposalResultingRecord[];
+  readonly resolutionReceipt?: ArgumentProposalResolutionReceipt;
 }
 
 export type ArgumentProposalPremise = ArgumentPremise;
@@ -959,7 +974,7 @@ export type ArgumentLibraryJsonParseResult =
   | {
       readonly status: 'valid';
       readonly value: ArgumentLibrary;
-      readonly migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+      readonly migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
     }
   | {
       readonly status: 'invalid-json' | 'future-schema' | 'invalid-library';

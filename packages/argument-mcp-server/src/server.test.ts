@@ -28,7 +28,7 @@ async function temporaryLibrary(): Promise<{
 }> {
   const directory = await mkdtemp(join(tmpdir(), 'icarus-argument-mcp-'));
   temporaryDirectories.push(directory);
-  return { directory, path: join(directory, 'library-v8.json') };
+  return { directory, path: join(directory, 'library-v9.json') };
 }
 
 function proposalArguments(
@@ -150,7 +150,7 @@ afterEach(async () => {
 });
 
 describe('Argument Library MCP tools', () => {
-  it('registers canonical reads and only non-canonical Proposal mutations', async () => {
+  it('registers bounded reads, staging mutations, and explicit canonical resolution tools', async () => {
     const { path } = await temporaryLibrary();
     const session = await connect(
       createArgumentMcpServer({ libraryPath: path }),
@@ -171,9 +171,11 @@ describe('Argument Library MCP tools', () => {
         'compiler_read_bundle',
         'compiler_list_proposals',
         'compiler_read_proposal',
+        'compiler_prepare_resolution',
         'compiler_submit_proposal',
         'compiler_revise_proposal',
         'compiler_discard_proposal',
+        'compiler_apply_resolution',
       ]);
       expect(
         listed.tools.find(({ name }) => name === 'compiler_usage_guide'),
@@ -199,16 +201,28 @@ describe('Argument Library MCP tools', () => {
         ),
       );
       expect(listed.tools[7]).toMatchObject({
+        name: 'compiler_prepare_resolution',
+        annotations: { readOnlyHint: true, destructiveHint: false },
+      });
+      expect(listed.tools[8]).toMatchObject({
         name: 'compiler_submit_proposal',
         annotations: { readOnlyHint: false, destructiveHint: false },
       });
-      expect(listed.tools[8]).toMatchObject({
+      expect(listed.tools[9]).toMatchObject({
         name: 'compiler_revise_proposal',
         annotations: { readOnlyHint: false, destructiveHint: false },
       });
-      expect(listed.tools[9]).toMatchObject({
+      expect(listed.tools[10]).toMatchObject({
         name: 'compiler_discard_proposal',
         annotations: { readOnlyHint: false, destructiveHint: true },
+      });
+      expect(listed.tools[11]).toMatchObject({
+        name: 'compiler_apply_resolution',
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: true,
+        },
       });
       expect(listed.tools.map(({ name }) => name)).not.toContain(
         'compiler_create_argument',
@@ -290,6 +304,204 @@ describe('Argument Library MCP tools', () => {
         status: 'error',
         error: { code: 'persistence-error' },
       });
+    } finally {
+      await session.close();
+    }
+  });
+
+  it('prepares without writing, applies atomically, retries idempotently, and rejects stale or changed plans', async () => {
+    const { path } = await temporaryLibrary();
+    const fixture = createSyntheticLibrary();
+    await writeFile(path, serializeArgumentLibrary(fixture.library), 'utf8');
+    const session = await connect(
+      createArgumentMcpServer({
+        libraryPath: path,
+        proposalRuntime: fixture.runtime,
+      }),
+    );
+    try {
+      const submitted = await session.client.callTool({
+        name: 'compiler_submit_proposal',
+        arguments: proposalArguments(fixture.library),
+      });
+      const proposalId = (structured(submitted) as { proposalId: string })
+        .proposalId;
+      const beforePrepare = await readFile(path, 'utf8');
+      const prepareArguments = {
+        proposals: [
+          {
+            kind: 'argument',
+            proposalId,
+            expectedRevision: 1,
+            canonicalId: 'AR-MCP-RESOLVED',
+            topicIds: ['T-MEASUREMENT'],
+          },
+        ],
+        draftRelationDispositions: [],
+      };
+      const firstPreparation = await session.client.callTool({
+        name: 'compiler_prepare_resolution',
+        arguments: prepareArguments,
+      });
+      expect(firstPreparation.isError).not.toBe(true);
+      const firstPrepared = structured(firstPreparation) as {
+        status: string;
+        plan: Record<string, unknown> & {
+          planFingerprint: { value: string };
+        };
+      };
+      expect(firstPrepared).toMatchObject({
+        status: 'ready',
+        plan: {
+          proposals: [
+            {
+              proposalId,
+              proposalRevision: 1,
+              resultingRecord: { kind: 'argument', id: 'AR-MCP-RESOLVED' },
+            },
+          ],
+          currentPromotions: [],
+        },
+      });
+      expect(await readFile(path, 'utf8')).toBe(beforePrepare);
+
+      const repeatedPreparation = await session.client.callTool({
+        name: 'compiler_prepare_resolution',
+        arguments: prepareArguments,
+      });
+      expect(structured(repeatedPreparation)).toMatchObject({
+        status: 'ready',
+        plan: {
+          planFingerprint: firstPrepared.plan.planFingerprint,
+        },
+      });
+      expect(await readFile(path, 'utf8')).toBe(beforePrepare);
+
+      const applied = await session.client.callTool({
+        name: 'compiler_apply_resolution',
+        arguments: { plan: firstPrepared.plan },
+      });
+      expect(applied.isError).not.toBe(true);
+      expect(structured(applied)).toMatchObject({
+        status: 'ok',
+        alreadyApplied: false,
+        canonicalRecords: [{ kind: 'argument', id: 'AR-MCP-RESOLVED' }],
+      });
+      const stored = parseArgumentLibraryJson(await readFile(path, 'utf8'));
+      expect(stored.status).toBe('valid');
+      if (stored.status !== 'valid') return;
+      expect(
+        stored.value.proposals.find(({ id }) => id === proposalId),
+      ).toMatchObject({
+        status: 'stored',
+        decision: {
+          resultingRecords: [{ kind: 'argument', id: 'AR-MCP-RESOLVED' }],
+          resolutionReceipt: {
+            planFingerprint: firstPrepared.plan.planFingerprint,
+          },
+        },
+      });
+      expect(stored.value.topics[0]?.currentArgumentId).toBe(
+        'AR-COMPATIBILITY',
+      );
+
+      const search = await session.client.callTool({
+        name: 'compiler_search_index',
+        arguments: { query: 'Verified normalization exception' },
+      });
+      expect(structured(search)).toMatchObject({
+        status: 'ok',
+        value: {
+          candidates: [
+            expect.objectContaining({
+              kind: 'argument',
+              id: 'AR-MCP-RESOLVED',
+            }),
+          ],
+        },
+      });
+
+      const retry = await session.client.callTool({
+        name: 'compiler_apply_resolution',
+        arguments: { plan: firstPrepared.plan },
+      });
+      expect(structured(retry)).toMatchObject({
+        status: 'ok',
+        alreadyApplied: true,
+        canonicalRecords: [{ kind: 'argument', id: 'AR-MCP-RESOLVED' }],
+      });
+
+      const tampered = structured(firstPreparation) as {
+        plan: Record<string, unknown> & { resolutionId: string };
+      };
+      const rejectedTamper = await session.client.callTool({
+        name: 'compiler_apply_resolution',
+        arguments: {
+          plan: { ...tampered.plan, resolutionId: 'RES-TAMPERED' },
+        },
+      });
+      expect(rejectedTamper.isError).toBe(true);
+
+      const secondInput = {
+        ...proposalArguments(stored.value),
+        clientSubmissionId: 'mcp-resolution-stale-2',
+        title: 'Prepared but stale proposal',
+        conclusion: 'This exact prepared plan must become stale.',
+      };
+      const secondSubmitted = await session.client.callTool({
+        name: 'compiler_submit_proposal',
+        arguments: secondInput,
+      });
+      const secondId = (structured(secondSubmitted) as { proposalId: string })
+        .proposalId;
+      const stalePreparation = await session.client.callTool({
+        name: 'compiler_prepare_resolution',
+        arguments: {
+          proposals: [
+            {
+              kind: 'argument',
+              proposalId: secondId,
+              expectedRevision: 1,
+              canonicalId: 'AR-MCP-STALE',
+              topicIds: ['T-MEASUREMENT'],
+            },
+          ],
+          draftRelationDispositions: [],
+        },
+      });
+      const stalePlan = (
+        structured(stalePreparation) as {
+          plan: Record<string, unknown>;
+        }
+      ).plan;
+      const afterSecond = parseArgumentLibraryJson(
+        await readFile(path, 'utf8'),
+      );
+      expect(afterSecond.status).toBe('valid');
+      if (afterSecond.status !== 'valid') return;
+      await session.client.callTool({
+        name: 'compiler_submit_proposal',
+        arguments: {
+          ...proposalArguments(afterSecond.value),
+          clientSubmissionId: 'mcp-resolution-stale-3',
+          title: 'Concurrent staging change',
+          conclusion: 'This staging mutation invalidates the exact snapshot.',
+        },
+      });
+      const rejectedStale = await session.client.callTool({
+        name: 'compiler_apply_resolution',
+        arguments: { plan: stalePlan },
+      });
+      expect(rejectedStale.isError).toBe(true);
+      const afterStale = parseArgumentLibraryJson(await readFile(path, 'utf8'));
+      expect(afterStale.status).toBe('valid');
+      if (afterStale.status !== 'valid') return;
+      expect(afterStale.value.arguments).not.toContainEqual(
+        expect.objectContaining({ id: 'AR-MCP-STALE' }),
+      );
+      expect(
+        afterStale.value.proposals.find(({ id }) => id === secondId)?.status,
+      ).toBe('pending');
     } finally {
       await session.close();
     }
@@ -567,7 +779,7 @@ describe('Argument Library MCP tools', () => {
       expect(result.isError).not.toBe(true);
       expect(response).toMatchObject({
         status: 'ok',
-        version: 'argument-compiler-ai-usage-v5',
+        version: 'argument-compiler-ai-usage-v6',
         format: 'markdown',
       });
       expect(
@@ -880,7 +1092,7 @@ describe('Argument Library MCP tools', () => {
 
       for (const [source, code] of [
         ['{broken', 'invalid-json'],
-        [JSON.stringify({ schemaVersion: 9 }), 'future-schema'],
+        [JSON.stringify({ schemaVersion: 10 }), 'future-schema'],
       ] as const) {
         await writeFile(path, source, 'utf8');
         const failed = await session.client.callTool({

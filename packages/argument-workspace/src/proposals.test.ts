@@ -481,8 +481,12 @@ describe('Argument Proposal Mailbox', () => {
     );
 
     expect(resolved.proposals[0]).toMatchObject({
-      status: 'rejected',
-      decision: { resultingCounterArgumentId: 'CA-PROPOSAL-REJECTED' },
+      status: 'stored',
+      decision: {
+        resultingRecords: [
+          { kind: 'counter-argument', id: 'CA-PROPOSAL-REJECTED' },
+        ],
+      },
     });
     expect(resolved.counterArguments).toContainEqual(
       expect.objectContaining({
@@ -598,8 +602,10 @@ describe('Argument Proposal Mailbox', () => {
     });
     expect(accepted.topics[0]!.currentArgumentId).toBe('AR-PROPOSAL-ACCEPTED');
     expect(accepted.proposals[0]).toMatchObject({
-      status: 'accepted',
-      decision: { resultingArgumentId: 'AR-PROPOSAL-ACCEPTED' },
+      status: 'stored',
+      decision: {
+        resultingRecords: [{ kind: 'argument', id: 'AR-PROPOSAL-ACCEPTED' }],
+      },
     });
     expect(() =>
       reviseArgumentProposal(

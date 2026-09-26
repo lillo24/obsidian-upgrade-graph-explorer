@@ -190,7 +190,7 @@ narrow bridge and scheduler keep all provider tests independent of a native
 runtime.
 
 `packages/argument-workspace` is an independent source-neutral domain and
-application boundary for one local Argument Library. Its schema-v8
+application boundary for one local Argument Library. Its schema-v9
 Topic/Context/Axiom/Argument/Counter-Argument data and separate Proposal
 Mailbox are not added to the canonical Markdown graph. Proposals are
 non-canonical, versioned staging objects excluded from reader search/bundles.
@@ -199,14 +199,17 @@ prior-revision snapshots, and typed revision-pinned draft links to other
 Proposals. It also distinguishes review intent, typed canonical dependencies,
 optional reasoning steps, and source observations that never become inference
 premises implicitly. An optional Soft Explanation is bounded human-review Markdown and
-is never copied into canonical content; only an atomic human resolution may create linked canonical
-Argument or Counter-Argument history. Contexts are named, ordered Axiom groups with zero or one
+is never copied into canonical content. Explicit canonical resolution prepares
+a bounded, fingerprinted multi-Proposal plan and applies that exact plan in one
+expected-snapshot commit with durable idempotency receipts; it never infers
+Current, supersession, relations, targets, or draft-link conversion. Contexts
+are named, ordered Axiom groups with zero or one
 parent; their inherited effective Axioms are interpretive background and never
 implicit inference dependencies. Arguments own scoped Examples, ordered authored or
 revision-pinned Axiom/conclusion/prior-premise dependencies, optional reasoning,
 conclusions, Boundary/Invariance prose, explicit attack/support relations, and
 separate supersession links; Topics expose an explicit Current pointer without
-truth semantics. The package owns strict validation and v1/v2/v3/v4/v5/v6/v7 migration, stable
+truth semantics. The package owns strict validation and v1/v2/v3/v4/v5/v6/v7/v8 migration, stable
 record/library revisions, portable source locators, premise/relation/response
 staleness and explicit reassessment, deterministic
 descriptive indexing, JSON/Markdown interchange, serialized expected-snapshot
@@ -218,14 +221,15 @@ store access, agent role, review stage, graph/view state, or model dependency.
 separate Proposal-staging surface. It can list/read staging and can create or
 revision-safely revise active Proposals, including draft Proposal relations.
 Discard is recoverable, creates no canonical record, and is documented as
-explicit-user-only. The service has no canonical authoring or
-Proposal-resolution capability; human canonical resolution remains exclusively
-in the application authoring surface.
+explicit-user-only. An explicit-user-only prepare/apply pair exposes only the
+bounded exact-plan resolution transaction, not generic canonical authoring.
+Prepare is read-only; apply rejects stale or altered plans and exact retries
+return the stored receipt without duplicate records.
 
 `apps/web/src/persistence/argument-library.ts` adapts that store contract to one
 stable profile-level localStorage key. `packages/argument-workspace-tauri`
-adapts it to dedicated private app-local schema-v8 JSON using validated
-temporary-sibling replacement and preserves migrated schema-v1/v2/v3/v4/v5/v6/v7 files.
+adapts it to dedicated private app-local schema-v9 JSON using validated
+temporary-sibling replacement and preserves migrated schema-v1/v2/v3/v4/v5/v6/v7/v8 files.
 Neither adapter uses the graph view registry, selected-vault Markdown, or
 workspace identity catalog. Live theory-source acquisition remains a later host
 adapter behind the Argument Workspace's narrow registered-reference reader; it

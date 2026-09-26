@@ -7,9 +7,10 @@ requests open/close transitions.
 - `ArgumentsWorkspace.tsx` owns onboarding, drafts, navigation, search, source
   binding/previews, separate additive Insert JSON and full-library Import JSON
   dialogs, the first-class Library / To store view switch, human Proposal
-  resolution, and confirmed-snapshot exports. It composes canonical and staged
-  draft protection into one narrow leave guard, exposes an embedded panel to
-  the shared workspace modal, and retains standalone title/Close chrome.
+  resolution through the core shared Proposal conversion, and
+  confirmed-snapshot exports. It composes canonical and staged draft protection
+  into one narrow leave guard, exposes an embedded panel to the shared workspace
+  modal, and retains standalone title/Close chrome.
 - `ProposalMailbox.tsx` owns the human-readable To store Active/History staging
   view: compact Proposal navigation, current and prior revisions, draft
   Proposal links, discard, bounded prose editing and its narrow leave-guard
@@ -74,14 +75,15 @@ Confirmation persists the prepared candidate once against the previewed snapshot
 editor drafts retain the existing Save/Discard/Stay guard. The format and
 neutral example are documented in
 [`docs/ARGUMENT_WORKSPACE_INSERT_JSON.md`](../../../../../docs/ARGUMENT_WORKSPACE_INSERT_JSON.md).
-Schema-v1/v2/v3/v4/v5/v6/v7 imports surface a migration notice and use the core deterministic
+Schema-v1/v2/v3/v4/v5/v6/v7/v8 imports surface a migration notice and use the core deterministic
 migration; no Argument, Example/provenance, relation, or Current pointer is
 inferred. V3 migration adds empty Context storage and empty Argument Context
 bindings only; v4 migration adds only an empty Proposal Mailbox. Context
 background remains visibly separate from inference premises and never
 participates in premise staleness.
-V7 Proposal content and pending/accepted/rejected decisions are preserved;
-migration adds empty draft-link and prior-revision collections only.
+V7 migration adds empty draft-link and prior-revision collections only. V8
+accepted/rejected decisions migrate to the neutral v9 `stored` state with an
+Argument or Counter-Argument result; pending and discarded remain distinct.
 
 The Library / To store selector exposes non-canonical AI Proposals separately
 from the canonical record browser; the staging view retains Active / History
@@ -99,8 +101,10 @@ boundary intent seed no attack; supersession and Current promotion remain
 separate human choices. Store refutation / Counter-Argument requires a human
 response plus resolved outcome and remains distinct from discard.
 Save performs one expected-snapshot transaction, while Cancel and dirty-draft
-guards preserve the To store Proposal. Entering To store reloads first so local
-MCP submissions become visible.
+guards preserve the To store Proposal. Completed history says Stored as Argument
+or Stored as Counter-Argument instead of treating canonical criticism as a
+rejected Proposal. Entering To store reloads first so local MCP submissions
+become visible.
 
 Canonical pending-review Arguments and Counter-Arguments remain available
 through the Proposals-only filter; they are distinct from the Mailbox. Current

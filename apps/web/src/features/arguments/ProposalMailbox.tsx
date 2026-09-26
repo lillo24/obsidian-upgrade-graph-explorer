@@ -36,9 +36,19 @@ const INTENT_LABELS: Readonly<Record<ArgumentProposalIntent, string>> = {
 const STATUS_LABELS: Readonly<Record<ArgumentProposal['status'], string>> = {
   pending: 'To store',
   discarded: 'Discarded',
-  accepted: 'Stored as Argument',
-  rejected: 'Stored as Counter-Argument',
+  stored: 'Stored',
 };
+
+function proposalStatusLabel(proposal: ArgumentProposal): string {
+  if (proposal.status !== 'stored') return STATUS_LABELS[proposal.status];
+  const kinds = new Set(
+    proposal.decision?.resultingRecords.map(({ kind }) => kind) ?? [],
+  );
+  if (kinds.size !== 1) return STATUS_LABELS.stored;
+  return kinds.has('argument')
+    ? 'Stored as Argument'
+    : 'Stored as Counter-Argument';
+}
 
 export interface ProposalDraftTextEdits {
   readonly revisionReason: string;
@@ -507,7 +517,7 @@ export const ProposalMailbox = forwardRef<
               <header className="arguments-mailbox__proposal-header">
                 <div className="arguments-badges">
                   <span className="arguments-badge">
-                    {STATUS_LABELS[selected.status]}
+                    {proposalStatusLabel(selected)}
                   </span>
                   <span className="arguments-badge">
                     {INTENT_LABELS[selected.intent]}
@@ -796,31 +806,23 @@ export const ProposalMailbox = forwardRef<
                   <h4>
                     {selected.status === 'discarded'
                       ? 'Staging decision'
-                      : 'Human canonical decision'}
+                      : 'Canonical storage decision'}
                   </h4>
                   {selected.decision.note === undefined ? null : (
                     <p>{selected.decision.note}</p>
                   )}
-                  {selected.decision.resultingArgumentId ===
-                  undefined ? null : (
+                  {selected.decision.resultingRecords.map((record) => (
                     <RecordAction
-                      id={selected.decision.resultingArgumentId}
-                      kind="argument"
+                      id={record.id}
+                      key={`${record.kind}:${record.id}`}
+                      kind={record.kind}
                       onNavigate={onNavigate}
                     >
-                      Open resulting Argument
+                      {record.kind === 'argument'
+                        ? 'Open resulting Argument'
+                        : 'Open resulting Counter-Argument'}
                     </RecordAction>
-                  )}
-                  {selected.decision.resultingCounterArgumentId ===
-                  undefined ? null : (
-                    <RecordAction
-                      id={selected.decision.resultingCounterArgumentId}
-                      kind="counter-argument"
-                      onNavigate={onNavigate}
-                    >
-                      Open resulting Counter-Argument
-                    </RecordAction>
-                  )}
+                  ))}
                 </section>
               )}
               {selected.status !== 'pending' ? null : (

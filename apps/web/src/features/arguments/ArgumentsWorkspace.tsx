@@ -20,6 +20,8 @@ import {
   createKnowledgeReader,
   exportArgumentLibraryMarkdown,
   parseArgumentLibraryJson,
+  proposalToCanonicalArgumentInput,
+  proposalToCanonicalCounterArgumentInput,
   safeMarkdownFileName,
   sameSnapshot,
   serializeArgumentLibrary,
@@ -432,47 +434,27 @@ function proposalArgumentEditor(
             reliedOnRevision: target.reliedOnRevision,
           },
         ];
+  const converted = proposalToCanonicalArgumentInput(proposal, {
+    id: base.record.id,
+    exampleIds: proposal.examples.map(() =>
+      session.runtime.createId('example'),
+    ),
+    relations,
+    retrieval: base.record.retrieval,
+    sourceReferences: [],
+    ...(proposal.intent === 'supersede' && target !== undefined
+      ? { supersedesArgumentId: target.argumentId }
+      : {}),
+  });
   return {
     promoteToCurrent: false,
     editor: {
       ...base,
       record: {
         ...base.record,
-        title: proposal.title,
-        examples: proposal.examples.map((text) => ({
-          id: session.runtime.createId('example'),
-          text,
-        })),
-        premises: proposal.premises.map((premise) => ({ ...premise })),
-        ...(proposal.reasoning === undefined &&
-        proposal.reasoningSteps.length === 0
-          ? {}
-          : {
-              reasoning: [
-                proposal.reasoning,
-                ...proposal.reasoningSteps.map((step) => {
-                  const uses = step.uses
-                    .map((reference) =>
-                      reference.kind === 'premise'
-                        ? reference.premiseId
-                        : reference.stepId,
-                    )
-                    .join(', ');
-                  return `${step.id}${uses === '' ? '' : ` (uses ${uses})`}: ${step.text}`;
-                }),
-              ]
-                .filter((value): value is string => value !== undefined)
-                .join('\n\n'),
-            }),
-        conclusion: proposal.conclusion,
-        ...(proposal.boundary === undefined
-          ? {}
-          : { boundary: proposal.boundary }),
-        relations,
-        ...(proposal.intent === 'supersede' && target !== undefined
-          ? { supersedesArgumentId: target.argumentId }
-          : {}),
-        reviewState: 'accepted',
+        ...converted,
+        retrieval: base.record.retrieval,
+        sourceReferences: [],
       },
     },
   };
@@ -492,39 +474,50 @@ function proposalCounterArgumentEditor(
   if (base.record.kind !== 'counter-argument') {
     throw new Error('Counter-Argument proposal draft initialization failed.');
   }
-  const observation =
-    proposal.examples.length === 0
-      ? (proposal.reasoning ?? proposal.conclusion)
-      : proposal.examples.join('\n\n');
-  return {
-    ...base,
-    record: {
-      ...base.record,
-      title: proposal.title,
-      observation,
-      challengedClaim: proposal.conclusion,
-      ...(proposal.target === undefined
+  const converted = proposalToCanonicalCounterArgumentInput(proposal, {
+    id: base.record.id,
+    target:
+      proposal.target === undefined
         ? proposal.topicId === undefined
-          ? {}
-          : {
-              target: {
-                kind: 'topic-claim' as const,
-                topicId: proposal.topicId,
-              },
-            }
+          ? undefined
+          : { kind: 'topic-claim', topicId: proposal.topicId }
         : {
-            target: {
-              kind: 'argument' as const,
-              argumentId: proposal.target.argumentId,
-              part: proposal.target.part,
-            },
-          }),
-      responseExplanation: '',
+            kind: 'argument',
+            argumentId: proposal.target.argumentId,
+            part: proposal.target.part,
+          },
+    retrieval: base.record.retrieval,
+    sourceReferences: [],
+    response: {
       outcome: 'refuted',
       ...(proposal.boundary === undefined
         ? {}
         : { boundary: proposal.boundary }),
-      reviewState: 'accepted',
+    },
+  });
+  return {
+    ...base,
+    record: {
+      ...base.record,
+      id: converted.id,
+      title: converted.title,
+      observation: converted.observation,
+      challengedClaim: converted.challengedClaim,
+      ...(converted.target === undefined ? {} : { target: converted.target }),
+      retrieval: base.record.retrieval,
+      sourceReferences: [],
+      answeringAxiomIds:
+        converted.response?.answeringAxioms?.map(({ axiomId }) => axiomId) ??
+        [],
+      responseExplanation: converted.response?.explanation ?? '',
+      outcome: converted.response?.outcome ?? 'unanswered',
+      ...(converted.response?.boundary === undefined
+        ? {}
+        : { boundary: converted.response.boundary }),
+      ...(converted.response?.reopeningCondition === undefined
+        ? {}
+        : { reopeningCondition: converted.response.reopeningCondition }),
+      reviewState: converted.reviewState ?? 'accepted',
     },
   };
 }
@@ -947,7 +940,7 @@ function WorkspaceOnboarding({
     source: string;
     fileName: string;
     library: ArgumentLibrary;
-    migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+    migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   }>();
   const [error, setError] = useState<string>();
   async function select(event: ChangeEvent<HTMLInputElement>) {
@@ -3124,7 +3117,7 @@ const ArgumentsWorkspaceContent = forwardRef<
                     <p className="arguments-disclosure">
                       Incoming schema v
                       {importPreview.merge.migratedFromSchemaVersion} was
-                      migrated to v8 without inferring canonical records,
+                      migrated to v9 without inferring canonical records,
                       relationships, Context bindings, Current pointers, or
                       Mailbox proposals.
                     </p>
