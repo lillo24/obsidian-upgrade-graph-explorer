@@ -787,6 +787,7 @@
 
 .arguments-mailbox__detail {
   display: grid;
+  min-width: 0;
   gap: 0.8rem;
 }
 
@@ -805,6 +806,7 @@
 }
 
 .arguments-mailbox__soft-explanation {
+  min-width: 0;
   padding: 1rem;
   border: 1px solid var(--color-status-info-border);
   border-radius: 0.55rem;
