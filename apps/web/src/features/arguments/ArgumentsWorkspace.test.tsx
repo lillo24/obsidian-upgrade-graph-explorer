@@ -412,6 +412,19 @@ describe('standalone Arguments workspace', () => {
     });
   }
 
+  function disclosure(name: string): HTMLDetailsElement {
+    const result = [
+      ...container.querySelectorAll<HTMLDetailsElement>('details'),
+    ].find((candidate) =>
+      candidate
+        .querySelector(':scope > summary')
+        ?.textContent?.trim()
+        .startsWith(name),
+    );
+    if (result === undefined) throw new Error(`Missing disclosure ${name}`);
+    return result;
+  }
+
   function textarea(name: string): HTMLTextAreaElement {
     const result = [
       ...container.querySelectorAll<HTMLTextAreaElement>('textarea'),
@@ -686,19 +699,23 @@ describe('standalone Arguments workspace', () => {
     expect(container.textContent).toContain(
       'Compatibility reasoning argument · AR-UI · revision 1',
     );
-    expect(container.textContent).toContain('Source observations / provenance');
+    expect(container.textContent).toContain('Sources / provenance');
     expect(container.textContent).toContain('36c927f');
     expect(container.textContent).toContain('Stale target:');
+    expect(
+      container.querySelector('[role="alert"]')?.closest('details'),
+    ).toBeNull();
     const soft = container.querySelector<HTMLElement>(
       '.arguments-mailbox__soft-explanation',
     );
     const localContext = [...container.querySelectorAll('h4')].find(
-      (heading) => heading.textContent === 'Local Argument context',
+      (heading) => heading.textContent === 'Local Argument Context',
     );
-    const formal = container.querySelector<HTMLElement>(
-      '.arguments-mailbox__formal-title',
-    );
+    const formal = container.querySelector<HTMLDetailsElement>(
+      '.arguments-mailbox__formal',
+    )!;
     expect(soft?.textContent).toContain('What this means');
+    expect(soft?.textContent).not.toContain('Fast review');
     expect(soft?.querySelector('h3')?.textContent).toBe('Review impact');
     expect(soft?.querySelector('strong')?.textContent).toBe(
       'plain-language view',
@@ -728,6 +745,79 @@ describe('standalone Arguments workspace', () => {
     expect(soft?.compareDocumentPosition(formal!)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
+    expect(formal.open).toBe(false);
+    expect(formal.querySelector(':scope > summary')?.textContent).toContain(
+      'A second conversion is unnecessary in this bounded case.',
+    );
+    await act(async () => {
+      formal.open = true;
+      formal.dispatchEvent(new Event('toggle'));
+      await Promise.resolve();
+    });
+    expect(formal.textContent).toContain('Examples');
+    expect(formal.textContent).toContain('Premises / dependencies');
+    expect(formal.textContent).toContain('Reasoning');
+    expect(formal.textContent).toContain('Conclusion');
+    expect(formal.textContent).toContain('Boundary');
+
+    const targetDetails = disclosure('Inspect target details');
+    expect(targetDetails.open).toBe(false);
+    expect(targetDetails.textContent).toContain(
+      'The canonical reasoning changed after consultation.',
+    );
+    const contextRecords = [
+      ...container.querySelectorAll<HTMLDetailsElement>(
+        '.arguments-mailbox__context-record',
+      ),
+    ];
+    expect(contextRecords).toHaveLength(2);
+    expect(contextRecords.every(({ open }) => !open)).toBe(true);
+    expect(
+      contextRecords[0]?.querySelector('summary')?.textContent,
+    ).not.toContain('Convert units before concluding a contradiction.');
+    expect(
+      contextRecords[0]?.querySelector('summary')?.textContent,
+    ).not.toContain('The canonical reasoning changed after consultation.');
+    await act(async () => {
+      contextRecords[0]!.open = true;
+      contextRecords[0]!.dispatchEvent(new Event('toggle'));
+      await Promise.resolve();
+    });
+    expect(contextRecords[0]?.textContent).toContain(
+      'Convert units before concluding a contradiction.',
+    );
+    expect(contextRecords[0]?.textContent).toContain(
+      'The canonical reasoning changed after consultation.',
+    );
+    expect(contextRecords[0]?.textContent).toContain('Open record');
+    expect(container.textContent).toContain('Current');
+    expect(container.textContent).toContain('Target');
+    expect(container.textContent).toContain('Attacked by AR-UI-NEXT');
+    expect(container.textContent).toContain('Attacks AR-UI');
+    expect(container.textContent).not.toContain('Superseded by');
+    expect(container.textContent).toContain('Non-canonical Proposal');
+
+    const sources = disclosure('Sources / provenance');
+    expect(sources.textContent).toContain('Normalization implementation');
+    expect(sources.querySelector('.arguments-mailbox__premises')).toBeNull();
+    expect(disclosure('Review rationale').textContent).toContain(
+      'The canonical reasoning does not discuss pre-normalized inputs.',
+    );
+    expect(disclosure('Technical metadata').textContent).toContain(
+      'Proposal ID',
+    );
+    expect(disclosure('Technical metadata').textContent).toContain(
+      'Compatibility reasoning',
+    );
+    const actionFooter = container.querySelector<HTMLElement>(
+      '.arguments-mailbox__action-footer',
+    );
+    expect(actionFooter).not.toBeNull();
+    expect(
+      container
+        .querySelector('.arguments-mailbox__detail')
+        ?.contains(actionFooter!),
+    ).toBe(true);
 
     await click('Store as Argument…');
     expect(container.textContent).toContain('Store Proposal as Argument');
@@ -762,7 +852,8 @@ describe('standalone Arguments workspace', () => {
     expect(
       container.querySelector('.arguments-mailbox__soft-explanation'),
     ).toBeNull();
-    expect(container.textContent).toContain('Formal argument');
+    const formal = disclosure('Formal argument');
+    expect(formal.open).toBe(true);
   });
 
   it('edits a versioned To store draft and discards it without canonical writes', async () => {
@@ -817,6 +908,9 @@ describe('standalone Arguments workspace', () => {
     await click('History');
     expect(container.textContent).toContain('Discarded');
     expect(container.textContent).toContain('Revision history (2 prior)');
+    expect(
+      container.querySelector('.arguments-mailbox__action-footer'),
+    ).toBeNull();
   });
 
   it('fails a stale draft revision and offers a confirmed-library reload', async () => {

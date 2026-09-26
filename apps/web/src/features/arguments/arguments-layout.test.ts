@@ -18,7 +18,10 @@ describe('Arguments view layout CSS', () => {
       /\.arguments-mailbox__layout nav\s*\{[^}]*min-width:\s*0;[^}]*min-height:\s*0;[^}]*overflow:\s*auto;/su,
     );
     expect(argumentsCss).toMatch(
-      /\.arguments-mailbox__detail\s*\{[^}]*min-width:\s*0;[^}]*min-height:\s*0;[^}]*overflow:\s*auto;/su,
+      /\.arguments-mailbox__detail\s*\{[^}]*min-width:\s*0;[^}]*min-height:\s*0;[^}]*overflow:\s*hidden;/su,
+    );
+    expect(argumentsCss).toMatch(
+      /\.arguments-mailbox__detail-scroll\s*\{[^}]*min-width:\s*0;[^}]*min-height:\s*0;[^}]*overflow:\s*auto;/su,
     );
   });
 
@@ -43,6 +46,24 @@ describe('Arguments view layout CSS', () => {
     );
     expect(argumentsCss).toMatch(
       /\.arguments-source-control\s*\{[^}]*max-width:\s*100%;/su,
+    );
+  });
+
+  it('keeps pending actions sticky within the shrinkable detail pane and returns them to flow on narrow screens', () => {
+    expect(argumentsCss).toMatch(
+      /\.arguments-mailbox__action-footer\s*\{[^}]*position:\s*sticky;[^}]*bottom:\s*0;[^}]*border-top:/su,
+    );
+    expect(argumentsCss).not.toMatch(
+      /\.arguments-mailbox__action-footer\s*\{[^}]*position:\s*absolute;/su,
+    );
+    expect(argumentsCss).toMatch(
+      /\.arguments-mailbox__disclosure-content\s*\{[^}]*min-width:\s*0;/su,
+    );
+    expect(argumentsCss).toMatch(
+      /\.arguments-mailbox__context-strip\s*\{[^}]*min-width:\s*0;/su,
+    );
+    expect(argumentsCss).toMatch(
+      /@media \(max-width: 560px\)[\s\S]*\.arguments-mailbox__action-footer\s*\{[^}]*position:\s*static;/su,
     );
   });
 });

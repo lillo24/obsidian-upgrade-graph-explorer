@@ -192,6 +192,40 @@ function referencedArgumentContext(
     .filter((argument): argument is Argument => argument !== undefined);
 }
 
+function argumentContextRelationships(
+  argumentsInContext: readonly Argument[],
+  argument: Argument,
+): readonly string[] {
+  const contextIds = new Set(argumentsInContext.map(({ id }) => id));
+  const relationships: string[] = [];
+  if (
+    argument.supersedesArgumentId !== undefined &&
+    contextIds.has(argument.supersedesArgumentId)
+  ) {
+    relationships.push(`Supersedes ${argument.supersedesArgumentId}`);
+  }
+  for (const candidate of argumentsInContext) {
+    if (candidate.supersedesArgumentId === argument.id) {
+      relationships.push(`Superseded by ${candidate.id}`);
+    }
+  }
+  for (const relation of argument.relations) {
+    if (!contextIds.has(relation.targetArgumentId)) continue;
+    relationships.push(
+      `${relation.kind === 'attack' ? 'Attacks' : 'Supports'} ${relation.targetArgumentId} — ${targetPartLabel(relation.targetPart)}`,
+    );
+  }
+  for (const candidate of argumentsInContext) {
+    for (const relation of candidate.relations) {
+      if (relation.targetArgumentId !== argument.id) continue;
+      relationships.push(
+        `${relation.kind === 'attack' ? 'Attacked' : 'Supported'} by ${candidate.id} — ${targetPartLabel(relation.targetPart)}`,
+      );
+    }
+  }
+  return relationships;
+}
+
 function RecordAction({
   children,
   id,
@@ -312,42 +346,67 @@ function LocalArgumentContext({
   );
   if (argumentsInContext.length === 0) return null;
   return (
-    <section className="arguments-mailbox__section">
-      <h4>Local Argument context</h4>
-      <div className="arguments-mailbox__chain" role="list">
-        {argumentsInContext.map((argument) => (
-          <article key={argument.id} role="listitem">
-            <div className="arguments-badges">
-              {argument.id === proposal.target?.argumentId ? (
-                <span className="arguments-badge">Target</span>
-              ) : null}
-              {argument.id === topic?.currentArgumentId ? (
-                <span className="arguments-badge arguments-badge--fresh">
-                  Current
-                </span>
-              ) : null}
+    <section className="arguments-mailbox__section arguments-mailbox__context">
+      <h4>Local Argument Context</h4>
+      <div className="arguments-mailbox__context-strip" role="list">
+        {argumentsInContext.map((argument) => {
+          const relationships = argumentContextRelationships(
+            argumentsInContext,
+            argument,
+          );
+          return (
+            <div key={argument.id} role="listitem">
+              <details className="arguments-mailbox__context-record">
+                <summary>
+                  <span className="arguments-badges">
+                    {argument.id === proposal.target?.argumentId ? (
+                      <span className="arguments-badge">Target</span>
+                    ) : null}
+                    {argument.id === topic?.currentArgumentId ? (
+                      <span className="arguments-badge arguments-badge--fresh">
+                        Current
+                      </span>
+                    ) : null}
+                  </span>
+                  <strong>
+                    {argument.id} — {argument.title}
+                  </strong>
+                  {relationships.length === 0 ? null : (
+                    <span
+                      aria-label={`Stored relationships for ${argument.title}`}
+                      className="arguments-mailbox__relationship-labels"
+                    >
+                      {relationships.map((relationship) => (
+                        <span key={relationship}>{relationship}</span>
+                      ))}
+                    </span>
+                  )}
+                </summary>
+                <p>{argument.conclusion}</p>
+                {argument.reasoning === undefined ? null : (
+                  <p>{argument.reasoning}</p>
+                )}
+                <RecordAction
+                  id={argument.id}
+                  kind="argument"
+                  onNavigate={onNavigate}
+                >
+                  Open record
+                </RecordAction>
+              </details>
             </div>
-            <strong>{argument.title}</strong>
-            <p>{argument.conclusion}</p>
-            <details>
-              <summary>Inspect Argument</summary>
-              {argument.reasoning === undefined ? null : (
-                <p>{argument.reasoning}</p>
-              )}
-              <RecordAction
-                id={argument.id}
-                kind="argument"
-                onNavigate={onNavigate}
-              >
-                Open record
-              </RecordAction>
-            </details>
-          </article>
-        ))}
+          );
+        })}
         <article className="arguments-mailbox__proposal-marker" role="listitem">
-          <span className="arguments-badge">Proposal</span>
+          <span className="arguments-badge">Non-canonical Proposal</span>
           <strong>{INTENT_LABELS[proposal.intent]}</strong>
           <p>{proposal.title}</p>
+          {proposal.target === undefined ? null : (
+            <small>
+              Targets {proposal.target.argumentId} —{' '}
+              {targetPartLabel(proposal.target.part)}
+            </small>
+          )}
         </article>
       </div>
     </section>
@@ -523,505 +582,541 @@ export const ProposalMailbox = forwardRef<
           </nav>
           {selected === undefined ? null : (
             <article className="arguments-mailbox__detail">
-              <header className="arguments-mailbox__proposal-header">
-                <div className="arguments-badges">
-                  <span className="arguments-badge">
-                    {proposalStatusLabel(selected)}
-                  </span>
-                  <span className="arguments-badge">
-                    {INTENT_LABELS[selected.intent]}
-                  </span>
-                </div>
-                <p className="eyebrow">{topic?.title ?? 'No Topic assigned'}</p>
-                <h3>{selected.title}</h3>
-                {target === undefined ? (
-                  <p>No existing Argument is targeted.</p>
-                ) : (
-                  <p>
-                    {INTENT_LABELS[selected.intent]}{' '}
-                    <strong>{target.title}</strong> —{' '}
-                    {targetPartLabel(selected.target!.part)}
+              <div className="arguments-mailbox__detail-scroll">
+                <header className="arguments-mailbox__proposal-header">
+                  <div className="arguments-badges">
+                    <span className="arguments-badge">
+                      {proposalStatusLabel(selected)}
+                    </span>
+                    <span className="arguments-badge">
+                      {INTENT_LABELS[selected.intent]}
+                    </span>
+                  </div>
+                  <p className="eyebrow">
+                    {topic?.title ?? 'No Topic assigned'}
+                  </p>
+                  <h3>{selected.title}</h3>
+                  {target === undefined ? (
+                    <p className="arguments-mailbox__target-summary">
+                      <strong>Target:</strong> No existing Argument
+                    </p>
+                  ) : (
+                    <p className="arguments-mailbox__target-summary">
+                      <strong>Target:</strong> {target.id} — {target.title} —{' '}
+                      {targetPartLabel(selected.target!.part)}
+                    </p>
+                  )}
+                  <small>
+                    Revision {selected.revision} · updated{' '}
+                    {new Date(selected.updatedAt).toLocaleString()}
+                  </small>
+                </header>
+                {targetStale === undefined ? null : (
+                  <p className="arguments-error" role="alert">
+                    Stale target: {targetStale} Review the current record before
+                    resolving.
                   </p>
                 )}
-                <small>
-                  Revision {selected.revision} · created{' '}
-                  {new Date(selected.createdAt).toLocaleString()} · updated{' '}
-                  {new Date(selected.updatedAt).toLocaleString()}
-                </small>
-              </header>
-              {targetStale === undefined ? null : (
-                <p className="arguments-error" role="alert">
-                  Stale target: {targetStale} Review the current record before
-                  resolving.
-                </p>
-              )}
-              {target === undefined ? null : (
-                <section className="arguments-mailbox__section">
-                  <h4>Target Argument</h4>
-                  <details>
-                    <summary>
-                      {target.title} — {targetPartLabel(selected.target!.part)}
-                    </summary>
-                    <p>{targetPartPreview(target, selected)}</p>
-                    <small>
-                      Relied on revision {selected.target!.reliedOnRevision};
-                      current revision {target.revision}. ID {target.id}.
-                    </small>
-                    <RecordAction
-                      id={target.id}
-                      kind="argument"
-                      onNavigate={onNavigate}
-                    >
-                      Open record
-                    </RecordAction>
-                  </details>
-                </section>
-              )}
-              <LocalArgumentContext
-                library={library}
-                onNavigate={onNavigate}
-                proposal={selected}
-              />
-              {selected.softExplanationMarkdown === undefined ? null : (
-                <section className="arguments-mailbox__soft-explanation">
-                  <p className="eyebrow">Fast review</p>
-                  <h4>What this means</h4>
-                  <SafeMarkdown markdown={selected.softExplanationMarkdown} />
-                </section>
-              )}
-              <h4 className="arguments-mailbox__formal-title">
-                Formal argument
-              </h4>
-              {selected.examples.length === 0 ? null : (
-                <section className="arguments-mailbox__section">
-                  <h4>Examples</h4>
-                  <ul>
-                    {selected.examples.map((example, index) => (
-                      <li key={`${index}:${example}`}>{example}</li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-              {selected.premises.length === 0 ? null : (
-                <section className="arguments-mailbox__section">
-                  <h4>Premises / dependencies</h4>
-                  <ol className="arguments-mailbox__premises">
-                    {selected.premises.map((premise) => (
-                      <ProposalPremiseCard
-                        key={premise.id}
-                        library={library}
+                {target === undefined ? null : (
+                  <details className="arguments-mailbox__disclosure arguments-mailbox__target-details">
+                    <summary>Inspect target details</summary>
+                    <div className="arguments-mailbox__disclosure-content">
+                      <p>{targetPartPreview(target, selected)}</p>
+                      <small>
+                        Relied on revision {selected.target!.reliedOnRevision};
+                        current revision {target.revision}. ID {target.id}.
+                      </small>
+                      <RecordAction
+                        id={target.id}
+                        kind="argument"
                         onNavigate={onNavigate}
-                        premise={premise}
-                      />
-                    ))}
-                  </ol>
-                </section>
-              )}
-              {selected.reasoning === undefined &&
-              selected.reasoningSteps.length === 0 ? null : (
-                <section className="arguments-mailbox__section">
-                  <h4>Reasoning</h4>
-                  {selected.reasoning === undefined ? null : (
-                    <p>{selected.reasoning}</p>
-                  )}
-                  {selected.reasoningSteps.length === 0 ? null : (
-                    <ol className="arguments-mailbox__reasoning">
-                      {selected.reasoningSteps.map((step) => (
-                        <li key={step.id}>
-                          <strong>{step.id}</strong>
-                          <p>{step.text}</p>
-                          {step.uses.length === 0 ? null : (
-                            <small>
-                              Uses{' '}
-                              {step.uses
-                                .map((reference) =>
-                                  reference.kind === 'premise'
-                                    ? reference.premiseId
-                                    : reference.stepId,
-                                )
-                                .join(', ')}
-                            </small>
-                          )}
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                </section>
-              )}
-              <section className="arguments-mailbox__section arguments-mailbox__conclusion">
-                <h4>Conclusion</h4>
-                <p>{selected.conclusion}</p>
-              </section>
-              {selected.boundary === undefined ? null : (
-                <section className="arguments-mailbox__section">
-                  <h4>Boundary</h4>
-                  <p>{selected.boundary}</p>
-                </section>
-              )}
-              {selected.sourceObservations.length === 0 ? null : (
-                <section className="arguments-mailbox__section">
-                  <h4>Source observations / provenance</h4>
-                  <ul className="arguments-mailbox__sources">
-                    {selected.sourceObservations.map((observation) => (
-                      <li key={observation.id}>
-                        <strong>
-                          {observation.label ?? 'Source observation'}
-                        </strong>
-                        <p>{observation.observation}</p>
-                        <div className="arguments-mailbox__source-meta">
-                          {observation.repository === undefined ? null : (
-                            <span>{observation.repository}</span>
-                          )}
-                          {observation.filePath === undefined ? null : (
-                            <span>{observation.filePath}</span>
-                          )}
-                          {observation.heading === undefined ? null : (
-                            <span>§ {observation.heading}</span>
-                          )}
-                          {observation.span === undefined ? null : (
-                            <span>{observation.span}</span>
-                          )}
-                          {observation.sourceVersion === undefined ? null : (
-                            <span title={observation.sourceVersion}>
-                              Version {observation.sourceVersion}
-                            </span>
-                          )}
-                          {observation.commitSha === undefined ? null : (
-                            <span>
-                              {observation.url === undefined ? (
-                                <code title={observation.commitSha}>
-                                  {observation.commitSha.slice(0, 8)}
-                                </code>
-                              ) : (
+                      >
+                        Open record
+                      </RecordAction>
+                    </div>
+                  </details>
+                )}
+                <LocalArgumentContext
+                  library={library}
+                  onNavigate={onNavigate}
+                  proposal={selected}
+                />
+                {selected.softExplanationMarkdown === undefined ? null : (
+                  <section className="arguments-mailbox__soft-explanation">
+                    <h4>What this means</h4>
+                    <SafeMarkdown markdown={selected.softExplanationMarkdown} />
+                  </section>
+                )}
+                <details
+                  className="arguments-mailbox__disclosure arguments-mailbox__formal"
+                  key={`formal:${selected.id}`}
+                  open={selected.softExplanationMarkdown === undefined}
+                >
+                  <summary>
+                    <span>Formal argument</span>
+                    <small>{selected.conclusion}</small>
+                  </summary>
+                  <div className="arguments-mailbox__disclosure-content">
+                    {selected.examples.length === 0 ? null : (
+                      <section className="arguments-mailbox__section">
+                        <h4>Examples</h4>
+                        <ul>
+                          {selected.examples.map((example, index) => (
+                            <li key={`${index}:${example}`}>{example}</li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
+                    {selected.premises.length === 0 ? null : (
+                      <section className="arguments-mailbox__section">
+                        <h4>Premises / dependencies</h4>
+                        <ol className="arguments-mailbox__premises">
+                          {selected.premises.map((premise) => (
+                            <ProposalPremiseCard
+                              key={premise.id}
+                              library={library}
+                              onNavigate={onNavigate}
+                              premise={premise}
+                            />
+                          ))}
+                        </ol>
+                      </section>
+                    )}
+                    {selected.reasoning === undefined &&
+                    selected.reasoningSteps.length === 0 ? null : (
+                      <section className="arguments-mailbox__section">
+                        <h4>Reasoning</h4>
+                        {selected.reasoning === undefined ? null : (
+                          <p>{selected.reasoning}</p>
+                        )}
+                        {selected.reasoningSteps.length === 0 ? null : (
+                          <ol className="arguments-mailbox__reasoning">
+                            {selected.reasoningSteps.map((step) => (
+                              <li key={step.id}>
+                                <strong>{step.id}</strong>
+                                <p>{step.text}</p>
+                                {step.uses.length === 0 ? null : (
+                                  <small>
+                                    Uses{' '}
+                                    {step.uses
+                                      .map((reference) =>
+                                        reference.kind === 'premise'
+                                          ? reference.premiseId
+                                          : reference.stepId,
+                                      )
+                                      .join(', ')}
+                                  </small>
+                                )}
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                      </section>
+                    )}
+                    <section className="arguments-mailbox__section arguments-mailbox__conclusion">
+                      <h4>Conclusion</h4>
+                      <p>{selected.conclusion}</p>
+                    </section>
+                    {selected.boundary === undefined ? null : (
+                      <section className="arguments-mailbox__section">
+                        <h4>Boundary</h4>
+                        <p>{selected.boundary}</p>
+                      </section>
+                    )}
+                  </div>
+                </details>
+                <details className="arguments-mailbox__disclosure">
+                  <summary>Sources / provenance</summary>
+                  <div className="arguments-mailbox__disclosure-content">
+                    {selected.sourceObservations.length === 0 ? (
+                      <p>No source observations were recorded.</p>
+                    ) : (
+                      <ul className="arguments-mailbox__sources">
+                        {selected.sourceObservations.map((observation) => (
+                          <li key={observation.id}>
+                            <strong>
+                              {observation.label ?? 'Source observation'}
+                            </strong>
+                            <p>{observation.observation}</p>
+                            <div className="arguments-mailbox__source-meta">
+                              {observation.repository === undefined ? null : (
+                                <span>{observation.repository}</span>
+                              )}
+                              {observation.filePath === undefined ? null : (
+                                <span>{observation.filePath}</span>
+                              )}
+                              {observation.heading === undefined ? null : (
+                                <span>§ {observation.heading}</span>
+                              )}
+                              {observation.span === undefined ? null : (
+                                <span>{observation.span}</span>
+                              )}
+                              {observation.sourceVersion ===
+                              undefined ? null : (
+                                <span title={observation.sourceVersion}>
+                                  Version {observation.sourceVersion}
+                                </span>
+                              )}
+                              {observation.commitSha === undefined ? null : (
+                                <span>
+                                  {observation.url === undefined ? (
+                                    <code title={observation.commitSha}>
+                                      {observation.commitSha.slice(0, 8)}
+                                    </code>
+                                  ) : (
+                                    <a
+                                      href={observation.url}
+                                      rel="noreferrer"
+                                      target="_blank"
+                                      title={observation.commitSha}
+                                    >
+                                      {observation.commitSha.slice(0, 8)}
+                                    </a>
+                                  )}
+                                  <button
+                                    onClick={() =>
+                                      onCopy(
+                                        observation.commitSha!,
+                                        'Commit SHA copied',
+                                      )
+                                    }
+                                    type="button"
+                                  >
+                                    Copy SHA
+                                  </button>
+                                </span>
+                              )}
+                              {observation.url === undefined ||
+                              observation.commitSha !== undefined ? null : (
                                 <a
                                   href={observation.url}
                                   rel="noreferrer"
                                   target="_blank"
-                                  title={observation.commitSha}
                                 >
-                                  {observation.commitSha.slice(0, 8)}
+                                  Open source
                                 </a>
                               )}
-                              <button
-                                onClick={() =>
-                                  onCopy(
-                                    observation.commitSha!,
-                                    'Commit SHA copied',
-                                  )
-                                }
-                                type="button"
-                              >
-                                Copy SHA
-                              </button>
-                            </span>
-                          )}
-                          {observation.url === undefined ||
-                          observation.commitSha !== undefined ? null : (
-                            <a
-                              href={observation.url}
-                              rel="noreferrer"
-                              target="_blank"
-                            >
-                              Open source
-                            </a>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-              <section className="arguments-mailbox__section">
-                <h4>Why novel / unresolved</h4>
-                <p>{selected.whyNovelOrUnresolved}</p>
-              </section>
-              {selected.draftRelations.length === 0 ? null : (
-                <section className="arguments-mailbox__section">
-                  <h4>Draft Proposal relationships</h4>
-                  <p>
-                    Staging intent only; these links are not canonical Argument
-                    relations.
-                  </p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </details>
+                <details className="arguments-mailbox__disclosure">
+                  <summary>Review rationale</summary>
+                  <div className="arguments-mailbox__disclosure-content">
+                    <section className="arguments-mailbox__section">
+                      <h4>Why novel / unresolved</h4>
+                      <p>{selected.whyNovelOrUnresolved}</p>
+                    </section>
+                    {selected.draftRelations.length === 0 ? null : (
+                      <section className="arguments-mailbox__section">
+                        <h4>Draft Proposal relationships</h4>
+                        <p>
+                          Staging intent only; these links are not canonical
+                          Argument relations.
+                        </p>
+                        <ul>
+                          {selected.draftRelations.map((relation) => {
+                            const related = library.proposals.find(
+                              ({ id }) => id === relation.targetProposalId,
+                            );
+                            return (
+                              <li key={relation.id}>
+                                <strong>{relation.kind}</strong> →{' '}
+                                {related?.title ?? relation.targetProposalId}{' '}
+                                <small>
+                                  revision {relation.targetProposalRevision}
+                                  {related === undefined
+                                    ? ' · missing'
+                                    : related.revision ===
+                                        relation.targetProposalRevision
+                                      ? ' · current'
+                                      : ` · now revision ${related.revision}`}
+                                </small>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </section>
+                    )}
+                  </div>
+                </details>
+                <details className="arguments-mailbox__disclosure arguments-mailbox__technical">
+                  <summary>
+                    Revision history ({selected.revisionHistory.length} prior)
+                  </summary>
+                  {selected.revisionHistory.length === 0 ? (
+                    <p>This Proposal has not been revised.</p>
+                  ) : (
+                    <ol>
+                      {[...selected.revisionHistory]
+                        .reverse()
+                        .map((revision) => (
+                          <li key={revision.revision}>
+                            <strong>Revision {revision.revision}</strong>{' '}
+                            <small>
+                              replaced{' '}
+                              {new Date(revision.replacedAt).toLocaleString()}
+                            </small>
+                            <p>{revision.revisionReason}</p>
+                            <details>
+                              <summary>{revision.content.title}</summary>
+                              <p>{revision.content.conclusion}</p>
+                            </details>
+                          </li>
+                        ))}
+                    </ol>
+                  )}
+                </details>
+                <details className="arguments-mailbox__disclosure arguments-mailbox__technical">
+                  <summary>Technical metadata</summary>
                   <ul>
-                    {selected.draftRelations.map((relation) => {
-                      const related = library.proposals.find(
-                        ({ id }) => id === relation.targetProposalId,
-                      );
-                      return (
-                        <li key={relation.id}>
-                          <strong>{relation.kind}</strong> →{' '}
-                          {related?.title ?? relation.targetProposalId}{' '}
-                          <small>
-                            revision {relation.targetProposalRevision}
-                            {related === undefined
-                              ? ' · missing'
-                              : related.revision ===
-                                  relation.targetProposalRevision
-                                ? ' · current'
-                                : ` · now revision ${related.revision}`}
-                          </small>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
-              )}
-              <details className="arguments-mailbox__technical">
-                <summary>
-                  Revision history ({selected.revisionHistory.length} prior)
-                </summary>
-                {selected.revisionHistory.length === 0 ? (
-                  <p>This Proposal has not been revised.</p>
-                ) : (
-                  <ol>
-                    {[...selected.revisionHistory].reverse().map((revision) => (
-                      <li key={revision.revision}>
-                        <strong>Revision {revision.revision}</strong>{' '}
+                    {selected.consultation.records.map((record) => (
+                      <li key={`${record.kind}:${record.id}`}>
+                        <strong>{consultedLabel(library, record)}</strong>{' '}
                         <small>
-                          replaced{' '}
-                          {new Date(revision.replacedAt).toLocaleString()}
+                          {record.kind} · {record.id}
+                          {record.revision === undefined
+                            ? ''
+                            : ` · revision ${record.revision}`}
                         </small>
-                        <p>{revision.revisionReason}</p>
-                        <details>
-                          <summary>{revision.content.title}</summary>
-                          <p>{revision.content.conclusion}</p>
-                        </details>
                       </li>
                     ))}
-                  </ol>
+                  </ul>
+                  <p>
+                    Proposal ID <code>{selected.id}</code>
+                  </p>
+                  <p>
+                    Created {new Date(selected.createdAt).toLocaleString()} ·
+                    updated {new Date(selected.updatedAt).toLocaleString()} ·
+                    revision {selected.revision}
+                  </p>
+                  <p>
+                    Consultation library{' '}
+                    <code>{selected.consultation.libraryId}</code> · revision{' '}
+                    {selected.consultation.libraryRevision} · fingerprint{' '}
+                    <code>
+                      {selected.consultation.contentFingerprint === undefined
+                        ? 'not recorded'
+                        : String(selected.consultation.contentFingerprint)}
+                    </code>
+                  </p>
+                </details>
+                {selected.decision === undefined ? null : (
+                  <section className="arguments-mailbox__decision">
+                    <h4>
+                      {selected.status === 'discarded'
+                        ? 'Staging decision'
+                        : 'Canonical storage decision'}
+                    </h4>
+                    {selected.decision.note === undefined ? null : (
+                      <p>{selected.decision.note}</p>
+                    )}
+                    {selected.decision.resultingRecords.map((record) => (
+                      <RecordAction
+                        id={record.id}
+                        key={`${record.kind}:${record.id}`}
+                        kind={record.kind}
+                        onNavigate={onNavigate}
+                      >
+                        {record.kind === 'argument'
+                          ? 'Open resulting Argument'
+                          : 'Open resulting Counter-Argument'}
+                      </RecordAction>
+                    ))}
+                  </section>
                 )}
-              </details>
-              <details className="arguments-mailbox__technical">
-                <summary>Consulted records and technical metadata</summary>
-                <ul>
-                  {selected.consultation.records.map((record) => (
-                    <li key={`${record.kind}:${record.id}`}>
-                      <strong>{consultedLabel(library, record)}</strong>{' '}
-                      <small>
-                        {record.kind} · {record.id}
-                        {record.revision === undefined
-                          ? ''
-                          : ` · revision ${record.revision}`}
-                      </small>
-                    </li>
-                  ))}
-                </ul>
-                <p>
-                  Proposal ID <code>{selected.id}</code>
-                </p>
-              </details>
-              {selected.decision === undefined ? null : (
-                <section className="arguments-mailbox__decision">
-                  <h4>
-                    {selected.status === 'discarded'
-                      ? 'Staging decision'
-                      : 'Canonical storage decision'}
-                  </h4>
-                  {selected.decision.note === undefined ? null : (
-                    <p>{selected.decision.note}</p>
-                  )}
-                  {selected.decision.resultingRecords.map((record) => (
-                    <RecordAction
-                      id={record.id}
-                      key={`${record.kind}:${record.id}`}
-                      kind={record.kind}
-                      onNavigate={onNavigate}
-                    >
-                      {record.kind === 'argument'
-                        ? 'Open resulting Argument'
-                        : 'Open resulting Counter-Argument'}
-                    </RecordAction>
-                  ))}
-                </section>
-              )}
-              {selected.status !== 'pending' ? null : (
-                <>
-                  {editDraft?.proposalId !== selected.id ? null : (
-                    <form
-                      className="arguments-mailbox__section"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        void saveEdit();
-                      }}
-                    >
-                      <h4>Edit active draft</h4>
-                      <p>
-                        This creates a recoverable Proposal revision; it does
-                        not store canonical theory.
-                      </p>
-                      <label>
-                        Revision reason
-                        <textarea
-                          onChange={(event) =>
-                            setEditDraft((current) =>
-                              current === undefined
-                                ? current
-                                : {
-                                    ...current,
-                                    revisionReason: event.target.value,
-                                  },
-                            )
-                          }
-                          required
-                          value={editDraft.revisionReason}
-                        />
-                      </label>
-                      <label>
-                        Title
-                        <input
-                          onChange={(event) =>
-                            setEditDraft((current) =>
-                              current === undefined
-                                ? current
-                                : { ...current, title: event.target.value },
-                            )
-                          }
-                          required
-                          value={editDraft.title}
-                        />
-                      </label>
-                      <label>
-                        Soft Explanation (Markdown)
-                        <textarea
-                          onChange={(event) =>
-                            setEditDraft((current) =>
-                              current === undefined
-                                ? current
-                                : {
-                                    ...current,
-                                    softExplanationMarkdown: event.target.value,
-                                  },
-                            )
-                          }
-                          value={editDraft.softExplanationMarkdown}
-                        />
-                      </label>
-                      <label>
-                        Reasoning
-                        <textarea
-                          onChange={(event) =>
-                            setEditDraft((current) =>
-                              current === undefined
-                                ? current
-                                : {
-                                    ...current,
-                                    reasoning: event.target.value,
-                                  },
-                            )
-                          }
-                          value={editDraft.reasoning}
-                        />
-                      </label>
-                      <label>
-                        Conclusion
-                        <textarea
-                          onChange={(event) =>
-                            setEditDraft((current) =>
-                              current === undefined
-                                ? current
-                                : {
-                                    ...current,
-                                    conclusion: event.target.value,
-                                  },
-                            )
-                          }
-                          required
-                          value={editDraft.conclusion}
-                        />
-                      </label>
-                      <label>
-                        Boundary
-                        <textarea
-                          onChange={(event) =>
-                            setEditDraft((current) =>
-                              current === undefined
-                                ? current
-                                : { ...current, boundary: event.target.value },
-                            )
-                          }
-                          value={editDraft.boundary}
-                        />
-                      </label>
-                      <label>
-                        Why novel / unresolved
-                        <textarea
-                          onChange={(event) =>
-                            setEditDraft((current) =>
-                              current === undefined
-                                ? current
-                                : {
-                                    ...current,
-                                    whyNovelOrUnresolved: event.target.value,
-                                  },
-                            )
-                          }
-                          required
-                          value={editDraft.whyNovelOrUnresolved}
-                        />
-                      </label>
-                      <div className="arguments-actions">
-                        <button
-                          onClick={() => setEditDraft(undefined)}
-                          type="button"
-                        >
-                          Cancel edit
-                        </button>
-                        <button disabled={busy} type="submit">
-                          Save draft revision
-                        </button>
-                      </div>
-                    </form>
-                  )}
-                  {editDraft === undefined ? (
-                    <div className="arguments-actions arguments-mailbox__resolution-actions">
-                      <button
-                        className="arguments-action--primary"
-                        disabled={busy}
-                        onClick={() => onAccept(selected)}
-                        type="button"
-                      >
-                        Store as Argument…
-                      </button>
-                      <button
-                        className="arguments-action--secondary"
-                        disabled={busy}
-                        onClick={() => onReject(selected)}
-                        type="button"
-                      >
-                        Store refutation / Counter-Argument…
-                      </button>
-                      <button
-                        className="arguments-action--quiet"
-                        disabled={busy}
-                        onClick={() =>
-                          setEditDraft({
-                            proposalId: selected.id,
-                            ...proposalDraftTextEdits(selected),
-                          })
+                {selected.status === 'pending' &&
+                editDraft?.proposalId === selected.id ? (
+                  <form
+                    className="arguments-mailbox__section"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void saveEdit();
+                    }}
+                  >
+                    <h4>Edit active draft</h4>
+                    <p>
+                      This creates a recoverable Proposal revision; it does not
+                      store canonical theory.
+                    </p>
+                    <label>
+                      Revision reason
+                      <textarea
+                        onChange={(event) =>
+                          setEditDraft((current) =>
+                            current === undefined
+                              ? current
+                              : {
+                                  ...current,
+                                  revisionReason: event.target.value,
+                                },
+                          )
                         }
+                        required
+                        value={editDraft.revisionReason}
+                      />
+                    </label>
+                    <label>
+                      Title
+                      <input
+                        onChange={(event) =>
+                          setEditDraft((current) =>
+                            current === undefined
+                              ? current
+                              : { ...current, title: event.target.value },
+                          )
+                        }
+                        required
+                        value={editDraft.title}
+                      />
+                    </label>
+                    <label>
+                      Soft Explanation (Markdown)
+                      <textarea
+                        onChange={(event) =>
+                          setEditDraft((current) =>
+                            current === undefined
+                              ? current
+                              : {
+                                  ...current,
+                                  softExplanationMarkdown: event.target.value,
+                                },
+                          )
+                        }
+                        value={editDraft.softExplanationMarkdown}
+                      />
+                    </label>
+                    <label>
+                      Reasoning
+                      <textarea
+                        onChange={(event) =>
+                          setEditDraft((current) =>
+                            current === undefined
+                              ? current
+                              : {
+                                  ...current,
+                                  reasoning: event.target.value,
+                                },
+                          )
+                        }
+                        value={editDraft.reasoning}
+                      />
+                    </label>
+                    <label>
+                      Conclusion
+                      <textarea
+                        onChange={(event) =>
+                          setEditDraft((current) =>
+                            current === undefined
+                              ? current
+                              : {
+                                  ...current,
+                                  conclusion: event.target.value,
+                                },
+                          )
+                        }
+                        required
+                        value={editDraft.conclusion}
+                      />
+                    </label>
+                    <label>
+                      Boundary
+                      <textarea
+                        onChange={(event) =>
+                          setEditDraft((current) =>
+                            current === undefined
+                              ? current
+                              : { ...current, boundary: event.target.value },
+                          )
+                        }
+                        value={editDraft.boundary}
+                      />
+                    </label>
+                    <label>
+                      Why novel / unresolved
+                      <textarea
+                        onChange={(event) =>
+                          setEditDraft((current) =>
+                            current === undefined
+                              ? current
+                              : {
+                                  ...current,
+                                  whyNovelOrUnresolved: event.target.value,
+                                },
+                          )
+                        }
+                        required
+                        value={editDraft.whyNovelOrUnresolved}
+                      />
+                    </label>
+                    <div className="arguments-actions">
+                      <button
+                        onClick={() => setEditDraft(undefined)}
                         type="button"
                       >
-                        Edit draft
+                        Cancel edit
                       </button>
-                      <ArgumentActionMenu
-                        align="end"
-                        disabled={busy}
-                        label="More"
-                        ref={moreMenuRef}
-                      >
-                        <button
-                          disabled={busy}
-                          onClick={() => onDiscard(selected)}
-                          role="menuitem"
-                          type="button"
-                        >
-                          Discard
-                        </button>
-                      </ArgumentActionMenu>
+                      <button disabled={busy} type="submit">
+                        Save draft revision
+                      </button>
                     </div>
-                  ) : null}
-                </>
-              )}
+                  </form>
+                ) : null}
+              </div>
+              {selected.status === 'pending' && editDraft === undefined ? (
+                <div
+                  aria-label="Pending Proposal actions"
+                  className="arguments-actions arguments-mailbox__resolution-actions arguments-mailbox__action-footer"
+                >
+                  <button
+                    className="arguments-action--primary"
+                    disabled={busy}
+                    onClick={() => onAccept(selected)}
+                    type="button"
+                  >
+                    Store as Argument…
+                  </button>
+                  <button
+                    className="arguments-action--secondary"
+                    disabled={busy}
+                    onClick={() => onReject(selected)}
+                    type="button"
+                  >
+                    Store refutation / Counter-Argument…
+                  </button>
+                  <button
+                    className="arguments-action--quiet"
+                    disabled={busy}
+                    onClick={() =>
+                      setEditDraft({
+                        proposalId: selected.id,
+                        ...proposalDraftTextEdits(selected),
+                      })
+                    }
+                    type="button"
+                  >
+                    Edit draft
+                  </button>
+                  <ArgumentActionMenu
+                    align="end"
+                    disabled={busy}
+                    label="More"
+                    ref={moreMenuRef}
+                  >
+                    <button
+                      disabled={busy}
+                      onClick={() => onDiscard(selected)}
+                      role="menuitem"
+                      type="button"
+                    >
+                      Discard
+                    </button>
+                  </ArgumentActionMenu>
+                </div>
+              ) : null}
             </article>
           )}
         </div>

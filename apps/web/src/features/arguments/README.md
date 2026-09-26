@@ -17,9 +17,11 @@ requests open/close transitions.
   Proposal links, discard, bounded prose editing and its narrow leave-guard
   handle, intent and target previews, compact local Argument context, the
   optional Soft Explanation rendered through the shared safe Markdown boundary,
-  typed dependency cards, structured reasoning, and source observations kept
-  separate from inference premises. It is an inline Arguments panel, not a
-  dialog or scrim.
+  progressive disclosures for formal support and secondary review evidence,
+  and the pending-only local action footer. Stored supersession and canonical
+  attack/support data are the only relationship connectors shown in context;
+  typed dependencies and source observations remain separate. It is an inline
+  Arguments panel, not a dialog or scrim.
 - `ArgumentActionMenu.tsx` owns the small keyboard-accessible disclosure menu
   used only to compact Arguments workspace controls and preserve Escape/focus
   behavior.
@@ -95,10 +97,16 @@ The Library / To store selector exposes non-canonical AI Proposals separately
 from the canonical record browser; the staging view retains Active / History
 navigation. Details lead with Topic,
 intent, human-readable target/part, staleness, and a compact local Argument
-context. When present, “What this means” appears before the formal Argument and
-is retained only in Proposal history; it never seeds canonical storage forms or
-canonical content. Typed premises and expandable dependencies are distinct from drafting
-source observations and compact commit provenance. Edit draft creates a stable-ID
+context whose Current/Target markers stay visible while conclusions and reasoning
+remain expandable. When present, “What this means” appears before a collapsed
+formal Argument; without it, the formal Argument starts expanded. Review
+rationale, source provenance, revision history, and technical metadata remain
+available in native disclosures. The explanation is retained only in Proposal
+history; it never seeds canonical storage forms or canonical content. Typed
+premises and expandable dependencies are distinct from drafting source
+observations and compact commit provenance. Pending storage actions remain in a
+sticky footer local to the independently scrolling detail pane and return to
+normal flow on narrow screens. Edit draft creates a stable-ID
 recoverable revision; draft links remain visibly non-canonical. Discard removes
 the item from active staging without creating a canonical record. Store as
 Argument carries only typed premises into the ordinary Argument editor. `attack` and `support` intent may
