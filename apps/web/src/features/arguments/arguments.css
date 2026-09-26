@@ -43,12 +43,17 @@
 .arguments-dialog__header {
   display: grid;
   flex: 0 0 auto;
-  grid-template-columns: minmax(10rem, 1fr) auto minmax(20rem, 1fr);
+  grid-template-columns: minmax(10rem, 1fr) auto auto minmax(20rem, 1fr);
   gap: 1rem;
   align-items: center;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--color-border-default);
   background: var(--color-surface-toolbar);
+}
+
+.arguments-dialog__header--embedded {
+  grid-template-columns: auto auto minmax(0, 1fr);
+  padding-block: 0.55rem;
 }
 
 .arguments-dialog__header .eyebrow {
@@ -77,6 +82,18 @@
 
 .arguments-dialog__actions {
   justify-content: flex-end;
+}
+
+.arguments-view-switcher {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.arguments-view-switcher button[aria-selected='true'] {
+  border-color: var(--color-control-selected-border);
+  color: var(--color-control-selected-foreground);
+  background: var(--color-control-selected-background);
 }
 
 .arguments-dialog button,
@@ -738,20 +755,60 @@
   font-size: 0.72rem;
 }
 
-.arguments-mailbox > div {
-  width: min(72rem, 100%);
+.arguments-mailbox {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding: 0.85rem 1rem 1rem;
+  overflow: hidden;
+  background: var(--color-surface-panel);
+}
+
+.arguments-mailbox__surface {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.arguments-mailbox__intro {
+  flex: 0 0 auto;
+}
+
+.arguments-mailbox__intro h2,
+.arguments-mailbox__intro p {
+  margin-block: 0 0.3rem;
+}
+
+.arguments-mailbox__tabs {
+  flex: 0 0 auto;
 }
 
 .arguments-mailbox__layout {
   display: grid;
-  grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr);
   gap: 1rem;
-  align-items: start;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.arguments-mailbox__layout nav {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .arguments-mailbox__layout nav ul {
   display: grid;
   gap: 0.45rem;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -768,12 +825,17 @@
   background: var(--color-control-selected-background);
 }
 
-.arguments-mailbox__layout nav button span,
-.arguments-mailbox__layout nav button small {
+.arguments-mailbox__row-title,
+.arguments-mailbox__row-meta {
+  display: block;
   overflow: hidden;
   color: var(--color-control-foreground);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.arguments-mailbox__row-meta {
+  font-weight: 650;
 }
 
 .arguments-mailbox__detail,
@@ -788,7 +850,19 @@
 .arguments-mailbox__detail {
   display: grid;
   min-width: 0;
+  min-height: 0;
   gap: 0.8rem;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.arguments-mailbox textarea {
+  width: 100%;
+  min-height: 7rem;
+  padding: 0.75rem;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.72rem;
 }
 
 .arguments-mailbox__proposal-header,
@@ -934,6 +1008,10 @@
     grid-template-columns: minmax(8rem, 1fr) auto;
   }
 
+  .arguments-dialog__header--embedded {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
   .arguments-dialog__status {
     display: none;
   }
@@ -995,5 +1073,24 @@
 
   .arguments-mailbox__layout {
     grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .arguments-mailbox {
+    overflow: auto;
+  }
+
+  .arguments-mailbox__surface,
+  .arguments-mailbox__layout {
+    min-height: auto;
+    flex: 0 0 auto;
+  }
+
+  .arguments-mailbox__layout nav {
+    max-height: 36dvh;
+  }
+
+  .arguments-mailbox__detail {
+    overflow: visible;
   }
 }

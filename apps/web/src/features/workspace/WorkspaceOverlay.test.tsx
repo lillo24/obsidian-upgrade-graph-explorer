@@ -6,9 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   captureArgumentLibrarySnapshot,
   createEmptyArgumentLibrary,
+  createTopic,
   sameSnapshot,
+  submitArgumentProposal,
   type ArgumentLibrary,
   type ArgumentLibraryStore,
+  type ArgumentRuntime,
 } from '@icarus-graph-explorer/argument-workspace';
 import { MemoryReviewHistoryStore } from '@icarus-graph-explorer/review-workspace';
 import { ScriptedAgentProvider } from '@icarus-graph-explorer/ai-review';
@@ -24,12 +27,17 @@ import { ArgumentWorkspaceSession } from '../arguments/session';
 import { WorkspaceOverlay, type WorkspaceArea } from './WorkspaceOverlay';
 
 class ArgumentStore implements ArgumentLibraryStore {
-  snapshot = captureArgumentLibrarySnapshot(
-    createEmptyArgumentLibrary({
+  snapshot: ReturnType<typeof captureArgumentLibrarySnapshot>;
+  writes = 0;
+
+  constructor(
+    library: ArgumentLibrary = createEmptyArgumentLibrary({
       createId: (kind) => `workspace-${kind}`,
       now: () => '2026-09-13T08:00:00.000Z',
     }),
-  );
+  ) {
+    this.snapshot = captureArgumentLibrarySnapshot(library);
+  }
 
   async load() {
     return { status: 'loaded' as const, snapshot: this.snapshot };
@@ -45,9 +53,57 @@ class ArgumentStore implements ArgumentLibraryStore {
     ) {
       return { status: 'conflict' as const, message: 'changed' };
     }
+    this.writes += 1;
     this.snapshot = captureArgumentLibrarySnapshot(library);
     return { status: 'saved' as const, snapshot: this.snapshot };
   }
+}
+
+function workspaceProposalFixture(): ArgumentLibrary {
+  let sequence = 0;
+  const runtime: ArgumentRuntime = {
+    createId: (kind) => `workspace-${kind}-${++sequence}`,
+    now: () => `2026-09-13T08:00:${String(sequence).padStart(2, '0')}.000Z`,
+  };
+  let library = createEmptyArgumentLibrary(runtime, 'workspace-library');
+  library = createTopic(
+    library,
+    {
+      id: 'workspace-topic',
+      title: 'Workspace navigation',
+      summary: 'Proposal navigation behavior in the shared workspace.',
+    },
+    runtime,
+  );
+  const descriptor = captureArgumentLibrarySnapshot(library).descriptor;
+  return submitArgumentProposal(
+    library,
+    {
+      clientSubmissionId: 'workspace-proposal-submission',
+      title: 'Keep To store inside the Arguments workspace',
+      intent: 'new',
+      topicId: 'workspace-topic',
+      examples: [],
+      premises: [
+        {
+          id: 'workspace-premise',
+          kind: 'text',
+          text: 'The staging view belongs to the Arguments workspace.',
+        },
+      ],
+      reasoning: 'One workspace surface keeps navigation comprehensible.',
+      conclusion: 'To store should render as an inline view.',
+      sourceObservations: [],
+      whyNovelOrUnresolved: 'The previous surface was a nested modal.',
+      consultation: {
+        libraryId: descriptor.libraryId,
+        libraryRevision: descriptor.libraryRevision,
+        contentFingerprint: descriptor.contentFingerprint,
+        records: [{ kind: 'topic', id: 'workspace-topic', revision: 1 }],
+      },
+    },
+    runtime,
+  ).library;
 }
 
 const unsupportedSource: ReviewSourceProvider = {
@@ -59,11 +115,15 @@ const unsupportedSource: ReviewSourceProvider = {
 
 const SENTINEL_KEY = 'sk-test-DO-NOT-PERSIST-123';
 
-function setValue(control: HTMLInputElement, value: string): void {
-  const setter = Object.getOwnPropertyDescriptor(
-    HTMLInputElement.prototype,
-    'value',
-  )?.set;
+function setValue(
+  control: HTMLInputElement | HTMLTextAreaElement,
+  value: string,
+): void {
+  const prototype =
+    control instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
   if (setter === undefined) throw new Error('Missing input value setter.');
   setter.call(control, value);
   control.dispatchEvent(new Event('input', { bubbles: true }));
@@ -208,6 +268,122 @@ describe('shared local workspace overlay', () => {
     });
     expect(credentials.snapshot().configured).toBe(false);
     expect(controller.snapshot().modelAvailable).toBe(false);
+  });
+
+  it('hosts inline To store chrome and guards dirty Proposal exits through the shared workspace', async () => {
+    const controller = new AiReviewController({
+      sourceProvider: unsupportedSource,
+      historyStore: new MemoryReviewHistoryStore(),
+    });
+    await controller.open();
+    const argumentStore = new ArgumentStore(workspaceProposalFixture());
+    const argumentSession = new ArgumentWorkspaceSession(argumentStore);
+
+    function Harness() {
+      const [area, setArea] = useState<WorkspaceArea>('arguments');
+      const [open, setOpen] = useState(true);
+      return (
+        <WorkspaceOverlay
+          area={area}
+          argumentSession={argumentSession}
+          controller={controller}
+          onAreaChange={setArea}
+          onRequestClose={() => setOpen(false)}
+          open={open}
+        />
+      );
+    }
+
+    await act(async () => {
+      root.render(<Harness />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const buttons = () => [
+      ...container.querySelectorAll<HTMLButtonElement>('button'),
+    ];
+    const button = (name: string) => {
+      const result = buttons().find(
+        (candidate) =>
+          candidate.textContent?.trim() === name ||
+          candidate.getAttribute('aria-label') === name,
+      );
+      if (result === undefined) throw new Error(`Missing button ${name}`);
+      return result;
+    };
+    const click = async (name: string) => {
+      await act(async () => {
+        button(name).click();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+    };
+
+    const argumentsArea = container.querySelector<HTMLElement>(
+      '#arguments-workspace-area',
+    )!;
+    expect(container.querySelectorAll('dialog')).toHaveLength(1);
+    expect(
+      argumentsArea.querySelector('#arguments-workspace-title'),
+    ).toBeNull();
+    expect(
+      argumentsArea.querySelector('.arguments-dialog__header .eyebrow'),
+    ).toBeNull();
+    expect(
+      [...argumentsArea.querySelectorAll('button')].some(
+        ({ textContent }) => textContent?.trim() === 'Close',
+      ),
+    ).toBe(false);
+
+    await click('To store (1)');
+    const mailbox =
+      argumentsArea.querySelector<HTMLElement>('.arguments-mailbox');
+    expect(mailbox).not.toBeNull();
+    expect(mailbox?.classList.contains('arguments-subdialog')).toBe(false);
+    expect(container.querySelectorAll('dialog')).toHaveLength(1);
+    expect(document.activeElement?.getAttribute('aria-current')).toBe('page');
+
+    await click('Edit draft');
+    const revisionReason = [
+      ...mailbox!.querySelectorAll<HTMLTextAreaElement>('textarea'),
+    ].find((candidate) =>
+      candidate.closest('label')?.textContent?.includes('Revision reason'),
+    )!;
+    await act(() =>
+      setValue(revisionReason, 'Keep this edit while testing every exit path.'),
+    );
+
+    await click('AI Review');
+    expect(container.textContent).toContain(
+      'Switch to AI Review with unsaved Argument changes?',
+    );
+    expect(argumentsArea.hasAttribute('hidden')).toBe(false);
+    await click('Stay');
+    expect(revisionReason.value).toContain('every exit path');
+
+    await click('Close');
+    expect(container.textContent).toContain(
+      'Close the workspace with unsaved Argument changes?',
+    );
+    await click('Stay');
+    expect(container.querySelector('.arguments-mailbox')).not.toBeNull();
+
+    await act(() =>
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      ),
+    );
+    expect(container.textContent).toContain(
+      'Return to Library with unsaved Proposal changes?',
+    );
+    await click('Stay');
+
+    await click('AI Review');
+    await click('Discard');
+    expect(
+      container.querySelector('#review-workspace-area')?.hasAttribute('hidden'),
+    ).toBe(false);
+    expect(argumentStore.writes).toBe(0);
   });
 
   it('keeps one modal, routes dirty Arguments transitions, and restores the launcher', async () => {

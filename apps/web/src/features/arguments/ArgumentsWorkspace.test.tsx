@@ -294,6 +294,7 @@ function fixtureWithProposal(
 
 class MemoryStore implements ArgumentLibraryStore {
   snapshot: ReturnType<typeof captureArgumentLibrarySnapshot>;
+  loads = 0;
   writes = 0;
 
   constructor(library: ArgumentLibrary = fixture()) {
@@ -301,6 +302,7 @@ class MemoryStore implements ArgumentLibraryStore {
   }
 
   async load() {
+    this.loads += 1;
     return { status: 'loaded' as const, snapshot: this.snapshot };
   }
 
@@ -524,7 +526,7 @@ describe('standalone Arguments workspace', () => {
     await click('Cancel');
     expect(container.textContent).toContain('Cancel this draft?');
     await click('Discard');
-    expect(container.textContent).toContain('Proposal Mailbox');
+    expect(container.textContent).toContain('Non-canonical staging area');
     expect(container.textContent).toContain('To store (1)');
     expect(store.snapshot.library.proposals[0]?.status).toBe('pending');
     expect(store.writes).toBe(0);
@@ -638,12 +640,154 @@ describe('standalone Arguments workspace', () => {
 
     await click('To store (1)');
     expect(container.textContent).toContain(
-      'Open Mailbox with unsaved changes?',
+      'Open To store with unsaved changes?',
     );
-    expect(container.textContent).not.toContain('Proposal Mailbox');
+    expect(container.querySelector('.arguments-mailbox')).toBeNull();
     await click('Discard');
-    expect(container.textContent).toContain('Proposal Mailbox');
+    expect(container.querySelector('.arguments-mailbox')).not.toBeNull();
     expect(store.writes).toBe(0);
+  });
+
+  it('renders To store inline with compact rows, reloads on entry, and returns to Library before closing', async () => {
+    const longTitle =
+      'A deliberately long Proposal title that must remain a single compact navigation line rather than expanding the entire left column';
+    const library = fixtureWithProposal();
+    store = new MemoryStore({
+      ...library,
+      proposals: library.proposals.map((proposal) => ({
+        ...proposal,
+        title: longTitle,
+      })),
+    });
+    session = new ArgumentWorkspaceSession(store, runtime());
+    await mount();
+
+    expect(
+      container.querySelector('#arguments-workspace-title')?.textContent,
+    ).toBe('Arguments');
+    expect(button('Close')).toBeDefined();
+    expect(store.loads).toBe(1);
+
+    await click('To store (1)');
+
+    expect(store.loads).toBe(2);
+    const mailbox = container.querySelector<HTMLElement>('.arguments-mailbox');
+    expect(mailbox?.getAttribute('role')).toBe('tabpanel');
+    expect(mailbox?.classList.contains('arguments-subdialog')).toBe(false);
+    expect(container.querySelector('.arguments-subdialog')).toBeNull();
+    expect(
+      container.querySelector('.arguments-subdialog.arguments-mailbox'),
+    ).toBeNull();
+    expect(container.textContent).not.toContain('Close Mailbox');
+    const selectedRow = mailbox?.querySelector<HTMLButtonElement>(
+      'nav button[aria-current="page"]',
+    );
+    expect(selectedRow?.textContent).toContain(longTitle);
+    expect(selectedRow?.textContent).toContain('Attack · Neutral comparison');
+    expect(selectedRow?.textContent).not.toContain(
+      'A second conversion is unnecessary in this bounded case.',
+    );
+    expect(
+      selectedRow
+        ?.querySelector('strong')
+        ?.classList.contains('arguments-mailbox__row-title'),
+    ).toBe(true);
+
+    const snapshotBeforeNavigation = JSON.stringify(store.snapshot.library);
+    await click('Library');
+    expect(container.querySelector('#arguments-library-panel')).not.toBeNull();
+    expect(container.querySelector('.arguments-mailbox')).toBeNull();
+    expect(JSON.stringify(store.snapshot.library)).toBe(
+      snapshotBeforeNavigation,
+    );
+    expect(store.writes).toBe(0);
+
+    await click('To store (1)');
+    await act(() =>
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      ),
+    );
+    expect(container.querySelector('#arguments-library-panel')).not.toBeNull();
+    expect(document.activeElement?.id).toBe('arguments-library-tab');
+    expect(close).not.toHaveBeenCalled();
+    await act(() =>
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      ),
+    );
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('guards dirty Proposal edits with Save, Discard, and Stay before leaving To store', async () => {
+    store = new MemoryStore(fixtureWithProposal());
+    session = new ArgumentWorkspaceSession(store, runtime());
+    await mount();
+    await click('To store (1)');
+    await click('Edit draft');
+
+    await act(() =>
+      setValue(
+        textarea('Revision reason'),
+        'The staged wording was clarified before leaving To store.',
+      ),
+    );
+    const title = [
+      ...container.querySelectorAll<HTMLInputElement>(
+        '.arguments-mailbox input',
+      ),
+    ].find((candidate) =>
+      candidate.closest('label')?.textContent?.includes('Title'),
+    )!;
+    await act(() => setValue(title, 'Clarified normalization exception'));
+
+    await act(() =>
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      ),
+    );
+    expect(container.textContent).toContain(
+      'Return to Library with unsaved Proposal changes?',
+    );
+    await click('Stay');
+    expect(title.value).toBe('Clarified normalization exception');
+    expect(container.querySelector('.arguments-mailbox')).not.toBeNull();
+
+    await click('Open record');
+    expect(container.textContent).toContain(
+      'Open this Library record with unsaved Proposal changes?',
+    );
+    await click('Stay');
+    expect(title.value).toBe('Clarified normalization exception');
+
+    await click('Library');
+    expect(container.textContent).toContain(
+      'Return to Library with unsaved Proposal changes?',
+    );
+    await click('Save');
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(container.querySelector('#arguments-library-panel')).not.toBeNull();
+    expect(store.writes).toBe(1);
+    expect(store.snapshot.library.proposals[0]).toMatchObject({
+      revision: 2,
+      title: 'Clarified normalization exception',
+    });
+
+    await click('To store (1)');
+    await click('Edit draft');
+    await act(() =>
+      setValue(textarea('Conclusion'), 'This local edit should be discarded.'),
+    );
+    await click('Library');
+    await click('Discard');
+    expect(container.querySelector('#arguments-library-panel')).not.toBeNull();
+    expect(store.writes).toBe(1);
+    expect(store.snapshot.library.proposals[0]?.conclusion).toBe(
+      'A second conversion is unnecessary in this bounded case.',
+    );
   });
 
   it('keeps boundary intent separate from canonical attack and exposes navigable target provenance', async () => {
