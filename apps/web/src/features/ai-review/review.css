@@ -496,8 +496,7 @@
 .review-material-list pre,
 .review-prompt-grid pre,
 .review-dependency-preview pre,
-.review-raw-output,
-.review-markdown__error pre {
+.review-raw-output {
   max-width: 100%;
   padding: 0.8rem;
   overflow: auto;
@@ -571,70 +570,6 @@
 
 .review-compare__panes > div {
   min-width: 0;
-}
-
-.review-markdown {
-  max-width: 76ch;
-  line-height: 1.68;
-  overflow-wrap: anywhere;
-}
-
-.review-markdown h1,
-.review-markdown h2,
-.review-markdown h3,
-.review-markdown h4 {
-  scroll-margin-top: 5rem;
-  text-wrap: balance;
-}
-
-.review-markdown blockquote {
-  margin-inline: 0;
-  padding-left: 1rem;
-  border-left: 3px solid var(--color-status-info-border);
-  color: var(--color-text-secondary);
-}
-
-.review-markdown__table-scroll,
-.review-code-block,
-.review-markdown .katex-display {
-  max-width: 100%;
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-
-.review-markdown table {
-  border-collapse: collapse;
-  font-variant-numeric: tabular-nums;
-}
-
-.review-markdown th,
-.review-markdown td {
-  padding: 0.45rem 0.55rem;
-  border: 1px solid var(--color-border-subtle);
-}
-
-.review-code-block {
-  position: relative;
-}
-
-.review-code-block pre {
-  padding: 2.5rem 0.8rem 0.8rem;
-}
-
-.review-code-block__copy {
-  position: absolute;
-  z-index: 1;
-  top: 0.4rem;
-  right: 0.4rem;
-}
-
-.review-markdown__inert-link,
-.review-markdown__blocked-image {
-  padding: 0.08rem 0.2rem;
-  border: 1px dashed var(--color-status-error-border);
-  border-radius: 0.2rem;
-  color: var(--color-status-error-foreground);
-  background: var(--color-status-error-background);
 }
 
 .review-subdialog {

@@ -1,0 +1,75 @@
+.safe-markdown {
+  max-width: 76ch;
+  line-height: 1.68;
+  overflow-wrap: anywhere;
+}
+
+.safe-markdown h1,
+.safe-markdown h2,
+.safe-markdown h3,
+.safe-markdown h4 {
+  scroll-margin-top: 5rem;
+  text-wrap: balance;
+}
+
+.safe-markdown blockquote {
+  margin-inline: 0;
+  padding-left: 1rem;
+  border-left: 3px solid var(--color-status-info-border);
+  color: var(--color-text-secondary);
+}
+
+.safe-markdown__table-scroll,
+.safe-markdown__code-block,
+.safe-markdown .katex-display {
+  max-width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.safe-markdown table {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.safe-markdown th,
+.safe-markdown td {
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.safe-markdown__code-block {
+  position: relative;
+}
+
+.safe-markdown__code-block pre,
+.safe-markdown__error pre {
+  max-width: 100%;
+  padding: 2.5rem 0.8rem 0.8rem;
+  overflow: auto;
+  border-radius: 0.45rem;
+  color: var(--color-text-on-dark);
+  background: var(--color-surface-code);
+  white-space: pre;
+  tab-size: 2;
+}
+
+.safe-markdown__error pre {
+  padding-top: 0.8rem;
+}
+
+.safe-markdown__code-copy {
+  position: absolute;
+  z-index: 1;
+  top: 0.4rem;
+  right: 0.4rem;
+}
+
+.safe-markdown__inert-link,
+.safe-markdown__blocked-image {
+  padding: 0.08rem 0.2rem;
+  border: 1px dashed var(--color-status-error-border);
+  border-radius: 0.2rem;
+  color: var(--color-status-error-foreground);
+  background: var(--color-status-error-background);
+}

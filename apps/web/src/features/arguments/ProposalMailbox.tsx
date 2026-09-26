@@ -11,6 +11,7 @@ import type {
 } from '@icarus-graph-explorer/argument-workspace';
 
 import type { ArgumentSelection } from './ArgumentRecordView';
+import { SafeMarkdown } from '../../components/markdown/SafeMarkdown';
 import { proposalTargetStaleness } from './proposal-mailbox';
 
 const INTENT_LABELS: Readonly<Record<ArgumentProposalIntent, string>> = {
@@ -421,6 +422,16 @@ export function ProposalMailbox({
                 onNavigate={onNavigate}
                 proposal={selected}
               />
+              {selected.softExplanationMarkdown === undefined ? null : (
+                <section className="arguments-mailbox__soft-explanation">
+                  <p className="eyebrow">Fast review</p>
+                  <h4>What this means</h4>
+                  <SafeMarkdown markdown={selected.softExplanationMarkdown} />
+                </section>
+              )}
+              <h4 className="arguments-mailbox__formal-title">
+                Formal argument
+              </h4>
               {selected.examples.length === 0 ? null : (
                 <section className="arguments-mailbox__section">
                   <h4>Examples</h4>

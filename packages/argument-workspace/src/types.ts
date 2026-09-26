@@ -1,4 +1,4 @@
-export const ARGUMENT_LIBRARY_SCHEMA_VERSION = 6 as const;
+export const ARGUMENT_LIBRARY_SCHEMA_VERSION = 7 as const;
 export const KNOWLEDGE_READER_CONTRACT_VERSION = 5 as const;
 export const CONTENT_FINGERPRINT_ALGORITHM =
   'sha256-canonical-json-v1' as const;
@@ -310,6 +310,8 @@ export interface ArgumentProposal {
   readonly updatedAt: string;
   readonly status: ProposalStatus;
   readonly title: string;
+  /** Optional non-canonical Markdown written only for human review. */
+  readonly softExplanationMarkdown?: string;
   readonly intent: ArgumentProposalIntent;
   readonly topicId?: string;
   readonly target?: ArgumentProposalTarget;
@@ -557,6 +559,8 @@ export interface UpdateCounterArgumentResponseInput {
 export interface CreateArgumentProposalInput {
   readonly clientSubmissionId?: string;
   readonly title: string;
+  /** Optional non-canonical Markdown written only for human review. */
+  readonly softExplanationMarkdown?: string;
   readonly intent?: ArgumentProposalIntent;
   readonly topicId?: string;
   readonly target?: ArgumentProposalTarget;
@@ -901,7 +905,7 @@ export type ArgumentLibraryJsonParseResult =
   | {
       readonly status: 'valid';
       readonly value: ArgumentLibrary;
-      readonly migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5;
+      readonly migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5 | 6;
     }
   | {
       readonly status: 'invalid-json' | 'future-schema' | 'invalid-library';

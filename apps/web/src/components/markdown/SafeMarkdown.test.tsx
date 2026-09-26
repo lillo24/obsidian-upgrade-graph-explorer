@@ -3,8 +3,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MarkdownRenderer } from './MarkdownRenderer';
-import { reviewMarkdownUrlTransform } from './markdown-security';
+import { SafeMarkdown } from './SafeMarkdown';
+import { safeMarkdownUrlTransform } from './security';
 
 describe('safe review Markdown rendering', () => {
   let container: HTMLDivElement;
@@ -44,7 +44,7 @@ describe('safe review Markdown rendering', () => {
       '',
       '$x^2 + y^2$',
     ].join('\n');
-    await act(() => root.render(<MarkdownRenderer markdown={markdown} />));
+    await act(() => root.render(<SafeMarkdown markdown={markdown} />));
     expect(container.querySelector('script')).toBeNull();
     expect(container.querySelector('img')).toBeNull();
     expect(container.textContent).toContain('Remote image blocked: remote');
@@ -62,16 +62,16 @@ describe('safe review Markdown rendering', () => {
 
   it('accepts only deliberate web/mail protocols in the URL boundary', () => {
     expect(
-      reviewMarkdownUrlTransform('https://example.test', 'href', {} as never),
+      safeMarkdownUrlTransform('https://example.test', 'href', {} as never),
     ).toBe('https://example.test');
     expect(
-      reviewMarkdownUrlTransform('javascript:alert(1)', 'href', {} as never),
+      safeMarkdownUrlTransform('javascript:alert(1)', 'href', {} as never),
     ).toBe('');
     expect(
-      reviewMarkdownUrlTransform('file:///secret', 'href', {} as never),
+      safeMarkdownUrlTransform('file:///secret', 'href', {} as never),
     ).toBe('');
     expect(
-      reviewMarkdownUrlTransform('[[Local Note]]', 'href', {} as never),
+      safeMarkdownUrlTransform('[[Local Note]]', 'href', {} as never),
     ).toBe('');
   });
 });

@@ -20,6 +20,7 @@ import {
   validateArgumentLibraryV3,
   validateArgumentLibraryV4,
   validateArgumentLibraryV5,
+  validateArgumentLibraryV6,
 } from './validation';
 
 export function serializeArgumentLibrary(library: ArgumentLibrary): string {
@@ -82,6 +83,22 @@ export function parseArgumentLibraryJson(
         status: 'valid',
         value: migration.value,
         migratedFromSchemaVersion: 4,
+      };
+    }
+    return { ...migration, preservedSource: source };
+  }
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value as { readonly schemaVersion?: unknown }).schemaVersion === 6
+  ) {
+    const migration = migrateArgumentLibraryV6(value);
+    if (migration.status === 'valid') {
+      return {
+        status: 'valid',
+        value: migration.value,
+        migratedFromSchemaVersion: 6,
       };
     }
     return { ...migration, preservedSource: source };
@@ -366,6 +383,28 @@ export function migrateArgumentLibraryV5(
     ...legacy,
     schemaVersion: 6,
     proposals,
+  };
+  return migrateArgumentLibraryV6(candidate);
+}
+
+/** Adds the optional human-review explanation field without fabricating content. */
+export function migrateArgumentLibraryV6(
+  value: unknown,
+): ArgumentLibraryMigrationResult {
+  const legacyValidation = validateArgumentLibraryV6(value);
+  if (!legacyValidation.valid) {
+    const first = legacyValidation.issues[0];
+    return {
+      status: 'invalid-library',
+      message: `Argument Library v6 is invalid${
+        first === undefined ? '.' : ` at ${first.path}: ${first.message}`
+      }`,
+      issues: legacyValidation.issues,
+    };
+  }
+  const candidate = {
+    ...clonePlainData(legacyValidation.value),
+    schemaVersion: 7,
   };
   const migratedValidation = validateArgumentLibrary(candidate);
   if (!migratedValidation.valid) {

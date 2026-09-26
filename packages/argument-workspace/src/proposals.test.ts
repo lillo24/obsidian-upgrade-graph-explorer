@@ -25,6 +25,8 @@ function submission(library: ArgumentLibrary): CreateArgumentProposalInput {
   return {
     clientSubmissionId: 'client-proposal-1',
     title: 'Compatibility rule has a scoped exception',
+    softExplanationMarkdown:
+      '## Plain-language view\n\nThis is a **human review aid**, not evidence.',
     intent: 'add-boundary',
     topicId: 'T-NEUTRAL',
     target: {
@@ -108,6 +110,7 @@ describe('Argument Proposal Mailbox', () => {
     expect(first.proposal).toMatchObject({
       status: 'pending',
       title: input.title,
+      softExplanationMarkdown: input.softExplanationMarkdown,
       intent: 'add-boundary',
       target: input.target,
       premises: input.premises,
@@ -123,6 +126,16 @@ describe('Argument Proposal Mailbox', () => {
       submitArgumentProposal(
         first.library,
         { ...input, conclusion: 'Different content under the same retry key.' },
+        runtime,
+      ),
+    ).toThrow('already used for different content');
+    expect(() =>
+      submitArgumentProposal(
+        first.library,
+        {
+          ...input,
+          softExplanationMarkdown: 'A different human-facing explanation.',
+        },
         runtime,
       ),
     ).toThrow('already used for different content');
@@ -142,6 +155,44 @@ describe('Argument Proposal Mailbox', () => {
         search.value.candidates.some(({ id }) => id === first.proposal.id),
       ).toBe(false);
     }
+  });
+
+  it('keeps Soft Explanation optional and rejects blank or oversized text', () => {
+    const library = createNeutralArgumentLibrary();
+    const runtime = deterministicRuntime('optional-soft-explanation');
+    const input = submission(library);
+    const withoutExplanation = { ...input };
+    delete withoutExplanation.softExplanationMarkdown;
+
+    const submitted = submitArgumentProposal(
+      library,
+      withoutExplanation,
+      runtime,
+    );
+
+    expect(submitted.proposal).not.toHaveProperty('softExplanationMarkdown');
+    expect(() =>
+      submitArgumentProposal(
+        library,
+        {
+          ...input,
+          clientSubmissionId: 'blank-soft',
+          softExplanationMarkdown: '   ',
+        },
+        runtime,
+      ),
+    ).toThrow('Proposal Soft Explanation must not be empty');
+    expect(() =>
+      submitArgumentProposal(
+        library,
+        {
+          ...input,
+          clientSubmissionId: 'oversized-soft',
+          softExplanationMarkdown: 'x'.repeat(20_001),
+        },
+        runtime,
+      ),
+    ).toThrow('Proposal Soft Explanation exceeds the 20000-character limit');
   });
 
   it('rejects stale consultation and target identities without storing anything', () => {

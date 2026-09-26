@@ -114,7 +114,7 @@ describe('Argument Library interchange', () => {
     });
     expect(
       parseArgumentLibraryJson(
-        JSON.stringify({ ...createNeutralArgumentLibrary(), schemaVersion: 7 }),
+        JSON.stringify({ ...createNeutralArgumentLibrary(), schemaVersion: 8 }),
       ),
     ).toMatchObject({ status: 'future-schema' });
   });
@@ -127,7 +127,7 @@ describe('Argument Library interchange', () => {
       status: 'valid',
       migratedFromSchemaVersion: 1,
       value: {
-        schemaVersion: 6,
+        schemaVersion: 7,
         libraryId: 'library-v1-fixture',
         libraryRevision: 7,
         arguments: [],
@@ -173,7 +173,7 @@ describe('Argument Library interchange', () => {
       status: 'valid',
       migratedFromSchemaVersion: 2,
       value: {
-        schemaVersion: 6,
+        schemaVersion: 7,
         contexts: [],
         proposals: [],
         arguments: [{ examples: [], relations: [], contextIds: [] }],
@@ -198,7 +198,7 @@ describe('Argument Library interchange', () => {
     expect(parsed).toMatchObject({
       status: 'valid',
       migratedFromSchemaVersion: 4,
-      value: { schemaVersion: 6, proposals: [] },
+      value: { schemaVersion: 7, proposals: [] },
     });
     if (parsed.status !== 'valid') return;
     const migratedWithoutMailbox = clonePlainData(
@@ -279,7 +279,7 @@ describe('Argument Library interchange', () => {
       status: 'valid',
       migratedFromSchemaVersion: 5,
       value: {
-        schemaVersion: 6,
+        schemaVersion: 7,
         proposals: [
           {
             intent: 'unspecified',
@@ -306,6 +306,54 @@ describe('Argument Library interchange', () => {
     expect(
       parseArgumentLibraryJson(serializeArgumentLibrary(first.value)),
     ).toMatchObject({ status: 'valid', value: first.value });
+  });
+
+  it('migrates v6 proposals without fabricating a Soft Explanation', () => {
+    const library = createNeutralArgumentLibrary();
+    const descriptor = captureArgumentLibrarySnapshot(library).descriptor;
+    const submitted = submitArgumentProposal(
+      library,
+      {
+        clientSubmissionId: 'legacy-v6-submission',
+        title: 'Legacy v6 proposal',
+        intent: 'new',
+        examples: [],
+        premises: [{ id: 'P-1', kind: 'text', text: 'A bounded claim.' }],
+        reasoningSteps: [],
+        conclusion: 'The bounded claim may be reviewed.',
+        sourceObservations: [],
+        whyNovelOrUnresolved: 'This proposal predates Soft Explanations.',
+        consultation: {
+          libraryId: descriptor.libraryId,
+          libraryRevision: descriptor.libraryRevision,
+          contentFingerprint: descriptor.contentFingerprint,
+          records: [
+            {
+              kind: 'topic',
+              id: library.topics[0]!.id,
+              revision: library.topics[0]!.revision,
+            },
+          ],
+        },
+      },
+      deterministicRuntime('legacy-v6'),
+    ).library;
+    const legacy = { ...submitted, schemaVersion: 6 };
+
+    const parsed = parseArgumentLibraryJson(JSON.stringify(legacy));
+
+    expect(parsed).toMatchObject({
+      status: 'valid',
+      migratedFromSchemaVersion: 6,
+      value: { schemaVersion: 7 },
+    });
+    if (parsed.status !== 'valid') return;
+    expect(parsed.value.proposals[0]).not.toHaveProperty(
+      'softExplanationMarkdown',
+    );
+    expect(
+      parseArgumentLibraryJson(serializeArgumentLibrary(parsed.value)),
+    ).toMatchObject({ status: 'valid', value: parsed.value });
   });
 
   it('treats identical import as idempotent and same-lineage altered content as conflict', () => {

@@ -28,7 +28,7 @@ async function temporaryLibrary(): Promise<{
 }> {
   const directory = await mkdtemp(join(tmpdir(), 'icarus-argument-mcp-'));
   temporaryDirectories.push(directory);
-  return { directory, path: join(directory, 'library-v6.json') };
+  return { directory, path: join(directory, 'library-v7.json') };
 }
 
 function proposalArguments(
@@ -40,6 +40,8 @@ function proposalArguments(
   return {
     clientSubmissionId: 'mcp-proposal-1',
     title: 'Verified normalization exception',
+    softExplanationMarkdown:
+      '## Reviewer summary\n\nThe proposal adds a **bounded exception**.',
     intent: 'refine' as const,
     topicId: topic.id,
     target: {
@@ -251,6 +253,7 @@ describe('Argument Library MCP tools', () => {
         id: firstId,
         status: 'pending',
         intent: 'refine',
+        softExplanationMarkdown: input.softExplanationMarkdown,
         premises: input.premises,
         reasoningSteps: input.reasoningSteps,
         sourceObservations: input.sourceObservations,
@@ -262,6 +265,19 @@ describe('Argument Library MCP tools', () => {
       expect(parsed.value.counterArguments).toEqual(
         fixture.library.counterArguments,
       );
+
+      const changedExplanation = await session.client.callTool({
+        name: 'compiler_submit_proposal',
+        arguments: {
+          ...input,
+          softExplanationMarkdown: 'A different review explanation.',
+        },
+      });
+      expect(changedExplanation.isError).toBe(true);
+      expect(structured(changedExplanation)).toMatchObject({
+        status: 'error',
+        error: { code: 'persistence-error' },
+      });
     } finally {
       await session.close();
     }
@@ -283,6 +299,7 @@ describe('Argument Library MCP tools', () => {
     delete shared.reasoningSteps;
     delete shared.sourceObservations;
     delete shared.intent;
+    delete shared.softExplanationMarkdown;
     try {
       const result = await session.client.callTool({
         name: 'compiler_submit_proposal',
@@ -383,7 +400,7 @@ describe('Argument Library MCP tools', () => {
       expect(result.isError).not.toBe(true);
       expect(response).toMatchObject({
         status: 'ok',
-        version: 'argument-compiler-ai-usage-v3',
+        version: 'argument-compiler-ai-usage-v4',
         format: 'markdown',
       });
       expect(
@@ -408,6 +425,7 @@ describe('Argument Library MCP tools', () => {
       expect(normalizedGuide).toContain(
         'The Mailbox is not an Argument Library record',
       );
+      expect(normalizedGuide).toContain('softExplanationMarkdown');
       expect(normalizedGuide).toContain(
         'If `compiler_submit_proposal` is not present in the current tool list',
       );
@@ -680,7 +698,7 @@ describe('Argument Library MCP tools', () => {
 
       for (const [source, code] of [
         ['{broken', 'invalid-json'],
-        [JSON.stringify({ schemaVersion: 7 }), 'future-schema'],
+        [JSON.stringify({ schemaVersion: 8 }), 'future-schema'],
       ] as const) {
         await writeFile(path, source, 'utf8');
         const failed = await session.client.callTool({

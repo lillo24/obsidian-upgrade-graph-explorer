@@ -943,7 +943,7 @@ function WorkspaceOnboarding({
     source: string;
     fileName: string;
     library: ArgumentLibrary;
-    migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5;
+    migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5 | 6;
   }>();
   const [error, setError] = useState<string>();
   async function select(event: ChangeEvent<HTMLInputElement>) {
@@ -2940,7 +2940,7 @@ const ArgumentsWorkspaceContent = forwardRef<
                     <p className="arguments-disclosure">
                       Incoming schema v
                       {importPreview.merge.migratedFromSchemaVersion} was
-                      migrated to v6 without inferring canonical records,
+                      migrated to v7 without inferring canonical records,
                       relationships, Context bindings, Current pointers, or
                       Mailbox proposals.
                     </p>
