@@ -76,6 +76,11 @@
   outline-offset: 2px;
 }
 
+.workspace-dialog__notice {
+  flex: 0 0 auto;
+  padding: 0.55rem 0.75rem 0;
+}
+
 .workspace-dialog__area {
   display: flex;
   min-width: 0;

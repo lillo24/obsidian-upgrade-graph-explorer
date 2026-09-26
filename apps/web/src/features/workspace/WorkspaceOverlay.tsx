@@ -1,4 +1,4 @@
-import { useEffect, useRef, type SyntheticEvent } from 'react';
+import { useEffect, useRef, type ReactNode, type SyntheticEvent } from 'react';
 
 import {
   ArgumentsWorkspacePanel,
@@ -29,6 +29,7 @@ const FOCUSABLE_SELECTOR = [
 
 export function WorkspaceOverlay({
   area,
+  argumentNotice,
   argumentSession,
   argumentSourceAccess,
   controller,
@@ -39,6 +40,7 @@ export function WorkspaceOverlay({
   restoreFocus,
 }: {
   readonly area: WorkspaceArea;
+  readonly argumentNotice?: ReactNode;
   readonly argumentSession: ArgumentWorkspaceSession;
   readonly argumentSourceAccess?: ArgumentSourceAccess;
   readonly controller: AiReviewController;
@@ -198,6 +200,9 @@ export function WorkspaceOverlay({
             Close
           </button>
         </header>
+        {area === 'arguments' && argumentNotice !== undefined ? (
+          <div className="workspace-dialog__notice">{argumentNotice}</div>
+        ) : null}
         <div
           aria-labelledby="arguments-workspace-tab"
           className="workspace-dialog__area"

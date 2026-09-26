@@ -68,6 +68,7 @@ import {
   browserNetworkStartupCapabilityDelayMs,
   browserNetworkStartupTrace,
 } from './network-startup-trace';
+import type { ArgumentCompilerTunnelCapability } from './argument-compiler-tunnel';
 import { browserStorage, clearWorkspaceView } from './persistence/storage';
 import {
   describeVaultOpenProgress,
@@ -117,9 +118,12 @@ export interface AppProps {
   readonly reviewHistoryStore?: ReviewHistoryStore;
   /** Tests may inject the narrow app-owned theory-source boundary. */
   readonly argumentSourceAccess?: ArgumentSourceAccessHost;
+  /** Tests may inject the desktop-only Compiler tunnel ensure boundary. */
+  readonly argumentCompilerTunnel?: ArgumentCompilerTunnelCapability;
 }
 
 export function App({
+  argumentCompilerTunnel,
   argumentLibraryStore,
   argumentSourceAccess,
   desktopSourceProvider,
@@ -147,6 +151,9 @@ export function App({
   const sourceRequestGeneration = useRef(0);
   const vaultOpenAbortRef = useRef<AbortController | undefined>(undefined);
   const argumentSourceSessionSequence = useRef(0);
+  const argumentCompilerTunnelEnsureRef = useRef<Promise<void> | undefined>(
+    undefined,
+  );
   const [defaultArgumentSourceAccess] = useState(
     () => new ArgumentSourceAccessSession(),
   );
@@ -182,6 +189,8 @@ export function App({
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [workspaceRestoreFocus, setWorkspaceRestoreFocus] =
     useState<HTMLElement>();
+  const [argumentCompilerTunnelWarning, setArgumentCompilerTunnelWarning] =
+    useState<string>();
   const [reviewWorkspace, setReviewWorkspace] = useState<{
     readonly identitySession: WorkspaceIdentitySession;
     readonly label: string;
@@ -736,9 +745,33 @@ export function App({
     },
     [],
   );
+  const ensureArgumentCompilerTunnel = useCallback(() => {
+    if (argumentCompilerTunnelEnsureRef.current !== undefined) return;
+    setArgumentCompilerTunnelWarning(undefined);
+    const request = (async () => {
+      const capability =
+        argumentCompilerTunnel ??
+        (await import('./desktop-runtime')).desktopArgumentCompilerTunnel();
+      if (capability === undefined) return;
+      await capability.ensureRunning();
+    })().catch(() => {
+      setArgumentCompilerTunnelWarning(
+        'Argument Compiler tunnel could not be started.',
+      );
+    });
+    argumentCompilerTunnelEnsureRef.current = request;
+    void request.then(() => {
+      if (argumentCompilerTunnelEnsureRef.current === request) {
+        argumentCompilerTunnelEnsureRef.current = undefined;
+      }
+    });
+  }, [argumentCompilerTunnel]);
   const openArguments = useCallback(
-    (trigger: HTMLElement) => openWorkspace('arguments', trigger),
-    [openWorkspace],
+    (trigger: HTMLElement) => {
+      openWorkspace('arguments', trigger);
+      ensureArgumentCompilerTunnel();
+    },
+    [ensureArgumentCompilerTunnel, openWorkspace],
   );
   const openReview = useCallback(
     (trigger: HTMLElement) => openWorkspace('review', trigger),
@@ -921,6 +954,25 @@ export function App({
       ) : null}
       <WorkspaceOverlay
         area={workspaceArea}
+        {...(argumentCompilerTunnelWarning === undefined
+          ? {}
+          : {
+              argumentNotice: (
+                <WorkspaceNotice
+                  action={
+                    <button
+                      onClick={ensureArgumentCompilerTunnel}
+                      type="button"
+                    >
+                      Retry
+                    </button>
+                  }
+                  tone="warning"
+                >
+                  {argumentCompilerTunnelWarning}
+                </WorkspaceNotice>
+              ),
+            })}
         argumentSession={argumentSession}
         controller={reviewController}
         {...(injectedReviewController === undefined
