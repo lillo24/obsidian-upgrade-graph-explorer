@@ -25,7 +25,7 @@ const APP_IDENTIFIER = 'com.icarus.graph-explorer';
 const LIBRARY_PARTS = [
   APP_IDENTIFIER,
   'argument-workspace',
-  'library-v5.json',
+  'library-v6.json',
 ] as const;
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -164,7 +164,7 @@ function fixedLoadError(
 
 export class ArgumentLibraryLoader {
   readonly #path: LibraryPathResolution;
-  readonly #legacyPath: string | undefined;
+  readonly #legacyPaths: readonly string[];
   readonly #maxLibraryBytes: number;
 
   public constructor(options: ArgumentLibraryLoaderOptions = {}) {
@@ -178,10 +178,14 @@ export class ArgumentLibraryLoader {
               options.workingDirectory ?? process.cwd(),
             ),
           };
-    this.#legacyPath =
-      options.libraryPath === undefined && this.#path.status === 'resolved'
-        ? join(dirname(this.#path.path), 'library-v4.json')
-        : undefined;
+    if (options.libraryPath === undefined && this.#path.status === 'resolved') {
+      const directory = dirname(this.#path.path);
+      this.#legacyPaths = [5, 4, 3, 2, 1].map((version) =>
+        join(directory, `library-v${version}.json`),
+      );
+    } else {
+      this.#legacyPaths = [];
+    }
     this.#maxLibraryBytes =
       options.maxLibraryBytes ?? DEFAULT_MAX_LIBRARY_BYTES;
     if (
@@ -202,11 +206,15 @@ export class ArgumentLibraryLoader {
       handle = await open(this.#path.path, 'r');
     } catch (error: unknown) {
       let openError = error;
-      if (fileErrorCode(error) === 'ENOENT' && this.#legacyPath !== undefined) {
-        try {
-          handle = await open(this.#legacyPath, 'r');
-        } catch (legacyError: unknown) {
-          openError = legacyError;
+      if (fileErrorCode(error) === 'ENOENT') {
+        for (const legacyPath of this.#legacyPaths) {
+          try {
+            handle = await open(legacyPath, 'r');
+            break;
+          } catch (legacyError: unknown) {
+            openError = legacyError;
+            if (fileErrorCode(legacyError) !== 'ENOENT') break;
+          }
         }
       }
       if (handle !== undefined) {
@@ -279,7 +287,7 @@ export class ArgumentLibraryLoader {
           ? 'The Argument Library is not valid JSON.'
           : code === 'future-schema'
             ? 'The Argument Library uses an unsupported future schema version.'
-            : 'The Argument Library does not satisfy the schema-v5 contract.';
+            : 'The Argument Library does not satisfy the schema-v6 contract.';
       return fixedLoadError(code, message);
     }
 

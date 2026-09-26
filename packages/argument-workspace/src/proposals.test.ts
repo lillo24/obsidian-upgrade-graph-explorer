@@ -25,6 +25,7 @@ function submission(library: ArgumentLibrary): CreateArgumentProposalInput {
   return {
     clientSubmissionId: 'client-proposal-1',
     title: 'Compatibility rule has a scoped exception',
+    intent: 'add-boundary',
     topicId: 'T-NEUTRAL',
     target: {
       argumentId: target.id,
@@ -32,11 +33,54 @@ function submission(library: ArgumentLibrary): CreateArgumentProposalInput {
       reliedOnRevision: target.revision,
     },
     examples: ['Two quantities are intentionally normalized upstream.'],
-    premiseHints: ['The normalization contract is independently verified.'],
-    suggestedAxiomIds: ['AX-NEUTRAL'],
+    premises: [
+      {
+        id: 'P-TEXT',
+        kind: 'text',
+        text: 'The normalization contract is independently verified.',
+      },
+      {
+        id: 'P-AXIOM',
+        kind: 'axiom',
+        axiomId: axiom.id,
+        reliedOnRevision: axiom.revision,
+      },
+      {
+        id: 'P-ARGUMENT',
+        kind: 'argument-conclusion',
+        argumentId: target.id,
+        reliedOnRevision: target.revision,
+      },
+    ],
     reasoning: 'Pre-normalized quantities do not require another conversion.',
+    reasoningSteps: [
+      {
+        id: 'R-1',
+        uses: [
+          { kind: 'premise', premiseId: 'P-TEXT' },
+          { kind: 'premise', premiseId: 'P-AXIOM' },
+        ],
+        text: 'The verified normalization satisfies the compatibility rule.',
+      },
+      {
+        id: 'R-2',
+        uses: [{ kind: 'reasoning-step', stepId: 'R-1' }],
+        text: 'No second conversion is required.',
+      },
+    ],
     conclusion: 'The compatibility check can reuse a verified normalization.',
     boundary: 'Only where the normalization contract is current.',
+    sourceObservations: [
+      {
+        id: 'SOURCE-1',
+        label: 'Normalization implementation',
+        repository: 'icarus/example',
+        url: 'https://example.com/icarus/commit/36c927fabcd',
+        commitSha: '36c927fabcd',
+        filePath: 'Associated Value.md',
+        observation: 'The source performs normalization before comparison.',
+      },
+    ],
     whyNovelOrUnresolved:
       'The existing response discusses incompatible units, not a verified normalization boundary.',
     consultation: {
@@ -64,7 +108,11 @@ describe('Argument Proposal Mailbox', () => {
     expect(first.proposal).toMatchObject({
       status: 'pending',
       title: input.title,
+      intent: 'add-boundary',
       target: input.target,
+      premises: input.premises,
+      reasoningSteps: input.reasoningSteps,
+      sourceObservations: input.sourceObservations,
       consultation: input.consultation,
     });
     expect(first.library.proposals).toHaveLength(1);
@@ -136,7 +184,7 @@ describe('Argument Proposal Mailbox', () => {
         },
         deterministicRuntime('missing-target-receipt'),
       ),
-    ).toThrow('target and revision must appear in the consultation records');
+    ).toThrow('must be revision-pinned in consultation records');
     expect(library.proposals).toEqual([]);
   });
 

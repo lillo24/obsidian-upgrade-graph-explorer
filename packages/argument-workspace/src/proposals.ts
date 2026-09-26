@@ -12,6 +12,10 @@ import {
 import type {
   ArgumentLibrary,
   ArgumentProposal,
+  ArgumentProposalIntent,
+  ArgumentProposalPremise,
+  ArgumentProposalReasoningStep,
+  ArgumentProposalSourceObservation,
   ArgumentProposalTarget,
   ArgumentRuntime,
   CreateArgumentProposalInput,
@@ -26,6 +30,17 @@ export const ARGUMENT_PROPOSAL_MAX_TITLE_LENGTH = 300;
 export const ARGUMENT_PROPOSAL_MAX_TEXT_LENGTH = 20_000;
 export const ARGUMENT_PROPOSAL_MAX_LIST_ITEMS = 40;
 export const ARGUMENT_PROPOSAL_MAX_ID_LENGTH = 512;
+
+const PROPOSAL_INTENTS = new Set<ArgumentProposalIntent>([
+  'unspecified',
+  'new',
+  'attack',
+  'support',
+  'refine',
+  'extend',
+  'add-boundary',
+  'supersede',
+]);
 
 export interface ArgumentProposalSubmissionOutcome {
   readonly library: ArgumentLibrary;
@@ -82,6 +97,194 @@ function uniqueIds(
       ARGUMENT_PROPOSAL_MAX_ID_LENGTH,
     ),
   );
+}
+
+function proposalIntent(
+  input: CreateArgumentProposalInput,
+): ArgumentProposalIntent {
+  const intent =
+    input.intent ?? (input.target === undefined ? 'new' : 'unspecified');
+  if (!PROPOSAL_INTENTS.has(intent))
+    throw new Error('Proposal intent is invalid.');
+  if (intent === 'new' && input.target !== undefined)
+    throw new Error('An independent Proposal must not identify a target.');
+  if (
+    intent !== 'new' &&
+    intent !== 'unspecified' &&
+    input.target === undefined
+  )
+    throw new Error(`Proposal intent "${intent}" requires a target Argument.`);
+  return intent;
+}
+
+function legacyPremises(
+  input: CreateArgumentProposalInput,
+): readonly ArgumentProposalPremise[] {
+  if (
+    input.premises !== undefined &&
+    ((input.premiseHints?.length ?? 0) > 0 ||
+      (input.suggestedAxiomIds?.length ?? 0) > 0)
+  )
+    throw new Error(
+      'Use typed Proposal premises or legacy premise hints, not both.',
+    );
+  if (input.premises !== undefined) return clonePlainData(input.premises);
+  const text = boundedStrings(
+    input.premiseHints ?? [],
+    'Proposal premise hints',
+  ).map((value, index) => ({
+    id: `legacy-text-${index + 1}`,
+    kind: 'text' as const,
+    text: value,
+  }));
+  const axiomIds = uniqueIds(
+    input.suggestedAxiomIds ?? [],
+    'Suggested Axiom IDs',
+  );
+  const axioms = axiomIds.map((axiomId, index) => {
+    const consulted = input.consultation.records.find(
+      (record) => record.kind === 'axiom' && record.id === axiomId,
+    );
+    if (consulted?.revision === undefined)
+      throw new Error(
+        `Suggested Axiom "${axiomId}" requires a consulted revision.`,
+      );
+    return {
+      id: `legacy-axiom-${index + 1}`,
+      kind: 'axiom' as const,
+      axiomId,
+      reliedOnRevision: consulted.revision,
+    };
+  });
+  return [...text, ...axioms];
+}
+
+function normalizeProposalPremises(
+  input: CreateArgumentProposalInput,
+): readonly ArgumentProposalPremise[] {
+  const premises = legacyPremises(input);
+  if (premises.length > ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+    throw new Error(
+      `Proposal premises exceed the ${ARGUMENT_PROPOSAL_MAX_LIST_ITEMS}-item limit.`,
+    );
+  const ids = new Set<string>();
+  return premises.map((premise, index) => {
+    requiredText(
+      premise.id,
+      `Proposal premise ${index + 1} ID`,
+      ARGUMENT_PROPOSAL_MAX_ID_LENGTH,
+    );
+    if (ids.has(premise.id))
+      throw new Error(`Proposal premise ID "${premise.id}" is duplicated.`);
+    ids.add(premise.id);
+    if (premise.kind === 'text')
+      requiredText(
+        premise.text,
+        `Proposal premise ${index + 1}`,
+        ARGUMENT_PROPOSAL_MAX_TEXT_LENGTH,
+      );
+    return clonePlainData(premise);
+  });
+}
+
+function normalizeReasoningSteps(
+  values: readonly ArgumentProposalReasoningStep[],
+  premiseIds: ReadonlySet<string>,
+): readonly ArgumentProposalReasoningStep[] {
+  if (values.length > ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+    throw new Error(
+      `Proposal reasoning steps exceed the ${ARGUMENT_PROPOSAL_MAX_LIST_ITEMS}-item limit.`,
+    );
+  const priorStepIds = new Set<string>();
+  return values.map((step, index) => {
+    requiredText(
+      step.id,
+      `Reasoning step ${index + 1} ID`,
+      ARGUMENT_PROPOSAL_MAX_ID_LENGTH,
+    );
+    requiredText(
+      step.text,
+      `Reasoning step ${index + 1}`,
+      ARGUMENT_PROPOSAL_MAX_TEXT_LENGTH,
+    );
+    if (priorStepIds.has(step.id))
+      throw new Error(`Reasoning step ID "${step.id}" is duplicated.`);
+    if (step.uses.length > ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+      throw new Error(`Reasoning step "${step.id}" has too many references.`);
+    for (const reference of step.uses) {
+      if (reference.kind === 'premise' && !premiseIds.has(reference.premiseId))
+        throw new Error(
+          `Reasoning step "${step.id}" references unknown premise "${reference.premiseId}".`,
+        );
+      if (
+        reference.kind === 'reasoning-step' &&
+        !priorStepIds.has(reference.stepId)
+      )
+        throw new Error(
+          `Reasoning step "${step.id}" must reference an earlier reasoning step.`,
+        );
+    }
+    priorStepIds.add(step.id);
+    return clonePlainData(step);
+  });
+}
+
+function normalizeSourceObservations(
+  values: readonly ArgumentProposalSourceObservation[],
+): readonly ArgumentProposalSourceObservation[] {
+  if (values.length > ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+    throw new Error(
+      `Proposal source observations exceed the ${ARGUMENT_PROPOSAL_MAX_LIST_ITEMS}-item limit.`,
+    );
+  const ids = new Set<string>();
+  return values.map((observation, index) => {
+    requiredText(
+      observation.id,
+      `Source observation ${index + 1} ID`,
+      ARGUMENT_PROPOSAL_MAX_ID_LENGTH,
+    );
+    requiredText(
+      observation.observation,
+      `Source observation ${index + 1}`,
+      ARGUMENT_PROPOSAL_MAX_TEXT_LENGTH,
+    );
+    if (ids.has(observation.id))
+      throw new Error(
+        `Source observation ID "${observation.id}" is duplicated.`,
+      );
+    ids.add(observation.id);
+    for (const [label, value] of [
+      ['label', observation.label],
+      ['repository', observation.repository],
+      ['source version', observation.sourceVersion],
+      ['file path', observation.filePath],
+      ['heading', observation.heading],
+      ['span', observation.span],
+    ] as const) {
+      if (value !== undefined)
+        requiredText(
+          value,
+          `Source observation ${label}`,
+          ARGUMENT_PROPOSAL_MAX_TEXT_LENGTH,
+        );
+    }
+    if (
+      observation.commitSha !== undefined &&
+      !/^[a-f0-9]{7,64}$/iu.test(observation.commitSha)
+    )
+      throw new Error('Source observation commit SHA is invalid.');
+    if (observation.url !== undefined) {
+      let parsed: URL;
+      try {
+        parsed = new URL(observation.url);
+      } catch {
+        throw new Error('Source observation URL is invalid.');
+      }
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:')
+        throw new Error('Source observation URL must use HTTP or HTTPS.');
+    }
+    return clonePlainData(observation);
+  });
 }
 
 function targetPartExists(
@@ -227,10 +430,8 @@ function withProposals(
 }
 
 function normalizedSubmission(input: CreateArgumentProposalInput) {
-  const suggestedAxiomIds = uniqueIds(
-    input.suggestedAxiomIds ?? [],
-    'Suggested Axiom IDs',
-  );
+  const premises = normalizeProposalPremises(input);
+  const premiseIds = new Set(premises.map(({ id }) => id));
   return {
     title: requiredText(
       input.title,
@@ -246,10 +447,12 @@ function normalizedSubmission(input: CreateArgumentProposalInput) {
             ARGUMENT_PROPOSAL_MAX_ID_LENGTH,
           ),
         }),
-    ...(input.target === undefined ? {} : { target: input.target }),
+    intent: proposalIntent(input),
+    ...(input.target === undefined
+      ? {}
+      : { target: clonePlainData(input.target) }),
     examples: boundedStrings(input.examples, 'Proposal examples'),
-    premiseHints: boundedStrings(input.premiseHints, 'Proposal premise hints'),
-    suggestedAxiomIds,
+    premises,
     ...(optionalText(
       input.reasoning,
       'Proposal reasoning',
@@ -257,6 +460,10 @@ function normalizedSubmission(input: CreateArgumentProposalInput) {
     ) === undefined
       ? {}
       : { reasoning: input.reasoning }),
+    reasoningSteps: normalizeReasoningSteps(
+      input.reasoningSteps ?? [],
+      premiseIds,
+    ),
     conclusion: requiredText(
       input.conclusion,
       'Proposal conclusion',
@@ -269,6 +476,9 @@ function normalizedSubmission(input: CreateArgumentProposalInput) {
     ) === undefined
       ? {}
       : { boundary: input.boundary }),
+    sourceObservations: normalizeSourceObservations(
+      input.sourceObservations ?? [],
+    ),
     whyNovelOrUnresolved: requiredText(
       input.whyNovelOrUnresolved,
       'Why novel or unresolved',
@@ -276,6 +486,60 @@ function normalizedSubmission(input: CreateArgumentProposalInput) {
     ),
     consultation: clonePlainData(input.consultation),
   };
+}
+
+function validatePremiseConsultation(
+  library: ArgumentLibrary,
+  input: CreateArgumentProposalInput,
+  premises: readonly ArgumentProposalPremise[],
+): void {
+  for (const premise of premises) {
+    if (premise.kind === 'text') continue;
+    if (premise.kind === 'axiom') {
+      const axiom = library.axioms.find(({ id }) => id === premise.axiomId);
+      if (axiom === undefined)
+        throw new Error(
+          `Proposal premise Axiom "${premise.axiomId}" does not exist.`,
+        );
+      if (axiom.revision !== premise.reliedOnRevision)
+        throw new Error(
+          `Proposal premise Axiom "${premise.axiomId}" revision is stale.`,
+        );
+      const consulted = consultationIdentity(input, 'axiom', premise.axiomId);
+      if (consulted?.revision !== premise.reliedOnRevision)
+        throw new Error(
+          `Proposal premise Axiom "${premise.axiomId}" must be revision-pinned in consultation records.`,
+        );
+      continue;
+    }
+    const argument = library.arguments.find(
+      ({ id }) => id === premise.argumentId,
+    );
+    if (argument === undefined)
+      throw new Error(
+        `Proposal premise Argument "${premise.argumentId}" does not exist.`,
+      );
+    if (argument.revision !== premise.reliedOnRevision)
+      throw new Error(
+        `Proposal premise Argument "${premise.argumentId}" revision is stale.`,
+      );
+    if (
+      premise.kind === 'argument-premise' &&
+      !argument.premises.some(({ id }) => id === premise.premiseId)
+    )
+      throw new Error(
+        `Proposal referenced premise "${premise.premiseId}" does not exist.`,
+      );
+    const consulted = consultationIdentity(
+      input,
+      'argument',
+      premise.argumentId,
+    );
+    if (consulted?.revision !== premise.reliedOnRevision)
+      throw new Error(
+        `Proposal premise Argument "${premise.argumentId}" must be revision-pinned in consultation records.`,
+      );
+  }
 }
 
 /** Append-only, non-canonical submission with exact-payload idempotency. */
@@ -317,6 +581,7 @@ export function submitArgumentProposal(
     }
   }
   validateConsultation(library, input);
+  validatePremiseConsultation(library, input, normalized.premises);
   if (
     input.topicId !== undefined &&
     !library.topics.some(({ id }) => id === input.topicId)
@@ -355,16 +620,6 @@ export function submitArgumentProposal(
     ) {
       throw new Error(
         'Proposal target and revision must appear in the consultation records.',
-      );
-    }
-  }
-  for (const axiomId of input.suggestedAxiomIds ?? []) {
-    if (!library.axioms.some(({ id }) => id === axiomId)) {
-      throw new Error(`Suggested Axiom "${axiomId}" does not exist.`);
-    }
-    if (consultationIdentity(input, 'axiom', axiomId) === undefined) {
-      throw new Error(
-        `Suggested Axiom "${axiomId}" must appear in the consultation records.`,
       );
     }
   }

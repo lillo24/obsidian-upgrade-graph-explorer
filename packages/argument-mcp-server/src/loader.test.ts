@@ -72,7 +72,7 @@ describe('ArgumentLibraryLoader', () => {
         'Application Support',
         'com.icarus.graph-explorer',
         'argument-workspace',
-        'library-v5.json',
+        'library-v6.json',
       ),
     });
     expect(
@@ -87,12 +87,12 @@ describe('ArgumentLibraryLoader', () => {
         '/data',
         'com.icarus.graph-explorer',
         'argument-workspace',
-        'library-v5.json',
+        'library-v6.json',
       ),
     });
   });
 
-  it('loads strict UTF-8 schema-v5 data through the domain reader', async () => {
+  it('loads strict UTF-8 schema-v6 data through the domain reader', async () => {
     const directory = await temporaryDirectory();
     const path = join(directory, 'library-v4.json');
     const { library } = createSyntheticLibrary();
@@ -139,7 +139,7 @@ describe('ArgumentLibraryLoader', () => {
     expect(loaded).toMatchObject({
       status: 'loaded',
       library: {
-        schemaVersion: 5,
+        schemaVersion: 6,
         libraryId: 'library-mcp-test',
         proposals: [],
       },
@@ -177,7 +177,7 @@ describe('ArgumentLibraryLoader', () => {
     {
       name: 'future schema',
       prepare: async (path: string) =>
-        writeFile(path, JSON.stringify({ schemaVersion: 6 }), 'utf8'),
+        writeFile(path, JSON.stringify({ schemaVersion: 7 }), 'utf8'),
       expected: 'future-schema',
     },
   ])(

@@ -9,7 +9,7 @@ Graph Explorer UI ─┐
 MCP server ──────┘
 ```
 
-The server reloads and validates `library-v5.json` for every tool call and never
+The server reloads and validates `library-v6.json` for every tool call and never
 creates a second database. Five tools provide the bundled usage guide or
 retained read-only `KnowledgeReader` snapshots. One tightly scoped append-only
 tool can submit a bounded non-canonical Proposal to the same file. No canonical
@@ -30,13 +30,13 @@ for MCP host configuration.
 Without that variable, the server mirrors Tauri's app-local-data convention for
 the `com.icarus.graph-explorer` application identifier:
 
-- Windows: `%LOCALAPPDATA%\com.icarus.graph-explorer\argument-workspace\library-v5.json`
-- macOS: `~/Library/Application Support/com.icarus.graph-explorer/argument-workspace/library-v5.json`
+- Windows: `%LOCALAPPDATA%\com.icarus.graph-explorer\argument-workspace\library-v6.json`
+- macOS: `~/Library/Application Support/com.icarus.graph-explorer/argument-workspace/library-v6.json`
 - Linux: `$XDG_DATA_HOME` (or `~/.local/share`) followed by
-  `com.icarus.graph-explorer/argument-workspace/library-v5.json`
+  `com.icarus.graph-explorer/argument-workspace/library-v6.json`
 
-When the derived v5 path is absent, reads may recover a valid adjacent
-`library-v4.json` through the core's deterministic in-memory migration. An
+When the derived v6 path is absent, reads may recover the newest valid adjacent
+`library-v5.json` through `library-v1.json` via deterministic in-memory migration. An
 explicit `ICARUS_ARGUMENT_LIBRARY_PATH` is authoritative and has no implicit
 fallback.
 
@@ -47,7 +47,7 @@ resolved absolute path. Reads are capped at 64 MiB and tool responses at 1 MiB.
 For the current Windows desktop library:
 
 ```powershell
-$env:ICARUS_ARGUMENT_LIBRARY_PATH = Join-Path $env:LOCALAPPDATA 'com.icarus.graph-explorer\argument-workspace\library-v5.json'
+$env:ICARUS_ARGUMENT_LIBRARY_PATH = Join-Path $env:LOCALAPPDATA 'com.icarus.graph-explorer\argument-workspace\library-v6.json'
 ```
 
 ## Tools
@@ -64,10 +64,12 @@ $env:ICARUS_ARGUMENT_LIBRARY_PATH = Join-Path $env:LOCALAPPDATA 'com.icarus.grap
   `kind`, `maxRecords`, and `maxDepth`.
 - `compiler_submit_proposal`: appends one pending non-canonical Proposal after
   validating payload bounds, exact consultation descriptor and record
-  revisions, optional exact Argument-part target, Topic, and suggested Axiom
-  IDs. Referenced Topics, targets, and suggested Axioms must also appear in the
-  consultation records. `clientSubmissionId` and exact payload retries are
-  idempotent.
+  revisions, review intent, optional exact Argument-part target, Topic, typed
+  text/Axiom/Argument dependencies, optional reasoning steps, and separate
+  source observations. Referenced Topics, targets, and dependencies must also
+  appear in consultation records. Legacy `premiseHints`/`suggestedAxiomIds`
+  remain a transitional input and normalize immediately to typed premises.
+  `clientSubmissionId` and exact payload retries are idempotent.
 
 The five guide/reader tools are annotated read-only. Proposal submission is annotated
 non-destructive and idempotent, but not read-only. It is intended only after an
@@ -104,14 +106,14 @@ Bundles preserve registered theory-source references, but MCP1 intentionally
 does not expose `compiler_read_source`. The standalone process has no authorized
 vault/source binding and never follows record paths into the filesystem.
 
-Submission accepts candidate title, examples, premise hints, optional
-reasoning, conclusion, optional boundary, why it is novel/unresolved, optional
-Topic/target/suggested Axioms, and the consultation descriptor/records. Text,
-list lengths, and the whole JSON payload are bounded. A stale consultation or
-target fails without writing. The server performs one expected-snapshot atomic
-replacement; concurrent changes return a conflict rather than silently
-retargeting. It never exposes a tool that resolves Proposals or mutates
-canonical arrays.
+Submission accepts candidate title, review intent, examples, typed premises,
+optional simple or stepwise reasoning, conclusion, boundary, separate source
+observations, why it is novel/unresolved, optional Topic/precise target, and the
+consultation descriptor/records. Text, list lengths, and the whole JSON payload
+are bounded. A stale consultation, target, or typed dependency fails without
+writing. The server performs one expected-snapshot atomic replacement;
+concurrent changes return a conflict rather than silently retargeting. It never
+exposes a tool that resolves Proposals or mutates canonical arrays.
 
 ## Build, test, and run
 
@@ -137,7 +139,7 @@ pnpm dlx @modelcontextprotocol/inspector@2.6.0 node packages/argument-mcp-server
 
 In the Inspector, connect and use the Tools tab to call status, list/search, and
 bundle reads. For a synthetic fixture, point `ICARUS_ARGUMENT_LIBRARY_PATH` at a
-temporary schema-v5 JSON file before starting Inspector. Never commit or paste
+temporary schema-v6 JSON file before starting Inspector. Never commit or paste
 the private real library into tests or logs.
 
 For a headless connection check, the same Inspector package also has a CLI

@@ -58,7 +58,7 @@ describe('browser Argument Library storage', () => {
       status: 'loaded',
       snapshot: {
         library: {
-          schemaVersion: 5,
+          schemaVersion: 6,
           arguments: [],
           contexts: [],
           proposals: [],
@@ -75,7 +75,7 @@ describe('browser Argument Library storage', () => {
     expect(
       JSON.parse(storage.values.get(ARGUMENT_LIBRARY_BROWSER_STORAGE_KEY)!),
     ).toMatchObject({
-      schemaVersion: 5,
+      schemaVersion: 6,
       arguments: [],
       contexts: [],
       proposals: [],

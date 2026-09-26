@@ -1,6 +1,6 @@
 # Icarus Argument Compiler AI cross-check protocol
 
-Protocol version: `argument-compiler-ai-usage-v2`
+Protocol version: `argument-compiler-ai-usage-v3`
 
 Use this protocol when substantive candidate ideas already exist and the
 Compiler cross-check is beginning. The Compiler is not the generator of the
@@ -142,10 +142,18 @@ If a meaningful new or revised candidate survives the cross-check:
 
 1. Present the surviving candidate to the user in chat.
 2. Call `compiler_submit_proposal` to send it to the Compiler Mailbox.
-3. Follow the tool's actual schema and include useful review provenance: the
-   candidate, its target when known, concrete examples when useful, relevant
-   consulted record IDs and revisions, why the prior reasoning did not settle
-   it, and unresolved scope or boundary.
+3. Follow the tool's actual schema and include useful review provenance. Use a
+   target only when the candidate genuinely targets that Argument or part.
+   Choose the review intent that describes the candidate (`refine`, `extend`,
+   or `add-boundary` when appropriate) instead of forcing `attack`.
+4. Encode existing Axiom, Argument-conclusion, and Argument-premise dependencies
+   as typed, revision-pinned premises. Keep repository/file/commit observations
+   in `sourceObservations`; they are drafting provenance and do not become
+   canonical premises implicitly.
+5. Include the exact consulted record IDs/revisions, why prior reasoning did not
+   settle the candidate, and any unresolved scope or boundary. Simple reasoning
+   prose is sufficient; use ordered reasoning steps only when their premise or
+   earlier-step references help human review.
 
 Do not search the Argument Library for a record called "Mailbox". The Mailbox
 is a proposal-submission workflow, not canonical Argument Library knowledge.

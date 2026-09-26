@@ -191,7 +191,10 @@ function fixture(): ArgumentLibrary {
   );
 }
 
-function fixtureWithProposal(staleTarget = false): ArgumentLibrary {
+function fixtureWithProposal(
+  staleTarget = false,
+  intent: 'attack' | 'add-boundary' = 'attack',
+): ArgumentLibrary {
   const clock = runtime();
   const base = fixture();
   const descriptor = captureArgumentLibrarySnapshot(base).descriptor;
@@ -203,6 +206,7 @@ function fixtureWithProposal(staleTarget = false): ArgumentLibrary {
     {
       clientSubmissionId: 'ui-proposal-submission',
       title: 'Verified normalization exception',
+      intent,
       topicId: topic.id,
       target: {
         argumentId: target.id,
@@ -210,11 +214,33 @@ function fixtureWithProposal(staleTarget = false): ArgumentLibrary {
         reliedOnRevision: target.revision,
       },
       examples: ['The input quantities were normalized upstream.'],
-      premiseHints: ['A current normalization contract exists.'],
-      suggestedAxiomIds: [axiom.id],
+      premises: [
+        {
+          id: 'P-CLAIM',
+          kind: 'text',
+          text: 'A current normalization contract exists.',
+        },
+        {
+          id: 'P-AXIOM',
+          kind: 'axiom',
+          axiomId: axiom.id,
+          reliedOnRevision: axiom.revision,
+        },
+      ],
       reasoning: 'Verified normalization can satisfy the compatibility rule.',
       conclusion: 'A second conversion is unnecessary in this bounded case.',
       boundary: 'Only while the normalization contract remains current.',
+      sourceObservations: [
+        {
+          id: 'SOURCE-1',
+          label: 'Normalization implementation',
+          repository: 'icarus/example',
+          url: 'https://example.com/icarus/commit/36c927fabcd',
+          commitSha: '36c927fabcd',
+          filePath: 'Associated Value.md',
+          observation: 'The implementation normalizes quantities upstream.',
+        },
+      ],
       whyNovelOrUnresolved:
         'The canonical reasoning does not discuss pre-normalized inputs.',
       consultation: {
@@ -302,11 +328,13 @@ describe('standalone Arguments workspace', () => {
     ) {
       this.removeAttribute('open');
     });
-    vi.stubGlobal('URL', {
-      ...URL,
-      createObjectURL: vi.fn(() => 'blob:test'),
-      revokeObjectURL: vi.fn(),
-    });
+    vi.stubGlobal(
+      'URL',
+      Object.assign(URL, {
+        createObjectURL: vi.fn(() => 'blob:test'),
+        revokeObjectURL: vi.fn(),
+      }),
+    );
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -409,20 +437,24 @@ describe('standalone Arguments workspace', () => {
     expect(container.textContent).toContain(
       'The canonical reasoning does not discuss pre-normalized inputs.',
     );
-    expect(container.textContent).toContain('argument AR-UI at revision 1');
+    expect(container.textContent).toContain(
+      'Compatibility reasoning argument · AR-UI · revision 1',
+    );
+    expect(container.textContent).toContain('Source observations / provenance');
+    expect(container.textContent).toContain('36c927f');
     expect(container.textContent).toContain('Stale target:');
 
     await click('Accept / Integrate');
     expect(container.textContent).toContain('Integrate accepted proposal');
-    expect(container.textContent).toContain(
-      'Suggested Axioms (not selected automatically): Compatible units',
-    );
+    expect(container.textContent).toContain('Compatible units');
     expect(textarea('Conclusion').value).toBe(
       'A second conversion is unnecessary in this bounded case.',
     );
     expect(
-      fieldsetCheckbox('Final relationship to the target', 'Attack').checked,
-    ).toBe(true);
+      [...container.querySelectorAll('select')].find((select) =>
+        select.closest('label')?.textContent?.includes('Canonical relation'),
+      )?.value,
+    ).toBe('attack');
     expect(store.writes).toBe(0);
 
     await click('Cancel');
@@ -449,6 +481,30 @@ describe('standalone Arguments workspace', () => {
     expect(container.textContent).not.toContain('Proposal Mailbox');
     await click('Discard');
     expect(container.textContent).toContain('Proposal Mailbox');
+    expect(store.writes).toBe(0);
+  });
+
+  it('keeps boundary intent separate from canonical attack and exposes navigable target provenance', async () => {
+    store = new MemoryStore(fixtureWithProposal(false, 'add-boundary'));
+    session = new ArgumentWorkspaceSession(store, runtime());
+    await mount();
+    await click('Mailbox (1)');
+
+    expect(container.textContent).toContain('Add boundary to');
+    const commit = container.querySelector<HTMLAnchorElement>(
+      'a[href="https://example.com/icarus/commit/36c927fabcd"]',
+    );
+    expect(commit?.textContent).toBe('36c927fa');
+    expect(commit?.title).toBe('36c927fabcd');
+    expect(button('Copy SHA')).toBeDefined();
+    expect(button('Open record')).toBeDefined();
+
+    await click('Accept / Integrate');
+    expect(
+      [...container.querySelectorAll('select')].find((select) =>
+        select.closest('label')?.textContent?.includes('Canonical relation'),
+      )?.value,
+    ).toBe('none');
     expect(store.writes).toBe(0);
   });
 
@@ -529,6 +585,18 @@ describe('standalone Arguments workspace', () => {
         'Accepted as the Current bounded refinement.',
       ),
     );
+    await act(() =>
+      fieldsetCheckbox(
+        'Final relationship to the target',
+        'Supersede the target Argument',
+      ).click(),
+    );
+    await act(() =>
+      fieldsetCheckbox(
+        'Final relationship to the target',
+        'Promote the new Argument to Current for the selected Topic',
+      ).click(),
+    );
     await click('Save');
 
     expect(store.writes).toBe(1);
@@ -550,7 +618,20 @@ describe('standalone Arguments workspace', () => {
         }),
       ],
     });
-    expect(result?.premises.some(({ kind }) => kind === 'axiom')).toBe(false);
+    expect(result?.premises).toEqual([
+      expect.objectContaining({
+        kind: 'text',
+        text: 'A current normalization contract exists.',
+      }),
+      expect.objectContaining({ kind: 'axiom', axiomId: 'AX-UI' }),
+    ]);
+    expect(
+      result?.premises.some(
+        (premise) =>
+          premise.kind === 'text' &&
+          premise.text.includes('implementation normalizes'),
+      ),
+    ).toBe(false);
     expect(store.snapshot.library.topics[0]?.currentArgumentId).toBe(
       resultingId,
     );
