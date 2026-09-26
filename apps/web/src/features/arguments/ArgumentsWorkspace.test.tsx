@@ -220,7 +220,7 @@ function fixtureWithProposal(
               '2. Check the cited structure.',
               '',
               '```text',
-              'review-only-code',
+              'review-only-code     LEFT -> MIDDLE -> RIGHT'.padEnd(240, '-'),
               '```',
               '',
               '<script>globalThis.mailboxPwned = true</script>',
@@ -484,9 +484,16 @@ describe('standalone Arguments workspace', () => {
     );
     expect(soft?.querySelector('blockquote')).not.toBeNull();
     expect(soft?.querySelector('ol')).not.toBeNull();
-    expect(soft?.querySelector('pre')?.textContent).toContain(
-      'review-only-code',
+    const codeViewport = soft?.querySelector('pre');
+    expect(codeViewport?.textContent).toContain(
+      'review-only-code     LEFT -> MIDDLE -> RIGHT',
     );
+    expect(codeViewport?.textContent).toContain('-'.repeat(120));
+    expect(
+      codeViewport?.parentElement?.classList.contains(
+        'safe-markdown__code-block',
+      ),
+    ).toBe(true);
     expect(soft?.querySelector('script')).toBeNull();
     expect(soft?.querySelector('img')).toBeNull();
     expect(soft?.querySelectorAll('a')).toHaveLength(1);
