@@ -110,3 +110,59 @@ it('serves initialize, tools/list, and tools/call over clean stdio', async () =>
   expect(stderr).toContain('listening on stdio');
   expect(stderr).not.toContain(libraryPath);
 }, 15_000);
+
+it('rebuilds before repository-supported start without polluting protocol stdout', async () => {
+  const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+  const pnpmEntryPoint = process.env.npm_execpath;
+  if (!pnpmEntryPoint) {
+    throw new Error(
+      'npm_execpath is required to exercise the pnpm start path.',
+    );
+  }
+  const temporary = await mkdtemp(join(tmpdir(), 'icarus-argument-mcp-start-'));
+  const libraryPath = join(temporary, 'library-v7.json');
+  const { library } = createSyntheticLibrary();
+  await writeFile(libraryPath, serializeArgumentLibrary(library), 'utf8');
+
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [
+      pnpmEntryPoint,
+      '--filter',
+      '@icarus-graph-explorer/argument-mcp-server',
+      'start',
+    ],
+    cwd: packageRoot,
+    env: {
+      ...inheritedEnvironment(),
+      [ARGUMENT_LIBRARY_PATH_ENV]: libraryPath,
+    },
+    stderr: 'pipe',
+  });
+  let stderr = '';
+  transport.stderr?.on('data', (chunk: unknown) => {
+    stderr += String(chunk);
+  });
+  const client = new Client({ name: 'start-test', version: '1.0.0' });
+
+  try {
+    await client.connect(transport);
+    const guide = await client.callTool({
+      name: 'compiler_usage_guide',
+      arguments: {},
+    });
+    expect(guide.structuredContent).toMatchObject({
+      status: 'ok',
+      version: 'argument-compiler-ai-usage-v4',
+      guide: expect.stringContaining(
+        'Run an argument-evolution resolution sweep',
+      ),
+    });
+  } finally {
+    await client.close();
+    await rm(temporary, { recursive: true, force: true });
+  }
+
+  expect(stderr).toContain('listening on stdio');
+  expect(stderr).not.toContain(libraryPath);
+}, 20_000);

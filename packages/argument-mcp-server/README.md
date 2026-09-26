@@ -131,13 +131,14 @@ pnpm --filter @icarus-graph-explorer/argument-mcp-server start
 `start` always rebuilds `dist/server.js` before waiting for an MCP client on
 stdin, so the repository-supported launch path cannot silently reuse an older
 embedded guide or tool schema. Waiting on stdin is normal. Protocol messages
-use stdout exclusively, and the single startup diagnostic goes to stderr.
+use stdout exclusively; build output and the startup diagnostic go to stderr.
 
 An external service that invokes `node packages/argument-mcp-server/dist/server.js`
 directly bypasses that protection. Its launcher must run the package `build`
 command before every restart, then reconnect the MCP client so the client
-rediscovers the current tool schemas. The spawned stdio test builds and launches
-that exact deployment artifact against a synthetic library.
+rediscovers the current tool schemas. The spawned stdio tests build and launch
+that exact deployment artifact and connect through the repository-supported
+`start` command against synthetic libraries.
 
 After building, launch the official MCP Inspector from the repository root.
 Inspector 2.6.0 requires Node 22.19 or newer. Inspector gives spawned servers a
