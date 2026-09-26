@@ -11,6 +11,7 @@ import {
   createEmptyArgumentLibrary,
   createTopic,
 } from './library';
+import { submitArgumentProposal } from './proposals';
 import {
   exportArgumentLibraryMarkdown,
   safeMarkdownFileName,
@@ -113,7 +114,7 @@ describe('Argument Library interchange', () => {
     });
     expect(
       parseArgumentLibraryJson(
-        JSON.stringify({ ...createNeutralArgumentLibrary(), schemaVersion: 6 }),
+        JSON.stringify({ ...createNeutralArgumentLibrary(), schemaVersion: 7 }),
       ),
     ).toMatchObject({ status: 'future-schema' });
   });
@@ -126,7 +127,7 @@ describe('Argument Library interchange', () => {
       status: 'valid',
       migratedFromSchemaVersion: 1,
       value: {
-        schemaVersion: 5,
+        schemaVersion: 6,
         libraryId: 'library-v1-fixture',
         libraryRevision: 7,
         arguments: [],
@@ -172,7 +173,7 @@ describe('Argument Library interchange', () => {
       status: 'valid',
       migratedFromSchemaVersion: 2,
       value: {
-        schemaVersion: 5,
+        schemaVersion: 6,
         contexts: [],
         proposals: [],
         arguments: [{ examples: [], relations: [], contextIds: [] }],
@@ -197,7 +198,7 @@ describe('Argument Library interchange', () => {
     expect(parsed).toMatchObject({
       status: 'valid',
       migratedFromSchemaVersion: 4,
-      value: { schemaVersion: 5, proposals: [] },
+      value: { schemaVersion: 6, proposals: [] },
     });
     if (parsed.status !== 'valid') return;
     const migratedWithoutMailbox = clonePlainData(
@@ -206,6 +207,105 @@ describe('Argument Library interchange', () => {
     delete migratedWithoutMailbox.proposals;
     migratedWithoutMailbox.schemaVersion = 4;
     expect(migratedWithoutMailbox).toEqual(legacyV4);
+  });
+
+  it('migrates v5 proposals into typed review roles without inferring references from prose', () => {
+    const library = createNeutralArgumentLibrary();
+    const descriptor = captureArgumentLibrarySnapshot(library).descriptor;
+    const target = library.arguments[0]!;
+    const axiom = library.axioms[0]!;
+    const submitted = submitArgumentProposal(
+      library,
+      {
+        clientSubmissionId: 'legacy-v5-submission',
+        title: 'Legacy boundary candidate',
+        topicId: library.topics[0]!.id,
+        target: {
+          argumentId: target.id,
+          part: { kind: 'reasoning' },
+          reliedOnRevision: target.revision,
+        },
+        examples: [],
+        premiseHints: [
+          `Arbitrary prose mentions ${target.id} but remains a text claim.`,
+        ],
+        suggestedAxiomIds: [axiom.id],
+        reasoning: 'Legacy reasoning remains readable.',
+        conclusion: 'The legacy proposal remains reviewable.',
+        whyNovelOrUnresolved: 'This proposal predates typed review roles.',
+        consultation: {
+          libraryId: descriptor.libraryId,
+          libraryRevision: descriptor.libraryRevision,
+          contentFingerprint: descriptor.contentFingerprint,
+          records: [
+            {
+              kind: 'topic',
+              id: library.topics[0]!.id,
+              revision: library.topics[0]!.revision,
+            },
+            { kind: 'argument', id: target.id, revision: target.revision },
+            { kind: 'axiom', id: axiom.id, revision: axiom.revision },
+          ],
+        },
+      },
+      deterministicRuntime('legacy-v5'),
+    );
+    const currentProposal = submitted.proposal;
+    const v5Proposal = {
+      ...currentProposal,
+    } as unknown as Record<string, unknown>;
+    delete v5Proposal.intent;
+    delete v5Proposal.premises;
+    delete v5Proposal.reasoningSteps;
+    delete v5Proposal.sourceObservations;
+    const legacy = {
+      ...submitted.library,
+      schemaVersion: 5,
+      proposals: [
+        {
+          ...v5Proposal,
+          premiseHints: [
+            `Arbitrary prose mentions ${target.id} but remains a text claim.`,
+          ],
+          suggestedAxiomIds: [axiom.id],
+        },
+      ],
+    };
+
+    const first = parseArgumentLibraryJson(JSON.stringify(legacy));
+    const second = parseArgumentLibraryJson(JSON.stringify(legacy));
+    expect(first).toEqual(second);
+    expect(first).toMatchObject({
+      status: 'valid',
+      migratedFromSchemaVersion: 5,
+      value: {
+        schemaVersion: 6,
+        proposals: [
+          {
+            intent: 'unspecified',
+            premises: [
+              {
+                id: 'legacy-text-1',
+                kind: 'text',
+                text: `Arbitrary prose mentions ${target.id} but remains a text claim.`,
+              },
+              {
+                id: 'legacy-axiom-1',
+                kind: 'axiom',
+                axiomId: axiom.id,
+                reliedOnRevision: axiom.revision,
+              },
+            ],
+            reasoningSteps: [],
+            sourceObservations: [],
+          },
+        ],
+      },
+    });
+    if (first.status !== 'valid') return;
+    expect(
+      parseArgumentLibraryJson(serializeArgumentLibrary(first.value)),
+    ).toMatchObject({ status: 'valid', value: first.value });
   });
 
   it('treats identical import as idempotent and same-lineage altered content as conflict', () => {

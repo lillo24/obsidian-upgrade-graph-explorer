@@ -1,4 +1,4 @@
-export const ARGUMENT_LIBRARY_SCHEMA_VERSION = 5 as const;
+export const ARGUMENT_LIBRARY_SCHEMA_VERSION = 6 as const;
 export const KNOWLEDGE_READER_CONTRACT_VERSION = 5 as const;
 export const CONTENT_FINGERPRINT_ALGORITHM =
   'sha256-canonical-json-v1' as const;
@@ -233,6 +233,17 @@ export interface ArgumentRelation {
 
 export type ProposalStatus = 'pending' | 'accepted' | 'rejected';
 
+/** Review intent only; canonical attack/support/supersession remains a human choice. */
+export type ArgumentProposalIntent =
+  | 'unspecified'
+  | 'new'
+  | 'attack'
+  | 'support'
+  | 'refine'
+  | 'extend'
+  | 'add-boundary'
+  | 'supersede';
+
 export interface ArgumentProposalTarget {
   readonly argumentId: string;
   readonly part: ArgumentTargetPart;
@@ -262,6 +273,32 @@ export interface ArgumentProposalDecision {
   readonly resultingCounterArgumentId?: string;
 }
 
+export type ArgumentProposalPremise = ArgumentPremise;
+
+export type ArgumentProposalReasoningReference =
+  | { readonly kind: 'premise'; readonly premiseId: string }
+  | { readonly kind: 'reasoning-step'; readonly stepId: string };
+
+export interface ArgumentProposalReasoningStep {
+  readonly id: string;
+  readonly text: string;
+  readonly uses: readonly ArgumentProposalReasoningReference[];
+}
+
+/** Drafting provenance that never becomes a canonical premise implicitly. */
+export interface ArgumentProposalSourceObservation {
+  readonly id: string;
+  readonly observation: string;
+  readonly label?: string;
+  readonly repository?: string;
+  readonly url?: string;
+  readonly commitSha?: string;
+  readonly sourceVersion?: string;
+  readonly filePath?: string;
+  readonly heading?: string;
+  readonly span?: string;
+}
+
 /**
  * Non-canonical AI-authored candidate retained in the same durable snapshot.
  * Only human resolution may link it to a canonical Argument or Counter-Argument.
@@ -273,14 +310,16 @@ export interface ArgumentProposal {
   readonly updatedAt: string;
   readonly status: ProposalStatus;
   readonly title: string;
+  readonly intent: ArgumentProposalIntent;
   readonly topicId?: string;
   readonly target?: ArgumentProposalTarget;
   readonly examples: readonly string[];
-  readonly premiseHints: readonly string[];
-  readonly suggestedAxiomIds: readonly string[];
+  readonly premises: readonly ArgumentProposalPremise[];
   readonly reasoning?: string;
+  readonly reasoningSteps: readonly ArgumentProposalReasoningStep[];
   readonly conclusion: string;
   readonly boundary?: string;
+  readonly sourceObservations: readonly ArgumentProposalSourceObservation[];
   readonly whyNovelOrUnresolved: string;
   readonly consultation: ArgumentProposalConsultation;
   readonly clientSubmissionId?: string;
@@ -518,14 +557,20 @@ export interface UpdateCounterArgumentResponseInput {
 export interface CreateArgumentProposalInput {
   readonly clientSubmissionId?: string;
   readonly title: string;
+  readonly intent?: ArgumentProposalIntent;
   readonly topicId?: string;
   readonly target?: ArgumentProposalTarget;
   readonly examples: readonly string[];
-  readonly premiseHints: readonly string[];
+  readonly premises?: readonly ArgumentProposalPremise[];
+  /** Transitional input only; normalized immediately into text premises. */
+  readonly premiseHints?: readonly string[];
+  /** Transitional input only; normalized immediately into Axiom premises. */
   readonly suggestedAxiomIds?: readonly string[];
   readonly reasoning?: string;
+  readonly reasoningSteps?: readonly ArgumentProposalReasoningStep[];
   readonly conclusion: string;
   readonly boundary?: string;
+  readonly sourceObservations?: readonly ArgumentProposalSourceObservation[];
   readonly whyNovelOrUnresolved: string;
   readonly consultation: ArgumentProposalConsultation;
 }
@@ -856,7 +901,7 @@ export type ArgumentLibraryJsonParseResult =
   | {
       readonly status: 'valid';
       readonly value: ArgumentLibrary;
-      readonly migratedFromSchemaVersion?: 1 | 2 | 3 | 4;
+      readonly migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5;
     }
   | {
       readonly status: 'invalid-json' | 'future-schema' | 'invalid-library';

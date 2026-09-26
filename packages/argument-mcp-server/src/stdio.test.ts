@@ -24,7 +24,7 @@ it('serves initialize, tools/list, and tools/call over clean stdio', async () =>
   const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
   const temporary = await mkdtemp(join(tmpdir(), 'icarus-argument-mcp-stdio-'));
   const serverPath = join(temporary, 'server.mjs');
-  const libraryPath = join(temporary, 'library-v5.json');
+  const libraryPath = join(temporary, 'library-v6.json');
   const { library } = createSyntheticLibrary();
   await writeFile(libraryPath, serializeArgumentLibrary(library), 'utf8');
   await build({
@@ -67,7 +67,7 @@ it('serves initialize, tools/list, and tools/call over clean stdio', async () =>
     });
     expect(guide.structuredContent).toMatchObject({
       status: 'ok',
-      version: 'argument-compiler-ai-usage-v2',
+      version: 'argument-compiler-ai-usage-v3',
       format: 'markdown',
       guide: expect.stringContaining(
         'search result -> plausible prior record -> compiler_read_bundle',

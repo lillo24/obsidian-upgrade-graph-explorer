@@ -112,10 +112,56 @@ const proposalId = z
   .trim()
   .min(1)
   .max(ARGUMENT_PROPOSAL_MAX_ID_LENGTH);
+const proposalPremiseInput = z.discriminatedUnion('kind', [
+  z
+    .object({ id: proposalId, kind: z.literal('text'), text: proposalText })
+    .strict(),
+  z
+    .object({
+      id: proposalId,
+      kind: z.literal('axiom'),
+      axiomId: proposalId,
+      reliedOnRevision: z.number().int().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      id: proposalId,
+      kind: z.literal('argument-conclusion'),
+      argumentId: proposalId,
+      reliedOnRevision: z.number().int().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      id: proposalId,
+      kind: z.literal('argument-premise'),
+      argumentId: proposalId,
+      premiseId: proposalId,
+      reliedOnRevision: z.number().int().min(1),
+    })
+    .strict(),
+]);
+const reasoningReferenceInput = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('premise'), premiseId: proposalId }).strict(),
+  z.object({ kind: z.literal('reasoning-step'), stepId: proposalId }).strict(),
+]);
 const submitProposalInput = z
   .object({
     clientSubmissionId: proposalId.optional(),
     title: z.string().trim().min(1).max(ARGUMENT_PROPOSAL_MAX_TITLE_LENGTH),
+    intent: z
+      .enum([
+        'unspecified',
+        'new',
+        'attack',
+        'support',
+        'refine',
+        'extend',
+        'add-boundary',
+        'supersede',
+      ])
+      .optional(),
     topicId: proposalId.optional(),
     target: z
       .object({
@@ -126,14 +172,57 @@ const submitProposalInput = z
       .strict()
       .optional(),
     examples: z.array(proposalText).max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS),
-    premiseHints: z.array(proposalText).max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS),
+    premises: z
+      .array(proposalPremiseInput)
+      .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+      .optional(),
+    premiseHints: z
+      .array(proposalText)
+      .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+      .optional(),
     suggestedAxiomIds: z
       .array(proposalId)
       .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
       .optional(),
     reasoning: proposalText.optional(),
+    reasoningSteps: z
+      .array(
+        z
+          .object({
+            id: proposalId,
+            text: proposalText,
+            uses: z
+              .array(reasoningReferenceInput)
+              .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS),
+          })
+          .strict(),
+      )
+      .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+      .optional(),
     conclusion: proposalText,
     boundary: proposalText.optional(),
+    sourceObservations: z
+      .array(
+        z
+          .object({
+            id: proposalId,
+            observation: proposalText,
+            label: proposalText.optional(),
+            repository: proposalText.optional(),
+            url: z.url().max(ARGUMENT_PROPOSAL_MAX_TEXT_LENGTH).optional(),
+            commitSha: z
+              .string()
+              .regex(/^[a-f0-9]{7,64}$/iu)
+              .optional(),
+            sourceVersion: proposalText.optional(),
+            filePath: proposalText.optional(),
+            heading: proposalText.optional(),
+            span: proposalText.optional(),
+          })
+          .strict(),
+      )
+      .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+      .optional(),
     whyNovelOrUnresolved: proposalText,
     consultation: z
       .object({
@@ -165,7 +254,19 @@ const submitProposalInput = z
       })
       .strict(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.premises !== undefined &&
+      ((value.premiseHints?.length ?? 0) > 0 ||
+        (value.suggestedAxiomIds?.length ?? 0) > 0)
+    )
+      context.addIssue({
+        code: 'custom',
+        message: 'Use typed premises or the legacy premise fields, not both.',
+        path: ['premises'],
+      });
+  });
 
 type JsonObject = Record<string, unknown>;
 
@@ -206,16 +307,53 @@ function domainProposalInput(
       ? {}
       : { clientSubmissionId: input.clientSubmissionId }),
     title: input.title,
+    ...(input.intent === undefined ? {} : { intent: input.intent }),
     ...(input.topicId === undefined ? {} : { topicId: input.topicId }),
     ...(input.target === undefined ? {} : { target: input.target }),
     examples: input.examples,
-    premiseHints: input.premiseHints,
+    ...(input.premises === undefined ? {} : { premises: input.premises }),
+    ...(input.premiseHints === undefined
+      ? {}
+      : { premiseHints: input.premiseHints }),
     ...(input.suggestedAxiomIds === undefined
       ? {}
       : { suggestedAxiomIds: input.suggestedAxiomIds }),
     ...(input.reasoning === undefined ? {} : { reasoning: input.reasoning }),
+    ...(input.reasoningSteps === undefined
+      ? {}
+      : { reasoningSteps: input.reasoningSteps }),
     conclusion: input.conclusion,
     ...(input.boundary === undefined ? {} : { boundary: input.boundary }),
+    ...(input.sourceObservations === undefined
+      ? {}
+      : {
+          sourceObservations: input.sourceObservations.map((observation) => ({
+            id: observation.id,
+            observation: observation.observation,
+            ...(observation.label === undefined
+              ? {}
+              : { label: observation.label }),
+            ...(observation.repository === undefined
+              ? {}
+              : { repository: observation.repository }),
+            ...(observation.url === undefined ? {} : { url: observation.url }),
+            ...(observation.commitSha === undefined
+              ? {}
+              : { commitSha: observation.commitSha }),
+            ...(observation.sourceVersion === undefined
+              ? {}
+              : { sourceVersion: observation.sourceVersion }),
+            ...(observation.filePath === undefined
+              ? {}
+              : { filePath: observation.filePath }),
+            ...(observation.heading === undefined
+              ? {}
+              : { heading: observation.heading }),
+            ...(observation.span === undefined
+              ? {}
+              : { span: observation.span }),
+          })),
+        }),
     whyNovelOrUnresolved: input.whyNovelOrUnresolved,
     consultation: input.consultation,
   };
@@ -422,7 +560,7 @@ export function createArgumentMcpServer(
     {
       title: 'Submit proposal to human Mailbox',
       description:
-        'Append one pending, non-canonical proposal after independent reasoning and a Compiler cross-check. Mailbox submission does not establish that the proposal is correct. A human must accept or reject it and is solely responsible for any canonical Argument, Counter-Argument, Axiom dependency, supersession, or Current promotion.',
+        'Append one pending, non-canonical proposal after independent reasoning and a Compiler cross-check. State whether it is new, attacks, supports, refines, extends, adds a boundary to, or supersedes a precise target. Encode canonical dependencies as typed premises and keep repository/source observations separate. A human remains solely responsible for canonical relations, supersession, Current promotion, acceptance, or rejection.',
       inputSchema: submitProposalInput,
       annotations: APPEND_ONLY_ANNOTATIONS,
     },

@@ -36,6 +36,8 @@ import {
 } from '@icarus-graph-explorer/argument-workspace';
 
 import { ArgumentRecordEditor } from './ArgumentRecordEditor';
+import { ProposalMailbox } from './ProposalMailbox';
+import { proposalTargetStaleness } from './proposal-mailbox';
 import {
   ArgumentAxiomView,
   ArgumentCounterArgumentView,
@@ -401,7 +403,6 @@ function newDraft(
 }
 
 function proposalArgumentEditor(
-  library: ArgumentLibrary,
   descriptor: SnapshotDescriptor,
   proposal: ArgumentProposal,
   session: ArgumentWorkspaceSession,
@@ -411,25 +412,24 @@ function proposalArgumentEditor(
     throw new Error('Argument proposal draft initialization failed.');
   }
   const target = proposal.target;
-  const commonReplacement =
-    target !== undefined &&
-    proposal.topicId !== undefined &&
-    library.topics.find(({ id }) => id === proposal.topicId)
-      ?.currentArgumentId === target.argumentId;
+  const proposedCanonicalRelation =
+    proposal.intent === 'attack' || proposal.intent === 'support'
+      ? proposal.intent
+      : undefined;
   const relations =
-    target === undefined
+    target === undefined || proposedCanonicalRelation === undefined
       ? []
       : [
           {
             id: session.runtime.createId('relation'),
-            kind: 'attack' as const,
+            kind: proposedCanonicalRelation,
             targetArgumentId: target.argumentId,
             targetPart: target.part,
             reliedOnRevision: target.reliedOnRevision,
           },
         ];
   return {
-    promoteToCurrent: commonReplacement,
+    promoteToCurrent: false,
     editor: {
       ...base,
       record: {
@@ -439,20 +439,33 @@ function proposalArgumentEditor(
           id: session.runtime.createId('example'),
           text,
         })),
-        premises: proposal.premiseHints.map((text) => ({
-          id: session.runtime.createId('premise'),
-          kind: 'text' as const,
-          text,
-        })),
-        ...(proposal.reasoning === undefined
+        premises: proposal.premises.map((premise) => ({ ...premise })),
+        ...(proposal.reasoning === undefined &&
+        proposal.reasoningSteps.length === 0
           ? {}
-          : { reasoning: proposal.reasoning }),
+          : {
+              reasoning: [
+                proposal.reasoning,
+                ...proposal.reasoningSteps.map((step) => {
+                  const uses = step.uses
+                    .map((reference) =>
+                      reference.kind === 'premise'
+                        ? reference.premiseId
+                        : reference.stepId,
+                    )
+                    .join(', ');
+                  return `${step.id}${uses === '' ? '' : ` (uses ${uses})`}: ${step.text}`;
+                }),
+              ]
+                .filter((value): value is string => value !== undefined)
+                .join('\n\n'),
+            }),
         conclusion: proposal.conclusion,
         ...(proposal.boundary === undefined
           ? {}
           : { boundary: proposal.boundary }),
         relations,
-        ...(commonReplacement
+        ...(proposal.intent === 'supersede' && target !== undefined
           ? { supersedesArgumentId: target.argumentId }
           : {}),
         reviewState: 'accepted',
@@ -591,285 +604,12 @@ function counts(library: ArgumentLibrary): string {
   return `${library.topics.length} Topic${library.topics.length === 1 ? '' : 's'}, ${library.contexts.length} Context${library.contexts.length === 1 ? '' : 's'}, ${library.axioms.length} Axiom${library.axioms.length === 1 ? '' : 's'}, ${library.arguments.length} Argument${library.arguments.length === 1 ? '' : 's'}, ${library.counterArguments.length} Counter-Argument${library.counterArguments.length === 1 ? '' : 's'}`;
 }
 
-function proposalTargetStaleness(
-  library: ArgumentLibrary,
-  proposal: ArgumentProposal,
-): string | undefined {
-  const target = proposal.target;
-  if (target === undefined) return undefined;
-  const argument = library.arguments.find(({ id }) => id === target.argumentId);
-  if (argument === undefined)
-    return 'The target Argument is no longer present.';
-  if (argument.revision !== target.reliedOnRevision) {
-    return `The proposal targeted revision ${target.reliedOnRevision}; the Argument is now revision ${argument.revision}.`;
-  }
-  if (target.part.kind === 'premise') {
-    const premiseId = target.part.premiseId;
-    if (!argument.premises.some(({ id }) => id === premiseId)) {
-      return `The targeted premise ${premiseId} is no longer present.`;
-    }
-  }
-  if (target.part.kind === 'reasoning' && argument.reasoning === undefined) {
-    return 'The targeted reasoning section is no longer present.';
-  }
-  return undefined;
-}
-
-function proposalTargetText(
-  library: ArgumentLibrary,
-  proposal: ArgumentProposal,
-): string {
-  if (proposal.target === undefined) {
-    const topic = library.topics.find(({ id }) => id === proposal.topicId);
-    return topic === undefined
-      ? 'No canonical target'
-      : `Topic: ${topic.title}`;
-  }
-  const argument = library.arguments.find(
-    ({ id }) => id === proposal.target?.argumentId,
-  );
-  const part =
-    proposal.target.part.kind === 'premise'
-      ? `premise ${proposal.target.part.premiseId}`
-      : proposal.target.part.kind;
-  return `${argument?.title ?? proposal.target.argumentId} — ${part}`;
-}
-
-function MailboxDialog({
-  busy,
-  library,
-  onAccept,
-  onClose,
-  onNavigate,
-  onReject,
-}: {
-  readonly busy: boolean;
-  readonly library: ArgumentLibrary;
-  readonly onAccept: (proposal: ArgumentProposal) => void;
-  readonly onClose: () => void;
-  readonly onNavigate: (selection: ArgumentSelection) => void;
-  readonly onReject: (proposal: ArgumentProposal) => void;
-}) {
-  const [view, setView] = useState<'pending' | 'history'>('pending');
-  const [selectedId, setSelectedId] = useState<string>();
-  const proposals = library.proposals.filter(({ status }) =>
-    view === 'pending' ? status === 'pending' : status !== 'pending',
-  );
-  const selected =
-    proposals.find(({ id }) => id === selectedId) ?? proposals[0];
-  const targetStale =
-    selected === undefined
-      ? undefined
-      : proposalTargetStaleness(library, selected);
-  return (
-    <section
-      aria-labelledby="arguments-mailbox-title"
-      className="arguments-subdialog arguments-mailbox"
-      role="dialog"
-    >
-      <div>
-        <header>
-          <p className="eyebrow">Non-canonical review queue</p>
-          <h2 id="arguments-mailbox-title">Proposal Mailbox</h2>
-          <p>
-            AI proposals are not framework knowledge. Only human resolution can
-            create canonical Argument or Counter-Argument history.
-          </p>
-        </header>
-        <div className="arguments-actions" role="tablist">
-          <button
-            aria-selected={view === 'pending'}
-            onClick={() => {
-              setView('pending');
-              setSelectedId(undefined);
-            }}
-            role="tab"
-            type="button"
-          >
-            Pending (
-            {
-              library.proposals.filter(({ status }) => status === 'pending')
-                .length
-            }
-            )
-          </button>
-          <button
-            aria-selected={view === 'history'}
-            onClick={() => {
-              setView('history');
-              setSelectedId(undefined);
-            }}
-            role="tab"
-            type="button"
-          >
-            History
-          </button>
-        </div>
-        <div className="arguments-mailbox__layout">
-          <nav aria-label={`${view} proposals`}>
-            {proposals.length === 0 ? (
-              <p className="arguments-empty">
-                {view === 'pending'
-                  ? 'No pending proposals.'
-                  : 'No resolved proposals.'}
-              </p>
-            ) : (
-              <ul>
-                {proposals.map((proposal) => (
-                  <li key={proposal.id}>
-                    <button
-                      aria-current={
-                        proposal.id === selected?.id ? 'page' : undefined
-                      }
-                      onClick={() => setSelectedId(proposal.id)}
-                      type="button"
-                    >
-                      <strong>{proposal.title}</strong>
-                      <small>{proposalTargetText(library, proposal)}</small>
-                      <small>
-                        {proposal.status} ·{' '}
-                        {new Date(proposal.createdAt).toLocaleString()}
-                      </small>
-                      <span>{proposal.conclusion}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </nav>
-          {selected === undefined ? null : (
-            <article className="arguments-mailbox__detail">
-              <p className="eyebrow">{selected.status}</p>
-              <h3>{selected.title}</h3>
-              <p>
-                Target: <strong>{proposalTargetText(library, selected)}</strong>
-              </p>
-              {targetStale === undefined ? null : (
-                <p className="arguments-error" role="alert">
-                  Stale target: {targetStale} Review the current record before
-                  resolving.
-                </p>
-              )}
-              <h3>Examples</h3>
-              {selected.examples.length === 0 ? (
-                <p className="arguments-empty">No examples supplied.</p>
-              ) : (
-                <ul>
-                  {selected.examples.map((example, index) => (
-                    <li key={`${index}:${example}`}>{example}</li>
-                  ))}
-                </ul>
-              )}
-              <h3>Premise hints</h3>
-              {selected.premiseHints.length === 0 ? (
-                <p className="arguments-empty">No premise hints supplied.</p>
-              ) : (
-                <ul>
-                  {selected.premiseHints.map((premise, index) => (
-                    <li key={`${index}:${premise}`}>{premise}</li>
-                  ))}
-                </ul>
-              )}
-              {selected.reasoning === undefined ? null : (
-                <>
-                  <h3>Candidate reasoning</h3>
-                  <p>{selected.reasoning}</p>
-                </>
-              )}
-              <h3>Candidate conclusion</h3>
-              <p>{selected.conclusion}</p>
-              {selected.boundary === undefined ? null : (
-                <>
-                  <h3>Boundary / Invariance</h3>
-                  <p>{selected.boundary}</p>
-                </>
-              )}
-              <h3>Why novel or unresolved</h3>
-              <p>{selected.whyNovelOrUnresolved}</p>
-              <h3>Consulted records</h3>
-              <ul>
-                {selected.consultation.records.map((record) => (
-                  <li key={`${record.kind}:${record.id}`}>
-                    {record.kind} <code>{record.id}</code>
-                    {record.revision === undefined
-                      ? ''
-                      : ` at revision ${record.revision}`}
-                  </li>
-                ))}
-              </ul>
-              {selected.decision === undefined ? null : (
-                <section className="arguments-mailbox__decision">
-                  <h3>Human decision</h3>
-                  {selected.decision.note === undefined ? null : (
-                    <p>{selected.decision.note}</p>
-                  )}
-                  {selected.decision.resultingArgumentId ===
-                  undefined ? null : (
-                    <button
-                      onClick={() =>
-                        onNavigate({
-                          kind: 'argument',
-                          id: selected.decision!.resultingArgumentId!,
-                        })
-                      }
-                      type="button"
-                    >
-                      Open resulting Argument
-                    </button>
-                  )}
-                  {selected.decision.resultingCounterArgumentId ===
-                  undefined ? null : (
-                    <button
-                      onClick={() =>
-                        onNavigate({
-                          kind: 'counter-argument',
-                          id: selected.decision!.resultingCounterArgumentId!,
-                        })
-                      }
-                      type="button"
-                    >
-                      Open resulting Counter-Argument
-                    </button>
-                  )}
-                </section>
-              )}
-              {selected.status !== 'pending' ? null : (
-                <div className="arguments-actions">
-                  <button
-                    disabled={busy}
-                    onClick={() => onReject(selected)}
-                    type="button"
-                  >
-                    Reject / Record response
-                  </button>
-                  <button
-                    disabled={busy}
-                    onClick={() => onAccept(selected)}
-                    type="button"
-                  >
-                    Accept / Integrate
-                  </button>
-                </div>
-              )}
-            </article>
-          )}
-        </div>
-        <div className="arguments-actions">
-          <button onClick={onClose} type="button">
-            Close Mailbox
-          </button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function ProposalResolutionPanel({
   draft,
   library,
   onDecisionNoteChange,
   onPromoteChange,
-  onToggleAttack,
+  onRelationChange,
   onToggleSupersession,
   proposal,
   resolution,
@@ -878,21 +618,20 @@ function ProposalResolutionPanel({
   readonly library: ArgumentLibrary;
   readonly onDecisionNoteChange: (note: string) => void;
   readonly onPromoteChange: (promote: boolean) => void;
-  readonly onToggleAttack: (enabled: boolean) => void;
+  readonly onRelationChange: (kind: 'none' | 'attack' | 'support') => void;
   readonly onToggleSupersession: (enabled: boolean) => void;
   readonly proposal: ArgumentProposal;
   readonly resolution: ProposalResolutionState;
 }) {
   const target = proposal.target;
-  const attackSelected =
-    draft.kind === 'argument' &&
-    target !== undefined &&
-    draft.relations.some(
-      (relation) =>
-        relation.kind === 'attack' &&
-        relation.targetArgumentId === target.argumentId &&
-        canonicalJson(relation.targetPart) === canonicalJson(target.part),
-    );
+  const selectedRelation =
+    draft.kind !== 'argument' || target === undefined
+      ? 'none'
+      : (draft.relations.find(
+          (relation) =>
+            relation.targetArgumentId === target.argumentId &&
+            canonicalJson(relation.targetPart) === canonicalJson(target.part),
+        )?.kind ?? 'none');
   const supersessionSelected =
     draft.kind === 'argument' &&
     target !== undefined &&
@@ -915,19 +654,6 @@ function ProposalResolutionPanel({
           Stale target: {stale}
         </p>
       )}
-      {proposal.suggestedAxiomIds.length === 0 ? null : (
-        <div className="arguments-disclosure">
-          Suggested Axioms (not selected automatically):{' '}
-          {proposal.suggestedAxiomIds
-            .map(
-              (id) =>
-                library.axioms.find((axiom) => axiom.id === id)?.title ?? id,
-            )
-            .join('; ')}
-          . Add any accepted dependency through the ordinary Axiom premise or
-          answering-Axiom controls below.
-        </div>
-      )}
       {resolution.mode === 'reject' ? (
         <p className="arguments-disclosure">
           The canonical Counter-Argument will be human-accepted Audit. Record
@@ -938,14 +664,27 @@ function ProposalResolutionPanel({
         <fieldset className="arguments-editor__fieldset">
           <legend>Final relationship to the target</legend>
           <label>
-            <input
-              checked={attackSelected}
+            Canonical relation
+            <select
               disabled={target === undefined}
-              onChange={(event) => onToggleAttack(event.currentTarget.checked)}
-              type="checkbox"
-            />{' '}
-            Attack the proposal target and exact target part
+              onChange={(event) =>
+                onRelationChange(
+                  event.currentTarget.value as 'none' | 'attack' | 'support',
+                )
+              }
+              value={selectedRelation}
+            >
+              <option value="none">No attack/support relation</option>
+              <option value="attack">Attack the exact target part</option>
+              <option value="support">Support the exact target part</option>
+            </select>
           </label>
+          <p className="arguments-disclosure">
+            Proposal intent: <strong>{proposal.intent}</strong>. Refinement,
+            extension, and boundary intent do not silently become an attack;
+            confirm the canonical relation, supersession, and Current status
+            separately.
+          </p>
           <label>
             <input
               checked={supersessionSelected}
@@ -1204,7 +943,7 @@ function WorkspaceOnboarding({
     source: string;
     fileName: string;
     library: ArgumentLibrary;
-    migratedFromSchemaVersion?: 1 | 2 | 3 | 4;
+    migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5;
   }>();
   const [error, setError] = useState<string>();
   async function select(event: ChangeEvent<HTMLInputElement>) {
@@ -1855,7 +1594,6 @@ const ArgumentsWorkspaceContent = forwardRef<
   function startProposalAcceptance(proposal: ArgumentProposal) {
     if (state.phase !== 'ready') return;
     const prepared = proposalArgumentEditor(
-      state.snapshot.library,
       state.snapshot.descriptor,
       proposal,
       session,
@@ -1888,7 +1626,7 @@ const ArgumentsWorkspaceContent = forwardRef<
     });
   }
 
-  function toggleProposalAttack(enabled: boolean) {
+  function changeProposalRelation(kind: 'none' | 'attack' | 'support') {
     if (state.phase !== 'ready' || proposalResolution === undefined) return;
     const proposal = state.snapshot.library.proposals.find(
       ({ id }) => id === proposalResolution.proposalId,
@@ -1898,23 +1636,24 @@ const ArgumentsWorkspaceContent = forwardRef<
     setEditor((current) => {
       if (current?.record.kind !== 'argument') return current;
       const matches = (relation: (typeof current.record.relations)[number]) =>
-        relation.kind === 'attack' &&
         relation.targetArgumentId === target.argumentId &&
         canonicalJson(relation.targetPart) === canonicalJson(target.part);
-      const relations = enabled
-        ? current.record.relations.some(matches)
-          ? current.record.relations
+      const retained = current.record.relations.filter(
+        (relation) => !matches(relation),
+      );
+      const relations =
+        kind === 'none'
+          ? retained
           : [
-              ...current.record.relations,
+              ...retained,
               {
                 id: session.runtime.createId('relation'),
-                kind: 'attack' as const,
+                kind,
                 targetArgumentId: target.argumentId,
                 targetPart: target.part,
                 reliedOnRevision: target.reliedOnRevision,
               },
-            ]
-        : current.record.relations.filter((relation) => !matches(relation));
+            ];
       return {
         ...current,
         dirty: true,
@@ -3057,7 +2796,7 @@ const ArgumentsWorkspaceContent = forwardRef<
                             : { ...current, promoteToCurrent },
                         )
                       }
-                      onToggleAttack={toggleProposalAttack}
+                      onRelationChange={changeProposalRelation}
                       onToggleSupersession={toggleProposalSupersession}
                       proposal={resolvingProposal}
                       resolution={proposalResolution}
@@ -3136,11 +2875,12 @@ const ArgumentsWorkspaceContent = forwardRef<
         )}
 
         {!mailboxOpen || state.phase !== 'ready' ? null : (
-          <MailboxDialog
+          <ProposalMailbox
             busy={state.busy}
             library={state.snapshot.library}
             onAccept={startProposalAcceptance}
             onClose={() => setMailboxOpen(false)}
+            onCopy={(value, message) => void copy(value, message)}
             onNavigate={(next) => {
               setMailboxOpen(false);
               navigate(next);
@@ -3200,7 +2940,7 @@ const ArgumentsWorkspaceContent = forwardRef<
                     <p className="arguments-disclosure">
                       Incoming schema v
                       {importPreview.merge.migratedFromSchemaVersion} was
-                      migrated to v5 without inferring canonical records,
+                      migrated to v6 without inferring canonical records,
                       relationships, Context bindings, Current pointers, or
                       Mailbox proposals.
                     </p>

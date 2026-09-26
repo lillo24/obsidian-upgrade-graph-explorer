@@ -6,10 +6,16 @@ requests open/close transitions.
 
 - `ArgumentsWorkspace.tsx` owns onboarding, drafts, navigation, search, source
   binding/previews, separate additive Insert JSON and full-library Import JSON
-  dialogs, the Proposal Mailbox and human resolution UI, and confirmed-snapshot
+  dialogs, human Proposal resolution, and confirmed-snapshot
   exports. It exposes a
   narrow leave guard and embedded panel to the shared workspace modal while
   retaining a standalone wrapper for tests.
+- `ProposalMailbox.tsx` owns the human-readable pending/history review surface:
+  intent and target previews, compact local Argument context, typed dependency
+  cards, structured reasoning, and source observations kept separate from
+  inference premises.
+- `proposal-mailbox.ts` owns shared target-staleness derivation used by the
+  Mailbox and human resolution panel.
 - `ArgumentRecordView.tsx` presents Topic, Context/Axiom Group, Axiom, Argument, Counter-Argument,
   Current/source status, direct versus inherited premise staleness with compact
   cause paths, separate relation staleness, and metadata reading views. The
@@ -60,7 +66,7 @@ Confirmation persists the prepared candidate once against the previewed snapshot
 editor drafts retain the existing Save/Discard/Stay guard. The format and
 neutral example are documented in
 [`docs/ARGUMENT_WORKSPACE_INSERT_JSON.md`](../../../../../docs/ARGUMENT_WORKSPACE_INSERT_JSON.md).
-Schema-v1/v2/v3/v4 imports surface a migration notice and use the core deterministic
+Schema-v1/v2/v3/v4/v5 imports surface a migration notice and use the core deterministic
 migration; no Argument, Example/provenance, relation, or Current pointer is
 inferred. V3 migration adds empty Context storage and empty Argument Context
 bindings only; v4 migration adds only an empty Proposal Mailbox. Context
@@ -68,15 +74,17 @@ background remains visibly separate from inference premises and never
 participates in premise staleness.
 
 The Mailbox header count and pending/history tabs expose non-canonical AI
-Proposals separately from the canonical record browser. Details show candidate
-content, exact target/revision, staleness, suggested Axioms, and consultation
-provenance. Suggestions never auto-select canonical dependencies. Accept opens
-the ordinary Argument editor with attack, supersession, and Current promotion
-as distinct controls; Reject opens the Counter-Argument editor and requires a
-human response plus resolved outcome. Save performs one expected-snapshot
-transaction, while Cancel and dirty-draft guards preserve the pending Proposal.
-Opening the Mailbox reloads first so writes made through the local MCP process
-become visible.
+Proposals separately from the canonical record browser. Details lead with Topic,
+intent, human-readable target/part, staleness, and a compact local Argument
+context; typed premises and expandable dependencies are distinct from drafting
+source observations and compact commit provenance. Accept carries only typed
+premises into the ordinary Argument editor. `attack` and `support` intent may
+seed the corresponding canonical relation, while refinement, extension, and
+boundary intent seed no attack; supersession and Current promotion remain
+separate human choices. Reject requires a human response plus resolved outcome.
+Save performs one expected-snapshot transaction, while Cancel and dirty-draft
+guards preserve the pending Proposal. Opening the Mailbox reloads first so local
+MCP submissions become visible.
 
 Canonical pending-review Arguments and Counter-Arguments remain available
 through the Proposals-only filter; they are distinct from the Mailbox. Current

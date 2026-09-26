@@ -28,7 +28,7 @@ async function temporaryLibrary(): Promise<{
 }> {
   const directory = await mkdtemp(join(tmpdir(), 'icarus-argument-mcp-'));
   temporaryDirectories.push(directory);
-  return { directory, path: join(directory, 'library-v5.json') };
+  return { directory, path: join(directory, 'library-v6.json') };
 }
 
 function proposalArguments(
@@ -40,6 +40,7 @@ function proposalArguments(
   return {
     clientSubmissionId: 'mcp-proposal-1',
     title: 'Verified normalization exception',
+    intent: 'refine' as const,
     topicId: topic.id,
     target: {
       argumentId: argument.id,
@@ -47,11 +48,49 @@ function proposalArguments(
       reliedOnRevision: argument.revision,
     },
     examples: ['The quantities were normalized upstream.'],
-    premiseHints: ['A current normalization receipt exists.'],
-    suggestedAxiomIds: ['AX-UNITS'],
+    premises: [
+      {
+        id: 'P-CLAIM',
+        kind: 'text' as const,
+        text: 'A current normalization receipt exists.',
+      },
+      {
+        id: 'P-AXIOM',
+        kind: 'axiom' as const,
+        axiomId: 'AX-UNITS',
+        reliedOnRevision: library.axioms[0]!.revision,
+      },
+      {
+        id: 'P-ARGUMENT',
+        kind: 'argument-conclusion' as const,
+        argumentId: argument.id,
+        reliedOnRevision: argument.revision,
+      },
+    ],
     reasoning: 'A repeated conversion may be unnecessary.',
+    reasoningSteps: [
+      {
+        id: 'R-1',
+        uses: [
+          { kind: 'premise' as const, premiseId: 'P-CLAIM' },
+          { kind: 'premise' as const, premiseId: 'P-AXIOM' },
+        ],
+        text: 'The receipt and Axiom establish compatibility.',
+      },
+    ],
     conclusion: 'Verified normalized quantities can be compared directly.',
     boundary: 'Only while the normalization receipt remains current.',
+    sourceObservations: [
+      {
+        id: 'SOURCE-1',
+        label: 'Normalization implementation',
+        repository: 'icarus/example',
+        url: 'https://example.com/icarus/commit/36c927fabcd',
+        commitSha: '36c927fabcd',
+        filePath: 'Associated Value.md',
+        observation: 'The implementation normalizes quantities upstream.',
+      },
+    ],
     whyNovelOrUnresolved:
       'The existing response does not discuss pre-normalized quantities.',
     consultation: {
@@ -211,6 +250,10 @@ describe('Argument Library MCP tools', () => {
       expect(parsed.value.proposals[0]).toMatchObject({
         id: firstId,
         status: 'pending',
+        intent: 'refine',
+        premises: input.premises,
+        reasoningSteps: input.reasoningSteps,
+        sourceObservations: input.sourceObservations,
         consultation: input.consultation,
       });
       expect(parsed.value.topics).toEqual(fixture.library.topics);
@@ -219,6 +262,55 @@ describe('Argument Library MCP tools', () => {
       expect(parsed.value.counterArguments).toEqual(
         fixture.library.counterArguments,
       );
+    } finally {
+      await session.close();
+    }
+  });
+
+  it('normalizes the transitional premise fields into the typed proposal model', async () => {
+    const { path } = await temporaryLibrary();
+    const fixture = createSyntheticLibrary();
+    await writeFile(path, serializeArgumentLibrary(fixture.library), 'utf8');
+    const session = await connect(
+      createArgumentMcpServer({
+        libraryPath: path,
+        proposalRuntime: fixture.runtime,
+      }),
+    );
+    const rich = proposalArguments(fixture.library);
+    const shared = { ...rich } as Record<string, unknown>;
+    delete shared.premises;
+    delete shared.reasoningSteps;
+    delete shared.sourceObservations;
+    delete shared.intent;
+    try {
+      const result = await session.client.callTool({
+        name: 'compiler_submit_proposal',
+        arguments: {
+          ...shared,
+          clientSubmissionId: 'mcp-proposal-legacy',
+          premiseHints: ['A legacy claim remains plain text.'],
+          suggestedAxiomIds: ['AX-UNITS'],
+        },
+      });
+      expect(result.isError).not.toBe(true);
+
+      const parsed = parseArgumentLibraryJson(await readFile(path, 'utf8'));
+      expect(parsed.status).toBe('valid');
+      if (parsed.status !== 'valid') return;
+      expect(parsed.value.proposals[0]).toMatchObject({
+        intent: 'unspecified',
+        premises: [
+          {
+            id: 'legacy-text-1',
+            kind: 'text',
+            text: 'A legacy claim remains plain text.',
+          },
+          { id: 'legacy-axiom-1', kind: 'axiom', axiomId: 'AX-UNITS' },
+        ],
+        reasoningSteps: [],
+        sourceObservations: [],
+      });
     } finally {
       await session.close();
     }
@@ -291,7 +383,7 @@ describe('Argument Library MCP tools', () => {
       expect(result.isError).not.toBe(true);
       expect(response).toMatchObject({
         status: 'ok',
-        version: 'argument-compiler-ai-usage-v2',
+        version: 'argument-compiler-ai-usage-v3',
         format: 'markdown',
       });
       expect(
@@ -588,7 +680,7 @@ describe('Argument Library MCP tools', () => {
 
       for (const [source, code] of [
         ['{broken', 'invalid-json'],
-        [JSON.stringify({ schemaVersion: 6 }), 'future-schema'],
+        [JSON.stringify({ schemaVersion: 7 }), 'future-schema'],
       ] as const) {
         await writeFile(path, source, 'utf8');
         const failed = await session.client.callTool({

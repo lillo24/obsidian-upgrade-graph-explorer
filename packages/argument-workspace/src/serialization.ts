@@ -2,6 +2,7 @@ import {
   canonicalJson,
   captureArgumentLibrarySnapshot,
   clonePlainData,
+  contentFingerprint,
   describeArgumentLibrary,
   sameSnapshot,
 } from './canonical';
@@ -18,6 +19,7 @@ import {
   validateArgumentLibraryV2,
   validateArgumentLibraryV3,
   validateArgumentLibraryV4,
+  validateArgumentLibraryV5,
 } from './validation';
 
 export function serializeArgumentLibrary(library: ArgumentLibrary): string {
@@ -80,6 +82,22 @@ export function parseArgumentLibraryJson(
         status: 'valid',
         value: migration.value,
         migratedFromSchemaVersion: 4,
+      };
+    }
+    return { ...migration, preservedSource: source };
+  }
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value as { readonly schemaVersion?: unknown }).schemaVersion === 5
+  ) {
+    const migration = migrateArgumentLibraryV5(value);
+    if (migration.status === 'valid') {
+      return {
+        status: 'valid',
+        value: migration.value,
+        migratedFromSchemaVersion: 5,
       };
     }
     return { ...migration, preservedSource: source };
@@ -256,6 +274,98 @@ export function migrateArgumentLibraryV4(
     ...legacy,
     schemaVersion: 5,
     proposals: [],
+  };
+  return migrateArgumentLibraryV5(candidate);
+}
+
+/** Deterministically separates v5 Proposal roles without inferring references from prose. */
+export function migrateArgumentLibraryV5(
+  value: unknown,
+): ArgumentLibraryMigrationResult {
+  const legacyValidation = validateArgumentLibraryV5(value);
+  if (!legacyValidation.valid) {
+    const first = legacyValidation.issues[0];
+    return {
+      status: 'invalid-library',
+      message: `Argument Library v5 is invalid${
+        first === undefined ? '.' : ` at ${first.path}: ${first.message}`
+      }`,
+      issues: legacyValidation.issues,
+    };
+  }
+  const legacy = clonePlainData(legacyValidation.value);
+  const axioms = legacy.axioms as readonly Record<string, unknown>[];
+  const proposals = (
+    legacy.proposals as readonly Record<string, unknown>[]
+  ).map((proposal) => {
+    const premiseHints = proposal.premiseHints as readonly string[];
+    const suggestedAxiomIds = proposal.suggestedAxiomIds as readonly string[];
+    const consultedRecords = (
+      proposal.consultation as {
+        readonly records: readonly {
+          readonly kind: string;
+          readonly id: string;
+          readonly revision: number;
+        }[];
+      }
+    ).records;
+    const premises = [
+      ...premiseHints.map((text, index) => ({
+        id: `legacy-text-${index + 1}`,
+        kind: 'text' as const,
+        text,
+      })),
+      ...suggestedAxiomIds.map((axiomId, index) => {
+        const axiom = axioms.find(({ id }) => id === axiomId)!;
+        return {
+          id: `legacy-axiom-${index + 1}`,
+          kind: 'axiom' as const,
+          axiomId,
+          reliedOnRevision:
+            consultedRecords.find(
+              (record) => record.kind === 'axiom' && record.id === axiomId,
+            )?.revision ?? axiom.revision,
+        };
+      }),
+    ];
+    const retained = { ...proposal };
+    delete retained.premiseHints;
+    delete retained.suggestedAxiomIds;
+    delete retained.submissionFingerprint;
+    const normalized = {
+      title: proposal.title,
+      ...(proposal.topicId === undefined ? {} : { topicId: proposal.topicId }),
+      intent: proposal.target === undefined ? 'new' : 'unspecified',
+      ...(proposal.target === undefined ? {} : { target: proposal.target }),
+      examples: proposal.examples,
+      premises,
+      ...(proposal.reasoning === undefined
+        ? {}
+        : { reasoning: proposal.reasoning }),
+      reasoningSteps: [],
+      conclusion: proposal.conclusion,
+      ...(proposal.boundary === undefined
+        ? {}
+        : { boundary: proposal.boundary }),
+      sourceObservations: [],
+      whyNovelOrUnresolved: proposal.whyNovelOrUnresolved,
+      consultation: proposal.consultation,
+    };
+    return {
+      ...retained,
+      ...normalized,
+      submissionFingerprint: contentFingerprint({
+        ...normalized,
+        ...(proposal.clientSubmissionId === undefined
+          ? {}
+          : { clientSubmissionId: proposal.clientSubmissionId }),
+      }),
+    };
+  });
+  const candidate = {
+    ...legacy,
+    schemaVersion: 6,
+    proposals,
   };
   const migratedValidation = validateArgumentLibrary(candidate);
   if (!migratedValidation.valid) {

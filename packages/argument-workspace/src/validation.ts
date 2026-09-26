@@ -23,6 +23,16 @@ const OUTCOMES = new Set([
   'inapplicable-under-stated-scope',
 ]);
 const PROPOSAL_STATUSES = new Set(['pending', 'accepted', 'rejected']);
+const PROPOSAL_INTENTS = new Set([
+  'unspecified',
+  'new',
+  'attack',
+  'support',
+  'refine',
+  'extend',
+  'add-boundary',
+  'supersede',
+]);
 const SOURCE_ROLES = new Set(['target', 'basis', 'support']);
 const FINGERPRINT_SCOPES = new Set(['file', 'heading', 'block', 'span']);
 
@@ -412,7 +422,7 @@ function validateTopic(
   value: unknown,
   path: string,
   issues: ArgumentLibraryValidationIssue[],
-  schemaVersion: 1 | 2 | 3 | 4 | 5 = 5,
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 = 6,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected a Topic.');
@@ -456,7 +466,7 @@ function validateArgumentPremise(
   path: string,
   ownerId: unknown,
   issues: ArgumentLibraryValidationIssue[],
-  schemaVersion: 2 | 3 | 4 | 5 = 5,
+  schemaVersion: 2 | 3 | 4 | 5 | 6 = 6,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected an Argument premise.');
@@ -566,7 +576,7 @@ function validateArgument(
   path: string,
   issues: ArgumentLibraryValidationIssue[],
   sourceIds: Set<string>,
-  schemaVersion: 2 | 3 | 4 | 5 = 5,
+  schemaVersion: 2 | 3 | 4 | 5 | 6 = 6,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected an Argument.');
@@ -1147,6 +1157,7 @@ function validateProposal(
   value: unknown,
   path: string,
   issues: ArgumentLibraryValidationIssue[],
+  schemaVersion: 5 | 6,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected a Mailbox proposal.');
@@ -1162,8 +1173,9 @@ function validateProposal(
       'status',
       'title',
       'examples',
-      'premiseHints',
-      'suggestedAxiomIds',
+      ...(schemaVersion === 5
+        ? ['premiseHints', 'suggestedAxiomIds']
+        : ['intent', 'premises', 'reasoningSteps', 'sourceObservations']),
       'conclusion',
       'whyNovelOrUnresolved',
       'consultation',
@@ -1193,6 +1205,14 @@ function validateProposal(
     );
   }
   nonEmptyString(value.title, `${path}.title`, issues);
+  if (schemaVersion === 6 && !PROPOSAL_INTENTS.has(value.intent as string)) {
+    issue(
+      issues,
+      `${path}.intent`,
+      'invalid-value',
+      'Unsupported Proposal intent.',
+    );
+  }
   if (Object.hasOwn(value, 'topicId')) {
     nonEmptyString(value.topicId, `${path}.topicId`, issues);
   }
@@ -1225,9 +1245,262 @@ function validateProposal(
       );
     }
   }
+  if (schemaVersion === 6) {
+    if (value.intent === 'new' && Object.hasOwn(value, 'target'))
+      issue(
+        issues,
+        `${path}.target`,
+        'invalid-value',
+        'An independent Proposal must not identify a target.',
+      );
+    if (
+      value.intent !== 'new' &&
+      value.intent !== 'unspecified' &&
+      !Object.hasOwn(value, 'target')
+    )
+      issue(
+        issues,
+        `${path}.target`,
+        'invalid-type',
+        'This Proposal intent requires a target.',
+      );
+  }
   textArray(value.examples, `${path}.examples`, issues);
-  textArray(value.premiseHints, `${path}.premiseHints`, issues);
-  stringArray(value.suggestedAxiomIds, `${path}.suggestedAxiomIds`, issues);
+  if (schemaVersion === 5) {
+    textArray(value.premiseHints, `${path}.premiseHints`, issues);
+    stringArray(value.suggestedAxiomIds, `${path}.suggestedAxiomIds`, issues);
+  } else {
+    const premiseIds = new Set<string>();
+    if (!Array.isArray(value.premises)) {
+      issue(issues, `${path}.premises`, 'invalid-type', 'Expected an array.');
+    } else {
+      value.premises.forEach((premise, index) => {
+        const premisePath = `${path}.premises[${index}]`;
+        validateArgumentPremise(premise, premisePath, value.id, issues, 6);
+        if (isRecord(premise) && typeof premise.id === 'string') {
+          if (premiseIds.has(premise.id))
+            issue(
+              issues,
+              `${premisePath}.id`,
+              'duplicate-id',
+              'Duplicate Proposal premise ID.',
+            );
+          premiseIds.add(premise.id);
+          if (Object.hasOwn(premise, 'exampleIds'))
+            issue(
+              issues,
+              `${premisePath}.exampleIds`,
+              'unknown-field',
+              'Proposal premises do not bind canonical Example IDs.',
+            );
+        }
+      });
+    }
+    const reasoningStepIds = new Set<string>();
+    if (!Array.isArray(value.reasoningSteps)) {
+      issue(
+        issues,
+        `${path}.reasoningSteps`,
+        'invalid-type',
+        'Expected an array.',
+      );
+    } else {
+      value.reasoningSteps.forEach((step, index) => {
+        const stepPath = `${path}.reasoningSteps[${index}]`;
+        if (!isRecord(step)) {
+          issue(issues, stepPath, 'invalid-type', 'Expected a reasoning step.');
+          return;
+        }
+        fields(step, ['id', 'text', 'uses'], [], stepPath, issues);
+        nonEmptyString(step.id, `${stepPath}.id`, issues);
+        nonEmptyString(step.text, `${stepPath}.text`, issues);
+        if (typeof step.id === 'string' && reasoningStepIds.has(step.id))
+          issue(
+            issues,
+            `${stepPath}.id`,
+            'duplicate-id',
+            'Duplicate reasoning step ID.',
+          );
+        if (!Array.isArray(step.uses)) {
+          issue(
+            issues,
+            `${stepPath}.uses`,
+            'invalid-type',
+            'Expected an array.',
+          );
+        } else {
+          step.uses.forEach((reference, referenceIndex) => {
+            const referencePath = `${stepPath}.uses[${referenceIndex}]`;
+            if (!isRecord(reference)) {
+              issue(
+                issues,
+                referencePath,
+                'invalid-type',
+                'Expected a reasoning reference.',
+              );
+              return;
+            }
+            if (reference.kind === 'premise') {
+              fields(
+                reference,
+                ['kind', 'premiseId'],
+                [],
+                referencePath,
+                issues,
+              );
+              if (
+                nonEmptyString(
+                  reference.premiseId,
+                  `${referencePath}.premiseId`,
+                  issues,
+                ) &&
+                !premiseIds.has(reference.premiseId)
+              )
+                issue(
+                  issues,
+                  `${referencePath}.premiseId`,
+                  'missing-reference',
+                  'Unknown Proposal premise.',
+                );
+            } else if (reference.kind === 'reasoning-step') {
+              fields(reference, ['kind', 'stepId'], [], referencePath, issues);
+              if (
+                nonEmptyString(
+                  reference.stepId,
+                  `${referencePath}.stepId`,
+                  issues,
+                ) &&
+                !reasoningStepIds.has(reference.stepId)
+              )
+                issue(
+                  issues,
+                  `${referencePath}.stepId`,
+                  'missing-reference',
+                  'Reasoning steps may reference earlier steps only.',
+                );
+            } else {
+              issue(
+                issues,
+                `${referencePath}.kind`,
+                'invalid-value',
+                'Unsupported reasoning reference kind.',
+              );
+            }
+          });
+        }
+        if (typeof step.id === 'string') reasoningStepIds.add(step.id);
+      });
+    }
+    const observationIds = new Set<string>();
+    if (!Array.isArray(value.sourceObservations)) {
+      issue(
+        issues,
+        `${path}.sourceObservations`,
+        'invalid-type',
+        'Expected an array.',
+      );
+    } else {
+      value.sourceObservations.forEach((observation, index) => {
+        const observationPath = `${path}.sourceObservations[${index}]`;
+        if (!isRecord(observation)) {
+          issue(
+            issues,
+            observationPath,
+            'invalid-type',
+            'Expected a source observation.',
+          );
+          return;
+        }
+        fields(
+          observation,
+          ['id', 'observation'],
+          [
+            'label',
+            'repository',
+            'url',
+            'commitSha',
+            'sourceVersion',
+            'filePath',
+            'heading',
+            'span',
+          ],
+          observationPath,
+          issues,
+        );
+        nonEmptyString(observation.id, `${observationPath}.id`, issues);
+        nonEmptyString(
+          observation.observation,
+          `${observationPath}.observation`,
+          issues,
+        );
+        if (
+          typeof observation.id === 'string' &&
+          observationIds.has(observation.id)
+        )
+          issue(
+            issues,
+            `${observationPath}.id`,
+            'duplicate-id',
+            'Duplicate source observation ID.',
+          );
+        if (typeof observation.id === 'string')
+          observationIds.add(observation.id);
+        for (const field of [
+          'label',
+          'repository',
+          'sourceVersion',
+          'filePath',
+          'heading',
+          'span',
+        ] as const) {
+          if (Object.hasOwn(observation, field))
+            nonEmptyString(
+              observation[field],
+              `${observationPath}.${field}`,
+              issues,
+            );
+        }
+        if (
+          Object.hasOwn(observation, 'commitSha') &&
+          (!nonEmptyString(
+            observation.commitSha,
+            `${observationPath}.commitSha`,
+            issues,
+          ) ||
+            !/^[a-f0-9]{7,64}$/iu.test(String(observation.commitSha)))
+        )
+          issue(
+            issues,
+            `${observationPath}.commitSha`,
+            'invalid-value',
+            'Expected a hexadecimal commit SHA.',
+          );
+        if (Object.hasOwn(observation, 'url')) {
+          if (
+            nonEmptyString(observation.url, `${observationPath}.url`, issues)
+          ) {
+            try {
+              const parsed = new URL(observation.url);
+              if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
+                issue(
+                  issues,
+                  `${observationPath}.url`,
+                  'invalid-value',
+                  'Expected an HTTP or HTTPS URL.',
+                );
+            } catch {
+              issue(
+                issues,
+                `${observationPath}.url`,
+                'invalid-value',
+                'Expected a valid URL.',
+              );
+            }
+          }
+        }
+      });
+    }
+  }
   for (const field of [
     'reasoning',
     'boundary',
@@ -1756,6 +2029,57 @@ function validateIntegrity(
           }
         });
       }
+      if (Array.isArray(entry.premises)) {
+        entry.premises.forEach((premise, premiseIndex) => {
+          if (!isRecord(premise)) return;
+          if (
+            premise.kind === 'axiom' &&
+            typeof premise.axiomId === 'string' &&
+            !axiomIds.has(premise.axiomId)
+          )
+            issue(
+              issues,
+              `$.proposals[${index}].premises[${premiseIndex}].axiomId`,
+              'missing-reference',
+              `Unknown Proposal premise Axiom "${premise.axiomId}".`,
+            );
+          if (
+            (premise.kind === 'argument-conclusion' ||
+              premise.kind === 'argument-premise') &&
+            typeof premise.argumentId === 'string'
+          ) {
+            const referenced = Array.isArray(library.arguments)
+              ? library.arguments.find(
+                  (candidate) =>
+                    isRecord(candidate) && candidate.id === premise.argumentId,
+                )
+              : undefined;
+            if (!argumentIds.has(premise.argumentId))
+              issue(
+                issues,
+                `$.proposals[${index}].premises[${premiseIndex}].argumentId`,
+                'missing-reference',
+                `Unknown Proposal premise Argument "${premise.argumentId}".`,
+              );
+            if (
+              premise.kind === 'argument-premise' &&
+              typeof premise.premiseId === 'string' &&
+              isRecord(referenced) &&
+              Array.isArray(referenced.premises) &&
+              !referenced.premises.some(
+                (candidate) =>
+                  isRecord(candidate) && candidate.id === premise.premiseId,
+              )
+            )
+              issue(
+                issues,
+                `$.proposals[${index}].premises[${premiseIndex}].premiseId`,
+                'missing-reference',
+                `Unknown referenced Argument premise "${premise.premiseId}".`,
+              );
+          }
+        });
+      }
       if (
         isRecord(entry.consultation) &&
         Array.isArray(entry.consultation.records)
@@ -1887,7 +2211,7 @@ function validateIntegrity(
 
 function validateArgumentLibraryVersion(
   value: unknown,
-  expectedVersion: 2 | 3 | 4 | 5,
+  expectedVersion: 2 | 3 | 4 | 5 | 6,
 ): ArgumentLibraryValidationResult {
   const issues: ArgumentLibraryValidationIssue[] = [];
   if (!isRecord(value)) {
@@ -2000,7 +2324,12 @@ function validateArgumentLibraryVersion(
     );
   if (expectedVersion >= 5 && Array.isArray(value.proposals)) {
     value.proposals.forEach((entry, index) =>
-      validateProposal(entry, `$.proposals[${index}]`, issues),
+      validateProposal(
+        entry,
+        `$.proposals[${index}]`,
+        issues,
+        expectedVersion >= 6 ? 6 : 5,
+      ),
     );
   }
   validateIntegrity(
@@ -2020,7 +2349,28 @@ function validateArgumentLibraryVersion(
 export function validateArgumentLibrary(
   value: unknown,
 ): ArgumentLibraryValidationResult {
-  return validateArgumentLibraryVersion(value, 5);
+  return validateArgumentLibraryVersion(value, 6);
+}
+
+export type ArgumentLibraryV5ValidationResult =
+  | {
+      readonly valid: true;
+      readonly value: PlainRecord;
+      readonly issues: readonly [];
+    }
+  | {
+      readonly valid: false;
+      readonly issues: readonly ArgumentLibraryValidationIssue[];
+    };
+
+/** Strictly validates the schema-v5 Proposal shape before migration. */
+export function validateArgumentLibraryV5(
+  value: unknown,
+): ArgumentLibraryV5ValidationResult {
+  const validation = validateArgumentLibraryVersion(value, 5);
+  return validation.valid
+    ? { valid: true, value: value as PlainRecord, issues: [] }
+    : validation;
 }
 
 export type ArgumentLibraryV4ValidationResult =
