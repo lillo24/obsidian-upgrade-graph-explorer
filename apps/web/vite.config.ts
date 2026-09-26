@@ -30,26 +30,45 @@ export function assertWorkerChunkIsDomFree(
   );
 }
 
-export function workerRuntimeBoundary(): Plugin {
+interface WorkerRuntimeBoundaryOptions {
+  readonly apply?: 'serve' | 'build';
+  readonly guardBundle?: boolean;
+}
+
+export function workerRuntimeBoundary({
+  apply,
+  guardBundle = true,
+}: WorkerRuntimeBoundaryOptions = {}): Plugin {
   return {
     name: 'icarus-worker-runtime-boundary',
     enforce: 'pre',
+    ...(apply === undefined ? {} : { apply }),
     resolveId: (source) =>
       source === 'decode-named-character-reference'
         ? WORKER_SAFE_NAMED_REFERENCE_MODULE
         : null,
-    generateBundle: (_options, bundle) => {
-      for (const output of Object.values(bundle)) {
-        if (output.type === 'chunk') {
-          assertWorkerChunkIsDomFree(output.fileName, output.code);
+    ...(guardBundle
+      ? {
+          generateBundle: (_options, bundle) => {
+            for (const output of Object.values(bundle)) {
+              if (output.type === 'chunk') {
+                assertWorkerChunkIsDomFree(output.fileName, output.code);
+              }
+            }
+          },
         }
-      }
-    },
+      : {}),
   };
 }
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    workerRuntimeBoundary({ apply: 'serve', guardBundle: false }),
+    react(),
+  ],
+  optimizeDeps: {
+    exclude: ['decode-named-character-reference'],
+  },
   worker: {
     plugins: () => [workerRuntimeBoundary()],
   },
