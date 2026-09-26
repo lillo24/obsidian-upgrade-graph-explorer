@@ -119,7 +119,7 @@ After merging any change that can affect the desktop app or shared code:
 - update the primary `main` checkout to merged `origin/main`;
 - run `pnpm desktop:build`;
 - confirm `apps/desktop/src-tauri/target/release/icarus-graph-explorer-desktop.exe` was rebuilt;
-- if the primary checkout is dirty/diverged or the build fails, do not overwrite/discard anything; report the blocker.
+- if the primary checkout has modified/staged tracked files, or `main` cannot be safely fast-forwarded to `origin/main`, do not overwrite/discard anything; report the blocker. Untracked files alone do not block the refresh unless they would conflict with the update/build.
 
 The Desktop launcher should point to that stable executable path, so it does not need to be recreated after each build.
 
