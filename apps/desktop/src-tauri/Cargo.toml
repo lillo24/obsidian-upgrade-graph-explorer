@@ -1,7 +1,7 @@
 [package]
 name = "icarus-graph-explorer-desktop"
 version = "0.0.0"
-description = "Read-only desktop shell for Icarus Graph Explorer"
+description = "Desktop shell for Icarus Graph Explorer"
 authors = ["Icarus Graph Explorer contributors"]
 edition = "2021"
 rust-version = "1.77.2"

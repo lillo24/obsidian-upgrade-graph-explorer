@@ -1,6 +1,7 @@
 use tauri::Manager;
 use tauri_plugin_fs::FsExt;
 
+mod compiler_tunnel;
 mod review_source;
 
 fn allow_private_state_scope<R: tauri::Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
@@ -39,6 +40,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            compiler_tunnel::ensure_argument_compiler_tunnel_running,
             review_source::open_review_source_session,
             review_source::prepare_review_source_history,
             review_source::list_review_source_files,

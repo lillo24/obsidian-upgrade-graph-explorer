@@ -4,9 +4,10 @@ Status: **STABLE — KG11 live update, resync, capability, and controller gates 
 
 This package owns the minimal Tauri v2 process around the existing
 `apps/web` Vite application. Rust registers the dialog/filesystem plugins and
-dedicated, read-only Git review-source commands. It exposes no general process
-API. Markdown parsing, resolution, stable identity, diagnostics, graph
-projection, review orchestration, and UI remain in TypeScript packages.
+dedicated, read-only Git review-source commands plus the fixed Windows
+Scheduled Task ensure command. It exposes no general process API. Markdown
+parsing, resolution, stable identity, diagnostics, graph projection, review
+orchestration, and UI remain in TypeScript packages.
 
 ```text
 package.json                 Tauri CLI scripts and pinned CLI version.
@@ -18,6 +19,7 @@ src-tauri/
   tauri.global-renderer-spike.conf.json KG13A-only release harness override.
   capabilities/main.json     Dialog, selected-root read/watch, and app-data scope.
   src/lib.rs                 Tauri/plugin initialization.
+  src/compiler_tunnel.rs     Fixed Windows Scheduled Task ensure boundary and platform-neutral result tests.
   src/review_source.rs       Authorized, pinned, bounded read-only Git capture and disposable-repository tests.
   src/main.rs                Desktop executable entry point.
   icons/                     Tauri-generated desktop icon formats.
@@ -67,6 +69,15 @@ opens it in a native window. `desktop:build` performs a release build without
 an installer/bundle; signing, packaging, updater, and release automation are
 outside KG11A. Ordinary `pnpm dev` remains browser-only.
 
+On Windows, the existing `Icarus Argument Compiler Tunnel` Scheduled Task is
+the primary/autostart lifecycle owner for the local Compiler tunnel. Opening
+Arguments in the desktop app performs one best-effort, idempotent fallback:
+it queries that fixed task and starts it only when it is not already running.
+Graph Explorer does not install, configure, update, stop, or duplicate the
+task or its external startup script, and closing Arguments or Graph Explorer
+does not shut the tunnel down. Browser builds do not expose this capability;
+non-Windows desktop builds return a clean unsupported-platform result.
+
 The main window enables Tauri's `zoomHotkeysEnabled` input path because Wry
 otherwise disables WebView2 precision-touchpad pinch before the graph can
 receive its ctrl-modified wheel signal. The graph's non-passive wheel handler
@@ -74,6 +85,12 @@ still owns that gesture and prevents WebView page zoom while applying focal
 canvas zoom. Keep this window setting aligned with the renderer gesture model.
 
 ## Security boundary
+
+The Compiler tunnel command is a separate zero-input native boundary, not a
+general process launcher. Its Scheduled Task name, PowerShell program, and
+PowerShell arguments are fixed in Rust; renderer code cannot provide a task
+name, executable, script path, or command string. Native stdout and stderr are
+discarded, and fixed sanitized errors never expose process output.
 
 The main window can open a native directory dialog. Tauri adds the selected
 directory to filesystem scope for that process, after which the TypeScript

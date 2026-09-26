@@ -237,6 +237,7 @@ describe('shared local workspace overlay', () => {
           </button>
           <WorkspaceOverlay
             area={area}
+            argumentNotice={<p>Compiler tunnel warning</p>}
             argumentSession={argumentSession}
             controller={controller}
             onAreaChange={setArea}
@@ -254,6 +255,7 @@ describe('shared local workspace overlay', () => {
       await Promise.resolve();
     });
     expect(container.querySelectorAll('dialog')).toHaveLength(1);
+    expect(container.textContent).toContain('Compiler tunnel warning');
     const buttons = () => [
       ...container.querySelectorAll<HTMLButtonElement>('button'),
     ];
@@ -293,6 +295,7 @@ describe('shared local workspace overlay', () => {
     expect(
       container.querySelector('#review-workspace-area')?.hasAttribute('hidden'),
     ).toBe(false);
+    expect(container.textContent).not.toContain('Compiler tunnel warning');
     expect(container.textContent).toContain('Live analysis is not connected');
     expect(container.textContent).toContain('Browser session only');
 
