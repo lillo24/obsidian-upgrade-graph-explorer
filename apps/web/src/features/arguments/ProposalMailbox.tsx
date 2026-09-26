@@ -1,4 +1,12 @@
-import { useMemo, useState } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import type {
   Argument,
@@ -50,6 +58,56 @@ export interface ProposalDraftTextEdits {
   readonly conclusion: string;
   readonly boundary: string;
   readonly whyNovelOrUnresolved: string;
+}
+
+export interface ProposalMailboxHandle {
+  discardUnsavedEdit(): void;
+  focusInitial(): void;
+  hasUnsavedEdit(): boolean;
+  saveUnsavedEdit(): Promise<boolean>;
+}
+
+interface ProposalMailboxProps {
+  readonly busy: boolean;
+  readonly library: ArgumentLibrary;
+  readonly onAccept: (proposal: ArgumentProposal) => void;
+  readonly onCopy: (value: string, message: string) => void;
+  readonly onDirtyChange: (dirty: boolean) => void;
+  readonly onDiscard: (proposal: ArgumentProposal) => void;
+  readonly onEdit: (
+    proposal: ArgumentProposal,
+    edits: ProposalDraftTextEdits,
+  ) => Promise<boolean>;
+  readonly onNavigate: (selection: ArgumentSelection) => void;
+  readonly onReject: (proposal: ArgumentProposal) => void;
+  readonly onReload: () => void;
+  readonly operationError?: string;
+}
+
+function proposalDraftTextEdits(
+  proposal: ArgumentProposal,
+): ProposalDraftTextEdits {
+  return {
+    revisionReason: '',
+    title: proposal.title,
+    softExplanationMarkdown: proposal.softExplanationMarkdown ?? '',
+    reasoning: proposal.reasoning ?? '',
+    conclusion: proposal.conclusion,
+    boundary: proposal.boundary ?? '',
+    whyNovelOrUnresolved: proposal.whyNovelOrUnresolved,
+  };
+}
+
+function proposalDraftChanged(
+  proposal: ArgumentProposal | undefined,
+  editDraft:
+    ({ readonly proposalId: string } & ProposalDraftTextEdits) | undefined,
+): boolean {
+  if (proposal === undefined || editDraft === undefined) return false;
+  const baseline = proposalDraftTextEdits(proposal);
+  return (Object.keys(baseline) as (keyof ProposalDraftTextEdits)[]).some(
+    (key) => baseline[key] !== editDraft[key],
+  );
 }
 
 function targetPartLabel(part: ArgumentTargetPart): string {
@@ -291,35 +349,32 @@ function LocalArgumentContext({
   );
 }
 
-export function ProposalMailbox({
-  busy,
-  library,
-  onAccept,
-  onClose,
-  onCopy,
-  onDiscard,
-  onEdit,
-  onNavigate,
-  onReject,
-}: {
-  readonly busy: boolean;
-  readonly library: ArgumentLibrary;
-  readonly onAccept: (proposal: ArgumentProposal) => void;
-  readonly onClose: () => void;
-  readonly onCopy: (value: string, message: string) => void;
-  readonly onDiscard: (proposal: ArgumentProposal) => void;
-  readonly onEdit: (
-    proposal: ArgumentProposal,
-    edits: ProposalDraftTextEdits,
-  ) => void;
-  readonly onNavigate: (selection: ArgumentSelection) => void;
-  readonly onReject: (proposal: ArgumentProposal) => void;
-}) {
+export const ProposalMailbox = forwardRef<
+  ProposalMailboxHandle,
+  ProposalMailboxProps
+>(function ProposalMailbox(
+  {
+    busy,
+    library,
+    onAccept,
+    onCopy,
+    onDirtyChange,
+    onDiscard,
+    onEdit,
+    onNavigate,
+    onReject,
+    onReload,
+    operationError,
+  },
+  ref,
+) {
   const [view, setView] = useState<'pending' | 'history'>('pending');
   const [selectedId, setSelectedId] = useState<string>();
   const [editDraft, setEditDraft] = useState<
     { readonly proposalId: string } & ProposalDraftTextEdits
   >();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const selectedButtonRef = useRef<HTMLButtonElement>(null);
   const proposals = library.proposals.filter(({ status }) =>
     view === 'pending' ? status === 'pending' : status !== 'pending',
   );
@@ -334,23 +389,73 @@ export function ProposalMailbox({
       ? undefined
       : library.arguments.find(({ id }) => id === selected.target?.argumentId);
   const topic = library.topics.find(({ id }) => id === selected?.topicId);
+  const editedProposal = library.proposals.find(
+    ({ id }) => id === editDraft?.proposalId,
+  );
+  const editDirty = proposalDraftChanged(editedProposal, editDraft);
+  const saveEdit = useCallback(async (): Promise<boolean> => {
+    if (editDraft === undefined || editedProposal === undefined) return true;
+    if (!editDirty) {
+      setEditDraft(undefined);
+      return true;
+    }
+    const saved = await onEdit(editedProposal, editDraft);
+    if (saved) setEditDraft(undefined);
+    return saved;
+  }, [editDraft, editDirty, editedProposal, onEdit]);
+
+  useEffect(() => {
+    onDirtyChange(editDirty);
+  }, [editDirty, onDirtyChange]);
+
+  useEffect(
+    () => () => {
+      onDirtyChange(false);
+    },
+    [onDirtyChange],
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      discardUnsavedEdit() {
+        setEditDraft(undefined);
+      },
+      focusInitial() {
+        (selectedButtonRef.current ?? headingRef.current)?.focus();
+      },
+      hasUnsavedEdit() {
+        return editDirty;
+      },
+      saveUnsavedEdit: saveEdit,
+    }),
+    [editDirty, saveEdit],
+  );
+
   return (
     <section
-      aria-labelledby="arguments-mailbox-title"
-      className="arguments-subdialog arguments-mailbox"
-      role="dialog"
+      aria-labelledby="arguments-to-store-tab"
+      className="arguments-mailbox"
+      id="arguments-to-store-panel"
+      role="tabpanel"
     >
-      <div>
-        <header>
+      <div className="arguments-mailbox__surface">
+        <header className="arguments-mailbox__intro">
           <p className="eyebrow">Non-canonical staging area</p>
-          <h2 id="arguments-mailbox-title">Proposal Mailbox</h2>
+          <h2 id="arguments-mailbox-title" ref={headingRef} tabIndex={-1}>
+            To store
+          </h2>
           <p>
             Develop active To store drafts over time. Staging revisions and
             links are non-canonical; storage still requires the separate human
             resolution editor.
           </p>
         </header>
-        <div className="arguments-actions" role="tablist">
+        <div
+          aria-label="Proposal staging status"
+          className="arguments-actions arguments-mailbox__tabs"
+          role="tablist"
+        >
           {(['pending', 'history'] as const).map((tab) => (
             <button
               aria-selected={view === tab}
@@ -363,7 +468,7 @@ export function ProposalMailbox({
               type="button"
             >
               {tab === 'pending'
-                ? `To store (${library.proposals.filter(({ status }) => status === 'pending').length})`
+                ? `Active (${library.proposals.filter(({ status }) => status === 'pending').length})`
                 : 'History'}
             </button>
           ))}
@@ -385,16 +490,22 @@ export function ProposalMailbox({
                         proposal.id === selected?.id ? 'page' : undefined
                       }
                       onClick={() => setSelectedId(proposal.id)}
+                      ref={
+                        proposal.id === selected?.id
+                          ? selectedButtonRef
+                          : undefined
+                      }
                       type="button"
                     >
-                      <strong>{proposal.title}</strong>
-                      <small>{INTENT_LABELS[proposal.intent]}</small>
-                      <small>
+                      <strong className="arguments-mailbox__row-title">
+                        {proposal.title}
+                      </strong>
+                      <small className="arguments-mailbox__row-meta">
+                        {INTENT_LABELS[proposal.intent]} ·{' '}
                         {library.topics.find(
                           ({ id }) => id === proposal.topicId,
                         )?.title ?? 'No Topic'}
                       </small>
-                      <span>{proposal.conclusion}</span>
                     </button>
                   </li>
                 ))}
@@ -721,8 +832,7 @@ export function ProposalMailbox({
                       className="arguments-mailbox__section"
                       onSubmit={(event) => {
                         event.preventDefault();
-                        onEdit(selected, editDraft);
-                        setEditDraft(undefined);
+                        void saveEdit();
                       }}
                     >
                       <h4>Edit active draft</h4>
@@ -853,59 +963,60 @@ export function ProposalMailbox({
                       </div>
                     </form>
                   )}
-                  <div className="arguments-actions">
-                    <button
-                      disabled={busy}
-                      onClick={() =>
-                        setEditDraft({
-                          proposalId: selected.id,
-                          revisionReason: '',
-                          title: selected.title,
-                          softExplanationMarkdown:
-                            selected.softExplanationMarkdown ?? '',
-                          reasoning: selected.reasoning ?? '',
-                          conclusion: selected.conclusion,
-                          boundary: selected.boundary ?? '',
-                          whyNovelOrUnresolved: selected.whyNovelOrUnresolved,
-                        })
-                      }
-                      type="button"
-                    >
-                      Edit draft
-                    </button>
-                    <button
-                      disabled={busy}
-                      onClick={() => onDiscard(selected)}
-                      type="button"
-                    >
-                      Discard
-                    </button>
-                    <button
-                      disabled={busy}
-                      onClick={() => onReject(selected)}
-                      type="button"
-                    >
-                      Store refutation / Counter-Argument…
-                    </button>
-                    <button
-                      disabled={busy}
-                      onClick={() => onAccept(selected)}
-                      type="button"
-                    >
-                      Store as Argument…
-                    </button>
-                  </div>
+                  {editDraft === undefined ? (
+                    <div className="arguments-actions">
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          setEditDraft({
+                            proposalId: selected.id,
+                            ...proposalDraftTextEdits(selected),
+                          })
+                        }
+                        type="button"
+                      >
+                        Edit draft
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={() => onDiscard(selected)}
+                        type="button"
+                      >
+                        Discard
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={() => onReject(selected)}
+                        type="button"
+                      >
+                        Store refutation / Counter-Argument…
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={() => onAccept(selected)}
+                        type="button"
+                      >
+                        Store as Argument…
+                      </button>
+                    </div>
+                  ) : null}
                 </>
               )}
             </article>
           )}
         </div>
-        <div className="arguments-actions">
-          <button onClick={onClose} type="button">
-            Close Mailbox
-          </button>
-        </div>
+        {operationError === undefined ? null : (
+          <div
+            className="arguments-error arguments-operation-error"
+            role="alert"
+          >
+            <p>{operationError}</p>
+            <button disabled={busy} onClick={onReload} type="button">
+              Reload confirmed library and review draft
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );
-}
+});

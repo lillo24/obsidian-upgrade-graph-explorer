@@ -41,6 +41,7 @@ import { ArgumentRecordEditor } from './ArgumentRecordEditor';
 import {
   ProposalMailbox,
   type ProposalDraftTextEdits,
+  type ProposalMailboxHandle,
 } from './ProposalMailbox';
 import { proposalTargetStaleness } from './proposal-mailbox';
 import {
@@ -1222,7 +1223,7 @@ function ArgumentsWorkspaceContainer({
 }) {
   return embedded ? (
     <section
-      aria-labelledby="arguments-workspace-title"
+      aria-labelledby="arguments-workspace-tab"
       className="arguments-dialog arguments-dialog--embedded"
       hidden={!active}
     >
@@ -1270,14 +1271,23 @@ const ArgumentsWorkspaceContent = forwardRef<
   );
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const libraryViewButtonRef = useRef<HTMLButtonElement>(null);
+  const mailboxViewButtonRef = useRef<HTMLButtonElement>(null);
+  const mailboxRef = useRef<ProposalMailboxHandle>(null);
   const newTopicButtonRef = useRef<HTMLButtonElement>(null);
   const [selection, setSelection] = useState<ArgumentSelection>();
   const [history, setHistory] = useState<readonly ArgumentSelection[]>([]);
   const [editor, setEditor] = useState<EditorState>();
   const [confirmation, setConfirmation] = useState<string>();
   const pendingTransition = useRef<(() => void) | undefined>(undefined);
+  const pendingDirtySource = useRef<'record' | 'proposal' | undefined>(
+    undefined,
+  );
   const [notice, setNotice] = useState<string>();
-  const [mailboxOpen, setMailboxOpen] = useState(false);
+  const [activeView, setActiveView] = useState<'library' | 'mailbox'>(
+    'library',
+  );
+  const [mailboxEditDirty, setMailboxEditDirty] = useState(false);
   const [proposalResolution, setProposalResolution] =
     useState<ProposalResolutionState>();
   const [insertJson, setInsertJson] = useState<InsertJsonState>();
@@ -1307,6 +1317,13 @@ const ArgumentsWorkspaceContent = forwardRef<
     (message: string, action: () => void) => {
       if (editor?.dirty === true) {
         pendingTransition.current = action;
+        pendingDirtySource.current = 'record';
+        setConfirmation(message);
+        return;
+      }
+      if (mailboxRef.current?.hasUnsavedEdit() === true) {
+        pendingTransition.current = action;
+        pendingDirtySource.current = 'proposal';
         setConfirmation(message);
         return;
       }
@@ -1322,11 +1339,18 @@ const ArgumentsWorkspaceContent = forwardRef<
   const handleEscape = useCallback((): boolean => {
     if (confirmation !== undefined) {
       pendingTransition.current = undefined;
+      pendingDirtySource.current = undefined;
       setConfirmation(undefined);
       return true;
     }
-    if (mailboxOpen) {
-      setMailboxOpen(false);
+    if (activeView === 'mailbox') {
+      requestTransition(
+        'Return to Library with unsaved Proposal changes?',
+        () => {
+          setActiveView('library');
+          queueMicrotask(() => libraryViewButtonRef.current?.focus());
+        },
+      );
       return true;
     }
     if (contextExport !== undefined) {
@@ -1352,9 +1376,10 @@ const ArgumentsWorkspaceContent = forwardRef<
     contextExport,
     importPreview,
     insertJson,
-    mailboxOpen,
+    activeView,
     markdownFiles,
     requestClose,
+    requestTransition,
   ]);
 
   useEffect(() => {
@@ -1369,10 +1394,18 @@ const ArgumentsWorkspaceContent = forwardRef<
         requestTransition(message, action);
       },
       focusInitial() {
-        (newTopicButtonRef.current ?? closeButtonRef.current)?.focus();
+        if (activeView === 'mailbox') {
+          mailboxRef.current?.focusInitial();
+          return;
+        }
+        (
+          libraryViewButtonRef.current ??
+          newTopicButtonRef.current ??
+          closeButtonRef.current
+        )?.focus();
       },
     }),
-    [handleEscape, requestTransition],
+    [activeView, handleEscape, requestTransition],
   );
 
   useEffect(() => {
@@ -1409,40 +1442,43 @@ const ArgumentsWorkspaceContent = forwardRef<
   }, [embedded, open, restoreFocus]);
 
   useEffect(() => {
-    if (editor?.dirty !== true) return;
+    if (editor?.dirty !== true && !mailboxEditDirty) return;
     const protect = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener('beforeunload', protect);
     return () => window.removeEventListener('beforeunload', protect);
-  }, [editor?.dirty]);
+  }, [editor?.dirty, mailboxEditDirty]);
 
   useEffect(() => {
-    if (
-      !open ||
-      state.phase !== 'ready' ||
-      dialogRef.current?.contains(document.activeElement) === true
-    ) {
+    if (!open || state.phase !== 'ready') return;
+    if (activeView === 'mailbox') {
+      queueMicrotask(() => mailboxRef.current?.focusInitial());
       return;
     }
+    if (dialogRef.current?.contains(document.activeElement) === true) return;
     newTopicButtonRef.current?.focus();
-  }, [open, state.phase]);
+  }, [activeView, open, state.phase]);
 
   function cancelNative(event: SyntheticEvent<HTMLDialogElement>) {
     event.preventDefault();
     escapeAction.current();
   }
 
+  function applyNavigation(next: ArgumentSelection) {
+    sourceReadTokens.current.clear();
+    setHistory((current) =>
+      currentSelection === undefined || sameSelection(currentSelection, next)
+        ? current
+        : [...current, currentSelection],
+    );
+    setSelection(next);
+    setEditor(undefined);
+    setProposalResolution(undefined);
+  }
+
   function navigate(next: ArgumentSelection) {
-    requestTransition('Switch records with unsaved changes?', () => {
-      sourceReadTokens.current.clear();
-      setHistory((current) =>
-        currentSelection === undefined || sameSelection(currentSelection, next)
-          ? current
-          : [...current, currentSelection],
-      );
-      setSelection(next);
-      setEditor(undefined);
-      setProposalResolution(undefined);
-    });
+    requestTransition('Switch records with unsaved changes?', () =>
+      applyNavigation(next),
+    );
   }
 
   function goBack() {
@@ -1548,17 +1584,33 @@ const ArgumentsWorkspaceContent = forwardRef<
 
   function discardAndContinue() {
     const action = pendingTransition.current;
+    const dirtySource = pendingDirtySource.current;
     pendingTransition.current = undefined;
+    pendingDirtySource.current = undefined;
     setConfirmation(undefined);
-    setEditor(undefined);
-    setProposalResolution(undefined);
+    if (dirtySource === 'proposal') {
+      mailboxRef.current?.discardUnsavedEdit();
+    } else {
+      setEditor(undefined);
+      setProposalResolution(undefined);
+    }
     action?.();
   }
 
   async function saveAndContinue() {
     const action = pendingTransition.current;
+    if (pendingDirtySource.current === 'proposal') {
+      if (await mailboxRef.current?.saveUnsavedEdit()) {
+        pendingTransition.current = undefined;
+        pendingDirtySource.current = undefined;
+        setConfirmation(undefined);
+        action?.();
+      }
+      return;
+    }
     if (await saveCurrent(action)) {
       pendingTransition.current = undefined;
+      pendingDirtySource.current = undefined;
       setConfirmation(undefined);
     }
   }
@@ -1580,11 +1632,23 @@ const ArgumentsWorkspaceContent = forwardRef<
   }
 
   function openMailbox() {
-    requestTransition('Open Mailbox with unsaved changes?', () => {
+    if (activeView === 'mailbox') return;
+    requestTransition('Open To store with unsaved changes?', () => {
       setEditor(undefined);
       setProposalResolution(undefined);
-      void session.reload().then(() => setMailboxOpen(true));
+      void session.reload().then(() => setActiveView('mailbox'));
     });
+  }
+
+  function openLibrary() {
+    if (activeView === 'library') return;
+    requestTransition(
+      'Return to Library with unsaved Proposal changes?',
+      () => {
+        setActiveView('library');
+        queueMicrotask(() => libraryViewButtonRef.current?.focus());
+      },
+    );
   }
 
   function startProposalAcceptance(proposal: ArgumentProposal) {
@@ -1594,7 +1658,7 @@ const ArgumentsWorkspaceContent = forwardRef<
       proposal,
       session,
     );
-    setMailboxOpen(false);
+    setActiveView('library');
     setEditor(prepared.editor);
     setProposalResolution({
       proposalId: proposal.id,
@@ -1606,7 +1670,7 @@ const ArgumentsWorkspaceContent = forwardRef<
 
   function startProposalRejection(proposal: ArgumentProposal) {
     if (state.phase !== 'ready') return;
-    setMailboxOpen(false);
+    setActiveView('library');
     setEditor(
       proposalCounterArgumentEditor(
         state.snapshot.descriptor,
@@ -1625,8 +1689,8 @@ const ArgumentsWorkspaceContent = forwardRef<
   async function reviseProposalDraft(
     proposal: ArgumentProposal,
     edits: ProposalDraftTextEdits,
-  ) {
-    if (state.phase !== 'ready') return;
+  ): Promise<boolean> {
+    if (state.phase !== 'ready') return false;
     const descriptor = state.snapshot.descriptor;
     const result = await session.reviseProposal(descriptor, {
       proposalId: proposal.id,
@@ -1655,7 +1719,9 @@ const ArgumentsWorkspaceContent = forwardRef<
         contentFingerprint: descriptor.contentFingerprint,
       },
     });
-    if (result.status === 'ok') setNotice('Draft revision saved');
+    if (result.status !== 'ok') return false;
+    setNotice('Draft revision saved');
+    return true;
   }
 
   async function discardProposalDraft(proposal: ArgumentProposal) {
@@ -2306,6 +2372,12 @@ const ArgumentsWorkspaceContent = forwardRef<
       contextExport.sourcePacket.packet.library,
       state.snapshot.descriptor,
     );
+  const pendingProposalCount =
+    state.phase === 'ready'
+      ? state.snapshot.library.proposals.filter(
+          ({ status }) => status === 'pending',
+        ).length
+      : 0;
 
   return (
     <ArgumentsWorkspaceContainer
@@ -2315,11 +2387,52 @@ const ArgumentsWorkspaceContent = forwardRef<
       onCancel={cancelNative}
     >
       <div className="arguments-dialog__surface">
-        <header className="arguments-dialog__header">
-          <div>
-            <p className="eyebrow">Local knowledge workspace</p>
-            <h1 id="arguments-workspace-title">Arguments</h1>
-          </div>
+        <header
+          className={`arguments-dialog__header${embedded ? ' arguments-dialog__header--embedded' : ''}`}
+        >
+          {embedded ? null : (
+            <div>
+              <p className="eyebrow">Local knowledge workspace</p>
+              <h1 id="arguments-workspace-title">Arguments</h1>
+            </div>
+          )}
+          {state.phase !== 'ready' ? null : (
+            <div
+              aria-label="Arguments views"
+              className="arguments-view-switcher"
+              role="tablist"
+            >
+              <button
+                aria-controls="arguments-library-panel"
+                aria-selected={activeView === 'library'}
+                id="arguments-library-tab"
+                onClick={openLibrary}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowRight') openMailbox();
+                }}
+                ref={libraryViewButtonRef}
+                role="tab"
+                type="button"
+              >
+                Library
+              </button>
+              <button
+                aria-controls="arguments-to-store-panel"
+                aria-selected={activeView === 'mailbox'}
+                disabled={state.busy}
+                id="arguments-to-store-tab"
+                onClick={openMailbox}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowLeft') openLibrary();
+                }}
+                ref={mailboxViewButtonRef}
+                role="tab"
+                type="button"
+              >
+                To store ({pendingProposalCount})
+              </button>
+            </div>
+          )}
           <div className="arguments-dialog__status" role="status">
             {state.phase === 'loading'
               ? 'Opening…'
@@ -2332,19 +2445,6 @@ const ArgumentsWorkspaceContent = forwardRef<
           <div className="arguments-dialog__actions">
             {state.phase !== 'ready' ? null : (
               <>
-                <button
-                  disabled={state.busy}
-                  onClick={openMailbox}
-                  type="button"
-                >
-                  To store (
-                  {
-                    state.snapshot.library.proposals.filter(
-                      ({ status }) => status === 'pending',
-                    ).length
-                  }
-                  )
-                </button>
                 <button
                   disabled={state.busy}
                   onClick={() => setInsertJson({ source: '' })}
@@ -2382,9 +2482,11 @@ const ArgumentsWorkspaceContent = forwardRef<
                 </button>
               </>
             )}
-            <button onClick={requestClose} ref={closeButtonRef} type="button">
-              Close
-            </button>
+            {embedded ? null : (
+              <button onClick={requestClose} ref={closeButtonRef} type="button">
+                Close
+              </button>
+            )}
           </div>
         </header>
 
@@ -2442,8 +2544,13 @@ const ArgumentsWorkspaceContent = forwardRef<
           </section>
         ) : null}
 
-        {state.phase !== 'ready' ? null : (
-          <div className="arguments-layout">
+        {state.phase !== 'ready' || activeView !== 'library' ? null : (
+          <div
+            aria-labelledby="arguments-library-tab"
+            className="arguments-layout"
+            id="arguments-library-panel"
+            role="tabpanel"
+          >
             <aside className="arguments-sidebar">
               <div className="arguments-create-actions">
                 <button
@@ -2634,7 +2741,7 @@ const ArgumentsWorkspaceContent = forwardRef<
                           const wasResolving = proposalResolution !== undefined;
                           setEditor(undefined);
                           setProposalResolution(undefined);
-                          if (wasResolving) setMailboxOpen(true);
+                          if (wasResolving) setActiveView('mailbox');
                         })
                       }
                       type="button"
@@ -2917,22 +3024,45 @@ const ArgumentsWorkspaceContent = forwardRef<
           </div>
         )}
 
-        {!mailboxOpen || state.phase !== 'ready' ? null : (
+        {activeView !== 'mailbox' || state.phase !== 'ready' ? null : (
           <ProposalMailbox
             busy={state.busy}
             library={state.snapshot.library}
-            onAccept={startProposalAcceptance}
-            onClose={() => setMailboxOpen(false)}
-            onCopy={(value, message) => void copy(value, message)}
-            onDiscard={(proposal) => void discardProposalDraft(proposal)}
-            onEdit={(proposal, edits) =>
-              void reviseProposalDraft(proposal, edits)
+            onAccept={(proposal) =>
+              requestTransition(
+                'Store this Proposal with unsaved Proposal changes?',
+                () => startProposalAcceptance(proposal),
+              )
             }
+            onCopy={(value, message) => void copy(value, message)}
+            onDirtyChange={setMailboxEditDirty}
+            onDiscard={(proposal) =>
+              requestTransition(
+                'Discard this Proposal with unsaved Proposal changes?',
+                () => void discardProposalDraft(proposal),
+              )
+            }
+            onEdit={reviseProposalDraft}
             onNavigate={(next) => {
-              setMailboxOpen(false);
-              navigate(next);
+              requestTransition(
+                'Open this Library record with unsaved Proposal changes?',
+                () => {
+                  setActiveView('library');
+                  applyNavigation(next);
+                },
+              );
             }}
-            onReject={startProposalRejection}
+            onReject={(proposal) =>
+              requestTransition(
+                'Store this refutation with unsaved Proposal changes?',
+                () => startProposalRejection(proposal),
+              )
+            }
+            onReload={() => void session.reload()}
+            {...(state.operationError === undefined
+              ? {}
+              : { operationError: state.operationError })}
+            ref={mailboxRef}
           />
         )}
 
@@ -3256,6 +3386,7 @@ const ArgumentsWorkspaceContent = forwardRef<
                 <button
                   onClick={() => {
                     pendingTransition.current = undefined;
+                    pendingDirtySource.current = undefined;
                     setConfirmation(undefined);
                   }}
                   type="button"

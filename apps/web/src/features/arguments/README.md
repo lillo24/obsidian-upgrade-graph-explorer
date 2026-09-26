@@ -6,17 +6,19 @@ requests open/close transitions.
 
 - `ArgumentsWorkspace.tsx` owns onboarding, drafts, navigation, search, source
   binding/previews, separate additive Insert JSON and full-library Import JSON
-  dialogs, human Proposal resolution through the core shared Proposal conversion,
-  and confirmed-snapshot
-  exports. It exposes a
-  narrow leave guard and embedded panel to the shared workspace modal while
-  retaining a standalone wrapper for tests.
-- `ProposalMailbox.tsx` owns the human-readable To store/history staging
-  surface: current and prior revisions, draft Proposal links, discard, bounded
-  prose editing, intent and target previews, compact local Argument context,
-  the optional Soft Explanation rendered through the shared safe Markdown
-  boundary, typed dependency cards, structured reasoning, and source
-  observations kept separate from inference premises.
+  dialogs, the first-class Library / To store view switch, human Proposal
+  resolution through the core shared Proposal conversion, and
+  confirmed-snapshot exports. It composes canonical and staged draft protection
+  into one narrow leave guard, exposes an embedded panel to the shared workspace
+  modal, and retains standalone title/Close chrome.
+- `ProposalMailbox.tsx` owns the human-readable To store Active/History staging
+  view: compact Proposal navigation, current and prior revisions, draft
+  Proposal links, discard, bounded prose editing and its narrow leave-guard
+  handle, intent and target previews, compact local Argument context, the
+  optional Soft Explanation rendered through the shared safe Markdown boundary,
+  typed dependency cards, structured reasoning, and source observations kept
+  separate from inference premises. It is an inline Arguments panel, not a
+  dialog or scrim.
 - `proposal-mailbox.ts` owns shared target-staleness derivation used by the
   Mailbox and human resolution panel.
 - `ArgumentRecordView.tsx` presents Topic, Context/Axiom Group, Axiom, Argument, Counter-Argument,
@@ -59,8 +61,11 @@ requests open/close transitions.
 - `markdown-directory-export.ts` preserves the core export's safe relative
   directory layout beneath a directory explicitly selected by the user.
 - `arguments.css` owns the responsive 94vw by 93dvh two-pane surface. Its
+  Library and independently scrolling To store panes, compact Proposal rows,
   surface, control, focus, and status colors inherit the application semantic
   tokens; it owns no separate OS or root-theme override.
+- `arguments-layout.test.ts` locks the desktop pane-scroll, compact-row, and
+  narrow single-column layout contracts.
 
 Full-library imports are explicitly selected at runtime and limited to 5 MiB
 before parsing. Insert JSON uses the same size ceiling but a distinct,
@@ -80,8 +85,9 @@ V7 migration adds empty draft-link and prior-revision collections only. V8
 accepted/rejected decisions migrate to the neutral v9 `stored` state with an
 Argument or Counter-Argument result; pending and discarded remain distinct.
 
-The To store header count and To store/history tabs expose non-canonical AI
-Proposals separately from the canonical record browser. Details lead with Topic,
+The Library / To store selector exposes non-canonical AI Proposals separately
+from the canonical record browser; the staging view retains Active / History
+navigation. Details lead with Topic,
 intent, human-readable target/part, staleness, and a compact local Argument
 context. When present, “What this means” appears before the formal Argument and
 is retained only in Proposal history; it never seeds canonical storage forms or
@@ -97,8 +103,8 @@ response plus resolved outcome and remains distinct from discard.
 Save performs one expected-snapshot transaction, while Cancel and dirty-draft
 guards preserve the To store Proposal. Completed history says Stored as Argument
 or Stored as Counter-Argument instead of treating canonical criticism as a
-rejected Proposal. Opening the Mailbox reloads first so local
-MCP submissions become visible.
+rejected Proposal. Entering To store reloads first so local MCP submissions
+become visible.
 
 Canonical pending-review Arguments and Counter-Arguments remain available
 through the Proposals-only filter; they are distinct from the Mailbox. Current
