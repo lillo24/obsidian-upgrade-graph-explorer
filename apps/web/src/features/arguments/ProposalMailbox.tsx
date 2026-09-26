@@ -19,6 +19,10 @@ import type {
 } from '@icarus-graph-explorer/argument-workspace';
 
 import type { ArgumentSelection } from './ArgumentRecordView';
+import {
+  ArgumentActionMenu,
+  type ArgumentActionMenuHandle,
+} from './ArgumentActionMenu';
 import { SafeMarkdown } from '../../components/markdown/SafeMarkdown';
 import { proposalTargetStaleness } from './proposal-mailbox';
 
@@ -63,6 +67,7 @@ export interface ProposalDraftTextEdits {
 export interface ProposalMailboxHandle {
   discardUnsavedEdit(): void;
   focusInitial(): void;
+  handleEscape(): boolean;
   hasUnsavedEdit(): boolean;
   saveUnsavedEdit(): Promise<boolean>;
 }
@@ -375,6 +380,7 @@ export const ProposalMailbox = forwardRef<
   >();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const selectedButtonRef = useRef<HTMLButtonElement>(null);
+  const moreMenuRef = useRef<ArgumentActionMenuHandle>(null);
   const proposals = library.proposals.filter(({ status }) =>
     view === 'pending' ? status === 'pending' : status !== 'pending',
   );
@@ -423,6 +429,9 @@ export const ProposalMailbox = forwardRef<
       },
       focusInitial() {
         (selectedButtonRef.current ?? headingRef.current)?.focus();
+      },
+      handleEscape() {
+        return moreMenuRef.current?.closeAndFocus() ?? false;
       },
       hasUnsavedEdit() {
         return editDirty;
@@ -964,8 +973,25 @@ export const ProposalMailbox = forwardRef<
                     </form>
                   )}
                   {editDraft === undefined ? (
-                    <div className="arguments-actions">
+                    <div className="arguments-actions arguments-mailbox__resolution-actions">
                       <button
+                        className="arguments-action--primary"
+                        disabled={busy}
+                        onClick={() => onAccept(selected)}
+                        type="button"
+                      >
+                        Store as Argument…
+                      </button>
+                      <button
+                        className="arguments-action--secondary"
+                        disabled={busy}
+                        onClick={() => onReject(selected)}
+                        type="button"
+                      >
+                        Store refutation / Counter-Argument…
+                      </button>
+                      <button
+                        className="arguments-action--quiet"
                         disabled={busy}
                         onClick={() =>
                           setEditDraft({
@@ -977,27 +1003,21 @@ export const ProposalMailbox = forwardRef<
                       >
                         Edit draft
                       </button>
-                      <button
+                      <ArgumentActionMenu
+                        align="end"
                         disabled={busy}
-                        onClick={() => onDiscard(selected)}
-                        type="button"
+                        label="More"
+                        ref={moreMenuRef}
                       >
-                        Discard
-                      </button>
-                      <button
-                        disabled={busy}
-                        onClick={() => onReject(selected)}
-                        type="button"
-                      >
-                        Store refutation / Counter-Argument…
-                      </button>
-                      <button
-                        disabled={busy}
-                        onClick={() => onAccept(selected)}
-                        type="button"
-                      >
-                        Store as Argument…
-                      </button>
+                        <button
+                          disabled={busy}
+                          onClick={() => onDiscard(selected)}
+                          role="menuitem"
+                          type="button"
+                        >
+                          Discard
+                        </button>
+                      </ArgumentActionMenu>
                     </div>
                   ) : null}
                 </>

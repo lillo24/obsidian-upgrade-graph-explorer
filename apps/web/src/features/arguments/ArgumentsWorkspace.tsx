@@ -39,6 +39,10 @@ import {
 
 import { ArgumentRecordEditor } from './ArgumentRecordEditor';
 import {
+  ArgumentActionMenu,
+  type ArgumentActionMenuHandle,
+} from './ArgumentActionMenu';
+import {
   ProposalMailbox,
   type ProposalDraftTextEdits,
   type ProposalMailboxHandle,
@@ -70,6 +74,10 @@ import {
   retrievalEditorText,
   type RetrievalEditorText,
 } from './retrieval-editor';
+import {
+  HUMAN_REVIEW_STATES,
+  humanReviewStateLabel,
+} from './review-state-labels';
 import {
   ArgumentSourceAccessSession,
   type ArgumentSourceAccess,
@@ -1147,7 +1155,7 @@ function SearchPane({
           onChange={(event) => setProposalsOnly(event.currentTarget.checked)}
           type="checkbox"
         />{' '}
-        Proposals only
+        Pending review only
       </label>
       <div className="arguments-search-results" aria-live="polite">
         {displayedCandidates.length === 0 ? (
@@ -1274,7 +1282,11 @@ const ArgumentsWorkspaceContent = forwardRef<
   const libraryViewButtonRef = useRef<HTMLButtonElement>(null);
   const mailboxViewButtonRef = useRef<HTMLButtonElement>(null);
   const mailboxRef = useRef<ProposalMailboxHandle>(null);
-  const newTopicButtonRef = useRef<HTMLButtonElement>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
+  const newActionMenuRef = useRef<ArgumentActionMenuHandle>(null);
+  const libraryActionMenuRef = useRef<ArgumentActionMenuHandle>(null);
+  const recordActionMenuRef = useRef<ArgumentActionMenuHandle>(null);
+  const editorActionMenuRef = useRef<ArgumentActionMenuHandle>(null);
   const [selection, setSelection] = useState<ArgumentSelection>();
   const [history, setHistory] = useState<readonly ArgumentSelection[]>([]);
   const [editor, setEditor] = useState<EditorState>();
@@ -1343,7 +1355,16 @@ const ArgumentsWorkspaceContent = forwardRef<
       setConfirmation(undefined);
       return true;
     }
+    if (
+      libraryActionMenuRef.current?.closeAndFocus() === true ||
+      newActionMenuRef.current?.closeAndFocus() === true ||
+      recordActionMenuRef.current?.closeAndFocus() === true ||
+      editorActionMenuRef.current?.closeAndFocus() === true
+    ) {
+      return true;
+    }
     if (activeView === 'mailbox') {
+      if (mailboxRef.current?.handleEscape() === true) return true;
       requestTransition(
         'Return to Library with unsaved Proposal changes?',
         () => {
@@ -1398,11 +1419,11 @@ const ArgumentsWorkspaceContent = forwardRef<
           mailboxRef.current?.focusInitial();
           return;
         }
-        (
-          libraryViewButtonRef.current ??
-          newTopicButtonRef.current ??
-          closeButtonRef.current
-        )?.focus();
+        if (libraryViewButtonRef.current !== null) {
+          libraryViewButtonRef.current.focus();
+        } else if (newActionMenuRef.current !== null) {
+          newActionMenuRef.current.focusTrigger();
+        } else closeButtonRef.current?.focus();
       },
     }),
     [activeView, handleEscape, requestTransition],
@@ -1455,7 +1476,7 @@ const ArgumentsWorkspaceContent = forwardRef<
       return;
     }
     if (dialogRef.current?.contains(document.activeElement) === true) return;
-    newTopicButtonRef.current?.focus();
+    newActionMenuRef.current?.focusTrigger();
   }, [activeView, open, state.phase]);
 
   function cancelNative(event: SyntheticEvent<HTMLDialogElement>) {
@@ -1797,6 +1818,7 @@ const ArgumentsWorkspaceContent = forwardRef<
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = '';
     if (file === undefined) return;
+    libraryActionMenuRef.current?.closeAndFocus();
     if (file.size > ARGUMENT_LIBRARY_IMPORT_LIMIT_BYTES) {
       setImportPreview({
         fileName: file.name,
@@ -2444,26 +2466,44 @@ const ArgumentsWorkspaceContent = forwardRef<
           </div>
           <div className="arguments-dialog__actions">
             {state.phase !== 'ready' ? null : (
-              <>
+              <ArgumentActionMenu
+                align="end"
+                disabled={state.busy}
+                label="Library actions"
+                ref={libraryActionMenuRef}
+              >
                 <button
                   disabled={state.busy}
                   onClick={() => setInsertJson({ source: '' })}
+                  role="menuitem"
                   type="button"
                 >
                   Insert JSON
                 </button>
-                <label className="button-like">
+                <label
+                  className="button-like argument-action-menu__item"
+                  data-menu-keep-open
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    importFileRef.current?.click();
+                  }}
+                  role="menuitem"
+                  tabIndex={0}
+                >
                   Import Library JSON
                   <input
                     accept="application/json,.json"
                     disabled={state.busy}
                     onChange={(event) => void chooseImport(event)}
+                    ref={importFileRef}
                     type="file"
                   />
                 </label>
                 <button
                   disabled={state.busy}
                   onClick={exportJson}
+                  role="menuitem"
                   title="Export the confirmed snapshot; unsaved drafts are excluded."
                   type="button"
                 >
@@ -2476,11 +2516,12 @@ const ArgumentsWorkspaceContent = forwardRef<
                       exportArgumentLibraryMarkdown(state.snapshot.library),
                     )
                   }
+                  role="menuitem"
                   type="button"
                 >
                   Export Markdown
                 </button>
-              </>
+              </ArgumentActionMenu>
             )}
             {embedded ? null : (
               <button onClick={requestClose} ref={closeButtonRef} type="button">
@@ -2553,28 +2594,47 @@ const ArgumentsWorkspaceContent = forwardRef<
           >
             <aside className="arguments-sidebar">
               <div className="arguments-create-actions">
-                <button
-                  onClick={() => beginCreate('topic')}
-                  ref={newTopicButtonRef}
-                  type="button"
+                <ArgumentActionMenu
+                  className="arguments-create-menu"
+                  label="+ New"
+                  ref={newActionMenuRef}
                 >
-                  New Topic
-                </button>
-                <button onClick={() => beginCreate('axiom')} type="button">
-                  New Axiom
-                </button>
-                <button onClick={() => beginCreate('context')} type="button">
-                  New Context
-                </button>
-                <button onClick={() => beginCreate('argument')} type="button">
-                  New Argument
-                </button>
-                <button
-                  onClick={() => beginCreate('counter-argument')}
-                  type="button"
-                >
-                  New Counter-Argument
-                </button>
+                  <button
+                    onClick={() => beginCreate('topic')}
+                    role="menuitem"
+                    type="button"
+                  >
+                    Topic
+                  </button>
+                  <button
+                    onClick={() => beginCreate('argument')}
+                    role="menuitem"
+                    type="button"
+                  >
+                    Argument
+                  </button>
+                  <button
+                    onClick={() => beginCreate('counter-argument')}
+                    role="menuitem"
+                    type="button"
+                  >
+                    Counter-Argument
+                  </button>
+                  <button
+                    onClick={() => beginCreate('axiom')}
+                    role="menuitem"
+                    type="button"
+                  >
+                    Axiom
+                  </button>
+                  <button
+                    onClick={() => beginCreate('context')}
+                    role="menuitem"
+                    type="button"
+                  >
+                    Context
+                  </button>
+                </ArgumentActionMenu>
               </div>
               <nav aria-label="Topics" className="arguments-topics">
                 <h2>Topics</h2>
@@ -2646,28 +2706,6 @@ const ArgumentsWorkspaceContent = forwardRef<
               />
             </aside>
             <main className="arguments-main" data-graph-scroll-container>
-              <section className="arguments-source-binding">
-                <div>
-                  <strong>Theory source access</strong>
-                  <small>{sourceState.message}</small>
-                </div>
-                {sourceState.status ===
-                'unavailable' ? null : sourceState.status === 'bound' ? (
-                  <button
-                    onClick={() => {
-                      argumentSources.disconnect();
-                      setNotice('Theory source access disconnected.');
-                    }}
-                    type="button"
-                  >
-                    Disconnect source access
-                  </button>
-                ) : (
-                  <button onClick={bindTheorySources} type="button">
-                    Use selected vault for theory sources
-                  </button>
-                )}
-              </section>
               <div className="arguments-main__toolbar">
                 <button
                   disabled={history.length === 0}
@@ -2703,31 +2741,70 @@ const ArgumentsWorkspaceContent = forwardRef<
                     }
                     value={selectedRecord.reviewState}
                   >
-                    <option value="draft">draft</option>
-                    <option value="pending-review">pending-review</option>
-                    <option value="accepted">accepted</option>
-                    <option value="reopened">reopened</option>
-                    <option value="rejected">rejected</option>
+                    {HUMAN_REVIEW_STATES.map((reviewState) => (
+                      <option key={reviewState} value={reviewState}>
+                        {humanReviewStateLabel(reviewState)}
+                      </option>
+                    ))}
                   </select>
                 )}
-                {selectedRecord === undefined || editor !== undefined ? null : (
-                  <button
-                    disabled={state.busy}
-                    onClick={() => void toggleArchive()}
-                    type="button"
+                {sourceState.status === 'unavailable' ? null : (
+                  <div
+                    className="arguments-source-control"
+                    title={sourceState.message}
                   >
-                    {selectedRecord.archived ? 'Restore' : 'Archive'}
-                  </button>
+                    <span>
+                      Theory source:{' '}
+                      {sourceState.status === 'bound' ? 'Connected' : 'Ready'} ·{' '}
+                      {sourceState.source.displayName}
+                    </span>
+                    {sourceState.status === 'bound' ? (
+                      <button
+                        onClick={() => {
+                          argumentSources.disconnect();
+                          setNotice('Theory source access disconnected.');
+                        }}
+                        type="button"
+                      >
+                        Disconnect
+                      </button>
+                    ) : (
+                      <button onClick={bindTheorySources} type="button">
+                        Connect
+                      </button>
+                    )}
+                  </div>
                 )}
-                {currentSelection === undefined ||
-                editor !== undefined ? null : (
-                  <button onClick={previewContext} type="button">
-                    Preview context
-                  </button>
+                {selectedRecord === undefined || editor !== undefined ? null : (
+                  <ArgumentActionMenu
+                    align="end"
+                    disabled={state.busy}
+                    label="More"
+                    ref={recordActionMenuRef}
+                  >
+                    <button
+                      disabled={state.busy}
+                      onClick={() => void toggleArchive()}
+                      role="menuitem"
+                      type="button"
+                    >
+                      {selectedRecord.archived ? 'Restore' : 'Archive'}
+                    </button>
+                    {currentSelection === undefined ? null : (
+                      <button
+                        onClick={previewContext}
+                        role="menuitem"
+                        type="button"
+                      >
+                        Preview context
+                      </button>
+                    )}
+                  </ArgumentActionMenu>
                 )}
                 {editor === undefined ? null : (
                   <>
                     <button
+                      className="arguments-action--primary"
                       disabled={state.busy}
                       onClick={() => void saveCurrent()}
                       type="button"
@@ -2748,21 +2825,36 @@ const ArgumentsWorkspaceContent = forwardRef<
                     >
                       Cancel
                     </button>
-                    <button
-                      onClick={() =>
-                        downloadText(
-                          `argument-draft-${editor.record.id}.json`,
-                          `${JSON.stringify({ ...editor.record, retrievalEditorText: editor.retrievalText, sourceReferencesJson: editor.source }, null, 2)}\n`,
-                          'application/json',
-                        )
-                      }
-                      type="button"
+                    <ArgumentActionMenu
+                      align="end"
+                      label="More"
+                      ref={editorActionMenuRef}
                     >
-                      Download draft copy
-                    </button>
+                      <button
+                        onClick={() =>
+                          downloadText(
+                            `argument-draft-${editor.record.id}.json`,
+                            `${JSON.stringify({ ...editor.record, retrievalEditorText: editor.retrievalText, sourceReferencesJson: editor.source }, null, 2)}\n`,
+                            'application/json',
+                          )
+                        }
+                        role="menuitem"
+                        type="button"
+                      >
+                        Download draft copy
+                      </button>
+                    </ArgumentActionMenu>
                   </>
                 )}
               </div>
+              {sourceState.status !== 'unavailable' ? null : (
+                <section className="arguments-source-binding arguments-source-binding--unavailable">
+                  <div>
+                    <strong>Theory source access unavailable</strong>
+                    <small>{sourceState.message}</small>
+                  </div>
+                </section>
+              )}
               {editor === undefined ? (
                 selectedRecord === undefined ? (
                   <section className="arguments-empty-workspace">

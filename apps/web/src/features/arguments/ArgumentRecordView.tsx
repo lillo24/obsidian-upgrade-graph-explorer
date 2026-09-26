@@ -12,8 +12,11 @@ import {
   type ArgumentPremiseStalenessCause,
   type ArgumentRecordKind,
   type ArgumentTopic,
+  type HumanReviewState,
 } from '@icarus-graph-explorer/argument-workspace';
 import type { ReactNode } from 'react';
+
+import { humanReviewStateLabel } from './review-state-labels';
 
 export interface ArgumentSelection {
   readonly kind: ArgumentRecordKind;
@@ -91,7 +94,7 @@ function RecordHeader({
 }: {
   readonly archived: boolean;
   readonly eyebrow: string;
-  readonly reviewState: string;
+  readonly reviewState: HumanReviewState;
   readonly title: string;
 }) {
   return (
@@ -102,7 +105,7 @@ function RecordHeader({
         <span
           className={`arguments-badge arguments-badge--review-${reviewState}`}
         >
-          Human review: {reviewState}
+          Human review: {humanReviewStateLabel(reviewState)}
         </span>
         {archived ? <span className="arguments-badge">Archived</span> : null}
       </div>

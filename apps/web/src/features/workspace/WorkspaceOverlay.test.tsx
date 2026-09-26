@@ -438,7 +438,8 @@ describe('shared local workspace overlay', () => {
     const button = (name: string) =>
       buttons().find((candidate) => candidate.textContent?.trim() === name)!;
 
-    await act(() => button('New Topic').click());
+    await act(() => button('+ New ▾').click());
+    await act(() => button('Topic').click());
     const title = [
       ...container.querySelectorAll<HTMLInputElement>('input'),
     ].find((candidate) =>
