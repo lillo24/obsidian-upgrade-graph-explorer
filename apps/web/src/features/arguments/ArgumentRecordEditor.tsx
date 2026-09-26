@@ -9,15 +9,11 @@ import {
 } from '@icarus-graph-explorer/argument-workspace';
 
 import type { RetrievalEditorText } from './retrieval-editor';
+import {
+  HUMAN_REVIEW_STATES,
+  humanReviewStateLabel,
+} from './review-state-labels';
 import type { ArgumentRecordDraft } from './session';
-
-const REVIEW_STATES: readonly HumanReviewState[] = [
-  'draft',
-  'pending-review',
-  'accepted',
-  'reopened',
-  'rejected',
-];
 
 function MetadataEditor({
   text,
@@ -204,9 +200,9 @@ function CommonFields({
           }
           value={draft.reviewState}
         >
-          {REVIEW_STATES.map((state) => (
+          {HUMAN_REVIEW_STATES.map((state) => (
             <option key={state} value={state}>
-              {state}
+              {humanReviewStateLabel(state)}
             </option>
           ))}
         </select>

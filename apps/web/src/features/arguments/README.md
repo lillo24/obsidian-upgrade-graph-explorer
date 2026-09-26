@@ -7,10 +7,11 @@ requests open/close transitions.
 - `ArgumentsWorkspace.tsx` owns onboarding, drafts, navigation, search, source
   binding/previews, separate additive Insert JSON and full-library Import JSON
   dialogs, the first-class Library / To store view switch, human Proposal
-  resolution through the core shared Proposal conversion, and
-  confirmed-snapshot exports. It composes canonical and staged draft protection
-  into one narrow leave guard, exposes an embedded panel to the shared workspace
-  modal, and retains standalone title/Close chrome.
+  resolution through the core shared Proposal conversion, compact grouped
+  record/library controls, and confirmed-snapshot exports. It composes
+  canonical and staged draft protection into one narrow leave guard, exposes
+  an embedded panel to the shared workspace modal, and retains standalone
+  title/Close chrome.
 - `ProposalMailbox.tsx` owns the human-readable To store Active/History staging
   view: compact Proposal navigation, current and prior revisions, draft
   Proposal links, discard, bounded prose editing and its narrow leave-guard
@@ -19,6 +20,11 @@ requests open/close transitions.
   typed dependency cards, structured reasoning, and source observations kept
   separate from inference premises. It is an inline Arguments panel, not a
   dialog or scrim.
+- `ArgumentActionMenu.tsx` owns the small keyboard-accessible disclosure menu
+  used only to compact Arguments workspace controls and preserve Escape/focus
+  behavior.
+- `review-state-labels.ts` maps persisted review-state values to consistent
+  human-facing labels without changing the stored enum values.
 - `proposal-mailbox.ts` owns shared target-staleness derivation used by the
   Mailbox and human resolution panel.
 - `ArgumentRecordView.tsx` presents Topic, Context/Axiom Group, Axiom, Argument, Counter-Argument,

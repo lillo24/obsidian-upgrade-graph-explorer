@@ -141,6 +141,63 @@
   clip-path: inset(50%);
 }
 
+.argument-action-menu {
+  position: relative;
+  min-width: 0;
+}
+
+.argument-action-menu__popover {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + 0.3rem);
+  display: grid;
+  width: max-content;
+  min-width: 11rem;
+  max-width: min(20rem, calc(100vw - 2rem));
+  gap: 0.2rem;
+  padding: 0.3rem;
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.55rem;
+  background: var(--color-surface-elevated);
+  box-shadow: 0 0.5rem 1.5rem var(--color-shadow-elevated);
+}
+
+.argument-action-menu__popover--start {
+  left: 0;
+}
+
+.argument-action-menu__popover--end {
+  right: 0;
+}
+
+.argument-action-menu__popover button,
+.arguments-dialog .argument-action-menu__item {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
+}
+
+.arguments-dialog .argument-action-menu__item:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.arguments-dialog .arguments-action--primary {
+  border-color: var(--color-control-selected-border);
+  color: var(--color-control-selected-foreground);
+  background: var(--color-control-selected-background);
+}
+
+.arguments-dialog .arguments-action--primary:hover {
+  background: var(--color-accent-hover);
+}
+
+.arguments-dialog .arguments-action--quiet {
+  border-color: transparent;
+  background: transparent;
+}
+
 .arguments-layout {
   display: grid;
   min-width: 0;
@@ -165,6 +222,11 @@
 
 .arguments-create-actions button {
   flex: 1 1 7rem;
+}
+
+.arguments-create-menu,
+.arguments-create-menu > button {
+  width: 100%;
 }
 
 .arguments-topics {
@@ -280,6 +342,37 @@
   color: var(--color-text-muted);
 }
 
+.arguments-source-binding--unavailable {
+  border-color: var(--color-status-warning-border);
+  background: var(--color-status-warning-background);
+}
+
+.arguments-source-control {
+  display: inline-flex;
+  min-width: 0;
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0.2rem 0.25rem 0.2rem 0.55rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 0.45rem;
+  color: var(--color-text-muted);
+  background: var(--color-surface-subtle);
+  font-size: 0.72rem;
+  font-weight: 700;
+  max-width: 100%;
+}
+
+.arguments-source-control span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arguments-source-control button {
+  min-height: 1.8rem;
+  padding-block: 0.2rem;
+}
+
 .arguments-main__toolbar {
   position: sticky;
   z-index: 2;
@@ -291,8 +384,12 @@
   background: var(--color-surface-overlay);
 }
 
-.arguments-main__toolbar button:first-child {
+.arguments-main__toolbar > button:first-child {
   margin-right: auto;
+}
+
+.arguments-mailbox__resolution-actions {
+  align-items: center;
 }
 
 .arguments-record,
@@ -1017,7 +1114,7 @@
   }
 
   .arguments-dialog__actions {
-    overflow-x: auto;
+    overflow: visible;
     flex-wrap: nowrap;
   }
 

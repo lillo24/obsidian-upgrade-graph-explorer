@@ -24,6 +24,7 @@ import {
   editAxiom,
   promoteArgumentToCurrent,
   sameSnapshot,
+  setRecordReviewState,
   setTopicMembership,
   submitArgumentProposal,
   updateCounterArgumentResponse,
@@ -449,12 +450,230 @@ describe('standalone Arguments workspace', () => {
     }
   }
 
+  it('opens each record type from the compact New menu through the existing guarded create path', async () => {
+    await mount();
+
+    for (const [label, kind] of [
+      ['Topic', 'topic'],
+      ['Argument', 'argument'],
+      ['Counter-Argument', 'counter-argument'],
+      ['Axiom', 'axiom'],
+      ['Context', 'context'],
+    ] as const) {
+      await click('+ New');
+      await click(label);
+      expect(
+        container.querySelector('.arguments-editor .eyebrow')?.textContent,
+      ).toBe(`New ${kind}`);
+      expect(
+        container.querySelector('[role="menu"][aria-label="+ New"]'),
+      ).toBeNull();
+      await click('Cancel');
+      await click('Discard');
+    }
+  });
+
+  it('keeps Library actions accessible and invokes insert, import, and both export paths', async () => {
+    await mount();
+    const trigger = button('Library actions');
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+
+    await click('Library actions');
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    const menu = container.querySelector(
+      '[role="menu"][aria-label="Library actions"]',
+    );
+    expect(
+      [...(menu?.querySelectorAll('[role="menuitem"]') ?? [])].map((item) =>
+        item.textContent?.trim(),
+      ),
+    ).toEqual([
+      'Insert JSON',
+      'Import Library JSON',
+      'Export JSON',
+      'Export Markdown',
+    ]);
+
+    const picker = menu?.querySelector<HTMLInputElement>('input[type="file"]');
+    const pickerLabel = picker?.closest<HTMLElement>('[role="menuitem"]');
+    expect(picker?.accept).toBe('application/json,.json');
+    const openPicker = vi.spyOn(picker!, 'click');
+    await act(() =>
+      pickerLabel!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      ),
+    );
+    expect(openPicker).toHaveBeenCalledOnce();
+
+    Object.defineProperty(picker, 'files', {
+      configurable: true,
+      value: [
+        new File(['{}'], 'invalid-library.json', { type: 'application/json' }),
+      ],
+    });
+    await act(async () => {
+      picker!.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(container.textContent).toContain('Import preview');
+    await click('Cancel import');
+
+    const downloadsBefore = vi.mocked(URL.createObjectURL).mock.calls.length;
+    await click('Library actions');
+    await click('Export JSON');
+    expect(vi.mocked(URL.createObjectURL).mock.calls.length).toBe(
+      downloadsBefore + 1,
+    );
+
+    await click('Library actions');
+    await click('Export Markdown');
+    expect(container.textContent).toContain('Obsidian Markdown export');
+  });
+
+  it('closes compact menus before the workspace and restores trigger focus', async () => {
+    store = new MemoryStore(fixtureWithProposal());
+    session = new ArgumentWorkspaceSession(store, runtime());
+    await mount();
+
+    const newTrigger = button('+ New');
+    await click('+ New');
+    expect(
+      container.querySelector('[role="menu"][aria-label="+ New"]'),
+    ).not.toBeNull();
+    await act(async () => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      );
+      await Promise.resolve();
+    });
+    expect(
+      container.querySelector('[role="menu"][aria-label="+ New"]'),
+    ).toBeNull();
+    expect(document.activeElement).toBe(newTrigger);
+    expect(close).not.toHaveBeenCalled();
+
+    const libraryTrigger = button('Library actions');
+    await click('Library actions');
+    await act(async () => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      );
+      await Promise.resolve();
+    });
+    expect(
+      container.querySelector('[role="menu"][aria-label="Library actions"]'),
+    ).toBeNull();
+    expect(document.activeElement).toBe(libraryTrigger);
+    expect(close).not.toHaveBeenCalled();
+
+    await click('To store (1)');
+    const moreTrigger = button('More');
+    await click('More');
+    expect(button('Discard')).toBeInstanceOf(HTMLButtonElement);
+    await act(async () => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      );
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain('Non-canonical staging area');
+    expect(document.activeElement).toBe(moreTrigger);
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it('humanizes review controls and preserves compact record actions', async () => {
+    await mount();
+
+    const review = container.querySelector<HTMLSelectElement>(
+      'select[aria-label="Change human review state"]',
+    )!;
+    expect([...review.options].map(({ textContent }) => textContent)).toEqual([
+      'Draft',
+      'Pending review',
+      'Accepted',
+      'Reopened',
+      'Rejected',
+    ]);
+    expect(container.textContent).toContain('Human review: Draft');
+    expect(container.textContent).toContain('Pending review only');
+    expect(container.textContent).toContain('Theory source access unavailable');
+    await act(async () => {
+      review.value = 'pending-review';
+      review.dispatchEvent(new Event('change', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(store.snapshot.library.topics[0]?.reviewState).toBe(
+      'pending-review',
+    );
+
+    await click('More');
+    await click('Archive');
+    expect(store.snapshot.library.topics[0]?.archived).toBe(true);
+    await click('More');
+    expect(button('Restore')).toBeInstanceOf(HTMLButtonElement);
+    await click('Restore');
+    expect(store.snapshot.library.topics[0]?.archived).toBe(false);
+
+    await click('Edit');
+    expect(button('Save').classList).toContain('arguments-action--primary');
+    expect(button('Cancel')).toBeInstanceOf(HTMLButtonElement);
+    expect(
+      [...container.querySelectorAll('label')]
+        .find((label) => label.textContent?.includes('Human review state'))
+        ?.querySelector('option[value="pending-review"]')?.textContent,
+    ).toBe('Pending review');
+    const downloadsBefore = vi.mocked(URL.createObjectURL).mock.calls.length;
+    await click('More');
+    await click('Download draft copy');
+    expect(vi.mocked(URL.createObjectURL).mock.calls.length).toBe(
+      downloadsBefore + 1,
+    );
+  });
+
+  it('labels the canonical pending-review filter without changing its scope', async () => {
+    store = new MemoryStore(
+      setRecordReviewState(
+        fixture(),
+        'argument',
+        'AR-UI-NEXT',
+        'pending-review',
+        runtime(),
+      ),
+    );
+    session = new ArgumentWorkspaceSession(store, runtime());
+    await mount();
+
+    const filter = [...container.querySelectorAll('label')].find((label) =>
+      label.textContent?.includes('Pending review only'),
+    )!;
+    const checkbox = filter.querySelector<HTMLInputElement>(
+      'input[type="checkbox"]',
+    )!;
+    await act(() => checkbox.click());
+
+    const results = container.querySelector('.arguments-search-results');
+    expect(results?.textContent).toContain('Replacement reasoning');
+    expect(results?.textContent).not.toContain('Compatibility reasoning');
+    expect(results?.querySelectorAll('button')).toHaveLength(1);
+    expect(store.writes).toBe(0);
+  });
+
   it('shows pending proposal provenance, stale targets, suggestions, and cancellation without canonical writes', async () => {
     store = new MemoryStore(fixtureWithProposal(true));
     session = new ArgumentWorkspaceSession(store, runtime());
     await mount();
 
     await click('To store (1)');
+    expect(button('Store as Argument…').classList).toContain(
+      'arguments-action--primary',
+    );
+    expect(button('Store refutation / Counter-Argument…').classList).toContain(
+      'arguments-action--secondary',
+    );
+    expect(button('Edit draft').classList).toContain('arguments-action--quiet');
+    await click('More');
+    expect(button('Discard')).toBeInstanceOf(HTMLButtonElement);
+    await click('More');
     expect(container.textContent).toContain('Non-canonical staging area');
     expect(container.textContent).toContain('To store (1)');
     expect(container.textContent).toContain('Verified normalization exception');
@@ -585,6 +804,7 @@ describe('standalone Arguments workspace', () => {
     });
     expect(container.textContent).toContain('Revision history (1 prior)');
 
+    await click('More');
     await click('Discard');
     expect(store.writes).toBe(2);
     expect(store.snapshot.library.proposals[0]).toMatchObject({
@@ -996,6 +1216,7 @@ describe('standalone Arguments workspace', () => {
     ).toContain('Numeric mismatch');
 
     await click('Numeric mismatch');
+    await click('More');
     await click('Preview context');
     const preview = container.querySelector<HTMLTextAreaElement>(
       '[aria-label="Argument context preview"]',
@@ -1021,6 +1242,7 @@ describe('standalone Arguments workspace', () => {
     )!;
     await act(() => setValue(observation, 'Unsaved local draft.'));
 
+    await click('Library actions');
     await click('Insert JSON');
     const source = textarea('Insert JSON document');
     await act(() =>
@@ -1118,6 +1340,7 @@ describe('standalone Arguments workspace', () => {
 
   it('loads an Insert JSON file into the editable source before preview and confirmation', async () => {
     await mount();
+    await click('Library actions');
     await click('Insert JSON');
 
     const source = JSON.stringify({
@@ -1221,7 +1444,8 @@ describe('standalone Arguments workspace', () => {
 
   it('exposes Context authoring fields and the separate Argument background selector', async () => {
     await mount();
-    await click('New Context');
+    await click('+ New');
+    await click('Context');
     expect(textarea('Description')).toBeInstanceOf(HTMLTextAreaElement);
     expect(container.textContent).toContain('Parent Context');
     expect(container.textContent).toContain('Direct background Axioms');
@@ -1401,8 +1625,15 @@ describe('standalone Arguments workspace', () => {
       vi.fn(() => true),
     );
     await mount(sourceAccess);
+    expect(
+      container.querySelector('.arguments-source-control')?.textContent,
+    ).toContain('Theory source: Ready');
     await click('Compatible units');
-    await click('Use selected vault for theory sources');
+    await click('Connect');
+    expect(
+      container.querySelector('.arguments-source-control')?.textContent,
+    ).toContain('Theory source: Connected');
+    expect(button('Disconnect')).toBeInstanceOf(HTMLButtonElement);
     await click('Read source');
 
     expect(container.textContent).toContain('Exact S1.');
@@ -1432,6 +1663,7 @@ describe('standalone Arguments workspace', () => {
     expect(store.writes).toBe(1);
 
     await click('Numeric mismatch');
+    await click('More');
     await click('Preview context');
     expect(container.textContent).toContain('Registered theory sources (1)');
     await click('Include linked theory sources');
@@ -1467,7 +1699,7 @@ describe('standalone Arguments workspace', () => {
     );
     await mount(sourceAccess);
     await click('Compatible units');
-    await click('Use selected vault for theory sources');
+    await click('Connect');
     await click('Edit');
     const statement = textarea('Statement');
     await typeCharacters(statement, ' retained');
@@ -1488,9 +1720,7 @@ describe('standalone Arguments workspace', () => {
 
     expect(statement.value).toContain(' retained');
     expect(container.textContent).toContain('Unsaved draft');
-    expect(container.textContent).toContain(
-      'Use selected vault for theory sources',
-    );
+    expect(container.textContent).toContain('Connect');
     expect(store.writes).toBe(0);
   });
 });
