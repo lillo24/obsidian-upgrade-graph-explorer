@@ -16,10 +16,17 @@ import type {
   FocusSchematicComputedLayout,
   FocusSchematicEndpointLayoutPhaseTimings,
   FocusSchematicLayoutInput,
+  FocusSchematicLayoutTransitionEvidence,
   FocusSchematicSoftClusterEvidence,
 } from './types';
+import {
+  validateFocusSchematicLayoutTransitionPrior,
+  type FocusSchematicLayoutTransitionPrior,
+} from './transition-prior';
 
-export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 14 as const;
+export const FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION = 15 as const;
+/** Kept separate from the transport version so protocol evolution does not invalidate cold results. */
+export const FOCUS_SCHEMATIC_EXACT_LAYOUT_CACHE_VERSION = 14 as const;
 
 export interface FocusSchematicLayoutWorkerRequest {
   readonly protocolVersion: typeof FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION;
@@ -27,6 +34,7 @@ export interface FocusSchematicLayoutWorkerRequest {
   readonly kind: 'layout';
   readonly input: FocusSchematicLayoutInput;
   readonly policies: FocusSchematicProductLayoutPolicies;
+  readonly transitionPrior?: FocusSchematicLayoutTransitionPrior;
 }
 
 export type FocusSchematicLayoutWorkerFailureCode =
@@ -39,6 +47,7 @@ export type FocusSchematicLayoutWorkerResponse =
       readonly kind: 'success';
       readonly result: FocusSchematicComputedLayout;
       readonly softClusterEvidence: FocusSchematicSoftClusterEvidence | null;
+      readonly transitionEvidence: FocusSchematicLayoutTransitionEvidence;
       readonly timings: FocusSchematicEndpointLayoutPhaseTimings;
       readonly computeMs: number;
     }
@@ -527,11 +536,30 @@ export function validateFocusSchematicLayoutWorkerRequest(
   value: unknown,
 ): FocusSchematicLayoutWorkerRequest {
   const candidate = record(value, 'Focus Schematic worker request');
-  exactKeys(
-    candidate,
-    ['protocolVersion', 'requestId', 'kind', 'input', 'policies'],
-    'Focus Schematic worker request',
-  );
+  const requestKeys = Object.keys(candidate).sort().join('|');
+  const withoutPrior = [
+    'protocolVersion',
+    'requestId',
+    'kind',
+    'input',
+    'policies',
+  ]
+    .sort()
+    .join('|');
+  const withPrior = [
+    'protocolVersion',
+    'requestId',
+    'kind',
+    'input',
+    'policies',
+    'transitionPrior',
+  ]
+    .sort()
+    .join('|');
+  if (requestKeys !== withoutPrior && requestKeys !== withPrior)
+    throw new FocusSchematicLayoutProtocolError(
+      'Focus Schematic worker request has unexpected or missing fields.',
+    );
   if (
     candidate.protocolVersion !== FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION
   ) {
@@ -602,6 +630,18 @@ export function validateFocusSchematicLayoutWorkerRequest(
       `Focus Schematic Soft folder display policy is invalid: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+  let transitionPrior: FocusSchematicLayoutTransitionPrior | undefined;
+  if ('transitionPrior' in candidate) {
+    try {
+      transitionPrior = validateFocusSchematicLayoutTransitionPrior(
+        candidate.transitionPrior,
+      );
+    } catch (error: unknown) {
+      throw new FocusSchematicLayoutProtocolError(
+        `Focus Schematic transition prior is invalid: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
   return {
     protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
     requestId: id,
@@ -627,7 +667,74 @@ export function validateFocusSchematicLayoutWorkerRequest(
       endpointOrderPolicy: policies.endpointOrderPolicy,
       internalLayoutVariant: policies.internalLayoutVariant,
     },
+    ...(transitionPrior === undefined ? {} : { transitionPrior }),
   };
+}
+
+function validateTransitionEvidence(
+  value: unknown,
+): FocusSchematicLayoutTransitionEvidence {
+  const evidence = record(value, 'Focus Schematic transition evidence');
+  exactKeys(
+    evidence,
+    [
+      'schemaVersion',
+      'mode',
+      'eligible',
+      'classification',
+      'rejectionReason',
+      'priorModuleCount',
+      'survivingModuleCount',
+      'affectedModuleCount',
+      'unchangedModuleCount',
+      'movedUnaffectedModuleCount',
+      'meanUnaffectedModuleDisplacement',
+      'p95UnaffectedModuleDisplacement',
+      'maxUnaffectedModuleDisplacement',
+      'changedSurvivingCompassBranchCount',
+      'localRepairFrontierModuleCount',
+      'localRepairIterations',
+      'localRepairCandidates',
+      'coldFallbackUsed',
+    ],
+    'Focus Schematic transition evidence',
+  );
+  const modes = [
+    'cold',
+    'exact-cache',
+    'incremental-no-macro-move',
+    'incremental-local-repair',
+    'cold-fallback',
+  ];
+  if (
+    evidence.schemaVersion !== 1 ||
+    !modes.includes(String(evidence.mode)) ||
+    typeof evidence.eligible !== 'boolean' ||
+    (evidence.classification !== 'cold-required' &&
+      evidence.classification !== 'local-internal-change') ||
+    (evidence.rejectionReason !== null &&
+      typeof evidence.rejectionReason !== 'string') ||
+    typeof evidence.coldFallbackUsed !== 'boolean'
+  )
+    throw new FocusSchematicLayoutProtocolError(
+      'Focus Schematic transition evidence is invalid.',
+    );
+  for (const key of [
+    'priorModuleCount',
+    'survivingModuleCount',
+    'affectedModuleCount',
+    'unchangedModuleCount',
+    'movedUnaffectedModuleCount',
+    'meanUnaffectedModuleDisplacement',
+    'p95UnaffectedModuleDisplacement',
+    'maxUnaffectedModuleDisplacement',
+    'changedSurvivingCompassBranchCount',
+    'localRepairFrontierModuleCount',
+    'localRepairIterations',
+    'localRepairCandidates',
+  ])
+    finiteNonNegative(evidence[key], `transitionEvidence.${key}`);
+  return value as FocusSchematicLayoutTransitionEvidence;
 }
 
 export function validateFocusSchematicLayoutWorkerResponse(
@@ -658,6 +765,7 @@ export function validateFocusSchematicLayoutWorkerResponse(
         'kind',
         'result',
         'softClusterEvidence',
+        'transitionEvidence',
         'timings',
         'computeMs',
       ],
@@ -679,7 +787,18 @@ export function validateFocusSchematicLayoutWorkerResponse(
       throw new FocusSchematicLayoutProtocolError(
         'Computed layout does not match the requested product policies.',
       );
-    validateSoftClusterEvidence(candidate.softClusterEvidence, policies);
+    const transitionEvidence = validateTransitionEvidence(
+      candidate.transitionEvidence,
+    );
+    if (
+      transitionEvidence.mode === 'incremental-no-macro-move' ||
+      transitionEvidence.mode === 'incremental-local-repair'
+    ) {
+      if (candidate.softClusterEvidence !== null)
+        throw new FocusSchematicLayoutProtocolError(
+          'Incremental responses cannot report cold Soft Cluster stage evidence.',
+        );
+    } else validateSoftClusterEvidence(candidate.softClusterEvidence, policies);
     // Phase timings are part of the attempt API. JSON cloning plus this exact
     // finite-number check prevents partial or embellished timing payloads.
     const timings = record(candidate.timings, 'Focus Schematic timings');

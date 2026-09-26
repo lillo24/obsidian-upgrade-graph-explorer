@@ -1,5 +1,8 @@
 import { computeFocusSchematicComputedLayoutAttempt } from './endpoint-facing';
 import { computeFocusSchematicSoftClusterLayoutAttempt } from './soft-clusters';
+import { computeFocusSchematicIncrementalLayoutAttempt } from './incremental-layout';
+import { createFocusSchematicTransitionEvidence } from './layout-continuity';
+import { classifyFocusSchematicLayoutTransition } from './transition-prior';
 import {
   FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
   FocusSchematicLayoutProtocolError,
@@ -41,6 +44,35 @@ export function handleFocusSchematicLayoutWorkerRequest(
       candidateRequestId = Number(value.requestId);
     }
     const request = validateFocusSchematicLayoutWorkerRequest(value);
+    const classification =
+      request.transitionPrior === undefined
+        ? null
+        : classifyFocusSchematicLayoutTransition(
+            request.input,
+            request.policies,
+            request.transitionPrior,
+          );
+    const incrementalAttempt =
+      request.transitionPrior !== undefined && classification?.eligible === true
+        ? computeFocusSchematicIncrementalLayoutAttempt(
+            request.input,
+            request.policies,
+            request.transitionPrior,
+            classification,
+          )
+        : null;
+    if (incrementalAttempt?.status === 'success') {
+      return {
+        protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
+        requestId: request.requestId,
+        kind: 'success',
+        result: incrementalAttempt.result,
+        softClusterEvidence: null,
+        transitionEvidence: incrementalAttempt.evidence,
+        timings: incrementalAttempt.timings,
+        computeMs: Math.max(0, now() - startedAt),
+      };
+    }
     const softAttempt =
       request.policies.macroLayout === 'soft-folder-clusters'
         ? computeFocusSchematicSoftClusterLayoutAttempt(request.input, {
@@ -74,6 +106,27 @@ export function handleFocusSchematicLayoutWorkerRequest(
       result: attempt.result,
       softClusterEvidence:
         softAttempt?.status === 'success' ? softAttempt.evidence : null,
+      transitionEvidence: createFocusSchematicTransitionEvidence({
+        mode:
+          request.transitionPrior !== undefined &&
+          classification?.eligible === true
+            ? 'cold-fallback'
+            : 'cold',
+        eligible: classification?.eligible ?? false,
+        rejectionReason:
+          incrementalAttempt?.status === 'failure'
+            ? incrementalAttempt.reason
+            : (classification?.reason ?? 'transition-prior-unavailable'),
+        ...(request.transitionPrior === undefined
+          ? {}
+          : {
+              priorInput: request.transitionPrior.input,
+              prior: request.transitionPrior.result.candidate,
+            }),
+        currentInput: request.input,
+        current: attempt.result.candidate,
+        affectedModuleIds: classification?.affectedModuleIds ?? [],
+      }),
       timings: attempt.timings,
       computeMs,
     };

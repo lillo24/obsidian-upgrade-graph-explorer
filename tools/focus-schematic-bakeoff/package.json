@@ -15,6 +15,7 @@
     "generate:folder-lab": "tsx src/folder-lab.ts",
     "generate:nested-directional-folder-lab": "tsx src/nested-directional-folder-lab.ts",
     "generate:soft-cluster-lab": "tsx src/soft-cluster-lab.ts",
+    "generate:incremental-layout-lab": "tsx src/incremental-layout-lab.ts",
     "generate:lab": "tsx src/lab.ts",
     "typecheck": "tsc --noEmit"
   },

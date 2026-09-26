@@ -167,6 +167,13 @@ the bakeoff evidence if changed.
 ## Source map
 
 - `src/types.ts` owns the plain input, plan, attempt, timing, and route types.
+- `src/transition-prior.ts` owns the clone-safe session prior, strict
+  revalidation, policy fingerprint, and local-internal eligibility classifier.
+- `src/layout-continuity.ts` owns pure File/node displacement and surviving
+  Compass-region evidence.
+- `src/incremental-layout.ts` rebuilds eligible current internal geometry at
+  prior File centers, validates the zero-macro-movement fast path, applies
+  bounded compound-folder repair, and rejects to the cold worker fallback.
 - `src/input.ts` validates exact dimension coverage, ordering, geometry, and
   settings.
 - `src/plan.ts` resolves HIER1 equal-mutual ambiguity once for every strategy

@@ -335,9 +335,18 @@ exact-boundary separation into a floating-point overlap. Heading Hide changes
 visible nodes and module rectangles only; folder membership remains unchanged.
 
 Soft structural algorithm version 13 invalidates the changed Soft geometry.
-Worker protocol 14 and evidence schema 9 remain unchanged because the payload
-shape is unchanged. Directional layout and the renderer-only 0–100 spacing
-architecture are unchanged.
+Soft evidence schema 9 remains unchanged. HIERSTAB1 later advances the worker
+transport to protocol 15 for an optional ephemeral transition prior while
+leaving Soft cold algorithm/cache version 13 and exact-cache schema 14 intact.
+Directional cold layout and the renderer-only 0–100 spacing architecture are
+unchanged.
+
+For eligible Heading/Block disclosure changes, the Focus/root File remains the
+same topology anchor and truthful visible folder member. HIERSTAB1 first keeps
+all prior File centers and validates immediate-folder unity, retained Nested
+containment/splits/blockers, coverage, and continuous radial safety. Bounded
+compound-folder repair runs only when one of those hard gates requires it.
+Prior-conditioned geometry never enters the ordinary exact cold cache.
 
 Before PATCH1, graphical review accepted the nested hierarchy, singleton-chain
 compression, promotion and flattening semantics, passive labels, File-only
