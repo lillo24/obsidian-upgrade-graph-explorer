@@ -21,8 +21,8 @@ argument-compiler-adapter.ts
                          REVIEW1 CompilerProvider sessions.
 ReviewWorkspace.tsx      Source picker, preparation/editor/history UI.
 ReviewResults.tsx        Lazily mounted individual/integrated/compare readers.
-MarkdownRenderer.tsx     Safe GFM + bounded KaTeX presentation boundary.
-markdown-security.ts     Shared inert/external URL policy for Markdown.
+../../components/markdown/
+                         Shared safe GFM + bounded KaTeX presentation boundary.
 openai-session-credentials.ts
                          Non-serializable session-memory API key owner.
 openai-agents-provider.ts
@@ -68,7 +68,8 @@ deeply validated; exact repeats are idempotent and differing ID collisions are
 rejected. Nonterminal history is marked interrupted when a new controller opens
 it, including queued records with no attempts.
 
-Markdown runs through `react-markdown` with GFM, `remark-math`, and locally
+Markdown runs through the shared `components/markdown/SafeMarkdown` boundary
+with `react-markdown`, GFM, `remark-math`, and locally
 bundled KaTeX (`trust: false`, strict errors, bounded expansion/size). Raw HTML
 is skipped, images never load, unsafe/relative protocols are inert, and safe
 web/mail links require a click and open outside the app. Exact raw output stays

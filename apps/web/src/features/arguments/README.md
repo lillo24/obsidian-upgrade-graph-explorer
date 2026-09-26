@@ -11,9 +11,10 @@ requests open/close transitions.
   narrow leave guard and embedded panel to the shared workspace modal while
   retaining a standalone wrapper for tests.
 - `ProposalMailbox.tsx` owns the human-readable pending/history review surface:
-  intent and target previews, compact local Argument context, typed dependency
-  cards, structured reasoning, and source observations kept separate from
-  inference premises.
+  intent and target previews, compact local Argument context, the optional Soft
+  Explanation rendered through the shared safe Markdown boundary, typed
+  dependency cards, structured reasoning, and source observations kept
+  separate from inference premises.
 - `proposal-mailbox.ts` owns shared target-staleness derivation used by the
   Mailbox and human resolution panel.
 - `ArgumentRecordView.tsx` presents Topic, Context/Axiom Group, Axiom, Argument, Counter-Argument,
@@ -66,7 +67,7 @@ Confirmation persists the prepared candidate once against the previewed snapshot
 editor drafts retain the existing Save/Discard/Stay guard. The format and
 neutral example are documented in
 [`docs/ARGUMENT_WORKSPACE_INSERT_JSON.md`](../../../../../docs/ARGUMENT_WORKSPACE_INSERT_JSON.md).
-Schema-v1/v2/v3/v4/v5 imports surface a migration notice and use the core deterministic
+Schema-v1/v2/v3/v4/v5/v6 imports surface a migration notice and use the core deterministic
 migration; no Argument, Example/provenance, relation, or Current pointer is
 inferred. V3 migration adds empty Context storage and empty Argument Context
 bindings only; v4 migration adds only an empty Proposal Mailbox. Context
@@ -76,7 +77,9 @@ participates in premise staleness.
 The Mailbox header count and pending/history tabs expose non-canonical AI
 Proposals separately from the canonical record browser. Details lead with Topic,
 intent, human-readable target/part, staleness, and a compact local Argument
-context; typed premises and expandable dependencies are distinct from drafting
+context. When present, “What this means” appears before the formal Argument and
+is retained only in Proposal history; it never seeds accept/reject forms or
+canonical content. Typed premises and expandable dependencies are distinct from drafting
 source observations and compact commit provenance. Accept carries only typed
 premises into the ordinary Argument editor. `attack` and `support` intent may
 seed the corresponding canonical relation, while refinement, extension, and

@@ -150,6 +150,7 @@ const submitProposalInput = z
   .object({
     clientSubmissionId: proposalId.optional(),
     title: z.string().trim().min(1).max(ARGUMENT_PROPOSAL_MAX_TITLE_LENGTH),
+    softExplanationMarkdown: proposalText.optional(),
     intent: z
       .enum([
         'unspecified',
@@ -307,6 +308,9 @@ function domainProposalInput(
       ? {}
       : { clientSubmissionId: input.clientSubmissionId }),
     title: input.title,
+    ...(input.softExplanationMarkdown === undefined
+      ? {}
+      : { softExplanationMarkdown: input.softExplanationMarkdown }),
     ...(input.intent === undefined ? {} : { intent: input.intent }),
     ...(input.topicId === undefined ? {} : { topicId: input.topicId }),
     ...(input.target === undefined ? {} : { target: input.target }),
@@ -560,7 +564,7 @@ export function createArgumentMcpServer(
     {
       title: 'Submit proposal to human Mailbox',
       description:
-        'Append one pending, non-canonical proposal after independent reasoning and a Compiler cross-check. State whether it is new, attacks, supports, refines, extends, adds a boundary to, or supersedes a precise target. Encode canonical dependencies as typed premises and keep repository/source observations separate. A human remains solely responsible for canonical relations, supersession, Current promotion, acceptance, or rejection.',
+        'Append one pending, non-canonical proposal after independent reasoning and a Compiler cross-check. State whether it is new, attacks, supports, refines, extends, adds a boundary to, or supersedes a precise target. Encode canonical dependencies as typed premises and keep repository/source observations separate. softExplanationMarkdown may explain the proposal to a human reviewer, but it is never canonical evidence, reasoning, or source material. A human remains solely responsible for canonical relations, supersession, Current promotion, acceptance, or rejection.',
       inputSchema: submitProposalInput,
       annotations: APPEND_ONLY_ANNOTATIONS,
     },

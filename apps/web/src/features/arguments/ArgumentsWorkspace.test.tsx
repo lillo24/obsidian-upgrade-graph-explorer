@@ -194,6 +194,7 @@ function fixture(): ArgumentLibrary {
 function fixtureWithProposal(
   staleTarget = false,
   intent: 'attack' | 'add-boundary' = 'attack',
+  includeSoftExplanation = true,
 ): ArgumentLibrary {
   const clock = runtime();
   const base = fixture();
@@ -206,6 +207,30 @@ function fixtureWithProposal(
     {
       clientSubmissionId: 'ui-proposal-submission',
       title: 'Verified normalization exception',
+      ...(includeSoftExplanation
+        ? {
+            softExplanationMarkdown: [
+              '### Review impact',
+              '',
+              'This **plain-language view** contains SOFT_ONLY_MARKER.',
+              '',
+              '> It helps a person scan the proposal.',
+              '',
+              '1. Review the boundary.',
+              '2. Check the cited structure.',
+              '',
+              '```text',
+              'review-only-code',
+              '```',
+              '',
+              '<script>globalThis.mailboxPwned = true</script>',
+              '',
+              '[unsafe](javascript:alert(1)) [safe](https://example.test/review)',
+              '',
+              '![remote](https://example.test/review.png)',
+            ].join('\n'),
+          }
+        : {}),
       intent,
       topicId: topic.id,
       target: {
@@ -443,6 +468,38 @@ describe('standalone Arguments workspace', () => {
     expect(container.textContent).toContain('Source observations / provenance');
     expect(container.textContent).toContain('36c927f');
     expect(container.textContent).toContain('Stale target:');
+    const soft = container.querySelector<HTMLElement>(
+      '.arguments-mailbox__soft-explanation',
+    );
+    const localContext = [...container.querySelectorAll('h4')].find(
+      (heading) => heading.textContent === 'Local Argument context',
+    );
+    const formal = container.querySelector<HTMLElement>(
+      '.arguments-mailbox__formal-title',
+    );
+    expect(soft?.textContent).toContain('What this means');
+    expect(soft?.querySelector('h3')?.textContent).toBe('Review impact');
+    expect(soft?.querySelector('strong')?.textContent).toBe(
+      'plain-language view',
+    );
+    expect(soft?.querySelector('blockquote')).not.toBeNull();
+    expect(soft?.querySelector('ol')).not.toBeNull();
+    expect(soft?.querySelector('pre')?.textContent).toContain(
+      'review-only-code',
+    );
+    expect(soft?.querySelector('script')).toBeNull();
+    expect(soft?.querySelector('img')).toBeNull();
+    expect(soft?.querySelectorAll('a')).toHaveLength(1);
+    expect(soft?.querySelector('a')?.getAttribute('href')).toBe(
+      'https://example.test/review',
+    );
+    expect(Reflect.get(globalThis, 'mailboxPwned')).toBeUndefined();
+    expect(localContext?.compareDocumentPosition(soft!)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(soft?.compareDocumentPosition(formal!)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
 
     await click('Accept / Integrate');
     expect(container.textContent).toContain('Integrate accepted proposal');
@@ -464,6 +521,20 @@ describe('standalone Arguments workspace', () => {
     expect(container.textContent).toContain('Pending (1)');
     expect(store.snapshot.library.proposals[0]?.status).toBe('pending');
     expect(store.writes).toBe(0);
+  });
+
+  it('omits the Soft Explanation section when the proposal has none', async () => {
+    store = new MemoryStore(fixtureWithProposal(false, 'attack', false));
+    session = new ArgumentWorkspaceSession(store, runtime());
+    await mount();
+
+    await click('Mailbox (1)');
+
+    expect(container.textContent).not.toContain('What this means');
+    expect(
+      container.querySelector('.arguments-mailbox__soft-explanation'),
+    ).toBeNull();
+    expect(container.textContent).toContain('Formal argument');
   });
 
   it('protects a dirty canonical draft before opening the Mailbox', async () => {
@@ -560,6 +631,8 @@ describe('standalone Arguments workspace', () => {
         answeringAxioms: [{ axiomId: 'AX-UI', reliedOnRevision: 1 }],
       },
     });
+    expect(JSON.stringify(result)).not.toContain('SOFT_ONLY_MARKER');
+    expect(proposal.softExplanationMarkdown).toContain('SOFT_ONLY_MARKER');
     expect(store.snapshot.library.topics[0]?.counterArgumentIds).toContain(
       resultingId,
     );
@@ -618,6 +691,8 @@ describe('standalone Arguments workspace', () => {
         }),
       ],
     });
+    expect(JSON.stringify(result)).not.toContain('SOFT_ONLY_MARKER');
+    expect(proposal.softExplanationMarkdown).toContain('SOFT_ONLY_MARKER');
     expect(result?.premises).toEqual([
       expect.objectContaining({
         kind: 'text',

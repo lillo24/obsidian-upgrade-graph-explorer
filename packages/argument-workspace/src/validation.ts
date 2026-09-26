@@ -422,7 +422,7 @@ function validateTopic(
   value: unknown,
   path: string,
   issues: ArgumentLibraryValidationIssue[],
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 = 6,
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 = 7,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected a Topic.');
@@ -466,7 +466,7 @@ function validateArgumentPremise(
   path: string,
   ownerId: unknown,
   issues: ArgumentLibraryValidationIssue[],
-  schemaVersion: 2 | 3 | 4 | 5 | 6 = 6,
+  schemaVersion: 2 | 3 | 4 | 5 | 6 | 7 = 7,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected an Argument premise.');
@@ -576,7 +576,7 @@ function validateArgument(
   path: string,
   issues: ArgumentLibraryValidationIssue[],
   sourceIds: Set<string>,
-  schemaVersion: 2 | 3 | 4 | 5 | 6 = 6,
+  schemaVersion: 2 | 3 | 4 | 5 | 6 | 7 = 7,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected an Argument.');
@@ -1157,7 +1157,7 @@ function validateProposal(
   value: unknown,
   path: string,
   issues: ArgumentLibraryValidationIssue[],
-  schemaVersion: 5 | 6,
+  schemaVersion: 5 | 6 | 7,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected a Mailbox proposal.');
@@ -1186,6 +1186,7 @@ function validateProposal(
       'target',
       'reasoning',
       'boundary',
+      ...(schemaVersion >= 7 ? ['softExplanationMarkdown'] : []),
       'clientSubmissionId',
       'decision',
     ],
@@ -1205,7 +1206,7 @@ function validateProposal(
     );
   }
   nonEmptyString(value.title, `${path}.title`, issues);
-  if (schemaVersion === 6 && !PROPOSAL_INTENTS.has(value.intent as string)) {
+  if (schemaVersion >= 6 && !PROPOSAL_INTENTS.has(value.intent as string)) {
     issue(
       issues,
       `${path}.intent`,
@@ -1245,7 +1246,7 @@ function validateProposal(
       );
     }
   }
-  if (schemaVersion === 6) {
+  if (schemaVersion >= 6) {
     if (value.intent === 'new' && Object.hasOwn(value, 'target'))
       issue(
         issues,
@@ -1510,6 +1511,22 @@ function validateProposal(
       nonEmptyString(value[field], `${path}.${field}`, issues);
     }
   }
+  if (
+    schemaVersion >= 7 &&
+    Object.hasOwn(value, 'softExplanationMarkdown') &&
+    nonEmptyString(
+      value.softExplanationMarkdown,
+      `${path}.softExplanationMarkdown`,
+      issues,
+    ) &&
+    value.softExplanationMarkdown.length > 20_000
+  )
+    issue(
+      issues,
+      `${path}.softExplanationMarkdown`,
+      'invalid-value',
+      'Soft Explanation exceeds the 20000-character limit.',
+    );
   nonEmptyString(value.conclusion, `${path}.conclusion`, issues);
   nonEmptyString(
     value.whyNovelOrUnresolved,
@@ -2211,7 +2228,7 @@ function validateIntegrity(
 
 function validateArgumentLibraryVersion(
   value: unknown,
-  expectedVersion: 2 | 3 | 4 | 5 | 6,
+  expectedVersion: 2 | 3 | 4 | 5 | 6 | 7,
 ): ArgumentLibraryValidationResult {
   const issues: ArgumentLibraryValidationIssue[] = [];
   if (!isRecord(value)) {
@@ -2328,7 +2345,7 @@ function validateArgumentLibraryVersion(
         entry,
         `$.proposals[${index}]`,
         issues,
-        expectedVersion >= 6 ? 6 : 5,
+        expectedVersion >= 7 ? 7 : expectedVersion >= 6 ? 6 : 5,
       ),
     );
   }
@@ -2349,7 +2366,28 @@ function validateArgumentLibraryVersion(
 export function validateArgumentLibrary(
   value: unknown,
 ): ArgumentLibraryValidationResult {
-  return validateArgumentLibraryVersion(value, 6);
+  return validateArgumentLibraryVersion(value, 7);
+}
+
+export type ArgumentLibraryV6ValidationResult =
+  | {
+      readonly valid: true;
+      readonly value: PlainRecord;
+      readonly issues: readonly [];
+    }
+  | {
+      readonly valid: false;
+      readonly issues: readonly ArgumentLibraryValidationIssue[];
+    };
+
+/** Strictly validates the schema-v6 Proposal shape before migration. */
+export function validateArgumentLibraryV6(
+  value: unknown,
+): ArgumentLibraryV6ValidationResult {
+  const validation = validateArgumentLibraryVersion(value, 6);
+  return validation.valid
+    ? { valid: true, value: value as PlainRecord, issues: [] }
+    : validation;
 }
 
 export type ArgumentLibraryV5ValidationResult =

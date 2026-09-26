@@ -12,10 +12,8 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 
 import 'katex/dist/katex.min.css';
-import {
-  reviewMarkdownUrlTransform,
-  safeReviewExternalUrl,
-} from './markdown-security';
+import './safe-markdown.css';
+import { safeMarkdownUrlTransform, safeMarkdownExternalUrl } from './security';
 
 function textContent(node: ReactNode): string {
   if (typeof node === 'string' || typeof node === 'number') return String(node);
@@ -32,10 +30,10 @@ function CodeBlock({ children, ...props }: ComponentProps<'pre'>) {
   const [copied, setCopied] = useState(false);
   const raw = textContent(children).replace(/\n$/u, '');
   return (
-    <div className="review-code-block">
+    <div className="safe-markdown__code-block">
       <button
         aria-label="Copy code"
-        className="review-code-block__copy"
+        className="safe-markdown__code-copy"
         onClick={() => {
           void navigator.clipboard.writeText(raw).then(() => {
             setCopied(true);
@@ -53,11 +51,11 @@ function CodeBlock({ children, ...props }: ComponentProps<'pre'>) {
 
 const COMPONENTS: Components = {
   a({ href, children, ...props }) {
-    const safe = href === undefined ? '' : safeReviewExternalUrl(href);
+    const safe = href === undefined ? '' : safeMarkdownExternalUrl(href);
     if (safe === '') {
       return (
         <span
-          className="review-markdown__inert-link"
+          className="safe-markdown__inert-link"
           title="Blocked or unresolved link"
         >
           {children}
@@ -72,7 +70,7 @@ const COMPONENTS: Components = {
   },
   img({ alt, src }) {
     return (
-      <span className="review-markdown__blocked-image">
+      <span className="safe-markdown__blocked-image">
         Remote image blocked{alt ? `: ${alt}` : ''}
         {src ? <code translate="no"> {src}</code> : null}
       </span>
@@ -81,7 +79,7 @@ const COMPONENTS: Components = {
   pre: CodeBlock,
   table({ children, ...props }) {
     return (
-      <div className="review-markdown__table-scroll">
+      <div className="safe-markdown__table-scroll">
         <table {...props}>{children}</table>
       </div>
     );
@@ -118,7 +116,7 @@ class MarkdownErrorBoundary extends Component<
   public override render() {
     if (this.state.error !== undefined) {
       return (
-        <div className="review-markdown__error" role="status">
+        <div className="safe-markdown__error" role="status">
           <p>Formatted rendering failed: {this.state.error}</p>
           <pre>{this.props.markdown}</pre>
         </div>
@@ -128,14 +126,14 @@ class MarkdownErrorBoundary extends Component<
   }
 }
 
-export const MarkdownRenderer = memo(function MarkdownRenderer({
+export const SafeMarkdown = memo(function SafeMarkdown({
   markdown,
 }: {
   readonly markdown: string;
 }) {
   return (
     <MarkdownErrorBoundary markdown={markdown}>
-      <div className="review-markdown">
+      <div className="safe-markdown">
         <ReactMarkdown
           components={COMPONENTS}
           rehypePlugins={[
@@ -152,7 +150,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
           ]}
           remarkPlugins={[remarkGfm, remarkMath]}
           skipHtml
-          urlTransform={reviewMarkdownUrlTransform}
+          urlTransform={safeMarkdownUrlTransform}
         >
           {markdown}
         </ReactMarkdown>

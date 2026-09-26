@@ -438,6 +438,13 @@ function normalizedSubmission(input: CreateArgumentProposalInput) {
       'Proposal title',
       ARGUMENT_PROPOSAL_MAX_TITLE_LENGTH,
     ),
+    ...(optionalText(
+      input.softExplanationMarkdown,
+      'Proposal Soft Explanation',
+      ARGUMENT_PROPOSAL_MAX_TEXT_LENGTH,
+    ) === undefined
+      ? {}
+      : { softExplanationMarkdown: input.softExplanationMarkdown }),
     ...(input.topicId === undefined
       ? {}
       : {

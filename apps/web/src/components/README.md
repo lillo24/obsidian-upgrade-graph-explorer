@@ -4,6 +4,9 @@ These components present the KG8 explainable-navigation workflow around the KG7
 graph plus secondary KG5 evidence. They do not load files, validate JSON, alter
 canonical truth, or own a platform storage implementation.
 
+- `markdown/` owns the shared safe Markdown renderer, URL policy, themed styles,
+  and security regression tests used by AI Review and the Proposal Mailbox.
+
 - `GraphExplorer.tsx` composes report-scoped projection/inspection workspaces,
   compact structural/focus/workspace controls, controlled Filters and Settings
   overlays, shared canonical navigation, graph selection, the transient unified

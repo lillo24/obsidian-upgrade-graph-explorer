@@ -1,6 +1,6 @@
 # Icarus Argument Compiler AI cross-check protocol
 
-Protocol version: `argument-compiler-ai-usage-v3`
+Protocol version: `argument-compiler-ai-usage-v4`
 
 Use this protocol when substantive candidate ideas already exist and the
 Compiler cross-check is beginning. The Compiler is not the generator of the
@@ -154,6 +154,16 @@ If a meaningful new or revised candidate survives the cross-check:
    settle the candidate, and any unresolved scope or boundary. Simple reasoning
    prose is sufficient; use ordered reasoning steps only when their premise or
    earlier-step references help human review.
+6. Optionally provide `softExplanationMarkdown` as a concise, plain-language
+   review aid. It may use Markdown to explain what the proposal means, but it is
+   not a premise, reasoning step, source observation, conclusion, relation, or
+   other canonical content. Do not put evidence there or expect acceptance to
+   copy it into the Argument Library. Use it when the formal structure is not
+   immediately obvious. As applicable, explain what the current theory already
+   says, what newer claim is being considered, the distinction or counterexample
+   the Proposal notices, what it claims, and what it does not claim. Do not dump
+   IDs/revisions, repeat every metadata field or formal Premise, overstate
+   uncertainty, or add reasoning unsupported by the formal Proposal.
 
 Do not search the Argument Library for a record called "Mailbox". The Mailbox
 is a proposal-submission workflow, not canonical Argument Library knowledge.

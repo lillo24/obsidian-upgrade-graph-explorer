@@ -190,20 +190,21 @@ narrow bridge and scheduler keep all provider tests independent of a native
 runtime.
 
 `packages/argument-workspace` is an independent source-neutral domain and
-application boundary for one local Argument Library. Its schema-v6
+application boundary for one local Argument Library. Its schema-v7
 Topic/Context/Axiom/Argument/Counter-Argument data and separate Proposal
 Mailbox are not added to the canonical Markdown graph. Proposals are
 non-canonical, append-only AI suggestions excluded from reader search/bundles.
 They distinguish review intent, typed revision-pinned dependencies, optional
 reasoning steps, and source observations that never become inference premises
-implicitly; only an atomic human resolution may create linked canonical
+implicitly. An optional Soft Explanation is bounded human-review Markdown and
+is never copied into canonical content; only an atomic human resolution may create linked canonical
 Argument or Counter-Argument history. Contexts are named, ordered Axiom groups with zero or one
 parent; their inherited effective Axioms are interpretive background and never
 implicit inference dependencies. Arguments own scoped Examples, ordered authored or
 revision-pinned Axiom/conclusion/prior-premise dependencies, optional reasoning,
 conclusions, Boundary/Invariance prose, explicit attack/support relations, and
 separate supersession links; Topics expose an explicit Current pointer without
-truth semantics. The package owns strict validation and v1/v2/v3/v4/v5 migration, stable
+truth semantics. The package owns strict validation and v1/v2/v3/v4/v5/v6 migration, stable
 record/library revisions, portable source locators, premise/relation/response
 staleness and explicit reassessment, deterministic
 descriptive indexing, JSON/Markdown interchange, serialized expected-snapshot
@@ -220,8 +221,8 @@ resolution remains exclusively in the application authoring surface.
 
 `apps/web/src/persistence/argument-library.ts` adapts that store contract to one
 stable profile-level localStorage key. `packages/argument-workspace-tauri`
-adapts it to dedicated private app-local schema-v6 JSON using validated
-temporary-sibling replacement and preserves migrated schema-v1/v2/v3/v4/v5 files.
+adapts it to dedicated private app-local schema-v7 JSON using validated
+temporary-sibling replacement and preserves migrated schema-v1/v2/v3/v4/v5/v6 files.
 Neither adapter uses the graph view registry, selected-vault Markdown, or
 workspace identity catalog. Live theory-source acquisition remains a later host
 adapter behind the Argument Workspace's narrow registered-reference reader; it
@@ -236,7 +237,9 @@ one serialized commit per Save, replaces its UI reader only after persistence
 confirms the exact new snapshot, and keeps search/import/export/context state
 outside canonical data. Its Mailbox reloads external local MCP submissions,
 shows pending/history provenance and stale targets, and reuses canonical editors
-for explicit human accept/reject transactions. Its platform store is chosen
+for explicit human accept/reject transactions. Proposal explanations and AI
+Review output share one safe Markdown renderer that skips raw HTML and blocks
+unsafe links and images. Its platform store is chosen
 once: browser localStorage
 or the dedicated Tauri app-local adapter, with no cross-platform fallback.
 `GraphExplorer` owns only the normal/maximized Arguments launcher and graph-tool

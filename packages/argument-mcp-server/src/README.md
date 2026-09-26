@@ -4,13 +4,14 @@ This folder owns the local MCP adapter for canonical Argument Library reads and
 non-canonical Proposal submission.
 
 - `loader.ts` derives the app-local path, reads strict UTF-8 bytes with a size
-  bound, validates schema-v6 data (or deterministic v1/v2/v3/v4/v5 imports) through
+  bound, validates schema-v7 data (or deterministic v1/v2/v3/v4/v5/v6 imports) through
   Argument Workspace, creates a retained `KnowledgeReader` for each read call,
   and exposes expected-snapshot atomic persistence to the Proposal-only
   service.
 - `server.ts` registers five read-only Compiler/guide tools plus the bounded,
   append-only, idempotent `compiler_submit_proposal` tool, including review
-  intent, typed dependencies, modest reasoning steps, and source provenance. It
+  intent, typed dependencies, modest reasoning steps, source provenance, and an
+  optional non-canonical human-review Markdown explanation. It
   does not expose canonical authoring or Proposal resolution.
 - `usage-guide.ts` imports the canonical Compiler cross-check guide as bundled
   text so the deployed server has no documentation-file runtime dependency.

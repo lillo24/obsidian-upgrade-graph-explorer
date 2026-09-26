@@ -804,6 +804,23 @@
   margin: 0.3rem 0 0.55rem;
 }
 
+.arguments-mailbox__soft-explanation {
+  padding: 1rem;
+  border: 1px solid var(--color-status-info-border);
+  border-radius: 0.55rem;
+  background: var(--color-status-info-background);
+}
+
+.arguments-mailbox__soft-explanation h4,
+.arguments-mailbox__formal-title {
+  margin: 0.3rem 0 0.55rem;
+}
+
+.arguments-mailbox__formal-title {
+  padding-top: 0.15rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
 .arguments-mailbox__chain {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));

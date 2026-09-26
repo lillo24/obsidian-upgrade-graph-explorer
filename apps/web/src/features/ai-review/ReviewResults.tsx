@@ -8,7 +8,7 @@ import type {
   VerifiedContributionReference,
 } from '@icarus-graph-explorer/ai-review';
 
-import { MarkdownRenderer } from './MarkdownRenderer';
+import { SafeMarkdown } from '../../components/markdown/SafeMarkdown';
 
 type ResultTab =
   'integrated' | 'negative' | 'positive' | 'compare' | 'post-check';
@@ -133,7 +133,7 @@ function AttemptView({
       ) : raw ? (
         <pre className="review-raw-output">{attempt.output.rawMarkdown}</pre>
       ) : (
-        <MarkdownRenderer markdown={attempt.output.rawMarkdown} />
+        <SafeMarkdown markdown={attempt.output.rawMarkdown} />
       )}
       <details>
         <summary>Exact prompt & evidence</summary>
@@ -187,7 +187,7 @@ function IntegratedView({
         <pre className="review-raw-output">{attempt.output?.rawMarkdown}</pre>
       ) : (
         <>
-          <MarkdownRenderer markdown={structured.summary} />
+          <SafeMarkdown markdown={structured.summary} />
           {structured.issues.map((issue) => (
             <section className="review-issue" key={issue.id}>
               <p className="review-badge">{issue.relation}</p>
@@ -198,7 +198,7 @@ function IntegratedView({
                   {issue.negativeContribution === undefined ? (
                     <p>Not addressed</p>
                   ) : (
-                    <MarkdownRenderer markdown={issue.negativeContribution} />
+                    <SafeMarkdown markdown={issue.negativeContribution} />
                   )}
                   <References references={issue.negativeReferences} />
                 </div>
@@ -207,13 +207,13 @@ function IntegratedView({
                   {issue.positiveContribution === undefined ? (
                     <p>Not addressed</p>
                   ) : (
-                    <MarkdownRenderer markdown={issue.positiveContribution} />
+                    <SafeMarkdown markdown={issue.positiveContribution} />
                   )}
                   <References references={issue.positiveReferences} />
                 </div>
               </div>
               <h5>Integration</h5>
-              <MarkdownRenderer markdown={issue.integrationMarkdown} />
+              <SafeMarkdown markdown={issue.integrationMarkdown} />
               {issue.unresolvedPoints.length === 0 ? null : (
                 <>
                   <h5>Unresolved Points</h5>
@@ -360,7 +360,7 @@ function CompareView({
                 <div>
                   <h4>Negative</h4>
                   {issue.negativeContribution ? (
-                    <MarkdownRenderer markdown={issue.negativeContribution} />
+                    <SafeMarkdown markdown={issue.negativeContribution} />
                   ) : (
                     <p>Not addressed</p>
                   )}
@@ -369,7 +369,7 @@ function CompareView({
                 <div>
                   <h4>Positive</h4>
                   {issue.positiveContribution ? (
-                    <MarkdownRenderer markdown={issue.positiveContribution} />
+                    <SafeMarkdown markdown={issue.positiveContribution} />
                   ) : (
                     <p>Not addressed</p>
                   )}
@@ -398,18 +398,18 @@ function PostCheckView({
   return (
     <article>
       <h3>Separate Post-check</h3>
-      <MarkdownRenderer markdown={structured.summary} />
+      <SafeMarkdown markdown={structured.summary} />
       {structured.findings.map((finding) => (
         <section className="review-issue" key={finding.id}>
           <p className="review-badge">{finding.kind}</p>
-          <MarkdownRenderer markdown={finding.markdown} />
+          <SafeMarkdown markdown={finding.markdown} />
           <References references={finding.references} />
         </section>
       ))}
       {structured.revisedSynthesis === undefined ? null : (
         <section>
           <h4>Revised Synthesis</h4>
-          <MarkdownRenderer markdown={structured.revisedSynthesis} />
+          <SafeMarkdown markdown={structured.revisedSynthesis} />
         </section>
       )}
     </article>
