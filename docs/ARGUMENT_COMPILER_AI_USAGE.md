@@ -1,6 +1,6 @@
 # Icarus Argument Compiler AI cross-check protocol
 
-Protocol version: `argument-compiler-ai-usage-v4`
+Protocol version: `argument-compiler-ai-usage-v5`
 
 Use this protocol when substantive candidate ideas already exist and the
 Compiler cross-check is beginning. The Compiler is not the generator of the
@@ -9,10 +9,13 @@ merely because the Argument Library exists. The first pass does not need a
 formal Premises / Reasoning / Conclusion schema. Use concrete examples when
 they arise naturally; do not force them.
 
-The Compiler Mailbox is the proposal-submission layer of this system. When
-`compiler_submit_proposal` is available, that tool is the action used to send a
-candidate to the Mailbox. The Mailbox is not an Argument Library record and
-should not be searched for with `compiler_search_index`.
+The Compiler Mailbox is a living, non-canonical **To store** staging area.
+`compiler_list_proposals` and `compiler_read_proposal` inspect it;
+`compiler_submit_proposal` creates a durable draft; and
+`compiler_revise_proposal` materially improves the same stable Proposal rather
+than creating `A2`, `A3`, and `A4` duplicates. The Mailbox is not canonical
+Argument Library knowledge and must not be searched with
+`compiler_search_index`.
 
 ## 1. Build focused lexical searches
 
@@ -176,7 +179,7 @@ future/current tool list exposes an authorized source-reading capability, use
 it selectively only when meaning, scope, or a stored dependency cannot be
 resolved from the bundle.
 
-## 7. Present and submit survivors
+## 7. Present and stage survivors
 
 Do not clutter the final answer with every retrieval step. Omit candidates
 defeated by existing reasoning. Present surviving or genuinely new arguments
@@ -186,8 +189,14 @@ preserve uncertainty when the library did not settle the issue.
 Prefer proposals that represent arguments which survived meaningful criticism
 or revision over speculative ideas that have not yet been pressure-tested.
 
-For this Compiler, `compiler_submit_proposal` is the action that sends a
-candidate to the human-reviewed Compiler Mailbox.
+Before creating a Proposal, use `compiler_list_proposals` with focused terms
+and `compiler_read_proposal` for plausible matches. Prefer revising the same
+active Proposal when later evidence materially improves, narrows, corrects,
+restructures, or supersedes its current formulation. Do not create duplicate
+Proposals or revisions for cosmetic wording churn.
+
+For this Compiler, `compiler_submit_proposal` creates an active To store draft
+in the human-reviewed Compiler Mailbox.
 
 If a meaningful new or revised candidate survives the cross-check:
 
@@ -219,11 +228,49 @@ If a meaningful new or revised candidate survives the cross-check:
 Do not search the Argument Library for a record called "Mailbox". The Mailbox
 is a proposal-submission workflow, not canonical Argument Library knowledge.
 
-A successful `compiler_submit_proposal` call means only that a pending,
-non-canonical proposal was stored for human review. It does not accept the
-idea, make it Current, mutate canonical theory, or replace an existing
+A successful `compiler_submit_proposal` call means only that an active,
+non-canonical To store Proposal was staged for human review. It does not accept
+the idea, make it Current, mutate canonical theory, or replace an existing
 Argument.
 
-If `compiler_submit_proposal` is not present in the current tool list, do not
-invent or claim a submission. Present the survivor to the user and state that
-the Mailbox submission action is unavailable.
+### Autonomous non-canonical staging permission
+
+During an ordinary Icarus theory review, after independent reasoning and the
+normal Compiler cross-check, the AI may autonomously:
+
+- list, search, and read Proposal staging;
+- create a pressure-tested surviving Proposal;
+- call `compiler_revise_proposal` to materially improve an active Proposal,
+  using its current Proposal revision and exact current library snapshot;
+- restructure formal fields or update explanation, premises, reasoning,
+  boundary, target, and source observations when the theory work warrants it;
+- add typed `draftRelations` between active Proposal revisions for `attack`,
+  `support`, `refine`, `extend`, `supersede`, or `related` staging intent.
+
+Draft Proposal relations are provenance and future-resolution intent only.
+They are not canonical attack/support/supersession relations. The newest
+revision is active, while bounded prior revision content and its revision
+reason remain recoverable.
+
+### Explicit-user-only operations
+
+The AI must not do any of the following unless the user explicitly requests
+that action:
+
+- call `compiler_discard_proposal` to remove a Proposal from active To store
+  staging;
+- hard-delete Proposal history, if a future capability ever supports it;
+- store, accept, or resolve a Proposal into canonical Argument DB records;
+- modify canonical Arguments, Counter-Arguments, or Axioms as resolution;
+- promote Current or create canonical supersession, attack, or support
+  relations.
+
+Discard is not theoretical rejection. It preserves a discarded history state
+and creates no canonical Argument or Counter-Argument. Canonical storage and
+canonical refutation remain human UI workflows and are intentionally not MCP
+tools. The fact that the AI submitted or revised a Proposal does not imply
+permission to discard or canonically store it.
+
+If a named Proposal tool is not present in the current tool list, do not invent
+or claim its action. Present the survivor or intended staging change to the
+user and state that the corresponding Mailbox capability is unavailable.

@@ -1,4 +1,4 @@
-export const ARGUMENT_LIBRARY_SCHEMA_VERSION = 7 as const;
+export const ARGUMENT_LIBRARY_SCHEMA_VERSION = 8 as const;
 export const KNOWLEDGE_READER_CONTRACT_VERSION = 5 as const;
 export const CONTENT_FINGERPRINT_ALGORITHM =
   'sha256-canonical-json-v1' as const;
@@ -231,7 +231,7 @@ export interface ArgumentRelation {
   readonly reliedOnRevision: number;
 }
 
-export type ProposalStatus = 'pending' | 'accepted' | 'rejected';
+export type ProposalStatus = 'pending' | 'discarded' | 'accepted' | 'rejected';
 
 /** Review intent only; canonical attack/support/supersession remains a human choice. */
 export type ArgumentProposalIntent =
@@ -299,16 +299,19 @@ export interface ArgumentProposalSourceObservation {
   readonly span?: string;
 }
 
-/**
- * Non-canonical AI-authored candidate retained in the same durable snapshot.
- * Only human resolution may link it to a canonical Argument or Counter-Argument.
- */
-export interface ArgumentProposal {
+/** Non-canonical intent between two Proposal revisions in the staging area. */
+export type ArgumentProposalDraftRelationKind =
+  'attack' | 'support' | 'refine' | 'extend' | 'supersede' | 'related';
+
+export interface ArgumentProposalDraftRelation {
   readonly id: string;
-  readonly revision: number;
-  readonly createdAt: string;
-  readonly updatedAt: string;
-  readonly status: ProposalStatus;
+  readonly kind: ArgumentProposalDraftRelationKind;
+  readonly targetProposalId: string;
+  readonly targetProposalRevision: number;
+}
+
+/** The mutable, non-canonical content of one Proposal revision. */
+export interface ArgumentProposalDraft {
   readonly title: string;
   /** Optional non-canonical Markdown written only for human review. */
   readonly softExplanationMarkdown?: string;
@@ -324,6 +327,28 @@ export interface ArgumentProposal {
   readonly sourceObservations: readonly ArgumentProposalSourceObservation[];
   readonly whyNovelOrUnresolved: string;
   readonly consultation: ArgumentProposalConsultation;
+  readonly draftRelations: readonly ArgumentProposalDraftRelation[];
+}
+
+/** Recoverable prior content retained when an active Proposal is revised. */
+export interface ArgumentProposalRevision {
+  readonly revision: number;
+  readonly replacedAt: string;
+  readonly revisionReason: string;
+  readonly content: ArgumentProposalDraft;
+}
+
+/**
+ * Non-canonical AI-authored candidate retained in the same durable snapshot.
+ * Only human resolution may link it to a canonical Argument or Counter-Argument.
+ */
+export interface ArgumentProposal extends ArgumentProposalDraft {
+  readonly id: string;
+  readonly revision: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly status: ProposalStatus;
+  readonly revisionHistory: readonly ArgumentProposalRevision[];
   readonly clientSubmissionId?: string;
   readonly submissionFingerprint: ContentFingerprint;
   readonly decision?: ArgumentProposalDecision;
@@ -575,8 +600,37 @@ export interface CreateArgumentProposalInput {
   readonly conclusion: string;
   readonly boundary?: string;
   readonly sourceObservations?: readonly ArgumentProposalSourceObservation[];
+  readonly draftRelations?: readonly ArgumentProposalDraftRelation[];
   readonly whyNovelOrUnresolved: string;
   readonly consultation: ArgumentProposalConsultation;
+}
+
+export interface ReviseArgumentProposalInput {
+  readonly proposalId: string;
+  readonly expectedRevision: number;
+  readonly revisionReason: string;
+  readonly title: string;
+  /** Optional non-canonical Markdown written only for human review. */
+  readonly softExplanationMarkdown?: string;
+  readonly intent?: ArgumentProposalIntent;
+  readonly topicId?: string;
+  readonly target?: ArgumentProposalTarget;
+  readonly examples: readonly string[];
+  readonly premises: readonly ArgumentProposalPremise[];
+  readonly reasoning?: string;
+  readonly reasoningSteps?: readonly ArgumentProposalReasoningStep[];
+  readonly conclusion: string;
+  readonly boundary?: string;
+  readonly sourceObservations?: readonly ArgumentProposalSourceObservation[];
+  readonly draftRelations?: readonly ArgumentProposalDraftRelation[];
+  readonly whyNovelOrUnresolved: string;
+  readonly consultation: ArgumentProposalConsultation;
+}
+
+export interface DiscardArgumentProposalInput {
+  readonly proposalId: string;
+  readonly expectedRevision: number;
+  readonly note?: string;
 }
 
 export interface ResolveProposalAsArgumentInput {
@@ -905,7 +959,7 @@ export type ArgumentLibraryJsonParseResult =
   | {
       readonly status: 'valid';
       readonly value: ArgumentLibrary;
-      readonly migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5 | 6;
+      readonly migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5 | 6 | 7;
     }
   | {
       readonly status: 'invalid-json' | 'future-schema' | 'invalid-library';

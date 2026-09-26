@@ -9,12 +9,12 @@ Graph Explorer UI ─┐
 MCP server ──────┘
 ```
 
-The server reloads and validates `library-v7.json` for every tool call and never
-creates a second database. Five tools provide the bundled usage guide or
-retained read-only `KnowledgeReader` snapshots. One tightly scoped append-only
-tool can submit a bounded non-canonical Proposal to the same file. No canonical
-create, update, delete, import, resolution, source-version, or vault-edit
-capability is registered.
+The server reloads and validates `library-v8.json` for every tool call and never
+creates a second database. Canonical reader tools remain separate from Mailbox
+list/read tools. Narrow staging tools can create and revision-safely revise
+bounded non-canonical Proposals; an explicit-user-only discard tool preserves
+history and creates no canonical record. No canonical create, update, delete,
+import, resolution, source-version, or vault-edit capability is registered.
 
 The intended AI workflow is: reason independently, cross-check the Compiler,
 test the candidate against the prior recorded response, and submit it to the
@@ -30,13 +30,13 @@ for MCP host configuration.
 Without that variable, the server mirrors Tauri's app-local-data convention for
 the `com.icarus.graph-explorer` application identifier:
 
-- Windows: `%LOCALAPPDATA%\com.icarus.graph-explorer\argument-workspace\library-v7.json`
-- macOS: `~/Library/Application Support/com.icarus.graph-explorer/argument-workspace/library-v7.json`
+- Windows: `%LOCALAPPDATA%\com.icarus.graph-explorer\argument-workspace\library-v8.json`
+- macOS: `~/Library/Application Support/com.icarus.graph-explorer/argument-workspace/library-v8.json`
 - Linux: `$XDG_DATA_HOME` (or `~/.local/share`) followed by
-  `com.icarus.graph-explorer/argument-workspace/library-v7.json`
+  `com.icarus.graph-explorer/argument-workspace/library-v8.json`
 
-When the derived v7 path is absent, reads may recover the newest valid adjacent
-`library-v6.json` through `library-v1.json` via deterministic in-memory migration. An
+When the derived v8 path is absent, reads may recover the newest valid adjacent
+`library-v7.json` through `library-v1.json` via deterministic in-memory migration. An
 explicit `ICARUS_ARGUMENT_LIBRARY_PATH` is authoritative and has no implicit
 fallback.
 
@@ -47,7 +47,7 @@ resolved absolute path. Reads are capped at 64 MiB and tool responses at 1 MiB.
 For the current Windows desktop library:
 
 ```powershell
-$env:ICARUS_ARGUMENT_LIBRARY_PATH = Join-Path $env:LOCALAPPDATA 'com.icarus.graph-explorer\argument-workspace\library-v7.json'
+$env:ICARUS_ARGUMENT_LIBRARY_PATH = Join-Path $env:LOCALAPPDATA 'com.icarus.graph-explorer\argument-workspace\library-v8.json'
 ```
 
 ## Tools
@@ -62,7 +62,11 @@ $env:ICARUS_ARGUMENT_LIBRARY_PATH = Join-Path $env:LOCALAPPDATA 'com.icarus.grap
   plus the same bounded paging/archive options.
 - `compiler_read_bundle`: bounded structured context selected by `id`, optional
   `kind`, `maxRecords`, and `maxDepth`.
-- `compiler_submit_proposal`: appends one pending non-canonical Proposal after
+- `compiler_list_proposals`: lists or text-filters active To store work by
+  default, with an explicit status filter for discarded/stored history.
+- `compiler_read_proposal`: reads current content, bounded recoverable prior
+  revisions, provenance, outgoing draft links, and incoming draft links.
+- `compiler_submit_proposal`: creates one active non-canonical Proposal after
   validating payload bounds, exact consultation descriptor and record
   revisions, review intent, optional exact Argument-part target, Topic, typed
   text/Axiom/Argument dependencies, optional reasoning steps, and separate
@@ -72,12 +76,20 @@ $env:ICARUS_ARGUMENT_LIBRARY_PATH = Join-Path $env:LOCALAPPDATA 'com.icarus.grap
   Optional `softExplanationMarkdown` is a human-review aid only; it is retained
   in Proposal history and never treated as evidence or canonical content.
   `clientSubmissionId` and exact payload retries are idempotent.
+- `compiler_revise_proposal`: replaces one active Proposal draft only when its
+  expected Proposal revision and complete consultation snapshot are current;
+  it retains the previous draft and reason and may update typed draft links.
+- `compiler_discard_proposal`: explicit-user-only removal from active To store
+  staging. It retains the Proposal as discarded history and creates no
+  canonical Argument or Counter-Argument.
 
-The five guide/reader tools are annotated read-only. Proposal submission is annotated
-non-destructive and idempotent, but not read-only. It is intended only after an
+The guide, canonical readers, and Proposal list/read tools are annotated
+read-only. Proposal creation is non-destructive and idempotent; revision is a
+recoverable non-canonical write; discard is marked destructive to emphasize its
+explicit-user-only policy even though history is retained. They are intended after an
 AI has done its own reasoning and cross-check against the compiler snapshot;
-submission is not a correctness verdict. The returned ID remains outside
-framework knowledge until a human accepts or rejects it in the Mailbox.
+staging mutation is not a correctness verdict. Proposal IDs remain outside
+framework knowledge until a human stores an Argument or Counter-Argument.
 
 Index and bundle results preserve the
 Argument Workspace result, snapshot, provenance, completeness, omissions, and
@@ -99,24 +111,24 @@ A minimal client/project instruction can therefore remain small:
 > After independent candidate reasoning, call `compiler_usage_guide` when
 > beginning the Icarus Argument Compiler cross-check.
 
-The current server exposes `compiler_submit_proposal`, so the guide's optional
-submission step is available. Clients must still discover the actual tool list;
-if a deployed older server lacks the tool, they must present the surviving
-proposal without claiming it was submitted.
+The current server exposes list/read/create/revise/discard staging tools.
+Clients must still discover the actual tool list and must never claim an action
+that an older deployed server does not expose.
 
 Bundles preserve registered theory-source references, but MCP1 intentionally
 does not expose `compiler_read_source`. The standalone process has no authorized
 vault/source binding and never follows record paths into the filesystem.
 
-Submission accepts candidate title, optional human-facing Soft Explanation,
+Creation and revision accept candidate title, optional human-facing Soft Explanation,
 review intent, examples, typed premises,
 optional simple or stepwise reasoning, conclusion, boundary, separate source
 observations, why it is novel/unresolved, optional Topic/precise target, and the
 consultation descriptor/records. Text, list lengths, and the whole JSON payload
 are bounded. A stale consultation, target, or typed dependency fails without
 writing. The server performs one expected-snapshot atomic replacement;
-concurrent changes return a conflict rather than silently retargeting. It never
-exposes a tool that resolves Proposals or mutates canonical arrays.
+concurrent changes return a conflict rather than silently retargeting. Draft
+links pin a target Proposal revision and never become canonical relations. The
+server never exposes a tool that resolves Proposals or mutates canonical arrays.
 
 ## Build, test, and run
 
@@ -151,7 +163,7 @@ pnpm dlx @modelcontextprotocol/inspector@2.6.0 node packages/argument-mcp-server
 
 In the Inspector, connect and use the Tools tab to call status, list/search, and
 bundle reads. For a synthetic fixture, point `ICARUS_ARGUMENT_LIBRARY_PATH` at a
-temporary schema-v7 JSON file before starting Inspector. Never commit or paste
+temporary schema-v8 JSON file before starting Inspector. Never commit or paste
 the private real library into tests or logs.
 
 For a headless connection check, the same Inspector package also has a CLI

@@ -21,6 +21,7 @@ import {
   validateArgumentLibraryV4,
   validateArgumentLibraryV5,
   validateArgumentLibraryV6,
+  validateArgumentLibraryV7,
 } from './validation';
 
 export function serializeArgumentLibrary(library: ArgumentLibrary): string {
@@ -83,6 +84,22 @@ export function parseArgumentLibraryJson(
         status: 'valid',
         value: migration.value,
         migratedFromSchemaVersion: 4,
+      };
+    }
+    return { ...migration, preservedSource: source };
+  }
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value as { readonly schemaVersion?: unknown }).schemaVersion === 7
+  ) {
+    const migration = migrateArgumentLibraryV7(value);
+    if (migration.status === 'valid') {
+      return {
+        status: 'valid',
+        value: migration.value,
+        migratedFromSchemaVersion: 7,
       };
     }
     return { ...migration, preservedSource: source };
@@ -405,6 +422,36 @@ export function migrateArgumentLibraryV6(
   const candidate = {
     ...clonePlainData(legacyValidation.value),
     schemaVersion: 7,
+  };
+  return migrateArgumentLibraryV7(candidate);
+}
+
+/** Adds versioned Proposal staging without changing canonical records. */
+export function migrateArgumentLibraryV7(
+  value: unknown,
+): ArgumentLibraryMigrationResult {
+  const legacyValidation = validateArgumentLibraryV7(value);
+  if (!legacyValidation.valid) {
+    const first = legacyValidation.issues[0];
+    return {
+      status: 'invalid-library',
+      message: `Argument Library v7 is invalid${
+        first === undefined ? '.' : ` at ${first.path}: ${first.message}`
+      }`,
+      issues: legacyValidation.issues,
+    };
+  }
+  const legacy = clonePlainData(legacyValidation.value);
+  const candidate = {
+    ...legacy,
+    schemaVersion: 8,
+    proposals: (legacy.proposals as readonly Record<string, unknown>[]).map(
+      (proposal) => ({
+        ...proposal,
+        draftRelations: [],
+        revisionHistory: [],
+      }),
+    ),
   };
   const migratedValidation = validateArgumentLibrary(candidate);
   if (!migratedValidation.valid) {

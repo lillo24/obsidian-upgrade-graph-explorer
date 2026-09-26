@@ -11,7 +11,11 @@ import {
   createEmptyArgumentLibrary,
   createTopic,
 } from './library';
-import { submitArgumentProposal } from './proposals';
+import {
+  resolveProposalAsArgument,
+  resolveProposalAsRejected,
+  submitArgumentProposal,
+} from './proposals';
 import {
   exportArgumentLibraryMarkdown,
   safeMarkdownFileName,
@@ -114,7 +118,7 @@ describe('Argument Library interchange', () => {
     });
     expect(
       parseArgumentLibraryJson(
-        JSON.stringify({ ...createNeutralArgumentLibrary(), schemaVersion: 8 }),
+        JSON.stringify({ ...createNeutralArgumentLibrary(), schemaVersion: 9 }),
       ),
     ).toMatchObject({ status: 'future-schema' });
   });
@@ -127,7 +131,7 @@ describe('Argument Library interchange', () => {
       status: 'valid',
       migratedFromSchemaVersion: 1,
       value: {
-        schemaVersion: 7,
+        schemaVersion: 8,
         libraryId: 'library-v1-fixture',
         libraryRevision: 7,
         arguments: [],
@@ -173,7 +177,7 @@ describe('Argument Library interchange', () => {
       status: 'valid',
       migratedFromSchemaVersion: 2,
       value: {
-        schemaVersion: 7,
+        schemaVersion: 8,
         contexts: [],
         proposals: [],
         arguments: [{ examples: [], relations: [], contextIds: [] }],
@@ -198,7 +202,7 @@ describe('Argument Library interchange', () => {
     expect(parsed).toMatchObject({
       status: 'valid',
       migratedFromSchemaVersion: 4,
-      value: { schemaVersion: 7, proposals: [] },
+      value: { schemaVersion: 8, proposals: [] },
     });
     if (parsed.status !== 'valid') return;
     const migratedWithoutMailbox = clonePlainData(
@@ -258,6 +262,8 @@ describe('Argument Library interchange', () => {
     delete v5Proposal.premises;
     delete v5Proposal.reasoningSteps;
     delete v5Proposal.sourceObservations;
+    delete v5Proposal.draftRelations;
+    delete v5Proposal.revisionHistory;
     const legacy = {
       ...submitted.library,
       schemaVersion: 5,
@@ -279,7 +285,7 @@ describe('Argument Library interchange', () => {
       status: 'valid',
       migratedFromSchemaVersion: 5,
       value: {
-        schemaVersion: 7,
+        schemaVersion: 8,
         proposals: [
           {
             intent: 'unspecified',
@@ -338,14 +344,23 @@ describe('Argument Library interchange', () => {
       },
       deterministicRuntime('legacy-v6'),
     ).library;
-    const legacy = { ...submitted, schemaVersion: 6 };
+    const legacy = {
+      ...submitted,
+      schemaVersion: 6,
+      proposals: submitted.proposals.map((proposal) => {
+        const retained = { ...proposal } as Record<string, unknown>;
+        delete retained.draftRelations;
+        delete retained.revisionHistory;
+        return retained;
+      }),
+    };
 
     const parsed = parseArgumentLibraryJson(JSON.stringify(legacy));
 
     expect(parsed).toMatchObject({
       status: 'valid',
       migratedFromSchemaVersion: 6,
-      value: { schemaVersion: 7 },
+      value: { schemaVersion: 8 },
     });
     if (parsed.status !== 'valid') return;
     expect(parsed.value.proposals[0]).not.toHaveProperty(
@@ -354,6 +369,122 @@ describe('Argument Library interchange', () => {
     expect(
       parseArgumentLibraryJson(serializeArgumentLibrary(parsed.value)),
     ).toMatchObject({ status: 'valid', value: parsed.value });
+  });
+
+  it('migrates v7 pending, stored, and canonically refuted history into v8 staging', () => {
+    const runtime = deterministicRuntime('legacy-v7');
+    const original = createNeutralArgumentLibrary();
+    const descriptor = captureArgumentLibrarySnapshot(original).descriptor;
+    const proposalInput = {
+      title: 'Legacy lifecycle proposal',
+      intent: 'new' as const,
+      examples: [],
+      premises: [],
+      reasoningSteps: [],
+      conclusion: 'A legacy proposal conclusion.',
+      sourceObservations: [],
+      whyNovelOrUnresolved: 'It remains relevant to migration coverage.',
+      consultation: {
+        libraryId: descriptor.libraryId,
+        libraryRevision: descriptor.libraryRevision,
+        contentFingerprint: descriptor.contentFingerprint,
+        records: [
+          {
+            kind: 'topic' as const,
+            id: original.topics[0]!.id,
+            revision: original.topics[0]!.revision,
+          },
+        ],
+      },
+    };
+    const pending = submitArgumentProposal(original, proposalInput, runtime);
+    const stored = resolveProposalAsArgument(
+      pending.library,
+      {
+        proposalId: pending.proposal.id,
+        topicIds: ['T-NEUTRAL'],
+        argument: {
+          id: 'AR-LEGACY-STORED',
+          title: 'Stored legacy proposal',
+          premises: [],
+          conclusion: pending.proposal.conclusion,
+        },
+      },
+      runtime,
+    );
+    const secondDescriptor = captureArgumentLibrarySnapshot(stored).descriptor;
+    const second = submitArgumentProposal(
+      stored,
+      {
+        ...proposalInput,
+        clientSubmissionId: 'legacy-refutation',
+        title: 'Legacy refuted proposal',
+        consultation: {
+          libraryId: secondDescriptor.libraryId,
+          libraryRevision: secondDescriptor.libraryRevision,
+          contentFingerprint: secondDescriptor.contentFingerprint,
+          records: [
+            {
+              kind: 'topic',
+              id: stored.topics[0]!.id,
+              revision: stored.topics[0]!.revision,
+            },
+          ],
+        },
+      },
+      runtime,
+    );
+    const resolved = resolveProposalAsRejected(
+      second.library,
+      {
+        proposalId: second.proposal.id,
+        topicIds: ['T-NEUTRAL'],
+        counterArgument: {
+          id: 'CA-LEGACY-REFUTED',
+          title: second.proposal.title,
+          observation: 'Legacy refuting observation.',
+          challengedClaim: second.proposal.conclusion,
+          response: {
+            explanation: 'The legacy claim was refuted.',
+            outcome: 'refuted',
+          },
+        },
+      },
+      runtime,
+    );
+    const legacyProposals = resolved.proposals.map((proposal) => {
+      const legacy = { ...proposal } as Record<string, unknown>;
+      delete legacy.draftRelations;
+      delete legacy.revisionHistory;
+      return legacy;
+    });
+    const legacy = {
+      ...resolved,
+      schemaVersion: 7,
+      proposals: legacyProposals,
+    };
+
+    const parsed = parseArgumentLibraryJson(JSON.stringify(legacy));
+
+    expect(parsed).toMatchObject({
+      status: 'valid',
+      migratedFromSchemaVersion: 7,
+      value: { schemaVersion: 8 },
+    });
+    if (parsed.status !== 'valid') return;
+    expect(parsed.value.arguments).toEqual(resolved.arguments);
+    expect(parsed.value.counterArguments).toEqual(resolved.counterArguments);
+    expect(parsed.value.proposals.map(({ status }) => status)).toEqual([
+      'accepted',
+      'rejected',
+    ]);
+    expect(parsed.value.proposals).toEqual(
+      resolved.proposals.map((proposal) => ({
+        ...proposal,
+        draftRelations: [],
+        revisionHistory: [],
+      })),
+    );
   });
 
   it('treats identical import as idempotent and same-lineage altered content as conflict', () => {

@@ -190,13 +190,15 @@ narrow bridge and scheduler keep all provider tests independent of a native
 runtime.
 
 `packages/argument-workspace` is an independent source-neutral domain and
-application boundary for one local Argument Library. Its schema-v7
+application boundary for one local Argument Library. Its schema-v8
 Topic/Context/Axiom/Argument/Counter-Argument data and separate Proposal
 Mailbox are not added to the canonical Markdown graph. Proposals are
-non-canonical, append-only AI suggestions excluded from reader search/bundles.
-They distinguish review intent, typed revision-pinned dependencies, optional
-reasoning steps, and source observations that never become inference premises
-implicitly. An optional Soft Explanation is bounded human-review Markdown and
+non-canonical, versioned staging objects excluded from reader search/bundles.
+An active Proposal has a stable ID, a current revision, bounded recoverable
+prior-revision snapshots, and typed revision-pinned draft links to other
+Proposals. It also distinguishes review intent, typed canonical dependencies,
+optional reasoning steps, and source observations that never become inference
+premises implicitly. An optional Soft Explanation is bounded human-review Markdown and
 is never copied into canonical content; only an atomic human resolution may create linked canonical
 Argument or Counter-Argument history. Contexts are named, ordered Axiom groups with zero or one
 parent; their inherited effective Axioms are interpretive background and never
@@ -204,7 +206,7 @@ implicit inference dependencies. Arguments own scoped Examples, ordered authored
 revision-pinned Axiom/conclusion/prior-premise dependencies, optional reasoning,
 conclusions, Boundary/Invariance prose, explicit attack/support relations, and
 separate supersession links; Topics expose an explicit Current pointer without
-truth semantics. The package owns strict validation and v1/v2/v3/v4/v5/v6 migration, stable
+truth semantics. The package owns strict validation and v1/v2/v3/v4/v5/v6/v7 migration, stable
 record/library revisions, portable source locators, premise/relation/response
 staleness and explicit reassessment, deterministic
 descriptive indexing, JSON/Markdown interchange, serialized expected-snapshot
@@ -212,17 +214,18 @@ authoring commits, and immutable snapshot-bound read/bundle/source-dispatch
 contracts. Authoring and consumer facades are separate. The consumer has no
 store access, agent role, review stage, graph/view state, or model dependency.
 
-`packages/argument-mcp-server` exposes the immutable consumer facade through
-four compiler read tools and the separate `ArgumentProposalSubmissionService`
-through one bounded append-only tool. That service can add a pending Proposal
-only after exact consultation/target validation and an expected-snapshot save;
-it has no canonical authoring or Proposal-resolution capability. Human
-resolution remains exclusively in the application authoring surface.
+`packages/argument-mcp-server` exposes the immutable consumer facade and a
+separate Proposal-staging surface. It can list/read staging and can create or
+revision-safely revise active Proposals, including draft Proposal relations.
+Discard is recoverable, creates no canonical record, and is documented as
+explicit-user-only. The service has no canonical authoring or
+Proposal-resolution capability; human canonical resolution remains exclusively
+in the application authoring surface.
 
 `apps/web/src/persistence/argument-library.ts` adapts that store contract to one
 stable profile-level localStorage key. `packages/argument-workspace-tauri`
-adapts it to dedicated private app-local schema-v7 JSON using validated
-temporary-sibling replacement and preserves migrated schema-v1/v2/v3/v4/v5/v6 files.
+adapts it to dedicated private app-local schema-v8 JSON using validated
+temporary-sibling replacement and preserves migrated schema-v1/v2/v3/v4/v5/v6/v7 files.
 Neither adapter uses the graph view registry, selected-vault Markdown, or
 workspace identity catalog. Live theory-source acquisition remains a later host
 adapter behind the Argument Workspace's narrow registered-reference reader; it
@@ -236,8 +239,10 @@ the library or protected drafts. The feature composes pure core operations into
 one serialized commit per Save, replaces its UI reader only after persistence
 confirms the exact new snapshot, and keeps search/import/export/context state
 outside canonical data. Its Mailbox reloads external local MCP submissions,
-shows pending/history provenance and stale targets, and reuses canonical editors
-for explicit human accept/reject transactions. Proposal explanations and AI
+shows To store/history provenance, revision history, draft links, and stale
+targets; it supports non-canonical draft editing and discard, and reuses
+canonical editors for explicit human Store as Argument or Store refutation
+transactions. Proposal explanations and AI
 Review output share one safe Markdown renderer that skips raw HTML and blocks
 unsafe links and images. Its platform store is chosen
 once: browser localStorage

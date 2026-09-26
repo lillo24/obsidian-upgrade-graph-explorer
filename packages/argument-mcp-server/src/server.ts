@@ -7,12 +7,14 @@ import {
   ARGUMENT_PROPOSAL_MAX_LIST_ITEMS,
   ARGUMENT_PROPOSAL_MAX_TEXT_LENGTH,
   ARGUMENT_PROPOSAL_MAX_TITLE_LENGTH,
+  ARGUMENT_LIBRARY_SCHEMA_VERSION,
   ArgumentLibraryRepository,
   ArgumentProposalSubmissionService,
   CONTENT_FINGERPRINT_ALGORITHM,
   KNOWLEDGE_READER_CONTRACT_VERSION,
   type ArgumentRuntime,
   type CreateArgumentProposalInput,
+  type ReviseArgumentProposalInput,
   type ListIndexRequest,
   type ReadArgumentBundleResult,
   type ReadArgumentBundleRequest,
@@ -44,10 +46,17 @@ const READ_ONLY_ANNOTATIONS = {
   openWorldHint: false,
 } as const;
 
-const APPEND_ONLY_ANNOTATIONS = {
+const STAGING_WRITE_ANNOTATIONS = {
   readOnlyHint: false,
   destructiveHint: false,
   idempotentHint: true,
+  openWorldHint: false,
+} as const;
+
+const DISCARD_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: false,
   openWorldHint: false,
 } as const;
 
@@ -146,6 +155,21 @@ const reasoningReferenceInput = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('premise'), premiseId: proposalId }).strict(),
   z.object({ kind: z.literal('reasoning-step'), stepId: proposalId }).strict(),
 ]);
+const proposalDraftRelationInput = z
+  .object({
+    id: proposalId,
+    kind: z.enum([
+      'attack',
+      'support',
+      'refine',
+      'extend',
+      'supersede',
+      'related',
+    ]),
+    targetProposalId: proposalId,
+    targetProposalRevision: z.number().int().min(1),
+  })
+  .strict();
 const submitProposalInput = z
   .object({
     clientSubmissionId: proposalId.optional(),
@@ -224,6 +248,10 @@ const submitProposalInput = z
       )
       .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
       .optional(),
+    draftRelations: z
+      .array(proposalDraftRelationInput)
+      .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS)
+      .optional(),
     whyNovelOrUnresolved: proposalText,
     consultation: z
       .object({
@@ -268,6 +296,66 @@ const submitProposalInput = z
         path: ['premises'],
       });
   });
+
+const reviseProposalInput = z
+  .object({
+    title: submitProposalInput.shape.title,
+    softExplanationMarkdown: submitProposalInput.shape.softExplanationMarkdown,
+    intent: submitProposalInput.shape.intent,
+    topicId: submitProposalInput.shape.topicId,
+    target: submitProposalInput.shape.target,
+    examples: submitProposalInput.shape.examples,
+    reasoning: submitProposalInput.shape.reasoning,
+    reasoningSteps: submitProposalInput.shape.reasoningSteps,
+    conclusion: submitProposalInput.shape.conclusion,
+    boundary: submitProposalInput.shape.boundary,
+    sourceObservations: submitProposalInput.shape.sourceObservations,
+    draftRelations: submitProposalInput.shape.draftRelations,
+    whyNovelOrUnresolved: submitProposalInput.shape.whyNovelOrUnresolved,
+    consultation: submitProposalInput.shape.consultation,
+    proposalId,
+    expectedRevision: z.number().int().min(1),
+    revisionReason: proposalText,
+    premises: z
+      .array(proposalPremiseInput)
+      .max(ARGUMENT_PROPOSAL_MAX_LIST_ITEMS),
+  })
+  .strict();
+
+const proposalSnapshotInput = z
+  .object({
+    libraryId: proposalId,
+    schemaVersion: z.literal(ARGUMENT_LIBRARY_SCHEMA_VERSION),
+    libraryRevision: z.number().int().min(1),
+    contentFingerprint: z
+      .object({
+        algorithm: z.literal(CONTENT_FINGERPRINT_ALGORITHM),
+        value: z.string().regex(/^[a-f0-9]{64}$/u),
+      })
+      .strict(),
+  })
+  .strict();
+
+const listProposalsInput = z
+  .object({
+    query: z.string().trim().max(2_000).optional(),
+    status: z
+      .enum(['pending', 'discarded', 'accepted', 'rejected', 'all'])
+      .optional(),
+    limit: z.number().int().min(1).max(100).optional(),
+  })
+  .strict();
+
+const readProposalInput = z.object({ proposalId }).strict();
+
+const discardProposalInput = z
+  .object({
+    proposalId,
+    expectedRevision: z.number().int().min(1),
+    expectedSnapshot: proposalSnapshotInput,
+    note: proposalText.optional(),
+  })
+  .strict();
 
 type JsonObject = Record<string, unknown>;
 
@@ -358,8 +446,45 @@ function domainProposalInput(
               : { span: observation.span }),
           })),
         }),
+    ...(input.draftRelations === undefined
+      ? {}
+      : { draftRelations: input.draftRelations }),
     whyNovelOrUnresolved: input.whyNovelOrUnresolved,
     consultation: input.consultation,
+  };
+}
+
+function domainRevisionInput(
+  input: z.infer<typeof reviseProposalInput>,
+): ReviseArgumentProposalInput {
+  const draft = domainProposalInput(input);
+  return {
+    proposalId: input.proposalId,
+    expectedRevision: input.expectedRevision,
+    revisionReason: input.revisionReason,
+    title: draft.title,
+    ...(draft.softExplanationMarkdown === undefined
+      ? {}
+      : { softExplanationMarkdown: draft.softExplanationMarkdown }),
+    ...(draft.intent === undefined ? {} : { intent: draft.intent }),
+    ...(draft.topicId === undefined ? {} : { topicId: draft.topicId }),
+    ...(draft.target === undefined ? {} : { target: draft.target }),
+    examples: draft.examples,
+    premises: input.premises,
+    ...(draft.reasoning === undefined ? {} : { reasoning: draft.reasoning }),
+    ...(draft.reasoningSteps === undefined
+      ? {}
+      : { reasoningSteps: draft.reasoningSteps }),
+    conclusion: draft.conclusion,
+    ...(draft.boundary === undefined ? {} : { boundary: draft.boundary }),
+    ...(draft.sourceObservations === undefined
+      ? {}
+      : { sourceObservations: draft.sourceObservations }),
+    ...(draft.draftRelations === undefined
+      ? {}
+      : { draftRelations: draft.draftRelations }),
+    whyNovelOrUnresolved: draft.whyNovelOrUnresolved,
+    consultation: draft.consultation,
   };
 }
 
@@ -450,7 +575,7 @@ export function createArgumentMcpServer(
     { name: ARGUMENT_MCP_SERVER_NAME, version: ARGUMENT_MCP_SERVER_VERSION },
     {
       instructions:
-        'After independent candidate reasoning, call compiler_usage_guide when beginning a Compiler cross-check. Search before guessing IDs and fight the prior response. Submit only a surviving unresolved candidate; Mailbox submission is non-canonical and awaits human resolution.',
+        'After independent candidate reasoning, call compiler_usage_guide before a Compiler cross-check. Canonical index tools exclude Mailbox drafts. You may create, read, revise, and link material non-canonical To store Proposals autonomously. Discard and every canonical store/resolve action require an explicit user request; canonical resolution is not exposed by this server.',
     },
   );
 
@@ -499,6 +624,12 @@ export function createArgumentMcpServer(
           proposals: loaded.library.proposals.length,
           pendingProposals: loaded.library.proposals.filter(
             ({ status }) => status === 'pending',
+          ).length,
+          toStoreProposals: loaded.library.proposals.filter(
+            ({ status }) => status === 'pending',
+          ).length,
+          discardedProposals: loaded.library.proposals.filter(
+            ({ status }) => status === 'discarded',
           ).length,
         },
         knowledgeReaderContractVersion: KNOWLEDGE_READER_CONTRACT_VERSION,
@@ -560,13 +691,109 @@ export function createArgumentMcpServer(
   );
 
   server.registerTool(
+    'compiler_list_proposals',
+    {
+      title: 'List Mailbox staging proposals',
+      description:
+        'List or text-filter bounded non-canonical Mailbox proposals. Defaults to active To store work and remains separate from the canonical Argument Library index.',
+      inputSchema: listProposalsInput,
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
+    async (input) => {
+      const loaded = await loader.load();
+      if (loaded.status === 'error') return loadErrorResult(loaded);
+      const query = input.query?.toLocaleLowerCase();
+      const status = input.status ?? 'pending';
+      const matching = loaded.library.proposals
+        .filter((proposal) => status === 'all' || proposal.status === status)
+        .filter((proposal) => {
+          if (query === undefined || query === '') return true;
+          return [
+            proposal.id,
+            proposal.title,
+            proposal.conclusion,
+            proposal.whyNovelOrUnresolved,
+            proposal.softExplanationMarkdown ?? '',
+          ].some((value) => value.toLocaleLowerCase().includes(query));
+        })
+        .sort(
+          (left, right) =>
+            right.updatedAt.localeCompare(left.updatedAt) ||
+            left.id.localeCompare(right.id),
+        );
+      const limit = input.limit ?? 50;
+      return serializedResult({
+        status: 'ok',
+        snapshot: loaded.snapshot.descriptor,
+        total: matching.length,
+        truncated: matching.length > limit,
+        proposals: matching.slice(0, limit).map((proposal) => ({
+          id: proposal.id,
+          revision: proposal.revision,
+          status: proposal.status,
+          title: proposal.title,
+          conclusion: proposal.conclusion,
+          intent: proposal.intent,
+          topicId: proposal.topicId,
+          updatedAt: proposal.updatedAt,
+          priorRevisionCount: proposal.revisionHistory.length,
+          draftRelationCount: proposal.draftRelations.length,
+        })),
+      });
+    },
+  );
+
+  server.registerTool(
+    'compiler_read_proposal',
+    {
+      title: 'Read one Mailbox staging proposal',
+      description:
+        'Read a non-canonical Proposal, its current revision, recoverable prior revisions, provenance, and draft Proposal links. This does not make the Proposal canonical.',
+      inputSchema: readProposalInput,
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
+    async (input) => {
+      const loaded = await loader.load();
+      if (loaded.status === 'error') return loadErrorResult(loaded);
+      const proposal = loaded.library.proposals.find(
+        ({ id }) => id === input.proposalId,
+      );
+      if (proposal === undefined) {
+        const error = {
+          status: 'error',
+          error: {
+            code: 'proposal-not-found',
+            message: `Proposal "${input.proposalId}" does not exist.`,
+          },
+        };
+        return { ...serializedResult(error), isError: true };
+      }
+      const linkedFrom = loaded.library.proposals.flatMap((source) =>
+        source.draftRelations
+          .filter(({ targetProposalId }) => targetProposalId === proposal.id)
+          .map((relation) => ({
+            sourceProposalId: source.id,
+            sourceProposalRevision: source.revision,
+            relation,
+          })),
+      );
+      return serializedResult({
+        status: 'ok',
+        snapshot: loaded.snapshot.descriptor,
+        proposal,
+        linkedFrom,
+      });
+    },
+  );
+
+  server.registerTool(
     'compiler_submit_proposal',
     {
       title: 'Submit proposal to human Mailbox',
       description:
-        'Append one pending, non-canonical proposal after independent reasoning and a Compiler cross-check. State whether it is new, attacks, supports, refines, extends, adds a boundary to, or supersedes a precise target. Encode canonical dependencies as typed premises and keep repository/source observations separate. softExplanationMarkdown may explain the proposal to a human reviewer, but it is never canonical evidence, reasoning, or source material. A human remains solely responsible for canonical relations, supersession, Current promotion, acceptance, or rejection.',
+        'Create one active To store, non-canonical Proposal after independent reasoning and a Compiler cross-check. Prefer revising an existing Proposal over creating a duplicate. Draft Proposal relations are staging intent only. A human remains solely responsible for canonical storage, relations, supersession, Current promotion, or refutation.',
       inputSchema: submitProposalInput,
-      annotations: APPEND_ONLY_ANNOTATIONS,
+      annotations: STAGING_WRITE_ANNOTATIONS,
     },
     async (input) => {
       const proposalRepository = new ArgumentLibraryRepository(loader.store());
@@ -611,6 +838,133 @@ export function createArgumentMcpServer(
         proposalId: result.proposal.id,
         proposalStatus: result.proposal.status,
         duplicate: result.duplicate,
+        snapshot: result.snapshot.descriptor,
+      });
+    },
+  );
+
+  server.registerTool(
+    'compiler_revise_proposal',
+    {
+      title: 'Revise a To store Proposal',
+      description:
+        'Replace the current content of one active non-canonical Proposal while retaining the prior revision and reason. Requires the exact Proposal revision and consultation snapshot. Use only for a material improvement, correction, restructuring, or new draft relationship—not cosmetic wording churn. This tool cannot store canonical theory.',
+      inputSchema: reviseProposalInput,
+      annotations: STAGING_WRITE_ANNOTATIONS,
+    },
+    async (input) => {
+      const fingerprint = input.consultation.contentFingerprint;
+      const expected = {
+        libraryId: input.consultation.libraryId,
+        schemaVersion: ARGUMENT_LIBRARY_SCHEMA_VERSION,
+        libraryRevision: input.consultation.libraryRevision,
+        contentFingerprint: fingerprint,
+      };
+      const proposalRepository = new ArgumentLibraryRepository(loader.store());
+      const proposalService = new ArgumentProposalSubmissionService(
+        proposalRepository,
+        proposalRuntime,
+      );
+      const opened = await proposalRepository.open();
+      if (opened.status !== 'ready') {
+        const error = {
+          status: 'error',
+          error: {
+            code: 'proposal-revision-unavailable',
+            message:
+              opened.status === 'missing'
+                ? 'The Argument Library is missing.'
+                : opened.message,
+          },
+        };
+        return { ...serializedResult(error), isError: true };
+      }
+      const result = await proposalService.reviseProposal(
+        expected,
+        domainRevisionInput(input),
+      );
+      if (result.status !== 'committed') {
+        const error = {
+          status: 'error',
+          error: {
+            code: result.status,
+            message: result.message,
+            ...(result.actual === undefined ? {} : { actual: result.actual }),
+          },
+        };
+        return { ...serializedResult(error), isError: true };
+      }
+      const proposal = result.snapshot.library.proposals.find(
+        ({ id }) => id === input.proposalId,
+      )!;
+      return serializedResult({
+        status: 'ok',
+        proposalId: proposal.id,
+        proposalStatus: proposal.status,
+        proposalRevision: proposal.revision,
+        priorRevisionCount: proposal.revisionHistory.length,
+        snapshot: result.snapshot.descriptor,
+      });
+    },
+  );
+
+  server.registerTool(
+    'compiler_discard_proposal',
+    {
+      title: 'Discard a Proposal from active staging',
+      description:
+        'Explicit-user-only: mark one active To store Proposal discarded while preserving its history. This creates no canonical Argument or Counter-Argument. The fact that an AI created or revised a Proposal never grants permission to discard it.',
+      inputSchema: discardProposalInput,
+      annotations: DISCARD_ANNOTATIONS,
+    },
+    async (input) => {
+      const proposalRepository = new ArgumentLibraryRepository(loader.store());
+      const proposalService = new ArgumentProposalSubmissionService(
+        proposalRepository,
+        proposalRuntime,
+      );
+      const opened = await proposalRepository.open();
+      if (opened.status !== 'ready') {
+        const error = {
+          status: 'error',
+          error: {
+            code: 'proposal-discard-unavailable',
+            message:
+              opened.status === 'missing'
+                ? 'The Argument Library is missing.'
+                : opened.message,
+          },
+        };
+        return { ...serializedResult(error), isError: true };
+      }
+      const result = await proposalService.discardProposal(
+        input.expectedSnapshot,
+        {
+          proposalId: input.proposalId,
+          expectedRevision: input.expectedRevision,
+          ...(input.note === undefined ? {} : { note: input.note }),
+        },
+      );
+      if (result.status !== 'committed') {
+        const error = {
+          status: 'error',
+          error: {
+            code: result.status,
+            message: result.message,
+            ...(result.actual === undefined ? {} : { actual: result.actual }),
+          },
+        };
+        return { ...serializedResult(error), isError: true };
+      }
+      const proposal = result.snapshot.library.proposals.find(
+        ({ id }) => id === input.proposalId,
+      )!;
+      return serializedResult({
+        status: 'ok',
+        proposalId: proposal.id,
+        proposalStatus: proposal.status,
+        proposalRevision: proposal.revision,
+        canonicalRecordsCreated: 0,
         snapshot: result.snapshot.descriptor,
       });
     },

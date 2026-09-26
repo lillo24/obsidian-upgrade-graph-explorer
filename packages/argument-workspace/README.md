@@ -9,7 +9,7 @@ has no UI, renderer, vault, platform, agent, or model dependency.
 
 - `types.ts` defines Topic, Context, Axiom, Argument, Counter-Argument, Proposal, source locator,
   persistence, snapshot, bundle, source-read, and receipt contracts.
-- `validation.ts` strictly validates schema-v7 libraries and legacy-v1/v2/v3/v4/v5/v6 migration
+- `validation.ts` strictly validates schema-v8 libraries and legacy-v1/v2/v3/v4/v5/v6/v7 migration
   input, portable relative locators, global record/source-reference identities,
   and relationship/dependency integrity.
 - `canonical.ts` owns canonical JSON, browser/worker/Node-neutral SHA-256,
@@ -21,14 +21,15 @@ has no UI, renderer, vault, platform, agent, or model dependency.
 - `contexts.ts` resolves the single-parent Context chain, deterministic
   effective-Axiom union, and per-Argument background provenance without
   entering the inference dependency graph.
-- `proposals.ts` validates and appends non-canonical AI proposals and owns the
-  atomic human accept/reject transformations into canonical history.
+- `proposals.ts` validates non-canonical Proposal creation, revision history,
+  draft links, discard, and atomic human storage/refutation transformations
+  into canonical history.
 - `storage.ts` serializes expected-snapshot commits and adopts data only after a
   store confirms persistence.
 - `authoring.ts` exposes the mutation-only human service and the narrower
-  proposal-submission-only service over that repository.
-- `serialization.ts` owns lossless schema-v7 JSON parsing/export, deterministic
-  schema-v1/v2/v3/v4/v5/v6 migration, non-mutating historical validation, import preview,
+  non-canonical Proposal-staging service over that repository.
+- `serialization.ts` owns lossless schema-v8 JSON parsing/export, deterministic
+  schema-v1/v2/v3/v4/v5/v6/v7 migration, non-mutating historical validation, import preview,
   collision checks, and merge preparation.
 - `insert.ts` owns strict `argument-workspace-insert-v1` parsing, whole-payload
   reference and promotion resolution, revision-pin normalization, non-mutating
@@ -46,7 +47,7 @@ has no UI, renderer, vault, platform, agent, or model dependency.
 
 ## Schema and revisions
 
-Schema v7 stores one library identity/revision; canonical arrays of Topics,
+Schema v8 stores one library identity/revision; canonical arrays of Topics,
 Contexts, Axioms, Arguments, and Counter-Arguments; and a separate `proposals`
 Mailbox. Every canonical record has a stable ID, independent
 record revision, human review state, archive state, and timestamps. Topic
@@ -78,28 +79,39 @@ same record. A response has a multi-valued outcome, application explanation,
 boundary/reopening text, and answering Axiom IDs plus the Axiom revisions used
 for that assessment.
 
-Mailbox Proposals are append-only AI suggestions, not framework knowledge and
-not a sixth canonical record kind. A pending Proposal distinguishes review
+Mailbox Proposals are living non-canonical staging objects, not framework
+knowledge and not a sixth canonical record kind. An active `pending` Proposal
+is presented as **To store** and distinguishes review
 intent (`new`, `attack`, `support`, `refine`, `extend`, `add-boundary`, or
 `supersede`), an exact optional Argument/part/revision target, typed text/Axiom/
 Argument dependencies, optional ordered reasoning steps, and drafting source
 observations. Source observations retain repository/file/version provenance but
 are never inference premises implicitly. The Proposal also stores why it may be
 novel or unresolved and the exact library descriptor plus record revisions
-consulted. Submission requires that consultation snapshot and every structured
-dependency revision still match. Exact retries are idempotent; payloads and
-lists are bounded. A Proposal may also carry bounded `softExplanationMarkdown`
+consulted. Submission and revision require that consultation snapshot and every
+structured dependency revision still match. Exact create retries are
+idempotent; payloads and lists are bounded. Material revision keeps the stable
+Proposal ID, increments its revision, and retains a bounded full snapshot of
+the prior draft plus a required revision reason. Stale expected Proposal or
+library revisions fail before persistence. A Proposal may also carry bounded `softExplanationMarkdown`
 for human review. It remains only in Proposal history and is never parsed or
 copied into canonical premises, reasoning, sources, conclusions, relations, or
-records during acceptance or rejection. Proposals are excluded from canonical search, bundles,
+records during storage or refutation. Typed `draftRelations` may point to an
+exact recoverable Proposal revision with `attack`, `support`, `refine`,
+`extend`, `supersede`, or `related` intent. Creation/update requires an active
+current target revision; the link remains staging provenance and never becomes
+a canonical relation automatically. Proposals are excluded from canonical search, bundles,
 Markdown export, Topic membership, Current, and canonical create/edit APIs.
 
-Only a human resolution can change Proposal status. Acceptance atomically
-creates an accepted canonical Argument and records the resulting ID; rejection
+Proposal lifecycle states remain distinct: `pending` is active To store work;
+`discarded` removes it from active staging without canonical creation;
+`accepted` records storage as a canonical Argument; and `rejected` records a
+canonical refutation as a Counter-Argument. Human storage atomically creates an
+accepted canonical Argument and records the resulting ID; canonical refutation
 atomically creates an accepted canonical Counter-Argument/Audit with a
 non-`unanswered` response outcome and records that ID. Attack, supersession,
 Topic membership, and Current promotion remain separate explicit choices.
-Cancelling or failing either transaction leaves the Proposal pending.
+Cancelling or failing either canonical transaction leaves the Proposal active.
 
 Attack/support and supersession are independent: neither creates, implies, or
 promotes the other. Relation cycles are allowed as debate structure and are
@@ -166,7 +178,7 @@ returned explicitly without adopting the candidate. Desktop storage lives in
 with validated temporary-sibling replacement. Neither adapter stores data in a
 vault, graph view state, or workspace identity catalog.
 
-Valid schema-v1 through schema-v6 JSON are accepted only through strict
+Valid schema-v1 through schema-v7 JSON are accepted only through strict
 deterministic migrations:
 record content/revisions/timestamps remain unchanged, each Topic receives an
 empty `argumentIds`, the library receives an empty `arguments`, and no Current
@@ -176,16 +188,19 @@ state, membership, Current pointer, and supersession link remain unchanged.
 No Example provenance or Counter-Argument conversion is inferred. V3 receives
 an empty `contexts` collection and each Argument receives empty `contextIds`;
 no grouping or attachment is inferred. Browser data stays under its established
-profile key and is rewritten as v7 only after a successful save. V4 receives
+profile key and is rewritten as v8 only after a successful save. V4 receives
 only an empty `proposals` array; no candidate content or decision is inferred.
 V5 Proposals migrate deterministically: legacy premise hints become text
 premises, explicit suggested Axiom IDs become revision-pinned Axiom premises,
 and no reference is inferred from prose. Targeted legacy Proposals use the
 explicit `unspecified` intent so migration never invents an attack. Desktop load
-prefers `library-v7.json`, then migrates a valid v6, v5, v4, v3, v2, or v1 file
+prefers `library-v8.json`, then migrates a valid v7, v6, v5, v4, v3, v2, or v1 file
 atomically while retaining the source file as a recoverable copy.
 V6 Proposals remain semantically unchanged and receive no generated Soft
 Explanation; the optional field is simply absent.
+V7 adds empty `draftRelations` and `revisionHistory` arrays to every Proposal;
+pending, accepted, and rejected status, decisions, IDs, timestamps, content,
+and all canonical records remain unchanged.
 
 ## Authoring and interchange
 
@@ -197,8 +212,9 @@ answering-Axiom attach/detach, response updates/reassessment, source-version
 baseline recording, archive/restore, human review/reopen, and validated merge
 imports, and human Proposal resolution. All calls take an expected snapshot
 descriptor and return an explicit commit/conflict/failure.
-`ArgumentProposalSubmissionService` exposes only bounded Proposal submission;
-it cannot create or modify canonical records. Canonical `pending-review`
+`ArgumentProposalSubmissionService` exposes only bounded non-canonical Proposal
+creation, revision, and discard; it cannot create or modify canonical records.
+Canonical `pending-review`
 Arguments and Counter-Arguments remain ordinary human-authored records and are
 distinct from Mailbox Proposals. Acceptance never promotes automatically unless
 the human resolution explicitly requests promotion.
