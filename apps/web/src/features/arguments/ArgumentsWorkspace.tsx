@@ -36,7 +36,10 @@ import {
 } from '@icarus-graph-explorer/argument-workspace';
 
 import { ArgumentRecordEditor } from './ArgumentRecordEditor';
-import { ProposalMailbox } from './ProposalMailbox';
+import {
+  ProposalMailbox,
+  type ProposalDraftTextEdits,
+} from './ProposalMailbox';
 import { proposalTargetStaleness } from './proposal-mailbox';
 import {
   ArgumentAxiomView,
@@ -642,11 +645,11 @@ function ProposalResolutionPanel({
       <p className="eyebrow">Human Mailbox resolution</p>
       <h2>
         {resolution.mode === 'accept'
-          ? 'Integrate accepted proposal'
-          : 'Record why the proposal failed'}
+          ? 'Store Proposal as Argument'
+          : 'Store refutation as Counter-Argument'}
       </h2>
       <p>
-        Proposal <code>{proposal.id}</code> remains pending until this complete
+        Proposal <code>{proposal.id}</code> remains To store until this complete
         canonical transaction is saved.
       </p>
       {stale === undefined ? null : (
@@ -943,7 +946,7 @@ function WorkspaceOnboarding({
     source: string;
     fileName: string;
     library: ArgumentLibrary;
-    migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5 | 6;
+    migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   }>();
   const [error, setError] = useState<string>();
   async function select(event: ChangeEvent<HTMLInputElement>) {
@@ -1626,6 +1629,53 @@ const ArgumentsWorkspaceContent = forwardRef<
     });
   }
 
+  async function reviseProposalDraft(
+    proposal: ArgumentProposal,
+    edits: ProposalDraftTextEdits,
+  ) {
+    if (state.phase !== 'ready') return;
+    const descriptor = state.snapshot.descriptor;
+    const result = await session.reviseProposal(descriptor, {
+      proposalId: proposal.id,
+      expectedRevision: proposal.revision,
+      revisionReason: edits.revisionReason,
+      title: edits.title,
+      ...(edits.softExplanationMarkdown.trim() === ''
+        ? {}
+        : { softExplanationMarkdown: edits.softExplanationMarkdown }),
+      intent: proposal.intent,
+      ...(proposal.topicId === undefined ? {} : { topicId: proposal.topicId }),
+      ...(proposal.target === undefined ? {} : { target: proposal.target }),
+      examples: proposal.examples,
+      premises: proposal.premises,
+      ...(edits.reasoning.trim() === '' ? {} : { reasoning: edits.reasoning }),
+      reasoningSteps: proposal.reasoningSteps,
+      conclusion: edits.conclusion,
+      ...(edits.boundary.trim() === '' ? {} : { boundary: edits.boundary }),
+      sourceObservations: proposal.sourceObservations,
+      draftRelations: proposal.draftRelations,
+      whyNovelOrUnresolved: edits.whyNovelOrUnresolved,
+      consultation: {
+        ...proposal.consultation,
+        libraryId: descriptor.libraryId,
+        libraryRevision: descriptor.libraryRevision,
+        contentFingerprint: descriptor.contentFingerprint,
+      },
+    });
+    if (result.status === 'ok') setNotice('Draft revision saved');
+  }
+
+  async function discardProposalDraft(proposal: ArgumentProposal) {
+    if (state.phase !== 'ready') return;
+    const result = await session.discardProposal(
+      state.snapshot.descriptor,
+      proposal.id,
+      proposal.revision,
+      'Discarded from active To store staging by the user.',
+    );
+    if (result.status === 'ok') setNotice('Proposal discarded from To store');
+  }
+
   function changeProposalRelation(kind: 'none' | 'attack' | 'support') {
     if (state.phase !== 'ready' || proposalResolution === undefined) return;
     const proposal = state.snapshot.library.proposals.find(
@@ -2294,7 +2344,7 @@ const ArgumentsWorkspaceContent = forwardRef<
                   onClick={openMailbox}
                   type="button"
                 >
-                  Mailbox (
+                  To store (
                   {
                     state.snapshot.library.proposals.filter(
                       ({ status }) => status === 'pending',
@@ -2881,6 +2931,10 @@ const ArgumentsWorkspaceContent = forwardRef<
             onAccept={startProposalAcceptance}
             onClose={() => setMailboxOpen(false)}
             onCopy={(value, message) => void copy(value, message)}
+            onDiscard={(proposal) => void discardProposalDraft(proposal)}
+            onEdit={(proposal, edits) =>
+              void reviseProposalDraft(proposal, edits)
+            }
             onNavigate={(next) => {
               setMailboxOpen(false);
               navigate(next);
@@ -2940,7 +2994,7 @@ const ArgumentsWorkspaceContent = forwardRef<
                     <p className="arguments-disclosure">
                       Incoming schema v
                       {importPreview.merge.migratedFromSchemaVersion} was
-                      migrated to v7 without inferring canonical records,
+                      migrated to v8 without inferring canonical records,
                       relationships, Context bindings, Current pointers, or
                       Mailbox proposals.
                     </p>

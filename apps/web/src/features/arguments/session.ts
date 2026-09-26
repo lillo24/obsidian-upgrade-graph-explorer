@@ -53,6 +53,7 @@ import {
   type KnowledgeReader,
   type RetrievalMetadata,
   type RecordTheorySourceVersionInput,
+  type ReviseArgumentProposalInput,
   type SnapshotDescriptor,
   type TheorySourceReference,
 } from '@icarus-graph-explorer/argument-workspace';
@@ -164,7 +165,7 @@ export interface ArgumentImportPlan {
   readonly mode: 'merge' | 'replace';
   readonly preview: ArgumentImportPreview;
   readonly base: SnapshotDescriptor;
-  readonly migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5 | 6;
+  readonly migratedFromSchemaVersion?: 1 | 2 | 3 | 4 | 5 | 6 | 7;
 }
 
 export type ArgumentWorkspaceActionResult =
@@ -798,7 +799,7 @@ export class ArgumentWorkspaceSession {
       parsed.value,
       parsed.migratedFromSchemaVersion === undefined
         ? undefined
-        : `Migrated schema v${parsed.migratedFromSchemaVersion} to v7 and saved`,
+        : `Migrated schema v${parsed.migratedFromSchemaVersion} to v8 and saved`,
     );
   }
 
@@ -865,6 +866,28 @@ export class ArgumentWorkspaceSession {
         },
         this.runtime,
       ),
+    );
+  }
+
+  reviseProposal(
+    expected: SnapshotDescriptor,
+    input: ReviseArgumentProposalInput,
+  ): Promise<ArgumentWorkspaceActionResult> {
+    return this.#adopt(this.#authoring.reviseProposal(expected, input));
+  }
+
+  discardProposal(
+    expected: SnapshotDescriptor,
+    proposalId: string,
+    expectedRevision: number,
+    note?: string,
+  ): Promise<ArgumentWorkspaceActionResult> {
+    return this.#adopt(
+      this.#authoring.discardProposal(expected, {
+        proposalId,
+        expectedRevision,
+        ...(optional(note) === undefined ? {} : { note: optional(note)! }),
+      }),
     );
   }
 

@@ -10,11 +10,12 @@ requests open/close transitions.
   exports. It exposes a
   narrow leave guard and embedded panel to the shared workspace modal while
   retaining a standalone wrapper for tests.
-- `ProposalMailbox.tsx` owns the human-readable pending/history review surface:
-  intent and target previews, compact local Argument context, the optional Soft
-  Explanation rendered through the shared safe Markdown boundary, typed
-  dependency cards, structured reasoning, and source observations kept
-  separate from inference premises.
+- `ProposalMailbox.tsx` owns the human-readable To store/history staging
+  surface: current and prior revisions, draft Proposal links, discard, bounded
+  prose editing, intent and target previews, compact local Argument context,
+  the optional Soft Explanation rendered through the shared safe Markdown
+  boundary, typed dependency cards, structured reasoning, and source
+  observations kept separate from inference premises.
 - `proposal-mailbox.ts` owns shared target-staleness derivation used by the
   Mailbox and human resolution panel.
 - `ArgumentRecordView.tsx` presents Topic, Context/Axiom Group, Axiom, Argument, Counter-Argument,
@@ -34,7 +35,8 @@ requests open/close transitions.
   normalizes it into the existing arrays only at Save.
 - `session.ts` owns the single repository/authoring session, serialized reload
   and mutations, immutable reader replacement, atomic multi-operation Save and
-  Insert JSON commits, atomic Proposal resolutions, and the expected-snapshot
+  Insert JSON commits, revision-safe Proposal staging, atomic canonical
+  Proposal resolutions, and the expected-snapshot
   source-baseline transaction.
 - `platform-store.ts` selects the browser profile store or desktop app-local
   store once on first access. It never falls back across platforms.
@@ -67,26 +69,31 @@ Confirmation persists the prepared candidate once against the previewed snapshot
 editor drafts retain the existing Save/Discard/Stay guard. The format and
 neutral example are documented in
 [`docs/ARGUMENT_WORKSPACE_INSERT_JSON.md`](../../../../../docs/ARGUMENT_WORKSPACE_INSERT_JSON.md).
-Schema-v1/v2/v3/v4/v5/v6 imports surface a migration notice and use the core deterministic
+Schema-v1/v2/v3/v4/v5/v6/v7 imports surface a migration notice and use the core deterministic
 migration; no Argument, Example/provenance, relation, or Current pointer is
 inferred. V3 migration adds empty Context storage and empty Argument Context
 bindings only; v4 migration adds only an empty Proposal Mailbox. Context
 background remains visibly separate from inference premises and never
 participates in premise staleness.
+V7 Proposal content and pending/accepted/rejected decisions are preserved;
+migration adds empty draft-link and prior-revision collections only.
 
-The Mailbox header count and pending/history tabs expose non-canonical AI
+The To store header count and To store/history tabs expose non-canonical AI
 Proposals separately from the canonical record browser. Details lead with Topic,
 intent, human-readable target/part, staleness, and a compact local Argument
 context. When present, “What this means” appears before the formal Argument and
-is retained only in Proposal history; it never seeds accept/reject forms or
+is retained only in Proposal history; it never seeds canonical storage forms or
 canonical content. Typed premises and expandable dependencies are distinct from drafting
-source observations and compact commit provenance. Accept carries only typed
-premises into the ordinary Argument editor. `attack` and `support` intent may
+source observations and compact commit provenance. Edit draft creates a stable-ID
+recoverable revision; draft links remain visibly non-canonical. Discard removes
+the item from active staging without creating a canonical record. Store as
+Argument carries only typed premises into the ordinary Argument editor. `attack` and `support` intent may
 seed the corresponding canonical relation, while refinement, extension, and
 boundary intent seed no attack; supersession and Current promotion remain
-separate human choices. Reject requires a human response plus resolved outcome.
+separate human choices. Store refutation / Counter-Argument requires a human
+response plus resolved outcome and remains distinct from discard.
 Save performs one expected-snapshot transaction, while Cancel and dirty-draft
-guards preserve the pending Proposal. Opening the Mailbox reloads first so local
+guards preserve the To store Proposal. Opening the Mailbox reloads first so local
 MCP submissions become visible.
 
 Canonical pending-review Arguments and Counter-Arguments remain available

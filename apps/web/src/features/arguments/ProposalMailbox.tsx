@@ -25,6 +25,23 @@ const INTENT_LABELS: Readonly<Record<ArgumentProposalIntent, string>> = {
   supersede: 'Supersede',
 };
 
+const STATUS_LABELS: Readonly<Record<ArgumentProposal['status'], string>> = {
+  pending: 'To store',
+  discarded: 'Discarded',
+  accepted: 'Stored as Argument',
+  rejected: 'Stored as Counter-Argument',
+};
+
+export interface ProposalDraftTextEdits {
+  readonly revisionReason: string;
+  readonly title: string;
+  readonly softExplanationMarkdown: string;
+  readonly reasoning: string;
+  readonly conclusion: string;
+  readonly boundary: string;
+  readonly whyNovelOrUnresolved: string;
+}
+
 function targetPartLabel(part: ArgumentTargetPart): string {
   if (part.kind === 'argument') return 'whole Argument';
   if (part.kind === 'premise') return `premise ${part.premiseId}`;
@@ -270,6 +287,8 @@ export function ProposalMailbox({
   onAccept,
   onClose,
   onCopy,
+  onDiscard,
+  onEdit,
   onNavigate,
   onReject,
 }: {
@@ -278,11 +297,19 @@ export function ProposalMailbox({
   readonly onAccept: (proposal: ArgumentProposal) => void;
   readonly onClose: () => void;
   readonly onCopy: (value: string, message: string) => void;
+  readonly onDiscard: (proposal: ArgumentProposal) => void;
+  readonly onEdit: (
+    proposal: ArgumentProposal,
+    edits: ProposalDraftTextEdits,
+  ) => void;
   readonly onNavigate: (selection: ArgumentSelection) => void;
   readonly onReject: (proposal: ArgumentProposal) => void;
 }) {
   const [view, setView] = useState<'pending' | 'history'>('pending');
   const [selectedId, setSelectedId] = useState<string>();
+  const [editDraft, setEditDraft] = useState<
+    { readonly proposalId: string } & ProposalDraftTextEdits
+  >();
   const proposals = library.proposals.filter(({ status }) =>
     view === 'pending' ? status === 'pending' : status !== 'pending',
   );
@@ -305,11 +332,12 @@ export function ProposalMailbox({
     >
       <div>
         <header>
-          <p className="eyebrow">Non-canonical review queue</p>
+          <p className="eyebrow">Non-canonical staging area</p>
           <h2 id="arguments-mailbox-title">Proposal Mailbox</h2>
           <p>
-            Review the proposed argument structure and provenance. Canonical
-            mutation still requires the separate human resolution editor.
+            Develop active To store drafts over time. Staging revisions and
+            links are non-canonical; storage still requires the separate human
+            resolution editor.
           </p>
         </header>
         <div className="arguments-actions" role="tablist">
@@ -325,7 +353,7 @@ export function ProposalMailbox({
               type="button"
             >
               {tab === 'pending'
-                ? `Pending (${library.proposals.filter(({ status }) => status === 'pending').length})`
+                ? `To store (${library.proposals.filter(({ status }) => status === 'pending').length})`
                 : 'History'}
             </button>
           ))}
@@ -335,7 +363,7 @@ export function ProposalMailbox({
             {proposals.length === 0 ? (
               <p className="arguments-empty">
                 {view === 'pending'
-                  ? 'No pending proposals.'
+                  ? 'No proposals to store.'
                   : 'No resolved proposals.'}
               </p>
             ) : (
@@ -367,7 +395,9 @@ export function ProposalMailbox({
             <article className="arguments-mailbox__detail">
               <header className="arguments-mailbox__proposal-header">
                 <div className="arguments-badges">
-                  <span className="arguments-badge">{selected.status}</span>
+                  <span className="arguments-badge">
+                    {STATUS_LABELS[selected.status]}
+                  </span>
                   <span className="arguments-badge">
                     {INTENT_LABELS[selected.intent]}
                   </span>
@@ -384,9 +414,9 @@ export function ProposalMailbox({
                   </p>
                 )}
                 <small>
-                  Submitted {new Date(selected.createdAt).toLocaleString()} ·
-                  consultation snapshot revision{' '}
-                  {selected.consultation.libraryRevision}
+                  Revision {selected.revision} · created{' '}
+                  {new Date(selected.createdAt).toLocaleString()} · updated{' '}
+                  {new Date(selected.updatedAt).toLocaleString()}
                 </small>
               </header>
               {targetStale === undefined ? null : (
@@ -575,6 +605,62 @@ export function ProposalMailbox({
                 <h4>Why novel / unresolved</h4>
                 <p>{selected.whyNovelOrUnresolved}</p>
               </section>
+              {selected.draftRelations.length === 0 ? null : (
+                <section className="arguments-mailbox__section">
+                  <h4>Draft Proposal relationships</h4>
+                  <p>
+                    Staging intent only; these links are not canonical Argument
+                    relations.
+                  </p>
+                  <ul>
+                    {selected.draftRelations.map((relation) => {
+                      const related = library.proposals.find(
+                        ({ id }) => id === relation.targetProposalId,
+                      );
+                      return (
+                        <li key={relation.id}>
+                          <strong>{relation.kind}</strong> →{' '}
+                          {related?.title ?? relation.targetProposalId}{' '}
+                          <small>
+                            revision {relation.targetProposalRevision}
+                            {related === undefined
+                              ? ' · missing'
+                              : related.revision ===
+                                  relation.targetProposalRevision
+                                ? ' · current'
+                                : ` · now revision ${related.revision}`}
+                          </small>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              )}
+              <details className="arguments-mailbox__technical">
+                <summary>
+                  Revision history ({selected.revisionHistory.length} prior)
+                </summary>
+                {selected.revisionHistory.length === 0 ? (
+                  <p>This Proposal has not been revised.</p>
+                ) : (
+                  <ol>
+                    {[...selected.revisionHistory].reverse().map((revision) => (
+                      <li key={revision.revision}>
+                        <strong>Revision {revision.revision}</strong>{' '}
+                        <small>
+                          replaced{' '}
+                          {new Date(revision.replacedAt).toLocaleString()}
+                        </small>
+                        <p>{revision.revisionReason}</p>
+                        <details>
+                          <summary>{revision.content.title}</summary>
+                          <p>{revision.content.conclusion}</p>
+                        </details>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </details>
               <details className="arguments-mailbox__technical">
                 <summary>Consulted records and technical metadata</summary>
                 <ul>
@@ -596,7 +682,11 @@ export function ProposalMailbox({
               </details>
               {selected.decision === undefined ? null : (
                 <section className="arguments-mailbox__decision">
-                  <h4>Human decision</h4>
+                  <h4>
+                    {selected.status === 'discarded'
+                      ? 'Staging decision'
+                      : 'Human canonical decision'}
+                  </h4>
                   {selected.decision.note === undefined ? null : (
                     <p>{selected.decision.note}</p>
                   )}
@@ -623,22 +713,187 @@ export function ProposalMailbox({
                 </section>
               )}
               {selected.status !== 'pending' ? null : (
-                <div className="arguments-actions">
-                  <button
-                    disabled={busy}
-                    onClick={() => onReject(selected)}
-                    type="button"
-                  >
-                    Reject / Record response
-                  </button>
-                  <button
-                    disabled={busy}
-                    onClick={() => onAccept(selected)}
-                    type="button"
-                  >
-                    Accept / Integrate
-                  </button>
-                </div>
+                <>
+                  {editDraft?.proposalId !== selected.id ? null : (
+                    <form
+                      className="arguments-mailbox__section"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        onEdit(selected, editDraft);
+                        setEditDraft(undefined);
+                      }}
+                    >
+                      <h4>Edit active draft</h4>
+                      <p>
+                        This creates a recoverable Proposal revision; it does
+                        not store canonical theory.
+                      </p>
+                      <label>
+                        Revision reason
+                        <textarea
+                          onChange={(event) =>
+                            setEditDraft((current) =>
+                              current === undefined
+                                ? current
+                                : {
+                                    ...current,
+                                    revisionReason: event.target.value,
+                                  },
+                            )
+                          }
+                          required
+                          value={editDraft.revisionReason}
+                        />
+                      </label>
+                      <label>
+                        Title
+                        <input
+                          onChange={(event) =>
+                            setEditDraft((current) =>
+                              current === undefined
+                                ? current
+                                : { ...current, title: event.target.value },
+                            )
+                          }
+                          required
+                          value={editDraft.title}
+                        />
+                      </label>
+                      <label>
+                        Soft Explanation (Markdown)
+                        <textarea
+                          onChange={(event) =>
+                            setEditDraft((current) =>
+                              current === undefined
+                                ? current
+                                : {
+                                    ...current,
+                                    softExplanationMarkdown: event.target.value,
+                                  },
+                            )
+                          }
+                          value={editDraft.softExplanationMarkdown}
+                        />
+                      </label>
+                      <label>
+                        Reasoning
+                        <textarea
+                          onChange={(event) =>
+                            setEditDraft((current) =>
+                              current === undefined
+                                ? current
+                                : {
+                                    ...current,
+                                    reasoning: event.target.value,
+                                  },
+                            )
+                          }
+                          value={editDraft.reasoning}
+                        />
+                      </label>
+                      <label>
+                        Conclusion
+                        <textarea
+                          onChange={(event) =>
+                            setEditDraft((current) =>
+                              current === undefined
+                                ? current
+                                : {
+                                    ...current,
+                                    conclusion: event.target.value,
+                                  },
+                            )
+                          }
+                          required
+                          value={editDraft.conclusion}
+                        />
+                      </label>
+                      <label>
+                        Boundary
+                        <textarea
+                          onChange={(event) =>
+                            setEditDraft((current) =>
+                              current === undefined
+                                ? current
+                                : { ...current, boundary: event.target.value },
+                            )
+                          }
+                          value={editDraft.boundary}
+                        />
+                      </label>
+                      <label>
+                        Why novel / unresolved
+                        <textarea
+                          onChange={(event) =>
+                            setEditDraft((current) =>
+                              current === undefined
+                                ? current
+                                : {
+                                    ...current,
+                                    whyNovelOrUnresolved: event.target.value,
+                                  },
+                            )
+                          }
+                          required
+                          value={editDraft.whyNovelOrUnresolved}
+                        />
+                      </label>
+                      <div className="arguments-actions">
+                        <button
+                          onClick={() => setEditDraft(undefined)}
+                          type="button"
+                        >
+                          Cancel edit
+                        </button>
+                        <button disabled={busy} type="submit">
+                          Save draft revision
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                  <div className="arguments-actions">
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        setEditDraft({
+                          proposalId: selected.id,
+                          revisionReason: '',
+                          title: selected.title,
+                          softExplanationMarkdown:
+                            selected.softExplanationMarkdown ?? '',
+                          reasoning: selected.reasoning ?? '',
+                          conclusion: selected.conclusion,
+                          boundary: selected.boundary ?? '',
+                          whyNovelOrUnresolved: selected.whyNovelOrUnresolved,
+                        })
+                      }
+                      type="button"
+                    >
+                      Edit draft
+                    </button>
+                    <button
+                      disabled={busy}
+                      onClick={() => onDiscard(selected)}
+                      type="button"
+                    >
+                      Discard
+                    </button>
+                    <button
+                      disabled={busy}
+                      onClick={() => onReject(selected)}
+                      type="button"
+                    >
+                      Store refutation / Counter-Argument…
+                    </button>
+                    <button
+                      disabled={busy}
+                      onClick={() => onAccept(selected)}
+                      type="button"
+                    >
+                      Store as Argument…
+                    </button>
+                  </div>
+                </>
               )}
             </article>
           )}

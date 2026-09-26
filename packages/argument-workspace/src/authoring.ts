@@ -35,6 +35,8 @@ import {
   previewArgumentLibraryImport,
 } from './serialization';
 import {
+  discardArgumentProposal,
+  reviseArgumentProposal,
   resolveProposalAsArgument,
   resolveProposalAsRejected,
   submitArgumentProposal,
@@ -55,6 +57,7 @@ import type {
   CreateCounterArgumentInput,
   CreateContextInput,
   CreateTopicInput,
+  DiscardArgumentProposalInput,
   EditAxiomInput,
   EditArgumentInput,
   EditCounterArgumentInput,
@@ -64,6 +67,7 @@ import type {
   RecordTheorySourceVersionInput,
   ResolveProposalAsArgumentInput,
   ResolveProposalAsRejectedInput,
+  ReviseArgumentProposalInput,
   SnapshotDescriptor,
   TopicMembershipKind,
   UpdateCounterArgumentResponseInput,
@@ -78,7 +82,7 @@ export type ArgumentProposalSubmissionCommitResult =
     }
   | Exclude<ArgumentLibraryCommitResult, { readonly status: 'committed' }>;
 
-/** The only mutation capability exposed to AI-facing Compiler adapters. */
+/** Non-canonical Proposal staging mutations exposed to Compiler adapters. */
 export class ArgumentProposalSubmissionService {
   constructor(
     private readonly repository: ArgumentLibraryRepository,
@@ -107,6 +111,24 @@ export class ArgumentProposalSubmissionService {
       proposal: outcome.proposal,
       duplicate: outcome.duplicate,
     };
+  }
+
+  reviseProposal(
+    expected: SnapshotDescriptor,
+    input: ReviseArgumentProposalInput,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.repository.commit(expected, (library) =>
+      reviseArgumentProposal(library, input, this.runtime),
+    );
+  }
+
+  discardProposal(
+    expected: SnapshotDescriptor,
+    input: DiscardArgumentProposalInput,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.repository.commit(expected, (library) =>
+      discardArgumentProposal(library, input, this.runtime),
+    );
   }
 }
 
@@ -475,6 +497,24 @@ export class ArgumentLibraryAuthoringService {
   ): Promise<ArgumentLibraryCommitResult> {
     return this.commit(expected, (library) =>
       resolveProposalAsRejected(library, input, this.runtime),
+    );
+  }
+
+  reviseProposal(
+    expected: SnapshotDescriptor,
+    input: ReviseArgumentProposalInput,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      reviseArgumentProposal(library, input, this.runtime),
+    );
+  }
+
+  discardProposal(
+    expected: SnapshotDescriptor,
+    input: DiscardArgumentProposalInput,
+  ): Promise<ArgumentLibraryCommitResult> {
+    return this.commit(expected, (library) =>
+      discardArgumentProposal(library, input, this.runtime),
     );
   }
 

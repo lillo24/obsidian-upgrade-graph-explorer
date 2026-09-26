@@ -28,7 +28,7 @@ async function temporaryLibrary(): Promise<{
 }> {
   const directory = await mkdtemp(join(tmpdir(), 'icarus-argument-mcp-'));
   temporaryDirectories.push(directory);
-  return { directory, path: join(directory, 'library-v7.json') };
+  return { directory, path: join(directory, 'library-v8.json') };
 }
 
 function proposalArguments(
@@ -150,7 +150,7 @@ afterEach(async () => {
 });
 
 describe('Argument Library MCP tools', () => {
-  it('registers five read-only tools and one proposal-only append capability', async () => {
+  it('registers canonical reads and only non-canonical Proposal mutations', async () => {
     const { path } = await temporaryLibrary();
     const session = await connect(
       createArgumentMcpServer({ libraryPath: path }),
@@ -160,16 +160,20 @@ describe('Argument Library MCP tools', () => {
       const instructions = session.client.getInstructions();
 
       expect(instructions).toContain(
-        'call compiler_usage_guide when beginning a Compiler cross-check',
+        'call compiler_usage_guide before a Compiler cross-check',
       );
-      expect(instructions?.length).toBeLessThan(300);
+      expect(instructions?.length).toBeLessThan(500);
       expect(listed.tools.map(({ name }) => name)).toEqual([
         'compiler_usage_guide',
         'compiler_status',
         'compiler_list_index',
         'compiler_search_index',
         'compiler_read_bundle',
+        'compiler_list_proposals',
+        'compiler_read_proposal',
         'compiler_submit_proposal',
+        'compiler_revise_proposal',
+        'compiler_discard_proposal',
       ]);
       expect(
         listed.tools.find(({ name }) => name === 'compiler_usage_guide'),
@@ -187,16 +191,24 @@ describe('Argument Library MCP tools', () => {
           ]),
         },
       });
-      expect(listed.tools.slice(0, 5)).toSatisfy((tools: typeof listed.tools) =>
+      expect(listed.tools.slice(0, 7)).toSatisfy((tools: typeof listed.tools) =>
         tools.every(
           ({ annotations }) =>
             annotations?.readOnlyHint === true &&
             annotations.destructiveHint === false,
         ),
       );
-      expect(listed.tools[5]).toMatchObject({
+      expect(listed.tools[7]).toMatchObject({
         name: 'compiler_submit_proposal',
         annotations: { readOnlyHint: false, destructiveHint: false },
+      });
+      expect(listed.tools[8]).toMatchObject({
+        name: 'compiler_revise_proposal',
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      });
+      expect(listed.tools[9]).toMatchObject({
+        name: 'compiler_discard_proposal',
+        annotations: { readOnlyHint: false, destructiveHint: true },
       });
       expect(listed.tools.map(({ name }) => name)).not.toContain(
         'compiler_create_argument',
@@ -277,6 +289,161 @@ describe('Argument Library MCP tools', () => {
       expect(structured(changedExplanation)).toMatchObject({
         status: 'error',
         error: { code: 'persistence-error' },
+      });
+    } finally {
+      await session.close();
+    }
+  });
+
+  it('lists, reads, revises, links, and explicitly discards only non-canonical staging', async () => {
+    const { path } = await temporaryLibrary();
+    const fixture = createSyntheticLibrary();
+    await writeFile(path, serializeArgumentLibrary(fixture.library), 'utf8');
+    const session = await connect(
+      createArgumentMcpServer({
+        libraryPath: path,
+        proposalRuntime: fixture.runtime,
+      }),
+    );
+    try {
+      const first = await session.client.callTool({
+        name: 'compiler_submit_proposal',
+        arguments: proposalArguments(fixture.library),
+      });
+      const firstId = (structured(first) as { proposalId: string }).proposalId;
+      const afterFirst = parseArgumentLibraryJson(await readFile(path, 'utf8'));
+      expect(afterFirst.status).toBe('valid');
+      if (afterFirst.status !== 'valid') return;
+      const secondInput = {
+        ...proposalArguments(afterFirst.value),
+        clientSubmissionId: 'mcp-proposal-2',
+        title: 'A staged counterexample',
+        conclusion: 'A staged counterexample challenges direct comparison.',
+      };
+      const second = await session.client.callTool({
+        name: 'compiler_submit_proposal',
+        arguments: secondInput,
+      });
+      const secondId = (structured(second) as { proposalId: string })
+        .proposalId;
+      const afterSecond = parseArgumentLibraryJson(
+        await readFile(path, 'utf8'),
+      );
+      expect(afterSecond.status).toBe('valid');
+      if (afterSecond.status !== 'valid') return;
+      const revisionDraft = proposalArguments(afterSecond.value);
+      const revisionInput = {
+        ...revisionDraft,
+        proposalId: secondId,
+        expectedRevision: 1,
+        revisionReason: 'A later review connected the counterexample.',
+        title: 'A connected staged counterexample',
+        conclusion: secondInput.conclusion,
+        draftRelations: [
+          {
+            id: 'DRAFT-ATTACK',
+            kind: 'attack',
+            targetProposalId: firstId,
+            targetProposalRevision: 1,
+          },
+        ],
+      };
+      delete (revisionInput as { clientSubmissionId?: string })
+        .clientSubmissionId;
+      const revised = await session.client.callTool({
+        name: 'compiler_revise_proposal',
+        arguments: revisionInput,
+      });
+      expect(revised.isError, JSON.stringify(structured(revised))).not.toBe(
+        true,
+      );
+      expect(structured(revised)).toMatchObject({
+        status: 'ok',
+        proposalId: secondId,
+        proposalRevision: 2,
+        priorRevisionCount: 1,
+      });
+
+      const list = await session.client.callTool({
+        name: 'compiler_list_proposals',
+        arguments: { query: 'connected staged' },
+      });
+      expect(structured(list)).toMatchObject({
+        status: 'ok',
+        total: 1,
+        proposals: [
+          expect.objectContaining({
+            id: secondId,
+            revision: 2,
+            status: 'pending',
+            priorRevisionCount: 1,
+            draftRelationCount: 1,
+          }),
+        ],
+      });
+      const read = await session.client.callTool({
+        name: 'compiler_read_proposal',
+        arguments: { proposalId: secondId },
+      });
+      expect(structured(read)).toMatchObject({
+        proposal: {
+          id: secondId,
+          title: 'A connected staged counterexample',
+          revisionHistory: [
+            expect.objectContaining({
+              revision: 1,
+              revisionReason: expect.stringContaining('later review'),
+            }),
+          ],
+          draftRelations: [
+            expect.objectContaining({ targetProposalId: firstId }),
+          ],
+        },
+      });
+
+      const stale = await session.client.callTool({
+        name: 'compiler_revise_proposal',
+        arguments: revisionInput,
+      });
+      expect(stale.isError).toBe(true);
+
+      const current = parseArgumentLibraryJson(await readFile(path, 'utf8'));
+      expect(current.status).toBe('valid');
+      if (current.status !== 'valid') return;
+      const discarded = await session.client.callTool({
+        name: 'compiler_discard_proposal',
+        arguments: {
+          proposalId: firstId,
+          expectedRevision: 1,
+          expectedSnapshot: captureArgumentLibrarySnapshot(current.value)
+            .descriptor,
+          note: 'The user explicitly requested cleanup.',
+        },
+      });
+      expect(discarded.isError, JSON.stringify(structured(discarded))).not.toBe(
+        true,
+      );
+      expect(structured(discarded)).toMatchObject({
+        status: 'ok',
+        proposalId: firstId,
+        proposalStatus: 'discarded',
+        canonicalRecordsCreated: 0,
+      });
+
+      const final = parseArgumentLibraryJson(await readFile(path, 'utf8'));
+      expect(final.status).toBe('valid');
+      if (final.status !== 'valid') return;
+      expect(final.value.arguments).toEqual(fixture.library.arguments);
+      expect(final.value.counterArguments).toEqual(
+        fixture.library.counterArguments,
+      );
+      const canonicalSearch = await session.client.callTool({
+        name: 'compiler_search_index',
+        arguments: { query: 'connected staged counterexample' },
+      });
+      expect(structured(canonicalSearch)).toMatchObject({
+        status: 'ok',
+        value: { candidates: [] },
       });
     } finally {
       await session.close();
@@ -400,7 +567,7 @@ describe('Argument Library MCP tools', () => {
       expect(result.isError).not.toBe(true);
       expect(response).toMatchObject({
         status: 'ok',
-        version: 'argument-compiler-ai-usage-v4',
+        version: 'argument-compiler-ai-usage-v5',
         format: 'markdown',
       });
       expect(
@@ -432,11 +599,17 @@ describe('Argument Library MCP tools', () => {
       expect(normalizedGuide).toContain('Compiler Mailbox');
       expect(normalizedGuide).toContain('compiler_submit_proposal');
       expect(normalizedGuide).toContain(
-        'The Mailbox is not an Argument Library record',
+        'The Mailbox is not canonical Argument Library knowledge',
       );
       expect(normalizedGuide).toContain('softExplanationMarkdown');
       expect(normalizedGuide).toContain(
-        'If `compiler_submit_proposal` is not present in the current tool list',
+        'Autonomous non-canonical staging permission',
+      );
+      expect(normalizedGuide).toContain('Explicit-user-only operations');
+      expect(normalizedGuide).toContain('compiler_revise_proposal');
+      expect(normalizedGuide).toContain('compiler_discard_proposal');
+      expect(normalizedGuide).toContain(
+        'does not imply permission to discard or canonically store it',
       );
       expect(result.content).toEqual([{ type: 'text', text: response.guide }]);
       expect(existsSync(path)).toBe(false);
@@ -707,7 +880,7 @@ describe('Argument Library MCP tools', () => {
 
       for (const [source, code] of [
         ['{broken', 'invalid-json'],
-        [JSON.stringify({ schemaVersion: 8 }), 'future-schema'],
+        [JSON.stringify({ schemaVersion: 9 }), 'future-schema'],
       ] as const) {
         await writeFile(path, source, 'utf8');
         const failed = await session.client.callTool({

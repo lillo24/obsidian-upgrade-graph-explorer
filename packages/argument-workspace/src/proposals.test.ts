@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { captureArgumentLibrarySnapshot } from './canonical';
 import { createKnowledgeReaderFromLibrary } from './reader';
 import {
+  discardArgumentProposal,
+  reviseArgumentProposal,
   resolveProposalAsArgument,
   resolveProposalAsRejected,
   submitArgumentProposal,
@@ -11,11 +13,17 @@ import {
   parseArgumentLibraryJson,
   serializeArgumentLibrary,
 } from './serialization';
+import { validateArgumentLibrary } from './validation';
 import {
   createNeutralArgumentLibrary,
   deterministicRuntime,
 } from './test-fixture';
-import type { ArgumentLibrary, CreateArgumentProposalInput } from './types';
+import type {
+  ArgumentLibrary,
+  ArgumentProposal,
+  CreateArgumentProposalInput,
+  ReviseArgumentProposalInput,
+} from './types';
 
 function submission(library: ArgumentLibrary): CreateArgumentProposalInput {
   const snapshot = captureArgumentLibrarySnapshot(library).descriptor;
@@ -95,6 +103,41 @@ function submission(library: ArgumentLibrary): CreateArgumentProposalInput {
         { kind: 'axiom', id: axiom.id, revision: axiom.revision },
       ],
     },
+  };
+}
+
+function revision(
+  library: ArgumentLibrary,
+  proposal: ArgumentProposal,
+  patch: Partial<ReviseArgumentProposalInput> = {},
+): ReviseArgumentProposalInput {
+  const draft = submission(library);
+  return {
+    proposalId: proposal.id,
+    expectedRevision: proposal.revision,
+    revisionReason: 'New evidence materially narrows the surviving claim.',
+    title: draft.title,
+    ...(draft.softExplanationMarkdown === undefined
+      ? {}
+      : { softExplanationMarkdown: draft.softExplanationMarkdown }),
+    ...(draft.intent === undefined ? {} : { intent: draft.intent }),
+    ...(draft.topicId === undefined ? {} : { topicId: draft.topicId }),
+    ...(draft.target === undefined ? {} : { target: draft.target }),
+    examples: draft.examples,
+    premises: draft.premises!,
+    ...(draft.reasoning === undefined ? {} : { reasoning: draft.reasoning }),
+    ...(draft.reasoningSteps === undefined
+      ? {}
+      : { reasoningSteps: draft.reasoningSteps }),
+    conclusion:
+      'The compatibility check can reuse only a verified normalization.',
+    ...(draft.boundary === undefined ? {} : { boundary: draft.boundary }),
+    ...(draft.sourceObservations === undefined
+      ? {}
+      : { sourceObservations: draft.sourceObservations }),
+    whyNovelOrUnresolved: draft.whyNovelOrUnresolved,
+    consultation: draft.consultation,
+    ...patch,
   };
 }
 
@@ -193,6 +236,161 @@ describe('Argument Proposal Mailbox', () => {
         runtime,
       ),
     ).toThrow('Proposal Soft Explanation exceeds the 20000-character limit');
+  });
+
+  it('revises one stable To store Proposal and retains the prior draft', () => {
+    const runtime = deterministicRuntime('living-draft');
+    const original = createNeutralArgumentLibrary();
+    const submitted = submitArgumentProposal(
+      original,
+      submission(original),
+      runtime,
+    );
+    const input = revision(submitted.library, submitted.proposal);
+    const revised = reviseArgumentProposal(submitted.library, input, runtime);
+    const current = revised.proposals[0]!;
+
+    expect(current).toMatchObject({
+      id: submitted.proposal.id,
+      revision: 2,
+      status: 'pending',
+      conclusion: input.conclusion,
+    });
+    expect(current.revisionHistory).toEqual([
+      expect.objectContaining({
+        revision: 1,
+        revisionReason: input.revisionReason,
+        content: expect.objectContaining({
+          conclusion: submitted.proposal.conclusion,
+        }),
+      }),
+    ]);
+    expect(() =>
+      reviseArgumentProposal(
+        revised,
+        { ...revision(revised, current), expectedRevision: 1 },
+        runtime,
+      ),
+    ).toThrow('revision is stale');
+    expect(revised.proposals[0]).toBe(current);
+  });
+
+  it('links pending Proposal revisions and rejects broken or stale draft links', () => {
+    const runtime = deterministicRuntime('draft-links');
+    const original = createNeutralArgumentLibrary();
+    const argumentProposal = submitArgumentProposal(
+      original,
+      submission(original),
+      runtime,
+    );
+    const counterInput = {
+      ...submission(argumentProposal.library),
+      clientSubmissionId: 'counter-proposal',
+      title: 'Normalization evidence may be insufficient',
+      conclusion: 'The claimed normalization is not yet demonstrated.',
+    };
+    const counterProposal = submitArgumentProposal(
+      argumentProposal.library,
+      counterInput,
+      runtime,
+    );
+    const linked = reviseArgumentProposal(
+      counterProposal.library,
+      revision(counterProposal.library, counterProposal.proposal, {
+        title: counterInput.title,
+        conclusion: counterInput.conclusion,
+        draftRelations: [
+          {
+            id: 'DRAFT-ATTACK-1',
+            kind: 'attack',
+            targetProposalId: argumentProposal.proposal.id,
+            targetProposalRevision: argumentProposal.proposal.revision,
+          },
+        ],
+      }),
+      runtime,
+    );
+
+    expect(
+      linked.proposals.find(({ id }) => id === counterProposal.proposal.id),
+    ).toMatchObject({
+      revision: 2,
+      draftRelations: [
+        expect.objectContaining({
+          kind: 'attack',
+          targetProposalId: argumentProposal.proposal.id,
+          targetProposalRevision: 1,
+        }),
+      ],
+    });
+    expect(() =>
+      reviseArgumentProposal(
+        counterProposal.library,
+        revision(counterProposal.library, counterProposal.proposal, {
+          draftRelations: [
+            {
+              id: 'BROKEN',
+              kind: 'attack',
+              targetProposalId: argumentProposal.proposal.id,
+              targetProposalRevision: 99,
+            },
+          ],
+        }),
+        runtime,
+      ),
+    ).toThrow('revision is stale');
+
+    const invalid = structuredClone(linked) as ArgumentLibrary;
+    const source = invalid.proposals.find(
+      ({ id }) => id === counterProposal.proposal.id,
+    )!;
+    (
+      source.draftRelations[0] as { targetProposalRevision: number }
+    ).targetProposalRevision = 99;
+    expect(validateArgumentLibrary(invalid)).toMatchObject({
+      valid: false,
+      issues: [
+        expect.objectContaining({
+          path: expect.stringContaining('targetProposalRevision'),
+          code: 'missing-reference',
+        }),
+      ],
+    });
+  });
+
+  it('discards active staging without creating canonical records', () => {
+    const runtime = deterministicRuntime('discard');
+    const original = createNeutralArgumentLibrary();
+    const submitted = submitArgumentProposal(
+      original,
+      submission(original),
+      runtime,
+    );
+    const discarded = discardArgumentProposal(
+      submitted.library,
+      {
+        proposalId: submitted.proposal.id,
+        expectedRevision: submitted.proposal.revision,
+        note: 'User explicitly removed this draft from active staging.',
+      },
+      runtime,
+    );
+
+    expect(discarded.proposals[0]).toMatchObject({
+      id: submitted.proposal.id,
+      revision: 2,
+      status: 'discarded',
+      decision: { note: expect.stringContaining('explicitly removed') },
+    });
+    expect(discarded.arguments).toEqual(original.arguments);
+    expect(discarded.counterArguments).toEqual(original.counterArguments);
+    expect(() =>
+      reviseArgumentProposal(
+        discarded,
+        revision(discarded, discarded.proposals[0]!),
+        runtime,
+      ),
+    ).toThrow('already been resolved');
   });
 
   it('rejects stale consultation and target identities without storing anything', () => {
@@ -403,6 +601,13 @@ describe('Argument Proposal Mailbox', () => {
       status: 'accepted',
       decision: { resultingArgumentId: 'AR-PROPOSAL-ACCEPTED' },
     });
+    expect(() =>
+      reviseArgumentProposal(
+        accepted,
+        revision(accepted, accepted.proposals[0]!),
+        runtime,
+      ),
+    ).toThrow('already been resolved');
     expect(
       createKnowledgeReaderFromLibrary(accepted).readArgumentBundle({
         id: 'AR-PROPOSAL-ACCEPTED',

@@ -22,7 +22,12 @@ const OUTCOMES = new Set([
   'refuted',
   'inapplicable-under-stated-scope',
 ]);
-const PROPOSAL_STATUSES = new Set(['pending', 'accepted', 'rejected']);
+const PROPOSAL_STATUSES = new Set([
+  'pending',
+  'discarded',
+  'accepted',
+  'rejected',
+]);
 const PROPOSAL_INTENTS = new Set([
   'unspecified',
   'new',
@@ -32,6 +37,14 @@ const PROPOSAL_INTENTS = new Set([
   'extend',
   'add-boundary',
   'supersede',
+]);
+const PROPOSAL_DRAFT_RELATION_KINDS = new Set([
+  'attack',
+  'support',
+  'refine',
+  'extend',
+  'supersede',
+  'related',
 ]);
 const SOURCE_ROLES = new Set(['target', 'basis', 'support']);
 const FINGERPRINT_SCOPES = new Set(['file', 'heading', 'block', 'span']);
@@ -422,7 +435,7 @@ function validateTopic(
   value: unknown,
   path: string,
   issues: ArgumentLibraryValidationIssue[],
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 = 7,
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 = 8,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected a Topic.');
@@ -466,7 +479,7 @@ function validateArgumentPremise(
   path: string,
   ownerId: unknown,
   issues: ArgumentLibraryValidationIssue[],
-  schemaVersion: 2 | 3 | 4 | 5 | 6 | 7 = 7,
+  schemaVersion: 2 | 3 | 4 | 5 | 6 | 7 | 8 = 8,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected an Argument premise.');
@@ -576,7 +589,7 @@ function validateArgument(
   path: string,
   issues: ArgumentLibraryValidationIssue[],
   sourceIds: Set<string>,
-  schemaVersion: 2 | 3 | 4 | 5 | 6 | 7 = 7,
+  schemaVersion: 2 | 3 | 4 | 5 | 6 | 7 | 8 = 8,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected an Argument.');
@@ -1153,11 +1166,153 @@ function validateProposalConsultation(
   });
 }
 
+function validateProposalDraftRelations(
+  value: unknown,
+  path: string,
+  issues: ArgumentLibraryValidationIssue[],
+): void {
+  if (!Array.isArray(value)) {
+    issue(issues, path, 'invalid-type', 'Expected an array.');
+    return;
+  }
+  const ids = new Set<string>();
+  value.forEach((relation, index) => {
+    const relationPath = `${path}[${index}]`;
+    if (!isRecord(relation)) {
+      issue(
+        issues,
+        relationPath,
+        'invalid-type',
+        'Expected a Proposal draft relation.',
+      );
+      return;
+    }
+    fields(
+      relation,
+      ['id', 'kind', 'targetProposalId', 'targetProposalRevision'],
+      [],
+      relationPath,
+      issues,
+    );
+    if (nonEmptyString(relation.id, `${relationPath}.id`, issues)) {
+      if (ids.has(relation.id)) {
+        issue(
+          issues,
+          `${relationPath}.id`,
+          'duplicate-id',
+          'Duplicate Proposal draft relation ID.',
+        );
+      }
+      ids.add(relation.id);
+    }
+    if (!PROPOSAL_DRAFT_RELATION_KINDS.has(relation.kind as string)) {
+      issue(
+        issues,
+        `${relationPath}.kind`,
+        'invalid-value',
+        'Unsupported Proposal draft relation kind.',
+      );
+    }
+    nonEmptyString(
+      relation.targetProposalId,
+      `${relationPath}.targetProposalId`,
+      issues,
+    );
+    positiveRevision(
+      relation.targetProposalRevision,
+      `${relationPath}.targetProposalRevision`,
+      issues,
+    );
+  });
+}
+
+function validateProposalRevisionHistory(
+  value: unknown,
+  path: string,
+  issues: ArgumentLibraryValidationIssue[],
+): void {
+  if (!Array.isArray(value)) {
+    issue(issues, path, 'invalid-type', 'Expected an array.');
+    return;
+  }
+  if (value.length > 40) {
+    issue(
+      issues,
+      path,
+      'invalid-value',
+      'Proposal revision history exceeds the 40-revision limit.',
+    );
+  }
+  let priorRevision = 0;
+  value.forEach((entry, index) => {
+    const entryPath = `${path}[${index}]`;
+    if (!isRecord(entry)) {
+      issue(
+        issues,
+        entryPath,
+        'invalid-type',
+        'Expected a Proposal revision snapshot.',
+      );
+      return;
+    }
+    fields(
+      entry,
+      ['revision', 'replacedAt', 'revisionReason', 'content'],
+      [],
+      entryPath,
+      issues,
+    );
+    if (
+      positiveRevision(entry.revision, `${entryPath}.revision`, issues) &&
+      typeof entry.revision === 'number'
+    ) {
+      if (entry.revision <= priorRevision) {
+        issue(
+          issues,
+          `${entryPath}.revision`,
+          'invalid-value',
+          'Proposal revision history must be strictly increasing.',
+        );
+      }
+      priorRevision = entry.revision;
+    }
+    timestamp(entry.replacedAt, `${entryPath}.replacedAt`, issues);
+    nonEmptyString(entry.revisionReason, `${entryPath}.revisionReason`, issues);
+    if (!isRecord(entry.content)) {
+      issue(
+        issues,
+        `${entryPath}.content`,
+        'invalid-type',
+        'Expected recoverable Proposal draft content.',
+      );
+      return;
+    }
+    validateProposal(
+      {
+        ...entry.content,
+        id: '__revision-history-validation__',
+        revision: 1,
+        createdAt: '2000-01-01T00:00:00.000Z',
+        updatedAt: '2000-01-01T00:00:00.000Z',
+        status: 'pending',
+        revisionHistory: [],
+        submissionFingerprint: {
+          algorithm: CONTENT_FINGERPRINT_ALGORITHM,
+          value: '0'.repeat(64),
+        },
+      },
+      `${entryPath}.content`,
+      issues,
+      8,
+    );
+  });
+}
+
 function validateProposal(
   value: unknown,
   path: string,
   issues: ArgumentLibraryValidationIssue[],
-  schemaVersion: 5 | 6 | 7,
+  schemaVersion: 5 | 6 | 7 | 8,
 ): void {
   if (!isRecord(value)) {
     issue(issues, path, 'invalid-type', 'Expected a Mailbox proposal.');
@@ -1180,6 +1335,7 @@ function validateProposal(
       'whyNovelOrUnresolved',
       'consultation',
       'submissionFingerprint',
+      ...(schemaVersion >= 8 ? ['draftRelations', 'revisionHistory'] : []),
     ],
     [
       'topicId',
@@ -1197,7 +1353,10 @@ function validateProposal(
   positiveRevision(value.revision, `${path}.revision`, issues);
   timestamp(value.createdAt, `${path}.createdAt`, issues);
   timestamp(value.updatedAt, `${path}.updatedAt`, issues);
-  if (!PROPOSAL_STATUSES.has(value.status as string)) {
+  if (
+    !PROPOSAL_STATUSES.has(value.status as string) ||
+    (schemaVersion < 8 && value.status === 'discarded')
+  ) {
     issue(
       issues,
       `${path}.status`,
@@ -1543,6 +1702,35 @@ function validateProposal(
     `${path}.submissionFingerprint`,
     issues,
   );
+  if (schemaVersion >= 8) {
+    validateProposalDraftRelations(
+      value.draftRelations,
+      `${path}.draftRelations`,
+      issues,
+    );
+    validateProposalRevisionHistory(
+      value.revisionHistory,
+      `${path}.revisionHistory`,
+      issues,
+    );
+    if (
+      Array.isArray(value.revisionHistory) &&
+      typeof value.revision === 'number' &&
+      value.revisionHistory.some(
+        (entry) =>
+          isRecord(entry) &&
+          typeof entry.revision === 'number' &&
+          entry.revision >= Number(value.revision),
+      )
+    ) {
+      issue(
+        issues,
+        `${path}.revisionHistory`,
+        'invalid-value',
+        'Prior Proposal revisions must be older than the current revision.',
+      );
+    }
+  }
 
   const hasDecision = Object.hasOwn(value, 'decision');
   if (value.status === 'pending' && hasDecision) {
@@ -1602,13 +1790,14 @@ function validateProposal(
   }
   if (
     (value.status === 'accepted' && (!argumentResult || counterResult)) ||
-    (value.status === 'rejected' && (!counterResult || argumentResult))
+    (value.status === 'rejected' && (!counterResult || argumentResult)) ||
+    (value.status === 'discarded' && (argumentResult || counterResult))
   ) {
     issue(
       issues,
       `${path}.decision`,
       'invalid-value',
-      'Accepted proposals must link one Argument; rejected proposals must link one Counter-Argument.',
+      'Stored proposals must link one Argument; canonically refuted proposals must link one Counter-Argument; discarded proposals must link neither.',
     );
   }
 }
@@ -1653,6 +1842,7 @@ function validateIntegrity(
   const argumentIndexById = new Map<string, number>();
   const contextsById = new Map<string, PlainRecord>();
   const contextIndexById = new Map<string, number>();
+  const proposalsById = new Map<string, PlainRecord>();
   if (Array.isArray(library.contexts)) {
     library.contexts.forEach((entry, index) => {
       if (!isRecord(entry) || typeof entry.id !== 'string') return;
@@ -1665,6 +1855,12 @@ function validateIntegrity(
       if (!isRecord(entry) || typeof entry.id !== 'string') return;
       argumentsById.set(entry.id, entry);
       argumentIndexById.set(entry.id, index);
+    });
+  }
+  if (Array.isArray(library.proposals)) {
+    library.proposals.forEach((entry) => {
+      if (!isRecord(entry) || typeof entry.id !== 'string') return;
+      proposalsById.set(entry.id, entry);
     });
   }
   if (Array.isArray(library.topics)) {
@@ -2011,6 +2207,55 @@ function validateIntegrity(
     }
   });
 
+  const validateDraftRelationIntegrity = (
+    relation: unknown,
+    relationPath: string,
+    sourceProposalId: unknown,
+  ): void => {
+    if (
+      !isRecord(relation) ||
+      typeof relation.targetProposalId !== 'string' ||
+      typeof relation.targetProposalRevision !== 'number'
+    ) {
+      return;
+    }
+    if (relation.targetProposalId === sourceProposalId) {
+      issue(
+        issues,
+        `${relationPath}.targetProposalId`,
+        'self-reference',
+        'A Proposal draft relation cannot target itself.',
+      );
+      return;
+    }
+    const target = proposalsById.get(relation.targetProposalId);
+    if (target === undefined) {
+      issue(
+        issues,
+        `${relationPath}.targetProposalId`,
+        'missing-reference',
+        `Unknown target Proposal "${relation.targetProposalId}".`,
+      );
+      return;
+    }
+    const revisionExists =
+      target.revision === relation.targetProposalRevision ||
+      (Array.isArray(target.revisionHistory) &&
+        target.revisionHistory.some(
+          (revision) =>
+            isRecord(revision) &&
+            revision.revision === relation.targetProposalRevision,
+        ));
+    if (!revisionExists) {
+      issue(
+        issues,
+        `${relationPath}.targetProposalRevision`,
+        'missing-reference',
+        `Target Proposal "${relation.targetProposalId}" revision ${relation.targetProposalRevision} is not recoverable.`,
+      );
+    }
+  };
+
   if (Array.isArray(library.proposals)) {
     library.proposals.forEach((entry, index) => {
       if (!isRecord(entry)) return;
@@ -2117,6 +2362,33 @@ function validateIntegrity(
               `Unknown consulted ${String(identity.kind)} "${identity.id}".`,
             );
           }
+        });
+      }
+      if (Array.isArray(entry.draftRelations)) {
+        entry.draftRelations.forEach((relation, relationIndex) =>
+          validateDraftRelationIntegrity(
+            relation,
+            `$.proposals[${index}].draftRelations[${relationIndex}]`,
+            entry.id,
+          ),
+        );
+      }
+      if (Array.isArray(entry.revisionHistory)) {
+        entry.revisionHistory.forEach((revision, revisionIndex) => {
+          if (
+            !isRecord(revision) ||
+            !isRecord(revision.content) ||
+            !Array.isArray(revision.content.draftRelations)
+          ) {
+            return;
+          }
+          revision.content.draftRelations.forEach((relation, relationIndex) =>
+            validateDraftRelationIntegrity(
+              relation,
+              `$.proposals[${index}].revisionHistory[${revisionIndex}].content.draftRelations[${relationIndex}]`,
+              entry.id,
+            ),
+          );
         });
       }
       if (!isRecord(entry.decision)) return;
@@ -2228,7 +2500,7 @@ function validateIntegrity(
 
 function validateArgumentLibraryVersion(
   value: unknown,
-  expectedVersion: 2 | 3 | 4 | 5 | 6 | 7,
+  expectedVersion: 2 | 3 | 4 | 5 | 6 | 7 | 8,
 ): ArgumentLibraryValidationResult {
   const issues: ArgumentLibraryValidationIssue[] = [];
   if (!isRecord(value)) {
@@ -2345,7 +2617,13 @@ function validateArgumentLibraryVersion(
         entry,
         `$.proposals[${index}]`,
         issues,
-        expectedVersion >= 7 ? 7 : expectedVersion >= 6 ? 6 : 5,
+        expectedVersion >= 8
+          ? 8
+          : expectedVersion >= 7
+            ? 7
+            : expectedVersion >= 6
+              ? 6
+              : 5,
       ),
     );
   }
@@ -2366,7 +2644,28 @@ function validateArgumentLibraryVersion(
 export function validateArgumentLibrary(
   value: unknown,
 ): ArgumentLibraryValidationResult {
-  return validateArgumentLibraryVersion(value, 7);
+  return validateArgumentLibraryVersion(value, 8);
+}
+
+export type ArgumentLibraryV7ValidationResult =
+  | {
+      readonly valid: true;
+      readonly value: PlainRecord;
+      readonly issues: readonly [];
+    }
+  | {
+      readonly valid: false;
+      readonly issues: readonly ArgumentLibraryValidationIssue[];
+    };
+
+/** Strictly validates the schema-v7 Proposal shape before migration. */
+export function validateArgumentLibraryV7(
+  value: unknown,
+): ArgumentLibraryV7ValidationResult {
+  const validation = validateArgumentLibraryVersion(value, 7);
+  return validation.valid
+    ? { valid: true, value: value as PlainRecord, issues: [] }
+    : validation;
 }
 
 export type ArgumentLibraryV6ValidationResult =
