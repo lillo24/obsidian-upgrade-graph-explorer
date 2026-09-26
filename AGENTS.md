@@ -112,6 +112,17 @@ Code merge and external deployment are separate actions: automatic PR merge does
 
 Do not push directly to `main` unless the active user/task instruction explicitly authorizes it.
 
+### Post-merge desktop refresh
+
+After merging any change that can affect the desktop app or shared code:
+
+- update the primary `main` checkout to merged `origin/main`;
+- run `pnpm desktop:build`;
+- confirm `apps/desktop/src-tauri/target/release/icarus-graph-explorer-desktop.exe` was rebuilt;
+- if the primary checkout is dirty/diverged or the build fails, do not overwrite/discard anything; report the blocker.
+
+The Desktop launcher should point to that stable executable path, so it does not need to be recreated after each build.
+
 ### Parallel tasks
 
 Parallel Codex tasks must use separate branches/worktrees.
