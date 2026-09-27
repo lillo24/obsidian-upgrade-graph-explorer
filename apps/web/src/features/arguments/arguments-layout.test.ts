@@ -7,7 +7,7 @@ const argumentsCss = readFileSync(
 );
 
 describe('Arguments view layout CSS', () => {
-  it('gives desktop To store panes independent scrolling without page overflow', () => {
+  it('gives desktop Mailbox panes independent scrolling without page overflow', () => {
     expect(argumentsCss).toMatch(
       /\.arguments-mailbox\s*\{[^}]*min-width:\s*0;[^}]*min-height:\s*0;[^}]*overflow:\s*hidden;/su,
     );

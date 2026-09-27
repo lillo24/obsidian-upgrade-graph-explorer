@@ -785,7 +785,7 @@ export function createArgumentMcpServer(
     { name: ARGUMENT_MCP_SERVER_NAME, version: ARGUMENT_MCP_SERVER_VERSION },
     {
       instructions:
-        'After independent candidate reasoning, call compiler_usage_guide before a Compiler cross-check. Canonical index tools exclude Mailbox drafts. You may create, read, revise, and link material non-canonical To store Proposals autonomously. Discard and canonical prepare/apply require an explicit user request. Prepare exact canonical packages first; apply only an unchanged ready plan, never infer Current, supersession, or draft-link conversion.',
+        'After independent candidate reasoning, call compiler_usage_guide before a Compiler cross-check. Canonical index tools exclude Mailbox drafts. You may create, read, revise, and link material non-canonical Mailbox Proposals autonomously. Discard and canonical prepare/apply require an explicit user request. Prepare exact canonical packages first; apply only an unchanged ready plan, never infer Current, supersession, or draft-link conversion.',
     },
   );
 
@@ -908,7 +908,7 @@ export function createArgumentMcpServer(
     {
       title: 'List Mailbox staging proposals',
       description:
-        'List or text-filter bounded non-canonical Mailbox proposals. Defaults to active To store work and remains separate from the canonical Argument Library index.',
+        'List or text-filter bounded non-canonical Mailbox Proposals. Defaults to active pending work and remains separate from the canonical Argument Library index.',
       inputSchema: listProposalsInput,
       annotations: READ_ONLY_ANNOTATIONS,
     },
@@ -1047,7 +1047,7 @@ export function createArgumentMcpServer(
     {
       title: 'Submit proposal to human Mailbox',
       description:
-        'Create one active To store, non-canonical Proposal after independent reasoning and a Compiler cross-check. Prefer revising an existing Proposal over creating a duplicate. Draft Proposal relations are staging intent only. A human remains solely responsible for canonical storage, relations, supersession, Current promotion, or refutation.',
+        'Create one active pending Mailbox Proposal after independent reasoning and a Compiler cross-check. Prefer revising an existing Proposal over creating a duplicate. Draft Proposal relations are staging intent only. A human remains solely responsible for canonical storage, relations, supersession, Current promotion, or refutation.',
       inputSchema: submitProposalInput,
       annotations: STAGING_WRITE_ANNOTATIONS,
     },
@@ -1102,7 +1102,7 @@ export function createArgumentMcpServer(
   server.registerTool(
     'compiler_revise_proposal',
     {
-      title: 'Revise a To store Proposal',
+      title: 'Revise a pending Mailbox Proposal',
       description:
         'Replace the current content of one active non-canonical Proposal while retaining the prior revision and reason. Requires the exact Proposal revision and consultation snapshot. Use only for a material improvement, correction, restructuring, or new draft relationship—not cosmetic wording churn. This tool cannot store canonical theory.',
       inputSchema: reviseProposalInput,
@@ -1169,7 +1169,7 @@ export function createArgumentMcpServer(
     {
       title: 'Discard a Proposal from active staging',
       description:
-        'Explicit-user-only: mark one active To store Proposal discarded while preserving its history. This creates no canonical Argument or Counter-Argument. The fact that an AI created or revised a Proposal never grants permission to discard it.',
+        'Explicit-user-only: mark one active pending Mailbox Proposal discarded while preserving its history. This creates no canonical Argument or Counter-Argument. The fact that an AI created or revised a Proposal never grants permission to discard it.',
       inputSchema: discardProposalInput,
       annotations: DISCARD_ANNOTATIONS,
     },

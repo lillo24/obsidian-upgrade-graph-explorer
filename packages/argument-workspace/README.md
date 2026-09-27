@@ -86,7 +86,7 @@ for that assessment.
 
 Mailbox Proposals are living non-canonical staging objects, not framework
 knowledge and not a sixth canonical record kind. An active `pending` Proposal
-is presented as **To store** and distinguishes review
+is presented as a pending **Mailbox Proposal** and distinguishes review
 intent (`new`, `attack`, `support`, `refine`, `extend`, `add-boundary`, or
 `supersede`), an exact optional Argument/part/revision target, typed text/Axiom/
 Argument dependencies, optional ordered reasoning steps, and drafting source
@@ -108,7 +108,7 @@ current target revision; the link remains staging provenance and never becomes
 a canonical relation automatically. Proposals are excluded from canonical search, bundles,
 Markdown export, Topic membership, Current, and canonical create/edit APIs.
 
-Proposal lifecycle states remain distinct: `pending` is active To store work;
+Proposal lifecycle states remain distinct: `pending` is active Mailbox work;
 `discarded` removes it from active staging without canonical creation; and
 `stored` records canonical storage with one typed Argument or Counter-Argument
 result plus, for exact-package resolution, a durable plan receipt. A standing

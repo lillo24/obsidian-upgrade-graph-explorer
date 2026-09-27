@@ -344,7 +344,7 @@ function normalizeDraftRelations(
     }
     if (target.status !== 'pending') {
       throw new Error(
-        `Draft relation target Proposal "${relation.targetProposalId}" is not active To store work.`,
+        `Draft relation target Proposal "${relation.targetProposalId}" is not an active Mailbox Proposal.`,
       );
     }
     if (target.revision !== relation.targetProposalRevision) {
@@ -900,7 +900,7 @@ export function discardArgumentProposal(
         revision: proposal.revision,
         replacedAt: decidedAt,
         revisionReason:
-          note ?? 'Discarded from active To store staging by the user.',
+          note ?? 'Discarded from active Mailbox staging by the user.',
         content: argumentProposalDraft(proposal),
       },
     ],

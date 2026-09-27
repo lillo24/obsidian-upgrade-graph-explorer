@@ -238,7 +238,7 @@ describe('Argument Proposal Mailbox', () => {
     ).toThrow('Proposal Soft Explanation exceeds the 20000-character limit');
   });
 
-  it('revises one stable To store Proposal and retains the prior draft', () => {
+  it('revises one stable Mailbox Proposal and retains the prior draft', () => {
     const runtime = deterministicRuntime('living-draft');
     const original = createNeutralArgumentLibrary();
     const submitted = submitArgumentProposal(

@@ -31,6 +31,24 @@ function tokenDefinitionCount(token: string): number {
   return tokensCss.match(new RegExp(`${token}\\s*:`, 'g'))?.length ?? 0;
 }
 
+function ruleContaining(css: string, selector: string): string {
+  const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const match of withoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const selectors = match[1]?.split(',').map((value) => value.trim());
+    if (selectors?.includes(selector)) return match[2] ?? '';
+  }
+  throw new Error(`Missing CSS selector: ${selector}`);
+}
+
+function expectRuleTokens(
+  css: string,
+  selector: string,
+  tokens: readonly string[],
+): void {
+  const declarations = ruleContaining(css, selector);
+  for (const token of tokens) expect(declarations).toContain(`var(${token})`);
+}
+
 function themeTokens(theme: 'light' | 'dark'): ReadonlyMap<string, string> {
   const selector =
     theme === 'light'
@@ -105,9 +123,14 @@ describe('application theme CSS contract', () => {
       '--color-focus-ring',
       '--color-control-foreground',
       '--color-control-background',
+      '--color-control-hover-foreground',
       '--color-control-hover',
       '--color-control-selected-foreground',
       '--color-control-selected-background',
+      '--color-control-selected-border',
+      '--color-control-selected-hover-foreground',
+      '--color-control-selected-hover-background',
+      '--color-control-selected-hover-border',
       '--color-control-disabled-foreground',
       '--color-control-disabled-background',
       '--color-status-info-foreground',
@@ -125,6 +148,112 @@ describe('application theme CSS contract', () => {
     expect(combined).toContain('var(--color-control-selected-background)');
     expect(indexCss).toContain('var(--color-control-disabled-background)');
     expect(indexCss).toContain('var(--color-focus-ring)');
+  });
+
+  it('maps interactive selectors to complete normal, hover, and selected state pairs', () => {
+    const hoverTokens = [
+      '--color-control-hover-foreground',
+      '--color-control-hover',
+    ] as const;
+    const selectedTokens = [
+      '--color-control-selected-foreground',
+      '--color-control-selected-background',
+      '--color-control-selected-border',
+    ] as const;
+    const selectedHoverTokens = [
+      '--color-control-selected-hover-foreground',
+      '--color-control-selected-hover-background',
+      '--color-control-selected-hover-border',
+    ] as const;
+    const disabledTokens = [
+      '--color-control-disabled-foreground',
+      '--color-control-disabled-background',
+      '--color-control-disabled-border',
+    ] as const;
+
+    expectRuleTokens(
+      argumentsCss,
+      '.arguments-dialog button:hover',
+      hoverTokens,
+    );
+    for (const selector of [
+      ".arguments-view-switcher button[aria-selected='true']",
+      ".arguments-topics button[aria-current='page']",
+      ".arguments-mailbox__layout nav button[aria-current='page']",
+    ])
+      expectRuleTokens(argumentsCss, selector, selectedTokens);
+    for (const selector of [
+      ".arguments-view-switcher button[aria-selected='true']:hover",
+      ".arguments-topics button[aria-current='page']:hover",
+      ".arguments-mailbox__layout nav button[aria-current='page']:hover",
+    ])
+      expectRuleTokens(argumentsCss, selector, selectedHoverTokens);
+    expectRuleTokens(
+      argumentsCss,
+      '.arguments-dialog button:disabled',
+      disabledTokens,
+    );
+
+    expectRuleTokens(
+      workspaceCss,
+      ".workspace-dialog__tabs button[aria-selected='true']",
+      selectedTokens,
+    );
+    expectRuleTokens(
+      workspaceCss,
+      ".workspace-dialog__tabs button[aria-selected='true']:hover",
+      selectedHoverTokens,
+    );
+    expectRuleTokens(
+      reviewCss,
+      ".review-history__list button[aria-current='page']",
+      selectedTokens,
+    );
+    expectRuleTokens(
+      reviewCss,
+      ".review-tablist button[aria-selected='true']:hover",
+      selectedHoverTokens,
+    );
+    expectRuleTokens(
+      reviewCss,
+      '.review-workspace button:disabled',
+      disabledTokens,
+    );
+
+    for (const selector of [
+      ".control-group button[aria-pressed='true']",
+      ".graph-settings__tabs button[aria-selected='true']",
+      ".network-explorer__arrange-folder[aria-pressed='true']",
+      ".focus-explorer__tabs button[aria-selected='true']",
+      ".graph-filters__trigger[aria-expanded='true']",
+      ".visual-groups__trigger[aria-expanded='true']",
+    ])
+      expectRuleTokens(appCss, selector, selectedTokens);
+    for (const selector of [
+      ".control-group button[aria-pressed='true']:hover:not(:disabled)",
+      ".graph-settings__tabs button[aria-selected='true']:hover",
+      ".network-explorer__arrange-folder[aria-pressed='true']:hover",
+      ".focus-explorer__tabs button[aria-selected='true']:hover",
+      ".graph-filters__trigger[aria-expanded='true']:hover",
+      ".visual-groups__trigger[aria-expanded='true']:hover",
+    ])
+      expectRuleTokens(appCss, selector, selectedHoverTokens);
+    expectRuleTokens(appCss, '.control-group button:disabled', disabledTokens);
+  });
+
+  it('lets nested row text inherit its parent interactive state color', () => {
+    const mailboxRowText = ruleContaining(
+      argumentsCss,
+      '.arguments-mailbox__row-title',
+    );
+    expect(mailboxRowText).toContain('color: inherit');
+    expect(mailboxRowText).not.toContain('var(--color-control-foreground)');
+
+    const reviewRowText = ruleContaining(
+      reviewCss,
+      '.review-history__list span',
+    );
+    expect(reviewRowText).toContain('color: inherit');
   });
 
   it('allows only documented semantic-data and development-lab literals', () => {
@@ -173,9 +302,15 @@ describe('application theme CSS contract', () => {
         ['--color-text-primary', '--color-surface-app'],
         ['--color-text-secondary', '--color-surface-panel'],
         ['--color-text-muted', '--color-surface-panel'],
+        ['--color-control-foreground', '--color-control-background'],
+        ['--color-control-hover-foreground', '--color-control-hover'],
         [
           '--color-control-selected-foreground',
           '--color-control-selected-background',
+        ],
+        [
+          '--color-control-selected-hover-foreground',
+          '--color-control-selected-hover-background',
         ],
         ['--color-status-info-foreground', '--color-status-info-background'],
         [

@@ -271,6 +271,7 @@ h2 {
 .entity-search__results button:hover,
 .entity-search__results button:active {
   border-color: var(--color-border-focus);
+  color: var(--color-control-hover-foreground);
   background: var(--color-control-hover);
 }
 
@@ -373,12 +374,21 @@ h2 {
 .control-group button:hover:not(:disabled),
 .selection-panel button:hover {
   border-color: var(--color-border-focus);
+  color: var(--color-control-hover-foreground);
   background: var(--color-control-hover);
 }
 
+.control-group button[aria-pressed='true']:hover:not(:disabled) {
+  border-color: var(--color-control-selected-hover-border);
+  color: var(--color-control-selected-hover-foreground);
+  background: var(--color-control-selected-hover-background);
+}
+
 .control-group button:disabled {
+  border-color: var(--color-control-disabled-border);
+  color: var(--color-control-disabled-foreground);
+  background: var(--color-control-disabled-background);
   cursor: not-allowed;
-  opacity: 0.52;
 }
 
 .network-editing-controls {
@@ -464,6 +474,7 @@ h2 {
 .graph-history-controls button:hover:not(:disabled),
 .graph-history-controls button:active:not(:disabled) {
   border-color: var(--color-border-focus);
+  color: var(--color-control-hover-foreground);
   background: var(--color-control-hover);
 }
 
@@ -502,6 +513,7 @@ h2 {
 .saved-view-switcher select:hover:not(:disabled),
 .saved-view-switcher select:focus-visible {
   border-color: var(--color-border-focus);
+  color: var(--color-control-hover-foreground);
   background: var(--color-control-hover);
 }
 
@@ -529,6 +541,7 @@ h2 {
 .saved-views-trigger:hover,
 .saved-views-trigger:active {
   border-color: var(--color-border-focus);
+  color: var(--color-control-hover-foreground);
   background: var(--color-control-hover);
 }
 
@@ -630,6 +643,7 @@ h2 {
 
 .saved-views button:hover:not(:disabled) {
   border-color: var(--color-border-focus);
+  color: var(--color-control-hover-foreground);
   background: var(--color-control-hover);
 }
 
@@ -731,6 +745,7 @@ h2 {
 .graph-tools-trigger:hover,
 .graph-tools-trigger:active {
   border-color: var(--color-border-focus);
+  color: var(--color-control-hover-foreground);
   background: var(--color-control-hover);
 }
 
@@ -783,10 +798,22 @@ h2 {
 }
 
 .graph-settings__tabs button[aria-selected='true'] {
-  border-color: var(--color-border-default);
+  border-color: var(--color-control-selected-border);
   color: var(--color-control-selected-foreground);
   background: var(--color-control-selected-background);
   box-shadow: 0 0.2rem 0.5rem var(--color-shadow-subtle);
+}
+
+.graph-settings__tabs button:hover {
+  border-color: var(--color-border-focus);
+  color: var(--color-control-hover-foreground);
+  background: var(--color-control-hover);
+}
+
+.graph-settings__tabs button[aria-selected='true']:hover {
+  border-color: var(--color-control-selected-hover-border);
+  color: var(--color-control-selected-hover-foreground);
+  background: var(--color-control-selected-hover-background);
 }
 
 .graph-settings__sections {
@@ -1526,6 +1553,7 @@ h2 {
 .network-explorer__file-move button:hover,
 .network-explorer__file-move button:focus-visible {
   border-color: var(--color-border-focus);
+  color: var(--color-control-hover-foreground);
   background: var(--color-control-hover);
 }
 
@@ -1542,15 +1570,29 @@ h2 {
 }
 
 .network-explorer__arrange-folder:hover,
-.network-explorer__arrange-folder:focus-visible,
+.network-explorer__arrange-folder:focus-visible {
+  border-color: var(--color-border-focus);
+  color: var(--color-control-hover-foreground);
+  background: var(--color-control-hover);
+}
+
 .network-explorer__arrange-folder[aria-pressed='true'] {
-  border-color: var(--color-border-strong);
-  background: var(--color-surface-selected);
+  border-color: var(--color-control-selected-border);
+  color: var(--color-control-selected-foreground);
+  background: var(--color-control-selected-background);
+}
+
+.network-explorer__arrange-folder[aria-pressed='true']:hover {
+  border-color: var(--color-control-selected-hover-border);
+  color: var(--color-control-selected-hover-foreground);
+  background: var(--color-control-selected-hover-background);
 }
 
 .network-explorer__arrange-folder:disabled {
+  border-color: var(--color-control-disabled-border);
+  color: var(--color-control-disabled-foreground);
+  background: var(--color-control-disabled-background);
   cursor: not-allowed;
-  opacity: 0.55;
 }
 
 .network-explorer__arranged-marker {
@@ -1616,6 +1658,7 @@ h2 {
   .advanced-graph-query__icon-actions
   button:hover:not(:disabled) {
   border-color: var(--color-border-strong);
+  color: var(--color-control-hover-foreground);
   background: var(--color-control-hover);
 }
 
@@ -1683,6 +1726,7 @@ h2 {
 }
 
 .network-explorer__hidden-chips button:hover {
+  color: var(--color-control-hover-foreground);
   background: var(--color-control-hover);
 }
 
@@ -1714,6 +1758,7 @@ h2 {
 
 .network-explorer-menu button:hover:not(:disabled),
 .network-explorer-menu button:focus-visible {
+  color: var(--color-control-hover-foreground);
   background: var(--color-control-hover);
 }
 
@@ -2044,9 +2089,21 @@ h2 {
 }
 
 .focus-explorer__tabs button[aria-selected='true'] {
-  border-color: var(--color-border-strong);
-  color: var(--color-text-primary);
-  background: var(--color-surface-selected);
+  border-color: var(--color-control-selected-border);
+  color: var(--color-control-selected-foreground);
+  background: var(--color-control-selected-background);
+}
+
+.focus-explorer__tabs button:hover {
+  border-color: var(--color-border-focus);
+  color: var(--color-control-hover-foreground);
+  background: var(--color-control-hover);
+}
+
+.focus-explorer__tabs button[aria-selected='true']:hover {
+  border-color: var(--color-control-selected-hover-border);
+  color: var(--color-control-selected-hover-foreground);
+  background: var(--color-control-selected-hover-background);
 }
 
 .focus-explorer__heading-context {
@@ -2360,9 +2417,10 @@ h2 {
 .graph-filters__badge {
   min-width: 1.35rem;
   padding: 0.2rem 0.45rem;
+  border: 1px solid currentcolor;
   border-radius: 999px;
-  color: var(--color-text-muted);
-  background: var(--color-surface-inset);
+  color: inherit;
+  background: transparent;
   font-size: 0.68rem;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -2370,10 +2428,22 @@ h2 {
 }
 
 .graph-filters__trigger:hover,
-.graph-filters__trigger:active,
+.graph-filters__trigger:active {
+  border-color: var(--color-border-focus);
+  color: var(--color-control-hover-foreground);
+  background: var(--color-control-hover);
+}
+
 .graph-filters__trigger[aria-expanded='true'] {
   border-color: var(--color-control-selected-border);
+  color: var(--color-control-selected-foreground);
   background: var(--color-control-selected-background);
+}
+
+.graph-filters__trigger[aria-expanded='true']:hover {
+  border-color: var(--color-control-selected-hover-border);
+  color: var(--color-control-selected-hover-foreground);
+  background: var(--color-control-selected-hover-background);
 }
 
 .visual-groups {
@@ -2399,9 +2469,10 @@ h2 {
 .visual-groups__badge {
   min-width: 1.35rem;
   padding: 0.2rem 0.45rem;
+  border: 1px solid currentcolor;
   border-radius: 999px;
-  color: var(--color-text-muted);
-  background: var(--color-surface-inset);
+  color: inherit;
+  background: transparent;
   font-size: 0.68rem;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -2409,10 +2480,22 @@ h2 {
 }
 
 .visual-groups__trigger:hover,
-.visual-groups__trigger:active,
+.visual-groups__trigger:active {
+  border-color: var(--color-border-focus);
+  color: var(--color-control-hover-foreground);
+  background: var(--color-control-hover);
+}
+
 .visual-groups__trigger[aria-expanded='true'] {
   border-color: var(--color-control-selected-border);
+  color: var(--color-control-selected-foreground);
   background: var(--color-control-selected-background);
+}
+
+.visual-groups__trigger[aria-expanded='true']:hover {
+  border-color: var(--color-control-selected-hover-border);
+  color: var(--color-control-selected-hover-foreground);
+  background: var(--color-control-selected-hover-background);
 }
 
 .visual-groups__panel {
@@ -2496,6 +2579,7 @@ h2 {
 .visual-groups__heading button:hover:not(:disabled),
 .visual-groups__body button:hover:not(:disabled) {
   border-color: var(--color-border-focus);
+  color: var(--color-control-hover-foreground);
   background: var(--color-control-hover);
 }
 
@@ -3905,6 +3989,7 @@ h2 {
 
 .diagnostic-dialog__heading button:hover {
   border-color: var(--color-border-focus);
+  color: var(--color-control-hover-foreground);
   background: var(--color-control-hover);
 }
 
@@ -4247,8 +4332,8 @@ h2 {
 
 .pagination button:hover:not(:disabled),
 .pagination button:active:not(:disabled) {
-  color: var(--color-control-selected-foreground);
-  background: var(--color-accent-primary);
+  color: var(--color-control-hover-foreground);
+  background: var(--color-control-hover);
 }
 
 .pagination button:disabled {

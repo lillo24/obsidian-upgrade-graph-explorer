@@ -243,7 +243,7 @@ the library or protected drafts. The feature composes pure core operations into
 one serialized commit per Save, replaces its UI reader only after persistence
 confirms the exact new snapshot, and keeps search/import/export/context state
 outside canonical data. Its Mailbox reloads external local MCP submissions,
-shows To store/history provenance, revision history, draft links, and stale
+shows Mailbox active/history provenance, revision history, draft links, and stale
 targets; it supports non-canonical draft editing and discard, and reuses
 canonical editors for explicit human Store as Argument or Store refutation
 transactions. Proposal explanations and AI

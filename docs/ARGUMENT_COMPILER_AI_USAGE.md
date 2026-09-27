@@ -9,7 +9,7 @@ merely because the Argument Library exists. The first pass does not need a
 formal Premises / Reasoning / Conclusion schema. Use concrete examples when
 they arise naturally; do not force them.
 
-The Compiler Mailbox is a living, non-canonical **To store** staging area.
+The Compiler Mailbox is a living, non-canonical Proposal staging area.
 `compiler_list_proposals` and `compiler_read_proposal` inspect it;
 `compiler_submit_proposal` creates a durable draft; and
 `compiler_revise_proposal` materially improves the same stable Proposal rather
@@ -195,7 +195,7 @@ active Proposal when later evidence materially improves, narrows, corrects,
 restructures, or supersedes its current formulation. Do not create duplicate
 Proposals or revisions for cosmetic wording churn.
 
-For this Compiler, `compiler_submit_proposal` creates an active To store draft
+For this Compiler, `compiler_submit_proposal` creates an active pending Proposal
 in the human-reviewed Compiler Mailbox.
 
 If a meaningful new or revised candidate survives the cross-check:
@@ -229,7 +229,7 @@ Do not search the Argument Library for a record called "Mailbox". The Mailbox
 is a proposal-submission workflow, not canonical Argument Library knowledge.
 
 A successful `compiler_submit_proposal` call means only that an active,
-non-canonical To store Proposal was staged for human review. It does not accept
+non-canonical Mailbox Proposal was staged for human review. It does not accept
 the idea, make it Current, mutate canonical theory, or replace an existing
 Argument.
 
@@ -257,7 +257,7 @@ reason remain recoverable.
 The AI must not do any of the following unless the user explicitly requests
 that action:
 
-- call `compiler_discard_proposal` to remove a Proposal from active To store
+- call `compiler_discard_proposal` to remove a Proposal from active Mailbox
   staging;
 - hard-delete Proposal history, if a future capability ever supports it;
 - store, accept, or resolve a Proposal into canonical Argument DB records;

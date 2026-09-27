@@ -61,13 +61,20 @@
 .workspace-dialog__tabs button:hover,
 .workspace-dialog__close:hover {
   border-color: var(--color-border-focus);
-  background: var(--color-surface-hover);
+  color: var(--color-control-hover-foreground);
+  background: var(--color-control-hover);
 }
 
 .workspace-dialog__tabs button[aria-selected='true'] {
   border-color: var(--color-control-selected-border);
   color: var(--color-control-selected-foreground);
   background: var(--color-control-selected-background);
+}
+
+.workspace-dialog__tabs button[aria-selected='true']:hover {
+  border-color: var(--color-control-selected-hover-border);
+  color: var(--color-control-selected-hover-foreground);
+  background: var(--color-control-selected-hover-background);
 }
 
 .workspace-dialog__tabs button:focus-visible,
