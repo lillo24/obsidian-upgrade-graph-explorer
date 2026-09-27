@@ -38,7 +38,7 @@ const INTENT_LABELS: Readonly<Record<ArgumentProposalIntent, string>> = {
 };
 
 const STATUS_LABELS: Readonly<Record<ArgumentProposal['status'], string>> = {
-  pending: 'To store',
+  pending: 'Pending',
   discarded: 'Discarded',
   stored: 'Stored',
 };
@@ -511,10 +511,10 @@ export const ProposalMailbox = forwardRef<
         <header className="arguments-mailbox__intro">
           <p className="eyebrow">Non-canonical staging area</p>
           <h2 id="arguments-mailbox-title" ref={headingRef} tabIndex={-1}>
-            To store
+            Mailbox
           </h2>
           <p>
-            Develop active To store drafts over time. Staging revisions and
+            Develop active Mailbox Proposals over time. Staging revisions and
             links are non-canonical; storage still requires the separate human
             resolution editor.
           </p>

@@ -6,13 +6,13 @@ requests open/close transitions.
 
 - `ArgumentsWorkspace.tsx` owns onboarding, drafts, navigation, search, source
   binding/previews, separate additive Insert JSON and full-library Import JSON
-  dialogs, the first-class Library / To store view switch, human Proposal
+  dialogs, the first-class Library / Mailbox view switch, human Proposal
   resolution through the core shared Proposal conversion, compact grouped
   record/library controls, and confirmed-snapshot exports. It composes
   canonical and staged draft protection into one narrow leave guard, exposes
   an embedded panel to the shared workspace modal, and retains standalone
   title/Close chrome.
-- `ProposalMailbox.tsx` owns the human-readable To store Active/History staging
+- `ProposalMailbox.tsx` owns the human-readable Mailbox Active/History staging
   view: compact Proposal navigation, current and prior revisions, draft
   Proposal links, discard, bounded prose editing and its narrow leave-guard
   handle, intent and target previews, compact local Argument context, the
@@ -69,7 +69,7 @@ requests open/close transitions.
 - `markdown-directory-export.ts` preserves the core export's safe relative
   directory layout beneath a directory explicitly selected by the user.
 - `arguments.css` owns the responsive 94vw by 93dvh two-pane surface. Its
-  Library and independently scrolling To store panes, compact Proposal rows,
+  Library and independently scrolling Mailbox panes, compact Proposal rows,
   surface, control, focus, and status colors inherit the application semantic
   tokens; it owns no separate OS or root-theme override.
 - `arguments-layout.test.ts` locks the desktop pane-scroll, compact-row, and
@@ -93,7 +93,7 @@ V7 migration adds empty draft-link and prior-revision collections only. V8
 accepted/rejected decisions migrate to the neutral v9 `stored` state with an
 Argument or Counter-Argument result; pending and discarded remain distinct.
 
-The Library / To store selector exposes non-canonical AI Proposals separately
+The Library / Mailbox selector exposes non-canonical AI Proposals separately
 from the canonical record browser; the staging view retains Active / History
 navigation. Details lead with Topic,
 intent, human-readable target/part, staleness, and a compact local Argument
@@ -115,13 +115,13 @@ boundary intent seed no attack; supersession and Current promotion remain
 separate human choices. Store refutation / Counter-Argument requires a human
 response plus resolved outcome and remains distinct from discard.
 Save performs one expected-snapshot transaction, while Cancel and dirty-draft
-guards preserve the To store Proposal. Completed history says Stored as Argument
-or Stored as Counter-Argument instead of treating canonical criticism as a
-rejected Proposal. Entering To store reloads first so local MCP submissions
-become visible.
+guards preserve the pending Mailbox Proposal. Completed history says Stored as
+Argument or Stored as Counter-Argument instead of treating canonical criticism
+as a rejected Proposal. Entering the Mailbox reloads first so local MCP
+submissions become visible.
 
 Canonical pending-review Arguments and Counter-Arguments remain available
-through the Proposals-only filter; they are distinct from the Mailbox. Current
+through the Pending review only filter; they are distinct from the Mailbox. Current
 promotion and premise/relation reassessment require explicit confirmation and
 remain expected-snapshot commits. Inherited premise staleness disables local
 reassessment until upstream inference dependencies have been reassessed; reads

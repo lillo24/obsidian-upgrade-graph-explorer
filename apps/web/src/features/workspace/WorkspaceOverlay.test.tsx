@@ -80,7 +80,7 @@ function workspaceProposalFixture(): ArgumentLibrary {
     library,
     {
       clientSubmissionId: 'workspace-proposal-submission',
-      title: 'Keep To store inside the Arguments workspace',
+      title: 'Keep Mailbox inside the Arguments workspace',
       intent: 'new',
       topicId: 'workspace-topic',
       examples: [],
@@ -92,7 +92,7 @@ function workspaceProposalFixture(): ArgumentLibrary {
         },
       ],
       reasoning: 'One workspace surface keeps navigation comprehensible.',
-      conclusion: 'To store should render as an inline view.',
+      conclusion: 'Mailbox should render as an inline view.',
       sourceObservations: [],
       whyNovelOrUnresolved: 'The previous surface was a nested modal.',
       consultation: {
@@ -270,7 +270,7 @@ describe('shared local workspace overlay', () => {
     expect(controller.snapshot().modelAvailable).toBe(false);
   });
 
-  it('hosts inline To store chrome and guards dirty Proposal exits through the shared workspace', async () => {
+  it('hosts inline Mailbox chrome and guards dirty Proposal exits through the shared workspace', async () => {
     const controller = new AiReviewController({
       sourceProvider: unsupportedSource,
       historyStore: new MemoryReviewHistoryStore(),

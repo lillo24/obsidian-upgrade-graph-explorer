@@ -651,8 +651,8 @@ function ProposalResolutionPanel({
           : 'Store refutation as Counter-Argument'}
       </h2>
       <p>
-        Proposal <code>{proposal.id}</code> remains To store until this complete
-        canonical transaction is saved.
+        Proposal <code>{proposal.id}</code> remains pending in the Mailbox until
+        this complete canonical transaction is saved.
       </p>
       {stale === undefined ? null : (
         <p className="arguments-error" role="alert">
@@ -1654,7 +1654,7 @@ const ArgumentsWorkspaceContent = forwardRef<
 
   function openMailbox() {
     if (activeView === 'mailbox') return;
-    requestTransition('Open To store with unsaved changes?', () => {
+    requestTransition('Open Mailbox with unsaved changes?', () => {
       setEditor(undefined);
       setProposalResolution(undefined);
       void session.reload().then(() => setActiveView('mailbox'));
@@ -1751,9 +1751,9 @@ const ArgumentsWorkspaceContent = forwardRef<
       state.snapshot.descriptor,
       proposal.id,
       proposal.revision,
-      'Discarded from active To store staging by the user.',
+      'Discarded from active Mailbox staging by the user.',
     );
-    if (result.status === 'ok') setNotice('Proposal discarded from To store');
+    if (result.status === 'ok') setNotice('Proposal discarded from Mailbox');
   }
 
   function changeProposalRelation(kind: 'none' | 'attack' | 'support') {

@@ -328,7 +328,9 @@ function validateSelectedProposal(
 ): ArgumentProposal {
   const proposal = proposalById(library, spec.proposalId);
   if (proposal.status !== 'pending')
-    throw new Error(`Proposal "${proposal.id}" is not active To store work.`);
+    throw new Error(
+      `Proposal "${proposal.id}" is not an active Mailbox Proposal.`,
+    );
   if (proposal.revision !== spec.expectedRevision) {
     throw new Error(
       `Proposal "${proposal.id}" revision is stale: expected ${spec.expectedRevision}, current ${proposal.revision}.`,

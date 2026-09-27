@@ -119,12 +119,15 @@
 .arguments-dialog button:hover,
 .arguments-dialog .button-like:hover {
   border-color: var(--color-border-focus);
+  color: var(--color-control-hover-foreground);
   background: var(--color-control-hover);
 }
 
 .arguments-dialog button:disabled {
+  border-color: var(--color-control-disabled-border);
+  color: var(--color-control-disabled-foreground);
+  background: var(--color-control-disabled-background);
   cursor: not-allowed;
-  opacity: 0.55;
 }
 
 .arguments-dialog .button-like {
@@ -190,7 +193,17 @@
 }
 
 .arguments-dialog .arguments-action--primary:hover {
-  background: var(--color-accent-hover);
+  border-color: var(--color-control-selected-hover-border);
+  color: var(--color-control-selected-hover-foreground);
+  background: var(--color-control-selected-hover-background);
+}
+
+.arguments-view-switcher button[aria-selected='true']:hover,
+.arguments-topics button[aria-current='page']:hover,
+.arguments-mailbox__layout nav button[aria-current='page']:hover {
+  border-color: var(--color-control-selected-hover-border);
+  color: var(--color-control-selected-hover-foreground);
+  background: var(--color-control-selected-hover-background);
 }
 
 .arguments-dialog .arguments-action--quiet {
@@ -265,6 +278,7 @@
 
 .arguments-topics button[aria-current='page'] {
   border-color: var(--color-control-selected-border);
+  color: var(--color-control-selected-foreground);
   background: var(--color-control-selected-background);
 }
 
@@ -930,6 +944,7 @@
 
 .arguments-mailbox__layout nav button[aria-current='page'] {
   border-color: var(--color-control-selected-border);
+  color: var(--color-control-selected-foreground);
   background: var(--color-control-selected-background);
 }
 
@@ -937,7 +952,7 @@
 .arguments-mailbox__row-meta {
   display: block;
   overflow: hidden;
-  color: var(--color-control-foreground);
+  color: inherit;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

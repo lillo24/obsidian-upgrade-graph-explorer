@@ -856,7 +856,7 @@ describe('standalone Arguments workspace', () => {
     expect(formal.open).toBe(true);
   });
 
-  it('edits a versioned To store draft and discards it without canonical writes', async () => {
+  it('edits a versioned Mailbox Proposal and discards it without canonical writes', async () => {
     store = new MemoryStore(fixtureWithProposal());
     session = new ArgumentWorkspaceSession(store, runtime());
     await mount();
@@ -864,7 +864,7 @@ describe('standalone Arguments workspace', () => {
     const originalCounters = store.snapshot.library.counterArguments;
 
     await click('Mailbox (1)');
-    expect(container.textContent).toContain('To store');
+    expect(container.textContent).toContain('Mailbox');
     await click('Edit draft');
     await act(() =>
       setValue(
@@ -954,7 +954,7 @@ describe('standalone Arguments workspace', () => {
 
     await click('Mailbox (1)');
     expect(container.textContent).toContain(
-      'Open To store with unsaved changes?',
+      'Open Mailbox with unsaved changes?',
     );
     expect(container.querySelector('.arguments-mailbox')).toBeNull();
     await click('Discard');
@@ -962,7 +962,7 @@ describe('standalone Arguments workspace', () => {
     expect(store.writes).toBe(0);
   });
 
-  it('renders To store inline with compact rows, reloads on entry, and returns to Library before closing', async () => {
+  it('renders Mailbox inline with compact rows, reloads on entry, and returns to Library before closing', async () => {
     const longTitle =
       'A deliberately long Proposal title that must remain a single compact navigation line rather than expanding the entire left column';
     const library = fixtureWithProposal();
@@ -1033,7 +1033,7 @@ describe('standalone Arguments workspace', () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
-  it('guards dirty Proposal edits with Save, Discard, and Stay before leaving To store', async () => {
+  it('guards dirty Proposal edits with Save, Discard, and Stay before leaving Mailbox', async () => {
     store = new MemoryStore(fixtureWithProposal());
     session = new ArgumentWorkspaceSession(store, runtime());
     await mount();
@@ -1043,7 +1043,7 @@ describe('standalone Arguments workspace', () => {
     await act(() =>
       setValue(
         textarea('Revision reason'),
-        'The staged wording was clarified before leaving To store.',
+        'The staged wording was clarified before leaving Mailbox.',
       ),
     );
     const title = [

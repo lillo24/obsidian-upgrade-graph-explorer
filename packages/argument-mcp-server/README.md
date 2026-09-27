@@ -67,7 +67,7 @@ $env:ICARUS_ARGUMENT_LIBRARY_PATH = Join-Path $env:LOCALAPPDATA 'com.icarus.grap
   plus the same bounded paging/archive options.
 - `compiler_read_bundle`: bounded structured context selected by `id`, optional
   `kind`, `maxRecords`, and `maxDepth`.
-- `compiler_list_proposals`: lists or text-filters active To store work by
+- `compiler_list_proposals`: lists or text-filters active Mailbox Proposals by
   default, with an explicit status filter for discarded/stored history.
 - `compiler_read_proposal`: reads current content, bounded recoverable prior
   revisions, provenance, outgoing draft links, and incoming draft links.
@@ -89,7 +89,7 @@ $env:ICARUS_ARGUMENT_LIBRARY_PATH = Join-Path $env:LOCALAPPDATA 'com.icarus.grap
 - `compiler_revise_proposal`: replaces one active Proposal draft only when its
   expected Proposal revision and complete consultation snapshot are current;
   it retains the previous draft and reason and may update typed draft links.
-- `compiler_discard_proposal`: explicit-user-only removal from active To store
+- `compiler_discard_proposal`: explicit-user-only removal from active Mailbox
   staging. It retains the Proposal as discarded history and creates no
   canonical Argument or Counter-Argument.
 - `compiler_apply_resolution`: explicit-user-only canonical mutation that
