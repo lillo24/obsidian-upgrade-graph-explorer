@@ -22,6 +22,7 @@ import { projectLocalView } from '@icarus-graph-explorer/view-projection';
 import {
   exactFocusSchematicLayoutCacheKey,
   FocusSchematicLayoutCache,
+  shouldStoreFocusSchematicExactLayout,
 } from './focus-schematic-layout-cache';
 
 function fixtureInput(index = 0): FocusSchematicLayoutInput {
@@ -38,6 +39,17 @@ function fixtureInput(index = 0): FocusSchematicLayoutInput {
 }
 
 describe('page-lifetime Focus Schematic layout cache', () => {
+  it('keeps path-dependent transition results out of the exact cold cache', () => {
+    expect(shouldStoreFocusSchematicExactLayout('cold')).toBe(true);
+    expect(shouldStoreFocusSchematicExactLayout('cold-fallback')).toBe(true);
+    expect(
+      shouldStoreFocusSchematicExactLayout('incremental-no-macro-move'),
+    ).toBe(false);
+    expect(
+      shouldStoreFocusSchematicExactLayout('incremental-local-repair'),
+    ).toBe(false);
+    expect(shouldStoreFocusSchematicExactLayout('exact-cache')).toBe(false);
+  });
   it('uses the exact algorithm/model/projection/dimension/settings input', () => {
     const input = fixtureInput();
     const key = exactFocusSchematicLayoutCacheKey(input);

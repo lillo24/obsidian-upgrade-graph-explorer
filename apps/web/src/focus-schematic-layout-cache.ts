@@ -2,7 +2,7 @@ import {
   DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
   FOCUS_SCHEMATIC_SELECTED_LAYOUT_ALGORITHM_VERSION,
   FOCUS_SCHEMATIC_SOFT_CLUSTER_ALGORITHM_VERSION,
-  FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
+  FOCUS_SCHEMATIC_EXACT_LAYOUT_CACHE_VERSION,
   focusSchematicLayoutMatchesProductPolicies,
   normalizeFocusSchematicSoftAncestorDecayBase,
   normalizeFocusSchematicSoftFolderDisplayIntent,
@@ -11,9 +11,17 @@ import {
   type FocusSchematicComputedLayout,
   type FocusSchematicLayoutInput,
   type FocusSchematicProductLayoutPolicies,
+  type FocusSchematicTransitionMode,
 } from '@icarus-graph-explorer/focus-schematic-layout';
 
 const SELECTED_ALGORITHM_ID = 'modular-focus-hierarchy';
+
+/** Transition-conditioned geometry is deliberately excluded from the exact cold cache. */
+export function shouldStoreFocusSchematicExactLayout(
+  mode: FocusSchematicTransitionMode,
+): boolean {
+  return mode === 'cold' || mode === 'cold-fallback';
+}
 
 export interface FocusSchematicLayoutCacheLookup {
   readonly status: 'hit' | 'miss' | 'invalid';
@@ -44,7 +52,7 @@ export function exactFocusSchematicLayoutCacheKey(
       ? policiesOrAlgorithmVersion
       : algorithmVersion;
   return JSON.stringify({
-    protocolVersion: FOCUS_SCHEMATIC_LAYOUT_WORKER_PROTOCOL_VERSION,
+    protocolVersion: FOCUS_SCHEMATIC_EXACT_LAYOUT_CACHE_VERSION,
     algorithm: SELECTED_ALGORITHM_ID,
     algorithmVersion:
       policies.macroLayout === 'soft-folder-clusters'

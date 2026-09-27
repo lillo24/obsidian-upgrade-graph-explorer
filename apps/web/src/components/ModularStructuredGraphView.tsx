@@ -13,12 +13,14 @@ import {
   FOCUS_SCHEMATIC_PRODUCTION_LAYOUT_SETTINGS,
   DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
   buildFocusSchematicSoftFolderDisplayTree,
+  createFocusSchematicLayoutTransitionPrior,
   normalizeFocusSchematicSoftFolderStrength,
   normalizeFocusSchematicSoftSpacing,
   type FocusSchematicComputedLayout,
   type FocusSchematicDirectionalFolderHierarchyMode,
   type FocusSchematicEndpointLayoutPhaseTimings,
   type FocusSchematicLayoutInput,
+  type FocusSchematicLayoutTransitionPrior,
   type FocusSchematicProductInternalLayoutVariant,
   type FocusSchematicProductLayoutPolicies,
   type FocusSchematicProductMacroLayout,
@@ -61,6 +63,7 @@ import type { VisualGroupPresentationMap } from '@icarus-graph-explorer/visual-g
 import {
   exactFocusSchematicLayoutCacheKey,
   focusSchematicLayoutCache,
+  shouldStoreFocusSchematicExactLayout,
 } from '../focus-schematic-layout-cache';
 import {
   applySoftFolderDisplayMenuAction,
@@ -346,6 +349,9 @@ export default function ModularStructuredGraphView(
   >(null);
   const [lifecycle, setLifecycle] = useState<LifecycleState>({ phase: 'idle' });
   const fatalReported = useRef(false);
+  const transitionPriorRef = useRef<FocusSchematicLayoutTransitionPrior | null>(
+    null,
+  );
   const effectiveSoftFolderStrength =
     macroLayout === 'soft-folder-clusters'
       ? normalizeFocusSchematicSoftFolderStrength(softFolderStrength)
@@ -517,6 +523,12 @@ export default function ModularStructuredGraphView(
             'focus-schematic-cache-bytes',
             lookup.approximateBytes,
           );
+          transitionPriorRef.current =
+            createFocusSchematicLayoutTransitionPrior(
+              layoutInput,
+              layoutPolicies,
+              lookup.value,
+            );
           setLifecycle({
             phase: 'cache-hit',
             adopted: { key: layoutKey, computed: lookup.value, graph },
@@ -539,7 +551,11 @@ export default function ModularStructuredGraphView(
       }));
       instrumentation?.count('layouts');
       void workerService
-        .layoutLatest(layoutInput, layoutPolicies)
+        .layoutLatest(
+          layoutInput,
+          layoutPolicies,
+          transitionPriorRef.current ?? undefined,
+        )
         .then((result) => {
           if (!current || result.status === 'superseded') return;
           instrumentation?.record(
@@ -578,11 +594,20 @@ export default function ModularStructuredGraphView(
               result.metrics.softClusterEvidence,
             );
             const graph = prepareGraph(result.result, false, routeStyle);
-            focusSchematicLayoutCache.set(
-              layoutInput,
-              layoutPolicies,
-              result.result,
-            );
+            const transitionMode =
+              result.metrics.transitionEvidence?.mode ?? 'cold';
+            if (shouldStoreFocusSchematicExactLayout(transitionMode))
+              focusSchematicLayoutCache.set(
+                layoutInput,
+                layoutPolicies,
+                result.result,
+              );
+            transitionPriorRef.current =
+              createFocusSchematicLayoutTransitionPrior(
+                layoutInput,
+                layoutPolicies,
+                result.result,
+              );
             instrumentation?.record(
               'focus-schematic-request-adoption',
               Math.max(0, globalThis.performance.now() - startedAt),

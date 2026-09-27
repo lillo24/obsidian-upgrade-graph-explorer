@@ -584,3 +584,28 @@ The exact FIX2 prompt is archived at
 `history-implementations/HIERDISC1_FIX2_hidden_heading_nested_soft_geometry_codex_prompt.md`.
 Its SHA-256 is
 `A15A6F6FCB72A77AC29B98E55E77669BDA540D71BCF0159486B8F47467CFB260`.
+
+## HIERSTAB1 continuity validation
+
+The HIERSTAB1 matrix exercises unconnected and nested Heading hides, connected
+Heading endpoint roll-up, Block/disclosure changes, cache restore semantics,
+collision-free expansion, bounded growth repair, hard-folder repair, forced
+cold fallback, reroot/policy/File-set rejection, rapid latest-result-wins,
+secondary invariance, Direct/Nested policies, strength/decay rejection, and
+presentation-only Soft spacing isolation. Incremental candidates use the same
+computed-layout and Soft hard validators as cold results.
+
+The motivating H4 fixture reports zero movement for every unaffected File,
+zero displacement for every unaffected internal node, zero surviving Compass
+branch-region changes, an exact Focus anchor, and current endpoint ownership.
+The connected-hide case rolls the endpoint to its current visible owner while
+keeping the opposite and unrelated File centers exact. Growth repair is capped
+at two deterministic rounds and six stage candidates; an impossible internal
+overlap rejects incremental repair and the worker result is byte-equal to a
+direct cold solve.
+
+A 32-File/96-Heading synthetic sequence applies four local hides. Every step
+uses the incremental path, moves zero unaffected Files, changes zero surviving
+Compass regions, and uses no cold fallback. The development comparator at
+`output/hierstab1-incremental-layout-lab/index.html` shows Before, cold After,
+and incremental After with File-center movement vectors.

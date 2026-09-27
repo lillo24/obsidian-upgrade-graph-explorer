@@ -1,4 +1,7 @@
 export * from './types';
+export * from './transition-prior';
+export * from './layout-continuity';
+export * from './incremental-layout';
 export * from './policies';
 export * from './soft-cluster-spacing';
 export * from './soft-radial-spread';

@@ -5,6 +5,8 @@ import {
   type FocusSchematicComputedLayout,
   type FocusSchematicEndpointLayoutPhaseTimings,
   type FocusSchematicLayoutInput,
+  type FocusSchematicLayoutTransitionEvidence,
+  type FocusSchematicLayoutTransitionPrior,
   type FocusSchematicProductLayoutPolicies,
   type FocusSchematicSoftClusterEvidence,
   type FocusSchematicLayoutWorkerRequest,
@@ -17,6 +19,7 @@ export interface FocusSchematicLayoutWorkerMetrics {
   readonly mainThreadHighGapMs?: number;
   readonly timings?: FocusSchematicEndpointLayoutPhaseTimings;
   readonly softClusterEvidence?: FocusSchematicSoftClusterEvidence;
+  readonly transitionEvidence?: FocusSchematicLayoutTransitionEvidence;
 }
 
 export type FocusSchematicLayoutWorkerResult =
@@ -36,6 +39,7 @@ export interface FocusSchematicLayoutWorkerService {
   readonly layoutLatest: (
     input: FocusSchematicLayoutInput,
     policies?: FocusSchematicProductLayoutPolicies,
+    transitionPrior?: FocusSchematicLayoutTransitionPrior,
   ) => Promise<FocusSchematicLayoutWorkerResult>;
   readonly cancelPending: () => void;
   readonly dispose: () => void;
@@ -77,6 +81,7 @@ function metrics(
   mainThreadHighGapMs: number | undefined,
   timings?: FocusSchematicEndpointLayoutPhaseTimings,
   softClusterEvidence?: FocusSchematicSoftClusterEvidence,
+  transitionEvidence?: FocusSchematicLayoutTransitionEvidence,
 ): FocusSchematicLayoutWorkerMetrics {
   return {
     workerComputeMs,
@@ -85,6 +90,7 @@ function metrics(
     ...(mainThreadHighGapMs === undefined ? {} : { mainThreadHighGapMs }),
     ...(timings === undefined ? {} : { timings }),
     ...(softClusterEvidence === undefined ? {} : { softClusterEvidence }),
+    ...(transitionEvidence === undefined ? {} : { transitionEvidence }),
   };
 }
 
@@ -202,6 +208,7 @@ export function createFocusSchematicLayoutWorkerClient(
         response.kind === 'success'
           ? (response.softClusterEvidence ?? undefined)
           : undefined,
+        response.kind === 'success' ? response.transitionEvidence : undefined,
       );
       request.resolve(
         response.kind === 'success'
@@ -238,6 +245,7 @@ export function createFocusSchematicLayoutWorkerClient(
     layoutLatest(
       input,
       policies = DEFAULT_FOCUS_SCHEMATIC_PRODUCT_LAYOUT_POLICIES,
+      transitionPrior,
     ) {
       if (disposed) {
         return Promise.resolve({
@@ -269,6 +277,7 @@ export function createFocusSchematicLayoutWorkerClient(
         kind: 'layout',
         input,
         policies,
+        ...(transitionPrior === undefined ? {} : { transitionPrior }),
       };
       return new Promise((resolve) => {
         const startedAt = now();
