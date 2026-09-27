@@ -579,7 +579,7 @@ describe('standalone Arguments workspace', () => {
     expect(document.activeElement).toBe(libraryTrigger);
     expect(close).not.toHaveBeenCalled();
 
-    await click('To store (1)');
+    await click('Mailbox (1)');
     const moreTrigger = button('More');
     await click('More');
     expect(button('Discard')).toBeInstanceOf(HTMLButtonElement);
@@ -676,7 +676,7 @@ describe('standalone Arguments workspace', () => {
     session = new ArgumentWorkspaceSession(store, runtime());
     await mount();
 
-    await click('To store (1)');
+    await click('Mailbox (1)');
     expect(button('Store as Argument…').classList).toContain(
       'arguments-action--primary',
     );
@@ -688,7 +688,7 @@ describe('standalone Arguments workspace', () => {
     expect(button('Discard')).toBeInstanceOf(HTMLButtonElement);
     await click('More');
     expect(container.textContent).toContain('Non-canonical staging area');
-    expect(container.textContent).toContain('To store (1)');
+    expect(container.textContent).toContain('Mailbox (1)');
     expect(container.textContent).toContain('Verified normalization exception');
     expect(container.textContent).toContain(
       'A second conversion is unnecessary in this bounded case.',
@@ -836,7 +836,7 @@ describe('standalone Arguments workspace', () => {
     expect(container.textContent).toContain('Cancel this draft?');
     await click('Discard');
     expect(container.textContent).toContain('Non-canonical staging area');
-    expect(container.textContent).toContain('To store (1)');
+    expect(container.textContent).toContain('Mailbox (1)');
     expect(store.snapshot.library.proposals[0]?.status).toBe('pending');
     expect(store.writes).toBe(0);
   });
@@ -846,7 +846,7 @@ describe('standalone Arguments workspace', () => {
     session = new ArgumentWorkspaceSession(store, runtime());
     await mount();
 
-    await click('To store (1)');
+    await click('Mailbox (1)');
 
     expect(container.textContent).not.toContain('What this means');
     expect(
@@ -863,7 +863,7 @@ describe('standalone Arguments workspace', () => {
     const originalArguments = store.snapshot.library.arguments;
     const originalCounters = store.snapshot.library.counterArguments;
 
-    await click('To store (1)');
+    await click('Mailbox (1)');
     expect(container.textContent).toContain('To store');
     await click('Edit draft');
     await act(() =>
@@ -917,7 +917,7 @@ describe('standalone Arguments workspace', () => {
     store = new MemoryStore(fixtureWithProposal());
     session = new ArgumentWorkspaceSession(store, runtime());
     await mount();
-    await click('To store (1)');
+    await click('Mailbox (1)');
 
     store.snapshot = captureArgumentLibrarySnapshot(
       editAxiom(
@@ -941,7 +941,7 @@ describe('standalone Arguments workspace', () => {
     expect(button('Reload confirmed library and review draft')).toBeDefined();
     await click('Reload confirmed library and review draft');
     expect(container.textContent).toContain('Reloaded');
-    expect(container.textContent).toContain('To store (1)');
+    expect(container.textContent).toContain('Mailbox (1)');
   });
 
   it('protects a dirty canonical draft before opening the Mailbox', async () => {
@@ -952,7 +952,7 @@ describe('standalone Arguments workspace', () => {
     await click('Edit');
     await act(() => setValue(textarea('Observation'), 'Unsaved Mailbox test.'));
 
-    await click('To store (1)');
+    await click('Mailbox (1)');
     expect(container.textContent).toContain(
       'Open To store with unsaved changes?',
     );
@@ -982,7 +982,7 @@ describe('standalone Arguments workspace', () => {
     expect(button('Close')).toBeDefined();
     expect(store.loads).toBe(1);
 
-    await click('To store (1)');
+    await click('Mailbox (1)');
 
     expect(store.loads).toBe(2);
     const mailbox = container.querySelector<HTMLElement>('.arguments-mailbox');
@@ -1016,7 +1016,7 @@ describe('standalone Arguments workspace', () => {
     );
     expect(store.writes).toBe(0);
 
-    await click('To store (1)');
+    await click('Mailbox (1)');
     await act(() =>
       window.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
@@ -1037,7 +1037,7 @@ describe('standalone Arguments workspace', () => {
     store = new MemoryStore(fixtureWithProposal());
     session = new ArgumentWorkspaceSession(store, runtime());
     await mount();
-    await click('To store (1)');
+    await click('Mailbox (1)');
     await click('Edit draft');
 
     await act(() =>
@@ -1090,7 +1090,7 @@ describe('standalone Arguments workspace', () => {
       title: 'Clarified normalization exception',
     });
 
-    await click('To store (1)');
+    await click('Mailbox (1)');
     await click('Edit draft');
     await act(() =>
       setValue(textarea('Conclusion'), 'This local edit should be discarded.'),
@@ -1108,7 +1108,7 @@ describe('standalone Arguments workspace', () => {
     store = new MemoryStore(fixtureWithProposal(false, 'add-boundary'));
     session = new ArgumentWorkspaceSession(store, runtime());
     await mount();
-    await click('To store (1)');
+    await click('Mailbox (1)');
 
     expect(container.textContent).toContain('Add boundary to');
     const commit = container.querySelector<HTMLAnchorElement>(
@@ -1132,7 +1132,7 @@ describe('standalone Arguments workspace', () => {
     store = new MemoryStore(fixtureWithProposal());
     session = new ArgumentWorkspaceSession(store, runtime());
     await mount();
-    await click('To store (1)');
+    await click('Mailbox (1)');
     await click('Store refutation / Counter-Argument…');
 
     expect(container.textContent).toContain(
@@ -1191,7 +1191,7 @@ describe('standalone Arguments workspace', () => {
       resultingId,
     );
 
-    await click('To store (0)');
+    await click('Mailbox (0)');
     await click('History');
     expect(container.textContent).toContain('Canonical storage decision');
     expect(container.textContent).toContain(
@@ -1204,7 +1204,7 @@ describe('standalone Arguments workspace', () => {
     store = new MemoryStore(fixtureWithProposal());
     session = new ArgumentWorkspaceSession(store, runtime());
     await mount();
-    await click('To store (1)');
+    await click('Mailbox (1)');
     await click('Store as Argument…');
     await act(() =>
       setValue(
@@ -1266,7 +1266,7 @@ describe('standalone Arguments workspace', () => {
       resultingId,
     );
 
-    await click('To store (0)');
+    await click('Mailbox (0)');
     await click('History');
     expect(container.textContent).toContain(
       'Accepted as the Current bounded refinement.',
