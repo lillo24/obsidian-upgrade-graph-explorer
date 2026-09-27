@@ -2451,7 +2451,7 @@ const ArgumentsWorkspaceContent = forwardRef<
                 role="tab"
                 type="button"
               >
-                To store ({pendingProposalCount})
+                Mailbox ({pendingProposalCount})
               </button>
             </div>
           )}

@@ -335,7 +335,7 @@ describe('shared local workspace overlay', () => {
       ),
     ).toBe(false);
 
-    await click('To store (1)');
+    await click('Mailbox (1)');
     const mailbox =
       argumentsArea.querySelector<HTMLElement>('.arguments-mailbox');
     expect(mailbox).not.toBeNull();
